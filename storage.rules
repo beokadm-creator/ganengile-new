@@ -1,0 +1,16 @@
+rules_version = '2';
+service firebase.storage {
+  match /b/{bucket}/o {
+    match /users/{userId}/{allPaths=**} {
+      // 사용자는 자신의 프로필 사진만 업로드/읽기 가능
+      allow read: if true;
+      allow write: if request.auth != null && request.auth.uid == userId;
+    }
+    
+    match /public/{allPaths=**} {
+      // 공개적으로 접근 가능한 파일
+      allow read: if true;
+      allow write: if false; // 쓰기는 불가
+    }
+  }
+}

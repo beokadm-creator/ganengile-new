@@ -1,0 +1,28 @@
+{
+  "firestore": {
+    "rules": "firestore.rules",
+    "indexes": "firestore.indexes.json"
+  },
+  "functions": {
+    "source": "functions",
+    "runtime": "nodejs20",
+    "region": "asia-northeast3"
+  },
+  "hosting": {
+    "public": "dist",
+    "ignore": [
+      "firebase.json",
+      "**/.*",
+      "**/node_modules/**"
+    ],
+    "rewrites": [
+      {
+        "source": "**",
+        "destination": "/index.html"
+      }
+    ]
+  },
+  "storage": {
+    "rules": "storage.rules"
+  }
+}

@@ -1,0 +1,12 @@
+{
+  "extends": "expo/tsconfig.base",
+  "compilerOptions": {
+    "strict": true,
+    "esModuleInterop": true,
+    "allowSyntheticDefaultImports": true
+  },
+  "ts-node": {
+    "esm": true,
+    "experimentalSpecifierResolution": "node"
+  }
+}

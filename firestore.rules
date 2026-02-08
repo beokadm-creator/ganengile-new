@@ -1,0 +1,206 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Config collections (read-only for authenticated users)
+    match /config_stations/{document=**} {
+      allow read: if request.auth != null;
+      allow write: if false;
+    }
+    match /config_travel_times/{document=**} {
+      allow read: if request.auth != null;
+      allow write: if false;
+    }
+    match /config_express_trains/{document=**} {
+      allow read: if request.auth != null;
+      allow write: if false;
+    }
+    match /config_congestion/{document=**} {
+      allow read: if request.auth != null;
+      allow write: if false;
+    }
+    match /config_algorithm_params/{document=**} {
+      allow read: if request.auth != null;
+      allow write: if false;
+    }
+    
+    // Users collection
+    match /users/{userId} {
+      // Anyone can read (for now, will restrict later)
+      allow read: if true;
+      
+      // Only the user can write their own document
+      allow write: if request.auth != null && request.auth.uid == userId;
+    }
+    
+    // Routes collection
+    match /routes/{routeId} {
+      // Only authenticated users can read
+      allow read: if request.auth != null;
+      
+      // Only the route owner can create/update/delete
+      allow create: if request.auth != null 
+                    && request.resource.data.userId == request.auth.uid;
+      
+      allow update, delete: if request.auth != null 
+                          && resource.data.userId == request.auth.uid;
+    }
+    
+    // Requests collection
+    match /requests/{requestId} {
+      // Only authenticated users can read
+      allow read: if request.auth != null;
+
+      // Validation helper functions
+      function isValidPhoneNumber(phone) {
+        return phone.matches('^010-\\\\d{4}-\\\\d{4}$');
+      }
+
+      function isValidStation(station) {
+        return station.stationId is string
+          && station.stationName is string
+          && station.line is string
+          && station.lineCode is string
+          && station.lat is number
+          && station.lng is number;
+      }
+
+      function isValidPackageInfo(pkg) {
+        return pkg.size in ['small', 'medium', 'large', 'extra_large']
+          && pkg.weight is number
+          && pkg.weight > 0
+          && pkg.description is string
+          && pkg.description.length > 0;
+      }
+
+      function isValidDeliveryFee(fee) {
+        return fee.totalFee is number
+          && fee.totalFee > 0
+          && fee.baseFee is number
+          && fee.baseFee >= 0
+          && fee.vat is number
+          && fee.vat >= 0;
+      }
+
+      function isValidRequestData(data) {
+        return isValidStation(data.pickupStation)
+          && isValidStation(data.deliveryStation)
+          && data.pickupStation.stationId != data.deliveryStation.stationId
+          && isValidPackageInfo(data.packageInfo)
+          && isValidDeliveryFee(data.fee)
+          && data.recipientName is string
+          && data.recipientName.length > 0
+          && isValidPhoneNumber(data.recipientPhone)
+          && data.status in ['pending', 'matched', 'accepted', 'in_transit', 'arrived', 'completed', 'cancelled'];
+      }
+
+      // Create: authenticated user with valid data
+      allow create: if request.auth != null
+                    && request.resource.data.gllerId == request.auth.uid
+                    && isValidRequestData(request.resource.data)
+                    && request.resource.data.pickupDeadline is timestamp
+                    && request.resource.data.deliveryDeadline is timestamp
+                    && request.resource.data.pickupDeadline < request.resource.data.deliveryDeadline;
+
+      // Update: only the gller (requester) can update
+      allow update: if request.auth != null
+                   && resource.data.gllerId == request.auth.uid
+                   && isValidRequestData(request.resource.data);
+
+      // Delete: only the gller can delete
+      allow delete: if request.auth != null
+                   && resource.data.gllerId == request.auth.uid;
+    }
+    
+    // Matches collection
+    match /matches/{matchId} {
+      // Only authenticated users can read
+      allow read: if request.auth != null;
+      
+      // Only system or admin can create (will implement later)
+      allow create: if false;
+      
+      // Only courier or requester can update
+      allow update: if request.auth != null 
+                  && (resource.data.courierId == request.auth.uid 
+                      || resource.data.requesterId == request.auth.uid);
+    }
+    
+    // Ratings collection
+    match /ratings/{ratingId} {
+      // Only authenticated users can read
+      allow read: if request.auth != null;
+
+      // Validation helper
+      function isValidRating(rating) {
+        return rating.rating is number
+          && rating.rating >= 1
+          && rating.rating <= 5
+          && rating.matchId is string
+          && rating.matchId.length > 0
+          && rating.fromUserId is string
+          && rating.fromUserId.length > 0
+          && rating.toUserId is string
+          && rating.toUserId.length > 0;
+      }
+
+      // Only the rater can create
+      allow create: if request.auth != null
+                  && request.resource.data.fromUserId == request.auth.uid
+                  && isValidRating(request.resource.data);
+
+      // No updates or deletes (ratings are immutable)
+      allow update, delete: if false;
+    }
+
+    // Payments collection
+    match /payments/{paymentId} {
+      // Only authenticated users can read
+      allow read: if request.auth != null
+                    && resource.data.userId == request.auth.uid;
+
+      // Validation helper
+      function isValidPayment(payment) {
+        return payment.userId is string
+          && payment.userId.length > 0
+          && payment.amount is number
+          && payment.amount > 0
+          && payment.type in ['request_fee', 'giller_earning', 'withdrawal']
+          && payment.status in ['pending', 'processing', 'completed', 'failed', 'refunded'];
+      }
+
+      // Only the payment owner can create
+      allow create: if request.auth != null
+                    && request.resource.data.userId == request.auth.uid
+                    && request.resource.data.type != 'giller_earning' // Cannot create giller_earning directly
+                    && isValidPayment(request.resource.data);
+
+      // Only the owner can update (for withdrawal requests, etc.)
+      allow update: if request.auth != null
+                   && resource.data.userId == request.auth.uid;
+
+      // Only the owner can delete
+      allow delete: if request.auth != null
+                   && resource.data.userId == request.auth.uid;
+    }
+
+    // Notifications collection
+    match /notifications/{notificationId} {
+      // Only authenticated users can read their own notifications
+      allow read: if request.auth != null
+                    && resource.data.userId == request.auth.uid;
+
+      // Only the owner can update (mark as read, etc.)
+      allow update: if request.auth != null
+                   && resource.data.userId == request.auth.uid
+                   && request.resource.data.read == true; // Only allow marking as read
+
+      // No one can create notifications directly (created by Cloud Functions)
+      allow create: if false;
+
+      // Only the owner can delete
+      allow delete: if request.auth != null
+                   && resource.data.userId == request.auth.uid;
+    }
+  }
+}

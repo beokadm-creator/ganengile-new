@@ -1,0 +1,927 @@
+/**
+ * Request Service
+ * Firebase Firestore Requests Collection 관리 서비스
+ */
+
+import {
+  collection,
+  doc,
+  getDoc,
+  getDocs,
+  addDoc,
+  updateDoc,
+  deleteDoc,
+  query,
+  where,
+  orderBy,
+  Timestamp,
+} from 'firebase/firestore';
+import { db } from './firebase';
+import type {
+  DeliveryRequest,
+  PackageInfo,
+  DeliveryFee,
+} from '../types/delivery';
+import type { StationInfo } from '../types/route';
+import { DeliveryStatus } from '../types/delivery';
+
+// ==================== Cache Configuration ====================
+
+const REQUEST_CACHE_TTL = 5 * 60 * 1000; // 5 minutes
+const USER_REQUESTS_CACHE_TTL = 2 * 60 * 1000; // 2 minutes
+
+interface CacheEntry<T> {
+  data: T;
+  expiresAt: number;
+}
+
+class RequestCache {
+  private cache: Map<string, CacheEntry<unknown>> = new Map();
+
+  set<T>(key: string, data: T, ttl: number): void {
+    this.cache.set(key, {
+      data,
+      expiresAt: Date.now() + ttl,
+    });
+  }
+
+  get<T>(key: string): T | null {
+    const entry = this.cache.get(key);
+    if (!entry) return null;
+
+    if (Date.now() > entry.expiresAt) {
+      this.cache.delete(key);
+      return null;
+    }
+
+    return entry.data as T;
+  }
+
+  clear(): void {
+    this.cache.clear();
+  }
+
+  clearPattern(pattern: string): void {
+    const regex = new RegExp(pattern);
+    const keysToDelete: string[] = Array.from(this.cache.keys()).filter(key => regex.test(key));
+    keysToDelete.forEach(key => this.cache.delete(key));
+  }
+}
+
+const cache = new RequestCache();
+
+// ==================== Helper Functions ====================
+
+function convertTimestampToDate(timestamp: { seconds: number; nanoseconds?: number }): Date {
+  return new Date(timestamp.seconds * 1000 + (timestamp.nanoseconds || 0) / 1000000);
+}
+
+function convertDateToTimestamp(date: Date): Timestamp {
+  return Timestamp.fromDate(date);
+}
+
+function convertStation(data: any): StationInfo {
+  return {
+    stationId: data.stationId,
+    stationName: data.stationName,
+    line: data.line,
+    lineCode: data.lineCode,
+    lat: data.lat,
+    lng: data.lng,
+  };
+}
+
+function convertPackageInfo(data: any): PackageInfo {
+  return {
+    size: data.size,
+    weight: data.weight,
+    description: data.description,
+    category: data.category,
+    photos: data.photos,
+    isFragile: data.isFragile ?? false,
+    isPerishable: data.isPerishable ?? false,
+    specialInstructions: data.specialInstructions,
+    declaredValue: data.declaredValue,
+  };
+}
+
+function convertDeliveryFee(data: any): DeliveryFee {
+  return {
+    baseFee: data.baseFee,
+    distanceFee: data.distanceFee,
+    weightFee: data.weightFee,
+    sizeFee: data.sizeFee,
+    expressFee: data.expressFee,
+    insuranceFee: data.insuranceFee,
+    serviceFee: data.serviceFee,
+    discount: data.discount,
+    totalFee: data.totalFee,
+    vat: data.vat,
+  };
+}
+
+function convertDeliveryRequest(data: any, docId: string): DeliveryRequest {
+  return {
+    requestId: docId,
+    gllerId: data.gllerId,
+    gllerName: data.gllerName,
+    pickupStation: convertStation(data.pickupStation),
+    deliveryStation: convertStation(data.deliveryStation),
+    deliveryType: data.deliveryType,
+    packageInfo: convertPackageInfo(data.packageInfo),
+    fee: convertDeliveryFee(data.fee),
+    recipientName: data.recipientName,
+    recipientPhone: data.recipientPhone,
+    recipientVerificationCode: data.recipientVerificationCode,
+    preferredTimeWindow: data.preferredTimeWindow
+      ? {
+          start: convertTimestampToDate(data.preferredTimeWindow.start),
+          end: convertTimestampToDate(data.preferredTimeWindow.end),
+        }
+      : undefined,
+    pickupDeadline: convertTimestampToDate(data.pickupDeadline),
+    deliveryDeadline: convertTimestampToDate(data.deliveryDeadline),
+    specialRequests: data.specialRequests,
+    status: data.status,
+    createdAt: convertTimestampToDate(data.createdAt),
+    updatedAt: convertTimestampToDate(data.updatedAt),
+    matchedDeliveryId: data.matchedDeliveryId,
+    cancellationReason: data.cancellationReason,
+    cancelledBy: data.cancelledBy,
+    cancelledAt: data.cancelledAt ? convertTimestampToDate(data.cancelledAt) : undefined,
+  };
+}
+
+// ==================== Retry Logic ====================
+
+async function withRetry<T>(
+  operation: () => Promise<T>,
+  maxRetries: number = 3
+): Promise<T> {
+  let lastError: Error | undefined;
+
+  for (let attempt = 0; attempt < maxRetries; attempt++) {
+    try {
+      return await operation();
+    } catch (error) {
+      lastError = error as Error;
+
+      const errorCode = (error as { code?: string })?.code;
+      const isNetworkError = !errorCode || errorCode === 'unavailable' || errorCode === 'deadline-exceeded';
+
+      if (!isNetworkError || attempt === maxRetries - 1) {
+        throw error;
+      }
+
+      const delay = Math.pow(2, attempt) * 1000;
+      await new Promise(resolve => setTimeout(resolve, delay));
+    }
+  }
+
+  throw lastError;
+}
+
+// ==================== Request Validation ====================
+
+function validatePhoneNumber(phone: string): boolean {
+  const phoneRegex = /^010-\d{4}-\d{4}$/;
+  return phoneRegex.test(phone);
+}
+
+function validateStationInfo(station: StationInfo): boolean {
+  return !!(
+    station &&
+    station.stationId &&
+    station.stationName &&
+    station.line &&
+    station.lineCode &&
+    typeof station.lat === 'number' &&
+    typeof station.lng === 'number'
+  );
+}
+
+function validatePackageInfo(pkg: PackageInfo): boolean {
+  if (!pkg) return false;
+
+  const hasValidSize = ['small', 'medium', 'large', 'extra_large'].includes(pkg.size);
+  const hasValidWeight = typeof pkg.weight === 'number' && pkg.weight > 0;
+  const hasDescription = !!pkg.description && pkg.description.trim().length > 0;
+
+  return hasValidSize && hasValidWeight && hasDescription;
+}
+
+function validateDeliveryFee(fee: DeliveryFee): boolean {
+  if (!fee) return false;
+
+  const hasValidTotalFee = typeof fee.totalFee === 'number' && fee.totalFee > 0;
+  const hasValidBaseFee = typeof fee.baseFee === 'number' && fee.baseFee >= 0;
+  const hasValidServiceFee = typeof fee.serviceFee === 'number' && fee.serviceFee >= 0;
+  const hasValidVat = typeof fee.vat === 'number' && fee.vat >= 0;
+
+  return hasValidTotalFee && hasValidBaseFee && hasValidServiceFee && hasValidVat;
+}
+
+function generateVerificationCode(): string {
+  return Math.floor(100000 + Math.random() * 900000).toString();
+}
+
+/**
+ * 배송 요청 유효성 검사
+ * @param gllerId 의뢰인(Gller) 사용자 ID
+ * @param pickupStation 픽업 역 정보
+ * @param deliveryStation 배송 역 정보
+ * @param packageInfo 패키지 정보
+ * @param fee 배송비
+ * @param recipientName 수신자 이름
+ * @param recipientPhone 수신자 전화번호
+ * @param pickupDeadline 픽업 마감 시간
+ * @param deliveryDeadline 배송 마감 시간
+ * @returns 유효성 검사 결과
+ */
+export function validateRequest(
+  gllerId: string,
+  pickupStation: StationInfo,
+  deliveryStation: StationInfo,
+  packageInfo: PackageInfo,
+  fee: DeliveryFee,
+  recipientName: string,
+  recipientPhone: string,
+  pickupDeadline: Date,
+  deliveryDeadline: Date
+): { isValid: boolean; errors: string[]; warnings: string[] } {
+  const errors: string[] = [];
+  const warnings: string[] = [];
+
+  // 필수 필드 검증
+  if (!gllerId || gllerId.trim().length === 0) {
+    errors.push('의뢰인 ID가 필요합니다.');
+  }
+
+  if (!validateStationInfo(pickupStation)) {
+    errors.push('픽업 역 정보가 올바르지 않습니다.');
+  }
+
+  if (!validateStationInfo(deliveryStation)) {
+    errors.push('배송 역 정보가 올바르지 않습니다.');
+  }
+
+  if (pickupStation.stationId === deliveryStation.stationId) {
+    errors.push('픽업 역과 배송 역이 같을 수 없습니다.');
+  }
+
+  if (!validatePackageInfo(packageInfo)) {
+    errors.push('패키지 정보가 올바르지 않습니다.');
+  }
+
+  if (!validateDeliveryFee(fee)) {
+    errors.push('배송비 정보가 올바르지 않습니다.');
+  }
+
+  if (!recipientName || recipientName.trim().length === 0) {
+    errors.push('수신자 이름이 필요합니다.');
+  }
+
+  if (!validatePhoneNumber(recipientPhone)) {
+    errors.push('수신자 전화번호 형식이 올바르지 않습니다. (010-XXXX-XXXX)');
+  }
+
+  // 시간 검증
+  if (pickupDeadline >= deliveryDeadline) {
+    errors.push('픽업 마감 시간은 배송 마감 시간보다 빨라야 합니다.');
+  }
+
+  const now = new Date();
+  if (pickupDeadline < now) {
+    errors.push('픽업 마감 시간은 현재 시간보다 미래여야 합니다.');
+  }
+
+  // 경고
+  if (packageInfo.isFragile && packageInfo.weight > 5) {
+    warnings.push('깨지기 쉬운 물품이고 무게가 5kg를 초과합니다.');
+  }
+
+  if (fee.totalFee < 3000) {
+    warnings.push('배송비가 3,000원 미만입니다. 최소 배송비를 고려하세요.');
+  }
+
+  return {
+    isValid: errors.length === 0,
+    errors,
+    warnings,
+  };
+}
+
+// ==================== Create Request ====================
+
+/**
+ * 새 배송 요청 생성
+ * @param gllerId 의뢰인(Gller) 사용자 ID
+ * @param pickupStation 픽업 역 정보
+ * @param deliveryStation 배송 역 정보
+ * @param deliveryType 배송 타입
+ * @param packageInfo 패키지 정보
+ * @param fee 배송비
+ * @param recipientName 수신자 이름
+ * @param recipientPhone 수신자 전화번호
+ * @param pickupDeadline 픽업 마감 시간
+ * @param deliveryDeadline 배송 마감 시간
+ * @param preferredTimeWindow 선호 시간대 (선택)
+ * @param specialRequests 특별 요청사항 (선택)
+ * @returns 생성된 배송 요청
+ * @throws 유효성 검사 실패 시 에러
+ */
+export async function createRequest(
+  gllerId: string,
+  pickupStation: StationInfo,
+  deliveryStation: StationInfo,
+  deliveryType: string,
+  packageInfo: PackageInfo,
+  fee: DeliveryFee,
+  recipientName: string,
+  recipientPhone: string,
+  pickupDeadline: Date,
+  deliveryDeadline: Date,
+  preferredTimeWindow?: { start: Date; end: Date },
+  specialRequests?: string[]
+): Promise<DeliveryRequest> {
+  const validation = validateRequest(
+    gllerId,
+    pickupStation,
+    deliveryStation,
+    packageInfo,
+    fee,
+    recipientName,
+    recipientPhone,
+    pickupDeadline,
+    deliveryDeadline
+  );
+
+  if (!validation.isValid) {
+    throw new Error(`배송 요청 유효성 검사 실패: ${validation.errors.join(', ')}`);
+  }
+
+  const now = new Date();
+  const verificationCode = generateVerificationCode();
+
+  const requestData: any = {
+    gllerId,
+    gllerName: undefined, // 나중에 denormalization
+    pickupStation,
+    deliveryStation,
+    deliveryType,
+    packageInfo,
+    fee,
+    recipientName,
+    recipientPhone,
+    recipientVerificationCode: verificationCode,
+    preferredTimeWindow: preferredTimeWindow
+      ? {
+          start: convertDateToTimestamp(preferredTimeWindow.start),
+          end: convertDateToTimestamp(preferredTimeWindow.end),
+        }
+      : undefined,
+    pickupDeadline: convertDateToTimestamp(pickupDeadline),
+    deliveryDeadline: convertDateToTimestamp(deliveryDeadline),
+    specialRequests: specialRequests || [],
+    status: DeliveryStatus.PENDING,
+    createdAt: convertDateToTimestamp(now),
+    updatedAt: convertDateToTimestamp(now),
+  };
+
+  try {
+    const docRef = await withRetry(() => addDoc(collection(db, 'requests'), requestData));
+
+    const request: DeliveryRequest = {
+      requestId: docRef.id,
+      gllerId,
+      pickupStation,
+      deliveryStation,
+      deliveryType: deliveryType as any,
+      packageInfo,
+      fee,
+      recipientName,
+      recipientPhone,
+      recipientVerificationCode: verificationCode,
+      preferredTimeWindow,
+      pickupDeadline,
+      deliveryDeadline,
+      specialRequests: specialRequests || [],
+      status: DeliveryStatus.PENDING,
+      createdAt: now,
+      updatedAt: now,
+    };
+
+    cache.clearPattern(`^userRequests:${gllerId}:`);
+    cache.clearPattern(`^pendingRequests:`);
+
+    return request;
+  } catch (error) {
+    console.error('Error creating request:', error);
+    throw error;
+  }
+}
+
+// ==================== Read Requests ====================
+
+/**
+ * 특정 배송 요청 조회
+ * @param requestId 요청 ID
+ * @param userId 사용자 ID (권한 체크용)
+ * @returns 배송 요청 또는 null (존재하지 않거나 권한 없음)
+ */
+export async function getRequest(requestId: string, userId: string): Promise<DeliveryRequest | null> {
+  const cacheKey = `request:${requestId}`;
+  const cached = cache.get<DeliveryRequest>(cacheKey);
+  if (cached) {
+    // 권한 체크: 본인의 요청이어야 함
+    if (cached.gllerId !== userId) {
+      return null;
+    }
+    return cached;
+  }
+
+  try {
+    const docRef = doc(db, 'requests', requestId);
+    const docSnapshot = await getDoc(docRef);
+
+    if (!docSnapshot.exists()) {
+      return null;
+    }
+
+    const request = convertDeliveryRequest(docSnapshot.data(), docSnapshot.id);
+
+    // 권한 체크
+    if (request.gllerId !== userId) {
+      return null;
+    }
+
+    cache.set(cacheKey, request, REQUEST_CACHE_TTL);
+    return request;
+  } catch (error) {
+    console.error(`Error fetching request ${requestId}:`, error);
+    throw error;
+  }
+}
+
+/**
+ * 사용자의 모든 배송 요청 조회
+ * @param userId 사용자 ID
+ * @returns 배송 요청 목록
+ */
+export async function getUserRequests(userId: string): Promise<DeliveryRequest[]> {
+  const cacheKey = `userRequests:${userId}:all`;
+  const cached = cache.get<DeliveryRequest[]>(cacheKey);
+  if (cached) {
+    return cached;
+  }
+
+  try {
+    const q = query(
+      collection(db, 'requests'),
+      where('gllerId', '==', userId),
+      orderBy('createdAt', 'desc')
+    );
+
+    const snapshot = await getDocs(q);
+    const requests: DeliveryRequest[] = [];
+
+    snapshot.forEach((docSnapshot) => {
+      requests.push(convertDeliveryRequest(docSnapshot.data(), docSnapshot.id));
+    });
+
+    cache.set(cacheKey, requests, USER_REQUESTS_CACHE_TTL);
+    return requests;
+  } catch (error) {
+    console.error(`Error fetching requests for user ${userId}:`, error);
+    throw error;
+  }
+}
+
+/**
+ * 매칭 대기 중인 배송 요청 조회
+ * @returns 매칭 대기 중인 요청 목록
+ */
+export async function getPendingRequests(): Promise<DeliveryRequest[]> {
+  const cacheKey = 'pendingRequests:all';
+  const cached = cache.get<DeliveryRequest[]>(cacheKey);
+  if (cached) {
+    return cached;
+  }
+
+  try {
+    const q = query(
+      collection(db, 'requests'),
+      where('status', '==', DeliveryStatus.PENDING),
+      orderBy('createdAt', 'desc')
+    );
+
+    const snapshot = await getDocs(q);
+    const requests: DeliveryRequest[] = [];
+
+    snapshot.forEach((docSnapshot) => {
+      requests.push(convertDeliveryRequest(docSnapshot.data(), docSnapshot.id));
+    });
+
+    cache.set(cacheKey, requests, REQUEST_CACHE_TTL);
+    return requests;
+  } catch (error) {
+    console.error('Error fetching pending requests:', error);
+    throw error;
+  }
+}
+
+/**
+ * 특정 상태의 배송 요청 조회
+ * @param status 배송 상태
+ * @returns 해당 상태의 요청 목록
+ */
+export async function getRequestsByStatus(status: DeliveryStatus): Promise<DeliveryRequest[]> {
+  const cacheKey = `requestsByStatus:${status}`;
+  const cached = cache.get<DeliveryRequest[]>(cacheKey);
+  if (cached) {
+    return cached;
+  }
+
+  try {
+    const q = query(
+      collection(db, 'requests'),
+      where('status', '==', status),
+      orderBy('createdAt', 'desc')
+    );
+
+    const snapshot = await getDocs(q);
+    const requests: DeliveryRequest[] = [];
+
+    snapshot.forEach((docSnapshot) => {
+      requests.push(convertDeliveryRequest(docSnapshot.data(), docSnapshot.id));
+    });
+
+    cache.set(cacheKey, requests, REQUEST_CACHE_TTL);
+    return requests;
+  } catch (error) {
+    console.error(`Error fetching requests with status ${status}:`, error);
+    throw error;
+  }
+}
+
+/**
+ * 사용자의 특정 상태 배송 요청 조회
+ * @param userId 사용자 ID
+ * @param status 배송 상태
+ * @returns 해당 상태의 요청 목록
+ */
+export async function getUserRequestsByStatus(
+  userId: string,
+  status: DeliveryStatus
+): Promise<DeliveryRequest[]> {
+  const cacheKey = `userRequests:${userId}:status:${status}`;
+  const cached = cache.get<DeliveryRequest[]>(cacheKey);
+  if (cached) {
+    return cached;
+  }
+
+  try {
+    const q = query(
+      collection(db, 'requests'),
+      where('gllerId', '==', userId),
+      where('status', '==', status),
+      orderBy('createdAt', 'desc')
+    );
+
+    const snapshot = await getDocs(q);
+    const requests: DeliveryRequest[] = [];
+
+    snapshot.forEach((docSnapshot) => {
+      requests.push(convertDeliveryRequest(docSnapshot.data(), docSnapshot.id));
+    });
+
+    cache.set(cacheKey, requests, USER_REQUESTS_CACHE_TTL);
+    return requests;
+  } catch (error) {
+    console.error(`Error fetching requests for user ${userId} with status ${status}:`, error);
+    throw error;
+  }
+}
+
+// ==================== Update Request ====================
+
+/**
+ * 배송 요청 업데이트
+ * @param requestId 요청 ID
+ * @param userId 사용자 ID (권한 체크용)
+ * @param updates 업데이트할 필드
+ * @returns 업데이트된 요청 또는 null (권한 없음)
+ */
+export async function updateRequest(
+  requestId: string,
+  userId: string,
+  updates: Partial<Omit<DeliveryRequest, 'requestId' | 'gllerId' | 'createdAt'>>
+): Promise<DeliveryRequest | null> {
+  const existingRequest = await getRequest(requestId, userId);
+
+  if (!existingRequest) {
+    return null;
+  }
+
+  // 취소된 요청은 수정 불가
+  if (existingRequest.status === DeliveryStatus.CANCELLED) {
+    throw new Error('취소된 요청은 수정할 수 없습니다.');
+  }
+
+  // 매칭된 요청은 일부 필드만 수정 가능
+  if (existingRequest.status !== DeliveryStatus.PENDING && (existingRequest.status as string) !== 'cancelled') {
+    const allowedFields = ['specialRequests', 'cancellationReason', 'cancelledBy', 'cancelledAt'];
+    const hasDisallowedField = Object.keys(updates).some(
+      key => !allowedFields.includes(key)
+    );
+    if (hasDisallowedField) {
+      throw new Error('매칭된 요청은 특별 요청사항만 수정할 수 있습니다.');
+    }
+  }
+
+  const updatedData: any = {
+    updatedAt: convertDateToTimestamp(new Date()),
+  };
+
+  if (updates.pickupStation) {
+    updatedData.pickupStation = updates.pickupStation;
+  }
+
+  if (updates.deliveryStation) {
+    updatedData.deliveryStation = updates.deliveryStation;
+  }
+
+  if (updates.packageInfo) {
+    updatedData.packageInfo = updates.packageInfo;
+  }
+
+  if (updates.fee) {
+    updatedData.fee = updates.fee;
+  }
+
+  if (updates.recipientName) {
+    updatedData.recipientName = updates.recipientName;
+  }
+
+  if (updates.recipientPhone) {
+    if (!validatePhoneNumber(updates.recipientPhone)) {
+      throw new Error('수신자 전화번호 형식이 올바르지 않습니다.');
+    }
+    updatedData.recipientPhone = updates.recipientPhone;
+  }
+
+  if (updates.specialRequests) {
+    updatedData.specialRequests = updates.specialRequests;
+  }
+
+  if (updates.pickupDeadline) {
+    updatedData.pickupDeadline = convertDateToTimestamp(updates.pickupDeadline);
+  }
+
+  if (updates.deliveryDeadline) {
+    updatedData.deliveryDeadline = convertDateToTimestamp(updates.deliveryDeadline);
+  }
+
+  if (updates.preferredTimeWindow) {
+    updatedData.preferredTimeWindow = {
+      start: convertDateToTimestamp(updates.preferredTimeWindow.start),
+      end: convertDateToTimestamp(updates.preferredTimeWindow.end),
+    };
+  }
+
+  try {
+    const docRef = doc(db, 'requests', requestId);
+    await withRetry(() => updateDoc(docRef, updatedData));
+
+    const updatedRequest: DeliveryRequest = {
+      ...existingRequest,
+      ...updates,
+      updatedAt: new Date(),
+    };
+
+    cache.clearPattern(`^request:${requestId}$`);
+    cache.clearPattern(`^userRequests:${userId}:`);
+    cache.clearPattern(`^pendingRequests:`);
+    cache.clearPattern(`^requestsByStatus:`);
+
+    return updatedRequest;
+  } catch (error) {
+    console.error(`Error updating request ${requestId}:`, error);
+    throw error;
+  }
+}
+
+// ==================== Update Request Status ====================
+
+/**
+ * 상태 전파 규칙
+ */
+const STATUS_TRANSITIONS: Record<DeliveryStatus, DeliveryStatus[]> = {
+  [DeliveryStatus.PENDING]: [DeliveryStatus.MATCHED, DeliveryStatus.CANCELLED],
+  [DeliveryStatus.MATCHED]: [DeliveryStatus.ACCEPTED, DeliveryStatus.CANCELLED],
+  [DeliveryStatus.ACCEPTED]: [DeliveryStatus.IN_TRANSIT, DeliveryStatus.CANCELLED],
+  [DeliveryStatus.IN_TRANSIT]: [DeliveryStatus.ARRIVED, DeliveryStatus.CANCELLED],
+  [DeliveryStatus.ARRIVED]: [DeliveryStatus.COMPLETED, DeliveryStatus.CANCELLED],
+  [DeliveryStatus.COMPLETED]: [], // 완료된 상태는 변경 불가
+  [DeliveryStatus.CANCELLED]: [], // 취소된 상태는 변경 불가
+  [DeliveryStatus.QUOTE_REQUESTED]: [DeliveryStatus.QUOTE_RECEIVED, DeliveryStatus.CANCELLED],
+  [DeliveryStatus.QUOTE_RECEIVED]: [DeliveryStatus.SCHEDULED, DeliveryStatus.CANCELLED],
+  [DeliveryStatus.SCHEDULED]: [DeliveryStatus.ACCEPTED, DeliveryStatus.CANCELLED],
+};
+
+/**
+ * 배송 요청 상태 업데이트
+ * @param requestId 요청 ID
+ * @param currentUserId 현재 사용자 ID (권한 체크용)
+ * @param newStatus 새로운 상태
+ * @param reason 상태 변경 사유 (취소 시 필요)
+ * @returns 업데이트된 요청 또는 null
+ */
+export async function updateRequestStatus(
+  requestId: string,
+  currentUserId: string,
+  newStatus: DeliveryStatus,
+  reason?: string
+): Promise<DeliveryRequest | null> {
+  const existingRequest = await getRequest(requestId, currentUserId);
+
+  if (!existingRequest) {
+    return null;
+  }
+
+  // 상태 전파 규칙 검증
+  const allowedTransitions = STATUS_TRANSITIONS[existingRequest.status];
+  if (!allowedTransitions.includes(newStatus)) {
+    throw new Error(
+      `상태 전파 불가: ${existingRequest.status} → ${newStatus}. ` +
+      `가능한 전파: ${allowedTransitions.join(', ') || '없음'}`
+    );
+  }
+
+  const updatedData: any = {
+    status: newStatus,
+    updatedAt: convertDateToTimestamp(new Date()),
+  };
+
+  // 취소 시 추가 정보 저장
+  if (newStatus === 'cancelled') {
+    if (!reason) {
+      throw new Error('취소 사유가 필요합니다.');
+    }
+    updatedData.cancellationReason = reason;
+    updatedData.cancelledBy = currentUserId;
+    updatedData.cancelledAt = convertDateToTimestamp(new Date());
+  }
+
+  try {
+    const docRef = doc(db, 'requests', requestId);
+    await withRetry(() => updateDoc(docRef, updatedData));
+
+    const updatedRequest: DeliveryRequest = {
+      ...existingRequest,
+      status: newStatus,
+      updatedAt: new Date(),
+      ...(newStatus === 'cancelled' && {
+        cancellationReason: reason,
+        cancelledBy: currentUserId,
+        cancelledAt: new Date(),
+      }),
+    };
+
+    cache.clearPattern(`^request:${requestId}$`);
+    cache.clearPattern(`^userRequests:${currentUserId}:`);
+    cache.clearPattern(`^pendingRequests:`);
+    cache.clearPattern(`^requestsByStatus:`);
+
+    return updatedRequest;
+  } catch (error) {
+    console.error(`Error updating status for request ${requestId}:`, error);
+    throw error;
+  }
+}
+
+// ==================== Cancel Request ====================
+
+/**
+ * 배송 요청 취소 (Soft Delete)
+ * @param requestId 요청 ID
+ * @param userId 사용자 ID (권한 체크용)
+ * @param reason 취소 사유
+ * @returns 취소된 요청 또는 null
+ */
+export async function cancelRequest(
+  requestId: string,
+  userId: string,
+  reason: string
+): Promise<DeliveryRequest | null> {
+  return updateRequestStatus(requestId, userId, DeliveryStatus.CANCELLED, reason);
+}
+
+// ==================== Delete Request ====================
+
+/**
+ * 배송 요청 삭제 (Hard Delete - 관리자만 사용 권장)
+ * @param requestId 요청 ID
+ * @param userId 사용자 ID (권한 체크용)
+ * @returns 성공 여부
+ */
+export async function deleteRequest(requestId: string, userId: string): Promise<boolean> {
+  const existingRequest = await getRequest(requestId, userId);
+
+  if (!existingRequest) {
+    return false;
+  }
+
+  // 본인만 삭제 가능
+  if (existingRequest.gllerId !== userId) {
+    throw new Error('본인의 요청만 삭제할 수 있습니다.');
+  }
+
+  // 진행 중인 요청은 삭제 불가
+  const status = existingRequest.status as DeliveryStatus;
+  if (status !== DeliveryStatus.CANCELLED && status !== DeliveryStatus.COMPLETED) {
+    throw new Error('진행 중인 요청은 삭제할 수 없습니다. 취소를 먼저 진행하세요.');
+  }
+
+  try {
+    const docRef = doc(db, 'requests', requestId);
+    await withRetry(() => deleteDoc(docRef));
+
+    cache.clearPattern(`^request:${requestId}$`);
+    cache.clearPattern(`^userRequests:${userId}:`);
+    cache.clearPattern(`^pendingRequests:`);
+    cache.clearPattern(`^requestsByStatus:`);
+
+    return true;
+  } catch (error) {
+    console.error(`Error deleting request ${requestId}:`, error);
+    throw error;
+  }
+}
+
+// ==================== Cache Management ====================
+
+/**
+ * 요청 캐시 초기화
+ * @param userId 사용자 ID (지정 시 해당 사용자 캐시만 초기화)
+ */
+export function clearRequestCache(userId?: string): void {
+  if (userId) {
+    cache.clearPattern(`^userRequests:${userId}:`);
+  } else {
+    cache.clear();
+  }
+}
+
+// ==================== Delivery Fee Calculation ====================
+
+/**
+ * 배송비 계산
+ * @param pickupStation 픽업 역 정보
+ * @param deliveryStation 배송 역 정보
+ * @param packageSize 패키지 크기
+ * @param weight 무게 (kg)
+ * @returns 배송비 정보
+ */
+export function calculateDeliveryFee(
+  pickupStation: StationInfo,
+  deliveryStation: StationInfo,
+  packageSize: PackageSize,
+  weight: number
+): DeliveryFee {
+  // 기본 요금
+  const baseFee = 3000;
+
+  // 거리 기반 요금 (임의 계산 - 실제로는 ConfigService의 travel_times 사용)
+  // TODO: ConfigService.getTravelTime()으로 실제 소요시간 가져오기
+  const distanceFee = 800;
+
+  // 무게 기반 요금 (kg당 100원)
+  const weightFee = Math.round(weight * 100);
+
+  // 크기 기반 요금
+  const sizeFeeMap: Record<PackageSize, number> = {
+    small: 0,
+    medium: 500,
+    large: 1000,
+    extra_large: 2000,
+  };
+  const sizeFee = sizeFeeMap[packageSize];
+
+  // 부가세 (10%)
+  const subtotal = baseFee + distanceFee + weightFee + sizeFee;
+  const vat = Math.round(subtotal * 0.1);
+
+  // 총계
+  const totalFee = subtotal + vat;
+
+  return {
+    baseFee,
+    distanceFee,
+    weightFee,
+    sizeFee,
+    serviceFee: 0,
+    vat,
+    totalFee,
+  };
+}
