@@ -1,17 +1,15 @@
-import React, { useEffect, useState, useRef } from 'react';
+import React, { useEffect, useState, useRef, useCallback } from 'react';
 import {
   View,
   Text,
   StyleSheet,
   ScrollView,
   TouchableOpacity,
-  ActivityIndicator,
   Animated,
-  Dimensions,
 } from 'react-native';
 import { StackNavigationProp } from '@react-navigation/stack';
 import { getMatchingResults as getMatchesFromFirestore } from '../../services/matching-service';
-import RatingStars from '../../components/common/RatingStars';
+import GillerProfileCard, { GillerMatch } from '../../components/matching/GillerProfileCard';
 import { Colors, Spacing, BorderRadius, Typography } from '../../theme';
 
 type NavigationProp = StackNavigationProp<any>;
@@ -25,52 +23,134 @@ interface Props {
   };
 }
 
-interface GillerMatch {
-  rank: number;
-  gillerId: string;
-  gillerName: string;
-  score: number;
-  travelTime: number;
-  hasExpress: boolean;
-  transferCount: number;
-  reasons: string[];
-}
-
-const { width: SCREEN_WIDTH } = Dimensions.get('window');
+const MATCHING_TIMEOUT = 30000; // 30 seconds
 
 export default function MatchingResultScreen({ navigation, route }: Props) {
   const { requestId } = route.params;
   const [matches, setMatches] = useState<GillerMatch[]>([]);
   const [loading, setLoading] = useState(true);
   const [searching, setSearching] = useState(true);
+  const [timedOut, setTimedOut] = useState(false);
+  const [timeRemaining, setTimeRemaining] = useState(MATCHING_TIMEOUT / 1000);
+  const [autoRetrying, setAutoRetrying] = useState(false);
+  const [autoRetryCount, setAutoRetryCount] = useState(0);
 
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const scaleAnim = useRef(new Animated.Value(0.8)).current;
-  const slideAnim = useRef(new Animated.Value(50)).current;
+  const shakeAnim = useRef(new Animated.Value(0)).current;
   const pulseAnim = useRef(new Animated.Value(1)).current;
+  const progressAnim = useRef(new Animated.Value(0)).current;
 
-  useEffect(() => {
-    loadMatches();
-  }, [requestId]);
+  const countdownIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const pulseAnimationRef = useRef<Animated.CompositeAnimation | null>(null);
+  const progressAnimationRef = useRef<Animated.CompositeAnimation | null>(null);
 
-  const loadMatches = async () => {
+  const clearTimersAndAnimations = () => {
+    if (countdownIntervalRef.current) {
+      clearInterval(countdownIntervalRef.current);
+      countdownIntervalRef.current = null;
+    }
+    pulseAnimationRef.current?.stop();
+    progressAnimationRef.current?.stop();
+  };
+
+  const startSearch = useCallback(async () => {
+    clearTimersAndAnimations();
+
+    setTimedOut(false);
+    setTimeRemaining(MATCHING_TIMEOUT / 1000);
+    setSearching(true);
+    setLoading(true);
+    setMatches([]);
+
+    // Reset animations
+    progressAnim.setValue(0);
+    fadeAnim.setValue(0);
+    scaleAnim.setValue(0.8);
+
+    // Start progress animation
+    const progressAnimation = Animated.timing(progressAnim, {
+      toValue: 1,
+      duration: MATCHING_TIMEOUT,
+      useNativeDriver: false,
+    });
+    progressAnimationRef.current = progressAnimation;
+    progressAnimation.start();
+
+    // Start pulse animation
+    const pulse = Animated.loop(
+      Animated.sequence([
+        Animated.timing(pulseAnim, {
+          toValue: 1.1,
+          duration: 800,
+          useNativeDriver: true,
+        }),
+        Animated.timing(pulseAnim, {
+          toValue: 1,
+          duration: 800,
+          useNativeDriver: true,
+        }),
+      ])
+    );
+    pulseAnimationRef.current = pulse;
+    pulse.start();
+
+    // Start countdown
+    countdownIntervalRef.current = setInterval(() => {
+      setTimeRemaining((prev) => {
+        if (prev <= 1) {
+          if (countdownIntervalRef.current) {
+            clearInterval(countdownIntervalRef.current);
+            countdownIntervalRef.current = null;
+          }
+          handleTimeout();
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+
     try {
       const results = await getMatchesFromFirestore(requestId);
       setMatches(results);
+      setSearching(false);
+      setLoading(false);
 
       if (results.length > 0) {
         animateSuccess();
       } else {
         animateFailure();
       }
-
-      setSearching(false);
     } catch (error) {
       console.error('Error loading matches:', error);
-      animateFailure();
       setSearching(false);
-    } finally {
       setLoading(false);
+      animateFailure();
+    } finally {
+      clearTimersAndAnimations();
+    }
+  }, [requestId, fadeAnim, pulseAnim, progressAnim, scaleAnim]);
+
+  useEffect(() => {
+    startSearch();
+    return () => {
+      clearTimersAndAnimations();
+    };
+  }, [startSearch]);
+
+  const handleTimeout = () => {
+    setTimedOut(true);
+    setSearching(false);
+    setLoading(false);
+    animateShake();
+
+    if (autoRetryCount < 1 && !autoRetrying) {
+      setAutoRetrying(true);
+      setAutoRetryCount((prev) => prev + 1);
+      setTimeout(() => {
+        setAutoRetrying(false);
+        startSearch();
+      }, 1500);
     }
   };
 
@@ -93,55 +173,58 @@ export default function MatchingResultScreen({ navigation, route }: Props) {
   };
 
   const animateFailure = () => {
-    Animated.parallel([
-      Animated.timing(fadeAnim, {
-        toValue: 1,
-        duration: 600,
-        delay: 300,
+    Animated.timing(fadeAnim, {
+      toValue: 1,
+      duration: 600,
+      delay: 300,
+      useNativeDriver: true,
+    }).start();
+  };
+
+  const animateShake = () => {
+    Animated.sequence([
+      Animated.timing(shakeAnim, {
+        toValue: 10,
+        duration: 100,
         useNativeDriver: true,
       }),
-      Animated.timing(slideAnim, {
+      Animated.timing(shakeAnim, {
+        toValue: -10,
+        duration: 100,
+        useNativeDriver: true,
+      }),
+      Animated.timing(shakeAnim, {
+        toValue: 10,
+        duration: 100,
+        useNativeDriver: true,
+      }),
+      Animated.timing(shakeAnim, {
         toValue: 0,
-        duration: 500,
-        delay: 300,
+        duration: 100,
         useNativeDriver: true,
       }),
     ]).start();
   };
 
-  const animateCard = (index: number) => {
-    const delay = index * 100;
-    return {
-      opacity: fadeAnim,
-      transform: [
-        {
-          translateY: slideAnim.interpolate({
-            inputRange: [0, 1],
-            outputRange: [50 * (index + 1), 0],
-          }),
-        },
-      ],
-    };
+  const handleRetry = () => {
+    startSearch();
   };
 
-  useEffect(() => {
-    const pulse = Animated.loop(
-      Animated.sequence([
-        Animated.timing(pulseAnim, {
-          toValue: 1.1,
-          duration: 1000,
-          useNativeDriver: true,
-        }),
-        Animated.timing(pulseAnim, {
-          toValue: 1,
-          duration: 1000,
-          useNativeDriver: true,
-        }),
-      ])
-    );
-    pulse.start();
-    return () => pulse.stop();
-  }, []);
+  const handleChangeConditions = () => {
+    navigation.goBack();
+  };
+
+  const handleSelectGiller = (match: GillerMatch) => {
+    navigation.navigate('RequestDetail', {
+      requestId,
+      gillerId: match.gillerId,
+    });
+  };
+
+  const progressWidth = progressAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: ['0%', '100%'],
+  });
 
   if (loading) {
     return (
@@ -151,8 +234,33 @@ export default function MatchingResultScreen({ navigation, route }: Props) {
             <Text style={styles.searchingEmoji}>🔍</Text>
           </View>
         </Animated.View>
+
         <Text style={styles.loadingText}>길러를 찾고 있어요...</Text>
-        <ActivityIndicator size="large" color={Colors.primary} style={styles.spinner} />
+
+        <View style={styles.progressContainer}>
+          <View style={styles.progressBackground}>
+            <Animated.View
+              style={[
+                styles.progressBar,
+                { width: progressWidth },
+              ]}
+            />
+          </View>
+          <Text style={styles.timeText}>{timeRemaining}초</Text>
+        </View>
+
+        {timedOut && (
+          <View style={styles.timeoutContainer}>
+            <Text style={styles.timeoutEmoji}>⏰</Text>
+            <Text style={styles.timeoutText}>매칭 시간 초과</Text>
+            <Text style={styles.timeoutHint}>
+              조건에 맞는 길러를 찾지 못했어요
+            </Text>
+            {autoRetrying && (
+              <Text style={styles.timeoutHint}>잠시 후 자동으로 다시 찾고 있어요</Text>
+            )}
+          </View>
+        )}
       </View>
     );
   }
@@ -187,60 +295,12 @@ export default function MatchingResultScreen({ navigation, route }: Props) {
             </View>
 
             {matches.map((match, index) => (
-              <Animated.View
+              <GillerProfileCard
                 key={match.gillerId}
-                style={[styles.matchCard, animateCard(index)]}
-              >
-                <View style={styles.matchHeader}>
-                  <View style={styles.rankBadge}>
-                    <Text style={styles.rankText}>#{match.rank}</Text>
-                  </View>
-                  <View style={styles.matchScore}>
-                    <Text style={styles.matchScoreText}>
-                      {match.score.toFixed(0)}점
-                    </Text>
-                  </View>
-                </View>
-
-                <View style={styles.gillerInfo}>
-                  <Text style={styles.gillerName}>{match.gillerName}</Text>
-                  <RatingStars rating={4.5} size={16} />
-                </View>
-
-                <View style={styles.travelInfo}>
-                  <View style={styles.travelItem}>
-                    <Text style={styles.travelIcon}>⏱</Text>
-                    <Text style={styles.travelText}>{match.travelTime}분</Text>
-                  </View>
-                  <View style={styles.travelItem}>
-                    <Text style={styles.travelIcon}>🔄</Text>
-                    <Text style={styles.travelText}>환승 {match.transferCount}회</Text>
-                  </View>
-                </View>
-
-                {match.hasExpress && (
-                  <View style={styles.expressBadge}>
-                    <Text style={styles.expressText}>급행 가능</Text>
-                  </View>
-                )}
-
-                <View style={styles.reasonsContainer}>
-                  {match.reasons.map((reason, idx) => (
-                    <Text key={idx} style={styles.reasonText}>
-                      ✓ {reason}
-                    </Text>
-                  ))}
-                </View>
-
-                <TouchableOpacity
-                  style={styles.selectButton}
-                  onPress={() => {
-                    navigation.navigate('RequestDetail', { requestId, gillerId: match.gillerId });
-                  }}
-                >
-                  <Text style={styles.selectButtonText}>선택하기</Text>
-                </TouchableOpacity>
-              </Animated.View>
+                match={match}
+                index={index}
+                onPress={handleSelectGiller}
+              />
             ))}
           </Animated.View>
         ) : (
@@ -249,7 +309,7 @@ export default function MatchingResultScreen({ navigation, route }: Props) {
               styles.failureContainer,
               {
                 opacity: fadeAnim,
-                transform: [{ translateY: slideAnim }],
+                transform: [{ translateX: shakeAnim }],
               },
             ]}
           >
@@ -257,7 +317,9 @@ export default function MatchingResultScreen({ navigation, route }: Props) {
               <Text style={styles.failureEmoji}>😢</Text>
               <Text style={styles.failureTitle}>매칭 실패</Text>
               <Text style={styles.failureSubtitle}>
-                아직 조건에 맞는 길러가 없어요
+                {timedOut
+                  ? '시간 내에 조건에 맞는 길러를 찾지 못했어요'
+                  : '아직 조건에 맞는 길러가 없어요'}
               </Text>
               <Text style={styles.failureHint}>
                 조건을 변경하거나 나중에 다시 시도해주세요
@@ -266,9 +328,17 @@ export default function MatchingResultScreen({ navigation, route }: Props) {
 
             <TouchableOpacity
               style={styles.retryButton}
-              onPress={() => navigation.goBack()}
+              onPress={handleRetry}
             >
-              <Text style={styles.retryButtonText}>다시 검색하기</Text>
+              <Text style={styles.retryButtonText}>
+                {timedOut ? '다시 시도하기' : '다시 검색하기'}
+              </Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.secondaryButton}
+              onPress={handleChangeConditions}
+            >
+              <Text style={styles.secondaryButtonText}>조건 변경하기</Text>
             </TouchableOpacity>
           </Animated.View>
         )}
@@ -292,20 +362,6 @@ const styles = StyleSheet.create({
   content: {
     flex: 1,
     padding: Spacing.md,
-  },
-  expressBadge: {
-    backgroundColor: Colors.error,
-    borderRadius: BorderRadius.sm,
-    paddingHorizontal: Spacing.sm,
-    paddingVertical: 2,
-    position: 'absolute',
-    right: Spacing.md,
-    top: Spacing.md,
-  },
-  expressText: {
-    color: Colors.white,
-    fontSize: Typography.fontSize.xs,
-    fontWeight: Typography.fontWeight.bold as any,
   },
   failureBanner: {
     alignItems: 'center',
@@ -337,15 +393,6 @@ const styles = StyleSheet.create({
     fontWeight: Typography.fontWeight.bold as any,
     marginBottom: Spacing.sm,
   },
-  gillerInfo: {
-    marginBottom: Spacing.sm,
-  },
-  gillerName: {
-    color: Colors.textPrimary,
-    fontSize: Typography.fontSize.lg,
-    fontWeight: Typography.fontWeight.bold as any,
-    marginBottom: Spacing.xs,
-  },
   header: {
     alignItems: 'center',
     backgroundColor: Colors.white,
@@ -371,60 +418,29 @@ const styles = StyleSheet.create({
     flex: 1,
     gap: Spacing.md,
     justifyContent: 'center',
+    padding: Spacing.xl,
   },
   loadingText: {
     color: Colors.textPrimary,
     fontSize: Typography.fontSize.lg,
     fontWeight: Typography.fontWeight.semibold as any,
   },
-  matchCard: {
-    backgroundColor: Colors.white,
-    borderColor: Colors.gray300,
-    borderRadius: BorderRadius.lg,
-    borderWidth: 1,
-    elevation: 3,
-    marginBottom: Spacing.md,
-    padding: Spacing.md,
-    shadowColor: Colors.black,
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
+  progressBackground: {
+    backgroundColor: Colors.gray300,
+    borderRadius: 8,
+    flex: 1,
+    height: 8,
+    overflow: 'hidden',
   },
-  matchHeader: {
+  progressBar: {
+    backgroundColor: Colors.primary,
+    height: '100%',
+  },
+  progressContainer: {
     alignItems: 'center',
     flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginBottom: Spacing.sm,
-  },
-  matchScore: {
-    backgroundColor: Colors.accent,
-    borderRadius: 16,
-    paddingHorizontal: Spacing.sm,
-    paddingVertical: Spacing.xs,
-  },
-  matchScoreText: {
-    color: Colors.white,
-    fontSize: Typography.fontSize.xs,
-    fontWeight: Typography.fontWeight.bold as any,
-  },
-  rankBadge: {
-    backgroundColor: Colors.primary,
-    borderRadius: 16,
-    paddingHorizontal: Spacing.sm,
-    paddingVertical: Spacing.xs,
-  },
-  rankText: {
-    color: Colors.white,
-    fontSize: Typography.fontSize.xs,
-    fontWeight: Typography.fontWeight.bold as any,
-  },
-  reasonText: {
-    color: Colors.textSecondary,
-    fontSize: Typography.fontSize.sm,
-  },
-  reasonsContainer: {
-    gap: Spacing.xs,
-    marginBottom: Spacing.sm,
+    gap: Spacing.sm,
+    width: '80%',
   },
   resultContainer: {
     gap: Spacing.md,
@@ -440,6 +456,18 @@ const styles = StyleSheet.create({
     fontSize: Typography.fontSize.lg,
     fontWeight: Typography.fontWeight.bold as any,
   },
+  secondaryButton: {
+    alignItems: 'center',
+    borderColor: Colors.gray300,
+    borderRadius: BorderRadius.md,
+    borderWidth: 1,
+    padding: Spacing.md,
+  },
+  secondaryButtonText: {
+    color: Colors.textSecondary,
+    fontSize: Typography.fontSize.base,
+    fontWeight: Typography.fontWeight.semibold as any,
+  },
   searchingEmoji: {
     fontSize: 40,
   },
@@ -451,20 +479,6 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     marginBottom: Spacing.md,
     width: 80,
-  },
-  selectButton: {
-    alignItems: 'center',
-    backgroundColor: Colors.primary,
-    borderRadius: BorderRadius.md,
-    padding: Spacing.sm,
-  },
-  selectButtonText: {
-    color: Colors.white,
-    fontSize: Typography.fontSize.base,
-    fontWeight: Typography.fontWeight.semibold as any,
-  },
-  spinner: {
-    marginTop: Spacing.lg,
   },
   successBanner: {
     alignItems: 'center',
@@ -487,21 +501,30 @@ const styles = StyleSheet.create({
     fontWeight: Typography.fontWeight.bold as any,
     marginBottom: Spacing.xs,
   },
-  travelIcon: {
-    fontSize: 16,
-  },
-  travelInfo: {
-    flexDirection: 'row',
-    gap: Spacing.md,
-    marginBottom: Spacing.sm,
-  },
-  travelItem: {
-    alignItems: 'center',
-    flexDirection: 'row',
-    gap: Spacing.xs,
-  },
-  travelText: {
+  timeText: {
     color: Colors.textSecondary,
     fontSize: Typography.fontSize.sm,
+    fontWeight: Typography.fontWeight.medium as any,
+    minWidth: 40,
+    textAlign: 'right',
+  },
+  timeoutContainer: {
+    alignItems: 'center',
+    marginTop: Spacing.lg,
+  },
+  timeoutEmoji: {
+    fontSize: 48,
+    marginBottom: Spacing.sm,
+  },
+  timeoutHint: {
+    color: Colors.textTertiary,
+    fontSize: Typography.fontSize.sm,
+    marginTop: Spacing.sm,
+    textAlign: 'center',
+  },
+  timeoutText: {
+    color: Colors.textPrimary,
+    fontSize: Typography.fontSize.xl,
+    fontWeight: Typography.fontWeight.bold as any,
   },
 });

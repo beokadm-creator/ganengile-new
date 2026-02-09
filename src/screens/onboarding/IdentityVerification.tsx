@@ -93,6 +93,10 @@ export default function IdentityVerification() {
             text: '확인',
             onPress: async () => {
               await completeOnboarding();
+              navigation.getParent()?.reset({
+                index: 0,
+                routes: [{ name: 'Main' }],
+              });
             },
           },
         ]

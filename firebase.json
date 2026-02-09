@@ -9,7 +9,7 @@
     "region": "asia-northeast3"
   },
   "hosting": {
-    "public": "dist",
+    "public": "web-build",
     "ignore": [
       "firebase.json",
       "**/.*",

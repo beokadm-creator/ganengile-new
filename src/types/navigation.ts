@@ -65,7 +65,7 @@ export type MainStackParamList = {
   Tabs: NavigatorScreenParams<MainTabParamList>;
   CreateRequest: undefined;
   AddRoute: { selectedStation?: import('../types/config').Station };
-  RequestDetail: { requestId: string };
+  RequestDetail: { requestId: string; gillerId?: string };
   DeliveryTracking: { matchId?: string };
   MatchingResult: {
     requestId: string;

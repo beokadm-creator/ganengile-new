@@ -13,6 +13,7 @@ import {
   TouchableOpacity,
   Alert,
   RefreshControl,
+  Platform,
 } from 'react-native';
 import { useUser } from '../../contexts/UserContext';
 import { getUserStats } from '../../services/user-service';
@@ -90,6 +91,9 @@ export default function HomeScreen({ navigation }: { navigation: MainStackNaviga
   return (
     <ScrollView
       style={styles.container}
+      contentContainerStyle={styles.scrollContent}
+      scrollEnabled={true}
+      bounces={false}
       refreshControl={
         <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
       }
@@ -233,7 +237,7 @@ function GllerDashboard({
         >
           <Text style={styles.infoTitle}>등록된 동선 관리</Text>
           <Text style={styles.infoSubtitle}>
-            현재 {stats?.totalRequests || 0}개의 동선이 등록되어 있습니다
+            동선 관리에서 등록된 경로를 확인하세요
           </Text>
         </TouchableOpacity>
       </View>
@@ -259,7 +263,7 @@ function GillerDashboard({
       <View style={styles.statsRow}>
         <TouchableOpacity
           style={styles.statCard}
-          onPress={() => navigation.navigate('Tabs', { screen: 'Requests' })}
+          onPress={() => navigation.navigate('Tabs', { screen: 'GillerRequests' })}
         >
           <Text style={styles.statNumber}>{stats?.totalDeliveries || 0}</Text>
           <Text style={styles.statLabel}>완료 배송</Text>
@@ -350,6 +354,7 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
     shadowRadius: 4,
+    ...(Platform.OS === 'web' && { cursor: 'pointer' }),
   },
   actionContent: {
     flex: 1,
@@ -401,6 +406,7 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
     shadowRadius: 4,
+    ...(Platform.OS === 'web' && { cursor: 'pointer' }),
   },
   infoSubtitle: {
     color: '#666',
@@ -481,6 +487,7 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
     shadowRadius: 4,
+    ...(Platform.OS === 'web' && { cursor: 'pointer' }),
   },
   statLabel: {
     color: '#666',
@@ -507,5 +514,9 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontSize: 24,
     fontWeight: 'bold',
+  },
+  scrollContent: {
+    flexGrow: 1,
+    paddingBottom: 20,
   },
 });

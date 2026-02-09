@@ -247,10 +247,46 @@ npm run android
 
 ---
 
+## 🔑 API 설정
+
+### 공공데이터포털 API 발급 (실시간 지하철 정보)
+
+1. **서울교통공사 API**
+   - 접속: https://www.data.go.kr
+   - 검색: "실시간 지하철 도착 정보 조회"
+   - 신청: 서울교통공사 > 지하철 > 실시간 도착 정보
+   - 발급: 즉시 (자동 승인)
+   - 키: `.env` 파일의 `SEOUL_SUBWAY_API_KEY`에 추가
+
+2. **한국철도공사 API** (선택)
+   - 검색: "수도권 전철 열차운행 정보"
+   - 경의중앙선, 경춘선, 수인분당선 등
+   - 키: `.env` 파일의 `KORAIL_API_KEY`에 추가
+
+3. **인천교통공사 API** (선택)
+   - 검색: "인천지하철 실시간 정보"
+   - 키: `.env` 파일의 `INCHEON_SUBWAY_API_KEY`에 추가
+
+```bash
+# .env 파일 예시
+SEOUL_SUBWAY_API_KEY=여기에_키_입력
+KORAIL_API_KEY=여기에_키_입력
+INCHEON_SUBWAY_API_KEY=여기에_키_입력
+```
+
+### API 사용 혜택
+- ✅ 실시간 열차 도착 정보
+- ✅ 혼잡도 데이터
+- ✅ 지연 정보
+- ✅ 무료 사용
+
+---
+
 ## 🔗 관련 링크
 
 - **Firebase Console**: https://console.firebase.google.com/project/ganengile
 - **Expo Dashboard**: https://expo.dev
+- **공공데이터포털**: https://www.data.go.kr
 - **GitHub Repository**: (예정)
 
 ---

@@ -166,13 +166,31 @@ export default function SignUpScreen({ navigation }: Props) {
         [
           {
             text: '시작하기',
-            onPress: () => navigation.replace('Auth'),
           },
         ]
       );
     } catch (error: any) {
       console.error('Sign up error:', error);
-      Alert.alert('가입 실패', error.message || '회원가입에 실패했습니다.');
+      let errorMessage = '회원가입에 실패했습니다.';
+
+      switch (error.code) {
+        case 'auth/email-already-in-use':
+          errorMessage = '이미 가입된 이메일입니다. 로그인을 진행해주세요.';
+          break;
+        case 'auth/invalid-email':
+          errorMessage = '올바른 이메일 형식이 아닙니다.';
+          break;
+        case 'auth/operation-not-allowed':
+          errorMessage = '이메일/비밀번호 가입이 비활성화되었습니다.';
+          break;
+        case 'auth/weak-password':
+          errorMessage = '비밀번호가 너무 취약합니다. 6자 이상 입력해주세요.';
+          break;
+        default:
+          errorMessage = error.message || '회원가입에 실패했습니다. 잠시 후 다시 시도해주세요.';
+      }
+
+      Alert.alert('가입 실패', errorMessage);
     } finally {
       setLoading(false);
     }

@@ -21,7 +21,11 @@ interface UserContextType {
   completeOnboarding: () => Promise<void>;
 }
 
+export type { UserContextType };
+
 const UserContext = createContext<UserContextType | undefined>(undefined);
+
+export { UserContext };
 
 interface UserProviderProps {
   children: ReactNode;

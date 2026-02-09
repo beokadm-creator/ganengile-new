@@ -77,6 +77,7 @@ export async function getUserById(userId: string): Promise<User | null> {
       createdAt: data.createdAt || null,
       updatedAt: data.updatedAt || null,
       isActive: data.isActive ?? true,
+      hasCompletedOnboarding: data.hasCompletedOnboarding || false,
       rating: data.rating,
       totalRatings: data.totalRatings,
       profilePhoto: data.profilePhoto,
@@ -253,12 +254,16 @@ export async function getUserDeliveryHistory(
       history.push({
         requestId: docSnapshot.id,
         ...data,
-        createdAt: data.createdAt?.toDate(),
+        createdAt: data.createdAt?.toDate() ?? null,
       });
     });
 
     // Sort by created date (newest first)
-    history.sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
+    history.sort((a, b) => {
+      const aTime = a.createdAt?.getTime?.() ?? 0;
+      const bTime = b.createdAt?.getTime?.() ?? 0;
+      return bTime - aTime;
+    });
 
     return history.slice(0, limit);
   } catch (error) {

@@ -17,7 +17,11 @@ import { StackNavigationProp } from '@react-navigation/stack';
 import { getRequest, cancelRequest } from '../../services/request-service';
 import { requireUserId } from '../../services/firebase';
 import { getMatchingResults } from '../../services/matching-service';
-import type { DeliveryRequest, DeliveryStatus } from '../../types/delivery';
+import type { Request } from '../../types/request';
+import { RequestStatus } from '../../types/request';
+import { toRequestDetailView } from '../../utils/request-adapters';
+import { formatDateTimeKR } from '../../utils/date';
+import { TextInputModal } from '../../components/common';
 
 type NavigationProp = StackNavigationProp<any>;
 
@@ -26,6 +30,7 @@ interface Props {
   route: {
     params: {
       requestId: string;
+      gillerId?: string;  // 선택한 길러 ID (선택 사항)
     };
   };
 }
@@ -42,11 +47,14 @@ interface MatchingGiller {
 }
 
 export default function RequestDetailScreen({ navigation, route }: Props) {
-  const { requestId } = route.params;
-  const [request, setRequest] = useState<DeliveryRequest | null>(null);
+  const { requestId, gillerId: selectedGillerId } = route.params;
+  const [request, setRequest] = useState<Request | null>(null);
+  const [detailView, setDetailView] = useState<ReturnType<typeof toRequestDetailView> | null>(null);
   const [matches, setMatches] = useState<MatchingGiller[]>([]);
   const [loading, setLoading] = useState(true);
   const [cancelling, setCancelling] = useState(false);
+  const [cancelModalVisible, setCancelModalVisible] = useState(false);
+  const [cancelReason, setCancelReason] = useState('');
 
   useEffect(() => {
     loadData();
@@ -64,7 +72,9 @@ export default function RequestDetailScreen({ navigation, route }: Props) {
         return;
       }
 
-      setRequest(requestData as any);
+      const typedRequest = requestData as Request;
+      setRequest(typedRequest);
+      setDetailView(toRequestDetailView(typedRequest));
 
       // 매칭 결과 조회 (PENDING 상태인 경우만)
       if ((requestData as any).status === 'pending') {
@@ -87,92 +97,67 @@ export default function RequestDetailScreen({ navigation, route }: Props) {
 
   const handleCancel = () => {
     if (!request) return;
-
-    Alert.prompt(
-      '취소 사유',
-      '배송 요청을 취소하는 사유를 입력해주세요.',
-      [
-        { text: '취소', style: 'cancel' },
-        {
-          text: '확인',
-          onPress: async (reason: string | undefined) => {
-            if (!reason || reason.trim().length === 0) {
-              Alert.alert('오류', '취소 사유를 입력해주세요.');
-              return;
-            }
-
-            setCancelling(true);
-            try {
-              const userId = requireUserId();
-              await cancelRequest(requestId, userId, reason);
-              Alert.alert('성공', '배송 요청이 취소되었습니다.', [
-                { text: '확인', onPress: () => navigation.goBack() },
-              ]);
-            } catch (error) {
-              console.error('Error cancelling request:', error);
-              Alert.alert('오류', '요청 취소에 실패했습니다.');
-            } finally {
-              setCancelling(false);
-            }
-          },
-        },
-      ],
-      'plain-text',
-      ''
-    );
+    setCancelReason('');
+    setCancelModalVisible(true);
   };
 
-  const getStatusColor = (status: DeliveryStatus): string => {
+  const handleConfirmCancel = async () => {
+    if (!cancelReason.trim()) {
+      Alert.alert('오류', '취소 사유를 입력해주세요.');
+      return;
+    }
+
+    setCancelling(true);
+    try {
+      const userId = requireUserId();
+      await cancelRequest(requestId, userId, cancelReason.trim());
+      setCancelModalVisible(false);
+      Alert.alert('성공', '배송 요청이 취소되었습니다.', [
+        { text: '확인', onPress: () => navigation.goBack() },
+      ]);
+    } catch (error) {
+      console.error('Error cancelling request:', error);
+      Alert.alert('오류', '요청 취소에 실패했습니다.');
+    } finally {
+      setCancelling(false);
+    }
+  };
+
+  const getStatusColor = (status: RequestStatus): string => {
     switch (status) {
-      case 'pending':
+      case RequestStatus.PENDING:
         return '#FFA726';
-      case 'matched':
+      case RequestStatus.MATCHED:
         return '#42A5F5';
-      case 'accepted':
-        return '#26C6DA';
-      case 'in_transit':
+      case RequestStatus.IN_PROGRESS:
         return '#AB47BC';
-      case 'arrived':
-        return '#66BB6A';
-      case 'completed':
+      case RequestStatus.COMPLETED:
         return '#4CAF50';
-      case 'cancelled':
+      case RequestStatus.CANCELLED:
         return '#EF5350';
       default:
         return '#9E9E9E';
     }
   };
 
-  const getStatusText = (status: DeliveryStatus): string => {
+  const getStatusText = (status: RequestStatus): string => {
     switch (status) {
-      case 'pending':
+      case RequestStatus.PENDING:
         return '매칭 대기 중';
-      case 'matched':
+      case RequestStatus.MATCHED:
         return '매칭 완료';
-      case 'accepted':
-        return '수락 완료';
-      case 'in_transit':
+      case RequestStatus.IN_PROGRESS:
         return '배송 중';
-      case 'arrived':
-        return '도착 완료';
-      case 'completed':
+      case RequestStatus.COMPLETED:
         return '배송 완료';
-      case 'cancelled':
+      case RequestStatus.CANCELLED:
         return '취소됨';
       default:
         return status;
     }
   };
 
-  const formatDate = (date: Date): string => {
-    return new Date(date).toLocaleString('ko-KR', {
-      year: 'numeric',
-      month: '2-digit',
-      day: '2-digit',
-      hour: '2-digit',
-      minute: '2-digit',
-    });
-  };
+  const formatDate = (date?: Date | null): string => formatDateTimeKR(date);
 
   if (loading) {
     return (
@@ -183,7 +168,7 @@ export default function RequestDetailScreen({ navigation, route }: Props) {
     );
   }
 
-  if (!request) {
+  if (!request || !detailView) {
     return null;
   }
 
@@ -200,8 +185,8 @@ export default function RequestDetailScreen({ navigation, route }: Props) {
 
       <ScrollView style={styles.content}>
         {/* Status Badge */}
-        <View style={[styles.statusBanner, { backgroundColor: getStatusColor(request.status) }]}>
-          <Text style={styles.statusText}>{getStatusText(request.status)}</Text>
+        <View style={[styles.statusBanner, { backgroundColor: getStatusColor(detailView.status) }]}>
+          <Text style={styles.statusText}>{getStatusText(detailView.status as RequestStatus)}</Text>
         </View>
 
         {/* Route Info */}
@@ -210,8 +195,8 @@ export default function RequestDetailScreen({ navigation, route }: Props) {
           <View style={styles.routeContainer}>
             <View style={styles.stationInfo}>
               <Text style={styles.stationLabel}>픽업</Text>
-              <Text style={styles.stationName}>{request.pickupStation.stationName}</Text>
-              <Text style={styles.stationLine}>{request.pickupStation.line}</Text>
+              <Text style={styles.stationName}>{detailView.pickupStation.stationName}</Text>
+              <Text style={styles.stationLine}>{detailView.pickupStation.line}</Text>
             </View>
 
             <View style={styles.arrowContainer}>
@@ -221,8 +206,8 @@ export default function RequestDetailScreen({ navigation, route }: Props) {
 
             <View style={styles.stationInfo}>
               <Text style={styles.stationLabel}>배송</Text>
-              <Text style={styles.stationName}>{request.deliveryStation.stationName}</Text>
-              <Text style={styles.stationLine}>{request.deliveryStation.line}</Text>
+              <Text style={styles.stationName}>{detailView.deliveryStation.stationName}</Text>
+              <Text style={styles.stationLine}>{detailView.deliveryStation.line}</Text>
             </View>
           </View>
         </View>
@@ -233,45 +218,18 @@ export default function RequestDetailScreen({ navigation, route }: Props) {
           <View style={styles.infoRow}>
             <Text style={styles.infoLabel}>크기</Text>
             <Text style={styles.infoValue}>
-              {request.packageInfo.size === 'small' ? '소형' :
-               request.packageInfo.size === 'medium' ? '중형' :
-               request.packageInfo.size === 'large' ? '대형' : '특대'}
+              {detailView.packageInfo.size === 'small' ? '소형' :
+               detailView.packageInfo.size === 'medium' ? '중형' :
+               detailView.packageInfo.size === 'large' ? '대형' : detailView.packageInfo.size}
             </Text>
           </View>
           <View style={styles.infoRow}>
             <Text style={styles.infoLabel}>무게</Text>
-            <Text style={styles.infoValue}>{request.packageInfo.weight}kg</Text>
+            <Text style={styles.infoValue}>{detailView.packageInfo.weight}</Text>
           </View>
           <View style={styles.infoRow}>
             <Text style={styles.infoLabel}>설명</Text>
-            <Text style={styles.infoValue}>{request.packageInfo.description}</Text>
-          </View>
-          {request.packageInfo.isFragile && (
-            <View style={styles.tagContainer}>
-              <Text style={styles.tag}>⚠️ 깨지기 쉬움</Text>
-            </View>
-          )}
-          {request.packageInfo.isPerishable && (
-            <View style={styles.tagContainer}>
-              <Text style={styles.tag}>❄️ 부패하기 쉬움</Text>
-            </View>
-          )}
-        </View>
-
-        {/* Recipient Info */}
-        <View style={styles.card}>
-          <Text style={styles.cardTitle}>👤 수신자 정보</Text>
-          <View style={styles.infoRow}>
-            <Text style={styles.infoLabel}>이름</Text>
-            <Text style={styles.infoValue}>{request.recipientName}</Text>
-          </View>
-          <View style={styles.infoRow}>
-            <Text style={styles.infoLabel}>전화번호</Text>
-            <Text style={styles.infoValue}>{request.recipientPhone}</Text>
-          </View>
-          <View style={styles.infoRow}>
-            <Text style={styles.infoLabel}>인증코드</Text>
-            <Text style={styles.verificationCode}>{request.recipientVerificationCode}</Text>
+            <Text style={styles.infoValue}>{detailView.packageInfo.description}</Text>
           </View>
         </View>
 
@@ -279,102 +237,95 @@ export default function RequestDetailScreen({ navigation, route }: Props) {
         <View style={styles.card}>
           <Text style={styles.cardTitle}>⏰ 시간 정보</Text>
           <View style={styles.infoRow}>
-            <Text style={styles.infoLabel}>픽업 마감</Text>
-            <Text style={styles.infoValue}>{formatDate(request.pickupDeadline)}</Text>
+            <Text style={styles.infoLabel}>요청 마감</Text>
+        <Text style={styles.infoValue}>{formatDate(detailView.deadline || null)}</Text>
           </View>
           <View style={styles.infoRow}>
-            <Text style={styles.infoLabel}>배송 마감</Text>
-            <Text style={styles.infoValue}>{formatDate(request.deliveryDeadline)}</Text>
+            <Text style={styles.infoLabel}>희망 시간</Text>
+            <Text style={styles.infoValue}>
+              {detailView.preferredTime?.departureTime || '-'} → {detailView.preferredTime?.arrivalTime || '-'}
+            </Text>
           </View>
           <View style={styles.infoRow}>
             <Text style={styles.infoLabel}>생성일</Text>
-            <Text style={styles.infoValue}>{formatDate(request.createdAt)}</Text>
+        <Text style={styles.infoValue}>{formatDate(detailView.createdAt || null)}</Text>
           </View>
         </View>
 
         {/* Fee Info */}
         <View style={styles.card}>
-          <Text style={styles.cardTitle}>💵 배송비</Text>
+            <Text style={styles.cardTitle}>💵 배송비</Text>
           <View style={styles.feeTotal}>
             <Text style={styles.feeTotalLabel}>총합계</Text>
-            <Text style={styles.feeTotalValue}>{request.fee.totalFee.toLocaleString()}원</Text>
-          </View>
-          <View style={styles.feeBreakdown}>
-            <View style={styles.feeItem}>
-              <Text style={styles.feeItemLabel}>기본요금</Text>
-              <Text style={styles.feeItemValue}>{request.fee.baseFee.toLocaleString()}원</Text>
-            </View>
-            <View style={styles.feeItem}>
-              <Text style={styles.feeItemLabel}>거리요금</Text>
-              <Text style={styles.feeItemValue}>{request.fee.distanceFee.toLocaleString()}원</Text>
-            </View>
-            <View style={styles.feeItem}>
-              <Text style={styles.feeItemLabel}>무게요금</Text>
-              <Text style={styles.feeItemValue}>{request.fee.weightFee.toLocaleString()}원</Text>
-            </View>
-            <View style={styles.feeItem}>
-              <Text style={styles.feeItemLabel}>크기요금</Text>
-              <Text style={styles.feeItemValue}>{request.fee.sizeFee.toLocaleString()}원</Text>
-            </View>
-            <View style={styles.feeItem}>
-              <Text style={styles.feeItemLabel}>부가세</Text>
-              <Text style={styles.feeItemValue}>{request.fee.vat.toLocaleString()}원</Text>
-            </View>
+            <Text style={styles.feeTotalValue}>{detailView.feeTotal.toLocaleString()}원</Text>
           </View>
         </View>
 
         {/* Matching Gillers */}
-        {request.status === 'pending' && matches.length > 0 && (
+        {detailView.status === RequestStatus.PENDING && matches.length > 0 && (
           <View style={styles.card}>
             <Text style={styles.cardTitle}>🎯 매칭된 길러 ({matches.length})</Text>
-            {matches.map((match) => (
-              <View key={match.gillerId} style={styles.gillerCard}>
-                <View style={styles.gillerHeader}>
-                  <View style={styles.gillerRank}>
-                    <Text style={styles.gillerRankText}>#{match.rank}</Text>
-                  </View>
-                  <View style={styles.gillerInfo}>
-                    <Text style={styles.gillerName}>{match.gillerName}</Text>
-                    <View style={styles.gillerStats}>
-                      <Text style={styles.gillerScore}>⭐ {match.score.toFixed(1)}점</Text>
-                      <Text style={styles.gillerTime}>⏱ {match.travelTime}분</Text>
+            {matches.map((match) => {
+              const isSelected = match.gillerId === selectedGillerId;
+              return (
+                <View
+                  key={match.gillerId}
+                  style={[styles.gillerCard, isSelected && styles.selectedGillerCard]}
+                >
+                  {isSelected && (
+                    <View style={styles.selectedBadge}>
+                      <Text style={styles.selectedBadgeText}>선택됨</Text>
+                    </View>
+                  )}
+                  <View style={styles.gillerHeader}>
+                    <View style={styles.gillerRank}>
+                      <Text style={styles.gillerRankText}>#{match.rank}</Text>
+                    </View>
+                    <View style={styles.gillerInfo}>
+                      <Text style={styles.gillerName}>{match.gillerName}</Text>
+                      <View style={styles.gillerStats}>
+                        <Text style={styles.gillerScore}>⭐ {match.score.toFixed(1)}점</Text>
+                        <Text style={styles.gillerTime}>⏱ {match.travelTime}분</Text>
+                      </View>
                     </View>
                   </View>
+                  {match.hasExpress && (
+                    <View style={styles.expressBadge}>
+                      <Text style={styles.expressText}>급행</Text>
+                    </View>
+                  )}
+                  {match.reasons && match.reasons.length > 0 && (
+                    <View style={styles.reasonsContainer}>
+                      {match.reasons.map((reason, index) => (
+                        <Text key={index} style={styles.reasonText}>✓ {reason}</Text>
+                      ))}
+                    </View>
+                  )}
                 </View>
-                {match.hasExpress && (
-                  <View style={styles.expressBadge}>
-                    <Text style={styles.expressText}>급행</Text>
-                  </View>
-                )}
-                <View style={styles.reasonsContainer}>
-                  {match.reasons.map((reason, index) => (
-                    <Text key={index} style={styles.reasonText}>✓ {reason}</Text>
-                  ))}
-                </View>
-              </View>
-            ))}
+              );
+            })}
           </View>
         )}
 
         {/* Cancellation Info */}
-        {request.status === 'cancelled' && (
+        {detailView.status === RequestStatus.CANCELLED && (
           <View style={[styles.card, styles.cancelledCard]}>
             <Text style={styles.cardTitle}>⚠️ 취소 정보</Text>
             <View style={styles.infoRow}>
               <Text style={styles.infoLabel}>사유</Text>
-              <Text style={styles.infoValue}>{request.cancellationReason}</Text>
+              <Text style={styles.infoValue}>{detailView.cancellationReason}</Text>
             </View>
-            {request.cancelledAt && (
+            {detailView.cancelledAt && (
               <View style={styles.infoRow}>
                 <Text style={styles.infoLabel}>취소일</Text>
-                <Text style={styles.infoValue}>{formatDate(request.cancelledAt)}</Text>
+                <Text style={styles.infoValue}>{formatDate(detailView.cancelledAt)}</Text>
               </View>
             )}
           </View>
         )}
 
         {/* Actions */}
-        {request.status === 'pending' && (
+        {detailView.status === RequestStatus.PENDING && (
           <View style={styles.actions}>
             <TouchableOpacity
               style={[styles.actionButton, styles.cancelButton]}
@@ -390,6 +341,20 @@ export default function RequestDetailScreen({ navigation, route }: Props) {
           </View>
         )}
       </ScrollView>
+
+      <TextInputModal
+        visible={cancelModalVisible}
+        title="취소 사유"
+        subtitle="배송 요청을 취소하는 사유를 입력해주세요."
+        value={cancelReason}
+        onChangeText={setCancelReason}
+        placeholder="예: 일정 변경"
+        confirmText="확인"
+        cancelText="취소"
+        loading={cancelling}
+        onConfirm={handleConfirmCancel}
+        onCancel={() => setCancelModalVisible(false)}
+      />
     </View>
   );
 }
@@ -506,6 +471,25 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     marginBottom: 8,
     padding: 12,
+  },
+  selectedGillerCard: {
+    backgroundColor: '#E1F5FE',
+    borderColor: '#00BCD4',
+    borderWidth: 2,
+  },
+  selectedBadge: {
+    position: 'absolute',
+    top: 8,
+    right: 8,
+    backgroundColor: '#00BCD4',
+    borderRadius: 12,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+  },
+  selectedBadgeText: {
+    color: '#fff',
+    fontSize: 11,
+    fontWeight: 'bold',
   },
   gillerHeader: {
     alignItems: 'center',
@@ -649,11 +633,5 @@ const styles = StyleSheet.create({
     color: '#999',
     fontSize: 12,
     marginTop: 4,
-  },
-  verificationCode: {
-    color: '#00BCD4',
-    fontSize: 18,
-    fontWeight: 'bold',
-    letterSpacing: 2,
   },
 });

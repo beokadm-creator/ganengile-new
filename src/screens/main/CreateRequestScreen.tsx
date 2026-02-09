@@ -114,6 +114,8 @@ export default function CreateRequestScreen({ navigation }: Props) {
     distanceFee: number;
     sizeFee: number;
     weightFee: number;
+    serviceFee: number;
+    vat: number;
     totalFee: number;
     estimatedTime: number;
     urgencyFee?: number;
@@ -159,10 +161,13 @@ export default function CreateRequestScreen({ navigation }: Props) {
       const urgencyOption = URGENCY_OPTIONS.find(opt => opt.level === urgency);
       const urgencyFee = Math.round(fee.baseFee * (urgencyOption?.surchargeMultiplier || 0));
 
-      const totalFee = fee.totalFee + urgencyFee;
+      const subtotal = fee.baseFee + fee.distanceFee + fee.sizeFee + fee.weightFee + fee.serviceFee + urgencyFee;
+      const vat = Math.round(subtotal * 0.1);
+      const totalFee = subtotal + vat;
 
       setDeliveryFee({
         ...fee,
+        vat,
         totalFee,
         urgencyFee,
       });
@@ -176,7 +181,8 @@ export default function CreateRequestScreen({ navigation }: Props) {
       const urgencyOption = URGENCY_OPTIONS.find(opt => opt.level === urgency);
       const urgencyFee = Math.round(baseFee * (urgencyOption?.surchargeMultiplier || 0));
 
-      const subtotal = baseFee + distanceFee + weightFeeValue + sizeFeeValue + urgencyFee;
+      const serviceFee = 0;
+      const subtotal = baseFee + distanceFee + weightFeeValue + sizeFeeValue + serviceFee + urgencyFee;
       const vat = Math.round(subtotal * 0.1);
 
       setDeliveryFee({
@@ -184,6 +190,8 @@ export default function CreateRequestScreen({ navigation }: Props) {
         distanceFee,
         sizeFee: sizeFeeValue,
         weightFee: weightFeeValue,
+        serviceFee,
+        vat,
         totalFee: subtotal + vat,
         estimatedTime: 30,
         urgencyFee,
@@ -293,7 +301,7 @@ export default function CreateRequestScreen({ navigation }: Props) {
         urgent: 'high',
       };
 
-      await createRequest({
+      const request = await createRequest({
         requesterId: userId,
         pickupStation: pickupInfo,
         deliveryStation: deliveryInfo,
@@ -309,11 +317,14 @@ export default function CreateRequestScreen({ navigation }: Props) {
 
       Alert.alert(
         '성공',
-        '배송 요청이 생성되었습니다.',
+        '배송 요청이 생성되었습니다. 길러를 찾고 있습니다...',
         [
           {
             text: '확인',
-            onPress: () => navigation.goBack(),
+            onPress: () => navigation.navigate('MatchingResult', {
+              requestId: request.requestId,
+              success: false,
+            }),
           },
         ]
       );
@@ -631,7 +642,7 @@ export default function CreateRequestScreen({ navigation }: Props) {
               {deliveryFee.urgencyFee && deliveryFee.urgencyFee > 0 && (
                 <Text style={styles.feeItemUrgency}>긴급 surcharge: +{deliveryFee.urgencyFee.toLocaleString()}원</Text>
               )}
-              <Text style={styles.feeItem}>VAT: {Math.round(deliveryFee.totalFee * 0.1).toLocaleString()}원</Text>
+              <Text style={styles.feeItem}>VAT: {deliveryFee.vat.toLocaleString()}원</Text>
             </View>
           </>
         )}

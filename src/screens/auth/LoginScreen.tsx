@@ -15,7 +15,7 @@ export default function LoginScreen({ navigation }: any) {
 
   const handleLogin = async () => {
     if (!email || !password) {
-      Alert.alert('오류', '이메일과 비밀번호를 입력해주세요');
+      Alert.alert('입력 오류', '이메일과 비밀번호를 모두 입력해주세요.');
       return;
     }
 
@@ -24,7 +24,29 @@ export default function LoginScreen({ navigation }: any) {
       await signInWithEmailAndPassword(auth, email, password);
       // Auth state change will be handled by AppNavigator
     } catch (error: any) {
-      Alert.alert('로그인 실패', error.message);
+      let errorMessage = '로그인에 실패했습니다.';
+
+      switch (error.code) {
+        case 'auth/user-not-found':
+          errorMessage = '등록되지 않은 이메일입니다. 회원가입을 먼저 진행해주세요.';
+          break;
+        case 'auth/wrong-password':
+          errorMessage = '비밀번호가 올바르지 않습니다. 다시 확인해주세요.';
+          break;
+        case 'auth/invalid-email':
+          errorMessage = '이메일 형식이 올바르지 않습니다.';
+          break;
+        case 'auth/user-disabled':
+          errorMessage = '계정이 비활성화되었습니다. 고객센터에 문의해주세요.';
+          break;
+        case 'auth/too-many-requests':
+          errorMessage = '로그인 시도가 너무 많습니다. 잠시 후 다시 시도해주세요.';
+          break;
+        default:
+          errorMessage = error.message || '로그인에 실패했습니다. 다시 시도해주세요.';
+      }
+
+      Alert.alert('로그인 실패', errorMessage);
     } finally {
       setLoading(false);
     }

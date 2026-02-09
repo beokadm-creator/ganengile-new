@@ -1,0 +1,867 @@
+{
+  "stations": [
+    {
+      "stationId": "150-1",
+      "stationName": "구로",
+      "stationNameEnglish": "Guro",
+      "lines": [
+        {
+          "lineId": "line-1",
+          "lineName": "1호선",
+          "stationNumber": "144"
+        }
+      ],
+      "location": {
+        "latitude": 37.4955,
+        "longitude": 126.8874
+      },
+      "isTransferStation": true,
+      "isExpressStop": false,
+      "isTerminus": false,
+      "facilities": ["elevator", "escalator", "toilet"],
+      "isActive": true,
+      "region": "seoul"
+    },
+    {
+      "stationId": "150-2",
+      "stationName": "부천",
+      "stationNameEnglish": "Bucheon",
+      "lines": [
+        {
+          "lineId": "line-1",
+          "lineName": "1호선",
+          "stationNumber": "150"
+        }
+      ],
+      "location": {
+        "latitude": 37.4989,
+        "longitude": 126.7831
+      },
+      "isTransferStation": false,
+      "isExpressStop": false,
+      "isTerminus": false,
+      "facilities": ["elevator", "escalator", "toilet"],
+      "isActive": true,
+      "region": "gyeonggi"
+    },
+    {
+      "stationId": "150-3",
+      "stationName": "송내",
+      "stationNameEnglish": "Songnae",
+      "lines": [
+        {
+          "lineId": "line-1",
+          "lineName": "1호선",
+          "stationNumber": "151"
+        }
+      ],
+      "location": {
+        "latitude": 37.5028,
+        "longitude": 126.7819
+      },
+      "isTransferStation": false,
+      "isExpressStop": false,
+      "isTerminus": false,
+      "facilities": ["elevator", "escalator", "toilet"],
+      "isActive": true,
+      "region": "gyeonggi"
+    },
+    {
+      "stationId": "150-4",
+      "stationName": "중동",
+      "stationNameEnglish": "Jungdong",
+      "lines": [
+        {
+          "lineId": "line-1",
+          "lineName": "1호선",
+          "stationNumber": "152"
+        }
+      ],
+      "location": {
+        "latitude": 37.5036,
+        "longitude": 126.7756
+      },
+      "isTransferStation": false,
+      "isExpressStop": false,
+      "isTerminus": false,
+      "facilities": ["escalator", "toilet"],
+      "isActive": true,
+      "region": "gyeonggi"
+    },
+    {
+      "stationId": "150-5",
+      "stationName": "부평",
+      "stationNameEnglish": "Bupyeong",
+      "lines": [
+        {
+          "lineId": "line-1",
+          "lineName": "1호선",
+          "stationNumber": "170"
+        }
+      ],
+      "location": {
+        "latitude": 37.4907,
+        "longitude": 126.7211
+      },
+      "isTransferStation": false,
+      "isExpressStop": true,
+      "isTerminus": false,
+      "facilities": ["elevator", "escalator", "toilet"],
+      "isActive": true,
+      "region": "incheon"
+    },
+    {
+      "stationId": "150-6",
+      "stationName": "주안",
+      "stationNameEnglish": "Juan",
+      "lines": [
+        {
+          "lineId": "line-1",
+          "lineName": "1호선",
+          "stationNumber": "168"
+        }
+      ],
+      "location": {
+        "latitude": 37.4689,
+        "longitude": 126.6769
+      },
+      "isTransferStation": false,
+      "isExpressStop": true,
+      "isTerminus": false,
+      "facilities": ["elevator", "escalator", "toilet"],
+      "isActive": true,
+      "region": "incheon"
+    },
+    {
+      "stationId": "150-7",
+      "stationName": "인천",
+      "stationNameEnglish": "Incheon",
+      "lines": [
+        {
+          "lineId": "line-1",
+          "lineName": "1호선",
+          "stationNumber": "161"
+        }
+      ],
+      "location": {
+        "latitude": 37.4756,
+        "longitude": 126.6264
+      },
+      "isTransferStation": false,
+      "isExpressStop": true,
+      "isTerminus": true,
+      "facilities": ["elevator", "escalator", "toilet"],
+      "isActive": true,
+      "region": "incheon"
+    },
+    {
+      "stationId": "156-1",
+      "stationName": "안양",
+      "stationNameEnglish": "Anyang",
+      "lines": [
+        {
+          "lineId": "line-1",
+          "lineName": "1호선",
+          "stationNumber": "156"
+        }
+      ],
+      "location": {
+        "latitude": 37.3915,
+        "longitude": 126.9564
+      },
+      "isTransferStation": false,
+      "isExpressStop": true,
+      "isTerminus": false,
+      "facilities": ["elevator", "escalator", "toilet"],
+      "isActive": true,
+      "region": "gyeonggi"
+    },
+    {
+      "stationId": "156-2",
+      "stationName": "만안",
+      "stationNameEnglish": "Manan",
+      "lines": [
+        {
+          "lineId": "line-1",
+          "lineName": "1호선",
+          "stationNumber": "157"
+        }
+      ],
+      "location": {
+        "latitude": 37.3845,
+        "longitude": 126.9526
+      },
+      "isTransferStation": false,
+      "isExpressStop": false,
+      "isTerminus": false,
+      "facilities": ["escalator", "toilet"],
+      "isActive": true,
+      "region": "gyeonggi"
+    },
+    {
+      "stationId": "156-3",
+      "stationName": "평촌",
+      "stationNameEnglish": "Pyeongchon",
+      "lines": [
+        {
+          "lineId": "line-1",
+          "lineName": "1호선",
+          "stationNumber": "158"
+        }
+      ],
+      "location": {
+        "latitude": 37.3768,
+        "longitude": 126.9494
+      },
+      "isTransferStation": false,
+      "isExpressStop": false,
+      "isTerminus": false,
+      "facilities": ["elevator", "escalator", "toilet"],
+      "isActive": true,
+      "region": "gyeonggi"
+    },
+    {
+      "stationId": "156-4",
+      "stationName": "산본",
+      "stationNameEnglish": "Sanbon",
+      "lines": [
+        {
+          "lineId": "line-1",
+          "lineName": "1호선",
+          "stationNumber": "159"
+        }
+      ],
+      "location": {
+        "latitude": 37.3609,
+        "longitude": 126.9326
+      },
+      "isTransferStation": false,
+      "isExpressStop": false,
+      "isTerminus": false,
+      "facilities": ["elevator", "escalator", "toilet"],
+      "isActive": true,
+      "region": "gyeonggi"
+    },
+    {
+      "stationId": "156-5",
+      "stationName": "수원",
+      "stationNameEnglish": "Suwon",
+      "lines": [
+        {
+          "lineId": "line-1",
+          "lineName": "1호선",
+          "stationNumber": "163"
+        }
+      ],
+      "location": {
+        "latitude": 37.2637,
+        "longitude": 127.0329
+      },
+      "isTransferStation": true,
+      "isExpressStop": true,
+      "isTerminus": false,
+      "facilities": ["elevator", "escalator", "toilet"],
+      "isActive": true,
+      "region": "gyeonggi"
+    },
+    {
+      "stationId": "319-1",
+      "stationName": "주엽",
+      "stationNameEnglish": "Juyeop",
+      "lines": [
+        {
+          "lineId": "line-3",
+          "lineName": "3호선",
+          "stationNumber": "319"
+        }
+      ],
+      "location": {
+        "latitude": 37.6539,
+        "longitude": 126.7639
+      },
+      "isTransferStation": false,
+      "isExpressStop": false,
+      "isTerminus": false,
+      "facilities": ["elevator", "escalator", "toilet"],
+      "isActive": true,
+      "region": "gyeonggi"
+    },
+    {
+      "stationId": "319-2",
+      "stationName": "대화",
+      "stationNameEnglish": "Daehwa",
+      "lines": [
+        {
+          "lineId": "line-3",
+          "lineName": "3호선",
+          "stationNumber": "320"
+        }
+      ],
+      "location": {
+        "latitude": 37.6614,
+        "longitude": 126.7709
+      },
+      "isTransferStation": false,
+      "isExpressStop": false,
+      "isTerminus": true,
+      "facilities": ["elevator", "escalator", "toilet"],
+      "isActive": true,
+      "region": "gyeonggi"
+    },
+    {
+      "stationId": "319-3",
+      "stationName": "화정",
+      "stationNameEnglish": "Hwajeong",
+      "lines": [
+        {
+          "lineId": "line-3",
+          "lineName": "3호선",
+          "stationNumber": "322"
+        }
+      ],
+      "location": {
+        "latitude": 37.6328,
+        "longitude": 126.7392
+      },
+      "isTransferStation": false,
+      "isExpressStop": false,
+      "isTerminus": false,
+      "facilities": ["elevator", "escalator", "toilet"],
+      "isActive": true,
+      "region": "gyeonggi"
+    },
+    {
+      "stationId": "K223-1",
+      "stationName": "백석",
+      "stationNameEnglish": "Baekseok",
+      "lines": [
+        {
+          "lineId": "line-gyeongui",
+          "lineName": "경의중앙선",
+          "stationNumber": "K325"
+        }
+      ],
+      "location": {
+        "latitude": 37.6495,
+        "longitude": 126.7756
+      },
+      "isTransferStation": false,
+      "isExpressStop": false,
+      "isTerminus": false,
+      "facilities": ["elevator", "escalator", "toilet"],
+      "isActive": true,
+      "region": "gyeonggi"
+    },
+    {
+      "stationId": "K223-2",
+      "stationName": "일산",
+      "stationNameEnglish": "Ilsan",
+      "lines": [
+        {
+          "lineId": "line-gyeongui",
+          "lineName": "경의중앙선",
+          "stationNumber": "K326"
+        }
+      ],
+      "location": {
+        "latitude": 37.6578,
+        "longitude": 126.7717
+      },
+      "isTransferStation": false,
+      "isExpressStop": false,
+      "isTerminus": false,
+      "facilities": ["elevator", "escalator", "toilet"],
+      "isActive": true,
+      "region": "gyeonggi"
+    },
+    {
+      "stationId": "K223-3",
+      "stationName": "능곡",
+      "stationNameEnglish": "Neunggok",
+      "lines": [
+        {
+          "lineId": "line-gyeongui",
+          "lineName": "경의중앙선",
+          "stationNumber": "K322"
+        }
+      ],
+      "location": {
+        "latitude": 37.6158,
+        "longitude": 126.7742
+      },
+      "isTransferStation": false,
+      "isExpressStop": false,
+      "isTerminus": false,
+      "facilities": ["escalator", "toilet"],
+      "isActive": true,
+      "region": "gyeonggi"
+    },
+    {
+      "stationId": "K223-4",
+      "stationName": "행신",
+      "stationNameEnglish": "Haengsin",
+      "lines": [
+        {
+          "lineId": "line-gyeongui",
+          "lineName": "경의중앙선",
+          "stationNumber": "K321"
+        }
+      ],
+      "location": {
+        "latitude": 37.6006,
+        "longitude": 126.7819
+      },
+      "isTransferStation": false,
+      "isExpressStop": false,
+      "isTerminus": false,
+      "facilities": ["escalator", "toilet"],
+      "isActive": true,
+      "region": "gyeonggi"
+    },
+    {
+      "stationId": "D11-1",
+      "stationName": "정자",
+      "stationNameEnglish": "Jeongja",
+      "lines": [
+        {
+          "lineId": "line-bundang",
+          "lineName": "수인분당선",
+          "stationNumber": "D225"
+        }
+      ],
+      "location": {
+        "latitude": 37.3697,
+        "longitude": 127.1081
+      },
+      "isTransferStation": false,
+      "isExpressStop": false,
+      "isTerminus": false,
+      "facilities": ["elevator", "escalator", "toilet"],
+      "isActive": true,
+      "region": "gyeonggi"
+    },
+    {
+      "stationId": "D11-2",
+      "stationName": "미금",
+      "stationNameEnglish": "Migeum",
+      "lines": [
+        {
+          "lineId": "line-bundang",
+          "lineName": "수인분당선",
+          "stationNumber": "D226"
+        }
+      ],
+      "location": {
+        "latitude": 37.3789,
+        "longitude": 127.1147
+      },
+      "isTransferStation": false,
+      "isExpressStop": false,
+      "isTerminus": false,
+      "facilities": ["elevator", "escalator", "toilet"],
+      "isActive": true,
+      "region": "gyeonggi"
+    },
+    {
+      "stationId": "D11-3",
+      "stationName": "오리",
+      "stationNameEnglish": "Ori",
+      "lines": [
+        {
+          "lineId": "line-bundang",
+          "lineName": "수인분당선",
+          "stationNumber": "D220"
+        }
+      ],
+      "location": {
+        "latitude": 37.3574,
+        "longitude": 127.1053
+      },
+      "isTransferStation": false,
+      "isExpressStop": false,
+      "isTerminus": false,
+      "facilities": ["elevator", "escalator", "toilet"],
+      "isActive": true,
+      "region": "gyeonggi"
+    },
+    {
+      "stationId": "D11-4",
+      "stationName": "죽전",
+      "stationNameEnglish": "Jukjeon",
+      "lines": [
+        {
+          "lineId": "line-bundang",
+          "lineName": "수인분당선",
+          "stationNumber": "D228"
+        }
+      ],
+      "location": {
+        "latitude": 37.3239,
+        "longitude": 127.1124
+      },
+      "isTransferStation": false,
+      "isExpressStop": false,
+      "isTerminus": false,
+      "facilities": ["elevator", "escalator", "toilet"],
+      "isActive": true,
+      "region": "gyeonggi"
+    },
+    {
+      "stationId": "D11-5",
+      "stationName": "기흥",
+      "stationNameEnglish": "Giheung",
+      "lines": [
+        {
+          "lineId": "line-bundang",
+          "lineName": "수인분당선",
+          "stationNumber": "D231"
+        }
+      ],
+      "location": {
+        "latitude": 37.2967,
+        "longitude": 127.1142
+      },
+      "isTransferStation": false,
+      "isExpressStop": false,
+      "isTerminus": false,
+      "facilities": ["elevator", "escalator", "toilet"],
+      "isActive": true,
+      "region": "gyeonggi"
+    },
+    {
+      "stationId": "D11-6",
+      "stationName": "망포",
+      "stationNameEnglish": "Mangpo",
+      "lines": [
+        {
+          "lineId": "line-bundang",
+          "lineName": "수인분당선",
+          "stationNumber": "D237"
+        }
+      ],
+      "location": {
+        "latitude": 37.2698,
+        "longitude": 127.0403
+      },
+      "isTransferStation": false,
+      "isExpressStop": false,
+      "isTerminus": false,
+      "facilities": ["elevator", "escalator", "toilet"],
+      "isActive": true,
+      "region": "gyeonggi"
+    },
+    {
+      "stationId": "D11-7",
+      "stationName": "매교",
+      "stationNameEnglish": "Maegyo",
+      "lines": [
+        {
+          "lineId": "line-bundang",
+          "lineName": "수인분당선",
+          "stationNumber": "D238"
+        }
+      ],
+      "location": {
+        "latitude": 37.2636,
+        "longitude": 127.0283
+      },
+      "isTransferStation": false,
+      "isExpressStop": false,
+      "isTerminus": false,
+      "facilities": ["elevator", "escalator", "toilet"],
+      "isActive": true,
+      "region": "gyeonggi"
+    },
+    {
+      "stationId": "814-1",
+      "stationName": "모란",
+      "stationNameEnglish": "Moran",
+      "lines": [
+        {
+          "lineId": "line-8",
+          "lineName": "8호선",
+          "stationNumber": "854"
+        }
+      ],
+      "location": {
+        "latitude": 37.4389,
+        "longitude": 127.1289
+      },
+      "isTransferStation": false,
+      "isExpressStop": false,
+      "isTerminus": true,
+      "facilities": ["elevator", "escalator", "toilet"],
+      "isActive": true,
+      "region": "gyeonggi"
+    },
+    {
+      "stationId": "814-2",
+      "stationName": "수진",
+      "stationNameEnglish": "Sujin",
+      "lines": [
+        {
+          "lineId": "line-bundang",
+          "lineName": "수인분당선",
+          "stationNumber": "D218"
+        }
+      ],
+      "location": {
+        "latitude": 37.4481,
+        "longitude": 127.1278
+      },
+      "isTransferStation": false,
+      "isExpressStop": false,
+      "isTerminus": false,
+      "facilities": ["elevator", "escalator", "toilet"],
+      "isActive": true,
+      "region": "gyeonggi"
+    },
+    {
+      "stationId": "A01-1",
+      "stationName": "김포공항",
+      "stationNameEnglish": "Gimpo Airport",
+      "lines": [
+        {
+          "lineId": "line-9",
+          "lineName": "9호선",
+          "stationNumber": "902"
+        },
+        {
+          "lineId": "line-airport",
+          "lineName": "공항철도",
+          "stationNumber": "A01"
+        }
+      ],
+      "location": {
+        "latitude": 37.5609,
+        "longitude": 126.7958
+      },
+      "isTransferStation": true,
+      "isExpressStop": false,
+      "isTerminus": false,
+      "facilities": ["elevator", "escalator", "toilet"],
+      "isActive": true,
+      "region": "seoul"
+    },
+    {
+      "stationId": "A01-2",
+      "stationName": "계양",
+      "stationNameEnglish": "Geyang",
+      "lines": [
+        {
+          "lineId": "line-airport",
+          "lineName": "공항철도",
+          "stationNumber": "A03"
+        }
+      ],
+      "location": {
+        "latitude": 37.5381,
+        "longitude": 126.7342
+      },
+      "isTransferStation": false,
+      "isExpressStop": true,
+      "isTerminus": false,
+      "facilities": ["elevator", "escalator", "toilet"],
+      "isActive": true,
+      "region": "incheon"
+    },
+    {
+      "stationId": "A01-3",
+      "stationName": "청라국제도시",
+      "stationNameEnglish": "Cheongna International City",
+      "lines": [
+        {
+          "lineId": "line-airport",
+          "lineName": "공항철도",
+          "stationNumber": "A04"
+        }
+      ],
+      "location": {
+        "latitude": 37.5194,
+        "longitude": 126.6772
+      },
+      "isTransferStation": false,
+      "isExpressStop": true,
+      "isTerminus": false,
+      "facilities": ["elevator", "escalator", "toilet"],
+      "isActive": true,
+      "region": "incheon"
+    },
+    {
+      "stationId": "A01-4",
+      "stationName": "영종도",
+      "stationNameEnglish": "Yeongjongdo",
+      "lines": [
+        {
+          "lineId": "line-airport",
+          "lineName": "공항철도",
+          "stationNumber": "A05"
+        }
+      ],
+      "location": {
+        "latitude": 37.5047,
+        "longitude": 126.5897
+      },
+      "isTransferStation": false,
+      "isExpressStop": false,
+      "isTerminus": false,
+      "facilities": ["elevator", "escalator", "toilet"],
+      "isActive": true,
+      "region": "incheon"
+    },
+    {
+      "stationId": "A01-5",
+      "stationName": "인천공항1터미널",
+      "stationNameEnglish": "Incheon Airport T1",
+      "lines": [
+        {
+          "lineId": "line-airport",
+          "lineName": "공항철도",
+          "stationNumber": "A10"
+        }
+      ],
+      "location": {
+        "latitude": 37.4492,
+        "longitude": 126.4508
+      },
+      "isTransferStation": false,
+      "isExpressStop": false,
+      "isTerminus": true,
+      "facilities": ["elevator", "escalator", "toilet"],
+      "isActive": true,
+      "region": "incheon"
+    },
+    {
+      "stationId": "K118-1",
+      "stationName": "망우",
+      "stationNameEnglish": "Mangu",
+      "lines": [
+        {
+          "lineId": "line-gyungchun",
+          "lineName": "경춘선",
+          "stationNumber": "K118"
+        }
+      ],
+      "location": {
+        "latitude": 37.5886,
+        "longitude": 127.1039
+      },
+      "isTransferStation": true,
+      "isExpressStop": false,
+      "isTerminus": false,
+      "facilities": ["elevator", "escalator", "toilet"],
+      "isActive": true,
+      "region": "seoul"
+    },
+    {
+      "stationId": "K118-2",
+      "stationName": "도농",
+      "stationNameEnglish": "Donong",
+      "lines": [
+        {
+          "lineId": "line-gyungchun",
+          "lineName": "경춘선",
+          "stationNumber": "K120"
+        }
+      ],
+      "location": {
+        "latitude": 37.5998,
+        "longitude": 127.1216
+      },
+      "isTransferStation": false,
+      "isExpressStop": false,
+      "isTerminus": false,
+      "facilities": ["elevator", "escalator", "toilet"],
+      "isActive": true,
+      "region": "gyeonggi"
+    },
+    {
+      "stationId": "K118-3",
+      "stationName": "양정",
+      "stationNameEnglish": "Yangjeong",
+      "lines": [
+        {
+          "lineId": "line-gyungchun",
+          "lineName": "경춘선",
+          "stationNumber": "K121"
+        }
+      ],
+      "location": {
+        "latitude": 37.6075,
+        "longitude": 127.1319
+      },
+      "isTransferStation": false,
+      "isExpressStop": false,
+      "isTerminus": false,
+      "facilities": ["escalator", "toilet"],
+      "isActive": true,
+      "region": "gyeonggi"
+    },
+    {
+      "stationId": "K118-4",
+      "stationName": "덕소",
+      "stationNameEnglish": "Deokso",
+      "lines": [
+        {
+          "lineId": "line-gyungchun",
+          "lineName": "경춘선",
+          "stationNumber": "K122"
+        }
+      ],
+      "location": {
+        "latitude": 37.6181,
+        "longitude": 127.1533
+      },
+      "isTransferStation": false,
+      "isExpressStop": false,
+      "isTerminus": false,
+      "facilities": ["escalator", "toilet"],
+      "isActive": true,
+      "region": "gyeonggi"
+    },
+    {
+      "stationId": "K118-5",
+      "stationName": "도심",
+      "stationNameEnglish": "Dosim",
+      "lines": [
+        {
+          "lineId": "line-gyungchun",
+          "lineName": "경춘선",
+          "stationNumber": "K123"
+        }
+      ],
+      "location": {
+        "latitude": 37.6289,
+        "longitude": 127.1764
+      },
+      "isTransferStation": false,
+      "isExpressStop": false,
+      "isTerminus": false,
+      "facilities": ["escalator", "toilet"],
+      "isActive": true,
+      "region": "gyeonggi"
+    },
+    {
+      "stationId": "K118-6",
+      "stationName": "팔당",
+      "stationNameEnglish": "Paldang",
+      "lines": [
+        {
+          "lineId": "line-gyungchun",
+          "lineName": "경춘선",
+          "stationNumber": "K124"
+        }
+      ],
+      "location": {
+        "latitude": 37.6423,
+        "longitude": 127.1945
+      },
+      "isTransferStation": false,
+      "isExpressStop": false,
+      "isTerminus": false,
+      "facilities": ["escalator", "toilet"],
+      "isActive": true,
+      "region": "gyeonggi"
+    }
+  ]
+}

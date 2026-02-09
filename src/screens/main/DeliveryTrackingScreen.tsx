@@ -3,7 +3,7 @@
  * 실시간 배송 추적 화면
  */
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useContext } from 'react';
 import {
   View,
   Text,
@@ -12,12 +12,17 @@ import {
   ActivityIndicator,
   TouchableOpacity,
   Dimensions,
+  Alert,
 } from 'react-native';
 import { StackNavigationProp } from '@react-navigation/stack';
 import { getDeliveryByRequestId } from '../../services/delivery-service';
 import { getRequestById } from '../../services/request-service';
-import { requireUserId } from '../../services/firebase';
-import type { DeliveryRequest, DeliveryStatus } from '../../types/delivery';
+import { UserContext } from '../../contexts/UserContext';
+import type { UserContextType } from '../../contexts/UserContext';
+import { UserRole } from '../../types/user';
+import type { Request } from '../../types/request';
+import { toTrackingModel, TrackingModel, TrackingEvent } from '../../utils/request-adapters';
+import { formatTimeKR } from '../../utils/date';
 
 const { width } = Dimensions.get('window');
 
@@ -32,20 +37,14 @@ interface Props {
   };
 }
 
-interface TrackingEvent {
-  type: string;
-  title: string;
-  description: string;
-  timestamp: Date;
-  completed: boolean;
-}
-
 export default function DeliveryTrackingScreen({ navigation, route }: Props) {
   const { requestId } = route.params;
-  const [request, setRequest] = useState<DeliveryRequest | null>(null);
+  const { user, currentRole } = useContext(UserContext) as UserContextType;
+  const [trackingData, setTrackingData] = useState<TrackingModel | null>(null);
   const [trackingEvents, setTrackingEvents] = useState<TrackingEvent[]>([]);
   const [loading, setLoading] = useState(true);
   const [progress, setProgress] = useState(0);
+  const [actionLoading, setActionLoading] = useState(false);
 
   useEffect(() => {
     loadTrackingData();
@@ -56,22 +55,22 @@ export default function DeliveryTrackingScreen({ navigation, route }: Props) {
 
   const loadTrackingData = async () => {
     try {
-      const userId = requireUserId();
-
       // Try to get delivery first
       const deliveryData = await getDeliveryByRequestId(requestId);
 
       if (deliveryData) {
-        setRequest(deliveryData);
-        generateTrackingEvents(deliveryData);
-        calculateProgress(deliveryData.status);
+        const model = mapToTrackingModel(deliveryData);
+        setTrackingData(model);
+        setTrackingEvents(model.trackingEvents || []);
+        calculateProgress(model.status);
       } else {
         // Fallback to request data
         const requestData = await getRequestById(requestId);
         if (requestData) {
-          setRequest(requestData as any);
-          generateTrackingEvents(requestData as any);
-          calculateProgress(requestData.status as any);
+          const model = mapToTrackingModel(requestData as Request);
+          setTrackingData(model);
+          setTrackingEvents(model.trackingEvents || []);
+          calculateProgress(model.status);
         }
       }
     } catch (error) {
@@ -81,64 +80,8 @@ export default function DeliveryTrackingScreen({ navigation, route }: Props) {
     }
   };
 
-  const generateTrackingEvents = (req: DeliveryRequest) => {
-    const events: TrackingEvent[] = [
-      {
-        type: 'created',
-        title: '요청 생성',
-        description: '배송 요청이 생성되었습니다',
-        timestamp: req.createdAt,
-        completed: true,
-      },
-      {
-        type: 'matched',
-        title: '매칭 완료',
-        description: '길러가 매칭되었습니다',
-        timestamp: req.createdAt, // 실제로는 매칭 시간
-        completed: ['matched', 'accepted', 'in_transit', 'arrived', 'completed'].includes(req.status),
-      },
-      {
-        type: 'accepted',
-        title: '수락 완료',
-        description: '길러가 배송을 수락했습니다',
-        timestamp: req.updatedAt,
-        completed: ['accepted', 'in_transit', 'arrived', 'completed'].includes(req.status),
-      },
-      {
-        type: 'picked_up',
-        title: '픽업 완료',
-        description: '물품을 수령했습니다',
-        timestamp: req.updatedAt,
-        completed: ['in_transit', 'arrived', 'completed'].includes(req.status),
-      },
-      {
-        type: 'in_transit',
-        title: '배송 중',
-        description: '지하철을 타고 이동 중입니다',
-        timestamp: req.updatedAt,
-        completed: ['in_transit', 'arrived', 'completed'].includes(req.status),
-      },
-      {
-        type: 'arrived',
-        title: '도착 완료',
-        description: '목적지에 도착했습니다',
-        timestamp: req.updatedAt,
-        completed: ['arrived', 'completed'].includes(req.status),
-      },
-      {
-        type: 'completed',
-        title: '배송 완료',
-        description: '배송이 완료되었습니다',
-        timestamp: req.updatedAt,
-        completed: req.status === 'completed',
-      },
-    ];
-
-    setTrackingEvents(events);
-  };
-
-  const calculateProgress = (status: DeliveryStatus) => {
-    const progressMap: Record<DeliveryStatus, number> = {
+  const calculateProgress = (status: string) => {
+    const progressMap: Record<string, number> = {
       pending: 10,
       matched: 25,
       accepted: 40,
@@ -154,7 +97,7 @@ export default function DeliveryTrackingScreen({ navigation, route }: Props) {
     setProgress(progressMap[status] || 0);
   };
 
-  const getStatusColor = (status: DeliveryStatus): string => {
+  const getStatusColor = (status: string): string => {
     switch (status) {
       case 'pending':
         return '#FFA726';
@@ -175,7 +118,7 @@ export default function DeliveryTrackingScreen({ navigation, route }: Props) {
     }
   };
 
-  const getStatusText = (status: DeliveryStatus): string => {
+  const getStatusText = (status: string): string => {
     switch (status) {
       case 'pending':
         return '매칭 대기 중';
@@ -196,12 +139,7 @@ export default function DeliveryTrackingScreen({ navigation, route }: Props) {
     }
   };
 
-  const formatTime = (date: Date): string => {
-    return new Date(date).toLocaleTimeString('ko-KR', {
-      hour: '2-digit',
-      minute: '2-digit',
-    });
-  };
+  const formatTime = (date: Date): string => formatTimeKR(date);
 
   if (loading) {
     return (
@@ -212,7 +150,7 @@ export default function DeliveryTrackingScreen({ navigation, route }: Props) {
     );
   }
 
-  if (!request) {
+  if (!trackingData) {
     return null;
   }
 
@@ -229,8 +167,8 @@ export default function DeliveryTrackingScreen({ navigation, route }: Props) {
 
       <ScrollView style={styles.content}>
         {/* Status Banner */}
-        <View style={[styles.statusBanner, { backgroundColor: getStatusColor(request.status) }]}>
-          <Text style={styles.statusBannerText}>{getStatusText(request.status)}</Text>
+        <View style={[styles.statusBanner, { backgroundColor: getStatusColor(trackingData.status) }]}>
+          <Text style={styles.statusBannerText}>{getStatusText(trackingData.status)}</Text>
         </View>
 
         {/* Progress Bar */}
@@ -247,8 +185,8 @@ export default function DeliveryTrackingScreen({ navigation, route }: Props) {
           <View style={styles.routeContainer}>
             <View style={styles.stationPoint}>
               <View style={styles.stationDot} />
-              <Text style={styles.stationName}>{request.pickupStation.stationName}</Text>
-              <Text style={styles.stationLine}>{request.pickupStation.line}</Text>
+              <Text style={styles.stationName}>{trackingData.pickupStation.stationName}</Text>
+              <Text style={styles.stationLine}>{trackingData.pickupStation.line}</Text>
             </View>
 
             <View style={styles.routeLine}>
@@ -258,8 +196,8 @@ export default function DeliveryTrackingScreen({ navigation, route }: Props) {
 
             <View style={styles.stationPoint}>
               <View style={[styles.stationDot, styles.stationDotEnd]} />
-              <Text style={styles.stationName}>{request.deliveryStation.stationName}</Text>
-              <Text style={styles.stationLine}>{request.deliveryStation.line}</Text>
+              <Text style={styles.stationName}>{trackingData.deliveryStation.stationName}</Text>
+              <Text style={styles.stationLine}>{trackingData.deliveryStation.line}</Text>
             </View>
           </View>
         </View>
@@ -302,7 +240,7 @@ export default function DeliveryTrackingScreen({ navigation, route }: Props) {
                   ]}>
                     {event.description}
                   </Text>
-                  {event.completed && (
+                  {event.completed && event.timestamp && (
                     <Text style={styles.timelineTime}>
                       {formatTime(event.timestamp)}
                     </Text>
@@ -319,24 +257,26 @@ export default function DeliveryTrackingScreen({ navigation, route }: Props) {
           <View style={styles.infoRow}>
             <Text style={styles.infoLabel}>패키지</Text>
             <Text style={styles.infoValue}>
-              {request.packageInfo.size === 'small' ? '소형' :
-               request.packageInfo.size === 'medium' ? '중형' :
-               request.packageInfo.size === 'large' ? '대형' : '특대'}
-              ({request.packageInfo.weight}kg)
+              {trackingData.packageInfo.size === 'small' ? '소형' :
+               trackingData.packageInfo.size === 'medium' ? '중형' :
+               trackingData.packageInfo.size === 'large' ? '대형' : trackingData.packageInfo.size}
+              ({trackingData.packageInfo.weight})
             </Text>
           </View>
           <View style={styles.infoRow}>
             <Text style={styles.infoLabel}>수신자</Text>
-            <Text style={styles.infoValue}>{request.recipientName}</Text>
+            <Text style={styles.infoValue}>{trackingData.recipientName || '-'}</Text>
           </View>
-          <View style={styles.infoRow}>
-            <Text style={styles.infoLabel}>인증코드</Text>
-            <Text style={styles.verificationCode}>{request.recipientVerificationCode}</Text>
-          </View>
+          {trackingData.recipientVerificationCode && (
+            <View style={styles.infoRow}>
+              <Text style={styles.infoLabel}>인증코드</Text>
+              <Text style={styles.verificationCode}>{trackingData.recipientVerificationCode}</Text>
+            </View>
+          )}
         </View>
 
         {/* Courier Info (if matched) */}
-        {request.status !== 'pending' && request.status !== 'cancelled' && (
+        {trackingData.status !== 'pending' && trackingData.status !== 'cancelled' && (
           <View style={styles.card}>
             <Text style={styles.cardTitle}>👤 길러 정보</Text>
             <View style={styles.courierInfo}>
@@ -359,15 +299,17 @@ export default function DeliveryTrackingScreen({ navigation, route }: Props) {
           </TouchableOpacity>
         </View>
 
-        {/* Giller Actions - for active deliveries */}
-        {request && (request.status === 'accepted' || request.status === 'in_transit') && (
+        {/* Giller Actions - for active deliveries (길러만) */}
+        {trackingData &&
+         (currentRole === 'giller' || currentRole === 'both') &&
+         (trackingData.status === 'accepted' || trackingData.status === 'in_transit') && (
           <View style={styles.card}>
             <Text style={styles.cardTitle}>📱 길러 액션</Text>
-            {request.status === 'accepted' && (
+            {trackingData.status === 'accepted' && (
               <TouchableOpacity
                 style={styles.actionButton}
                 onPress={() => {
-                  const delivery = request as any;
+                  const delivery = trackingData as any;
                   if (delivery.deliveryId) {
                     navigation.navigate('PickupVerification', {
                       deliveryId: delivery.deliveryId,
@@ -379,11 +321,11 @@ export default function DeliveryTrackingScreen({ navigation, route }: Props) {
                 <Text style={styles.actionButtonText}>픽업 인증하기</Text>
               </TouchableOpacity>
             )}
-            {request.status === 'in_transit' && (
+            {trackingData.status === 'in_transit' && (
               <TouchableOpacity
                 style={styles.actionButton}
                 onPress={() => {
-                  const delivery = request as any;
+                  const delivery = trackingData as any;
                   if (delivery.deliveryId) {
                     navigation.navigate('DeliveryCompletion', {
                       deliveryId: delivery.deliveryId,
@@ -394,6 +336,19 @@ export default function DeliveryTrackingScreen({ navigation, route }: Props) {
                 <Text style={styles.actionButtonText}>배송 완료하기</Text>
               </TouchableOpacity>
             )}
+          </View>
+        )}
+
+        {/* Gller Info - 읽기 전용 (글러만) */}
+        {currentRole === 'gller' && trackingData && trackingData.status !== 'pending' && trackingData.status !== 'cancelled' && (
+          <View style={styles.card}>
+            <Text style={styles.cardTitle}>📦 배송 정보</Text>
+            <Text style={styles.infoText}>
+              {trackingData.status === 'accepted' && '길러가 매칭을 수락했습니다.'}
+              {trackingData.status === 'in_transit' && '길러가 배송 중입니다.'}
+              {trackingData.status === 'arrived' && '길러가 도착했습니다.'}
+              {trackingData.status === 'completed' && '배송이 완료되었습니다.'}
+            </Text>
           </View>
         )}
       </ScrollView>
@@ -517,6 +472,11 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     marginBottom: 8,
+  },
+  infoText: {
+    color: '#666',
+    fontSize: 14,
+    lineHeight: 20,
   },
   infoValue: {
     color: '#333',

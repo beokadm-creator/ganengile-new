@@ -53,6 +53,7 @@ export default function Button({
     fullWidth && styles.fullWidth,
     disabled && styles.disabled,
     pressed && styles.pressed,
+    Platform.OS === 'web' && { cursor: 'pointer' },
     style,
   ];
 

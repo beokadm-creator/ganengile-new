@@ -9,7 +9,6 @@ import {
   Text,
   StyleSheet,
   TouchableOpacity,
-  Modal,
   ScrollView,
   Alert,
   ActivityIndicator,
@@ -24,16 +23,8 @@ import type { StationInfo } from '../../types/route';
 import { Colors, Spacing, Typography, BorderRadius } from '../../theme';
 import Button from '../../components/common/Button';
 import TimePicker from '../../components/common/TimePicker';
-
-const DAY_LABELS: Record<number, string> = {
-  1: '월',
-  2: '화',
-  3: '수',
-  4: '목',
-  5: '금',
-  6: '토',
-  7: '일',
-};
+import DaySelector from '../../components/common/DaySelector';
+import StationSelectModal from '../../components/common/StationSelectModal';
 
 export default function AddRouteScreen() {
   const route = useRoute();
@@ -47,10 +38,9 @@ export default function AddRouteScreen() {
   const [endStation, setEndStation] = useState<StationInfo | null>(null);
   const [departureTime, setDepartureTime] = useState('08:00');
   const [selectedDays, setSelectedDays] = useState<number[]>([1, 2, 3, 4, 5]);
-  
+
   const [startStationModalVisible, setStartStationModalVisible] = useState(false);
   const [endStationModalVisible, setEndStationModalVisible] = useState(false);
-  const [searchQuery, setSearchQuery] = useState('');
 
   useEffect(() => {
     const params = route.params as { selectedStation?: Station } | undefined;
@@ -94,7 +84,6 @@ export default function AddRouteScreen() {
       lng: station.location?.longitude || 0,
     };
     setStartStation(stationInfo);
-    setStartStationModalVisible(false);
   };
 
   const handleSelectEndStation = (station: Station) => {
@@ -108,15 +97,6 @@ export default function AddRouteScreen() {
       lng: station.location?.longitude || 0,
     };
     setEndStation(stationInfo);
-    setEndStationModalVisible(false);
-  };
-
-  const toggleDay = (day: number) => {
-    if (selectedDays.includes(day)) {
-      setSelectedDays(selectedDays.filter(d => d !== day));
-    } else {
-      setSelectedDays([...selectedDays, day]);
-    }
   };
 
   const handleSave = () => {
@@ -183,10 +163,6 @@ export default function AddRouteScreen() {
     }
   };
 
-  const filteredStations = stations.filter(station =>
-    station.stationName.toLowerCase().includes(searchQuery.toLowerCase())
-  );
-
   if (loading) {
     return (
       <View style={styles.loadingContainer}>
@@ -204,11 +180,13 @@ export default function AddRouteScreen() {
       </View>
 
       <ScrollView style={styles.content}>
+        {/* 출발역 */}
         <View style={styles.section}>
           <Text style={styles.label}>출발역</Text>
           <TouchableOpacity
             style={styles.stationButton}
             onPress={() => setStartStationModalVisible(true)}
+            activeOpacity={0.7}
           >
             <Text style={styles.stationButtonText}>
               {startStation ? startStation.stationName : '출발역 선택'}
@@ -217,11 +195,13 @@ export default function AddRouteScreen() {
           </TouchableOpacity>
         </View>
 
+        {/* 도착역 */}
         <View style={styles.section}>
           <Text style={styles.label}>도착역</Text>
           <TouchableOpacity
             style={styles.stationButton}
             onPress={() => setEndStationModalVisible(true)}
+            activeOpacity={0.7}
           >
             <Text style={styles.stationButtonText}>
               {endStation ? endStation.stationName : '도착역 선택'}
@@ -230,6 +210,7 @@ export default function AddRouteScreen() {
           </TouchableOpacity>
         </View>
 
+        {/* 출발 시간 */}
         <View style={styles.section}>
           <TimePicker
             label="출발 시간"
@@ -240,34 +221,17 @@ export default function AddRouteScreen() {
           />
         </View>
 
+        {/* 운영 요일 */}
         <View style={styles.section}>
-          <Text style={styles.label}>운영 요일</Text>
-          <View style={styles.daysContainer}>
-            {[1, 2, 3, 4, 5, 6, 7].map(day => (
-              <TouchableOpacity
-                key={day}
-                style={[
-                  styles.dayButton,
-                  selectedDays.includes(day) && styles.dayButtonSelected,
-                ]}
-                onPress={() => toggleDay(day)}
-              >
-                <Text
-                  style={[
-                    styles.dayButtonText,
-                    selectedDays.includes(day) && styles.dayButtonTextSelected,
-                  ]}
-                >
-                  {DAY_LABELS[day]}
-                </Text>
-              </TouchableOpacity>
-            ))}
-          </View>
-          <Text style={styles.hint}>
-            선택된 요일: {selectedDays.map(d => DAY_LABELS[d]).join(', ')}
-          </Text>
+          <DaySelector
+            selectedDays={selectedDays}
+            onChange={setSelectedDays}
+            label="운영 요일"
+            hint="선택된 요일"
+          />
         </View>
 
+        {/* 등록 버튼 */}
         <Button
           title="동선 등록"
           onPress={handleSave}
@@ -279,94 +243,27 @@ export default function AddRouteScreen() {
         />
       </ScrollView>
 
-      <Modal
+      {/* 역 선택 모달들 */}
+      <StationSelectModal
         visible={startStationModalVisible}
-        animationType="slide"
-        onRequestClose={() => setStartStationModalVisible(false)}
-      >
-        <View style={styles.modalContainer}>
-          <View style={styles.modalHeader}>
-            <Text style={styles.modalTitle}>출발역 선택</Text>
-            <TouchableOpacity onPress={() => setStartStationModalVisible(false)}>
-              <Text style={styles.modalClose}>✕</Text>
-            </TouchableOpacity>
-          </View>
-          
-          <View style={styles.searchContainer}>
-            <TextInput
-              style={styles.searchInput}
-              placeholder="역 이름 검색..."
-              value={searchQuery}
-              onChangeText={setSearchQuery}
-            />
-          </View>
+        onClose={() => setStartStationModalVisible(false)}
+        onStationSelect={handleSelectStartStation}
+        title="출발역 선택"
+        stations={stations}
+        searchPlaceholder="역 이름 검색..."
+      />
 
-          <ScrollView style={styles.modalContent}>
-            {filteredStations.map(station => (
-              <TouchableOpacity
-                key={station.stationId}
-                style={styles.stationItem}
-                onPress={() => handleSelectStartStation(station)}
-              >
-                <View style={styles.stationItemLeft}>
-                  <Text style={styles.stationItemName}>{station.stationName}</Text>
-                  <Text style={styles.stationItemLine}>
-                    {station.lines.map(l => l.lineName).join(', ')}
-                  </Text>
-                </View>
-                <Text style={styles.stationItemArrow}>›</Text>
-              </TouchableOpacity>
-            ))}
-          </ScrollView>
-        </View>
-      </Modal>
-
-      <Modal
+      <StationSelectModal
         visible={endStationModalVisible}
-        animationType="slide"
-        onRequestClose={() => setEndStationModalVisible(false)}
-      >
-        <View style={styles.modalContainer}>
-          <View style={styles.modalHeader}>
-            <Text style={styles.modalTitle}>도착역 선택</Text>
-            <TouchableOpacity onPress={() => setEndStationModalVisible(false)}>
-              <Text style={styles.modalClose}>✕</Text>
-            </TouchableOpacity>
-          </View>
-          
-          <View style={styles.searchContainer}>
-            <TextInput
-              style={styles.searchInput}
-              placeholder="역 이름 검색..."
-              value={searchQuery}
-              onChangeText={setSearchQuery}
-            />
-          </View>
-
-          <ScrollView style={styles.modalContent}>
-            {filteredStations.map(station => (
-              <TouchableOpacity
-                key={station.stationId}
-                style={styles.stationItem}
-                onPress={() => handleSelectEndStation(station)}
-              >
-                <View style={styles.stationItemLeft}>
-                  <Text style={styles.stationItemName}>{station.stationName}</Text>
-                  <Text style={styles.stationItemLine}>
-                    {station.lines.map(l => l.lineName).join(', ')}
-                  </Text>
-                </View>
-                <Text style={styles.stationItemArrow}>›</Text>
-              </TouchableOpacity>
-            ))}
-          </ScrollView>
-        </View>
-      </Modal>
+        onClose={() => setEndStationModalVisible(false)}
+        onStationSelect={handleSelectEndStation}
+        title="도착역 선택"
+        stations={stations}
+        searchPlaceholder="역 이름 검색..."
+      />
     </View>
   );
 }
-
-const TextInput = (props: any) => null;
 
 const styles = StyleSheet.create({
   container: {
@@ -377,98 +274,30 @@ const styles = StyleSheet.create({
     flex: 1,
     padding: Spacing.lg,
   },
-  dayButton: {
-    alignItems: 'center',
-    backgroundColor: Colors.white,
-    borderColor: Colors.gray300,
-    borderRadius: BorderRadius.sm,
-    borderWidth: 1,
-    height: 48,
-    justifyContent: 'center',
-    width: 48,
-  },
-  dayButtonSelected: {
-    backgroundColor: Colors.secondary,
-    borderColor: Colors.secondary,
-  },
-  dayButtonText: {
-    color: Colors.gray600,
-    fontSize: Typography.fontSize.sm,
-    fontWeight: Typography.fontWeight.semibold,
-  },
-  dayButtonTextSelected: {
-    color: Colors.white,
-  },
-  daysContainer: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: Spacing.sm,
-  },
   header: {
     backgroundColor: Colors.secondary,
     padding: Spacing.lg,
     paddingTop: 60,
   },
-  hint: {
-    color: Colors.gray500,
-    fontSize: Typography.fontSize.xs,
-    marginTop: Spacing.sm,
+  title: {
+    color: Colors.white,
+    fontSize: Typography.fontSize['3xl'],
+    fontWeight: Typography.fontWeight.bold,
+  },
+  subtitle: {
+    color: Colors.white,
+    fontSize: Typography.fontSize.base,
+    marginTop: Spacing.xs,
+    opacity: 0.9,
+  },
+  section: {
+    marginBottom: Spacing.lg,
   },
   label: {
     color: Colors.textPrimary,
     fontSize: Typography.fontSize.sm,
     fontWeight: Typography.fontWeight.semibold,
     marginBottom: Spacing.sm,
-  },
-  loadingContainer: {
-    alignItems: 'center',
-    backgroundColor: Colors.gray100,
-    flex: 1,
-    justifyContent: 'center',
-  },
-  loadingText: {
-    color: Colors.gray600,
-    fontSize: Typography.fontSize.base,
-    marginTop: Spacing.md,
-  },
-  modalClose: {
-    color: Colors.gray600,
-    fontSize: 24,
-  },
-  modalContainer: {
-    backgroundColor: Colors.white,
-    flex: 1,
-  },
-  modalContent: {
-    flex: 1,
-  },
-  modalHeader: {
-    alignItems: 'center',
-    borderBottomColor: Colors.gray200,
-    borderBottomWidth: 1,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    padding: Spacing.md,
-    paddingTop: 60,
-  },
-  modalTitle: {
-    color: Colors.textPrimary,
-    fontSize: Typography.fontSize.lg,
-    fontWeight: Typography.fontWeight.semibold,
-  },
-  searchContainer: {
-    borderBottomColor: Colors.gray200,
-    borderBottomWidth: 1,
-    padding: Spacing.md,
-  },
-  searchInput: {
-    backgroundColor: Colors.gray50,
-    borderRadius: BorderRadius.sm,
-    fontSize: Typography.fontSize.base,
-    padding: Spacing.md,
-  },
-  section: {
-    marginBottom: Spacing.lg,
   },
   stationButton: {
     alignItems: 'center',
@@ -480,50 +309,24 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     padding: Spacing.lg,
   },
+  stationButtonText: {
+    color: Colors.textPrimary,
+    fontSize: Typography.fontSize.base,
+  },
   stationButtonArrow: {
     color: Colors.gray400,
     fontSize: 24,
     fontWeight: '300',
   },
-  stationButtonText: {
-    color: Colors.textPrimary,
-    fontSize: Typography.fontSize.base,
-  },
-  stationItem: {
+  loadingContainer: {
     alignItems: 'center',
-    borderBottomColor: Colors.gray100,
-    borderBottomWidth: 1,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    padding: Spacing.md,
-  },
-  stationItemArrow: {
-    color: Colors.gray400,
-    fontSize: 24,
-    fontWeight: '300',
-  },
-  stationItemLeft: {
+    backgroundColor: Colors.gray100,
     flex: 1,
+    justifyContent: 'center',
   },
-  stationItemLine: {
-    color: Colors.gray500,
-    fontSize: Typography.fontSize.sm,
-  },
-  stationItemName: {
-    color: Colors.textPrimary,
+  loadingText: {
+    color: Colors.gray600,
     fontSize: Typography.fontSize.base,
-    fontWeight: Typography.fontWeight.medium,
-    marginBottom: Spacing.xs,
-  },
-  subtitle: {
-    color: Colors.white,
-    fontSize: Typography.fontSize.base,
-    marginTop: Spacing.xs,
-    opacity: 0.9,
-  },
-  title: {
-    color: Colors.white,
-    fontSize: Typography.fontSize['3xl'],
-    fontWeight: Typography.fontWeight.bold,
+    marginTop: Spacing.md,
   },
 });

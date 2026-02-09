@@ -13,17 +13,16 @@ import {
   Animated,
   StatusBar,
   Alert,
+  Platform,
 } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
 import { StackNavigationProp } from '@react-navigation/stack';
 import type { OnboardingStackParamList } from '../../types/navigation';
 import { Colors, Spacing, Typography, BorderRadius } from '../../theme';
 import Button from '../../components/common/Button';
-import Icons from '../../constants/icons';
 
 interface Slide {
   id: number;
-  icon: { name: string; color: string };
+  emoji: string;
   title: string;
   content: string;
 }
@@ -39,25 +38,25 @@ export default function GillerOnboarding({ navigation }: GillerOnboardingProps) 
   const slides: Slide[] = [
     {
       id: 1,
-      icon: Icons.wallet,
+      emoji: '💰',
       title: '출퇴근길에 수익을 창출하세요',
       content: '기존 동선을 활용해서 배송을 수행하고\n수익을 만드세요',
     },
     {
       id: 2,
-      icon: Icons.navigate,
+      emoji: '🚇',
       title: '동선 등록부터 시작하세요',
       content: '1. 자주 타는 출발역과 도착역을 선택\n2. 출발 시간대와 요일을 설정\n3. 길러 활동을 시작하세요',
     },
     {
       id: 3,
-      icon: Icons.cube,
+      emoji: '📦',
       title: '배송은 이렇게 진행됩니다',
       content: '1. 매칭된 요청을 확인\n2. 수락 후 출발역에서 인수\n3. 도착역에서 전달 및 완료 처리\n4. 평가와 수익 확인',
     },
     {
       id: 4,
-      icon: Icons.shield,
+      emoji: '🛡️',
       title: '신원 확인이 필요합니다',
       content: '안전한 배송을 위해 신원 확인을 진행합니다\n신분증과 실명 확인이 필요합니다',
     },
@@ -133,11 +132,7 @@ export default function GillerOnboarding({ navigation }: GillerOnboardingProps) 
       >
         <Animated.View style={{ opacity: fadeAnim }}>
           <View style={styles.iconContainer}>
-            <Ionicons
-              name={slide.icon.name as any}
-              size={120}
-              color={slide.icon.color}
-            />
+            <Text style={styles.iconEmoji}>{slide.emoji}</Text>
           </View>
 
           <Text style={styles.title}>{slide.title}</Text>
@@ -223,6 +218,10 @@ const styles = StyleSheet.create({
   iconContainer: {
     alignItems: 'center',
     marginBottom: Spacing.xl,
+  },
+  iconEmoji: {
+    fontSize: 120,
+    fontFamily: Platform.OS === 'web' ? 'Apple Color Emoji, Segoe UI Emoji, Noto Color Emoji, Arial, sans-serif' : undefined,
   },
   navigation: {
     flexDirection: 'row',
