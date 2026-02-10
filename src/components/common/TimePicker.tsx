@@ -1,6 +1,6 @@
 /**
  * TimePicker Component
- * 시간 선택기 컴포넌트
+ * 시간 선택기 컴포넌트 (슬라이더 방식 개선)
  */
 
 import React, { useState } from 'react';
@@ -12,6 +12,7 @@ import {
   Modal,
   ScrollView,
 } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import { Colors, Spacing, Typography, BorderRadius } from '../../theme';
 
 interface TimePickerProps {
@@ -22,6 +23,26 @@ interface TimePickerProps {
   minuteInterval?: 1 | 5 | 10 | 15 | 20 | 30;
 }
 
+// 시간 슬라이더 스텝 생성 (30분 단위)
+const generateTimeSteps = (): Array<{ hour: number; minute: number; label: string }> => {
+  const steps: Array<{ hour: number; minute: number; label: string }> = [];
+  for (let h = 0; h < 24; h++) {
+    for (let m = 0; m < 60; m += 30) {
+      const label = `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
+      steps.push({ hour: h, minute: m, label });
+    }
+  }
+  return steps;
+};
+
+const TIME_STEPS = generateTimeSteps();
+
+// 빠른 선택 프리셋
+const QUICK_PRESETS = {
+  commute: { hour: 8, minute: 0, label: '출근' },    // 08:00
+  leave: { hour: 18, minute: 0, label: '퇴근' },    // 18:00
+};
+
 export default function TimePicker({
   value,
   onChange,
@@ -31,36 +52,57 @@ export default function TimePicker({
 }: TimePickerProps) {
   const [modalVisible, setModalVisible] = useState(false);
 
-  const hours = Array.from({ length: 24 }, (_, i) => i);
-  const minutes = Array.from(
-    { length: 60 / minuteInterval },
-    (_, i) => i * minuteInterval
-  );
+  // 현재 시간에서 인덱스 찾기
+  const getCurrentIndex = (): number => {
+    const [h, m] = value.split(':').map(Number);
+    const stepMinute = m >= 30 ? 30 : 0;
+    return TIME_STEPS.findIndex(s => s.hour === h && s.minute === stepMinute);
+  };
 
-  const [selectedHour, setSelectedHour] = useState(
-    parseInt(value.split(':')[0]) || 0
-  );
-  const [selectedMinute, setSelectedMinute] = useState(
-    parseInt(value.split(':')[1]) || 0
-  );
+  const [selectedIndex, setSelectedIndex] = useState(getCurrentIndex());
 
-  const handleTimeSelect = (hour: number, minute: number) => {
-    setSelectedHour(hour);
-    setSelectedMinute(minute);
+  const handleTimeSelect = (index: number) => {
+    setSelectedIndex(index);
+  };
+
+  const handleQuickSelect = (preset: keyof typeof QUICK_PRESETS) => {
+    const p = QUICK_PRESETS[preset];
+    const timeString = `${String(p.hour).padStart(2, '0')}:${String(p.minute).padStart(2, '0')}`;
+    const newIndex = TIME_STEPS.findIndex(s => s.hour === p.hour && s.minute === p.minute);
+    setSelectedIndex(newIndex);
+    onChange(timeString);
   };
 
   const handleConfirm = () => {
-    const timeString = `${String(selectedHour).padStart(2, '0')}:${String(selectedMinute).padStart(2, '0')}`;
+    const selectedTime = TIME_STEPS[selectedIndex];
+    const timeString = `${String(selectedTime.hour).padStart(2, '0')}:${String(selectedTime.minute).padStart(2, '0')}`;
     onChange(timeString);
     setModalVisible(false);
   };
 
   const handleCancel = () => {
+    setSelectedIndex(getCurrentIndex()); // 원래 값으로 복원
     setModalVisible(false);
   };
 
-  const formatTime = (hour: number, minute: number) => {
-    return `${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}`;
+  const formatTime = (hour: number, minute: number): string => {
+    const h = String(hour).padStart(2, '0');
+    const m = String(minute).padStart(2, '0');
+    return `${h}:${m}`;
+  };
+
+  const getAmPm = (hour: number): string => {
+    return hour < 12 ? '오전' : '오후';
+  };
+
+  const getCurrentTime = () => {
+    const selected = TIME_STEPS[selectedIndex];
+    return {
+      hour: selected.hour,
+      minute: selected.minute,
+      formatted: formatTime(selected.hour, selected.minute),
+      ampm: getAmPm(selected.hour),
+    };
   };
 
   return (
@@ -74,7 +116,7 @@ export default function TimePicker({
         <Text style={styles.timeText}>
           {value || placeholder}
         </Text>
-        <Text style={styles.timeIcon}>🕐</Text>
+        <Ionicons name="time-outline" size={20} color={Colors.primary} />
       </TouchableOpacity>
 
       <Modal
@@ -88,73 +130,89 @@ export default function TimePicker({
             <View style={styles.modalHeader}>
               <Text style={styles.modalTitle}>{label}</Text>
               <TouchableOpacity onPress={handleCancel}>
-                <Text style={styles.modalClose}>✕</Text>
+                <Ionicons name="close" size={28} color={Colors.textSecondary} />
               </TouchableOpacity>
             </View>
 
-            <View style={styles.timePickerContainer}>
-              {/* 시간 선택 */}
-              <View style={styles.columnContainer}>
-                <Text style={styles.columnLabel}>시</Text>
-                <ScrollView style={styles.columnScroll}>
-                  {hours.map((hour) => (
-                    <TouchableOpacity
-                      key={hour}
-                      style={[
-                        styles.timeItem,
-                        selectedHour === hour && styles.timeItemSelected,
-                      ]}
-                      onPress={() => handleTimeSelect(hour, selectedMinute)}
-                    >
-                      <Text
-                        style={[
-                          styles.timeItemText,
-                          selectedHour === hour && styles.timeItemTextSelected,
-                        ]}
-                      >
-                        {String(hour).padStart(2, '0')}
-                      </Text>
-                    </TouchableOpacity>
-                  ))}
-                </ScrollView>
-              </View>
-
-              {/* 구분자 */}
-              <Text style={styles.separator}>:</Text>
-
-              {/* 분 선택 */}
-              <View style={styles.columnContainer}>
-                <Text style={styles.columnLabel}>분</Text>
-                <ScrollView style={styles.columnScroll}>
-                  {minutes.map((minute) => (
-                    <TouchableOpacity
-                      key={minute}
-                      style={[
-                        styles.timeItem,
-                        selectedMinute === minute && styles.timeItemSelected,
-                      ]}
-                      onPress={() => handleTimeSelect(selectedHour, minute)}
-                    >
-                      <Text
-                        style={[
-                          styles.timeItemText,
-                          selectedMinute === minute && styles.timeItemTextSelected,
-                        ]}
-                      >
-                        {String(minute).padStart(2, '0')}
-                      </Text>
-                    </TouchableOpacity>
-                  ))}
-                </ScrollView>
-              </View>
+            {/* 현재 선택된 시간 표시 (큰 숫자) */}
+            <View style={styles.selectedTimeDisplay}>
+              <Text style={styles.ampmText}>{getCurrentTime().ampm}</Text>
+              <Text style={styles.timeLarge}>{getCurrentTime().formatted}</Text>
             </View>
 
-            {/* 현재 선택된 시간 표시 */}
-            <View style={styles.selectedTimeContainer}>
-              <Text style={styles.selectedTimeLabel}>선택된 시간:</Text>
-              <Text style={styles.selectedTimeValue}>
-                {formatTime(selectedHour, selectedMinute)}
-              </Text>
+            {/* 빠른 선택 버튼 */}
+            <View style={styles.quickSelectContainer}>
+              <TouchableOpacity
+                style={[styles.quickButton, styles.commuteButton]}
+                onPress={() => handleQuickSelect('commute')}
+              >
+                <Ionicons name="sunny-outline" size={20} color={Colors.white} />
+                <Text style={styles.quickButtonText}>{QUICK_PRESETS.commute.label}</Text>
+                <Text style={styles.quickButtonTime}>{QUICK_PRESETS.commute.hour}:00</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={[styles.quickButton, styles.leaveButton]}
+                onPress={() => handleQuickSelect('leave')}
+              >
+                <Ionicons name="moon-outline" size={20} color={Colors.white} />
+                <Text style={styles.quickButtonText}>{QUICK_PRESETS.leave.label}</Text>
+                <Text style={styles.quickButtonTime}>{QUICK_PRESETS.leave.hour}:00</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={[styles.quickButton, styles.customButton]}
+                onPress={() => {}}
+              >
+                <Ionicons name="options-outline" size={20} color={Colors.primary} />
+                <Text style={[styles.quickButtonText, styles.customButtonText]}>커스텀</Text>
+              </TouchableOpacity>
+            </View>
+
+            {/* 시간 슬라이더 (가로 스크롤) */}
+            <View style={styles.sliderContainer}>
+              <Text style={styles.sliderLabel}>시간 선택</Text>
+              <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={styles.sliderScrollContent}
+                onMomentumScrollEnd={(event) => {
+                  const offsetX = event.nativeEvent.contentOffset.x;
+                  const itemWidth = 70; // 각 아이템 너비
+                  const index = Math.round(offsetX / itemWidth);
+                  if (index >= 0 && index < TIME_STEPS.length) {
+                    handleTimeSelect(index);
+                  }
+                }}
+                scrollEventThrottle={16}
+              >
+                {TIME_STEPS.map((step, index) => {
+                  const isSelected = index === selectedIndex;
+                  const isHour = step.minute === 0;
+
+                  return (
+                    <TouchableOpacity
+                      key={`${step.hour}-${step.minute}`}
+                      style={[
+                        styles.timeStep,
+                        isSelected && styles.timeStepSelected,
+                        isHour && styles.timeStepHour,
+                      ]}
+                      onPress={() => handleTimeSelect(index)}
+                    >
+                      <Text
+                        style={[
+                          styles.timeStepText,
+                          isSelected && styles.timeStepTextSelected,
+                          isHour && styles.timeStepTextHour,
+                        ]}
+                      >
+                        {step.label}
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </ScrollView>
             </View>
 
             {/* 확인 버튼 */}
@@ -169,31 +227,6 @@ export default function TimePicker({
 }
 
 const styles = StyleSheet.create({
-  columnContainer: {
-    alignItems: 'center',
-    flex: 1,
-  },
-  columnLabel: {
-    color: Colors.textSecondary,
-    fontSize: Typography.fontSize.sm,
-    fontWeight: Typography.fontWeight.semibold,
-    marginBottom: Spacing.sm,
-  },
-  columnScroll: {
-    height: 200,
-  },
-  confirmButton: {
-    alignItems: 'center',
-    backgroundColor: Colors.primary,
-    borderRadius: BorderRadius.md,
-    marginHorizontal: Spacing.lg,
-    padding: Spacing.lg,
-  },
-  confirmButtonText: {
-    color: Colors.white,
-    fontSize: Typography.fontSize.base,
-    fontWeight: Typography.fontWeight.semibold,
-  },
   container: {
     marginBottom: Spacing.md,
   },
@@ -203,10 +236,22 @@ const styles = StyleSheet.create({
     fontWeight: Typography.fontWeight.semibold,
     marginBottom: Spacing.sm,
   },
-  modalClose: {
-    color: Colors.textSecondary,
-    fontSize: 24,
+  timeButton: {
+    alignItems: 'center',
+    backgroundColor: Colors.white,
+    borderColor: Colors.gray300,
+    borderRadius: BorderRadius.md,
+    borderWidth: 1,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    paddingHorizontal: Spacing.lg,
+    paddingVertical: Spacing.md,
   },
+  timeText: {
+    color: Colors.textPrimary,
+    fontSize: Typography.fontSize.base,
+  },
+  // Modal styles
   modalContainer: {
     backgroundColor: Colors.overlay,
     flex: 1,
@@ -217,6 +262,9 @@ const styles = StyleSheet.create({
     borderTopLeftRadius: BorderRadius.lg,
     borderTopRightRadius: BorderRadius.lg,
     paddingBottom: Spacing.xl,
+    paddingHorizontal: Spacing.lg,
+    paddingTop: Spacing.lg,
+    maxHeight: '80%',
   },
   modalHeader: {
     alignItems: 'center',
@@ -224,78 +272,117 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     flexDirection: 'row',
     justifyContent: 'space-between',
-    padding: Spacing.lg,
+    paddingBottom: Spacing.md,
   },
   modalTitle: {
     color: Colors.textPrimary,
     fontSize: Typography.fontSize.lg,
     fontWeight: Typography.fontWeight.bold,
   },
-  selectedTimeContainer: {
+  // 큰 시간 표시
+  selectedTimeDisplay: {
     alignItems: 'center',
-    borderTopColor: Colors.gray200,
-    borderTopWidth: 1,
-    flexDirection: 'row',
-    justifyContent: 'center',
-    padding: Spacing.lg,
+    paddingVertical: Spacing.xl,
   },
-  selectedTimeLabel: {
+  ampmText: {
     color: Colors.textSecondary,
     fontSize: Typography.fontSize.base,
-    marginRight: Spacing.sm,
-  },
-  selectedTimeValue: {
-    color: Colors.primary,
-    fontSize: Typography.fontSize.xl,
-    fontWeight: Typography.fontWeight.bold,
-  },
-  separator: {
-    color: Colors.textSecondary,
-    fontSize: Typography.fontSize['2xl'],
-    fontWeight: Typography.fontWeight.bold,
-    marginTop: 20,
-  },
-  timeButton: {
-    alignItems: 'center',
-    backgroundColor: Colors.white,
-    borderColor: Colors.gray300,
-    borderRadius: BorderRadius.md,
-    borderWidth: 1,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    padding: Spacing.md,
-  },
-  timeIcon: {
-    fontSize: 20,
-  },
-  timeItem: {
-    alignItems: 'center',
-    borderRadius: BorderRadius.sm,
-    height: 40,
-    justifyContent: 'center',
     marginBottom: Spacing.xs,
-    width: 60,
   },
-  timeItemSelected: {
+  timeLarge: {
+    color: Colors.primary,
+    fontSize: 48,
+    fontWeight: Typography.fontWeight.bold,
+    letterSpacing: 2,
+  },
+  // 빠른 선택 버튼
+  quickSelectContainer: {
+    flexDirection: 'row',
+    gap: Spacing.md,
+    justifyContent: 'space-between',
+    marginBottom: Spacing.lg,
+  },
+  quickButton: {
+    alignItems: 'center',
+    borderRadius: BorderRadius.md,
+    flex: 1,
+    paddingVertical: Spacing.md,
+  },
+  commuteButton: {
     backgroundColor: Colors.primary,
   },
-  timeItemText: {
-    color: Colors.textPrimary,
-    fontSize: Typography.fontSize.base,
+  leaveButton: {
+    backgroundColor: Colors.secondary,
   },
-  timeItemTextSelected: {
+  customButton: {
+    backgroundColor: Colors.gray100,
+    borderColor: Colors.gray300,
+    borderWidth: 1,
+  },
+  quickButtonText: {
+    color: Colors.white,
+    fontSize: Typography.fontSize.sm,
+    fontWeight: Typography.fontWeight.semibold,
+    marginTop: Spacing.xs,
+  },
+  customButtonText: {
+    color: Colors.primary,
+  },
+  quickButtonTime: {
+    color: Colors.white,
+    fontSize: Typography.fontSize.xs,
+    marginTop: 2,
+    opacity: 0.9,
+  },
+  // 슬라이더
+  sliderContainer: {
+    marginBottom: Spacing.lg,
+  },
+  sliderLabel: {
+    color: Colors.textSecondary,
+    fontSize: Typography.fontSize.sm,
+    fontWeight: Typography.fontWeight.semibold,
+    marginBottom: Spacing.sm,
+  },
+  sliderScrollContent: {
+    paddingHorizontal: Spacing.md,
+  },
+  timeStep: {
+    alignItems: 'center',
+    backgroundColor: Colors.gray100,
+    borderRadius: BorderRadius.sm,
+    height: 50,
+    justifyContent: 'center',
+    marginRight: Spacing.sm,
+    width: 70,
+  },
+  timeStepSelected: {
+    backgroundColor: Colors.primary,
+  },
+  timeStepHour: {
+    backgroundColor: Colors.gray200,
+  },
+  timeStepText: {
+    color: Colors.textSecondary,
+    fontSize: Typography.fontSize.sm,
+  },
+  timeStepTextSelected: {
     color: Colors.white,
     fontWeight: Typography.fontWeight.semibold,
   },
-  timePickerContainer: {
-    alignItems: 'center',
-    flexDirection: 'row',
-    gap: Spacing.lg,
-    justifyContent: 'center',
-    padding: Spacing.xl,
+  timeStepTextHour: {
+    fontWeight: Typography.fontWeight.medium,
   },
-  timeText: {
-    color: Colors.textPrimary,
+  // 확인 버튼
+  confirmButton: {
+    alignItems: 'center',
+    backgroundColor: Colors.primary,
+    borderRadius: BorderRadius.md,
+    padding: Spacing.lg,
+  },
+  confirmButtonText: {
+    color: Colors.white,
     fontSize: Typography.fontSize.base,
+    fontWeight: Typography.fontWeight.semibold,
   },
 });
