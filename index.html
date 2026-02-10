@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8" />
+  <meta content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=0" name="viewport" />
+  <title>가는길에</title>
+  <style>
+    /* Hide icon placeholders until replaced with emoji */
+    .material-icons, .ionicons {
+      visibility: hidden;
+    }
+  </style>
+</head>
+<body>
+  <div id="root"></div>
+  <script>
+    // Icon name to emoji mapping
+    const iconEmojis = {
+      'waving-hand': '👋',
+      'inventory': '📦',
+      'check-circle': '✅',
+      'inventory-2': '📦',
+      'chevron-right': '▶',
+      'subway': '🚇',
+      'location-on': '📍',
+      'local-shipping': '🚚',
+      'payments': '💰',
+      'star': '⭐',
+      'star-rate': '⭐',
+      'pedal-bike': '🚲',
+      'card-outline': '💳',
+      'car-outline': '🚗',
+      'airplane-outline': '✈️',
+    };
+
+    // Replace icons with emoji after page load
+    function replaceIconsWithEmoji() {
+      const icons = document.querySelectorAll('.material-icons, .ionicons, [class*="MaterialIcons"], [class*="Ionicons"]');
+      icons.forEach(icon => {
+        const iconName = icon.textContent?.trim();
+        if (iconName && iconEmojis[iconName]) {
+          icon.textContent = iconEmojis[iconName];
+          icon.style.visibility = 'visible';
+          icon.style.fontSize = window.getComputedStyle(icon).fontSize || '24px';
+          icon.style.color = window.getComputedStyle(icon).color || '#000';
+        }
+      });
+    }
+
+    // Run on load and with delay
+    window.addEventListener('load', replaceIconsWithEmoji);
+    setTimeout(replaceIconsWithEmoji, 100);
+    setTimeout(replaceIconsWithEmoji, 500);
+    setTimeout(replaceIconsWithEmoji, 1000);
+  </script>
+</body>
+</html>

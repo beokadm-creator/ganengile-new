@@ -160,9 +160,6 @@ export async function getRequestsByRequester(
       q = query(q, where('status', '==', options.status));
     }
 
-    // 정렬 (최신순)
-    q = query(q, orderBy('createdAt', 'desc'));
-
     // limit
     if (options?.limit) {
       q = query(q, limit(options.limit));
@@ -177,6 +174,13 @@ export async function getRequestsByRequester(
         requestId: docSnapshot.id,
         ...data,
       } as Request);
+    });
+
+    // 정렬은 클라이언트 측에서 수행 (인덱스 불필요)
+    requests.sort((a, b) => {
+      const aTime = a.createdAt?.toMillis() || 0;
+      const bTime = b.createdAt?.toMillis() || 0;
+      return bTime - aTime; // 내림차순
     });
 
     return requests;

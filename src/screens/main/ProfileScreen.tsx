@@ -109,43 +109,82 @@ export default function ProfileScreen({ navigation: _navigation }: Props) {
     }
   };
 
-  const menuItems: MenuItem[] = [
-    {
-      icon: '📦',
-      title: '배송 내역',
-      subtitle: '모든 배송 요청 기록',
-      onPress: () => {},
-      color: '#FF9800',
-    },
-    {
-      icon: '⭐',
-      title: '내 평가',
-      subtitle: `평균 ${rating?.averageRating.toFixed(1) || 0}점 (${rating?.totalRatings || 0}개)`,
-      onPress: () => {},
-      color: '#FFA726',
-    },
+  // 공통 메뉴 아이템 (길러 전용 평가)
+  const commonItems: MenuItem[] = [
     {
       icon: '🔔',
       title: '알림 설정',
       subtitle: '푸시 알림, 이메일',
-      onPress: () => {},
+      onPress: () => (_navigation as any).navigate('NotificationSettings'),
       color: '#9C27B0',
     },
     {
       icon: '❓',
       title: '고객센터',
       subtitle: '도움말, 문의하기',
-      onPress: () => {},
+      onPress: () => (_navigation as any).navigate('CustomerService'),
       color: '#607D8B',
     },
     {
       icon: '📜',
       title: '약관 및 정책',
       subtitle: '이용약관, 개인정보처리방침',
-      onPress: () => {},
+      onPress: () => (_navigation as any).navigate('Terms'),
       color: '#9E9E9E',
     },
   ];
+
+  // 역할별 메뉴 가져오기
+  const getMenuItems = (): MenuItem[] => {
+    const gllerItems: MenuItem[] = [
+      {
+        icon: '📦',
+        title: '요청 내역',
+        subtitle: '모든 배송 요청 기록',
+        onPress: () => (_navigation as any).navigate('Tabs', { screen: 'Requests' }),
+        color: '#FF9800',
+      },
+      {
+        icon: '🚇',
+        title: '동선 관리',
+        subtitle: '등록된 동선 관리',
+        onPress: () => (_navigation as any).navigate('Tabs', { screen: 'RouteManagement' }),
+        color: '#00BCD4',
+      },
+      ...commonItems,
+    ];
+
+    const gillerItems: MenuItem[] = [
+      {
+        icon: '🚴',
+        title: '배송 내역',
+        subtitle: '완료한 배송 기록',
+        onPress: () => (_navigation as any).navigate('Tabs', { screen: 'GillerRequests' }),
+        color: '#4CAF50',
+      },
+      {
+        icon: '💰',
+        title: '수익 관리',
+        subtitle: '총 수익과 정산 내역',
+        onPress: () => (_navigation as any).navigate('Earnings'),
+        color: '#FFC107',
+      },
+      {
+        icon: '⭐',
+        title: '내 평가',
+        subtitle: `평균 ${rating?.averageRating.toFixed(1) || 0}점 (${rating?.totalRatings || 0}개)`,
+        onPress: () => (_navigation as any).navigate('MyRating'),
+        color: '#FFA726',
+      },
+      ...commonItems,
+    ];
+
+    if (currentRole === UserRole.GLER) return gllerItems;
+    if (currentRole === UserRole.GILLER) return gillerItems;
+    return commonItems;
+  };
+
+  const menuItems = getMenuItems();
 
   if (loading) {
     return (
@@ -196,8 +235,8 @@ export default function ProfileScreen({ navigation: _navigation }: Props) {
                 </Text>
                 <Text style={styles.roleSwitchSubtitle}>
                   {currentRole === 'gller'
-                    ? '배송을 요청하려면 길러 모드로 전환하세요'
-                    : '배송을 하려면 이용자 모드로 전환하세요'}
+                    ? '배송을 수행하려면 길러 모드로 전환하세요'
+                    : '배송을 요청하려면 이용자 모드로 전환하세요'}
                 </Text>
               </View>
             </View>

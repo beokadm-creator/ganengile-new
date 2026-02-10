@@ -213,15 +213,22 @@ export interface PricingBreakdown {
 }
 
 export interface PricingDiscount {
-  type: 'transfer_bonus' | 'professional_bonus' | 'express_discount';
+  type: 'transfer_bonus' | 'professional_bonus' | 'express_discount' | 'master_bonus';
   amount: number;
   description: string;
 }
 
 export interface GillerEarnings {
-  base: number;
-  bonus: number;
-  total: number;
+  base: number;       // 보너스 제외 기본 수익
+  bonus: number;      // 등급별 보너스
+  preTax: number;     // 보너스 포함 세전 수익
+  tax: number;        // 원천징수세
+  net: number;        // 보너스 포함 세후 실수익
+}
+
+export interface PlatformEarnings {
+  gross: number;      // 총 수수료
+  net: number;        // 실수익 (PG 수수료 제외)
 }
 
 export interface CalculateDeliveryPricingData {
@@ -240,6 +247,8 @@ export interface CalculateDeliveryPricingResult {
   discounts: PricingDiscount[];
   totalFare: number;
   gillerEarnings: GillerEarnings;
+  platformEarnings: PlatformEarnings;
+  pgFee?: number;      // PG사 수수료
   calculatedAt: Date;
 }
 

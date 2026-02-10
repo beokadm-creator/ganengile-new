@@ -7,6 +7,10 @@
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
     "newArchEnabled": true,
+    "assetBundlePatterns": [
+      "assets/**",
+      "node_modules/@expo/vector-icons/**/Fonts/**"
+    ],
     "splash": {
       "image": "./assets/splash-icon.png",
       "resizeMode": "contain",

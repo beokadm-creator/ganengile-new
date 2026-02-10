@@ -6,7 +6,7 @@
 import React from 'react';
 import { NavigationContainer } from '@react-navigation/native';
 import { createStackNavigator } from '@react-navigation/stack';
-import { ActivityIndicator, View, StyleSheet } from 'react-native';
+import { ActivityIndicator, View, StyleSheet, Platform } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 import { UserProvider, useUser } from '../contexts/UserContext';
@@ -15,6 +15,7 @@ import type { RootStackParamList } from '../types/navigation';
 import AuthNavigator from './AuthNavigator';
 import OnboardingNavigator from './OnboardingNavigator';
 import MainNavigator from './MainNavigator';
+import { AppDownloadBanner } from '../components/AppDownloadBanner';
 
 const Stack = createStackNavigator<RootStackParamList>();
 
@@ -37,6 +38,9 @@ function AppNavigatorContent() {
 
   return (
     <NavigationContainer>
+      {Platform.OS === 'web' && user?.hasCompletedOnboarding && (
+        <AppDownloadBanner />
+      )}
       <Stack.Navigator
         screenOptions={{
           headerShown: false,

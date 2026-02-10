@@ -7,7 +7,7 @@
 import React from 'react';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { createStackNavigator } from '@react-navigation/stack';
-import { Text } from 'react-native';
+import { Text, Platform } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import type { MainTabParamList } from '../types/navigation';
@@ -31,11 +31,29 @@ import RatingScreen from '../screens/main/RatingScreen';
 import ChatListScreen from '../screens/main/ChatListScreen';
 import ChatScreen from '../screens/main/ChatScreen';
 import NotificationSettingsScreen from '../screens/main/NotificationSettingsScreen';
+import EarningsScreen from '../screens/main/EarningsScreen';
+import MyRatingScreen from '../screens/main/MyRatingScreen';
+import CustomerServiceScreen from '../screens/main/CustomerServiceScreen';
+import TermsScreen from '../screens/main/TermsScreen';
 
 const Tab = createBottomTabNavigator<MainTabParamList>();
 const Stack = createStackNavigator();
 
 function TabBarIcon({ name, focused }: { name: string; focused: boolean }) {
+  const emojiMap: { [key: string]: string } = {
+    Home: '🏠',
+    RouteManagement: '🗺️',
+    Requests: '📋',
+    GillerRequests: '🚴',
+    Profile: '👤',
+  };
+
+  const emoji = emojiMap[name] || '•';
+
+  if (Platform.OS === 'web') {
+    return <Text style={{ fontSize: 24, opacity: focused ? 1 : 0.5 }}>{emoji}</Text>;
+  }
+
   const icons: { [key: string]: { name: keyof typeof Ionicons.glyphMap } } = {
     Home: { name: 'home' },
     RouteManagement: { name: 'map' },
@@ -133,6 +151,23 @@ export default function MainNavigator() {
     <Stack.Navigator
       screenOptions={{
         headerShown: false,
+        headerBackTitle: '뒤로',
+        headerBackTitleVisible: true,
+        headerTitleAlign: 'center',
+        headerTitleStyle: { fontWeight: 'bold', fontSize: 18 },
+        headerStyle: {
+          backgroundColor: '#fff',
+          shadowColor: '#000',
+          shadowOffset: { width: 0, height: 2 },
+          shadowOpacity: 0.1,
+          shadowRadius: 4,
+          elevation: 3,
+        },
+        headerTintColor: '#333',
+        gestureEnabled: true,
+        gestureDirection: 'horizontal',
+        cardOverlayEnabled: true,
+        cardShadowEnabled: true,
       }}
     >
       <Stack.Screen name="Tabs" component={TabNavigator} />
@@ -142,9 +177,6 @@ export default function MainNavigator() {
         options={{
           headerShown: true,
           title: '배송 요청하기',
-          headerStyle: { backgroundColor: '#FF9800' },
-          headerTintColor: '#fff',
-          headerTitleStyle: { fontWeight: 'bold' },
         }}
       />
       <Stack.Screen
@@ -153,9 +185,6 @@ export default function MainNavigator() {
         options={{
           headerShown: true,
           title: '동선 등록',
-          headerStyle: { backgroundColor: '#4CAF50' },
-          headerTintColor: '#fff',
-          headerTitleStyle: { fontWeight: 'bold' },
         }}
       />
       <Stack.Screen
@@ -164,9 +193,6 @@ export default function MainNavigator() {
         options={{
           headerShown: true,
           title: '요청 상세',
-          headerStyle: { backgroundColor: '#00BCD4' },
-          headerTintColor: '#fff',
-          headerTitleStyle: { fontWeight: 'bold' },
         }}
       />
       <Stack.Screen
@@ -175,9 +201,6 @@ export default function MainNavigator() {
         options={{
           headerShown: true,
           title: '배송 추적',
-          headerStyle: { backgroundColor: '#4CAF50' },
-          headerTintColor: '#fff',
-          headerTitleStyle: { fontWeight: 'bold' },
         }}
       />
       <Stack.Screen
@@ -186,9 +209,6 @@ export default function MainNavigator() {
         options={{
           headerShown: true,
           title: '매칭 결과',
-          headerStyle: { backgroundColor: '#FF9800' },
-          headerTintColor: '#fff',
-          headerTitleStyle: { fontWeight: 'bold' },
         }}
       />
       <Stack.Screen
@@ -197,9 +217,6 @@ export default function MainNavigator() {
         options={{
           headerShown: true,
           title: '픽업 인증',
-          headerStyle: { backgroundColor: '#4CAF50' },
-          headerTintColor: '#fff',
-          headerTitleStyle: { fontWeight: 'bold' },
         }}
       />
       <Stack.Screen
@@ -208,9 +225,6 @@ export default function MainNavigator() {
         options={{
           headerShown: true,
           title: '배송 완료',
-          headerStyle: { backgroundColor: '#4CAF50' },
-          headerTintColor: '#fff',
-          headerTitleStyle: { fontWeight: 'bold' },
         }}
       />
       <Stack.Screen
@@ -219,9 +233,6 @@ export default function MainNavigator() {
         options={{
           headerShown: true,
           title: '평가',
-          headerStyle: { backgroundColor: '#FF9800' },
-          headerTintColor: '#fff',
-          headerTitleStyle: { fontWeight: 'bold' },
         }}
       />
       <Stack.Screen
@@ -230,9 +241,6 @@ export default function MainNavigator() {
         options={{
           headerShown: true,
           title: '채팅',
-          headerStyle: { backgroundColor: '#2196F3' },
-          headerTintColor: '#fff',
-          headerTitleStyle: { fontWeight: 'bold' },
         }}
       />
       <Stack.Screen
@@ -241,9 +249,6 @@ export default function MainNavigator() {
         options={{
           headerShown: true,
           title: '채팅',
-          headerStyle: { backgroundColor: '#2196F3' },
-          headerTintColor: '#fff',
-          headerTitleStyle: { fontWeight: 'bold' },
         }}
       />
       <Stack.Screen
@@ -252,9 +257,38 @@ export default function MainNavigator() {
         options={{
           headerShown: true,
           title: '알림 설정',
-          headerStyle: { backgroundColor: '#FF9800' },
-          headerTintColor: '#fff',
-          headerTitleStyle: { fontWeight: 'bold' },
+        }}
+      />
+      <Stack.Screen
+        name="Earnings"
+        component={EarningsScreen}
+        options={{
+          headerShown: true,
+          title: '수익 관리',
+        }}
+      />
+      <Stack.Screen
+        name="MyRating"
+        component={MyRatingScreen}
+        options={{
+          headerShown: true,
+          title: '내 평가',
+        }}
+      />
+      <Stack.Screen
+        name="CustomerService"
+        component={CustomerServiceScreen}
+        options={{
+          headerShown: true,
+          title: '고객센터',
+        }}
+      />
+      <Stack.Screen
+        name="Terms"
+        component={TermsScreen}
+        options={{
+          headerShown: true,
+          title: '약관 및 정책',
         }}
       />
     </Stack.Navigator>

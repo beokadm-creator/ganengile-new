@@ -15,6 +15,8 @@ import {
   RefreshControl,
   Platform,
 } from 'react-native';
+import { MaterialIcons } from '@expo/vector-icons';
+import { Colors, Spacing, Typography, BorderRadius, Shadows } from '../../theme';
 import { useUser } from '../../contexts/UserContext';
 import { getUserStats } from '../../services/user-service';
 import StationSelectModal from '../../components/StationSelectModal';
@@ -23,6 +25,17 @@ import type { MainStackNavigationProp } from '../../types/navigation';
 import type { User } from '../../types/user';
 import type { Station } from '../../types/config';
 import { UserRole } from '../../types/user';
+
+// 웹에서는 아이콘 대신 텍스트 라벨 사용
+const IconLabel = ({ name, label }: { name: string; label: string }) => {
+  if (Platform.OS === 'web') {
+    return <Text style={styles.iconLabel}>{label}</Text>;
+  }
+  let iconName = name;
+  if (name === 'list') iconName = 'view-list';
+  if (name === 'route') iconName = 'alt-route';
+  return <MaterialIcons name={iconName as any} size={24} color="currentColor" />;
+};
 
 interface Stats {
   totalRequests: number;
@@ -106,9 +119,16 @@ export default function HomeScreen({ navigation }: { navigation: MainStackNaviga
         <>
           {/* Header */}
           <View style={styles.header}>
-            <Text style={styles.title}>
-              안녕하세요, {user.name.split(' ')[0]}님! 👋
-            </Text>
+            <View style={styles.headerGreeting}>
+              <Text style={styles.title}>
+                안녕하세요,{`\n`}{user.name.split(' ')[0]}님!
+              </Text>
+              {Platform.OS === 'web' ? (
+                <Text style={styles.waveText}>👋</Text>
+              ) : (
+                <MaterialIcons name="waving-hand" size={28} color="#FFD54F" style={styles.waveIcon} />
+              )}
+            </View>
             <Text style={styles.subtitle}>
               {currentRole === UserRole.GLER ? '오늘도 편리한 배송을' : '오늘도 좋은 수익을'}
             </Text>
@@ -123,7 +143,7 @@ export default function HomeScreen({ navigation }: { navigation: MainStackNaviga
           </View>
 
           {/* Role-specific content */}
-          {currentRole === 'gller' ? (
+          {!currentRole || currentRole === UserRole.GLER ? (
             <GllerDashboard
               user={user}
               stats={stats}
@@ -131,7 +151,12 @@ export default function HomeScreen({ navigation }: { navigation: MainStackNaviga
               openStationModal={openStationModal}
             />
           ) : (
-            <GillerDashboard user={user} stats={stats} navigation={navigation} />
+            <GillerDashboard
+              user={user}
+              stats={stats}
+              navigation={navigation}
+              openStationModal={openStationModal}
+            />
           )}
 
           {/* Station Select Modal */}
@@ -165,21 +190,29 @@ function GllerDashboard({
   return (
     <View style={styles.dashboardContainer}>
       {/* Quick Stats */}
-        <View style={styles.statsRow}>
+      <View style={styles.statsRow}>
         <TouchableOpacity
           style={styles.statCard}
           onPress={() => navigation.navigate('Tabs', { screen: 'Requests' })}
+          activeOpacity={0.7}
         >
           <Text style={styles.statNumber}>{stats?.totalRequests || 0}</Text>
           <Text style={styles.statLabel}>총 요청</Text>
+          <View style={styles.statIconContainer}>
+            <IconLabel name="inventory" label="📦" />
+          </View>
         </TouchableOpacity>
 
         <TouchableOpacity
           style={styles.statCard}
           onPress={() => navigation.navigate('Tabs', { screen: 'Requests' })}
+          activeOpacity={0.7}
         >
           <Text style={styles.statNumber}>{stats?.completionRate.toFixed(0) || 0}%</Text>
           <Text style={styles.statLabel}>완료율</Text>
+          <View style={[styles.statIconContainer, { backgroundColor: Colors.secondaryLight }]}>
+            <IconLabel name="check-circle" label="✅" />
+          </View>
         </TouchableOpacity>
       </View>
 
@@ -190,55 +223,43 @@ function GllerDashboard({
         <TouchableOpacity
           style={styles.actionCard}
           onPress={() => navigation.navigate('CreateRequest')}
+          activeOpacity={0.7}
         >
-          <View style={styles.actionIcon}>📦</View>
+          <View style={[styles.actionIcon, styles.actionIconGreen]}>
+            <IconLabel name="inventory-2" label="📦" />
+          </View>
           <View style={styles.actionContent}>
             <Text style={styles.actionTitle}>배송 요청하기</Text>
             <Text style={styles.actionSubtitle}>
               출퇴근길에 짐을 보내보세요
             </Text>
           </View>
-        </TouchableOpacity>
-
-        {/* 빠른 동선 추가 - 역 선택 Modal */}
-        <TouchableOpacity
-          style={styles.actionCard}
-          onPress={openStationModal}
-        >
-          <View style={styles.actionIcon}>🚇</View>
-          <View style={styles.actionContent}>
-            <Text style={styles.actionTitle}>빠른 동선 추가</Text>
-            <Text style={styles.actionSubtitle}>
-              역을 선택하여 동선을 등록하세요
-            </Text>
-          </View>
+          {Platform.OS === 'web' ? (
+            <Text style={styles.actionArrow}>▶</Text>
+          ) : (
+            <MaterialIcons name="chevron-right" size={24} color={Colors.gray400} style={styles.actionArrow} />
+          )}
         </TouchableOpacity>
 
         <TouchableOpacity
           style={styles.actionCard}
-          onPress={() => navigation.navigate('AddRoute', {})}
+          onPress={() => navigation.navigate('Tabs', { screen: 'Requests' })}
+          activeOpacity={0.7}
         >
-          <View style={styles.actionIcon}>📍</View>
+          <View style={[styles.actionIcon, styles.actionIconBlue]}>
+            <IconLabel name="list" label="📋" />
+          </View>
           <View style={styles.actionContent}>
-            <Text style={styles.actionTitle}>동선 등록</Text>
+            <Text style={styles.actionTitle}>요청 내역</Text>
             <Text style={styles.actionSubtitle}>
-              자주 타는 경로를 등록하세요
+              배송 요청 내역을 확인하세요
             </Text>
           </View>
-        </TouchableOpacity>
-      </View>
-
-      {/* My Routes Summary */}
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>내 동선</Text>
-        <TouchableOpacity
-          style={styles.infoCard}
-          onPress={() => navigation.navigate('AddRoute', {})}
-        >
-          <Text style={styles.infoTitle}>등록된 동선 관리</Text>
-          <Text style={styles.infoSubtitle}>
-            동선 관리에서 등록된 경로를 확인하세요
-          </Text>
+          {Platform.OS === 'web' ? (
+            <Text style={styles.actionArrow}>▶</Text>
+          ) : (
+            <MaterialIcons name="chevron-right" size={24} color={Colors.gray400} style={styles.actionArrow} />
+          )}
         </TouchableOpacity>
       </View>
     </View>
@@ -252,10 +273,12 @@ function GillerDashboard({
   user,
   stats,
   navigation,
+  openStationModal,
 }: {
   user: User;
   stats: Stats | null;
   navigation: MainStackNavigationProp;
+  openStationModal: () => void;
 }) {
   return (
     <View style={styles.dashboardContainer}>
@@ -264,21 +287,40 @@ function GillerDashboard({
         <TouchableOpacity
           style={styles.statCard}
           onPress={() => navigation.navigate('Tabs', { screen: 'GillerRequests' })}
+          activeOpacity={0.7}
         >
           <Text style={styles.statNumber}>{stats?.totalDeliveries || 0}</Text>
           <Text style={styles.statLabel}>완료 배송</Text>
+          <View style={[styles.statIconContainer, { backgroundColor: Colors.secondaryLight }]}>
+            <IconLabel name="local-shipping" label="🚚" />
+          </View>
         </TouchableOpacity>
 
-        <TouchableOpacity style={styles.statCard}>
-          <Text style={styles.statNumber}>
-            {(stats?.totalEarnings || 0).toLocaleString()}원
+        <TouchableOpacity
+          style={styles.statCard}
+          activeOpacity={0.7}
+        >
+          <Text style={styles.statNumber} adjustsFontSizeToFit numberOfLines={1}>
+            {((stats?.totalEarnings || 0) / 10000).toFixed(1)}만
           </Text>
           <Text style={styles.statLabel}>총 수익</Text>
+          <View style={[styles.statIconContainer, { backgroundColor: Colors.accentLight }]}>
+            <IconLabel name="payments" label="💰" />
+          </View>
         </TouchableOpacity>
 
-        <TouchableOpacity style={styles.statCard}>
+        <TouchableOpacity
+          style={styles.statCard}
+          activeOpacity={0.7}
+        >
           <Text style={styles.statNumber}>{stats?.averageRating || 0}</Text>
-          <Text style={styles.statLabel}>평점 ⭐</Text>
+          <View style={styles.ratingContainer}>
+            <Text style={styles.statLabel}>평점</Text>
+            <IconLabel name="star" label="⭐" />
+          </View>
+          <View style={[styles.statIconContainer, { backgroundColor: '#FFF9C4' }]}>
+            <IconLabel name="star-rate" label="⭐" />
+          </View>
         </TouchableOpacity>
       </View>
 
@@ -289,27 +331,85 @@ function GillerDashboard({
         <TouchableOpacity
           style={styles.actionCard}
           onPress={() => navigation.navigate('Tabs', { screen: 'GillerRequests' })}
+          activeOpacity={0.7}
         >
-          <View style={styles.actionIcon}>🚴</View>
+          <View style={[styles.actionIcon, styles.actionIconGreen]}>
+            <IconLabel name="pedal-bike" label="🚲" />
+          </View>
           <View style={styles.actionContent}>
             <Text style={styles.actionTitle}>가능한 배송</Text>
             <Text style={styles.actionSubtitle}>
               내 동선과 매칭된 요청을 확인하세요
             </Text>
           </View>
+          {Platform.OS === 'web' ? (
+            <Text style={styles.actionArrow}>▶</Text>
+          ) : (
+            <MaterialIcons name="chevron-right" size={24} color={Colors.gray400} style={styles.actionArrow} />
+          )}
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={styles.actionCard}
+          onPress={openStationModal}
+          activeOpacity={0.7}
+        >
+          <View style={[styles.actionIcon, styles.actionIconOrange]}>
+            <IconLabel name="subway" label="🚇" />
+          </View>
+          <View style={styles.actionContent}>
+            <Text style={styles.actionTitle}>빠른 동선 추가</Text>
+            <Text style={styles.actionSubtitle}>
+              역을 선택하여 동선을 빠르게 등록하세요
+            </Text>
+          </View>
+          {Platform.OS === 'web' ? (
+            <Text style={styles.actionArrow}>▶</Text>
+          ) : (
+            <MaterialIcons name="chevron-right" size={24} color={Colors.gray400} style={styles.actionArrow} />
+          )}
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={styles.actionCard}
+          onPress={() => navigation.navigate('AddRoute', {})}
+          activeOpacity={0.7}
+        >
+          <View style={[styles.actionIcon, styles.actionIconBlue]}>
+            <IconLabel name="route" label="🛤️" />
+          </View>
+          <View style={styles.actionContent}>
+            <Text style={styles.actionTitle}>동선 관리</Text>
+            <Text style={styles.actionSubtitle}>
+              루틴/단일 동선을 등록하고 관리하세요
+            </Text>
+          </View>
+          {Platform.OS === 'web' ? (
+            <Text style={styles.actionArrow}>▶</Text>
+          ) : (
+            <MaterialIcons name="chevron-right" size={24} color={Colors.gray400} style={styles.actionArrow} />
+          )}
         </TouchableOpacity>
 
         <TouchableOpacity
           style={styles.actionCard}
           onPress={() => navigation.navigate('DeliveryTracking', {})}
+          activeOpacity={0.7}
         >
-          <View style={styles.actionIcon}>📍</View>
+          <View style={[styles.actionIcon, styles.actionIconPurple]}>
+            <IconLabel name="location-on" label="📍" />
+          </View>
           <View style={styles.actionContent}>
             <Text style={styles.actionTitle}>배송 추적</Text>
             <Text style={styles.actionSubtitle}>
               진행 중인 배송을 확인하세요
             </Text>
           </View>
+          {Platform.OS === 'web' ? (
+            <Text style={styles.actionArrow}>▶</Text>
+          ) : (
+            <MaterialIcons name="chevron-right" size={24} color={Colors.gray400} style={styles.actionArrow} />
+          )}
         </TouchableOpacity>
       </View>
 
@@ -329,11 +429,14 @@ function GillerDashboard({
               {stats?.totalDeliveries || 0}건
             </Text>
           </View>
-          <View style={styles.performanceRow}>
+          <View style={[styles.performanceRow, styles.performanceRowLast]}>
             <Text style={styles.performanceLabel}>평균 평점</Text>
-            <Text style={styles.performanceValue}>
-              {stats?.averageRating || 0} / 5.0
-            </Text>
+            <View style={styles.ratingContainer}>
+              <Text style={styles.performanceValue}>
+                {stats?.averageRating || 0}
+              </Text>
+              <IconLabel name="star" label="⭐" />
+            </View>
           </View>
         </View>
       </View>
@@ -342,181 +445,217 @@ function GillerDashboard({
 }
 
 const styles = StyleSheet.create({
-  actionCard: {
-    alignItems: 'center',
-    backgroundColor: '#fff',
-    borderRadius: 12,
-    elevation: 3,
+  header: {
+    backgroundColor: Colors.primary,
+    borderBottomLeftRadius: 32,
+    borderBottomRightRadius: 32,
+    padding: Spacing.xxl,
+    paddingTop: 65,
+    paddingBottom: Spacing['3xl'],
+    ...Shadows.lg,
+  },
+  headerGreeting: {
     flexDirection: 'row',
-    marginBottom: 12,
-    padding: 16,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    ...(Platform.OS === 'web' && { cursor: 'pointer' }),
+    alignItems: 'center',
+    marginBottom: Spacing.xs,
+  },
+  title: {
+    color: Colors.white,
+    fontSize: Typography.fontSize['3xl'],
+    fontWeight: Typography.fontWeight.bold,
+    letterSpacing: -0.5,
+  },
+  waveIcon: {
+    marginLeft: Spacing.sm,
+  },
+  waveText: {
+    fontSize: 24,
+    marginLeft: Spacing.sm,
+  },
+  iconLabel: {
+    fontSize: 16,
+  },
+  subtitle: {
+    color: Colors.white,
+    fontSize: Typography.fontSize.lg,
+    marginTop: Spacing.xs,
+    opacity: 0.95,
+    fontWeight: Typography.fontWeight.medium,
+  },
+  dashboardContainer: {
+    padding: Spacing.lg,
+    marginTop: -Spacing['2xl'],
+  },
+  statsRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: Spacing.xl,
+    gap: Spacing.sm,
+  },
+  statCard: {
+    alignItems: 'center',
+    backgroundColor: Colors.white,
+    borderRadius: BorderRadius.xl,
+    flex: 1,
+    padding: Spacing.lg,
+    paddingTop: Spacing.lg,
+    paddingBottom: Spacing.md,
+    ...Shadows.md,
+    borderWidth: 1,
+    borderColor: Colors.gray100,
+  },
+  statNumber: {
+    color: Colors.primary,
+    fontSize: 28,
+    fontWeight: Typography.fontWeight.bold,
+    letterSpacing: -1,
+    marginBottom: Spacing.xs,
+  },
+  statLabel: {
+    color: Colors.textSecondary,
+    fontSize: Typography.fontSize.xs,
+    fontWeight: Typography.fontWeight.medium,
+  },
+  statIconContainer: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: Colors.primaryLight,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: Spacing.xs,
+  },
+  section: {
+    marginBottom: Spacing.xxl,
+  },
+  sectionTitle: {
+    color: Colors.textPrimary,
+    fontSize: Typography.fontSize.xl,
+    fontWeight: Typography.fontWeight.bold,
+    marginBottom: Spacing.lg,
+    letterSpacing: -0.3,
+  },
+  actionCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: Colors.white,
+    borderRadius: BorderRadius.xl,
+    marginBottom: Spacing.md,
+    padding: Spacing.lg,
+    ...Shadows.md,
+    borderWidth: 1,
+    borderColor: Colors.gray100,
+  },
+  actionIcon: {
+    width: 52,
+    height: 52,
+    borderRadius: 26,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: Spacing.lg,
+  },
+  actionIconGreen: {
+    backgroundColor: Colors.secondaryLight,
+  },
+  actionIconBlue: {
+    backgroundColor: Colors.primaryLight,
+  },
+  actionIconOrange: {
+    backgroundColor: Colors.accentLight,
+  },
+  actionIconPurple: {
+    backgroundColor: '#E1BEE7',
   },
   actionContent: {
     flex: 1,
   },
-  actionIcon: {
-    fontSize: 32,
-    marginRight: 16,
+  actionTitle: {
+    color: Colors.textPrimary,
+    fontSize: Typography.fontSize.lg,
+    fontWeight: Typography.fontWeight.semibold,
+    marginBottom: 2,
+    letterSpacing: -0.2,
   },
   actionSubtitle: {
-    color: '#666',
-    fontSize: 14,
-    marginTop: 2,
+    color: Colors.textSecondary,
+    fontSize: Typography.fontSize.sm,
+    lineHeight: 18,
   },
-  actionTitle: {
-    color: '#333',
-    fontSize: 16,
-    fontWeight: 'bold',
+  actionArrow: {
+    marginLeft: Spacing.sm,
+  },
+  infoCard: {
+    backgroundColor: Colors.white,
+    borderRadius: BorderRadius.xl,
+    padding: Spacing.lg,
+    ...Shadows.md,
+    borderWidth: 1,
+    borderColor: Colors.gray100,
+  },
+  infoTitle: {
+    color: Colors.textPrimary,
+    fontSize: Typography.fontSize.lg,
+    fontWeight: Typography.fontWeight.semibold,
+    marginBottom: Spacing.xs,
+  },
+  infoSubtitle: {
+    color: Colors.textSecondary,
+    fontSize: Typography.fontSize.sm,
+    lineHeight: 18,
+  },
+  performanceCard: {
+    backgroundColor: Colors.white,
+    borderRadius: BorderRadius.xl,
+    padding: Spacing.lg,
+    ...Shadows.md,
+    borderWidth: 1,
+    borderColor: Colors.gray100,
+  },
+  performanceRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: Spacing.sm,
+    borderBottomWidth: 1,
+    borderBottomColor: Colors.gray100,
+  },
+  performanceRowLast: {
+    borderBottomWidth: 0,
+  },
+  performanceLabel: {
+    color: Colors.textSecondary,
+    fontSize: Typography.fontSize.sm,
+    fontWeight: Typography.fontWeight.medium,
+  },
+  performanceValue: {
+    color: Colors.textPrimary,
+    fontSize: Typography.fontSize.base,
+    fontWeight: Typography.fontWeight.bold,
+  },
+  ratingContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  ratingStar: {
+    marginLeft: Spacing.xs,
+  },
+  container: {
+    backgroundColor: Colors.gray50,
+    flex: 1,
   },
   centerContainer: {
     alignItems: 'center',
     flex: 1,
     justifyContent: 'center',
-    padding: 20,
-  },
-  container: {
-    backgroundColor: '#f5f5f5',
-    flex: 1,
-  },
-  dashboardContainer: {
-    padding: 16,
+    padding: Spacing.xl,
   },
   errorText: {
-    color: '#f44336',
-    fontSize: 16,
-  },
-  header: {
-    backgroundColor: '#4CAF50',
-    borderBottomLeftRadius: 20,
-    borderBottomRightRadius: 20,
-    padding: 20,
-    paddingTop: 60,
-  },
-  infoCard: {
-    backgroundColor: '#fff',
-    borderRadius: 12,
-    elevation: 3,
-    padding: 16,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    ...(Platform.OS === 'web' && { cursor: 'pointer' }),
-  },
-  infoSubtitle: {
-    color: '#666',
-    fontSize: 14,
-    marginTop: 4,
-  },
-  infoTitle: {
-    color: '#333',
-    fontSize: 16,
-    fontWeight: 'bold',
-  },
-  loadingText: {
-    color: '#666',
-    fontSize: 16,
-    marginTop: 12,
-  },
-  performanceCard: {
-    backgroundColor: '#fff',
-    borderRadius: 12,
-    elevation: 3,
-    padding: 16,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-  },
-  performanceLabel: {
-    color: '#666',
-    fontSize: 14,
-  },
-  performanceRow: {
-    borderBottomColor: '#f0f0f0',
-    borderBottomWidth: 1,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    paddingVertical: 8,
-  },
-  performanceValue: {
-    color: '#333',
-    fontSize: 14,
-    fontWeight: 'bold',
-  },
-  roleToggle: {
-    backgroundColor: 'rgba(255, 255, 255, 0.2)',
-    borderRadius: 8,
-    marginTop: 16,
-    padding: 12,
-  },
-  roleToggleSub: {
-    color: '#fff',
-    fontSize: 12,
-    marginTop: 2,
-    opacity: 0.8,
-  },
-  roleToggleText: {
-    color: '#fff',
-    fontSize: 16,
-    fontWeight: 'bold',
-  },
-  section: {
-    marginBottom: 20,
-  },
-  sectionTitle: {
-    color: '#333',
-    fontSize: 18,
-    fontWeight: 'bold',
-    marginBottom: 12,
-  },
-  statCard: {
-    alignItems: 'center',
-    backgroundColor: '#fff',
-    borderRadius: 12,
-    elevation: 3,
-    flex: 1,
-    marginHorizontal: 4,
-    padding: 16,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    ...(Platform.OS === 'web' && { cursor: 'pointer' }),
-  },
-  statLabel: {
-    color: '#666',
-    fontSize: 12,
-    marginTop: 4,
-  },
-  statNumber: {
-    color: '#4CAF50',
-    fontSize: 24,
-    fontWeight: 'bold',
-  },
-  statsRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginBottom: 20,
-  },
-  subtitle: {
-    color: '#fff',
-    fontSize: 16,
-    marginTop: 4,
-    opacity: 0.9,
-  },
-  title: {
-    color: '#fff',
-    fontSize: 24,
-    fontWeight: 'bold',
+    color: Colors.error,
+    fontSize: Typography.fontSize.base,
+    textAlign: 'center',
   },
   scrollContent: {
     flexGrow: 1,
-    paddingBottom: 20,
+    paddingBottom: Spacing['3xl'],
   },
 });

@@ -171,6 +171,18 @@ export class NotificationService {
           createdAt: data.createdAt,
           updatedAt: data.updatedAt,
         } as NotificationSettings);
+      } else {
+        // 문서가 없으면 기본 설정 반환
+        listener({
+          userId: this.userId,
+          enabled: true,
+          settings: this.getDefaultNotificationSettings(),
+          quietHours: {
+            enabled: false,
+            startTime: '22:00',
+            endTime: '08:00',
+          },
+        } as NotificationSettings);
       }
     });
 

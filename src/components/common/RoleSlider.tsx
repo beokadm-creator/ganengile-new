@@ -1,5 +1,5 @@
-import React, { useEffect, useRef } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Animated, Dimensions } from 'react-native';
+import React from 'react';
+import { View, Text, StyleSheet, TouchableOpacity, Dimensions, Platform } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { Colors, Spacing, BorderRadius, Shadows, Typography } from '../../theme';
 
@@ -16,19 +16,6 @@ export default function RoleSlider({
   onRoleChange,
   disabled = false,
 }: RoleSliderProps) {
-  const translateX = useRef(new Animated.Value(currentRole === 'gller' ? 0 : 1)).current;
-
-  useEffect(() => {
-    if (currentRole) {
-      Animated.spring(translateX, {
-        toValue: currentRole === 'gller' ? 0 : 1,
-        useNativeDriver: true,
-        tension: 50,
-        friction: 7,
-      }).start();
-    }
-  }, [currentRole, translateX]);
-
   const handleRoleChange = () => {
     if (disabled || !currentRole) return;
 
@@ -36,10 +23,7 @@ export default function RoleSlider({
     onRoleChange(newRole);
   };
 
-  const thumbTranslateX = translateX.interpolate({
-    inputRange: [0, 1],
-    outputRange: [0, SCREEN_WIDTH - 64],
-  });
+  const isGllerActive = currentRole === 'gller';
 
   return (
     <View style={styles.container}>
@@ -53,66 +37,77 @@ export default function RoleSlider({
         accessibilityRole="switch"
         accessibilityState={{ checked: currentRole === 'giller' }}
       >
-        <View style={styles.labelsContainer}>
-          <View style={styles.labelColumn}>
-            <Ionicons
-              name="cube-outline"
-              size={24}
-              color={Colors.white}
-              style={styles.labelIcon}
-            />
-            <Text
-              style={[
-                styles.label,
-                currentRole === 'gller' && styles.activeLabel,
-              ]}
-            >
-              이용자
-            </Text>
-            <Text
-              style={[
-                styles.subtitle,
-                currentRole === 'gller' && styles.activeSubtitle,
-              ]}
-            >
-              배송을 요청하려면
-            </Text>
+        <View style={styles.halvesContainer}>
+          {/* 왼쪽 절반 - 이용자 */}
+          <View style={[
+            styles.half,
+            isGllerActive && styles.activeHalf
+          ]}>
+            <View style={styles.labelColumn}>
+              {Platform.OS === 'web' ? (
+                <Text style={styles.emojiIcon}>📦</Text>
+              ) : (
+                <Ionicons
+                  name="cube-outline"
+                  size={24}
+                  color={isGllerActive ? '#00BCD4' : Colors.white}
+                  style={styles.labelIcon}
+                />
+              )}
+              <Text
+                style={[
+                  styles.label,
+                  isGllerActive && styles.activeLabel,
+                ]}
+              >
+                이용자
+              </Text>
+              <Text
+                style={[
+                  styles.subtitle,
+                  isGllerActive && styles.activeSubtitle,
+                ]}
+              >
+                배송을 요청하려면
+              </Text>
+            </View>
           </View>
 
-          <View style={styles.labelColumn}>
-            <Ionicons
-              name="bicycle-outline"
-              size={24}
-              color={Colors.white}
-              style={styles.labelIcon}
-            />
-            <Text
-              style={[
-                styles.label,
-                currentRole === 'giller' && styles.activeLabel,
-              ]}
-            >
-              길러 모드
-            </Text>
-            <Text
-              style={[
-                styles.subtitle,
-                currentRole === 'giller' && styles.activeSubtitle,
-              ]}
-            >
-              배송을 하려면
-            </Text>
+          {/* 오른쪽 절반 - 길러 */}
+          <View style={[
+            styles.half,
+            !isGllerActive && styles.activeHalf
+          ]}>
+            <View style={styles.labelColumn}>
+              {Platform.OS === 'web' ? (
+                <Text style={styles.emojiIcon}>🚴</Text>
+              ) : (
+                <Ionicons
+                  name="bicycle-outline"
+                  size={24}
+                  color={!isGllerActive ? '#00BCD4' : Colors.white}
+                  style={styles.labelIcon}
+                />
+              )}
+              <Text
+                style={[
+                  styles.label,
+                  !isGllerActive && styles.activeLabel,
+                ]}
+              >
+                길러 모드
+              </Text>
+              <Text
+                style={[
+                  styles.subtitle,
+                  !isGllerActive && styles.activeSubtitle,
+                ]}
+              >
+                배송을 하려면
+              </Text>
+            </View>
           </View>
         </View>
-
-        <Animated.View
-          style={[
-            styles.thumb,
-            {
-              transform: [{ translateX: thumbTranslateX }],
-            },
-          ]}
-        />
       </TouchableOpacity>
     </View>
   );
@@ -121,12 +116,31 @@ export default function RoleSlider({
 const styles = StyleSheet.create({
   activeLabel: {
     opacity: 1,
+    color: '#00BCD4',
   },
   activeSubtitle: {
     opacity: 0.9,
   },
+  activeHalf: {
+    backgroundColor: 'rgba(255, 255, 255, 0.3)',
+  },
   container: {
-    marginTop: Spacing.md,
+    marginTop: 8,
+    width: '100%',
+  },
+  emojiIcon: {
+    fontSize: 28,
+    marginBottom: Spacing.xs,
+  },
+  half: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: Spacing.md,
+  },
+  halvesContainer: {
+    flexDirection: 'row',
+    height: 90,
   },
   labelIcon: {
     marginBottom: Spacing.xs,
@@ -143,34 +157,16 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     flex: 1,
   },
-  labelsContainer: {
-    alignItems: 'center',
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    zIndex: 1,
-  },
   sliderContainer: {
     backgroundColor: 'rgba(255, 255, 255, 0.2)',
     borderRadius: BorderRadius.lg,
-    height: 80,
+    height: 90,
     overflow: 'hidden',
-    padding: Spacing.md,
-    position: 'relative',
   },
   subtitle: {
     color: Colors.white,
     fontSize: Typography.fontSize.xs,
     opacity: 0.6,
     textAlign: 'center',
-  },
-  thumb: {
-    backgroundColor: 'rgba(255, 255, 255, 0.95)',
-    borderRadius: BorderRadius.md,
-    height: 72,
-    left: Spacing.xs,
-    position: 'absolute',
-    top: Spacing.xs,
-    width: SCREEN_WIDTH / 2 - 48,
-    ...Shadows.sm,
   },
 });

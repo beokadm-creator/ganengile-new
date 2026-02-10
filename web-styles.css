@@ -1,0 +1,40 @@
+/**
+ * Web Styles for Icon Fonts
+ * Load vector icon fonts for web environment
+ */
+
+/* Material Icons */
+@font-face {
+  font-family: 'MaterialIcons';
+  src: url('./assets/node_modules/@expo/vector-icons/build/vendor/react-native-vector-icons/Fonts/MaterialIcons.4e85bc9ebe07e0340c9c4fc2f6c38908.ttf') format('truetype');
+  font-weight: normal;
+  font-style: normal;
+  font-display: swap;
+}
+
+/* Ionicons */
+@font-face {
+  font-family: 'Ionicons';
+  src: url('./assets/node_modules/@expo/vector-icons/build/vendor/react-native-vector-icons/Fonts/Ionicons.b4eb097d35f44ed943676fd56f6bdc51.ttf') format('truetype');
+  font-weight: normal;
+  font-style: normal;
+  font-display: swap;
+}
+
+/* Ensure icons render correctly */
+[class^="MaterialIcons"],
+[class*=" MaterialIcons"],
+[class^="Ionicons"],
+[class*=" Ionicons"] {
+  font-family: 'MaterialIcons', 'Ionicons', sans-serif;
+  font-weight: normal;
+  font-style: normal;
+  font-size: 24px;
+  line-height: 1;
+  letter-spacing: normal;
+  text-transform: none;
+  display: inline-block;
+  white-space: nowrap;
+  word-wrap: normal;
+  direction: ltr;
+}

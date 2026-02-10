@@ -916,25 +916,45 @@ export const calculateDeliveryRate = functions.https.onCall(async (data, context
 // ==================== Pricing Functions ====================
 
 /**
- * Pricing Constants
+ * Pricing Constants (Updated with actual costs)
  */
 const PRICING_CONSTANTS = {
-  BASE_FARE: 1400,
-  SECOND_FARE: 1600,
-  THIRD_FARE: 1800,
+  // 기본 요금 (이용자 결제금액)
+  BASE_FARE: 4000,
+  SECOND_FARE: 5000,
+  THIRD_FARE: 6000,
   TRANSFER_BONUS: 500,
   TRANSFER_DISCOUNT: 500,
   EXPRESS_SURCHARGE: 500,
+  
+  // ==================== 실제 비용 ====================
+  
+  // PG사 수수료 (결제 대행 수수료)
+  PG_FEE_RATE: 0.03, // 3% (NICE, Toss 평균)
+  
+  // 플랫폼 수수료 (PG 수수료 차감 후, 단계별)
+  SERVICE_FEE_RATE: 0.08, // 8% (초기 우대, 나중에 10%로 조정)
+  
+  // 원천징수세 (길러 수익에서)
+  WITHHOLDING_TAX_RATE: 0.033, // 3.3%
+  
+  // ==================== 할증/할인 ====================
+  
   RUSH_HOUR_SURCHARGE_RATE: 0.15, // 러시아워 할증 15%
   URGENCY_SURCHARGE_RATES: {
     normal: 0,
     fast: 0.10,
     urgent: 0.20,
   },
-  PROFESSIONAL_BONUS_RATE: 0.15,
-  MASTER_BONUS_RATE: 0.25,
+  
+  // ==================== 길러 보너스 ====================
+  
+  PROFESSIONAL_BONUS_RATE: 0.25, // 25% (플랫폼 수수료 후)
+  MASTER_BONUS_RATE: 0.35,      // 35%
+  
+  // ==================== 기타 ====================
+  
   PER_KM_RATE: 100,
-  SERVICE_FEE_RATE: 0.15,
 };
 
 /**
@@ -1013,45 +1033,65 @@ export const calculateDeliveryPricing = functions.https.onCall(
         }
       }
 
-      // Giller level bonus
+      // Giller level bonus (플랫폼 수수료 후 보너스)
       let gillerBonus = 0;
       if (gillerLevel === 'professional') {
-        gillerBonus = Math.round(baseFare * PRICING_CONSTANTS.PROFESSIONAL_BONUS_RATE);
+        // 플랫폼 수수료 후에 보너스 계산 (calculateActualPricing 호출 후)
+        gillerBonus = 0; // calculateActualPricing에서 계산됨
         discounts.push({
           type: 'professional_bonus',
-          amount: gillerBonus,
-          description: '전문 길러 보너스 (15%)',
+          amount: 0, // 임시, 나중에 calculateActualPricing에서 계산
+          description: '전문 길러 보너스 (25%)',
         });
       } else if (gillerLevel === 'master') {
-        gillerBonus = Math.round(baseFare * PRICING_CONSTANTS.MASTER_BONUS_RATE);
+        gillerBonus = 0;
         discounts.push({
-          type: 'professional_bonus',
-          amount: gillerBonus,
-          description: '마스터 길러 보너스 (25%)',
+          type: 'master_bonus',
+          amount: 0,
+          description: '마스터 길러 보너스 (35%)',
         });
       }
 
-      // 4. Calculate total fare
+      // 4. Calculate total fare (이용자 결제액)
       const totalFare = Math.max(
-        1000, // Minimum fare
+    3500, // Minimum fare
         baseFare + discounts.reduce((sum, d) => sum + d.amount, 0)
       );
 
-      // 5. Calculate giller earnings
-      const serviceFee = Math.round(totalFare * PRICING_CONSTANTS.SERVICE_FEE_RATE);
-      const gillerBaseEarnings = totalFare - serviceFee;
-      const gillerTotalEarnings = gillerBaseEarnings + gillerBonus;
+      // 5. 실제 비용 계산 (PG사 수수료, 세금 반영)
+      const actualPricing = calculateActualPricing(totalFare, 0);
+
+      // 6. 길러 등급별 보너스 재계산 (실제 플랫폼 수수료 후)
+      if (gillerLevel === 'professional') {
+        gillerBonus = Math.round(
+          actualPricing.platformRevenue * PRICING_CONSTANTS.PROFESSIONAL_BONUS_RATE
+        );
+      } else if (gillerLevel === 'master') {
+        gillerBonus = Math.round(
+          actualPricing.platformRevenue * PRICING_CONSTANTS.MASTER_BONUS_RATE
+        );
+      }
+
+      // 보너스 포함하여 다시 계산
+      const finalPricing = calculateActualPricing(totalFare, gillerBonus);
 
       const result: CalculateDeliveryPricingResult = {
         baseFare: PRICING_CONSTANTS.BASE_FARE,
         breakdown,
         discounts,
-        totalFare,
+        totalFare: finalPricing.totalFare,
         gillerEarnings: {
-          base: gillerBaseEarnings,
+          base: finalPricing.gillerPreTaxEarnings - gillerBonus, // 보너스 제외 기본
           bonus: gillerBonus,
-          total: gillerTotalEarnings,
+          preTax: finalPricing.gillerPreTaxEarnings, // 보너스 포함 세전
+          tax: finalPricing.withholdingTax,
+          net: finalPricing.gillerNetEarnings, // 보너스 포함 세후
         },
+        platformEarnings: {
+          gross: actualPricing.serviceFee, // 총 수수료
+          net: actualPricing.platformNetEarnings, // 실수익
+        },
+        pgFee: actualPricing.pgFee,
         calculatedAt: new Date(),
       };
 
@@ -1092,6 +1132,55 @@ function calculateBaseFare(distance?: number, travelTime?: number): number {
 
   // Default base fare
   return PRICING_CONSTANTS.BASE_FARE;
+}
+
+/**
+ * Helper: Calculate actual pricing with PG fee and tax
+ * PG사 수수료와 원천징수세를 반영한 실제 정산 계산
+ */
+interface ActualPricingBreakdown {
+  totalFare: number;           // 이용자 결제액
+  pgFee: number;               // PG사 수수료 (3%)
+  platformRevenue: number;     // 플랫폼 입금액 (PG 수수료 차감 후)
+  serviceFee: number;          // 플랫폼 수수료
+  gillerPreTaxEarnings: number; // 길러 세전 수익
+  withholdingTax: number;      // 원천징수세 (3.3%)
+  gillerNetEarnings: number;   // 길러 실수익
+  platformNetEarnings: number; // 플랫폼 실수익
+}
+
+function calculateActualPricing(totalFare: number, gillerBonus: number = 0): ActualPricingBreakdown {
+  // 1. PG사 수수료 차감
+  const pgFee = Math.round(totalFare * PRICING_CONSTANTS.PG_FEE_RATE);
+  
+  // 2. 플랫폼 입금액
+  const platformRevenue = totalFare - pgFee;
+  
+  // 3. 플랫폼 수수료 차감
+  const serviceFee = Math.round(platformRevenue * PRICING_CONSTANTS.SERVICE_FEE_RATE);
+  
+  // 4. 길러 세전 수익 (보너스 포함)
+  const gillerPreTaxEarnings = platformRevenue - serviceFee + gillerBonus;
+  
+  // 5. 원천징수세 차감
+  const withholdingTax = Math.round(gillerPreTaxEarnings * PRICING_CONSTANTS.WITHHOLDING_TAX_RATE);
+  
+  // 6. 길러 실수익
+  const gillerNetEarnings = gillerPreTaxEarnings - withholdingTax;
+  
+  // 7. 플랫폼 실수익
+  const platformNetEarnings = serviceFee;
+  
+  return {
+    totalFare,              // 이용자 결제액
+    pgFee,                  // PG사 수수료
+    platformRevenue,        // 플랫폼 입금액
+    serviceFee,             // 플랫폼 수수료
+    gillerPreTaxEarnings,   // 길러 세전 수익
+    withholdingTax,         // 원천징수세
+    gillerNetEarnings,      // 길러 실수익
+    platformNetEarnings,    // 플랫폼 실수익
+  };
 }
 
 // ==================== Matching Functions ====================
