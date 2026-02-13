@@ -1,88 +1,54 @@
 /**
  * Onboarding Navigator
- * Stack navigator for onboarding screens after registration
- * 기획 문서에 맞춰 간소화: 슬라이드 형태의 온보딩만 사용
+ * 온보딩 화면 전용 Stack Navigator
  */
 
 import React from 'react';
 import { createStackNavigator } from '@react-navigation/stack';
-import type { OnboardingStackParamList } from '../types/navigation';
-import { Platform } from 'react-native';
+import GllerOnboardingScreen from '../screens/onboarding/GllerOnboardingScreen';
+import GillerOnboardingScreen from '../screens/onboarding/GillerOnboardingScreen';
+import RoleSelectionScreen from '../screens/onboarding/RoleSelectionScreen';
 
-// 슬라이드 형태 온보딩 (기획 문서에 맞춤)
-import GllerOnboarding from '../screens/onboarding/GllerOnboarding';
-import GillerOnboarding from '../screens/onboarding/GillerOnboarding';
+const Stack = createStackNavigator();
 
-// 신원 확인 (길러 필수)
-import IdentityVerification from '../screens/onboarding/IdentityVerification';
-
-const Stack = createStackNavigator<OnboardingStackParamList>();
-
-// 화면 전환 애니메이션 설정
-const screenOptions = {
-  headerShown: false,
-  cardStyle: { backgroundColor: '#fff' },
-  gestureEnabled: false, // Prevent swipe back during onboarding
-  transitionSpec: {
-    open: {
-      animation: 'timing' as const,
-      config: {
-        duration: 300,
-      },
-    },
-    close: {
-      animation: 'timing' as const,
-      config: {
-        duration: 300,
-      },
-    },
-  },
-  cardStyleInterpolator: ({ current, layouts }: any) => {
-    return {
-      cardStyle: {
-        transform: [
-          {
-            translateX: current.progress.interpolate({
-              inputRange: [0, 1],
-              outputRange: [layouts.screen.width, 0],
-            }),
-          },
-        ],
-      },
-    };
-  },
+type Props = {
+  role: string;
 };
 
-interface OnboardingNavigatorProps {
-  role: 'gller' | 'giller' | 'both';
-}
-
-export default function OnboardingNavigator({ role }: OnboardingNavigatorProps) {
-  // Determine initial route based on role
-  const getInitialRouteName = (): keyof OnboardingStackParamList => {
-    if (role === 'gller') {
-      return 'GllerOnboarding'; // 글러 3단계 슬라이드 온보딩
-    } else if (role === 'giller') {
-      return 'GillerOnboarding'; // 길러 4단계 슬라이드 온보딩
-    } else {
-      // 'both' starts with GllerOnboarding (글러 먼저)
-      return 'GllerOnboarding';
-    }
-  };
-
+export default function OnboardingNavigator({ role }: Props) {
   return (
     <Stack.Navigator
-      initialRouteName={getInitialRouteName()}
-      screenOptions={screenOptions}
+      screenOptions={{
+        headerShown: false,
+        cardStyle: { backgroundColor: '#fff' },
+      }}
     >
-      {/* 글러 온보딩 (3단계 슬라이드) */}
-      <Stack.Screen name="GllerOnboarding" component={GllerOnboarding} />
+      {/* BOTH 역할 사용자는 먼저 역할을 선택함 */}
+      {role === 'both' ? (
+        <Stack.Screen
+          name="RoleSelection"
+          component={RoleSelectionScreen}
+          options={{ gestureEnabled: false }}
+        />
+      ) : null}
 
-      {/* 길러 온보딩 (4단계 슬라이드) */}
-      <Stack.Screen name="GillerOnboarding" component={GillerOnboarding} />
+      {role === 'gller' || role === 'both' ? (
+        <Stack.Screen
+          name="GllerOnboarding"
+          component={GllerOnboardingScreen}
+          options={{ gestureEnabled: false }}
+          initialParams={{ role }}
+        />
+      ) : null}
 
-      {/* 신원 확인 (길러 필수) */}
-      <Stack.Screen name="IdentityVerification" component={IdentityVerification} />
+      {role === 'giller' || role === 'both' ? (
+        <Stack.Screen
+          name="GillerOnboarding"
+          component={GillerOnboardingScreen}
+          options={{ gestureEnabled: false }}
+          initialParams={{ role }}
+        />
+      ) : null}
     </Stack.Navigator>
   );
 }

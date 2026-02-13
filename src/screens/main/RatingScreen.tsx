@@ -13,11 +13,13 @@ import {
   Alert,
   ActivityIndicator,
   ScrollView,
+  Switch,
 } from 'react-native';
 import { StackNavigationProp } from '@react-navigation/stack';
 import { requireUserId } from '../../services/firebase';
 import { submitRating, getUserRating } from '../../services/rating-service';
 import { getDeliveryById } from '../../services/delivery-service';
+import { RatingTag, RATING_TAGS } from '../../types/rating';
 
 type NavigationProp = StackNavigationProp<any>;
 
@@ -32,26 +34,12 @@ interface Props {
   };
 }
 
-interface RatingTag {
-  id: string;
-  label: string;
-  emoji: string;
-}
-
-const RATING_TAGS: RatingTag[] = [
-  { id: 'friendly', label: '친절함', emoji: '😊' },
-  { id: 'fast', label: '빠름', emoji: '⚡' },
-  { id: 'careful', label: '조심스러움', emoji: '👍' },
-  { id: 'communicative', label: '소통 잘됨', emoji: '💬' },
-  { id: 'onTime', label: '시간 지킴', emoji: '⏰' },
-  { id: 'professional', label: '전문적', emoji: '👔' },
-];
-
 export default function RatingScreen({ navigation, route }: Props) {
   const { deliveryId, gillerId, gllerId } = route.params;
   const [rating, setRating] = useState(0);
-  const [selectedTags, setSelectedTags] = useState<string[]>([]);
+  const [selectedTags, setSelectedTags] = useState<RatingTag[]>([]);
   const [comment, setComment] = useState('');
+  const [isAnonymous, setIsAnonymous] = useState(false);
   const [loading, setLoading] = useState(false);
   const [opponentRating, setOpponentRating] = useState<any>(null);
   const [delivery, setDelivery] = useState<any>(null);
@@ -78,11 +66,11 @@ export default function RatingScreen({ navigation, route }: Props) {
     }
   };
 
-  const toggleTag = (tagId: string) => {
+  const toggleTag = (tag: RatingTag) => {
     setSelectedTags((prev) =>
-      prev.includes(tagId)
-        ? prev.filter((id) => id !== tagId)
-        : [...prev, tagId]
+      prev.includes(tag)
+        ? prev.filter((t) => t !== tag)
+        : [...prev, tag]
     );
   };
 
@@ -99,20 +87,14 @@ export default function RatingScreen({ navigation, route }: Props) {
       const isGiller = userId === gillerId;
       const targetUserId = isGiller ? gllerId : gillerId;
 
-      const tagLabels = selectedTags.map((id) =>
-        RATING_TAGS.find((tag) => tag.id === id)?.label
-      ).join(', ');
-
-      const fullComment = tagLabels
-        ? `${comment}\n\n특징: ${tagLabels}`
-        : comment;
-
       await submitRating(
         deliveryId,
         userId,
         targetUserId,
         rating,
-        fullComment.trim()
+        selectedTags,
+        comment.trim(),
+        isAnonymous
       );
 
       Alert.alert(
@@ -157,13 +139,11 @@ export default function RatingScreen({ navigation, route }: Props) {
   return (
     <View style={styles.container}>
       <ScrollView style={styles.content}>
-        {/* Header */}
         <View style={styles.header}>
           <Text style={styles.title}>배송 평가</Text>
           <Text style={styles.subtitle}>배송은 어떠셨나요?</Text>
         </View>
 
-        {/* Opponent Info */}
         {opponentRating && (
           <View style={styles.card}>
             <Text style={styles.cardTitle}>상대방 정보</Text>
@@ -178,7 +158,6 @@ export default function RatingScreen({ navigation, route }: Props) {
           </View>
         )}
 
-        {/* Star Rating */}
         <View style={styles.card}>
           <Text style={styles.cardTitle}>별점</Text>
           <View style={styles.starsContainer}>
@@ -189,7 +168,6 @@ export default function RatingScreen({ navigation, route }: Props) {
           )}
         </View>
 
-        {/* Tags */}
         <View style={styles.card}>
           <Text style={styles.cardTitle}>특징 선택 (선택)</Text>
           <View style={styles.tagsContainer}>
@@ -219,7 +197,6 @@ export default function RatingScreen({ navigation, route }: Props) {
           </View>
         </View>
 
-        {/* Comment */}
         <View style={styles.card}>
           <Text style={styles.cardTitle}>코멘트 (선택)</Text>
           <TextInput
@@ -235,7 +212,21 @@ export default function RatingScreen({ navigation, route }: Props) {
           <Text style={styles.charCount}>{comment.length}/500</Text>
         </View>
 
-        {/* Submit Button */}
+        <View style={styles.card}>
+          <View style={styles.switchRow}>
+            <Text style={styles.switchLabel}>익명으로 평가하기</Text>
+            <Switch
+              value={isAnonymous}
+              onValueChange={setIsAnonymous}
+              trackColor={{ false: '#e0e0e0', true: '#FF9800' }}
+              thumbColor={isAnonymous ? '#fff' : '#f5f5f5'}
+            />
+          </View>
+          <Text style={styles.switchDescription}>
+            익명으로 평가하면 상대방에게 평가자 정보가 공개되지 않습니다.
+          </Text>
+        </View>
+
         <TouchableOpacity
           style={[styles.submitButton, rating === 0 && styles.submitButtonDisabled]}
           onPress={handleSubmitRating}
@@ -390,5 +381,21 @@ const styles = StyleSheet.create({
   totalRatings: {
     color: '#666',
     fontSize: 14,
+  },
+  switchRow: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: 8,
+  },
+  switchLabel: {
+    color: '#333',
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  switchDescription: {
+    color: '#666',
+    fontSize: 13,
+    lineHeight: 18,
   },
 });

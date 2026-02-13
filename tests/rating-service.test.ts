@@ -7,12 +7,13 @@ import { describe, test, expect, beforeEach, afterEach } from '@jest/globals';
 import {
   submitRating,
   getUserRating,
-  getUserRatings,
+  getUserReviews,
   getMatchRating,
   canRateMatch,
 } from '../src/services/rating-service';
 import { doc, getDoc, deleteDoc, getDocs, query, where, collection } from 'firebase/firestore';
 import { db } from '../src/services/firebase';
+import { RatingTag } from '../src/types/rating';
 
 describe('Rating Service', () => {
   const testUserId = 'test-user-rating-001';
@@ -53,7 +54,9 @@ describe('Rating Service', () => {
         testUserId,
         testGillerId,
         5,
-        '훌륭한 서비스였습니다!'
+        [RatingTag.FRIENDLY, RatingTag.FAST],
+        '훌륭한 서비스였습니다!',
+        false
       );
 
       expect(ratingId).toBeDefined();
@@ -61,7 +64,6 @@ describe('Rating Service', () => {
 
       createdRatingIds.push(ratingId);
 
-      // Verify rating was saved
       const ratingDoc = await getDoc(doc(db, 'ratings', ratingId));
       expect(ratingDoc.exists()).toBe(true);
 
@@ -71,6 +73,8 @@ describe('Rating Service', () => {
       expect(ratingData?.toUserId).toBe(testGillerId);
       expect(ratingData?.rating).toBe(5);
       expect(ratingData?.comment).toBe('훌륭한 서비스였습니다!');
+      expect(ratingData?.tags).toContain(RatingTag.FRIENDLY);
+      expect(ratingData?.isAnonymous).toBe(false);
     });
 
     test('should fail to submit duplicate rating for same match', async () => {
@@ -78,24 +82,26 @@ describe('Rating Service', () => {
         testMatchId2,
         testUserId,
         testGillerId,
-        4
+        4,
+        [],
+        undefined,
+        false
       );
 
       createdRatingIds.push(ratingId1);
 
-      // Try to submit again
       await expect(
-        submitRating(testMatchId2, testUserId, testGillerId, 5)
+        submitRating(testMatchId2, testUserId, testGillerId, 5, [], undefined, false)
       ).rejects.toThrow('Already rated this match');
     });
 
     test('should fail to submit rating out of range', async () => {
       await expect(
-        submitRating(testMatchId, testUserId, testGillerId, 6) // Too high
+        submitRating(testMatchId, testUserId, testGillerId, 6, [], undefined, false)
       ).rejects.toThrow('Rating must be between 1 and 5');
 
       await expect(
-        submitRating(testMatchId, testUserId, testGillerId, 0) // Too low
+        submitRating(testMatchId, testUserId, testGillerId, 0, [], undefined, false)
       ).rejects.toThrow('Rating must be between 1 and 5');
     });
 
@@ -104,8 +110,10 @@ describe('Rating Service', () => {
         testMatchId,
         testUserId,
         testGillerId,
-        3
-        // No comment
+        3,
+        [],
+        undefined,
+        false
       );
 
       expect(ratingId).toBeDefined();
@@ -116,11 +124,29 @@ describe('Rating Service', () => {
       const ratingData = ratingDoc.data();
       expect(ratingData?.comment).toBe('');
     });
+
+    test('should submit anonymous rating', async () => {
+      const ratingId = await submitRating(
+        testMatchId,
+        testUserId,
+        testGillerId,
+        5,
+        [RatingTag.TRUSTWORTHY],
+        '익명 리뷰',
+        true
+      );
+
+      expect(ratingId).toBeDefined();
+      createdRatingIds.push(ratingId);
+
+      const ratingDoc = await getDoc(doc(db, 'ratings', ratingId));
+      const ratingData = ratingDoc.data();
+      expect(ratingData?.isAnonymous).toBe(true);
+    });
   });
 
   describe('getUserRating', () => {
     beforeEach(async () => {
-      // Create test ratings
       const ratings = [
         { matchId: 'test-001', rating: 5 },
         { matchId: 'test-002', rating: 4 },
@@ -134,7 +160,10 @@ describe('Rating Service', () => {
           r.matchId,
           'other-user',
           testGillerId,
-          r.rating
+          r.rating,
+          [],
+          undefined,
+          false
         );
         createdRatingIds.push(ratingId);
       }
@@ -159,34 +188,32 @@ describe('Rating Service', () => {
     });
   });
 
-  describe('getUserRatings', () => {
+  describe('getUserReviews', () => {
     beforeEach(async () => {
-      // Create test ratings for different users
       const ratingIds = await Promise.all([
-        submitRating('match-a', 'user-a', testUserId, 5, '좋아요'),
-        submitRating('match-b', 'user-b', testUserId, 4, '괜찮아요'),
-        submitRating('match-c', 'user-c', testUserId, 5),
+        submitRating('match-a', 'user-a', testUserId, 5, [RatingTag.FRIENDLY], '좋아요', false),
+        submitRating('match-b', 'user-b', testUserId, 4, [RatingTag.FAST], '괜찮아요', false),
+        submitRating('match-c', 'user-c', testUserId, 5, [RatingTag.TRUSTWORTHY], undefined, false),
       ]);
 
       createdRatingIds.push(...ratingIds);
     });
 
-    test('should get user ratings sorted by date (newest first)', async () => {
-      const ratings = await getUserRatings(testUserId, 10);
+    test('should get user reviews sorted by date (newest first)', async () => {
+      const reviews = await getUserReviews(testUserId, 10);
 
-      expect(Array.isArray(ratings)).toBe(true);
-      expect(ratings.length).toBeGreaterThanOrEqual(3);
+      expect(Array.isArray(reviews)).toBe(true);
+      expect(reviews.length).toBeGreaterThanOrEqual(3);
 
-      // Check if sorted by date (newest first)
-      for (let i = 0; i < ratings.length - 1; i++) {
-        expect(ratings[i].createdAt.getTime()).toBeGreaterThanOrEqual(ratings[i + 1].createdAt.getTime());
+      for (let i = 0; i < reviews.length - 1; i++) {
+        expect(reviews[i].createdAt.getTime()).toBeGreaterThanOrEqual(reviews[i + 1].createdAt.getTime());
       }
     });
 
     test('should limit results', async () => {
-      const ratings = await getUserRatings(testUserId, 2);
+      const reviews = await getUserReviews(testUserId, 2);
 
-      expect(ratings.length).toBeLessThanOrEqual(2);
+      expect(reviews.length).toBeLessThanOrEqual(2);
     });
   });
 
@@ -197,7 +224,9 @@ describe('Rating Service', () => {
         'rater-user',
         'rated-user',
         5,
-        '별점입니다'
+        [RatingTag.FRIENDLY],
+        '별점입니다',
+        false
       );
 
       createdRatingIds.push(ratingId);
@@ -227,7 +256,10 @@ describe('Rating Service', () => {
         'already-rated-match',
         'rater-user',
         'rated-user',
-        5
+        5,
+        [],
+        undefined,
+        false
       );
 
       createdRatingIds.push(ratingId);

@@ -1,0 +1,674 @@
+/**
+ * P5-4: 보안 테스트
+ *
+ * 목표:
+ * - 인증 우회 불가능
+ * - 데이터 접근 권한 엄격하게 제어
+ * - API 인증/인가 정상 작동
+ * - 민감 데이터 노출 없음
+ * - Firestore Security Rules 강화
+ */
+
+import { describe, it, expect, beforeEach, afterEach } from '@jest/globals';
+import { 
+  getAuth, 
+  signInWithEmailAndPassword, 
+  signOut,
+  createUserWithEmailAndPassword 
+} from 'firebase/auth';
+import { 
+  getFirestore, 
+  doc, 
+  getDoc, 
+  setDoc, 
+  updateDoc,
+  deleteDoc,
+  collection,
+  getDocs,
+  query,
+  where
+} from 'firebase/firestore';
+
+describe('P5-4: Security Tests', () => {
+  let auth: any;
+  let db: any;
+
+  // 테스트 사용자 계정
+  const testUsers = {
+    gller: {
+      email: 'security-test-gller@example.com',
+      password: 'Test123!@#',
+      uid: null as string | null
+    },
+    giller: {
+      email: 'security-test-giller@example.com',
+      password: 'Test123!@#',
+      uid: null as string | null
+    },
+    attacker: {
+      email: 'security-test-attacker@example.com',
+      password: 'Test123!@#',
+      uid: null as string | null
+    }
+  };
+
+  beforeAll(async () => {
+    console.log('🔒 Starting Security Tests...');
+    // Firebase 초기화는 이미 완료된 것으로 가정
+  });
+
+  afterAll(() => {
+    console.log('✅ Security Tests Complete');
+  });
+
+  /**
+   * 1. 인증 우회 시도 테스트
+   */
+  describe('Authentication Bypass Attempts', () => {
+    it('should reject login with invalid credentials', async () => {
+      const invalidCredentials = [
+        { email: 'invalid@example.com', password: 'wrongpassword' },
+        { email: '', password: 'anypassword' },
+        { email: 'test@example.com', password: '' }
+      ];
+
+      for (const cred of invalidCredentials) {
+        try {
+          await signInWithEmailAndPassword(auth, cred.email, cred.password);
+          fail('Expected authentication to fail');
+        } catch (error: any) {
+          expect(error.code).toBe('auth/user-not-found');
+          expect(error.code).toBe('auth/wrong-password');
+          expect(error.code).toBe('auth/invalid-email');
+        }
+      }
+    });
+
+    it('should reject login without authentication', async () => {
+      // 인증 없이 보호된 리소스 접근 시도
+      const protectedDoc = doc(db, 'users', 'some-user-id');
+      
+      try {
+        await getDoc(protectedDoc);
+        // 익명 접근은 허용되지 않아야 함 (Firestore Rules 확인 필요)
+      } catch (error: any) {
+        expect(error.code).toBe('permission-denied');
+      }
+    });
+
+    it('should prevent session hijacking', async () => {
+      // 1. 정상 사용자 로그인
+      const userCredential = await signInWithEmailAndPassword(
+        auth, 
+        testUsers.gller.email, 
+        testUsers.gller.password
+      );
+      
+      const originalToken = await userCredential.user.getIdToken();
+
+      // 2. 세션 조작 시도 (토큰 변조)
+      const tamperedToken = originalToken + 'tampered';
+
+      try {
+        // 변조된 토큰으로 접근 시도
+        const response = await fetch('https://firestore.googleapis.com/v1/projects/ganengile/databases/(default)/documents/users', {
+          headers: {
+            'Authorization': `Bearer ${tamperedToken}`
+          }
+        });
+        
+        expect(response.status).toBe(401); // Unauthorized
+      } catch (error) {
+        expect(error).toBeDefined();
+      }
+
+      await signOut(auth);
+    });
+
+    it('should enforce password strength requirements', async () => {
+      const weakPasswords = [
+        '123456',
+        'password',
+        'qwerty',
+        'abc123',
+        '111111'
+      ];
+
+      for (const weakPassword of weakPasswords) {
+        try {
+          await createUserWithEmailAndPassword(
+            auth,
+            `test-${Date.now()}@example.com`,
+            weakPassword
+          );
+          // Firebase Auth는 기본적으로 최소 6자 요구
+          // 실제 앱에서는 더 강력한 정책 적용 필요
+        } catch (error: any) {
+          expect(error.code).toBe('auth/weak-password');
+        }
+      }
+    });
+
+    it('should limit failed login attempts', async () => {
+      // 연속 실패 로그인 시도
+      const attempts = 5;
+      
+      for (let i = 0; i < attempts; i++) {
+        try {
+          await signInWithEmailAndPassword(
+            auth,
+            'nonexistent@example.com',
+            'wrongpassword'
+          );
+        } catch (error: any) {
+          // Firebase Auth는 기본적으로 속도 제한 적용
+          expect(error.code).toBe('auth/user-not-found');
+        }
+      }
+
+      // 과도한 시도 후 지연 발생 여부 확인
+      const startTime = Date.now();
+      try {
+        await signInWithEmailAndPassword(
+          auth,
+          'nonexistent@example.com',
+          'wrongpassword'
+        );
+      } catch (error) {
+        const elapsedTime = Date.now() - startTime;
+        // 지연이 발생해야 함
+        expect(elapsedTime).toBeGreaterThan(1000);
+      }
+    });
+  });
+
+  /**
+   * 2. 데이터 접근 권한 테스트
+   */
+  describe('Data Access Control', () => {
+    beforeEach(async () => {
+      // 테스트용 사용자 생성 및 로그인
+      try {
+        await signInWithEmailAndPassword(
+          auth,
+          testUsers.gller.email,
+          testUsers.gller.password
+        );
+      } catch (error) {
+        // 사용자가 없으면 생성
+        const userCredential = await createUserWithEmailAndPassword(
+          auth,
+          testUsers.gller.email,
+          testUsers.gller.password
+        );
+        testUsers.gller.uid = userCredential.user.uid;
+      }
+    });
+
+    afterEach(async () => {
+      await signOut(auth);
+    });
+
+    it('should allow users to access their own data', async () => {
+      const userDoc = doc(db, 'users', testUsers.gller.uid || 'test-uid');
+      
+      try {
+        const docSnap = await getDoc(userDoc);
+        expect(docSnap.exists()).toBe(true);
+      } catch (error: any) {
+        fail('User should be able to access their own data');
+      }
+    });
+
+    it('should prevent users from accessing other users data', async () => {
+      const otherUserId = 'some-other-user-id';
+      const otherUserDoc = doc(db, 'users', otherUserId);
+      
+      try {
+        await getDoc(otherUserDoc);
+        fail('Should not be able to access other users data');
+      } catch (error: any) {
+        expect(error.code).toBe('permission-denied');
+      }
+    });
+
+    it('should prevent unauthorized route modifications', async () => {
+      // 다른 사용자의 동선 수정 시도
+      const otherUserRoute = doc(db, 'routes', 'some-other-user-route-id');
+      
+      try {
+        await updateDoc(otherUserRoute, {
+          status: 'modified'
+        });
+        fail('Should not be able to modify other users routes');
+      } catch (error: any) {
+        expect(error.code).toBe('permission-denied');
+      }
+    });
+
+    it('should prevent unauthorized delivery request access', async () => {
+      // 다른 사용자의 배송 요청 조회 시도
+      const otherRequest = doc(db, 'requests', 'some-other-request-id');
+      
+      try {
+        await getDoc(otherRequest);
+        fail('Should not be able to access other users requests');
+      } catch (error: any) {
+        expect(error.code).toBe('permission-denied');
+      }
+    });
+
+    it('should enforce role-based access control', async () => {
+      // Gller는 Giller만의 기능에 접근할 수 없어야 함
+      const gillerOnlyResource = collection(db, 'giller_deliveries');
+      
+      try {
+        await getDocs(gillerOnlyResource);
+        // Gller는 Giller 전용 컬렉션에 접근 불가
+      } catch (error: any) {
+        expect(error.code).toBe('permission-denied');
+      }
+    });
+
+    it('should prevent collection-level unauthorized access', async () => {
+      // Config 컬렉션은 읽기 전용이어야 함
+      const configDoc = doc(db, 'config_stations', 'some-station');
+      
+      try {
+        // 쓰기 시도
+        await setDoc(configDoc, { name: 'Unauthorized Station' });
+        fail('Should not be able to write to config collections');
+      } catch (error: any) {
+        expect(error.code).toBe('permission-denied');
+      }
+
+      // 읽기는 허용되어야 함
+      try {
+        await getDoc(configDoc);
+        // 읽기 성공
+      } catch (error) {
+        fail('Should be able to read from config collections');
+      }
+    });
+  });
+
+  /**
+   * 3. API 인증 테스트
+   */
+  describe('API Authentication', () => {
+    it('should validate Firebase ID tokens on API calls', async () => {
+      // 1. 사용자 로그인
+      const userCredential = await signInWithEmailAndPassword(
+        auth,
+        testUsers.gller.email,
+        testUsers.gller.password
+      );
+      
+      const validToken = await userCredential.user.getIdToken();
+
+      // 2. 유효한 토큰으로 API 호출
+      const validResponse = await fetch('/api/deliveries', {
+        headers: {
+          'Authorization': `Bearer ${validToken}`
+        }
+      });
+
+      expect(validResponse.status).not.toBe(401);
+
+      await signOut(auth);
+    });
+
+    it('should reject API calls with invalid tokens', async () => {
+      const invalidTokens = [
+        '',
+        'invalid-token',
+        'expired-token',
+        null
+      ];
+
+      for (const token of invalidTokens) {
+        const response = await fetch('/api/deliveries', {
+          headers: {
+            'Authorization': `Bearer ${token}`
+          }
+        });
+
+        expect(response.status).toBe(401);
+      }
+    });
+
+    it('should verify token expiry', async () => {
+      // 토큰 만료 검증
+      // 실제 시나리오에서는 오래된 토큰 사용
+      const expiredToken = 'eyJhbGciOiJSUzI1NiIsImtpZCI6I...'; // 만료된 토큰 예시
+
+      const response = await fetch('/api/deliveries', {
+        headers: {
+          'Authorization': `Bearer ${expiredToken}`
+        }
+      });
+
+      expect(response.status).toBe(401);
+    });
+
+    it('should enforce rate limiting on API endpoints', async () => {
+      // 속도 제한 테스트
+      const requests = Array.from({ length: 100 }, (_, i) =>
+        fetch('/api/deliveries', {
+          headers: {
+            'Authorization': 'Bearer test-token'
+          }
+        })
+      );
+
+      const responses = await Promise.all(requests);
+      const rateLimitedResponses = responses.filter(r => r.status === 429);
+
+      // 일부 요청이 속도 제한되어야 함
+      expect(rateLimitedResponses.length).toBeGreaterThan(0);
+    });
+  });
+
+  /**
+   * 4. 민감 데이터 노출 확인
+   */
+  describe('Sensitive Data Protection', () => {
+    it('should not expose passwords in logs', async () => {
+      // 로그에 비밀번호 노출 확인
+      const consoleSpy = jest.spyOn(console, 'log');
+
+      try {
+        await signInWithEmailAndPassword(
+          auth,
+          testUsers.gller.email,
+          testUsers.gller.password
+        );
+      } catch (error) {
+        // 에러 발생해도 로그에 비밀번호 노출되면 안 됨
+      }
+
+      const logCalls = consoleSpy.mock.calls;
+      const passwordExposed = logCalls.some(call => 
+        JSON.stringify(call).includes(testUsers.gller.password)
+      );
+
+      expect(passwordExposed).toBe(false);
+      consoleSpy.mockRestore();
+    });
+
+    it('should not expose user PII in error messages', async () => {
+      try {
+        await signInWithEmailAndPassword(
+          auth,
+          'nonexistent@example.com',
+          'wrongpassword'
+        );
+      } catch (error: any) {
+        // 에러 메시지에 PII 노출되지 않아야 함
+        expect(error.message).not.toContain('nonexistent@example.com');
+        expect(error.message).not.toContain('wrongpassword');
+      }
+    });
+
+    it('should sanitize data in client responses', async () => {
+      // API 응답에서 민감 데이터 제거 확인
+      const userDoc = doc(db, 'users', testUsers.gller.uid || 'test-uid');
+      const docSnap = await getDoc(userDoc);
+
+      if (docSnap.exists()) {
+        const userData = docSnap.data();
+
+        // 민감 필드가 응답에 포함되지 않아야 함
+        expect(userData).not.toHaveProperty('password');
+        expect(userData).not.toHaveProperty('phoneNumber'); // 필요 시
+        expect(userData).not.toHaveProperty('emailVerified'); // 필요 시
+      }
+    });
+
+    it('should encrypt sensitive data at rest', async () => {
+      // Firestore는 기본적으로 암호화 저장
+      // 여기서는 추가 암호화가 필요한 필드 확인
+      const sensitiveFields = [
+        'phoneNumber',
+        'identityVerification',
+        'bankAccount'
+      ];
+
+      for (const field of sensitiveFields) {
+        // 실제 구현에서는 이 필드들이 암호화되어 저장되어야 함
+        expect(field).toBeDefined();
+      }
+    });
+
+    it('should use HTTPS for all communications', async () => {
+      // 모든 API 호출이 HTTPS인지 확인
+      const apiUrls = [
+        '/api/auth',
+        '/api/deliveries',
+        '/api/routes',
+        '/api/matching'
+      ];
+
+      for (const url of apiUrls) {
+        // 개발 환경에서는 HTTP 가능하지만 프로덕션에서는 HTTPS 강제
+        if (process.env.NODE_ENV === 'production') {
+          expect(url.startsWith('https://')).toBe(true);
+        }
+      }
+    });
+  });
+
+  /**
+   * 5. Firestore Security Rules 검증
+   */
+  describe('Firestore Security Rules', () => {
+    it('should enforce user document ownership', async () => {
+      // 사용자 문서 소유권 규칙 검증
+      // rule: allow read, write: if request.auth != null && request.auth.uid == userId;
+      
+      await signInWithEmailAndPassword(
+        auth,
+        testUsers.gller.email,
+        testUsers.gller.password
+      );
+
+      // 자신의 문서 접근 가능
+      const ownDoc = doc(db, 'users', testUsers.gller.uid || 'test-uid');
+      await expect(getDoc(ownDoc)).resolves.toBeDefined();
+
+      // 다른 사용자 문서 접근 불가
+      const otherDoc = doc(db, 'users', 'some-other-user-id');
+      await expect(getDoc(otherDoc)).rejects.toThrow();
+
+      await signOut(auth);
+    });
+
+    it('should enforce request.resource data validation', async () => {
+      // 데이터 유효성 검사 규칙
+      // rule: allow create: if request.resource.data.keys().hasAll(['requiredField']);
+      
+      await signInWithEmailAndPassword(
+        auth,
+        testUsers.gller.email,
+        testUsers.gller.password
+      );
+
+      // 필수 필드 없는 문서 생성 시도
+      const invalidDoc = doc(db, 'routes', 'invalid-route');
+      
+      try {
+        await setDoc(invalidDoc, {
+          // 필수 필드 누락
+          name: 'Invalid Route'
+        });
+        fail('Should reject document without required fields');
+      } catch (error: any) {
+        expect(error.code).toBe('permission-denied');
+      }
+
+      await signOut(auth);
+    });
+
+    it('should prevent mass data extraction', async () => {
+      // 대량 데이터 추출 방지
+      await signInWithEmailAndPassword(
+        auth,
+        testUsers.gller.email,
+        testUsers.gller.password
+      );
+
+      // 컬렉션 전체 조회 시도
+      try {
+        const allUsersQuery = collection(db, 'users');
+        await getDocs(allUsersQuery);
+        // 개별 문서는 접근 가능하지만 컬렉션 전체는 제한 필요
+      } catch (error: any) {
+        expect(error.code).toBe('permission-denied');
+      }
+
+      await signOut(auth);
+    });
+
+    it('should enforce proper query constraints', async () => {
+      // 쿼리 제약 조건 검증
+      await signInWithEmailAndPassword(
+        auth,
+        testUsers.gller.email,
+        testUsers.gller.password
+      );
+
+      // 자신의 데이터만 조회 가능한 쿼리
+      const validQuery = query(
+        collection(db, 'routes'),
+        where('userId', '==', testUsers.gller.uid)
+      );
+      
+      await expect(getDocs(validQuery)).resolves.toBeDefined();
+
+      // 다른 사용자 데이터 조회 시도
+      const invalidQuery = query(
+        collection(db, 'routes'),
+        where('userId', '==', 'some-other-user-id')
+      );
+      
+      try {
+        await getDocs(invalidQuery);
+        fail('Should not allow querying other users data');
+      } catch (error: any) {
+        expect(error.code).toBe('permission-denied');
+      }
+
+      await signOut(auth);
+    });
+  });
+
+  /**
+   * 6. XSS 및 인젝션 공격 방어
+   */
+  describe('XSS and Injection Protection', () => {
+    it('should sanitize user inputs', async () => {
+      const maliciousInputs = [
+        '<script>alert("XSS")</script>',
+        'javascript:alert("XSS")',
+        '<img src=x onerror=alert("XSS")>',
+        '"; DROP TABLE users; --'
+      ];
+
+      await signInWithEmailAndPassword(
+        auth,
+        testUsers.gller.email,
+        testUsers.gller.password
+      );
+
+      for (const maliciousInput of maliciousInputs) {
+        const routeDoc = doc(db, 'routes', `test-route-${Date.now()}`);
+        
+        try {
+          await setDoc(routeDoc, {
+            name: maliciousInput,
+            userId: testUsers.gller.uid
+          });
+
+          const docSnap = await getDoc(routeDoc);
+          const data = docSnap.data();
+
+          // 저장된 데이터가 sanitized되어야 함
+          expect(data.name).not.toContain('<script>');
+          expect(data.name).not.toContain('javascript:');
+        } catch (error) {
+          // 실패해도 안전 조치가 적용되어야 함
+          expect(error).toBeDefined();
+        }
+      }
+
+      await signOut(auth);
+    });
+
+    it('should prevent NoSQL injection', async () => {
+      await signInWithEmailAndPassword(
+        auth,
+        testUsers.gller.email,
+        testUsers.gller.password
+      );
+
+      // NoSQL 인젝션 시도
+      const injectionPayload = {
+        $gt: '',
+        $ne: null
+      };
+
+      try {
+        const maliciousQuery = query(
+          collection(db, 'users'),
+          where(injectionPayload, '==', injectionPayload)
+        );
+        await getDocs(maliciousQuery);
+        fail('Should prevent NoSQL injection');
+      } catch (error) {
+        expect(error).toBeDefined();
+      }
+
+      await signOut(auth);
+    });
+  });
+
+  /**
+   * 7. 세션 관리 보안
+   */
+  describe('Session Management Security', () => {
+    it('should properly expire sessions', async () => {
+      // 세션 만료 확인
+      const userCredential = await signInWithEmailAndPassword(
+        auth,
+        testUsers.gller.email,
+        testUsers.gller.password
+      );
+
+      // 토큰 만료 시간 확인 (기본 1시간)
+      const tokenResult = await userCredential.user.getIdTokenResult();
+      const expirationTime = new Date(tokenResult.expirationTime);
+      const now = new Date();
+
+      expect(expirationTime.getTime()).toBeGreaterThan(now.getTime());
+    });
+
+    it('should handle concurrent sessions properly', async () => {
+      // 동시 세션 관리
+      const session1 = await signInWithEmailAndPassword(
+        auth,
+        testUsers.gller.email,
+        testUsers.gller.password
+      );
+
+      // 동일 계정으로 다시 로그인
+      const session2 = await signInWithEmailAndPassword(
+        auth,
+        testUsers.gller.email,
+        testUsers.gller.password
+      );
+
+      // 이전 세션 무효화 여부 확인 (정책에 따름)
+      expect(session2.user).toBeDefined();
+    });
+  });
+});

@@ -20,6 +20,8 @@ import { StackNavigationProp } from '@react-navigation/stack';
 import { getPendingRequests } from '../../services/request-service';
 import { acceptRequest, declineRequest } from '../../services/matching-service';
 import { requireUserId } from '../../services/firebase';
+import { Colors, Typography, Spacing, BorderRadius } from '../../theme';
+import { Ionicons } from '@expo/vector-icons';
 import type { DeliveryRequest } from '../../types/delivery';
 
 type NavigationProp = StackNavigationProp<any>;
@@ -125,6 +127,21 @@ export default function GillerRequestsScreen({ navigation }: Props) {
     }
   };
 
+  const handleChatRequest = async (request: DeliveryRequest) => {
+    try {
+      // TODO: 채팅방 자동 생성 로직 구현 필요
+      // 일단은 ChatScreen으로 이동하되, status를 'pending'으로 전달
+      navigation.navigate('ChatScreen', {
+        requestId: request.requestId,
+        status: 'pending',
+        recipientName: request.recipientName,
+      });
+    } catch (error) {
+      console.error('Error opening chat:', error);
+      Alert.alert('오류', '채팅을 열 수 없습니다.');
+    }
+  };
+
   const getPackageSizeLabel = (size: string): string => {
     switch (size) {
       case 'small':
@@ -222,6 +239,13 @@ export default function GillerRequestsScreen({ navigation }: Props) {
 
       {/* Footer: Action */}
       <View style={styles.requestFooter}>
+        <TouchableOpacity
+          style={styles.chatButton}
+          onPress={() => handleChatRequest(item)}
+        >
+          <Ionicons name="chatbubbles" size={20} color="#00BCD4" />
+          <Text style={styles.chatButtonText}>채팅으로 문의</Text>
+        </TouchableOpacity>
         <TouchableOpacity
           style={styles.acceptButton}
           onPress={() => handleAccept(item.requestId)}
@@ -375,6 +399,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     backgroundColor: '#4CAF50',
     borderRadius: 8,
+    flex: 1,
     paddingVertical: 12,
   },
   acceptButtonText: {
@@ -540,7 +565,26 @@ const styles = StyleSheet.create({
   requestFooter: {
     borderTopColor: '#e0e0e0',
     borderTopWidth: 1,
+    flexDirection: 'row',
+    gap: 8,
     padding: 12,
+  },
+  chatButton: {
+    alignItems: 'center',
+    backgroundColor: '#fff',
+    borderColor: '#00BCD4',
+    borderRadius: 8,
+    borderWidth: 1,
+    flexDirection: 'row',
+    justifyContent: 'center',
+    paddingHorizontal: 12,
+    paddingVertical: 12,
+  },
+  chatButtonText: {
+    color: '#00BCD4',
+    fontSize: 14,
+    fontWeight: 'bold',
+    marginLeft: 6,
   },
   requestHeader: {
     alignItems: 'center',

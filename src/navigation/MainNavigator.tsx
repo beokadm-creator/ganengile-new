@@ -17,6 +17,7 @@ import { Colors } from '../components';
 // Screens
 import HomeScreen from '../screens/main/HomeScreen';
 import AddRouteScreen from '../screens/main/AddRouteScreen';
+import EditRouteScreen from '../screens/main/EditRouteScreen';
 import RequestsScreen from '../screens/main/RequestsScreen';
 import ProfileScreen from '../screens/main/ProfileScreen';
 import CreateRequestScreen from '../screens/main/CreateRequestScreen';
@@ -35,6 +36,7 @@ import EarningsScreen from '../screens/main/EarningsScreen';
 import MyRatingScreen from '../screens/main/MyRatingScreen';
 import CustomerServiceScreen from '../screens/main/CustomerServiceScreen';
 import TermsScreen from '../screens/main/TermsScreen';
+import GillerPickupFromLockerScreen from '../screens/requester/GillerPickupFromLockerScreen';
 
 const Tab = createBottomTabNavigator<MainTabParamList>();
 const Stack = createStackNavigator();
@@ -152,7 +154,6 @@ export default function MainNavigator() {
       screenOptions={{
         headerShown: false,
         headerBackTitle: '뒤로',
-        headerBackTitleVisible: true,
         headerTitleAlign: 'center',
         headerTitleStyle: { fontWeight: 'bold', fontSize: 18 },
         headerStyle: {
@@ -185,6 +186,13 @@ export default function MainNavigator() {
         options={{
           headerShown: true,
           title: '동선 등록',
+        }}
+      />
+      <Stack.Screen
+        name="EditRoute"
+        component={EditRouteScreen}
+        options={{
+          headerShown: false,
         }}
       />
       <Stack.Screen
@@ -236,6 +244,14 @@ export default function MainNavigator() {
         }}
       />
       <Stack.Screen
+        name="GillerPickupFromLocker"
+        component={GillerPickupFromLockerScreen}
+        options={{
+          headerShown: true,
+          title: '사물함 수령',
+        }}
+      />
+      <Stack.Screen
         name="Chat"
         component={ChatScreen as any}
         options={{
@@ -248,7 +264,7 @@ export default function MainNavigator() {
         component={ChatListScreen}
         options={{
           headerShown: true,
-          title: '채팅',
+          title: '채팅 목록',
         }}
       />
       <Stack.Screen

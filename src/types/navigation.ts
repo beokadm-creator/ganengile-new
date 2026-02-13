@@ -65,6 +65,7 @@ export type MainStackParamList = {
   Tabs: NavigatorScreenParams<MainTabParamList>;
   CreateRequest: undefined;
   AddRoute: { selectedStation?: import('../types/config').Station };
+  EditRoute: { routeId: string };
   RequestDetail: { requestId: string; gillerId?: string };
   DeliveryTracking: { matchId?: string };
   MatchingResult: {
@@ -89,8 +90,12 @@ export type MainStackParamList = {
     chatRoomId: string;
     otherUserId: string;
     otherUserName: string;
+    requestInfo?: { from: string; to: string; urgency: string };
   };
   NotificationSettings: undefined;
+  GillerPickupFromLocker: {
+    requestId: string;
+  };
 };
 
 export type MainTabNavigationProp = BottomTabNavigationProp<MainTabParamList>;
@@ -147,6 +152,15 @@ export type HomeScreenProps = {
 
 export type AddRouteScreenProps = {
   navigation: MainStackNavigationProp;
+};
+
+export type EditRouteScreenProps = {
+  navigation: MainStackNavigationProp;
+  route: {
+    params: {
+      routeId: string;
+    };
+  };
 };
 
 export type RequestsScreenProps = {

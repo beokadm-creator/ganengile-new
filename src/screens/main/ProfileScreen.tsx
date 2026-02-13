@@ -1,10 +1,9 @@
 /**
- * Profile Screen
- * 사용자 프로필 및 설정 화면
- * 역할 스위치 기능 추가
+ * Profile Screen (Enhanced)
+ * 프로필 관리 화면 - 사진 업로드, 정보 수정, 계좌 입력, 길러 등급 표시
  */
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   View,
   Text,
@@ -13,7 +12,9 @@ import {
   TouchableOpacity,
   Alert,
   ActivityIndicator,
+  Image,
 } from 'react-native';
+import * as ImagePicker from 'expo-image-picker';
 import { StackNavigationProp } from '@react-navigation/stack';
 import { signOut } from 'firebase/auth';
 import { auth } from '../../services/firebase';
@@ -22,6 +23,23 @@ import { getUserRating } from '../../services/rating-service';
 import { useUser } from '../../contexts/UserContext';
 import type { User } from '../../types/user';
 import { UserRole } from '../../types/user';
+import {
+  getUserProfile,
+  updateUserProfile,
+  uploadProfilePhoto,
+} from '../../services/profile-service';
+import {
+  getUserVerification,
+  getVerificationStatusDisplay,
+} from '../../services/verification-service';
+import {
+  calculateGrade,
+  getGradeInfo,
+  getDeliveriesUntilNextGrade,
+  getGradeProgress,
+} from '../../services/grade-service';
+import Modal from '../../components/common/Modal';
+import TextInputModal from '../../components/common/TextInputModal';
 
 type NavigationProp = StackNavigationProp<any>;
 
@@ -45,10 +63,42 @@ interface MenuItem {
   color?: string;
 }
 
+type EditModalType = 'name' | 'phone' | 'bankName' | 'accountNumber' | 'accountHolder' | null;
+
 export default function ProfileScreen({ navigation: _navigation }: Props) {
   const { user, currentRole, switchRole, loading, refreshUser } = useUser();
   const [stats, setStats] = useState<UserStats | null>(null);
-  const [rating, setRating] = useState<{ averageRating: number; totalRatings: number } | null>(null);
+  const [rating, setRating] = useState<{
+    averageRating: number;
+    totalRatings: number;
+  } | null>(null);
+  const [profile, setProfile] = useState<{
+    name: string;
+    phoneNumber: string;
+    profilePhotoUrl?: string;
+    bankAccount?: {
+      bankName: string;
+      accountNumber: string;
+      accountHolder: string;
+    };
+  } | null>(null);
+
+  const [verification, setVerification] = useState<any>(null);
+  const [editModal, setEditModal] = useState<{
+    type: EditModalType;
+    visible: boolean;
+    value: string;
+    title: string;
+    placeholder?: string;
+  }>({
+    type: null,
+    visible: false,
+    value: '',
+    title: '',
+  });
+
+  const [loadingProfile, setLoadingProfile] = useState(true);
+  const [saving, setSaving] = useState(false);
 
   useEffect(() => {
     if (user) {
@@ -60,56 +110,209 @@ export default function ProfileScreen({ navigation: _navigation }: Props) {
     if (!user) return;
 
     try {
-      // Get user stats
-      const userStats = await getUserStats(user.uid);
-      setStats(userStats);
+      setLoadingProfile(true);
 
-      // Get user rating
-      const userRating = await getUserRating(user.uid);
+      const [userStats, userRating, userProfile, userVerification] =
+        await Promise.all([
+          getUserStats(user.uid),
+          getUserRating(user.uid),
+          getUserProfile(user.uid),
+          getUserVerification(user.uid),
+        ]);
+
+      setStats(userStats);
       setRating({
         averageRating: userRating.averageRating,
         totalRatings: userRating.totalRatings,
       });
+
+      if (userProfile) {
+        setProfile({
+          name: userProfile.name,
+          phoneNumber: userProfile.phoneNumber || '',
+          profilePhotoUrl: userProfile.profilePhotoUrl,
+          bankAccount: userProfile.bankAccount,
+        });
+      }
+
+      if (userVerification) {
+        setVerification(userVerification);
+      }
     } catch (error) {
       console.error('Error loading user data:', error);
+    } finally {
+      setLoadingProfile(false);
     }
   };
 
   const handleLogout = () => {
-    Alert.alert(
-      '로그아웃',
-      '정말 로그아웃하시겠습니까?',
-      [
-        { text: '취소', style: 'cancel' },
-        {
-          text: '확인',
-          onPress: async () => {
-            try {
-              await signOut(auth);
-              // Navigation will handle auth state change
-            } catch (error) {
-              console.error('Logout error:', error);
-              Alert.alert('오류', '로그아웃에 실패했습니다.');
-            }
-          },
+    Alert.alert('로그아웃', '정말 로그아웃하시겠습니까?', [
+      { text: '취소', style: 'cancel' },
+      {
+        text: '확인',
+        onPress: async () => {
+          try {
+            await signOut(auth);
+          } catch (error) {
+            console.error('Logout error:', error);
+            Alert.alert('오류', '로그아웃에 실패했습니다.');
+          }
         },
-      ]
-    );
+      },
+    ]);
   };
 
   const toggleRole = () => {
     if (user?.role === UserRole.BOTH && currentRole) {
       const newRole = currentRole === UserRole.GLER ? UserRole.GILLER : UserRole.GLER;
       switchRole(newRole);
-      Alert.alert(
-        '역할 전환',
-        `${newRole === UserRole.GLER ? '이용자' : '길러'} 모드로 전환했습니다.`,
-        [{ text: '확인', onPress: () => refreshUser() }]
-      );
+      Alert.alert('역할 전환', `${newRole === UserRole.GLER ? '이용자' : '길러'} 모드로 전환했습니다.`, [
+        { text: '확인', onPress: () => refreshUser() },
+      ]);
     }
   };
 
-  // 공통 메뉴 아이템 (길러 전용 평가)
+  const openEditModal = useCallback(
+    (type: EditModalType, title: string, currentValue: string, placeholder?: string) => {
+      setEditModal({
+        type,
+        visible: true,
+        value: currentValue,
+        title,
+        placeholder,
+      });
+    },
+    []
+  );
+
+  const closeEditModal = useCallback(() => {
+    setEditModal((prev) => ({ ...prev, visible: false }));
+  }, []);
+
+  const handleSaveEdit = async () => {
+    if (!user || !editModal.type || !profile) return;
+
+    try {
+      setSaving(true);
+
+      const updateData = {
+        name: profile.name,
+        phoneNumber: profile.phoneNumber,
+        bankAccount: profile.bankAccount,
+      };
+
+      switch (editModal.type) {
+        case 'name':
+          updateData.name = editModal.value;
+          break;
+        case 'phone':
+          updateData.phoneNumber = editModal.value;
+          break;
+        case 'bankName': {
+          const existing = profile.bankAccount || { bankName: '', accountNumber: '', accountHolder: '' };
+          updateData.bankAccount = {
+            ...existing,
+            bankName: editModal.value,
+          };
+          break;
+        }
+        case 'accountNumber': {
+          const existing = profile.bankAccount || { bankName: '', accountNumber: '', accountHolder: '' };
+          updateData.bankAccount = {
+            ...existing,
+            accountNumber: editModal.value,
+          };
+          break;
+        }
+        case 'accountHolder': {
+          const existing = profile.bankAccount || { bankName: '', accountNumber: '', accountHolder: '' };
+          updateData.bankAccount = {
+            ...existing,
+            accountHolder: editModal.value,
+          };
+          break;
+        }
+      }
+
+      await updateUserProfile(user.uid, updateData);
+
+      setProfile((prev) => {
+        if (!prev) return prev;
+        return {
+          ...prev,
+          ...updateData,
+        };
+      });
+
+      closeEditModal();
+      Alert.alert('성공', '프로필이 업데이트되었습니다.');
+    } catch (error) {
+      console.error('Error updating profile:', error);
+      Alert.alert('오류', '프로필 업데이트에 실패했습니다.');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handlePhotoUpload = async () => {
+    if (!user) return;
+
+    try {
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        allowsEditing: true,
+        aspect: [1, 1],
+        quality: 0.8,
+      });
+
+      if (result.canceled) {
+        return;
+      }
+
+      const photoUrl = await uploadProfilePhoto(user.uid, result.assets[0].uri);
+      await updateUserProfile(user.uid, { profilePhotoUrl: photoUrl });
+
+      setProfile((prev) => ({
+        ...(prev || { name: '', phoneNumber: '' }),
+        profilePhotoUrl: photoUrl,
+      }));
+
+      Alert.alert('성공', '프로필 사진이 업데이트되었습니다.');
+    } catch (error) {
+      console.error('Error uploading photo:', error);
+      Alert.alert('오류', '사진 업로드에 실패했습니다.');
+    }
+  };
+
+  const getGillerGradeInfo = () => {
+    if (!stats) return null;
+
+    const grade = calculateGrade(stats.totalDeliveries);
+    return getGradeInfo(grade);
+  };
+
+  const gradeInfo = getGillerGradeInfo();
+  const verificationDisplay = getVerificationStatusDisplay(verification);
+
+  if (loading || loadingProfile) {
+    return (
+      <View style={styles.loadingContainer}>
+        <ActivityIndicator size="large" color="#9C27B0" />
+        <Text style={styles.loadingText}>로딩 중...</Text>
+      </View>
+    );
+  }
+
+  if (!user || !profile) {
+    return (
+      <View style={styles.loadingContainer}>
+        <Text style={styles.errorText}>사용자 정보를 찾을 수 없습니다.</Text>
+      </View>
+    );
+  }
+
+  const isGiller = currentRole === UserRole.GILLER || user.role === UserRole.GILLER;
+
   const commonItems: MenuItem[] = [
     {
       icon: '🔔',
@@ -134,7 +337,6 @@ export default function ProfileScreen({ navigation: _navigation }: Props) {
     },
   ];
 
-  // 역할별 메뉴 가져오기
   const getMenuItems = (): MenuItem[] => {
     const gllerItems: MenuItem[] = [
       {
@@ -186,39 +388,54 @@ export default function ProfileScreen({ navigation: _navigation }: Props) {
 
   const menuItems = getMenuItems();
 
-  if (loading) {
-    return (
-      <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color="#9C27B0" />
-        <Text style={styles.loadingText}>로딩 중...</Text>
-      </View>
-    );
-  }
-
-  if (!user) {
-    return (
-      <View style={styles.loadingContainer}>
-        <Text style={styles.errorText}>사용자 정보를 찾을 수 없습니다.</Text>
-      </View>
-    );
-  }
-
   return (
     <View style={styles.container}>
       {/* Header */}
       <View style={styles.header}>
         <View style={styles.profileHeader}>
-          <View style={styles.avatar}>
-            <Text style={styles.avatarText}>👤</Text>
-          </View>
-          <View style={styles.profileInfo}>
-            <Text style={styles.userName}>{user.name || '사용자'}</Text>
-            <Text style={styles.userEmail}>{user.email || ''}</Text>
-            <View style={styles.userRole}>
-              <Text style={styles.userRoleText}>
-                {currentRole === 'gller' ? '이용자 (Gller)' : '길러 (Giller)'}
-              </Text>
+          <TouchableOpacity style={styles.avatarContainer} onPress={handlePhotoUpload}>
+            {profile.profilePhotoUrl ? (
+              <Image source={{ uri: profile.profilePhotoUrl }} style={styles.avatarImage} />
+            ) : (
+              <View style={styles.avatar}>
+                <Text style={styles.avatarText}>👤</Text>
+              </View>
+            )}
+            <View style={styles.cameraIconContainer}>
+              <Text style={styles.cameraIcon}>📷</Text>
             </View>
+          </TouchableOpacity>
+          <View style={styles.profileInfo}>
+            <TouchableOpacity onPress={() => openEditModal('name', '이름', profile.name)}>
+              <View style={styles.nameRow}>
+                <Text style={styles.userName}>{profile.name}</Text>
+                <Text style={styles.editIcon}>✏️</Text>
+              </View>
+            </TouchableOpacity>
+            <TouchableOpacity onPress={() => openEditModal('phone', '연락처', profile.phoneNumber, '010-0000-0000')}>
+              <View style={styles.nameRow}>
+                <Text style={styles.userEmail}>
+                  {profile.phoneNumber || '연락처를 추가해주세요'}
+                </Text>
+                <Text style={styles.editIcon}>✏️</Text>
+              </View>
+            </TouchableOpacity>
+
+            {/* Verification Badge */}
+            {verificationDisplay.status === 'approved' && (
+              <View style={styles.verifiedBadge}>
+                <Text style={styles.verifiedIcon}>✅</Text>
+                <Text style={styles.verifiedText}>인증완료</Text>
+              </View>
+            )}
+
+            {/* Giller Grade */}
+            {isGiller && gradeInfo && (
+              <View style={[styles.gradeBadge, { backgroundColor: gradeInfo.color }]}>
+                <Text style={styles.gradeIcon}>{gradeInfo.icon}</Text>
+                <Text style={styles.gradeText}>{gradeInfo.nameKo} 길러</Text>
+              </View>
+            )}
           </View>
         </View>
 
@@ -226,9 +443,7 @@ export default function ProfileScreen({ navigation: _navigation }: Props) {
         {user.role === 'both' && (
           <TouchableOpacity style={styles.roleSwitchCard} onPress={toggleRole}>
             <View style={styles.roleSwitchContent}>
-              <Text style={styles.roleSwitchIcon}>
-                {currentRole === 'gller' ? '📦' : '🚴'}
-              </Text>
+              <Text style={styles.roleSwitchIcon}>{currentRole === 'gller' ? '📦' : '🚴'}</Text>
               <View style={styles.roleSwitchInfo}>
                 <Text style={styles.roleSwitchTitle}>
                   역할 전환: {currentRole === 'gller' ? '이용자' : '길러'} 모드
@@ -246,6 +461,116 @@ export default function ProfileScreen({ navigation: _navigation }: Props) {
       </View>
 
       <ScrollView style={styles.content}>
+        {/* Bank Account Section */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>계좌 정보</Text>
+          <TouchableOpacity
+            style={styles.bankAccountCard}
+            onPress={() =>
+              openEditModal(
+                'bankName',
+                '은행명',
+                profile.bankAccount?.bankName || '',
+                '은행을 선택해주세요'
+              )
+            }
+          >
+            <Text style={styles.bankLabel}>은행</Text>
+            <Text style={styles.bankValue}>
+              {profile.bankAccount?.bankName || '선택안함'}
+            </Text>
+            <Text style={styles.bankArrow}>›</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={styles.bankAccountCard}
+            onPress={() =>
+              openEditModal(
+                'accountNumber',
+                '계좌번호',
+                profile.bankAccount?.accountNumber || '',
+                '계좌번호를 입력해주세요'
+              )
+            }
+          >
+            <Text style={styles.bankLabel}>계좌번호</Text>
+            <Text style={styles.bankValue}>
+              {profile.bankAccount?.accountNumber
+                ? maskAccountNumber(profile.bankAccount.accountNumber)
+                : '입력안함'}
+            </Text>
+            <Text style={styles.bankArrow}>›</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={styles.bankAccountCard}
+            onPress={() =>
+              openEditModal(
+                'accountHolder',
+                '예금주',
+                profile.bankAccount?.accountHolder || '',
+                '예금주 성명을 입력해주세요'
+              )
+            }
+          >
+            <Text style={styles.bankLabel}>예금주</Text>
+            <Text style={styles.bankValue}>
+              {profile.bankAccount?.accountHolder || '입력안함'}
+            </Text>
+            <Text style={styles.bankArrow}>›</Text>
+          </TouchableOpacity>
+        </View>
+
+        {/* Grade Progress (Giller only) */}
+        {isGiller && gradeInfo && (
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>길러 등급</Text>
+            <View style={styles.gradeProgressCard}>
+              <View style={[styles.gradeHeader, { backgroundColor: gradeInfo.color }]}>
+                <Text style={styles.gradeHeaderIcon}>{gradeInfo.icon}</Text>
+                <View>
+                  <Text style={styles.gradeHeaderText}>{gradeInfo.nameKo} 길러</Text>
+                  <Text style={styles.gradeHeaderSub}>
+                    {stats?.totalDeliveries || 0}회 배송
+                  </Text>
+                </View>
+              </View>
+              <Text style={styles.gradeHeaderArrow}>›</Text>
+            </View>
+            <View style={styles.gradeDetails}>
+              <Text style={styles.gradeDescription}>{gradeInfo.description}</Text>
+              <View style={styles.benefitsList}>
+                {gradeInfo.benefits.map((benefit, index) => (
+                  <View key={index} style={styles.benefitItem}>
+                    <Text style={styles.benefitBullet}>•</Text>
+                    <Text style={styles.benefitText}>{benefit}</Text>
+                  </View>
+                ))}
+              </View>
+              {(() => {
+                const remaining = getDeliveriesUntilNextGrade(stats?.totalDeliveries || 0);
+                return remaining !== null ? (
+                  <View style={styles.nextGradeContainer}>
+                    <Text style={styles.nextGradeText}>
+                      다음 등급까지 {remaining}회 남음
+                    </Text>
+                    <View style={styles.progressBarContainer}>
+                      <View style={styles.progressBarBackground}>
+                        <View
+                          style={[
+                            styles.progressBarFill,
+                            { width: `${getGradeProgress(stats?.totalDeliveries || 0) * 100}%` },
+                          ]}
+                        />
+                      </View>
+                    </View>
+                  </View>
+                ) : (
+                  <Text style={styles.maxGradeText}>최고 등급 달성!</Text>
+                );
+              })()}
+            </View>
+          </View>
+        )}
+
         {/* Stats Cards */}
         <View style={styles.statsContainer}>
           <View style={styles.statCard}>
@@ -286,9 +611,7 @@ export default function ProfileScreen({ navigation: _navigation }: Props) {
               </View>
               <View style={styles.menuContent}>
                 <Text style={styles.menuTitle}>{item.title}</Text>
-                {item.subtitle && (
-                  <Text style={styles.menuSubtitle}>{item.subtitle}</Text>
-                )}
+                {item.subtitle && <Text style={styles.menuSubtitle}>{item.subtitle}</Text>}
               </View>
               <Text style={styles.menuArrow}>›</Text>
             </TouchableOpacity>
@@ -303,8 +626,28 @@ export default function ProfileScreen({ navigation: _navigation }: Props) {
         {/* Version Info */}
         <Text style={styles.versionText}>가는길에 v1.0.0</Text>
       </ScrollView>
+
+      {/* Edit Modal */}
+      <TextInputModal
+        visible={editModal.visible}
+        title={editModal.title}
+        value={editModal.value}
+        placeholder={editModal.placeholder}
+        loading={saving}
+        confirmText="저장"
+        cancelText="취소"
+        onChangeText={(text) => setEditModal((prev) => ({ ...prev, value: text }))}
+        onConfirm={handleSaveEdit}
+        onCancel={closeEditModal}
+      />
     </View>
   );
+}
+
+function maskAccountNumber(accountNumber: string): string {
+  if (accountNumber.length <= 4) return accountNumber;
+  const visible = accountNumber.slice(-4);
+  return '*'.repeat(accountNumber.length - 4) + visible;
 }
 
 const styles = StyleSheet.create({
@@ -314,11 +657,81 @@ const styles = StyleSheet.create({
     borderRadius: 35,
     height: 70,
     justifyContent: 'center',
+    width: 70,
+  },
+  avatarContainer: {
+    height: 70,
     marginRight: 16,
+    position: 'relative',
+    width: 70,
+  },
+  avatarImage: {
+    borderRadius: 35,
+    height: 70,
     width: 70,
   },
   avatarText: {
     fontSize: 32,
+  },
+  bankAccountCard: {
+    alignItems: 'center',
+    backgroundColor: '#fff',
+    borderRadius: 8,
+    elevation: 2,
+    flexDirection: 'row',
+    height: 56,
+    justifyContent: 'space-between',
+    marginBottom: 12,
+    paddingHorizontal: 16,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
+  },
+  bankArrow: {
+    color: '#999',
+    fontSize: 18,
+    fontWeight: 'bold',
+  },
+  bankLabel: {
+    color: '#666',
+    fontSize: 14,
+  },
+  bankValue: {
+    color: '#333',
+    fontSize: 16,
+    fontWeight: '500',
+  },
+  benefitBullet: {
+    color: '#4CAF50',
+    fontSize: 18,
+    marginRight: 8,
+  },
+  benefitItem: {
+    flexDirection: 'row',
+    marginBottom: 6,
+  },
+  benefitText: {
+    color: '#333',
+    fontSize: 14,
+    flex: 1,
+  },
+  benefitsList: {
+    marginTop: 12,
+  },
+  cameraIcon: {
+    fontSize: 18,
+  },
+  cameraIconContainer: {
+    position: 'absolute',
+    bottom: -2,
+    right: -2,
+    backgroundColor: '#9C27B0',
+    borderRadius: 12,
+    width: 24,
+    height: 24,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   container: {
     backgroundColor: '#f5f5f5',
@@ -327,10 +740,75 @@ const styles = StyleSheet.create({
   content: {
     flex: 1,
   },
+  editIcon: {
+    fontSize: 14,
+    marginLeft: 8,
+  },
   errorText: {
     color: '#f44336',
     fontSize: 16,
     textAlign: 'center',
+  },
+  gradeBadge: {
+    alignItems: 'center',
+    borderRadius: 16,
+    flexDirection: 'row',
+    marginTop: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    alignSelf: 'flex-start',
+  },
+  gradeDescription: {
+    color: '#666',
+    fontSize: 14,
+    marginBottom: 12,
+  },
+  gradeDetails: {
+    padding: 12,
+  },
+  gradeHeader: {
+    alignItems: 'center',
+    borderRadius: 8,
+    flexDirection: 'row',
+    padding: 12,
+    marginBottom: 12,
+  },
+  gradeHeaderIcon: {
+    fontSize: 32,
+    marginRight: 12,
+  },
+  gradeHeaderText: {
+    color: '#fff',
+    fontSize: 18,
+    fontWeight: 'bold',
+  },
+  gradeHeaderSub: {
+    color: 'rgba(255, 255, 255, 0.8)',
+    fontSize: 12,
+    marginTop: 4,
+  },
+  gradeHeaderArrow: {
+    color: '#fff',
+    fontSize: 20,
+  },
+  gradeIcon: {
+    fontSize: 18,
+    marginRight: 6,
+  },
+  gradeProgressCard: {
+    backgroundColor: '#fff',
+    borderRadius: 12,
+    elevation: 2,
+    marginBottom: 12,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
+  },
+  gradeText: {
+    color: '#fff',
+    fontSize: 14,
+    fontWeight: 'bold',
   },
   header: {
     backgroundColor: '#9C27B0',
@@ -369,6 +847,13 @@ const styles = StyleSheet.create({
     color: '#f44336',
     fontSize: 16,
     fontWeight: 'bold',
+  },
+  maxGradeText: {
+    color: '#4CAF50',
+    fontSize: 14,
+    fontWeight: 'bold',
+    marginTop: 12,
+    textAlign: 'center',
   },
   menuArrow: {
     color: '#999',
@@ -421,6 +906,33 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
   },
+  nameRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  nextGradeContainer: {
+    marginTop: 12,
+  },
+  nextGradeText: {
+    color: '#2196F3',
+    fontSize: 14,
+    fontWeight: 'bold',
+    marginBottom: 8,
+    textAlign: 'center',
+  },
+  progressBarBackground: {
+    backgroundColor: '#e0e0e0',
+    borderRadius: 4,
+    height: 8,
+    overflow: 'hidden',
+  },
+  progressBarContainer: {
+    marginTop: 8,
+  },
+  progressBarFill: {
+    backgroundColor: '#2196F3',
+    height: '100%',
+  },
   profileHeader: {
     alignItems: 'center',
     flexDirection: 'row',
@@ -463,6 +975,24 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontSize: 14,
     fontWeight: 'bold',
+  },
+  section: {
+    backgroundColor: '#fff',
+    borderRadius: 12,
+    elevation: 2,
+    marginHorizontal: 16,
+    marginTop: 16,
+    padding: 16,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
+  },
+  sectionTitle: {
+    color: '#333',
+    fontSize: 18,
+    fontWeight: 'bold',
+    marginBottom: 12,
   },
   statCard: {
     alignItems: 'center',
@@ -507,18 +1037,24 @@ const styles = StyleSheet.create({
     fontSize: 20,
     fontWeight: 'bold',
   },
-  userRole: {
-    alignSelf: 'flex-start',
-    backgroundColor: 'rgba(255, 255, 255, 0.2)',
-    borderRadius: 12,
+  verifiedBadge: {
+    alignItems: 'center',
+    backgroundColor: '#4CAF50',
+    borderRadius: 16,
+    flexDirection: 'row',
     marginTop: 8,
-    paddingHorizontal: 10,
-    paddingVertical: 4,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    alignSelf: 'flex-start',
   },
-  userRoleText: {
+  verifiedIcon: {
+    fontSize: 14,
+    marginRight: 6,
+  },
+  verifiedText: {
     color: '#fff',
     fontSize: 12,
-    fontWeight: '600',
+    fontWeight: 'bold',
   },
   versionText: {
     color: '#999',

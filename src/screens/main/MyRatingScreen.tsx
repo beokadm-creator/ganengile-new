@@ -13,8 +13,9 @@ import {
   ActivityIndicator,
 } from 'react-native';
 import { StackNavigationProp } from '@react-navigation/stack';
-import { getUserRating } from '../../services/rating-service';
+import { getUserRating, getUserRatingStats, getUserReviews } from '../../services/rating-service';
 import { useUser } from '../../contexts/UserContext';
+import { RATING_TAGS, RatingTag } from '../../types/rating';
 
 type NavigationProp = StackNavigationProp<any>;
 
@@ -22,74 +23,46 @@ interface Props {
   navigation: NavigationProp;
 }
 
-interface Review {
-  id: string;
-  rating: number;
-  comment: string;
-  from: string;
-  date: string;
-}
-
-// 더미데이터
-const dummyReviews: Review[] = [
-  {
-    id: '1',
-    rating: 5,
-    comment: '친절하게 잘 전달해주셨어요! 다시 이용하고 싶어요 👍',
-    from: '김*현',
-    date: '2026-02-10',
-  },
-  {
-    id: '2',
-    rating: 5,
-    comment: '빠르고 정확했어요',
-    from: '이*민',
-    date: '2026-02-09',
-  },
-  {
-    id: '3',
-    rating: 4,
-    comment: '좋았습니다. 조금 늦었지만 양해했습니다.',
-    from: '박*진',
-    date: '2026-02-08',
-  },
-  {
-    id: '4',
-    rating: 5,
-    comment: '완벽해요! 최고의 길러입니다',
-    from: '최*수',
-    date: '2026-02-07',
-  },
-  {
-    id: '5',
-    rating: 5,
-    comment: '매번 친절하게 해주세요!',
-    from: '정*우',
-    date: '2026-02-06',
-  },
-];
-
 export default function MyRatingScreen({ navigation }: Props) {
   const { user } = useUser();
   const [loading, setLoading] = useState(true);
-  const [rating, setRating] = useState<{ averageRating: number; totalRatings: number }>({
+  const [rating, setRating] = useState<{
+    averageRating: number;
+    totalRatings: number;
+    distribution: { [key: number]: number };
+  }>({
     averageRating: 0,
     totalRatings: 0,
+    distribution: { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 },
   });
-  const [reviews, setReviews] = useState<Review[]>(dummyReviews);
+  const [tagStats, setTagStats] = useState<{ [key in RatingTag]: number }>({
+    [RatingTag.FRIENDLY]: 0,
+    [RatingTag.FAST]: 0,
+    [RatingTag.TRUSTWORTHY]: 0,
+    [RatingTag.COMMUNICATIVE]: 0,
+    [RatingTag.PUNCTUAL]: 0,
+  });
+  const [reviews, setReviews] = useState<any[]>([]);
 
   useEffect(() => {
-    loadRating();
-  }, []);
+    loadData();
+  }, [user]);
 
-  const loadRating = async () => {
+  const loadData = async () => {
     if (!user) return;
 
     try {
-      const userRating = await getUserRating(user.uid);
+      const [userRating, userStats, userReviews] = await Promise.all([
+        getUserRating(user.uid),
+        getUserRatingStats(user.uid),
+        getUserReviews(user.uid, 10),
+      ]);
+
       setRating(userRating);
+      setTagStats(userStats.tagStats);
+      setReviews(userReviews);
     } catch (error) {
-      console.error('Error loading rating:', error);
+      console.error('Error loading rating data:', error);
     } finally {
       setLoading(false);
     }
@@ -99,15 +72,11 @@ export default function MyRatingScreen({ navigation }: Props) {
     return '⭐'.repeat(Math.floor(rating));
   };
 
-  const getRatingDistribution = () => {
-    const distribution = { 5: 0, 4: 0, 3: 0, 2: 0, 1: 0 };
-    reviews.forEach((review) => {
-      distribution[review.rating as keyof typeof distribution]++;
-    });
-    return distribution;
+  const getTagName = (tag: RatingTag): string => {
+    return RATING_TAGS.find((t) => t.id === tag)?.label || tag;
   };
 
-  const distribution = getRatingDistribution();
+  const distribution = rating.distribution;
 
   if (loading) {
     return (
@@ -120,13 +89,11 @@ export default function MyRatingScreen({ navigation }: Props) {
 
   return (
     <View style={styles.container}>
-      {/* Header */}
       <View style={styles.header}>
         <Text style={styles.headerTitle}>내 평가</Text>
       </View>
 
       <ScrollView style={styles.content}>
-        {/* Rating Summary */}
         <View style={styles.summaryCard}>
           <View style={styles.summaryLeft}>
             <Text style={styles.averageRating}>{rating.averageRating.toFixed(1)}</Text>
@@ -143,38 +110,94 @@ export default function MyRatingScreen({ navigation }: Props) {
                     style={[
                       styles.ratingBarFill,
                       {
-                        width: `${(distribution[star as keyof typeof distribution] / reviews.length) * 100}%`,
+                        width: rating.totalRatings > 0
+                          ? `${(distribution[star] / rating.totalRatings) * 100}%`
+                          : '0%',
                       },
                     ]}
                   />
                 </View>
                 <Text style={styles.ratingCount}>
-                  {distribution[star as keyof typeof distribution]}
+                  {distribution[star]}
                 </Text>
               </View>
             ))}
           </View>
         </View>
 
-        {/* Reviews List */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>태그 통계</Text>
+          <View style={styles.tagStatsContainer}>
+            {RATING_TAGS.map((tag) => {
+              const count = tagStats[tag.id];
+              const percentage =
+                rating.totalRatings > 0
+                  ? Math.round((count / rating.totalRatings) * 100)
+                  : 0;
+
+              return (
+                <View key={tag.id} style={styles.tagStatItem}>
+                  <Text style={styles.statTagEmoji}>{tag.emoji}</Text>
+                  <View style={styles.tagStatInfo}>
+                    <Text style={styles.statTagLabel}>{tag.label}</Text>
+                    <Text style={styles.tagCount}>
+                      {count}회 ({percentage}%)
+                    </Text>
+                  </View>
+                  <View style={styles.tagStatBarBg}>
+                    <View
+                      style={[
+                        styles.tagStatBarFill,
+                        { width: `${percentage}%` },
+                      ]}
+                    />
+                  </View>
+                </View>
+              );
+            })}
+          </View>
+        </View>
+
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>최근 리뷰</Text>
 
-          {reviews.map((review) => (
-            <View key={review.id} style={styles.reviewCard}>
-              <View style={styles.reviewHeader}>
-                <View style={styles.reviewAuthor}>
-                  <Text style={styles.authorName}>{review.from}</Text>
-                  <Text style={styles.reviewDate}>{review.date}</Text>
-                </View>
-                <Text style={styles.reviewStars}>{renderStars(review.rating)}</Text>
-              </View>
-
-              {review.comment && (
-                <Text style={styles.reviewComment}>{review.comment}</Text>
-              )}
+          {reviews.length === 0 ? (
+            <View style={styles.emptyState}>
+              <Text style={styles.emptyText}>아직 받은 평가가 없습니다.</Text>
             </View>
-          ))}
+          ) : (
+            reviews.map((review) => (
+              <View key={review.ratingId} style={styles.reviewCard}>
+                <View style={styles.reviewHeader}>
+                  <View style={styles.reviewAuthor}>
+                    <Text style={styles.authorName}>
+                      {review.isAnonymous ? '익명' : review.fromUser.name}
+                    </Text>
+                    <Text style={styles.reviewDate}>
+                      {new Date(review.createdAt).toLocaleDateString('ko-KR')}
+                    </Text>
+                  </View>
+                  <Text style={styles.reviewStars}>{renderStars(review.rating)}</Text>
+                </View>
+
+                {review.tags && review.tags.length > 0 && (
+                  <View style={styles.reviewTags}>
+                    {review.tags.map((tag: RatingTag) => (
+                      <View key={tag} style={styles.reviewTag}>
+                        <Text style={styles.reviewTagText}>
+                          {getTagName(tag)}
+                        </Text>
+                      </View>
+                    ))}
+                  </View>
+                )}
+
+                {review.comment && (
+                  <Text style={styles.reviewComment}>{review.comment}</Text>
+                )}
+              </View>
+            ))
+          )}
         </View>
       </ScrollView>
     </View>
@@ -326,5 +349,73 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#666',
     lineHeight: 20,
+  },
+  tagStatsContainer: {
+    backgroundColor: '#fff',
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 20,
+  },
+  tagStatItem: {
+    marginBottom: 16,
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  statTagEmoji: {
+    fontSize: 24,
+    marginRight: 12,
+  },
+  statTagLabel: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#333',
+  },
+  tagStatInfo: {
+    flex: 1,
+  },
+  tagCount: {
+    fontSize: 13,
+    color: '#999',
+    marginTop: 2,
+  },
+  tagStatBarBg: {
+    height: 6,
+    backgroundColor: '#f0f0f0',
+    borderRadius: 3,
+    marginTop: 8,
+    overflow: 'hidden',
+  },
+  tagStatBarFill: {
+    height: '100%',
+    backgroundColor: '#FFA726',
+    borderRadius: 3,
+  },
+  emptyState: {
+    backgroundColor: '#fff',
+    borderRadius: 12,
+    padding: 40,
+    alignItems: 'center',
+  },
+  emptyText: {
+    color: '#999',
+    fontSize: 14,
+  },
+  reviewTags: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 6,
+    marginTop: 8,
+    marginBottom: 8,
+  },
+  reviewTag: {
+    backgroundColor: '#FFF3E0',
+    borderRadius: 12,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+  },
+  reviewTagText: {
+    color: '#FF9800',
+    fontSize: 12,
+    fontWeight: '500',
   },
 });

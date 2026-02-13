@@ -1,6 +1,6 @@
 /**
  * Create Request Screen
- * 배송 요청 생성 화면 (4단계 스텝)
+ * 배송 요청 생성 화면 (5단계 스텝)
  * 디자인 토큰 적용 완료
  */
 
@@ -14,7 +14,6 @@ import {
   TouchableOpacity,
   Alert,
   ActivityIndicator,
-  Modal,
 } from 'react-native';
 import { StackNavigationProp } from '@react-navigation/stack';
 import { getAllStations } from '../../services/config-service';
@@ -24,6 +23,7 @@ import { Colors, Typography, Spacing, BorderRadius } from '../../theme';
 import type { Station } from '../../types/config';
 import type { StationInfo, PackageSize, PackageWeight } from '../../types/request';
 import TimePicker from '../../components/common/TimePicker';
+import OptimizedStationSelectModal from '../../components/OptimizedStationSelectModal';
 
 function convertStationToInfo(station: Station): StationInfo {
   const firstLine = station.lines[0];
@@ -51,7 +51,7 @@ interface Props {
   navigation: NavigationProp;
 }
 
-type Step = 1 | 2 | 3 | 4;
+type Step = 1 | 2 | 3 | 4 | 5;
 
 type UrgencyLevel = 'normal' | 'fast' | 'urgent';
 
@@ -107,6 +107,9 @@ export default function CreateRequestScreen({ navigation }: Props) {
   const [pickupTime, setPickupTime] = useState('12:00');
   const [deliveryTime, setDeliveryTime] = useState('14:00');
   const [urgency, setUrgency] = useState<UrgencyLevel>('normal');
+  const [pickupLocationDetail, setPickupLocationDetail] = useState('');
+  const [storageLocation, setStorageLocation] = useState('');
+  const [specialInstructions, setSpecialInstructions] = useState('');
 
   // Calculated values
   const [deliveryFee, setDeliveryFee] = useState<{
@@ -252,12 +255,42 @@ export default function CreateRequestScreen({ navigation }: Props) {
     return true;
   };
 
+  const validateStep4 = (): boolean => {
+    // Step 4는 요약 화면이므로 별도 검증 없음
+    return true;
+  };
+
+  const validateStep5 = (): boolean => {
+    // 5단계 필드 검증
+    if (pickupLocationDetail && pickupLocationDetail.trim().length > 0) {
+      if (pickupLocationDetail.length > 100) {
+        Alert.alert('오류', '만날 장소 상세는 100자 이내로 입력해주세요.');
+        return false;
+      }
+    }
+    if (storageLocation && storageLocation.trim().length > 0) {
+      if (storageLocation.length > 100) {
+        Alert.alert('오류', '보관 위치는 100자 이내로 입력해주세요.');
+        return false;
+      }
+    }
+    if (specialInstructions && specialInstructions.trim().length > 0) {
+      if (specialInstructions.length > 200) {
+        Alert.alert('오류', '특이사항은 200자 이내로 입력해주세요.');
+        return false;
+      }
+    }
+    return true;
+  };
+
   const handleNext = () => {
     if (currentStep === 1 && !validateStep1()) return;
     if (currentStep === 2 && !validateStep2()) return;
     if (currentStep === 3 && !validateStep3()) return;
+    if (currentStep === 4 && !validateStep4()) return;
+    if (currentStep === 5 && !validateStep5()) return;
 
-    if (currentStep < 4) {
+    if (currentStep < 5) {
       setCurrentStep((currentStep + 1) as Step);
     }
   };
@@ -313,6 +346,9 @@ export default function CreateRequestScreen({ navigation }: Props) {
         },
         deadline: deliveryDeadline,
         urgency: urgencyMap[urgency],
+        pickupLocationDetail: pickupLocationDetail || undefined,
+        storageLocation: storageLocation || undefined,
+        specialInstructions: specialInstructions || undefined,
       });
 
       Alert.alert(
@@ -335,47 +371,6 @@ export default function CreateRequestScreen({ navigation }: Props) {
       setLoading(false);
     }
   };
-
-  const renderStationPicker = () => (
-    <Modal
-      visible={showStationPicker}
-      transparent
-      animationType="slide"
-      onRequestClose={() => setShowStationPicker(false)}
-    >
-      <View style={styles.modalContainer}>
-        <View style={styles.modalContent}>
-          <View style={styles.modalHeader}>
-            <Text style={styles.modalTitle}>
-              {pickerType === 'pickup' ? '픽업 역 선택' : '배송 역 선택'}
-            </Text>
-            <TouchableOpacity onPress={() => setShowStationPicker(false)}>
-              <Text style={styles.modalClose}>✕</Text>
-            </TouchableOpacity>
-          </View>
-          <ScrollView style={styles.stationList}>
-            {stations.map((station) => (
-              <TouchableOpacity
-                key={station.stationId}
-                style={styles.stationItem}
-                onPress={() => {
-                  if (pickerType === 'pickup') {
-                    setPickupStation(station);
-                  } else {
-                    setDeliveryStation(station);
-                  }
-                  setShowStationPicker(false);
-                }}
-              >
-                <Text style={styles.stationName}>{station.stationName}</Text>
-                <Text style={styles.stationLine}>{station.lines[0]?.lineName || ''}</Text>
-              </TouchableOpacity>
-            ))}
-          </ScrollView>
-        </View>
-      </View>
-    </Modal>
-  );
 
   const renderStep1 = () => (
     <View style={styles.stepContainer}>
@@ -627,6 +622,33 @@ export default function CreateRequestScreen({ navigation }: Props) {
           </Text>
         </View>
 
+        {(pickupLocationDetail || storageLocation || specialInstructions) && (
+          <>
+            <View style={styles.summaryDivider} />
+            <View style={styles.summaryRow}>
+              <Text style={styles.summaryLabel}>📍 추가 정보</Text>
+            </View>
+            {pickupLocationDetail && (
+              <View style={styles.summaryRow}>
+                <Text style={styles.summaryLabel}>만날 장소</Text>
+                <Text style={styles.summaryValue}>{pickupLocationDetail}</Text>
+              </View>
+            )}
+            {storageLocation && (
+              <View style={styles.summaryRow}>
+                <Text style={styles.summaryLabel}>보관 위치</Text>
+                <Text style={styles.summaryValue}>{storageLocation}</Text>
+              </View>
+            )}
+            {specialInstructions && (
+              <View style={styles.summaryRow}>
+                <Text style={styles.summaryLabel}>특이사항</Text>
+                <Text style={styles.summaryValue}>{specialInstructions}</Text>
+              </View>
+            )}
+          </>
+        )}
+
         {deliveryFee && (
           <>
             <View style={styles.summaryDivider} />
@@ -662,6 +684,62 @@ export default function CreateRequestScreen({ navigation }: Props) {
     </View>
   );
 
+  const renderStep5 = () => (
+    <View style={styles.stepContainer}>
+      <Text style={styles.stepTitle}>📍 추가 정보</Text>
+      <Text style={styles.stepDesc}>만날 장소와 보관 방법을 입력해주세요. (선택 사항)</Text>
+
+      <Text style={styles.label}>만날 장소 상세</Text>
+      <Text style={styles.hintText}>픽업할 정확한 위치를 알려주세요. (예: 1번 출구, 편의점 앞)</Text>
+      <TextInput
+        style={[styles.input, styles.textArea]}
+        value={pickupLocationDetail}
+        onChangeText={setPickupLocationDetail}
+        placeholder="만날 장소를 상세하게 입력해주세요 (선택)"
+        placeholderTextColor={Colors.gray500}
+        multiline
+        numberOfLines={3}
+        maxLength={100}
+      />
+      <Text style={styles.charCount}>{pickupLocationDetail.length}/100</Text>
+
+      <Text style={styles.label}>보관 위치</Text>
+      <Text style={styles.hintText}>물건을 보관할 곳을 지정해주세요. (예: 역사물 보관함, 사물함)</Text>
+      <TextInput
+        style={[styles.input, styles.textArea]}
+        value={storageLocation}
+        onChangeText={setStorageLocation}
+        placeholder="보관 위치를 입력해주세요 (선택)"
+        placeholderTextColor={Colors.gray500}
+        multiline
+        numberOfLines={2}
+        maxLength={100}
+      />
+      <Text style={styles.charCount}>{storageLocation.length}/100</Text>
+
+      <Text style={styles.label}>특이사항</Text>
+      <Text style={styles.hintText}>길러가 알아야 할 특별한 사항을 적어주세요.</Text>
+      <TextInput
+        style={[styles.input, styles.textArea]}
+        value={specialInstructions}
+        onChangeText={setSpecialInstructions}
+        placeholder="특이사항을 입력해주세요 (선택)"
+        placeholderTextColor={Colors.gray500}
+        multiline
+        numberOfLines={4}
+        maxLength={200}
+      />
+      <Text style={styles.charCount}>{specialInstructions.length}/200</Text>
+
+      <View style={styles.noteCard}>
+        <Text style={styles.noteIcon}>ℹ️</Text>
+        <Text style={styles.noteText}>
+          이 모든 정보는 선택 사항입니다. 필요한 경우에만 입력해주세요.
+        </Text>
+      </View>
+    </View>
+  );
+
   const renderProgressBar = () => (
     <View style={styles.progressContainer}>
       <View style={styles.progressDot}>
@@ -691,6 +769,13 @@ export default function CreateRequestScreen({ navigation }: Props) {
           확인
         </Text>
       </View>
+      <View style={[styles.progressLine, currentStep >= 5 && styles.progressLineActive]} />
+      <View style={styles.progressDot}>
+        <View style={[styles.dot, currentStep >= 5 && styles.dotActive]} />
+        <Text style={[styles.progressLabel, currentStep >= 5 && styles.progressLabelActive]}>
+          추가
+        </Text>
+      </View>
     </View>
   );
 
@@ -711,9 +796,10 @@ export default function CreateRequestScreen({ navigation }: Props) {
         {currentStep === 2 && renderStep2()}
         {currentStep === 3 && renderStep3()}
         {currentStep === 4 && renderStep4()}
+        {currentStep === 5 && renderStep5()}
       </ScrollView>
 
-      {currentStep < 4 && (
+      {currentStep < 5 && (
         <View style={styles.footer}>
           <TouchableOpacity
             style={styles.nextButton}
@@ -724,7 +810,19 @@ export default function CreateRequestScreen({ navigation }: Props) {
         </View>
       )}
 
-      {renderStationPicker()}
+      <OptimizedStationSelectModal
+        visible={showStationPicker}
+        onClose={() => setShowStationPicker(false)}
+        onSelectStation={(station) => {
+          if (pickerType === 'pickup') {
+            setPickupStation(station);
+          } else {
+            setDeliveryStation(station);
+          }
+          setShowStationPicker(false);
+        }}
+        title={pickerType === 'pickup' ? '픽업 역 선택' : '배송 역 선택'}
+      />
     </View>
   );
 }
@@ -1050,56 +1148,33 @@ function createStyles(
       backgroundColor: colors.secondary,
       marginTop: space.lg,
     },
-    // Modal styles
-    modalContainer: {
-      backgroundColor: colors.overlay,
-      flex: 1,
-      justifyContent: 'flex-end',
-    },
-    modalContent: {
-      backgroundColor: colors.white,
-      borderTopLeftRadius: radius.xl,
-      borderTopRightRadius: radius.xl,
-      maxHeight: '70%',
-    },
-    modalHeader: {
-      alignItems: 'center',
-      borderBottomColor: colors.gray300,
-      borderBottomWidth: 1,
-      flexDirection: 'row',
-      justifyContent: 'space-between',
-      padding: space.lg,
-    },
-    modalTitle: {
-      color: colors.textPrimary,
-      fontSize: typo.fontSize.xl,
-      fontWeight: typo.fontWeight.bold,
-    },
-    modalClose: {
-      color: colors.textSecondary,
-      fontSize: typo.fontSize['5xl'],
-    },
-    stationList: {
-      padding: space.lg,
-    },
-    stationItem: {
-      alignItems: 'center',
-      backgroundColor: colors.white,
-      borderColor: colors.gray300,
-      borderRadius: radius.md,
-      borderWidth: 1,
-      flexDirection: 'row',
-      justifyContent: 'space-between',
+    hintText: {
+      color: colors.gray500,
+      fontSize: typo.fontSize.sm,
       marginBottom: space.sm,
-      padding: space.lg,
     },
-    stationName: {
-      color: colors.textPrimary,
-      fontSize: typo.fontSize.lg,
+    charCount: {
+      color: colors.gray500,
+      fontSize: typo.fontSize.xs,
+      textAlign: 'right',
+      marginTop: space.xs,
     },
-    stationLine: {
-      color: colors.textSecondary,
-      fontSize: typo.fontSize.base,
+    noteCard: {
+      alignItems: 'center',
+      backgroundColor: colors.infoLight,
+      borderRadius: radius.md,
+      flexDirection: 'row',
+      marginTop: space.xxl,
+      padding: space.md,
+    },
+    noteIcon: {
+      fontSize: typo.fontSize.xl,
+      marginRight: space.sm,
+    },
+    noteText: {
+      color: colors.infoDark,
+      flex: 1,
+      fontSize: typo.fontSize.sm,
     },
   });
 }

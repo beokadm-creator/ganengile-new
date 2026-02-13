@@ -1,0 +1,1 @@
+export { GillerProfileCard } from './GillerProfileCard';

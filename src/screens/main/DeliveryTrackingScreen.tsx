@@ -59,7 +59,7 @@ export default function DeliveryTrackingScreen({ navigation, route }: Props) {
       const deliveryData = await getDeliveryByRequestId(requestId);
 
       if (deliveryData) {
-        const model = mapToTrackingModel(deliveryData);
+        const model = toTrackingModel(deliveryData);
         setTrackingData(model);
         setTrackingEvents(model.trackingEvents || []);
         calculateProgress(model.status);
@@ -67,7 +67,7 @@ export default function DeliveryTrackingScreen({ navigation, route }: Props) {
         // Fallback to request data
         const requestData = await getRequestById(requestId);
         if (requestData) {
-          const model = mapToTrackingModel(requestData as Request);
+          const model = toTrackingModel(requestData as Request);
           setTrackingData(model);
           setTrackingEvents(model.trackingEvents || []);
           calculateProgress(model.status);

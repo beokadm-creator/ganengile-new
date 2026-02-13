@@ -1,155 +1,177 @@
 /**
  * Route Management Screen (동선 관리)
- * 지하철 역 목록 및 동선 관리 화면
+ * 등록된 동선을 관리하는 화면
  */
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   View,
   Text,
   StyleSheet,
-  ScrollView,
-  ActivityIndicator,
-  FlatList,
   TouchableOpacity,
-  TextInput,
+  ActivityIndicator,
+  Alert,
+  RefreshControl,
 } from 'react-native';
-import { getAllStations } from '../../services/config-service';
+import { Swipeable } from 'react-native-gesture-handler';
+import Animated from 'react-native-reanimated';
+import { Ionicons } from '@expo/vector-icons';
+import { useNavigation, useFocusEffect } from '@react-navigation/native';
+import { requireUserId } from '../../services/firebase';
+import { getUserRoutes, deleteRoute } from '../../services/route-service';
+import { DAY_LABELS } from '../../components/common/DaySelector';
+import type { Route } from '../../types/route';
+import { Colors, Spacing, BorderRadius, Typography } from '../../theme';
 
-interface Station {
-  stationId: string;
-  stationName: string;
-  stationNameEnglish: string;
-  lines: Array<{
-    lineId: string;
-    lineName: string;
-    lineCode: string;
-    lineColor: string;
-  }>;
-  isTransferStation: boolean;
-}
+const MAX_ROUTES = 5;
 
-export default function RouteManagementScreen({ navigation }: any) {
-  const [stations, setStations] = useState<Station[]>([]);
+export default function RouteManagementScreen() {
+  const navigation = useNavigation();
+  const [routes, setRoutes] = useState<Route[]>([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [searchQuery, setSearchQuery] = useState('');
-  const [selectedLines, setSelectedLines] = useState<string[]>([]);
+  const [refreshing, setRefreshing] = useState(false);
 
-  useEffect(() => {
-    loadStations();
-  }, []);
-
-  const loadStations = async () => {
+  const loadRoutes = async () => {
     try {
-      setLoading(true);
-      setError(null);
-
-      const stationData = await getAllStations();
-      console.log('🚉 Stations loaded:', stationData.length);
-
-      setStations(stationData);
-    } catch (err: any) {
-      console.error('Error loading stations:', err);
-      setError(err.message || '역 정보를 불러오는데 실패했습니다');
+      const userId = await requireUserId();
+      const userRoutes = await getUserRoutes(userId);
+      
+      // 활성화된 동선만 표시, 최신순 정렬
+      const activeRoutes = userRoutes
+        .filter((route) => route.isActive)
+        .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
+      
+      setRoutes(activeRoutes);
+    } catch (error: any) {
+      console.error('Error loading routes:', error);
+      Alert.alert('오류', '동선 목록을 불러오는데 실패했습니다.');
     } finally {
       setLoading(false);
+      setRefreshing(false);
     }
   };
 
-  // Filter stations by search query and selected lines
-  const filteredStations = stations.filter((station) => {
-    const matchesSearch =
-      searchQuery === '' ||
-      station.stationName.includes(searchQuery) ||
-      station.stationNameEnglish.toLowerCase().includes(searchQuery.toLowerCase());
-
-    const matchesLine =
-      selectedLines.length === 0 ||
-      station.lines?.some((line) => selectedLines.includes(line.lineId));
-
-    return matchesSearch && matchesLine;
-  });
-
-  // Get all unique lines
-  const allLines = Array.from(
-    new Set(
-      stations.flatMap((s) => s.lines?.map((l) => l.lineId) || [])
-    )
+  useFocusEffect(
+    useCallback(() => {
+      loadRoutes();
+    }, [])
   );
 
-  const toggleLineFilter = (lineId: string) => {
-    setSelectedLines((prev) =>
-      prev.includes(lineId)
-        ? prev.filter((id) => id !== lineId)
-        : [...prev, lineId]
+  const onRefresh = () => {
+    setRefreshing(true);
+    loadRoutes();
+  };
+
+  const handleDelete = async (routeId: string, routeName: string) => {
+    Alert.alert(
+      '동선 삭제',
+      `${routeName} 동선을 삭제하시겠습니까?`,
+      [
+        { text: '취소', style: 'cancel' },
+        {
+          text: '삭제',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              const userId = await requireUserId();
+              await deleteRoute(userId, routeId);
+              await loadRoutes();
+            } catch (error: any) {
+              console.error('Error deleting route:', error);
+              Alert.alert('오류', '동선 삭제에 실패했습니다.');
+            }
+          },
+        },
+      ]
     );
   };
 
-  const renderStation = ({ item }: { item: Station }) => (
-    <TouchableOpacity
-      style={styles.stationCard}
-      onPress={() => {
-        // TODO: Navigate to station detail or add to route
-        console.log('Selected station:', item.stationName);
-      }}
-    >
-      <View style={styles.stationHeader}>
-        <Text style={styles.stationName}>{item.stationName}</Text>
-        {item.isTransferStation && (
-          <View style={styles.transferBadge}>
-            <Text style={styles.transferText}>환승</Text>
-          </View>
-        )}
+  const handleEdit = (route: Route) => {
+    (navigation as any).navigate('EditRoute', { routeId: route.routeId });
+  };
+
+  const renderRightActions = (route: Route) => {
+    return (
+      <View style={styles.swipeActions}>
+        <TouchableOpacity
+          style={[styles.swipeButton, styles.editButton]}
+          onPress={() => handleEdit(route)}
+        >
+          <Ionicons name="create-outline" size={24} color="#fff" />
+          <Text style={styles.swipeButtonText}>편집</Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={[styles.swipeButton, styles.deleteButton]}
+          onPress={() => handleDelete(route.routeId, `${route.startStation.stationName} → ${route.endStation.stationName}`)}
+        >
+          <Ionicons name="trash-outline" size={24} color="#fff" />
+          <Text style={styles.swipeButtonText}>삭제</Text>
+        </TouchableOpacity>
       </View>
+    );
+  };
 
-      <View style={styles.linesContainer}>
-        {item.lines?.map((line) => (
-          <View
-            key={line.lineId}
-            style={[
-              styles.lineBadge,
-              { backgroundColor: line.lineColor || '#999' },
-            ]}
-          >
-            <Text style={styles.lineText}>{line.lineName}</Text>
-          </View>
-        ))}
-      </View>
-
-      <Text style={styles.stationNameEnglish}>
-        {item.stationNameEnglish}
-      </Text>
-    </TouchableOpacity>
-  );
-
-  const renderLineFilter = ({ item }: { item: string }) => {
-    const line = stations
-      .flatMap((s) => s.lines || [])
-      .find((l) => l.lineId === item);
-
-    const isSelected = selectedLines.includes(item);
+  const renderRouteCard = (route: Route) => {
+    const daysText = route.daysOfWeek.map((d) => DAY_LABELS[d]).join(', ');
+    const routeName = `${route.startStation.stationName} → ${route.endStation.stationName}`;
 
     return (
-      <TouchableOpacity
-        style={[
-          styles.lineFilterButton,
-          isSelected && styles.lineFilterButtonSelected,
-          { backgroundColor: isSelected ? line?.lineColor : '#f0f0f0' },
-        ]}
-        onPress={() => toggleLineFilter(item)}
+      <Swipeable
+        key={route.routeId}
+        renderRightActions={() => renderRightActions(route)}
+        friction={2}
+        rightThreshold={40}
       >
-        <Text
-          style={[
-            styles.lineFilterText,
-            isSelected && styles.lineFilterTextSelected,
-          ]}
-        >
-          {line?.lineName || item}
-        </Text>
-      </TouchableOpacity>
+        <View style={styles.routeCard}>
+          {/* 경로 이름 */}
+          <View style={styles.routeHeader}>
+            <View style={styles.routeIconContainer}>
+              <Ionicons name="train-outline" size={24} color={Colors.primary} />
+            </View>
+            <View style={styles.routeInfo}>
+              <Text style={styles.routeName}>{routeName}</Text>
+              <View style={styles.routeMeta}>
+                <View style={styles.timeTag}>
+                  <Ionicons name="time-outline" size={14} color={Colors.gray600} />
+                  <Text style={styles.timeText}>{route.departureTime}</Text>
+                </View>
+                <View style={styles.daysBadge}>
+                  <Text style={styles.daysText}>{daysText}</Text>
+                </View>
+              </View>
+            </View>
+          </View>
+
+          {/* 역 정보 */}
+          <View style={styles.stationsContainer}>
+            <View style={styles.stationInfo}>
+              <View style={styles.stationDot} />
+              <Text style={styles.stationName}>{route.startStation.stationName}</Text>
+            </View>
+            
+            <View style={styles.connector}>
+              <View style={styles.connectorLine} />
+              <Ionicons name="arrow-down" size={16} color={Colors.gray400} />
+            </View>
+            
+            <View style={styles.stationInfo}>
+              <View style={[styles.stationDot, { backgroundColor: Colors.secondary }]} />
+              <Text style={styles.stationName}>{route.endStation.stationName}</Text>
+            </View>
+          </View>
+        </View>
+      </Swipeable>
     );
   };
+
+  if (loading) {
+    return (
+      <View style={styles.centerContainer}>
+        <ActivityIndicator size="large" color={Colors.primary} />
+        <Text style={styles.loadingText}>동선 목록 불러오는 중...</Text>
+      </View>
+    );
+  }
 
   return (
     <View style={styles.container}>
@@ -157,71 +179,50 @@ export default function RouteManagementScreen({ navigation }: any) {
       <View style={styles.header}>
         <Text style={styles.title}>동선 관리</Text>
         <Text style={styles.subtitle}>
-          자주 타는 경로를 등록하고 매칭받으세요
+          {routes.length} / {MAX_ROUTES}개 등록됨
         </Text>
       </View>
 
-      {/* Search Bar */}
-      <View style={styles.searchContainer}>
-        <TextInput
-          style={styles.searchInput}
-          placeholder="역 이름 검색..."
-          value={searchQuery}
-          onChangeText={setSearchQuery}
-          placeholderTextColor="#999"
-        />
-      </View>
-
-      {/* Line Filters */}
-      <View style={styles.filtersContainer}>
-        <Text style={styles.filterTitle}>호선별 필터</Text>
-        <FlatList
-          horizontal
-          data={allLines}
-          renderItem={renderLineFilter}
-          keyExtractor={(item) => item}
-          showsHorizontalScrollIndicator={false}
-          style={styles.lineFiltersList}
-          contentContainerStyle={styles.lineFiltersContent}
-        />
-      </View>
-
-      {/* Station List */}
-      {loading ? (
+      {/* 동선 목록 */}
+      {routes.length === 0 ? (
         <View style={styles.centerContainer}>
-          <ActivityIndicator size="large" color="#4CAF50" />
-          <Text style={styles.loadingText}>역 정보 불러오는 중...</Text>
-        </View>
-      ) : error ? (
-        <View style={styles.centerContainer}>
-          <Text style={styles.errorText}>❌ {error}</Text>
-          <TouchableOpacity style={styles.retryButton} onPress={loadStations}>
-            <Text style={styles.retryButtonText}>다시 시도</Text>
+          <Ionicons name="train-outline" size={64} color={Colors.gray300} />
+          <Text style={styles.emptyTitle}>등록된 동선이 없습니다</Text>
+          <Text style={styles.emptySubtitle}>
+            출퇴근 경로를 등록하고 매칭받으세요
+          </Text>
+          <TouchableOpacity
+            style={styles.addButton}
+            onPress={() => navigation.navigate('AddRoute' as never)}
+          >
+            <Ionicons name="add-circle" size={20} color="#fff" />
+            <Text style={styles.addButtonText}>동선 등록하기</Text>
           </TouchableOpacity>
         </View>
       ) : (
-        <FlatList
-          data={filteredStations}
-          renderItem={renderStation}
-          keyExtractor={(item) => item.stationId}
-          contentContainerStyle={styles.listContent}
-          ListEmptyComponent={
-            <View style={styles.centerContainer}>
-              <Text style={styles.emptyText}>
-                {searchQuery || selectedLines.length > 0
-                  ? '검색 결과가 없습니다'
-                  : '표시할 역이 없습니다'}
+        <View style={styles.listContainer}>
+          {routes.map((route) => renderRouteCard(route))}
+          
+          {/* 최대 5개 안내 */}
+          {routes.length >= MAX_ROUTES && (
+            <View style={styles.limitBanner}>
+              <Ionicons name="information-circle" size={20} color={Colors.accent} />
+              <Text style={styles.limitText}>
+                최대 {MAX_ROUTES}개의 동선만 등록할 수 있습니다
               </Text>
             </View>
-          }
-          ListHeaderComponent={
-            <View style={styles.listHeader}>
-              <Text style={styles.listHeaderText}>
-                총 {filteredStations.length}개 역
-              </Text>
-            </View>
-          }
-        />
+          )}
+        </View>
+      )}
+
+      {/* 동선 추가 버튼 (FAB) */}
+      {routes.length < MAX_ROUTES && (
+        <TouchableOpacity
+          style={styles.fab}
+          onPress={() => navigation.navigate('AddRoute' as never)}
+        >
+          <Ionicons name="add" size={28} color="#fff" />
+        </TouchableOpacity>
       )}
     </View>
   );
@@ -232,169 +233,212 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     flex: 1,
     justifyContent: 'center',
-    padding: 20,
+    padding: Spacing.lg,
   },
   container: {
-    backgroundColor: '#f5f5f5',
+    backgroundColor: Colors.gray50,
     flex: 1,
   },
-  emptyText: {
-    color: '#999',
-    fontSize: 16,
+  connector: {
+    alignItems: 'center',
+    marginVertical: Spacing.xs,
   },
-  errorText: {
-    color: '#f44336',
-    fontSize: 16,
-    marginBottom: 16,
+  connectorLine: {
+    backgroundColor: Colors.gray300,
+    height: 20,
+    width: 2,
+  },
+  daysBadge: {
+    backgroundColor: Colors.secondaryLight,
+    borderRadius: BorderRadius.sm,
+    paddingHorizontal: Spacing.sm,
+    paddingVertical: Spacing.xs,
+  },
+  daysText: {
+    color: Colors.secondary,
+    fontSize: Typography.fontSize.xs,
+    fontWeight: Typography.fontWeight.semibold as any,
+  },
+  deleteButton: {
+    backgroundColor: '#f44336',
+  },
+  editButton: {
+    backgroundColor: Colors.primary,
+  },
+  emptySubtitle: {
+    color: Colors.gray500,
+    fontSize: Typography.fontSize.base,
+    marginTop: Spacing.sm,
     textAlign: 'center',
   },
-  filterTitle: {
-    color: '#666',
-    fontSize: 14,
-    fontWeight: 'bold',
-    paddingHorizontal: 16,
-    paddingTop: 12,
+  emptyTitle: {
+    color: Colors.gray700,
+    fontSize: Typography.fontSize.lg,
+    fontWeight: Typography.fontWeight.bold as any,
+    marginBottom: Spacing.xs,
   },
-  filtersContainer: {
-    backgroundColor: '#fff',
-    borderBottomColor: '#e0e0e0',
-    borderBottomWidth: 1,
+  fab: {
+    alignItems: 'center',
+    backgroundColor: Colors.primary,
+    borderRadius: 28,
+    bottom: 24,
+    elevation: 8,
+    height: 56,
+    justifyContent: 'center',
+    position: 'absolute',
+    right: 24,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    width: 56,
+  },
+  addButton: {
+    alignItems: 'center',
+    backgroundColor: Colors.primary,
+    borderRadius: BorderRadius.sm,
+    flexDirection: 'row',
+    gap: Spacing.sm,
+    marginTop: Spacing.md,
+    paddingHorizontal: Spacing.lg,
+    paddingVertical: Spacing.md,
+  },
+  addButtonText: {
+    color: Colors.white,
+    fontSize: Typography.fontSize.base,
+    fontWeight: Typography.fontWeight.semibold as any,
   },
   header: {
-    backgroundColor: '#4CAF50',
-    borderBottomLeftRadius: 20,
-    borderBottomRightRadius: 20,
-    padding: 20,
+    backgroundColor: Colors.primary,
+    borderBottomLeftRadius: BorderRadius.lg,
+    borderBottomRightRadius: BorderRadius.lg,
+    paddingHorizontal: Spacing.lg,
     paddingTop: 60,
+    paddingBottom: Spacing.lg,
   },
-  lineBadge: {
-    borderRadius: 4,
-    marginBottom: 4,
-    marginRight: 6,
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-  },
-  lineFilterButton: {
-    borderColor: '#e0e0e0',
-    borderRadius: 20,
-    borderWidth: 1,
-    marginRight: 8,
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-  },
-  lineFilterButtonSelected: {
-    borderColor: '#4CAF50',
-  },
-  lineFilterText: {
-    color: '#666',
-    fontSize: 14,
-    fontWeight: '600',
-  },
-  lineFilterTextSelected: {
-    color: '#fff',
-  },
-  lineFiltersContent: {
-    paddingBottom: 12,
-    paddingHorizontal: 16,
-  },
-  lineFiltersList: {
-    marginTop: 8,
-  },
-  lineText: {
-    color: '#fff',
-    fontSize: 12,
-    fontWeight: 'bold',
-  },
-  linesContainer: {
+  limitBanner: {
+    alignItems: 'center',
+    backgroundColor: Colors.accentLight,
+    borderRadius: BorderRadius.sm,
     flexDirection: 'row',
-    flexWrap: 'wrap',
-    marginBottom: 8,
+    gap: Spacing.sm,
+    marginHorizontal: Spacing.md,
+    marginTop: Spacing.md,
+    padding: Spacing.md,
   },
-  listContent: {
-    padding: 16,
+  limitText: {
+    color: Colors.accent,
+    fontSize: Typography.fontSize.sm,
+    flex: 1,
   },
-  listHeader: {
-    marginBottom: 12,
-  },
-  listHeaderText: {
-    color: '#666',
-    fontSize: 14,
-    fontWeight: '600',
+  listContainer: {
+    padding: Spacing.md,
   },
   loadingText: {
-    color: '#666',
-    fontSize: 16,
-    marginTop: 12,
+    color: Colors.gray600,
+    fontSize: Typography.fontSize.base,
+    marginTop: Spacing.md,
   },
-  retryButton: {
-    backgroundColor: '#4CAF50',
-    borderRadius: 8,
-    paddingHorizontal: 24,
-    paddingVertical: 12,
-  },
-  retryButtonText: {
-    color: '#fff',
-    fontSize: 16,
-    fontWeight: 'bold',
-  },
-  searchContainer: {
-    backgroundColor: '#fff',
-    padding: 16,
-  },
-  searchInput: {
-    backgroundColor: '#f5f5f5',
-    borderColor: '#e0e0e0',
-    borderRadius: 8,
-    borderWidth: 1,
-    fontSize: 16,
-    padding: 12,
-  },
-  stationCard: {
-    backgroundColor: '#fff',
-    borderRadius: 12,
-    elevation: 3,
-    marginBottom: 12,
-    padding: 16,
+  routeCard: {
+    backgroundColor: Colors.white,
+    borderRadius: BorderRadius.md,
+    elevation: 2,
+    marginBottom: Spacing.md,
+    padding: Spacing.md,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
     shadowRadius: 4,
   },
-  stationHeader: {
+  routeHeader: {
+    flexDirection: 'row',
+    gap: Spacing.md,
+    marginBottom: Spacing.md,
+  },
+  routeIconContainer: {
+    alignItems: 'center',
+    backgroundColor: Colors.primaryLight,
+    borderRadius: 20,
+    height: 40,
+    justifyContent: 'center',
+    width: 40,
+  },
+  routeInfo: {
+    flex: 1,
+  },
+  routeMeta: {
     alignItems: 'center',
     flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginBottom: 8,
+    gap: Spacing.sm,
+    marginTop: Spacing.xs,
+  },
+  routeName: {
+    color: Colors.textPrimary,
+    fontSize: Typography.fontSize.lg,
+    fontWeight: Typography.fontWeight.bold as any,
+  },
+  stationDot: {
+    backgroundColor: Colors.primary,
+    borderRadius: 6,
+    height: 12,
+    width: 12,
+  },
+  stationInfo: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    gap: Spacing.sm,
+    paddingVertical: Spacing.xs,
   },
   stationName: {
-    color: '#333',
-    fontSize: 20,
-    fontWeight: 'bold',
+    color: Colors.textPrimary,
+    fontSize: Typography.fontSize.sm,
   },
-  stationNameEnglish: {
-    color: '#999',
-    fontSize: 14,
+  stationsContainer: {
+    paddingLeft: 52,
   },
   subtitle: {
-    color: '#fff',
-    fontSize: 16,
-    marginTop: 4,
+    color: Colors.white,
+    fontSize: Typography.fontSize.sm,
+    marginTop: Spacing.xs,
     opacity: 0.9,
   },
-  title: {
-    color: '#fff',
-    fontSize: 28,
-    fontWeight: 'bold',
+  swipeActions: {
+    flexDirection: 'row',
+    width: 160,
   },
-  transferBadge: {
-    backgroundColor: '#FF9800',
+  swipeButton: {
+    alignItems: 'center',
+    flex: 1,
+    height: '100%',
+    justifyContent: 'center',
+  },
+  swipeButtonText: {
+    color: Colors.white,
+    fontSize: Typography.fontSize.xs,
+    fontWeight: Typography.fontWeight.semibold as any,
+    marginTop: 4,
+  },
+  text: {
+    color: Colors.white,
+    fontSize: Typography.fontSize.xl,
+    fontWeight: Typography.fontWeight.bold as any,
+  },
+  timeTag: {
+    alignItems: 'center',
+    backgroundColor: Colors.gray100,
     borderRadius: 4,
-    paddingHorizontal: 8,
-    paddingVertical: 4,
+    flexDirection: 'row',
+    gap: 4,
+    paddingHorizontal: Spacing.xs,
+    paddingVertical: 2,
   },
-  transferText: {
-    color: '#fff',
-    fontSize: 12,
-    fontWeight: 'bold',
+  timeText: {
+    color: Colors.gray600,
+    fontSize: Typography.fontSize.xs,
+  },
+  title: {
+    color: Colors.white,
+    fontSize: Typography.fontSize['2xl'],
+    fontWeight: Typography.fontWeight.bold as any,
   },
 });

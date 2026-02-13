@@ -132,6 +132,10 @@ export interface CreateRequestData {
   };
   deadline: Date;
   urgency?: 'low' | 'medium' | 'high';
+  pickupLocationDetail?: string;    // 만날 장소 상세 (예: 1번 출구, 편의점 앞)
+  storageLocation?: string;          // 보관 위치 (예: 역사물 보관함, 사물함)
+  specialInstructions?: string;      // 특이사항 (예: 비가 오면 우산 필요함)
+  specialRequests?: string[];        // 특별 요청 사항 배열
 }
 
 /**

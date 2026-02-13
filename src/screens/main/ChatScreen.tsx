@@ -14,10 +14,11 @@ import {
   KeyboardAvoidingView,
   Platform,
   ActivityIndicator,
+  Alert,
 } from 'react-native';
 import type { MainStackNavigationProp } from '../../types/navigation';
 import { createChatService } from '../../services/chat-service';
-import { MessageType, type ChatMessage } from '../../types/chat';
+import { MessageType, ChatRoomStatus, type ChatMessage, type ChatRoom } from '../../types/chat';
 import { useUser } from '../../contexts/UserContext';
 
 type Props = {
@@ -27,27 +28,67 @@ type Props = {
       chatRoomId: string;
       otherUserId: string;
       otherUserName: string;
+      requestInfo?: { from: string; to: string; urgency: string };
     };
   };
 };
 
 export default function ChatScreen({ navigation, route }: Props) {
   const { user } = useUser();
-  const { chatRoomId, otherUserId: _otherUserId, otherUserName } = route.params;
+  const { chatRoomId, otherUserId: _otherUserId, otherUserName, requestInfo: routeRequestInfo } = route.params;
 
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [inputText, setInputText] = useState('');
   const [loading, setLoading] = useState(true);
   const [sending, setSending] = useState(false);
+  const [chatRoom, setChatRoom] = useState<ChatRoom | null>(null);
 
   const flatListRef = useRef<FlatList>(null);
   const chatService = useRef(createChatService()).current;
 
   useEffect(() => {
+    const loadChatRoom = async () => {
+      const room = await chatService.getChatRoom(chatRoomId);
+      setChatRoom(room);
+    };
+
+    loadChatRoom();
+  }, [chatRoomId, chatService]);
+
+  const displayRequestInfo = chatRoom?.requestInfo || routeRequestInfo;
+
+  useEffect(() => {
     navigation.setOptions({
       title: otherUserName,
+      headerRight: () => (
+        <TouchableOpacity onPress={handleLeaveChat} style={styles.leaveButton}>
+          <Text style={styles.leaveButtonText}>나가기</Text>
+        </TouchableOpacity>
+      ),
     });
   }, [navigation, otherUserName]);
+
+  const handleLeaveChat = useCallback(() => {
+    Alert.alert(
+      '채팅방 나가기',
+      '정말로 채팅방에서 나가시겠습니까?',
+      [
+        { text: '취소', style: 'cancel' },
+        {
+          text: '나가기',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              await chatService.leaveChatRoom(chatRoomId);
+              navigation.goBack();
+            } catch (error) {
+              console.error('Error leaving chat room:', error);
+            }
+          },
+        },
+      ]
+    );
+  }, [chatRoomId, chatService, navigation]);
 
   const loadMessages = useCallback(() => {
     const unsubscribe = chatService.subscribeToChatMessages(chatRoomId, (msgs) => {
@@ -165,7 +206,12 @@ export default function ChatScreen({ navigation, route }: Props) {
         </View>
       );
     }
-    return null;
+    return (
+      <View style={styles.emptyContainer}>
+        <Text style={styles.emptyEmoji}>💬</Text>
+        <Text style={styles.emptyText}>첫 메시지를 보내보세요</Text>
+      </View>
+    );
   };
 
   return (
@@ -174,6 +220,17 @@ export default function ChatScreen({ navigation, route }: Props) {
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0}
     >
+      {displayRequestInfo && (
+        <View style={styles.requestInfoBar}>
+          <Text style={styles.requestInfoText}>
+            📦 {displayRequestInfo.from} → {displayRequestInfo.to}
+            {displayRequestInfo.urgency && (
+              <Text style={styles.urgencyBadge}> {displayRequestInfo.urgency}</Text>
+            )}
+          </Text>
+        </View>
+      )}
+
       <FlatList
         ref={flatListRef}
         data={messages}
@@ -231,6 +288,19 @@ const styles = StyleSheet.create({
     backgroundColor: '#f5f5f5',
     flex: 1,
   },
+  emptyContainer: {
+    alignItems: 'center',
+    flex: 1,
+    justifyContent: 'center',
+  },
+  emptyEmoji: {
+    fontSize: 48,
+    marginBottom: 12,
+  },
+  emptyText: {
+    color: '#999',
+    fontSize: 16,
+  },
   emptyList: {
     flex: 1,
   },
@@ -253,6 +323,15 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     paddingHorizontal: 12,
     paddingVertical: 8,
+  },
+  leaveButton: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+  },
+  leaveButtonText: {
+    color: '#FF5252',
+    fontSize: 14,
+    fontWeight: '600',
   },
   loadingContainer: {
     alignItems: 'center',
@@ -304,6 +383,26 @@ const styles = StyleSheet.create({
   },
   otherMessageTime: {
     color: '#999',
+  },
+  requestInfoBar: {
+    backgroundColor: '#fff',
+    borderBottomColor: '#e0e0e0',
+    borderBottomWidth: 1,
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+  },
+  requestInfoText: {
+    color: '#333',
+    fontSize: 14,
+  },
+  urgencyBadge: {
+    backgroundColor: '#FF9800',
+    borderRadius: 4,
+    color: '#fff',
+    fontSize: 12,
+    fontWeight: 'bold',
+    paddingHorizontal: 6,
+    paddingVertical: 2,
   },
   sendButton: {
     alignItems: 'center',

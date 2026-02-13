@@ -13,6 +13,7 @@ import {
   Alert,
   ActivityIndicator,
 } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import { useRoute, useNavigation } from '@react-navigation/native';
 import { requireUserId } from '../../services/firebase';
 import { getAllStations } from '../../services/config-service';
@@ -22,8 +23,8 @@ import type { Station } from '../../types/config';
 import type { StationInfo } from '../../types/route';
 import { Colors, Spacing, Typography, BorderRadius } from '../../theme';
 import Button from '../../components/common/Button';
-import TimePicker from '../../components/common/TimePicker';
-import DaySelector from '../../components/common/DaySelector';
+import TimePicker from '../../components/time/TimePicker';
+import DaySelector, { DAY_LABELS } from '../../components/time/DaySelector';
 import StationSelectModal from '../../components/common/StationSelectModal';
 
 export default function AddRouteScreen() {
@@ -101,28 +102,40 @@ export default function AddRouteScreen() {
 
   const handleSave = () => {
     if (!startStation || !endStation) {
-      Alert.alert('오류', '출발역과 도착역을 모두 선택해주세요.');
+      Alert.alert(
+        '역을 선택해주세요',
+        '출발역과 도착역을 모두 선택해야 합니다.',
+        [{ text: '확인' }]
+      );
       return;
     }
 
     if (selectedDays.length === 0) {
-      Alert.alert('오류', '최소 하나 이상의 요일을 선택해주세요.');
+      Alert.alert(
+        '요일을 선택해주세요',
+        '최소 하나 이상의 요일을 선택해야 합니다.',
+        [{ text: '확인' }]
+      );
       return;
     }
 
     const validation = validateRoute(startStation, endStation, departureTime, selectedDays);
     if (!validation.isValid) {
-      Alert.alert('유효성 오류', validation.errors.join('\n'));
+      Alert.alert(
+        '유효성 오류',
+        validation.errors.join('\n\n'),
+        [{ text: '확인' }]
+      );
       return;
     }
 
     if (validation.warnings.length > 0) {
       Alert.alert(
-        '경고',
-        validation.warnings.join('\n'),
+        '⚠️ 확인해주세요',
+        validation.warnings.join('\n\n'),
         [
           { text: '취소', style: 'cancel' },
-          { text: '계속', onPress: saveRoute },
+          { text: '계속 진행', onPress: saveRoute },
         ]
       );
     } else {
@@ -140,8 +153,8 @@ export default function AddRouteScreen() {
       await createRoute(userId, startStation, endStation, departureTime, selectedDays);
 
       Alert.alert(
-        '성공',
-        '동선이 등록되었습니다.',
+        '✅ 동선 등록 완료',
+        `${startStation.stationName} → ${endStation.stationName}\n${departureTime} 출발\n${selectedDays.map(d => DAY_LABELS[d]).join(', ')}요일에 운영합니다.`,
         [
           {
             text: '확인',
@@ -157,7 +170,11 @@ export default function AddRouteScreen() {
       );
     } catch (error) {
       console.error('동선 저장 실패:', error);
-      Alert.alert('오류', '동선 저장에 실패했습니다.');
+      Alert.alert(
+        '저장 실패',
+        '동선 저장에 실패했습니다. 다시 시도해주세요.',
+        [{ text: '확인' }]
+      );
     } finally {
       setSaving(false);
     }
@@ -180,6 +197,34 @@ export default function AddRouteScreen() {
       </View>
 
       <ScrollView style={styles.content}>
+        {/* 선택 정보 요약 */}
+        {startStation && endStation && (
+          <View style={styles.summaryCard}>
+            <View style={styles.summaryHeader}>
+              <Ionicons name="information-circle" size={20} color={Colors.primary} />
+              <Text style={styles.summaryTitle}>동선 요약</Text>
+            </View>
+            <View style={styles.summaryContent}>
+              <View style={styles.summaryRow}>
+                <Text style={styles.summaryLabel}>경로</Text>
+                <Text style={styles.summaryValue}>
+                  {startStation.stationName} → {endStation.stationName}
+                </Text>
+              </View>
+              <View style={styles.summaryRow}>
+                <Text style={styles.summaryLabel}>출발 시간</Text>
+                <Text style={styles.summaryValue}>{departureTime}</Text>
+              </View>
+              <View style={styles.summaryRow}>
+                <Text style={styles.summaryLabel}>운영 요일</Text>
+                <Text style={styles.summaryValue}>
+                  {selectedDays.map(d => DAY_LABELS[d]).join(', ')}
+                </Text>
+              </View>
+            </View>
+          </View>
+        )}
+
         {/* 출발역 */}
         <View style={styles.section}>
           <Text style={styles.label}>출발역</Text>
@@ -317,6 +362,42 @@ const styles = StyleSheet.create({
     color: Colors.gray400,
     fontSize: 24,
     fontWeight: '300',
+  },
+  summaryCard: {
+    backgroundColor: Colors.white,
+    borderRadius: BorderRadius.md,
+    marginBottom: Spacing.lg,
+    overflow: 'hidden',
+  },
+  summaryHeader: {
+    alignItems: 'center',
+    backgroundColor: Colors.primary,
+    flexDirection: 'row',
+    gap: Spacing.xs,
+    padding: Spacing.md,
+  },
+  summaryTitle: {
+    color: Colors.white,
+    fontSize: Typography.fontSize.base,
+    fontWeight: Typography.fontWeight.semibold,
+  },
+  summaryContent: {
+    padding: Spacing.md,
+  },
+  summaryRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: Spacing.sm,
+  },
+  summaryLabel: {
+    color: Colors.textSecondary,
+    fontSize: Typography.fontSize.sm,
+    fontWeight: Typography.fontWeight.medium,
+  },
+  summaryValue: {
+    color: Colors.textPrimary,
+    fontSize: Typography.fontSize.sm,
+    fontWeight: Typography.fontWeight.semibold,
   },
   loadingContainer: {
     alignItems: 'center',

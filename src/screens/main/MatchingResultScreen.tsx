@@ -1,266 +1,238 @@
-import React, { useEffect, useState, useRef, useCallback } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import {
   View,
   Text,
   StyleSheet,
-  ScrollView,
-  TouchableOpacity,
+  ActivityIndicator,
+  Alert,
+  BackHandler,
   Animated,
 } from 'react-native';
-import { StackNavigationProp } from '@react-navigation/stack';
-import { getMatchingResults as getMatchesFromFirestore } from '../../services/matching-service';
-import GillerProfileCard, { GillerMatch } from '../../components/matching/GillerProfileCard';
-import { Colors, Spacing, BorderRadius, Typography } from '../../theme';
+import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
+import Icon from 'react-native-vector-icons/MaterialIcons';
+import { GillerProfileCard } from '../../components/giller/GillerProfileCard';
+import { matchingService } from '../../services/matching-service';
 
-type NavigationProp = StackNavigationProp<any>;
-
-interface Props {
-  navigation: NavigationProp;
-  route: {
-    params: {
-      requestId: string;
-    };
+type MatchingResultRouteParams = {
+  MatchingResult: {
+    requestId: string;
   };
-}
+};
 
 const MATCHING_TIMEOUT = 30000; // 30 seconds
 
-export default function MatchingResultScreen({ navigation, route }: Props) {
+export const MatchingResultScreen: React.FC = () => {
+  const navigation = useNavigation();
+  const route = useRoute<RouteProp<MatchingResultRouteParams, 'MatchingResult'>>();
   const { requestId } = route.params;
-  const [matches, setMatches] = useState<GillerMatch[]>([]);
+
+  const [giller, setGiller] = useState<any>(null);
   const [loading, setLoading] = useState(true);
-  const [searching, setSearching] = useState(true);
-  const [timedOut, setTimedOut] = useState(false);
-  const [timeRemaining, setTimeRemaining] = useState(MATCHING_TIMEOUT / 1000);
-  const [autoRetrying, setAutoRetrying] = useState(false);
-  const [autoRetryCount, setAutoRetryCount] = useState(0);
+  const [error, setError] = useState<string | null>(null);
+  const [isAccepting, setIsAccepting] = useState(false);
+  const [isRejecting, setIsRejecting] = useState(false);
+  const [timeoutReached, setTimeoutReached] = useState(false);
+  const [retryCount, setRetryCount] = useState(0);
+  const [fadeAnim] = useState(new Animated.Value(0));
 
-  const fadeAnim = useRef(new Animated.Value(0)).current;
-  const scaleAnim = useRef(new Animated.Value(0.8)).current;
-  const shakeAnim = useRef(new Animated.Value(0)).current;
-  const pulseAnim = useRef(new Animated.Value(1)).current;
-  const progressAnim = useRef(new Animated.Value(0)).current;
-
-  const countdownIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
-  const pulseAnimationRef = useRef<Animated.CompositeAnimation | null>(null);
-  const progressAnimationRef = useRef<Animated.CompositeAnimation | null>(null);
-
-  const clearTimersAndAnimations = () => {
-    if (countdownIntervalRef.current) {
-      clearInterval(countdownIntervalRef.current);
-      countdownIntervalRef.current = null;
-    }
-    pulseAnimationRef.current?.stop();
-    progressAnimationRef.current?.stop();
-  };
-
-  const startSearch = useCallback(async () => {
-    clearTimersAndAnimations();
-
-    setTimedOut(false);
-    setTimeRemaining(MATCHING_TIMEOUT / 1000);
-    setSearching(true);
-    setLoading(true);
-    setMatches([]);
-
-    // Reset animations
-    progressAnim.setValue(0);
-    fadeAnim.setValue(0);
-    scaleAnim.setValue(0.8);
-
-    // Start progress animation
-    const progressAnimation = Animated.timing(progressAnim, {
-      toValue: 1,
-      duration: MATCHING_TIMEOUT,
-      useNativeDriver: false,
-    });
-    progressAnimationRef.current = progressAnimation;
-    progressAnimation.start();
-
-    // Start pulse animation
-    const pulse = Animated.loop(
-      Animated.sequence([
-        Animated.timing(pulseAnim, {
-          toValue: 1.1,
-          duration: 800,
-          useNativeDriver: true,
-        }),
-        Animated.timing(pulseAnim, {
-          toValue: 1,
-          duration: 800,
-          useNativeDriver: true,
-        }),
-      ])
-    );
-    pulseAnimationRef.current = pulse;
-    pulse.start();
-
-    // Start countdown
-    countdownIntervalRef.current = setInterval(() => {
-      setTimeRemaining((prev) => {
-        if (prev <= 1) {
-          if (countdownIntervalRef.current) {
-            clearInterval(countdownIntervalRef.current);
-            countdownIntervalRef.current = null;
-          }
-          handleTimeout();
-          return 0;
-        }
-        return prev - 1;
-      });
-    }, 1000);
-
-    try {
-      const results = await getMatchesFromFirestore(requestId);
-      setMatches(results);
-      setSearching(false);
-      setLoading(false);
-
-      if (results.length > 0) {
-        animateSuccess();
-      } else {
-        animateFailure();
-      }
-    } catch (error) {
-      console.error('Error loading matches:', error);
-      setSearching(false);
-      setLoading(false);
-      animateFailure();
-    } finally {
-      clearTimersAndAnimations();
-    }
-  }, [requestId, fadeAnim, pulseAnim, progressAnim, scaleAnim]);
-
+  // Handle hardware back button
   useEffect(() => {
-    startSearch();
-    return () => {
-      clearTimersAndAnimations();
-    };
-  }, [startSearch]);
+    const backHandler = BackHandler.addEventListener('hardwareBackPress', () => {
+      Alert.alert(
+        '매칭 취소',
+        '매칭을 취소하고 이전 화면으로 돌아가시겠습니까?',
+        [
+          { text: '아니오', style: 'cancel' },
+          {
+            text: '예',
+            style: 'destructive',
+            onPress: () => navigation.goBack(),
+          },
+        ]
+      );
+      return true;
+    });
 
-  const handleTimeout = () => {
-    setTimedOut(true);
-    setSearching(false);
-    setLoading(false);
-    animateShake();
+    return () => backHandler.remove();
+  }, [navigation]);
 
-    if (autoRetryCount < 1 && !autoRetrying) {
-      setAutoRetrying(true);
-      setAutoRetryCount((prev) => prev + 1);
-      setTimeout(() => {
-        setAutoRetrying(false);
-        startSearch();
-      }, 1500);
+  // Find giller for the request
+  const findGiller = useCallback(async () => {
+    try {
+      setLoading(true);
+      setError(null);
+      setTimeoutReached(false);
+
+      const result = await matchingService.findGiller(requestId);
+
+      if (result.success && result.data) {
+        setGiller(result.data.giller);
+        fadeIn();
+      } else {
+        setError(result.error || '일시적인 오류가 발생했습니다.');
+      }
+    } catch (err: any) {
+      setError(err.message || '네트워크 오류가 발생했습니다.');
+    } finally {
+      setLoading(false);
     }
-  };
+  }, [requestId]);
 
-  const animateSuccess = () => {
-    Animated.parallel([
-      Animated.timing(fadeAnim, {
-        toValue: 1,
-        duration: 600,
-        delay: 300,
-        useNativeDriver: true,
-      }),
-      Animated.spring(scaleAnim, {
-        toValue: 1,
-        tension: 50,
-        friction: 7,
-        delay: 300,
-        useNativeDriver: true,
-      }),
-    ]).start();
-  };
+  // Initial search
+  useEffect(() => {
+    findGiller();
+  }, [findGiller]);
 
-  const animateFailure = () => {
+  // Timeout handling
+  useEffect(() => {
+    if (loading) {
+      const timer = setTimeout(() => {
+        if (!giller) {
+          setTimeoutReached(true);
+          setError('매칭 시간이 초과되었습니다. 다시 시도해주세요.');
+          setLoading(false);
+        }
+      }, MATCHING_TIMEOUT);
+
+      return () => clearTimeout(timer);
+    }
+  }, [loading, giller]);
+
+  // Fade in animation
+  const fadeIn = useCallback(() => {
     Animated.timing(fadeAnim, {
       toValue: 1,
-      duration: 600,
-      delay: 300,
+      duration: 500,
       useNativeDriver: true,
     }).start();
+  }, [fadeAnim]);
+
+  // Handle accept
+  const handleAccept = async () => {
+    try {
+      setIsAccepting(true);
+
+      const result = await matchingService.acceptMatch(requestId, giller.id);
+
+      if (result.success) {
+        Alert.alert(
+          '매칭 성공',
+          '기일러와 매칭되었습니다. 배송을 시작합니다.',
+          [
+            {
+              text: '확인',
+              onPress: () => {
+                navigation.reset({
+                  index: 0,
+                  routes: [{ name: 'DeliveryTracking' as never }],
+                });
+              },
+            },
+          ]
+        );
+      } else {
+        Alert.alert('오류', result.error || '매칭 수락에 실패했습니다.');
+      }
+    } catch (err: any) {
+      Alert.alert('오류', err.message || '네트워크 오류가 발생했습니다.');
+    } finally {
+      setIsAccepting(false);
+    }
   };
 
-  const animateShake = () => {
-    Animated.sequence([
-      Animated.timing(shakeAnim, {
-        toValue: 10,
-        duration: 100,
-        useNativeDriver: true,
-      }),
-      Animated.timing(shakeAnim, {
-        toValue: -10,
-        duration: 100,
-        useNativeDriver: true,
-      }),
-      Animated.timing(shakeAnim, {
-        toValue: 10,
-        duration: 100,
-        useNativeDriver: true,
-      }),
-      Animated.timing(shakeAnim, {
-        toValue: 0,
-        duration: 100,
-        useNativeDriver: true,
-      }),
-    ]).start();
+  // Handle reject
+  const handleReject = () => {
+    Alert.alert(
+      '거절 확인',
+      '이 기일러를 거절하시겠습니까? 다른 기일러를 찾게 됩니다.',
+      [
+        { text: '취소', style: 'cancel' },
+        {
+          text: '거절',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              setIsRejecting(true);
+              const result = await matchingService.rejectMatch(requestId, giller.id);
+
+              if (result.success) {
+                // Find another giller
+                setRetryCount((prev) => prev + 1);
+                await findGiller();
+              } else {
+                Alert.alert('오류', result.error || '거절 처리에 실패했습니다.');
+              }
+            } catch (err: any) {
+              Alert.alert('오류', err.message || '네트워크 오류가 발생했습니다.');
+            } finally {
+              setIsRejecting(false);
+            }
+          },
+        },
+      ]
+    );
   };
 
+  // Retry matching
   const handleRetry = () => {
-    startSearch();
+    setGiller(null);
+    setError(null);
+    setRetryCount(0);
+    findGiller();
   };
 
-  const handleChangeConditions = () => {
-    navigation.goBack();
+  // Cancel matching
+  const handleCancel = () => {
+    Alert.alert(
+      '매칭 취소',
+      '매칭을 취소하고 이전 화면으로 돌아가시겠습니까?',
+      [
+        { text: '아니오', style: 'cancel' },
+        {
+          text: '예',
+          style: 'destructive',
+          onPress: () => navigation.goBack(),
+        },
+      ]
+    );
   };
 
-  const handleSelectGiller = (match: GillerMatch) => {
-    navigation.navigate('RequestDetail', {
-      requestId,
-      gillerId: match.gillerId,
-    });
-  };
-
-  const progressWidth = progressAnim.interpolate({
-    inputRange: [0, 1],
-    outputRange: ['0%', '100%'],
-  });
+  if (error) {
+    return (
+      <View style={styles.container}>
+        <View style={styles.errorContainer}>
+          <Icon name="error-outline" size={64} color="#FF5252" />
+          <Text style={styles.errorTitle}>매칭 실패</Text>
+          <Text style={styles.errorMessage}>{error}</Text>
+          <View style={styles.errorButtonContainer}>
+            <Text style={styles.retryButton} onPress={handleRetry}>
+              다시 시도
+            </Text>
+            <Text style={styles.cancelButton} onPress={handleCancel}>
+              취소
+            </Text>
+          </View>
+        </View>
+      </View>
+    );
+  }
 
   if (loading) {
     return (
-      <View style={styles.loadingContainer}>
-        <Animated.View style={{ transform: [{ scale: pulseAnim }] }}>
-          <View style={styles.searchingIcon}>
-            <Text style={styles.searchingEmoji}>🔍</Text>
-          </View>
-        </Animated.View>
-
-        <Text style={styles.loadingText}>길러를 찾고 있어요...</Text>
-
-        <View style={styles.progressContainer}>
-          <View style={styles.progressBackground}>
-            <Animated.View
-              style={[
-                styles.progressBar,
-                { width: progressWidth },
-              ]}
-            />
-          </View>
-          <Text style={styles.timeText}>{timeRemaining}초</Text>
+      <View style={styles.container}>
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color="#00BCD4" />
+          <Text style={styles.loadingText}>기일러를 찾고 있습니다...</Text>
+          <Text style={styles.loadingSubtext}>
+            잠시만 기다려주세요 ({Math.floor(MATCHING_TIMEOUT / 1000)}초 내)
+          </Text>
+          {retryCount > 0 && (
+            <Text style={styles.retryCount}>재시도 횟수: {retryCount}</Text>
+          )}
         </View>
-
-        {timedOut && (
-          <View style={styles.timeoutContainer}>
-            <Text style={styles.timeoutEmoji}>⏰</Text>
-            <Text style={styles.timeoutText}>매칭 시간 초과</Text>
-            <Text style={styles.timeoutHint}>
-              조건에 맞는 길러를 찾지 못했어요
-            </Text>
-            {autoRetrying && (
-              <Text style={styles.timeoutHint}>잠시 후 자동으로 다시 찾고 있어요</Text>
-            )}
-          </View>
-        )}
+        <Text style={styles.cancelText} onPress={handleCancel}>
+          취소
+        </Text>
       </View>
     );
   }
@@ -268,263 +240,111 @@ export default function MatchingResultScreen({ navigation, route }: Props) {
   return (
     <View style={styles.container}>
       <View style={styles.header}>
-        <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
-          <Text style={styles.backButtonText}>←</Text>
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>매칭 결과</Text>
-        <View style={styles.headerSpacer} />
+        <Text style={styles.headerTitle}>매칭 완료!</Text>
+        <Text style={styles.headerSubtitle}>
+          기일러를 찾았습니다. 수락 또는 거절해주세요.
+        </Text>
       </View>
 
-      <ScrollView style={styles.content}>
-        {searching ? null : matches.length > 0 ? (
-          <Animated.View
-            style={[
-              styles.resultContainer,
-              {
-                opacity: fadeAnim,
-                transform: [{ scale: scaleAnim }],
-              },
-            ]}
-          >
-            <View style={styles.successBanner}>
-              <Text style={styles.successEmoji}>🎉</Text>
-              <Text style={styles.successTitle}>매칭 성공!</Text>
-              <Text style={styles.successSubtitle}>
-                {matches.length}명의 길러를 찾았어요
-              </Text>
-            </View>
-
-            {matches.map((match, index) => (
-              <GillerProfileCard
-                key={match.gillerId}
-                match={match}
-                index={index}
-                onPress={handleSelectGiller}
-              />
-            ))}
-          </Animated.View>
-        ) : (
-          <Animated.View
-            style={[
-              styles.failureContainer,
-              {
-                opacity: fadeAnim,
-                transform: [{ translateX: shakeAnim }],
-              },
-            ]}
-          >
-            <View style={styles.failureBanner}>
-              <Text style={styles.failureEmoji}>😢</Text>
-              <Text style={styles.failureTitle}>매칭 실패</Text>
-              <Text style={styles.failureSubtitle}>
-                {timedOut
-                  ? '시간 내에 조건에 맞는 길러를 찾지 못했어요'
-                  : '아직 조건에 맞는 길러가 없어요'}
-              </Text>
-              <Text style={styles.failureHint}>
-                조건을 변경하거나 나중에 다시 시도해주세요
-              </Text>
-            </View>
-
-            <TouchableOpacity
-              style={styles.retryButton}
-              onPress={handleRetry}
-            >
-              <Text style={styles.retryButtonText}>
-                {timedOut ? '다시 시도하기' : '다시 검색하기'}
-              </Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={styles.secondaryButton}
-              onPress={handleChangeConditions}
-            >
-              <Text style={styles.secondaryButtonText}>조건 변경하기</Text>
-            </TouchableOpacity>
-          </Animated.View>
-        )}
-      </ScrollView>
+      <Animated.View style={{ opacity: fadeAnim }}>
+        <GillerProfileCard
+          giller={giller}
+          onAccept={handleAccept}
+          onReject={handleReject}
+          isAccepting={isAccepting}
+          isRejecting={isRejecting}
+        />
+      </Animated.View>
     </View>
   );
-}
+};
 
 const styles = StyleSheet.create({
-  backButton: {
-    width: 40,
-  },
-  backButtonText: {
-    color: Colors.textPrimary,
-    fontSize: 24,
-  },
   container: {
-    backgroundColor: Colors.gray100,
     flex: 1,
-  },
-  content: {
-    flex: 1,
-    padding: Spacing.md,
-  },
-  failureBanner: {
-    alignItems: 'center',
-    backgroundColor: Colors.white,
-    borderRadius: BorderRadius.lg,
-    padding: Spacing.xl,
-  },
-  failureContainer: {
-    gap: Spacing.lg,
-  },
-  failureEmoji: {
-    fontSize: 64,
-    marginBottom: Spacing.md,
-  },
-  failureHint: {
-    color: Colors.textTertiary,
-    fontSize: Typography.fontSize.sm,
-    textAlign: 'center',
-  },
-  failureSubtitle: {
-    color: Colors.textSecondary,
-    fontSize: Typography.fontSize.base,
-    marginBottom: Spacing.sm,
-    textAlign: 'center',
-  },
-  failureTitle: {
-    color: Colors.textPrimary,
-    fontSize: Typography.fontSize['3xl'],
-    fontWeight: Typography.fontWeight.bold as any,
-    marginBottom: Spacing.sm,
+    backgroundColor: '#F5F5F5',
   },
   header: {
+    padding: 20,
     alignItems: 'center',
-    backgroundColor: Colors.white,
-    borderBottomColor: Colors.gray300,
-    borderBottomWidth: 1,
-    flexDirection: 'row',
-    paddingHorizontal: Spacing.md,
-    paddingVertical: Spacing.sm,
-  },
-  headerSpacer: {
-    width: 40,
   },
   headerTitle: {
-    color: Colors.textPrimary,
-    flex: 1,
-    fontSize: Typography.fontSize.xl,
-    fontWeight: Typography.fontWeight.bold as any,
+    fontSize: 28,
+    fontWeight: 'bold',
+    color: '#00BCD4',
+    marginBottom: 8,
+  },
+  headerSubtitle: {
+    fontSize: 14,
+    color: '#666',
     textAlign: 'center',
   },
   loadingContainer: {
-    alignItems: 'center',
-    backgroundColor: Colors.white,
     flex: 1,
-    gap: Spacing.md,
     justifyContent: 'center',
-    padding: Spacing.xl,
+    alignItems: 'center',
+    padding: 20,
   },
   loadingText: {
-    color: Colors.textPrimary,
-    fontSize: Typography.fontSize.lg,
-    fontWeight: Typography.fontWeight.semibold as any,
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: '#333',
+    marginTop: 20,
   },
-  progressBackground: {
-    backgroundColor: Colors.gray300,
-    borderRadius: 8,
+  loadingSubtext: {
+    fontSize: 14,
+    color: '#666',
+    marginTop: 8,
+  },
+  retryCount: {
+    fontSize: 12,
+    color: '#FF9800',
+    marginTop: 8,
+  },
+  cancelText: {
+    fontSize: 16,
+    color: '#666',
+    textAlign: 'center',
+    padding: 16,
+    textDecorationLine: 'underline',
+  },
+  errorContainer: {
     flex: 1,
-    height: 8,
-    overflow: 'hidden',
-  },
-  progressBar: {
-    backgroundColor: Colors.primary,
-    height: '100%',
-  },
-  progressContainer: {
+    justifyContent: 'center',
     alignItems: 'center',
-    flexDirection: 'row',
-    gap: Spacing.sm,
-    width: '80%',
+    padding: 20,
   },
-  resultContainer: {
-    gap: Spacing.md,
+  errorTitle: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    color: '#333',
+    marginTop: 20,
+  },
+  errorMessage: {
+    fontSize: 16,
+    color: '#666',
+    textAlign: 'center',
+    marginTop: 12,
+    marginBottom: 32,
+  },
+  errorButtonContainer: {
+    flexDirection: 'row',
+    gap: 16,
   },
   retryButton: {
-    alignItems: 'center',
-    backgroundColor: Colors.primary,
-    borderRadius: BorderRadius.md,
-    padding: Spacing.md,
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#fff',
+    backgroundColor: '#00BCD4',
+    paddingVertical: 12,
+    paddingHorizontal: 24,
+    borderRadius: 8,
   },
-  retryButtonText: {
-    color: Colors.white,
-    fontSize: Typography.fontSize.lg,
-    fontWeight: Typography.fontWeight.bold as any,
-  },
-  secondaryButton: {
-    alignItems: 'center',
-    borderColor: Colors.gray300,
-    borderRadius: BorderRadius.md,
-    borderWidth: 1,
-    padding: Spacing.md,
-  },
-  secondaryButtonText: {
-    color: Colors.textSecondary,
-    fontSize: Typography.fontSize.base,
-    fontWeight: Typography.fontWeight.semibold as any,
-  },
-  searchingEmoji: {
-    fontSize: 40,
-  },
-  searchingIcon: {
-    alignItems: 'center',
-    backgroundColor: Colors.primaryLight,
-    borderRadius: 40,
-    height: 80,
-    justifyContent: 'center',
-    marginBottom: Spacing.md,
-    width: 80,
-  },
-  successBanner: {
-    alignItems: 'center',
-    backgroundColor: Colors.success,
-    borderRadius: BorderRadius.lg,
-    marginBottom: Spacing.md,
-    padding: Spacing.lg,
-  },
-  successEmoji: {
-    fontSize: 48,
-    marginBottom: Spacing.sm,
-  },
-  successSubtitle: {
-    color: Colors.white,
-    fontSize: Typography.fontSize.base,
-  },
-  successTitle: {
-    color: Colors.white,
-    fontSize: Typography.fontSize['3xl'],
-    fontWeight: Typography.fontWeight.bold as any,
-    marginBottom: Spacing.xs,
-  },
-  timeText: {
-    color: Colors.textSecondary,
-    fontSize: Typography.fontSize.sm,
-    fontWeight: Typography.fontWeight.medium as any,
-    minWidth: 40,
-    textAlign: 'right',
-  },
-  timeoutContainer: {
-    alignItems: 'center',
-    marginTop: Spacing.lg,
-  },
-  timeoutEmoji: {
-    fontSize: 48,
-    marginBottom: Spacing.sm,
-  },
-  timeoutHint: {
-    color: Colors.textTertiary,
-    fontSize: Typography.fontSize.sm,
-    marginTop: Spacing.sm,
-    textAlign: 'center',
-  },
-  timeoutText: {
-    color: Colors.textPrimary,
-    fontSize: Typography.fontSize.xl,
-    fontWeight: Typography.fontWeight.bold as any,
+  cancelButton: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#666',
+    paddingVertical: 12,
+    paddingHorizontal: 24,
   },
 });

@@ -1,16 +1,19 @@
-import React from 'react';
-import { View, Text, StyleSheet, ViewStyle } from 'react-native';
+import React, { useMemo } from 'react';
+import { View, Text, StyleSheet, ViewStyle, Animated } from 'react-native';
 import { Colors, Spacing, BorderRadius, Typography } from '../../theme';
+import { Ionicons } from '@expo/vector-icons';
 
 interface Station {
   name: string;
   line: string;
   lineColor: string;
+  estimatedTime?: number; // 분 단위
 }
 
 interface RouteVisualizationProps {
   stations: Station[];
   showTransferInfo?: boolean;
+  showEstimatedTime?: boolean;
   style?: ViewStyle;
 }
 
@@ -32,8 +35,20 @@ const LINE_COLORS: { [key: string]: string } = {
 export default function RouteVisualization({
   stations,
   showTransferInfo = true,
+  showEstimatedTime = true,
   style,
 }: RouteVisualizationProps) {
+  // 애니메이션 값 초기화
+  const fadeAnim = React.useRef(new Animated.Value(0)).current;
+  
+  React.useEffect(() => {
+    Animated.timing(fadeAnim, {
+      toValue: 1,
+      duration: 600,
+      useNativeDriver: true,
+    }).start();
+  }, []);
+
   const getLineColor = (line: string): string => {
     return LINE_COLORS[line] || Colors.gray500;
   };
@@ -50,8 +65,25 @@ export default function RouteVisualization({
     );
   };
 
+  // 총 예상 시간 계산 (분)
+  const totalEstimatedTime = useMemo(() => {
+    if (!showEstimatedTime) return 0;
+    return stations.reduce((sum, station) => sum + (station.estimatedTime || 0), 0);
+  }, [stations, showEstimatedTime]);
+
   return (
-    <View style={[styles.container, style]}>
+    <Animated.View style={[styles.container, style, { opacity: fadeAnim }]}>
+      {/* 총 예상 시간 헤더 */}
+      {showEstimatedTime && totalEstimatedTime > 0 && (
+        <View style={styles.header}>
+          <Ionicons name="time-outline" size={20} color={Colors.primary} />
+          <Text style={styles.headerTitle}>예상 소요 시간</Text>
+          <View style={styles.timeBadge}>
+            <Text style={styles.timeText}>{totalEstimatedTime}분</Text>
+          </View>
+        </View>
+      )}
+
       <View style={styles.routeContainer}>
         {stations.map((station, index) => {
           const isTransfer = isTransferStation(index);
@@ -88,6 +120,12 @@ export default function RouteVisualization({
                   >
                     <Text style={styles.lineText}>{station.line}</Text>
                   </View>
+                  {showEstimatedTime && station.estimatedTime && (
+                    <View style={styles.timeTag}>
+                      <Ionicons name="time" size={12} color={Colors.gray500} />
+                      <Text style={styles.timeTagText}>{station.estimatedTime}분</Text>
+                    </View>
+                  )}
                 </View>
               </View>
               {!isLast && (
@@ -104,11 +142,41 @@ export default function RouteVisualization({
           );
         })}
       </View>
-    </View>
+    </Animated.View>
   );
 }
 
 const styles = StyleSheet.create({
+  container: {
+    paddingVertical: Spacing.md,
+  },
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: `${Colors.primary}15`, // 15% opacity
+    borderRadius: BorderRadius.sm,
+    paddingHorizontal: Spacing.md,
+    paddingVertical: Spacing.sm,
+    marginBottom: Spacing.md,
+    gap: Spacing.sm,
+  },
+  headerTitle: {
+    color: Colors.primary,
+    fontSize: Typography.fontSize.sm,
+    fontWeight: Typography.fontWeight.semibold as any,
+    flex: 1,
+  },
+  timeBadge: {
+    backgroundColor: Colors.primary,
+    borderRadius: BorderRadius.sm,
+    paddingHorizontal: Spacing.md,
+    paddingVertical: Spacing.xs,
+  },
+  timeText: {
+    color: Colors.white,
+    fontSize: Typography.fontSize.sm,
+    fontWeight: Typography.fontWeight.bold as any,
+  },
   connector: {
     bottom: -20,
     left: 47,
@@ -122,9 +190,6 @@ const styles = StyleSheet.create({
     height: '100%',
     width: 2,
   },
-  container: {
-    paddingVertical: Spacing.md,
-  },
   lineBadge: {
     borderRadius: 4,
     paddingHorizontal: 8,
@@ -133,6 +198,8 @@ const styles = StyleSheet.create({
   lineInfo: {
     flexDirection: 'row',
     gap: Spacing.xs,
+    alignItems: 'center',
+    flexWrap: 'wrap',
   },
   lineText: {
     color: Colors.white,
@@ -173,6 +240,20 @@ const styles = StyleSheet.create({
     fontSize: Typography.fontSize.base,
     fontWeight: Typography.fontWeight.semibold as any,
     marginBottom: 4,
+  },
+  timeTag: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 2,
+    backgroundColor: Colors.gray50,
+    borderRadius: 4,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+  },
+  timeTagText: {
+    color: Colors.gray600,
+    fontSize: Typography.fontSize.xs,
+    fontWeight: Typography.fontWeight.medium as any,
   },
   transferBadge: {
     alignItems: 'center',

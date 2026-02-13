@@ -458,3 +458,68 @@ export async function getGllerDeliveries(gllerId: string, status?: DeliveryStatu
     return [];
   }
 }
+
+/**
+ * Mark delivery as dropped at locker
+ * 길러가 사물함에 물품을 보관한 후 호출
+ * @param deliveryId 배송 ID
+ * @param gillerId 길러 ID
+ * @param lockerId 사물함 ID
+ * @param reservationId 예약 ID
+ * @returns 성공 여부
+ */
+export async function markAsDroppedAtLocker(
+  deliveryId: string,
+  gillerId: string,
+  lockerId: string,
+  reservationId: string
+): Promise<{ success: boolean; message: string }> {
+  try {
+    const deliveryRef = doc(db, 'deliveries', deliveryId);
+    const deliveryDoc = await getDoc(deliveryRef);
+
+    if (!deliveryDoc.exists()) {
+      return { success: false, message: '배송 정보를 찾을 수 없습니다.' };
+    }
+
+    const delivery = deliveryDoc.data();
+
+    if (delivery.gillerId !== gillerId) {
+      return { success: false, message: '권한이 없습니다.' };
+    }
+
+    // 배송 상태 업데이트
+    await updateDoc(deliveryRef, {
+      status: 'at_locker' as DeliveryStatus,
+      lockerId,
+      reservationId,
+      'tracking.events': [
+        ...delivery.tracking.events,
+        {
+          type: 'dropped_at_locker',
+          timestamp: new Date(),
+          description: '사물함에 물품을 보관했습니다',
+          actorId: gillerId,
+        },
+      ],
+      'tracking.progress': 60,
+      updatedAt: serverTimestamp(),
+    });
+
+    // 요청 상태도 업데이트
+    if (delivery.requestId) {
+      const requestRef = doc(db, 'requests', delivery.requestId);
+      await updateDoc(requestRef, {
+        status: 'at_locker' as DeliveryStatus,
+        lockerId,
+        reservationId,
+        updatedAt: serverTimestamp(),
+      });
+    }
+
+    return { success: true, message: '사물함 인계가 완료되었습니다.' };
+  } catch (error) {
+    console.error('Error marking as dropped at locker:', error);
+    return { success: false, message: '사물함 인계 처리에 실패했습니다.' };
+  }
+}

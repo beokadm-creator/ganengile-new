@@ -22,6 +22,9 @@ describe('Payment Service', () => {
   const createdPaymentIds: string[] = [];
 
   beforeEach(async () => {
+    // Clear all mock data
+    global.__clearMockFirestore();
+
     // Cleanup: Delete test payments
     const snapshot = await getDocs(
       query(
@@ -30,7 +33,7 @@ describe('Payment Service', () => {
       )
     );
 
-    const deletePromises = snapshot.docs.map(doc => deleteDoc(doc.ref));
+    const deletePromises = snapshot.docs.map(d => deleteDoc(d.ref));
     await Promise.all(deletePromises);
   });
 
@@ -63,7 +66,7 @@ describe('Payment Service', () => {
 
       // Verify payment was saved
       const paymentDoc = await getDoc(doc(db, 'payments', paymentId));
-      expect(paymentDoc.exists()).toBe(true);
+      expect(paymentDoc.exists).toBe(true);
 
       const paymentData = paymentDoc.data();
       expect(paymentData?.userId).toBe(testUserId);
@@ -109,7 +112,7 @@ describe('Payment Service', () => {
 
       // Verify payment was saved
       const paymentDoc = await getDoc(doc(db, 'payments', paymentId));
-      expect(paymentDoc.exists()).toBe(true);
+      expect(paymentDoc.exists).toBe(true);
 
       const paymentData = paymentDoc.data();
       expect(paymentData?.userId).toBe(testUserId);

@@ -3,15 +3,35 @@
  * 로그인 화면 - Email/Password 및 Google 로그인
  */
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, TextInput, TouchableOpacity, ActivityIndicator, Alert } from 'react-native';
 import { signInWithEmailAndPassword } from 'firebase/auth';
 import { auth } from '../../services/firebase';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { Colors, Typography, Spacing, BorderRadius } from '../../theme';
 
 export default function LoginScreen({ navigation }: any) {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
+  const [saveId, setSaveId] = useState(false);
+
+  // 앱 시작 시 저장된 ID 불러오기
+  useEffect(() => {
+    loadSavedEmail();
+  }, []);
+
+  const loadSavedEmail = async () => {
+    try {
+      const savedEmail = await AsyncStorage.getItem('@user_email');
+      if (savedEmail) {
+        setEmail(savedEmail);
+        setSaveId(true);
+      }
+    } catch (error) {
+      console.error('Error loading saved email:', error);
+    }
+  };
 
   const handleLogin = async () => {
     if (!email || !password) {
@@ -22,6 +42,15 @@ export default function LoginScreen({ navigation }: any) {
     setLoading(true);
     try {
       await signInWithEmailAndPassword(auth, email, password);
+
+      // ID 저장 체크박스가 선택되어 있으면 저장
+      if (saveId) {
+        await AsyncStorage.setItem('@user_email', email);
+      } else {
+        // 체크 해제되면 저장된 ID 삭제
+        await AsyncStorage.removeItem('@user_email');
+      }
+
       // Auth state change will be handled by AppNavigator
     } catch (error: any) {
       let errorMessage = '로그인에 실패했습니다.';
@@ -74,6 +103,17 @@ export default function LoginScreen({ navigation }: any) {
             onChangeText={setPassword}
             secureTextEntry
           />
+
+          <TouchableOpacity
+            style={styles.saveIdContainer}
+            onPress={() => setSaveId(!saveId)}
+            activeOpacity={0.7}
+          >
+            <View style={[styles.checkbox, saveId && styles.checkboxChecked]}>
+              {saveId && <Text style={styles.checkmark}>✓</Text>}
+            </View>
+            <Text style={styles.saveIdLabel}>이메일 저장</Text>
+          </TouchableOpacity>
 
           <TouchableOpacity
             style={[styles.button, styles.loginButton]}
@@ -159,5 +199,35 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     marginBottom: 40,
     textAlign: 'center',
+  },
+  saveIdContainer: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    marginBottom: 16,
+    marginTop: 8,
+  },
+  checkbox: {
+    alignItems: 'center',
+    backgroundColor: '#fff',
+    borderColor: '#ddd',
+    borderRadius: 4,
+    borderWidth: 2,
+    height: 24,
+    justifyContent: 'center',
+    marginRight: 8,
+    width: 24,
+  },
+  checkboxChecked: {
+    backgroundColor: '#4CAF50',
+    borderColor: '#4CAF50',
+  },
+  checkmark: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: 'bold',
+  },
+  saveIdLabel: {
+    color: '#666',
+    fontSize: 14,
   },
 });

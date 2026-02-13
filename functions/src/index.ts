@@ -35,6 +35,8 @@ import {
   CompleteMatchData,
   CompleteMatchResult,
 } from './types';
+import { taxInvoiceScheduler } from './scheduled/tax-invoice-scheduler';
+import { gillerSettlementScheduler } from './scheduled/settlement-scheduler';
 
 // Initialize Firebase Admin
 admin.initializeApp();
@@ -1695,3 +1697,43 @@ export const completeMatch = functions.https.onCall(
     }
   }
 );
+
+// ==================== P3: B2B Scheduled Functions ====================
+
+/**
+ * Scheduled Function: Tax Invoice Scheduler
+ * 매월 1일 00:00에 실행되어 B2B 계약 기업의 세금계산서를 자동 발행합니다.
+ */
+export const scheduledTaxInvoice = functions.pubsub
+  .schedule('0 0 1 * *')
+  .timeZone('Asia/Seoul')
+  .onRun(async (context) => {
+    console.warn('🧾 [Scheduled Tax Invoice] Triggered at:', new Date().toISOString());
+    try {
+      const result = await taxInvoiceScheduler();
+      console.warn('✅ Tax invoice scheduler completed:', result);
+      return null;
+    } catch (error) {
+      console.error('❌ Tax invoice scheduler error:', error);
+      return null;
+    }
+  });
+
+/**
+ * Scheduled Function: Giller Settlement Scheduler
+ * 매월 5일 00:00에 실행되어 B2B 길러의 월간 정산을 자동 처리합니다.
+ */
+export const scheduledGillerSettlement = functions.pubsub
+  .schedule('0 0 5 * *')
+  .timeZone('Asia/Seoul')
+  .onRun(async (context) => {
+    console.warn('💰 [Scheduled Giller Settlement] Triggered at:', new Date().toISOString());
+    try {
+      const result = await gillerSettlementScheduler();
+      console.warn('✅ Giller settlement scheduler completed:', result);
+      return null;
+    } catch (error) {
+      console.error('❌ Giller settlement scheduler error:', error);
+      return null;
+    }
+  });

@@ -5,6 +5,7 @@ import {
   StyleSheet,
   TouchableOpacity,
   Animated,
+  Image,
 } from 'react-native';
 import RatingStars from '../common/RatingStars';
 import { Colors, Spacing, BorderRadius, Typography } from '../../theme';
@@ -18,6 +19,10 @@ export interface GillerMatch {
   hasExpress: boolean;
   transferCount: number;
   reasons: string[];
+  rating?: number;
+  completedDeliveries?: number;
+  estimatedFee?: number;
+  profileImage?: string;
 }
 
 interface Props {
@@ -84,10 +89,37 @@ const GillerProfileCard: React.FC<Props> = ({ match, index, onPress }) => {
         </View>
       </View>
 
-      <View style={styles.profileInfo}>
-        <Text style={styles.gillerName}>{match.gillerName}</Text>
-        <View style={styles.rating}>
-          <RatingStars rating={4.5} size={14} />
+      <View style={styles.profileSection}>
+        {/* Profile Image */}
+        <View style={styles.profileImageContainer}>
+          {match.profileImage ? (
+            <Image
+              source={{ uri: match.profileImage }}
+              style={styles.profileImage}
+            />
+          ) : (
+            <View style={styles.defaultAvatar}>
+              <Text style={styles.defaultAvatarText}>
+                {match.gillerName.charAt(0)}
+              </Text>
+            </View>
+          )}
+        </View>
+
+        <View style={styles.profileInfo}>
+          <View style={styles.nameRow}>
+            <Text style={styles.gillerName}>{match.gillerName}</Text>
+            {match.completedDeliveries !== undefined && (
+              <View style={styles.completedBadge}>
+                <Text style={styles.completedText}>
+                  {match.completedDeliveries}건 완료
+                </Text>
+              </View>
+            )}
+          </View>
+          <View style={styles.rating}>
+            <RatingStars rating={match.rating || 4.5} size={14} />
+          </View>
         </View>
       </View>
 
@@ -104,6 +136,12 @@ const GillerProfileCard: React.FC<Props> = ({ match, index, onPress }) => {
           <View style={styles.infoItem}>
             <Text style={styles.infoEmoji}>🚀</Text>
             <Text style={styles.infoText}>급행</Text>
+          </View>
+        )}
+        {match.estimatedFee !== undefined && (
+          <View style={styles.infoItem}>
+            <Text style={styles.infoEmoji}>💰</Text>
+            <Text style={styles.infoText}>{match.estimatedFee.toLocaleString()}원</Text>
           </View>
         )}
       </View>
@@ -170,18 +208,62 @@ const styles = StyleSheet.create({
     fontSize: Typography.fontSize.sm,
     fontWeight: Typography.fontWeight.bold as any,
   },
-  profileInfo: {
+  profileSection: {
+    flexDirection: 'row',
+    alignItems: 'center',
     marginBottom: Spacing.sm,
+    gap: Spacing.sm,
+  },
+  profileImageContainer: {
+    marginRight: Spacing.sm,
+  },
+  profileImage: {
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+  },
+  defaultAvatar: {
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    backgroundColor: Colors.primaryLight,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  defaultAvatarText: {
+    fontSize: 24,
+    fontWeight: Typography.fontWeight.bold as any,
+    color: Colors.primary,
+  },
+  profileInfo: {
+    flex: 1,
+  },
+  nameRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.xs,
+    flexWrap: 'wrap',
   },
   gillerName: {
     fontSize: Typography.fontSize.lg,
     fontWeight: Typography.fontWeight.bold as any,
     color: Colors.textPrimary,
-    marginBottom: Spacing.xs,
+  },
+  completedBadge: {
+    backgroundColor: Colors.success,
+    paddingHorizontal: Spacing.sm,
+    paddingVertical: 2,
+    borderRadius: 8,
+  },
+  completedText: {
+    color: Colors.white,
+    fontSize: Typography.fontSize.xs,
+    fontWeight: Typography.fontWeight.semibold as any,
   },
   rating: {
     flexDirection: 'row',
     alignItems: 'center',
+    marginTop: 2,
   },
   travelInfo: {
     flexDirection: 'row',

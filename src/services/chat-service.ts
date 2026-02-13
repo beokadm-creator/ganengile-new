@@ -120,7 +120,7 @@ export class ChatService {
   /**
    * 새 채팅방 생성
    */
-  async createChatRoom(data: CreateChatRoomData): Promise<ChatRoom> {
+  async createChatRoom(data: CreateChatRoomData, status: 'pending' | 'active' = 'pending'): Promise<ChatRoom> {
     const chatRoomData = {
       participants: {
         user1: {
@@ -136,11 +136,13 @@ export class ChatService {
       },
       requestId: data.requestId || null,
       matchId: data.matchId || null,
+      requestInfo: data.requestInfo || null,
       unreadCounts: {
         user1: 0,
         user2: 0,
       },
-      isActive: true,
+      status,
+      isActive: status === 'active',  // pending면 false, active면 true
       createdAt: serverTimestamp(),
       updatedAt: serverTimestamp(),
     };
@@ -176,9 +178,9 @@ export class ChatService {
     const chatRoomRef = doc(db, CHAT_ROOMS_COLLECTION, data.chatRoomId);
     await updateDoc(chatRoomRef, {
       lastMessage: {
-        content: data.content,
+        text: data.content,
         senderId: this.userId,
-        createdAt: serverTimestamp(),
+        timestamp: serverTimestamp(),
       },
       updatedAt: serverTimestamp(),
       [`unreadCounts.user${this.getUserIdPosition(data.chatRoomId)}`]: increment(1),
@@ -211,6 +213,32 @@ export class ChatService {
 
     await updateDoc(chatRoomRef, {
       isActive: false,
+      status: 'closed',
+      updatedAt: serverTimestamp(),
+    });
+  }
+
+  /**
+   * 채팅방 나가기
+   */
+  async leaveChatRoom(chatRoomId: string): Promise<void> {
+    const chatRoomRef = doc(db, CHAT_ROOMS_COLLECTION, chatRoomId);
+
+    await updateDoc(chatRoomRef, {
+      status: 'closed',
+      updatedAt: serverTimestamp(),
+    });
+  }
+
+  /**
+   * 매칭 완료 시 채팅방 상태를 active로 변경
+   */
+  async activateChatRoom(chatRoomId: string): Promise<void> {
+    const chatRoomRef = doc(db, CHAT_ROOMS_COLLECTION, chatRoomId);
+
+    await updateDoc(chatRoomRef, {
+      status: 'active',
+      isActive: true,
       updatedAt: serverTimestamp(),
     });
   }

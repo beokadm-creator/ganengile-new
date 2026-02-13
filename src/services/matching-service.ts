@@ -278,21 +278,37 @@ export async function processMatchingForRequest(
 export async function getMatchingResults(requestId: string) {
   const matches = await findMatchesForRequest(requestId, 10);
 
-  return matches.map((match, index) => ({
-    rank: index + 1,
-    gillerId: match.gillerId,
-    gillerName: match.gillerName,
-    score: match.totalScore,
-    routeMatchScore: match.routeMatchScore,
-    timeMatchScore: match.timeMatchScore,
-    ratingScore: match.ratingScore,
-    completionRateScore: match.completionRateScore,
-    travelTime: Math.round(match.routeDetails.travelTime / 60),
-    hasExpress: match.routeDetails.isExpressAvailable,
-    transferCount: match.routeDetails.transferCount,
-    congestion: match.routeDetails.congestionLevel,
-    reasons: match.reasons,
-  }));
+  // Fetch request to get fee information
+  const requestDoc = await getDoc(doc(db, 'requests', requestId));
+  const requestData = requestDoc.data();
+  const baseFee = requestData?.fee?.totalFee || 3000;
+
+  return await Promise.all(
+    matches.map(async (match, index) => {
+      // Fetch user info for rating and completed deliveries
+      const userInfo = await fetchUserInfo(match.gillerId);
+
+      return {
+        rank: index + 1,
+        gillerId: match.gillerId,
+        gillerName: match.gillerName,
+        score: match.totalScore,
+        routeMatchScore: match.routeMatchScore,
+        timeMatchScore: match.timeMatchScore,
+        ratingScore: match.ratingScore,
+        completionRateScore: match.completionRateScore,
+        travelTime: Math.round(match.routeDetails.travelTime / 60),
+        hasExpress: match.routeDetails.isExpressAvailable,
+        transferCount: match.routeDetails.transferCount,
+        congestion: match.routeDetails.congestionLevel,
+        reasons: match.reasons,
+        rating: userInfo.rating,
+        completedDeliveries: userInfo.completedDeliveries,
+        estimatedFee: Math.round(baseFee * (1 + (index * 0.1))), // Slightly higher fee for lower ranked matches
+        profileImage: undefined, // TODO: Add profile image to user data
+      };
+    })
+  );
 }
 
 /**
@@ -402,5 +418,98 @@ export async function declineRequest(
   } catch (error) {
     console.error('Error declining request:', error);
     return { success: false, message: '거절에 실패했습니다.' };
+  }
+}
+
+/**
+ * Find a single best giller for a request (for UI display)
+ * @param requestId Request ID
+ * @returns Giller info or error
+ */
+export async function findGiller(requestId: string): Promise<{
+  success: boolean;
+  data?: {
+    giller: {
+      id: string;
+      name: string;
+      profileImage?: string;
+      rating: number;
+      completedDeliveries: number;
+      estimatedTime?: number;
+      fee?: number;
+    };
+  };
+  error?: string;
+}> {
+  try {
+    const matches = await getMatchingResults(requestId);
+
+    if (matches.length === 0) {
+      return { success: false, error: '매칭 가능한 기일러를 찾을 수 없습니다.' };
+    }
+
+    // Return the best match (first in array is highest ranked)
+    const bestMatch = matches[0];
+
+    // Calculate estimated time based on route match score
+    // Higher score = better route match = less time
+    const baseTime = 20; // 20 minutes base time
+    const estimatedTime = baseTime - Math.round((bestMatch.routeMatchScore / 100) * 10);
+
+    return {
+      success: true,
+      data: {
+        giller: {
+          id: bestMatch.gillerId,
+          name: bestMatch.gillerName,
+          rating: bestMatch.rating,
+          completedDeliveries: bestMatch.completedDeliveries,
+          estimatedTime,
+          fee: bestMatch.estimatedFee,
+          profileImage: bestMatch.profileImage,
+        },
+      },
+    };
+  } catch (error: any) {
+    console.error('Error finding giller:', error);
+    return { success: false, error: error.message || '기일러 찾기에 실패했습니다.' };
+  }
+}
+
+/**
+ * Accept a match (giller accepts request)
+ * @param requestId Request ID
+ * @param gillerId Giller ID
+ * @returns Success status
+ */
+export async function acceptMatch(
+  requestId: string,
+  gillerId: string
+): Promise<{ success: boolean; error?: string }> {
+  try {
+    const result = await acceptRequest(requestId, gillerId);
+    return { success: result.success, error: result.success ? undefined : result.message };
+  } catch (error: any) {
+    console.error('Error accepting match:', error);
+    return { success: false, error: error.message || '매칭 수락에 실패했습니다.' };
+  }
+}
+
+/**
+ * Reject a match (giller declines request)
+ * @param requestId Request ID
+ * @param gillerId Giller ID
+ * @returns Success status
+ */
+export async function rejectMatch(
+  requestId: string,
+  gillerId: string
+): Promise<{ success: boolean; error?: string }> {
+  try {
+    const result = await declineRequest(requestId, gillerId);
+    return { success: result.success, error: result.success ? undefined : result.message };
+  } catch (error: any) {
+    console.error('Error rejecting match:', error);
+    return { success: false, error: error.message || '매칭 거절에 실패했습니다.' };
   }
 }

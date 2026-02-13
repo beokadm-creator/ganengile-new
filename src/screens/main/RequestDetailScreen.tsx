@@ -186,7 +186,7 @@ export default function RequestDetailScreen({ navigation, route }: Props) {
       <ScrollView style={styles.content}>
         {/* Status Badge */}
         <View style={[styles.statusBanner, { backgroundColor: getStatusColor(detailView.status) }]}>
-          <Text style={styles.statusText}>{getStatusText(detailView.status as RequestStatus)}</Text>
+          <Text style={styles.statusText}>{getStatusText(detailView.status)}</Text>
         </View>
 
         {/* Route Info */}

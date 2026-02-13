@@ -35,9 +35,17 @@ export const Colors = {
 
   // Functional
   success: '#4CAF50',
+  successLight: '#C8E6C9',
+  successDark: '#388E3C',
   warning: '#FF9800',
+  warningLight: '#FFE0B2',
+  warningDark: '#F57C00',
   error: '#F44336',
+  errorLight: '#FFCDD2',
+  errorDark: '#D32F2F',
   info: '#00BCD4',
+  infoLight: '#B2EBF2',
+  infoDark: '#0097A7',
 
   // Overlay
   overlay: 'rgba(0, 0, 0, 0.5)' as const,

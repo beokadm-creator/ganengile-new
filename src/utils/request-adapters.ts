@@ -1,5 +1,6 @@
 import { Timestamp } from 'firebase/firestore';
 import type { Request } from '../types/request';
+import { RequestStatus } from '../types/request';
 
 export interface TrackingEvent {
   type: string;
@@ -23,7 +24,7 @@ export interface TrackingModel {
 }
 
 export interface RequestDetailView {
-  status: string;
+  status: RequestStatus;
   pickupStation: { stationName: string; line: string };
   deliveryStation: { stationName: string; line: string };
   packageInfo: { size: string; weight: string | number; description?: string };

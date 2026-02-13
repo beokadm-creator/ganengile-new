@@ -1,6 +1,7 @@
 /**
  * Chat Types
  * 채팅 및 알림 관련 타입 정의
+ * 당근마켓 스타일 채팅 시스템
  */
 
 import { Timestamp } from 'firebase/firestore';
@@ -21,6 +22,25 @@ export enum MessageReadStatus {
   SENT = 'sent',         // 전송됨
   DELIVERED = 'delivered', // 배송됨
   READ = 'read',         // 읽음
+}
+
+/**
+ * 채팅방 상태 (당근마켓 스타일)
+ */
+export enum ChatRoomStatus {
+  PENDING = 'pending',   // 매칭 전 (협의중)
+  ACTIVE = 'active',     // 매칭 완료, 채팅 진행중
+  MATCHED = 'matched',   // 매칭 완료
+  CLOSED = 'closed',     // 종료됨
+}
+
+/**
+ * 배송 요청 정보 (당근마켓 상품 정보 스타일)
+ */
+export interface RequestInfo {
+  from: string;
+  to: string;
+  urgency: string;
 }
 
 /**
@@ -74,33 +94,31 @@ export interface ChatParticipant {
 export interface ChatRoom {
   chatRoomId: string;
 
-  // 참여자
   participants: {
     user1: ChatParticipant;
     user2: ChatParticipant;
   };
 
-  // 관련 요청 ID (배송 요청과 연결)
   requestId?: string;
   matchId?: string;
 
-  // 마지막 메시지 (캐싱용)
+  requestInfo?: RequestInfo;
+
   lastMessage?: {
-    content: string;
+    text: string;
     senderId: string;
-    createdAt: Timestamp;
+    timestamp: Timestamp;
   };
 
-  // 읽지 않은 메시지 수
   unreadCounts: {
     user1: number;
     user2: number;
   };
 
-  // 채팅방 상태
-  isActive: boolean;  // false면 채팅방 종료 (배송 완료 등)
+  status?: ChatRoomStatus;
 
-  // 생성/업데이트 시간
+  isActive: boolean;
+
   createdAt: Timestamp;
   updatedAt: Timestamp;
 }
@@ -121,6 +139,7 @@ export interface CreateChatRoomData {
   };
   requestId?: string;
   matchId?: string;
+  requestInfo?: RequestInfo;
 }
 
 /**
