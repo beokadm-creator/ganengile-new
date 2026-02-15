@@ -11,7 +11,7 @@ import {
   getDoc,
   serverTimestamp,
 } from 'firebase/firestore';
-import { db } from './firebase-service';
+import { db } from './firebase';
 import type { LocationData } from './location-service';
 
 export interface PickupVerificationData {

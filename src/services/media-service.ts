@@ -14,7 +14,7 @@
 import * as ImagePicker from 'expo-image-picker';
 import * as FileSystem from 'expo-file-system';
 import { getStorage, ref, uploadBytesResumable, getDownloadURL, deleteObject } from 'firebase/storage';
-import { firebaseApp } from './firebase-service';
+import { firebaseApp } from './firebase';
 
 export interface MediaUploadResult {
   url: string;

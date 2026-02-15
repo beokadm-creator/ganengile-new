@@ -13,6 +13,9 @@ import {
   ActivityIndicator,
 } from 'react-native';
 import { StackNavigationProp } from '@react-navigation/stack';
+import { auth, db } from '../../services/firebase';
+import { collection, query, where, orderBy, limit, getDocs, Timestamp } from 'firebase/firestore';
+import { b2bFirestoreService } from '../../services/b2b-firestore-service';
 import { Colors, Typography, Spacing, BorderRadius } from '../../theme';
 
 type NavigationProp = StackNavigationProp<any>;
@@ -43,53 +46,18 @@ interface MonthlyEarnings {
   progressToNext?: number;
 }
 
-// TODO: Firebase 연동 후 실제 데이터 사용
-const dummyDeliveries: GillerDelivery[] = [
-  {
-    id: '1',
-    requestId: 'req-001',
-    pickupStation: '서울역',
-    deliveryStation: '강남역',
-    status: 'in_progress',
-    fee: 5000,
-    createdAt: '2026-02-12 14:30',
-  },
-  {
-    id: '2',
-    requestId: 'req-002',
-    pickupStation: '역삼역',
-    deliveryStation: '선릉역',
-    status: 'completed',
-    fee: 4000,
-    createdAt: '2026-02-12 10:15',
-  },
-  {
-    id: '3',
-    requestId: 'req-003',
-    pickupStation: '삼성역',
-    deliveryStation: '종로3가역',
-    status: 'completed',
-    fee: 6000,
-    createdAt: '2026-02-11 16:45',
-  },
-];
-
-const dummyEarnings: MonthlyEarnings = {
-  totalDeliveries: 67,
-  totalEarnings: 335000,
-  tierBonus: 33500,
-  activityBonus: 50000,
-  qualityBonus: 30000,
-  netEarnings: 415355,
-  currentTier: 'gold',
-  nextTier: 'platinum',
-  progressToNext: 83,
-};
-
 export default function B2BGillerScreen({ navigation }: Props) {
   const [loading, setLoading] = useState(true);
-  const [deliveries, setDeliveries] = useState<GillerDelivery[]>(dummyDeliveries);
-  const [earnings, setEarnings] = useState<MonthlyEarnings>(dummyEarnings);
+  const [deliveries, setDeliveries] = useState<GillerDelivery[]>([]);
+  const [earnings, setEarnings] = useState<MonthlyEarnings>({
+    totalDeliveries: 0,
+    totalEarnings: 0,
+    tierBonus: 0,
+    activityBonus: 0,
+    qualityBonus: 0,
+    netEarnings: 0,
+    currentTier: 'silver',
+  });
 
   useEffect(() => {
     loadGillerData();
@@ -97,9 +65,65 @@ export default function B2BGillerScreen({ navigation }: Props) {
 
   const loadGillerData = async () => {
     try {
-      // TODO: Firebase Firestore에서 데이터 가져오기
-      // const deliveriesData = await getGillerDeliveries();
-      // const earningsData = await getGillerEarnings();
+      const currentUser = auth.currentUser;
+      if (!currentUser) {
+        console.error('No authenticated user');
+        setLoading(false);
+        return;
+      }
+
+      const gillerId = currentUser.uid;
+
+      // 1. 최근 배송 내역 가져오기
+      const deliveriesQuery = query(
+        collection(db, 'b2b_deliveries'),
+        where('gillerId', '==', gillerId),
+        orderBy('createdAt', 'desc'),
+        limit(10)
+      );
+
+      const deliveriesSnapshot = await getDocs(deliveriesQuery);
+      const deliveriesData: GillerDelivery[] = [];
+
+      deliveriesSnapshot.forEach((doc) => {
+        const data = doc.data();
+        deliveriesData.push({
+          id: doc.id,
+          requestId: data.requestId || '',
+          pickupStation: data.pickupStation || '',
+          deliveryStation: data.deliveryStation || '',
+          status: data.status || 'pending',
+          fee: data.fee || 0,
+          createdAt: data.createdAt?.toDate?.().toISOString() || new Date().toISOString(),
+        });
+      });
+
+      setDeliveries(deliveriesData);
+
+      // 2. 월간 수익 계산
+      const { year, month } = b2bFirestoreService.getCurrentYearMonth();
+      const stats = await b2bFirestoreService.getMonthlyStats(gillerId, year, month);
+
+      if (stats) {
+        // 등급 보너스 계산 (예시)
+        const tierBonusRate = 0.1; // Gold 등급 10%
+        const tierBonus = Math.round(stats.totalAmount * tierBonusRate);
+        const activityBonus = 0; // 활동 보너스 (추후 구현)
+        const qualityBonus = 0; // 품질 보너스 (추후 구현)
+        const netEarnings = stats.totalAmount + tierBonus + activityBonus + qualityBonus;
+
+        setEarnings({
+          totalDeliveries: stats.totalDeliveries,
+          totalEarnings: stats.totalAmount,
+          tierBonus,
+          activityBonus,
+          qualityBonus,
+          netEarnings,
+          currentTier: stats.totalDeliveries >= 60 ? 'gold' : stats.totalDeliveries >= 30 ? 'silver' : 'silver',
+          nextTier: stats.totalDeliveries >= 60 ? 'platinum' : stats.totalDeliveries >= 30 ? 'gold' : 'silver',
+          progressToNext: stats.totalDeliveries >= 60 ? 83 : stats.totalDeliveries >= 30 ? 50 : 20,
+        });
+      }
 
       setLoading(false);
     } catch (error) {

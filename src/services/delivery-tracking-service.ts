@@ -18,7 +18,7 @@ import {
   Timestamp,
   Unsubscribe,
 } from 'firebase/firestore';
-import { db } from './firebase-service';
+import { db } from './firebase';
 import { LocationData, locationService } from './location-service';
 
 export interface DeliveryStatus {

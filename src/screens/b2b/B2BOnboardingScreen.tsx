@@ -15,6 +15,8 @@ import {
   Alert,
 } from 'react-native';
 import { StackNavigationProp } from '@react-navigation/stack';
+import { auth, db } from '../../services/firebase';
+import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
 import { Colors, Typography, Spacing, BorderRadius } from '../../theme';
 
 type NavigationProp = StackNavigationProp<any>;
@@ -71,8 +73,47 @@ export default function B2BOnboardingScreen({ navigation }: Props) {
     setLoading(true);
 
     try {
-      // TODO: Firebase Firestore에 B2B 계약 신청 저장
-      // await createB2BContract(formData);
+      // 현재 사용자 확인
+      const currentUser = auth.currentUser;
+      if (!currentUser) {
+        Alert.alert('로그인 필요', '로그인 후 이용해주세요.');
+        setLoading(false);
+        return;
+      }
+
+      const businessId = currentUser.uid;
+
+      // B2B 계약 신청 데이터 생성
+      const contractApplication = {
+        businessId,
+        companyName: formData.companyName,
+        registrationNumber: formData.registrationNumber,
+        ceoName: formData.ceoName,
+        contact: formData.contact,
+        email: formData.email,
+        address: formData.address,
+        status: 'pending',
+        tier: 'basic',
+        duration: {
+          start: new Date(),
+          end: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000), // 1년
+          autoRenew: false,
+        },
+        deliverySettings: {
+          dailyLimit: 100,
+          priority: 'normal',
+          preferredTimeSlots: ['09:00-18:00'],
+        },
+        billing: {
+          method: 'invoice',
+          paymentTerms: 30,
+        },
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp(),
+      };
+
+      // Firestore에 저장
+      await addDoc(collection(db, 'business_contracts'), contractApplication);
 
       Alert.alert(
         '신청 완료',
@@ -85,6 +126,7 @@ export default function B2BOnboardingScreen({ navigation }: Props) {
         ]
       );
     } catch (error) {
+      console.error('Error creating B2B contract:', error);
       Alert.alert('신청 실패', '다시 시도해주세요.');
     } finally {
       setLoading(false);

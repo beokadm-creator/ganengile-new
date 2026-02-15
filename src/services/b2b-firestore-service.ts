@@ -18,7 +18,7 @@ import {
   sum,
   count,
 } from 'firebase/firestore';
-import { db } from './firebase-service';
+import { db } from './firebase';
 
 // 캐싱 설정
 const CACHE_DURATION = 5 * 60 * 1000; // 5분
