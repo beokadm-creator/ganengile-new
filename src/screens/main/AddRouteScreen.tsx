@@ -23,8 +23,8 @@ import type { Station } from '../../types/config';
 import type { StationInfo } from '../../types/route';
 import { Colors, Spacing, Typography, BorderRadius } from '../../theme';
 import Button from '../../components/common/Button';
-import TimePicker from '../../components/time/TimePicker';
-import DaySelector, { DAY_LABELS } from '../../components/time/DaySelector';
+import TimePicker from '../../components/common/TimePicker';
+import DaySelector, { DAY_LABELS } from '../../components/common/DaySelector';
 import StationSelectModal from '../../components/common/StationSelectModal';
 
 export default function AddRouteScreen() {

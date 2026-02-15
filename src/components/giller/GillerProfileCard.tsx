@@ -21,6 +21,7 @@ interface GillerProfileCardProps {
     estimatedTime?: number;
     fee?: number;
   };
+  rank?: number; // 순위 추가 (1, 2, 3)
   onAccept: () => void;
   onReject: () => void;
   isAccepting?: boolean;
@@ -29,11 +30,40 @@ interface GillerProfileCardProps {
 
 export const GillerProfileCard: React.FC<GillerProfileCardProps> = ({
   giller,
+  rank,
   onAccept,
   onReject,
   isAccepting = false,
   isRejecting = false,
 }) => {
+  // 순위에 따른 뱃지 색상 및 아이콘
+  const getRankBadge = () => {
+    if (!rank) return null;
+
+    if (rank === 1) {
+      return (
+        <View style={styles.rankBadgeGold}>
+          <Text style={styles.rankBadgeEmoji}>🥇</Text>
+          <Text style={styles.rankBadgeText}>1위 길러</Text>
+        </View>
+      );
+    } else if (rank === 2) {
+      return (
+        <View style={styles.rankBadgeSilver}>
+          <Text style={styles.rankBadgeEmoji}>🥈</Text>
+          <Text style={styles.rankBadgeText}>2위</Text>
+        </View>
+      );
+    } else if (rank === 3) {
+      return (
+        <View style={styles.rankBadgeBronze}>
+          <Text style={styles.rankBadgeEmoji}>🥉</Text>
+          <Text style={styles.rankBadgeText}>3위</Text>
+        </View>
+      );
+    }
+    return null;
+  };
   return (
     <View style={styles.container}>
       {/* Profile Image */}
@@ -52,7 +82,10 @@ export const GillerProfileCard: React.FC<GillerProfileCardProps> = ({
 
       {/* Giller Info */}
       <View style={styles.infoContainer}>
-        <Text style={styles.name}>{giller.name}</Text>
+        <View style={styles.nameRow}>
+          <Text style={styles.name}>{giller.name}</Text>
+          {getRankBadge()}
+        </View>
 
         {/* Rating */}
         <View style={styles.ratingContainer}>
@@ -147,12 +180,57 @@ const styles = StyleSheet.create({
   infoContainer: {
     marginBottom: 20,
   },
+  nameRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 12,
+  },
   name: {
     fontSize: 24,
     fontWeight: 'bold',
     color: '#333',
     textAlign: 'center',
-    marginBottom: 12,
+    marginRight: 8,
+  },
+  rankBadgeGold: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#FFF8E1',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#FFD700',
+  },
+  rankBadgeSilver: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#F5F5F5',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#C0C0C0',
+  },
+  rankBadgeBronze: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#FFF3E0',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#CD7F32',
+  },
+  rankBadgeEmoji: {
+    fontSize: 14,
+    marginRight: 4,
+  },
+  rankBadgeText: {
+    fontSize: 12,
+    fontWeight: 'bold',
+    color: '#666',
   },
   ratingContainer: {
     flexDirection: 'row',

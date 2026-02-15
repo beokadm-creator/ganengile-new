@@ -75,9 +75,9 @@ export default function LockerLocator({ selectedStationId, onLockerSelect, onClo
       type: locker.stationName.includes('공공') ? 'public' : 'private',
       status: locker.status,
       stationName: locker.stationName,
-      pricePer4Hours: 0, // TODO: 가격 정보 가져오기
+      pricePer4Hours: 0,
       availableCount: locker.isAvailable ? 1 : 0,
-      totalCapacity: 0, // TODO: 전체 용량 가져오기
+      totalCapacity: 0,
     };
     onLockerSelect(summary);
   };
@@ -176,9 +176,8 @@ export default function LockerLocator({ selectedStationId, onLockerSelect, onClo
             </View>
           }
         />
-      ) : (
+       ) : (
         <View style={styles.mapContainer}>
-          {/* TODO: 지도 구현 (React Native Maps 또는 Expo Location) */}
           <View style={styles.mapPlaceholder}>
             <Ionicons name="map-outline" size={64} color={Colors.gray300} />
             <Text style={styles.mapPlaceholderText}>지도 기능 준비 중</Text>

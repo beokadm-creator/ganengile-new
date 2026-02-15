@@ -15,7 +15,7 @@ import {
   serverTimestamp,
 } from 'firebase/firestore';
 import { db } from './firebase';
-import type {
+import {
   Locker,
   PublicLocker,
   PrivateLocker,
@@ -269,4 +269,74 @@ export class LockerService {
 
 export function createLockerService(): LockerService {
   return new LockerService();
+}
+
+// Convenience functions for backward compatibility
+const lockerService = new LockerService();
+
+/**
+ * Get locker reservation by ID
+ */
+export async function getLockerReservation(reservationId: string): Promise<LockerReservation | null> {
+  return lockerService.getReservation(reservationId);
+}
+
+/**
+ * Update reservation status
+ */
+export async function updateReservationStatus(
+  reservationId: string,
+  status: string
+): Promise<void> {
+  const docRef = doc(db, RESERVATIONS_COLLECTION, reservationId);
+  await updateDoc(docRef, {
+    status,
+    updatedAt: serverTimestamp(),
+  });
+}
+
+/**
+ * Add photos to reservation
+ */
+export async function addReservationPhotos(
+  reservationId: string,
+  pickupPhotoUrl: string,
+  deliveryPhotoUrl?: string
+): Promise<void> {
+  const docRef = doc(db, RESERVATIONS_COLLECTION, reservationId);
+  const updateData: any = {
+    updatedAt: serverTimestamp(),
+  };
+
+  if (pickupPhotoUrl) {
+    updateData.pickupPhotoUrl = pickupPhotoUrl;
+  }
+
+  if (deliveryPhotoUrl) {
+    updateData.deliveryPhotoUrl = deliveryPhotoUrl;
+  }
+
+  await updateDoc(docRef, updateData);
+}
+
+/**
+ * Get all reservations for a delivery
+ */
+export async function getDeliveryReservations(deliveryId: string): Promise<LockerReservation[]> {
+  const q = query(
+    collection(db, RESERVATIONS_COLLECTION),
+    where('deliveryId', '==', deliveryId)
+  );
+
+  const snapshot = await getDocs(q);
+  const reservations: LockerReservation[] = [];
+
+  snapshot.forEach((doc) => {
+    reservations.push({
+      reservationId: doc.id,
+      ...doc.data(),
+    } as LockerReservation);
+  });
+
+  return reservations;
 }

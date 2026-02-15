@@ -14,12 +14,14 @@ import {
   ActivityIndicator,
   ScrollView,
   Image,
+  Modal,
 } from 'react-native';
 import { StackNavigationProp } from '@react-navigation/stack';
 import * as Location from 'expo-location';
 import * as ImagePicker from 'expo-image-picker';
 import { requireUserId } from '../../services/firebase';
 import { verifyPickup, type PickupVerificationData } from '../../services/delivery-service';
+import QRScanner from '../../components/delivery/QRScanner';
 
 type NavigationProp = StackNavigationProp<any>;
 
@@ -42,6 +44,7 @@ export default function PickupVerificationScreen({ navigation, route }: Props) {
   const [photoUri, setPhotoUri] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [location, setLocation] = useState<{ latitude: number; longitude: number } | null>(null);
+  const [showQRScanner, setShowQRScanner] = useState(false);
 
   // Get current location
   React.useEffect(() => {
@@ -141,6 +144,29 @@ export default function PickupVerificationScreen({ navigation, route }: Props) {
     }
   };
 
+  const handleQRScan = (data: string) => {
+    setShowQRScanner(false);
+
+    // QR 데이터 형식: "GANENGILE:{verificationCode}"
+    // 예: "GANENGILE:1234"
+    if (data.startsWith('GANENGILE:')) {
+      const code = data.split(':')[1];
+      if (code && code.length === 4) {
+        setVerificationCode(code);
+        Alert.alert('QR 스캔 성공', `인증 코드 ${code}가 입력되었습니다.`);
+      } else {
+        Alert.alert('QR 오류', '잘못된 QR 코드 형식입니다.');
+      }
+    } else {
+      Alert.alert('QR 오류', '가는길에 QR 코드가 아닙니다.');
+    }
+  };
+
+  const handleQRError = (error: string) => {
+    setShowQRScanner(false);
+    Alert.alert('카메라 오류', error);
+  };
+
   if (loading) {
     return (
       <View style={styles.loadingContainer}>
@@ -227,12 +253,19 @@ export default function PickupVerificationScreen({ navigation, route }: Props) {
               요청자의 QR 코드를 스캔하세요
             </Text>
 
-            <View style={styles.qrScanner}>
-              <Text style={styles.qrPlaceholder}>QR 코드 스캔 기능</Text>
-              <Text style={styles.qrSubtext}>
-                (카메라 권한이 필요합니다)
-              </Text>
-            </View>
+            <TouchableOpacity
+              style={styles.qrButton}
+              onPress={() => setShowQRScanner(true)}
+            >
+              <Text style={styles.qrButtonText}>📷 QR 코드 스캔 시작</Text>
+            </TouchableOpacity>
+
+            {verificationCode && (
+              <View style={styles.scannedCodeContainer}>
+                <Text style={styles.scannedCodeLabel}>스캔된 코드:</Text>
+                <Text style={styles.scannedCode}>{verificationCode}</Text>
+              </View>
+            )}
           </View>
         )}
 
@@ -284,6 +317,19 @@ export default function PickupVerificationScreen({ navigation, route }: Props) {
           </TouchableOpacity>
         )}
       </ScrollView>
+
+      {/* QR Scanner Modal */}
+      <Modal
+        visible={showQRScanner}
+        animationType="slide"
+        onRequestClose={() => setShowQRScanner(false)}
+      >
+        <QRScanner
+          onScan={handleQRScan}
+          onError={handleQRError}
+          onClose={() => setShowQRScanner(false)}
+        />
+      </Modal>
     </View>
   );
 }
@@ -406,6 +452,17 @@ const styles = StyleSheet.create({
   photoSection: {
     padding: 16,
   },
+  qrButton: {
+    alignItems: 'center',
+    backgroundColor: '#000',
+    borderRadius: 12,
+    padding: 24,
+  },
+  qrButtonText: {
+    color: '#fff',
+    fontSize: 18,
+    fontWeight: 'bold',
+  },
   qrPlaceholder: {
     color: '#fff',
     fontSize: 16,
@@ -421,6 +478,28 @@ const styles = StyleSheet.create({
   qrSubtext: {
     color: '#999',
     fontSize: 12,
+  },
+  scannedCode: {
+    backgroundColor: '#E8F5E9',
+    borderColor: '#4CAF50',
+    borderRadius: 8,
+    borderWidth: 2,
+    color: '#333',
+    fontSize: 24,
+    fontWeight: 'bold',
+    letterSpacing: 4,
+    marginTop: 8,
+    padding: 16,
+    textAlign: 'center',
+  },
+  scannedCodeContainer: {
+    alignItems: 'center',
+    marginTop: 16,
+  },
+  scannedCodeLabel: {
+    color: '#666',
+    fontSize: 14,
+    marginBottom: 4,
   },
   retakeButton: {
     backgroundColor: '#FF9800',

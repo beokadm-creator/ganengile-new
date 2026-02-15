@@ -96,6 +96,35 @@ ganengile-new/
 
 ---
 
+## 🔐 인증 설정
+
+### Google 로그인 설정
+
+Google 로그인을 사용하려면 다음 단계를 완료해야 합니다:
+
+1. **Google Cloud Console 설정**
+   - 프로젝트 생성 및 OAuth 동의 화면 구성
+   - OAuth 클라이언트 ID 생성 (Web, iOS, Android)
+   - 상세 가이드: [Google 로그인 설정 가이드](./docs/GOOGLE_AUTH_SETUP.md)
+
+2. **Firebase Auth 설정**
+   - Firebase Console에서 Google 로그인 활성화
+   - 승인된 도메인 확인
+
+3. **환경 변수 설정**
+   ```bash
+   cp .env.example .env
+   # .env 파일에 Google Client ID 및 Secret 추가
+   EXPO_PUBLIC_GOOGLE_CLIENT_ID=your_google_client_id_here
+   EXPO_PUBLIC_GOOGLE_CLIENT_SECRET=your_google_client_secret_here
+   ```
+
+### 카카오 로그인 설정 (선택)
+
+카카오 로그인도 지원합니다. 자세한 내용은 [`kakao-auth.ts`](./src/services/kakao-auth.ts)를 참고하세요.
+
+---
+
 ## ⚙️ Config 초기화
 
 프로덕션 환경에서는 하드코딩된 대신 **Firestore Config Collections**을 사용하여 지하철 데이터를 관리합니다.

@@ -70,12 +70,12 @@ export function AppDownloadBanner({ visible = true, onDismiss }: AppDownloadBann
   };
 
   const openAppStore = (platform: 'ios' | 'android') => {
-    // TODO: 실제 앱 스토어 링크로 교체
+    // 앱 배포 후 실제 앱 스토어 링크로 교체 필요
     if (platform === 'ios') {
-      // App Store 링크
+      // App Store 링크 (배포 후 idXXXXXXXXX를 실제 App ID로 교체)
       Linking.openURL('https://apps.apple.com/app/idXXXXXXXXX');
     } else {
-      // Play Store 링크
+      // Play Store 링크 (배포 후 패키지명 확인)
       Linking.openURL('https://play.google.com/store/apps/details?id=com.ganengile');
     }
   };

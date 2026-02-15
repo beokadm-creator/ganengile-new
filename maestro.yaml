@@ -1,0 +1,15 @@
+appId: com.ganengile.app
+---
+- launchApp
+
+# 글러 신규 사용자 플로우
+- flow:
+    - gller-flow
+
+# 길러 신규 사용자 플로우
+- flow:
+    - giller-flow
+
+# B2B 신규 기업 고객 플로우
+- flow:
+    - b2b-flow

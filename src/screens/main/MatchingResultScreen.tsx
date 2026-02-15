@@ -11,6 +11,7 @@ import {
 import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
 import Icon from 'react-native-vector-icons/MaterialIcons';
 import { GillerProfileCard } from '../../components/giller/GillerProfileCard';
+import TransferInfoCard, { TransferInfo } from '../../components/TransferInfoCard';
 import { matchingService } from '../../services/matching-service';
 
 type MatchingResultRouteParams = {
@@ -20,6 +21,26 @@ type MatchingResultRouteParams = {
 };
 
 const MATCHING_TIMEOUT = 30000; // 30 seconds
+
+// 색상 보간 함수 (초록색 → 주황색 → 빨간색)
+const interpolateColor = (progress: number): string => {
+  'worklet';
+  if (progress < 0.5) {
+    // 초록색 → 주황색 (#00BCD4 → #FF9800)
+    const ratio = progress * 2; // 0 → 1
+    const r = Math.round(0 + (255 - 0) * ratio);
+    const g = Math.round(188 + (152 - 188) * ratio);
+    const b = Math.round(212 + (0 - 212) * ratio);
+    return `rgb(${r}, ${g}, ${b})`;
+  } else {
+    // 주황색 → 빨간색 (#FF9800 → #FF5252)
+    const ratio = (progress - 0.5) * 2; // 0 → 1
+    const r = 255;
+    const g = Math.round(152 + (82 - 152) * ratio);
+    const b = Math.round(0 + (82 - 0) * ratio);
+    return `rgb(${r}, ${g}, ${b})`;
+  }
+};
 
 export const MatchingResultScreen: React.FC = () => {
   const navigation = useNavigation();
@@ -34,6 +55,13 @@ export const MatchingResultScreen: React.FC = () => {
   const [timeoutReached, setTimeoutReached] = useState(false);
   const [retryCount, setRetryCount] = useState(0);
   const [fadeAnim] = useState(new Animated.Value(0));
+
+  // 타이머 관련 상태 추가
+  const [timeLeft, setTimeLeft] = useState(MATCHING_TIMEOUT / 1000); // 초 단위
+  const [progressAnim] = useState(new Animated.Value(0));
+
+  // 흔들림 애니메이션용 Animated.Value
+  const [shakeAnim] = useState(new Animated.Value(0));
 
   // Handle hardware back button
   useEffect(() => {
@@ -66,10 +94,14 @@ export const MatchingResultScreen: React.FC = () => {
       const result = await matchingService.findGiller(requestId);
 
       if (result.success && result.data) {
-        setGiller(result.data.giller);
+        setGiller({
+          ...result.data.giller,
+          rank: result.data.rank, // 순위 추가
+        });
         fadeIn();
       } else {
         setError(result.error || '일시적인 오류가 발생했습니다.');
+        shake(); // 흔들림 애니메이션
       }
     } catch (err: any) {
       setError(err.message || '네트워크 오류가 발생했습니다.');
@@ -83,10 +115,29 @@ export const MatchingResultScreen: React.FC = () => {
     findGiller();
   }, [findGiller]);
 
-  // Timeout handling
+  // 타이머 진행률 애니메이션
   useEffect(() => {
-    if (loading) {
-      const timer = setTimeout(() => {
+    if (loading && !timeoutReached) {
+      // 프로그레스 바 애니메이션 (0% → 100%)
+      Animated.timing(progressAnim, {
+        toValue: 1,
+        duration: MATCHING_TIMEOUT,
+        useNativeDriver: false, // width는 useNativeDriver 지원 안함
+      }).start();
+
+      // 카운트다운 타이머
+      const timer = setInterval(() => {
+        setTimeLeft((prev) => {
+          if (prev <= 1) {
+            clearInterval(timer);
+            return 0;
+          }
+          return prev - 1;
+        });
+      }, 1000);
+
+      // 타임아웃 핸들링
+      const timeoutTimer = setTimeout(() => {
         if (!giller) {
           setTimeoutReached(true);
           setError('매칭 시간이 초과되었습니다. 다시 시도해주세요.');
@@ -94,9 +145,12 @@ export const MatchingResultScreen: React.FC = () => {
         }
       }, MATCHING_TIMEOUT);
 
-      return () => clearTimeout(timer);
+      return () => {
+        clearInterval(timer);
+        clearTimeout(timeoutTimer);
+      };
     }
-  }, [loading, giller]);
+  }, [loading, giller, timeoutReached]);
 
   // Fade in animation
   const fadeIn = useCallback(() => {
@@ -107,6 +161,17 @@ export const MatchingResultScreen: React.FC = () => {
     }).start();
   }, [fadeAnim]);
 
+  // Shake animation (for errors)
+  const shake = useCallback(() => {
+    Animated.sequence([
+      Animated.timing(shakeAnim, { toValue: 10, duration: 50, useNativeDriver: true }),
+      Animated.timing(shakeAnim, { toValue: -10, duration: 50, useNativeDriver: true }),
+      Animated.timing(shakeAnim, { toValue: 10, duration: 50, useNativeDriver: true }),
+      Animated.timing(shakeAnim, { toValue: -10, duration: 50, useNativeDriver: true }),
+      Animated.timing(shakeAnim, { toValue: 0, duration: 50, useNativeDriver: true }),
+    ]).start();
+  }, [shakeAnim]);
+
   // Handle accept
   const handleAccept = async () => {
     try {
@@ -115,6 +180,14 @@ export const MatchingResultScreen: React.FC = () => {
       const result = await matchingService.acceptMatch(requestId, giller.id);
 
       if (result.success) {
+        // 매칭 성공 애니메이션
+        Animated.spring(fadeAnim, {
+          toValue: 1,
+          friction: 8,
+          tension: 40,
+          useNativeDriver: true,
+        }).start();
+
         Alert.alert(
           '매칭 성공',
           '기일러와 매칭되었습니다. 배송을 시작합니다.',
@@ -200,7 +273,7 @@ export const MatchingResultScreen: React.FC = () => {
   if (error) {
     return (
       <View style={styles.container}>
-        <View style={styles.errorContainer}>
+        <Animated.View style={[styles.errorContainer, { transform: [{ translateX: shakeAnim }] }]}>
           <Icon name="error-outline" size={64} color="#FF5252" />
           <Text style={styles.errorTitle}>매칭 실패</Text>
           <Text style={styles.errorMessage}>{error}</Text>
@@ -212,7 +285,7 @@ export const MatchingResultScreen: React.FC = () => {
               취소
             </Text>
           </View>
-        </View>
+        </Animated.View>
       </View>
     );
   }
@@ -229,6 +302,30 @@ export const MatchingResultScreen: React.FC = () => {
           {retryCount > 0 && (
             <Text style={styles.retryCount}>재시도 횟수: {retryCount}</Text>
           )}
+
+          {/* 타이머 프로그레스 바 */}
+          <View style={styles.progressContainer}>
+            <Animated.View
+              style={[
+                styles.progressBar,
+                {
+                  width: progressAnim.interpolate({
+                    inputRange: [0, 1],
+                    outputRange: ['0%', '100%'],
+                  }),
+                  backgroundColor: interpolateColor(
+                    progressAnim.interpolate({
+                      inputRange: [0, 1],
+                      outputRange: [0, 1],
+                    }).__getValue()
+                  ),
+                },
+              ]}
+            />
+          </View>
+          <Text style={styles.timeLeftText}>
+            {timeLeft}초 남음
+          </Text>
         </View>
         <Text style={styles.cancelText} onPress={handleCancel}>
           취소
@@ -249,11 +346,20 @@ export const MatchingResultScreen: React.FC = () => {
       <Animated.View style={{ opacity: fadeAnim }}>
         <GillerProfileCard
           giller={giller}
+          rank={giller.rank} // 순위 전달
           onAccept={handleAccept}
           onReject={handleReject}
           isAccepting={isAccepting}
           isRejecting={isRejecting}
         />
+
+        {/* 환승 정보 카드 (환승 시에만 표시) */}
+        {giller.transferInfo && giller.transferInfo.hasTransfer && (
+          <TransferInfoCard
+            transferInfo={giller.transferInfo}
+            style={{ marginTop: Spacing.md }}
+          />
+        )}
       </Animated.View>
     </View>
   );
@@ -300,6 +406,23 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: '#FF9800',
     marginTop: 8,
+  },
+  progressContainer: {
+    width: '80%',
+    height: 8,
+    backgroundColor: '#E0E0E0',
+    borderRadius: 4,
+    marginTop: 20,
+    overflow: 'hidden',
+  },
+  progressBar: {
+    height: '100%',
+    borderRadius: 4,
+  },
+  timeLeftText: {
+    fontSize: 14,
+    color: '#666',
+    marginTop: 12,
   },
   cancelText: {
     fontSize: 16,

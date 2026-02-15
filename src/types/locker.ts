@@ -95,7 +95,7 @@ export interface PrivateLocker extends Locker {
   type: LockerType.PRIVATE;
   operatingHours: {
     open: string;          // "00:00"
-    close: string;         - "24:00" (24시간)
+    close: string;         // "24:00" (24시간)
   };
 }
 
@@ -116,6 +116,6 @@ export interface LockerReservation {
   status: 'pending' | 'active' | 'completed' | 'cancelled';
   pickupPhotoUrl?: string;   // 인수 사진 URL
   dropoffPhotoUrl?: string;  // 인계 사진 URL
-  createdAt: Date;
-  updatedAt: Date;
+  createdAt: Date | any;
+  updatedAt: Date | any;
 }

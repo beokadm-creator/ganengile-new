@@ -129,8 +129,7 @@ export default function GillerRequestsScreen({ navigation }: Props) {
 
   const handleChatRequest = async (request: DeliveryRequest) => {
     try {
-      // TODO: 채팅방 자동 생성 로직 구현 필요
-      // 일단은 ChatScreen으로 이동하되, status를 'pending'으로 전달
+      // 채팅방은 acceptRequest에서 자동 생성됨
       navigation.navigate('ChatScreen', {
         requestId: request.requestId,
         status: 'pending',

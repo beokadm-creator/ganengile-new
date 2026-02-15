@@ -1,0 +1,248 @@
+/**
+ * Navigation Integration Tests
+ * 네비게이션 플로우 통합 테스트
+ */
+
+import React from 'react';
+import { render, fireEvent, waitFor } from '@testing-library/react-native';
+import { NavigationContainer } from '@react-navigation/native';
+import AppNavigator from '../../App';
+
+// Mock screens
+jest.mock('../../screens/auth/LandingScreen', () => ({
+  LandingScreen: () => 'LandingScreen',
+}));
+
+jest.mock('../../screens/auth/LoginScreen', () => ({
+  LoginScreen: () => 'LoginScreen',
+}));
+
+jest.mock('../../screens/onboarding/GllerOnboardingScreen', () => ({
+  GllerOnboardingScreen: () => 'GllerOnboardingScreen',
+}));
+
+jest.mock('../../screens/onboarding/GillerOnboardingScreen', () => ({
+  GillerOnboardingScreen: () => 'GillerOnboardingScreen',
+}));
+
+jest.mock('../../screens/main/HomeScreen', () => ({
+  HomeScreen: () => 'HomeScreen',
+}));
+
+jest.mock('../../screens/main/CreateRequestScreen', () => ({
+  CreateRequestScreen: () => 'CreateRequestScreen',
+}));
+
+jest.mock('../../screens/main/DeliveryTrackingScreen', () => ({
+  DeliveryTrackingScreen: () => 'DeliveryTrackingScreen',
+}));
+
+jest.mock('../../screens/main/RouteManagementScreen', () => ({
+  RouteManagementScreen: () => 'RouteManagementScreen',
+}));
+
+describe('Navigation Integration Tests', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+
+  // ==================== 온보딩 플로우 ====================
+
+  describe('Gller Onboarding Navigation', () => {
+    it('TC-NAV-001: 글러 온보딩 플로우를 완결한다', async () => {
+      const component = render(
+        <NavigationContainer>
+          <AppNavigator />
+        </NavigationContainer>
+      );
+
+      // Step 1: 서비스 소개 화면
+      const introText = await waitFor(() => component.getByText('지하철 타고'));
+      expect(introText).toBeTruthy();
+      fireEvent.press(introText);
+
+      // Step 2: 수익 정보 화면
+      const earningsText = await waitFor(() => component.getByText('월 30~80만원'));
+      expect(earningsText).toBeTruthy();
+      fireEvent.press(earningsText);
+
+      // Step 3: 활동 시간 화면
+      const timeText = await waitFor(() => component.getByText('출퇴근 시간대'));
+      expect(timeText).toBeTruthy();
+      fireEvent.press(timeText);
+
+      // Then: 홈 화면으로 이동 확인 (mock screen)
+      const homeScreen = await waitFor(() => component.getByText('동선 등록'));
+      expect(homeScreen).toBeTruthy();
+    });
+  });
+
+  describe('Giller Onboarding Navigation', () => {
+    it('TC-NAV-002: 길러 온보딩 플로우를 완결한다', async () => {
+      const component = render(
+        <NavigationContainer>
+          <AppNavigator />
+        </NavigationContainer>
+      );
+
+      // Step 1: 서비스 소개 화면
+      const introText = await waitFor(() => component.getByText('지하철 이용자가 배송을 요청'));
+      expect(introText).toBeTruthy();
+      fireEvent.press(introText);
+
+      // Step 2: 요금 정보 화면
+      const priceText = await waitFor(() => component.getByText('평균 3,000~8,000원'));
+      expect(priceText).toBeTruthy();
+      fireEvent.press(priceText);
+
+      // Step 3: 소요 시간 화면
+      const timeText = await waitFor(() => component.getByText('약 30~60분'));
+      expect(timeText).toBeTruthy();
+      fireEvent.press(timeText);
+
+      // Step 4: 신분증 정보 화면
+      const idText = await waitFor(() => component.getByText('신분증 번호'));
+      expect(idText).toBeTruthy();
+      fireEvent.press(idText);
+
+      // Then: 홈 화면으로 이동 확인
+      const homeScreen = await waitFor(() => component.getByText('배송 요청 목록'));
+      expect(homeScreen).toBeTruthy();
+    });
+  });
+
+  // ==================== 배송 요청 플로우 ====================
+
+  describe('Delivery Request Navigation', () => {
+    it('TC-NAV-003: 배송 요청부터 완료까지 완결한다', async () => {
+      const component = render(
+        <NavigationContainer>
+          <AppNavigator />
+        </NavigationContainer>
+      );
+
+      // Step 1: 홈 → 배송 요청
+      const requestButton = await waitFor(() => component.getByText('배송 요청'));
+      expect(requestButton).toBeTruthy();
+      fireEvent.press(requestButton);
+
+      // Step 2: 출발역 선택
+      const pickupLabel = await waitFor(() => component.getByText('출발역 선택'));
+      expect(pickupLabel).toBeTruthy();
+
+      const stationText = await waitFor(() => component.getByText('서울역'));
+      expect(stationText).toBeTruthy();
+      fireEvent.press(stationText);
+
+      // Step 3: 도착역 선택
+      const deliveryLabel = await waitFor(() => component.getByText('도착역 선택'));
+      expect(deliveryLabel).toBeTruthy();
+
+      const destinationText = await waitFor(() => component.getByText('강남역'));
+      expect(destinationText).toBeTruthy();
+      fireEvent.press(destinationText);
+
+      // Step 4: 요청 제출
+      const submitButton = await waitFor(() => component.getByText('요청하기'));
+      expect(submitButton).toBeTruthy();
+      fireEvent.press(submitButton);
+
+      // Then: 배송 추적 화면으로 이동 (mock screen)
+      const trackingText = await waitFor(() => component.getByText('배송 추적'));
+      expect(trackingText).toBeTruthy();
+    });
+  });
+
+  // ==================== 동선 관리 플로우 ====================
+
+  describe('Route Management Navigation', () => {
+    it('TC-NAV-004: 동선 등록 후 목록에 반영된다', async () => {
+      const component = render(
+        <NavigationContainer>
+          <AppNavigator />
+        </NavigationContainer>
+      );
+
+      // Step 1: 홈 → 동선 관리
+      const routeManagementButton = await waitFor(() => component.getByText('동선 관리'));
+      expect(routeManagementButton).toBeTruthy();
+      fireEvent.press(routeManagementButton);
+
+      // Step 2: 동선 추가
+      const addButton = await waitFor(() => component.getByText('동선 추가'));
+      expect(addButton).toBeTruthy();
+      fireEvent.press(addButton);
+
+      // Step 3: 출발역 선택
+      const startLabel = await waitFor(() => component.getByText('출발역'));
+      expect(startLabel).toBeTruthy();
+
+      const stationText = await waitFor(() => component.getByText('서울역'));
+      expect(stationText).toBeTruthy();
+      fireEvent.press(stationText);
+
+      // Step 4: 도착역 선택
+      const endLabel = await waitFor(() => component.getByText('도착역'));
+      expect(endLabel).toBeTruthy();
+
+      const destinationText = await waitFor(() => component.getByText('강남역'));
+      expect(destinationText).toBeTruthy();
+      fireEvent.press(destinationText);
+
+      // Step 5: 시간 선택
+      const timeText = await waitFor(() => component.getByText('08:30'));
+      expect(timeText).toBeTruthy();
+      fireEvent.press(timeText);
+
+      // Step 6: 요일 선택
+      const weekdayText = await waitFor(() => component.getByText('월'));
+      expect(weekdayText).toBeTruthy();
+      fireEvent.press(weekdayText);
+
+      // Step 7: 저장
+      const saveButton = await waitFor(() => component.getByText('저장'));
+      expect(saveButton).toBeTruthy();
+      fireEvent.press(saveButton);
+
+      // Then: 목록에 반영 확인 (mock route display)
+      const routeText = await waitFor(() => component.getByText('서울역 → 강남역'));
+      expect(routeText).toBeTruthy();
+    });
+  });
+
+  // ==================== 채팅 플로우 ====================
+
+  describe('Chat Navigation', () => {
+    it('TC-NAV-005: 채팅방 입장 후 메시지를 전송한다', async () => {
+      const component = render(
+        <NavigationContainer>
+          <AppNavigator />
+        </NavigationContainer>
+      );
+
+      // Step 1: 홈 → 채팅 목록
+      const chatButton = await waitFor(() => component.getByText('채팅'));
+      expect(chatButton).toBeTruthy();
+      fireEvent.press(chatButton);
+
+      // Step 2: 채팅방 선택
+      const chatRoomText = await waitFor(() => component.getByText('길러A'));
+      expect(chatRoomText).toBeTruthy();
+      fireEvent.press(chatRoomText);
+
+      // Step 3: 메시지 입력
+      const input = component.getByPlaceholderText('메시지를 입력하세요');
+      expect(input).toBeTruthy();
+      fireEvent.changeText(input, '안녕하세요!');
+
+      // Step 4: 전송
+      const sendButton = component.getByText('전송');
+      expect(sendButton).toBeTruthy();
+      fireEvent.press(sendButton);
+
+      // Then: 메시지 표시
+      const messageText = await waitFor(() => component.getByText('안녕하세요!'));
+      expect(messageText).toBeTruthy();
+    });
+  });
+});

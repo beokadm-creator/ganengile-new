@@ -156,8 +156,10 @@ export default function RequestsScreen({ navigation }: Props) {
     <TouchableOpacity
       style={styles.requestCard}
       onPress={() => {
-        // TODO: 상세 화면으로 이동
-        console.log('Request details:', item.requestId);
+        // 요청 상세 화면으로 이동
+        navigation.navigate('RequestDetail' as never, {
+          requestId: item.requestId,
+        });
       }}
     >
       <View style={styles.requestHeader}>

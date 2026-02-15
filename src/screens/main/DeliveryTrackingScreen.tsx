@@ -23,6 +23,7 @@ import { UserRole } from '../../types/user';
 import type { Request } from '../../types/request';
 import { toTrackingModel, TrackingModel, TrackingEvent } from '../../utils/request-adapters';
 import { formatTimeKR } from '../../utils/date';
+import { startDeliveryTracking, stopDeliveryTracking } from '../../services/location-tracking-service';
 
 const { width } = Dimensions.get('window');
 
@@ -45,12 +46,18 @@ export default function DeliveryTrackingScreen({ navigation, route }: Props) {
   const [loading, setLoading] = useState(true);
   const [progress, setProgress] = useState(0);
   const [actionLoading, setActionLoading] = useState(false);
+  const [currentLocation, setCurrentLocation] = useState<{ latitude: number; longitude: number } | null>(null);
+  const [isTracking, setIsTracking] = useState(false);
 
   useEffect(() => {
     loadTrackingData();
-    // Refresh every 30 seconds
-    const interval = setInterval(loadTrackingData, 30000);
-    return () => clearInterval(interval);
+
+    // Cleanup: stop location tracking when unmount
+    return () => {
+      if (isTracking) {
+        stopDeliveryTracking();
+      }
+    };
   }, [requestId]);
 
   const loadTrackingData = async () => {
@@ -63,6 +70,19 @@ export default function DeliveryTrackingScreen({ navigation, route }: Props) {
         setTrackingData(model);
         setTrackingEvents(model.trackingEvents || []);
         calculateProgress(model.status);
+
+        // Start real-time tracking for in_transit status
+        if (model.status === 'in_transit' || model.status === 'arrived') {
+          if (!isTracking && deliveryData.id) {
+            startDeliveryTracking(deliveryData.id);
+            setIsTracking(true);
+          }
+
+          // Update current location
+          if (deliveryData.tracking?.currentLocation) {
+            setCurrentLocation(deliveryData.tracking.currentLocation);
+          }
+        }
       } else {
         // Fallback to request data
         const requestData = await getRequestById(requestId);

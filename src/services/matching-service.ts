@@ -438,6 +438,7 @@ export async function findGiller(requestId: string): Promise<{
       estimatedTime?: number;
       fee?: number;
     };
+    rank?: number; // 순위 추가
   };
   error?: string;
 }> {
@@ -468,6 +469,7 @@ export async function findGiller(requestId: string): Promise<{
           fee: bestMatch.estimatedFee,
           profileImage: bestMatch.profileImage,
         },
+        rank: bestMatch.rank, // 순위 추가
       },
     };
   } catch (error: any) {

@@ -8,6 +8,7 @@ import { View, Text, StyleSheet, TextInput, TouchableOpacity, ActivityIndicator,
 import { signInWithEmailAndPassword } from 'firebase/auth';
 import { auth } from '../../services/firebase';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { Platform } from 'react-native';
 import { Colors, Typography, Spacing, BorderRadius } from '../../theme';
 
 export default function LoginScreen({ navigation }: any) {
@@ -81,6 +82,22 @@ export default function LoginScreen({ navigation }: any) {
     }
   };
 
+  const handleGoogleLogin = async () => {
+    setLoading(true);
+    try {
+      // google-auth의 handleGoogleSignIn 사용 (Web + Native 지원)
+      const { handleGoogleSignIn } = await import('../../services/google-auth');
+      await handleGoogleSignIn();
+
+      // Auth state change will be handled by AppNavigator
+    } catch (error: any) {
+      console.error('Google login error:', error);
+      Alert.alert('Google 로그인 실패', error.message || 'Google 로그인에 실패했습니다.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return (
     <View style={styles.container}>
       <View style={styles.content}>
@@ -127,12 +144,17 @@ export default function LoginScreen({ navigation }: any) {
             )}
           </TouchableOpacity>
 
-          {/* TODO: Google 로그인 구현 */}
+          {/* Google 로그인 */}
           <TouchableOpacity
             style={[styles.button, styles.googleButton]}
-            onPress={() => Alert.alert('안내', 'Google 로그인은 곧 지원됩니다')}
+            onPress={handleGoogleLogin}
+            disabled={loading}
           >
-            <Text style={styles.googleButtonText}>Google로 계속하기</Text>
+            {loading ? (
+              <ActivityIndicator color="#333" />
+            ) : (
+              <Text style={styles.googleButtonText}>Google로 계속하기</Text>
+            )}
           </TouchableOpacity>
         </View>
 

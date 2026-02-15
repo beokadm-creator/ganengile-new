@@ -1,16 +1,72 @@
 rules_version = '2';
 service firebase.storage {
   match /b/{bucket}/o {
+    // ==================== User Files ====================
+
     match /users/{userId}/{allPaths=**} {
       // 사용자는 자신의 프로필 사진만 업로드/읽기 가능
       allow read: if true;
       allow write: if request.auth != null && request.auth.uid == userId;
     }
-    
+
+    // ==================== Public Files ====================
+
     match /public/{allPaths=**} {
       // 공개적으로 접근 가능한 파일
       allow read: if true;
       allow write: if false; // 쓰기는 불가
+    }
+
+    // ==================== Delivery Photos ====================
+
+    match /pickup-photos/{deliveryId}/{allPaths=**} {
+      // 픽업 사진은 기러기와 요청자가 읽을 수 있음
+      allow read: if request.auth != null;
+      // 기러기만 업로드 가능
+      allow write: if request.auth != null;
+    }
+
+    match /delivery-photos/{deliveryId}/{allPaths=**} {
+      // 배송 완료 사진은 기러기와 요청자가 읽을 수 있음
+      allow read: if request.auth != null;
+      // 기러기만 업로드 가능
+      allow write: if request.auth != null;
+    }
+
+    // ==================== Profile Photos ====================
+
+    match /profile-photos/{userId}/{allPaths=**} {
+      // 프로필 사진은 공개
+      allow read: if true;
+      // 본인만 업로드 가능
+      allow write: if request.auth != null && request.auth.uid == userId;
+    }
+
+    // ==================== ID Photos (Verification) ====================
+
+    match /id-photos/{userId}/{allPaths=**} {
+      // 신분증 사진은 본인만 읽기 가능
+      allow read: if request.auth != null && request.auth.uid == userId;
+      // 본인만 업로드 가능
+      allow write: if request.auth != null && request.auth.uid == userId;
+    }
+
+    // ==================== Chat Photos ====================
+
+    match /chat-photos/{chatId}/{allPaths=**} {
+      // 채팅 사진은 참여자만 읽기 가능
+      allow read: if request.auth != null;
+      // 참여자만 업로드 가능
+      allow write: if request.auth != null;
+    }
+
+    // ==================== Locker Photos ====================
+
+    match /locker-photos/{lockerId}/{allPaths=**} {
+      // 락커 사진은 공개
+      allow read: if true;
+      // 인증된 사용자만 업로드 가능
+      allow write: if request.auth != null;
     }
   }
 }

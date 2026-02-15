@@ -24,6 +24,7 @@ import type { Station } from '../../types/config';
 import type { StationInfo, PackageSize, PackageWeight } from '../../types/request';
 import TimePicker from '../../components/common/TimePicker';
 import OptimizedStationSelectModal from '../../components/OptimizedStationSelectModal';
+import ModeToggleSwitch from '../../components/onetime/ModeToggleSwitch';
 
 function convertStationToInfo(station: Station): StationInfo {
   const firstLine = station.lines[0];
@@ -374,6 +375,8 @@ export default function CreateRequestScreen({ navigation }: Props) {
 
   const renderStep1 = () => (
     <View style={styles.stepContainer}>
+      <ModeToggleSwitch />
+
       <Text style={styles.stepTitle}>🚇 역 선택</Text>
       <Text style={styles.stepDesc}>픽업 역과 배송 역을 선택해주세요.</Text>
 

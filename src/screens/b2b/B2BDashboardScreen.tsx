@@ -13,7 +13,9 @@ import {
   ActivityIndicator,
 } from 'react-native';
 import { StackNavigationProp } from '@react-navigation/stack';
-import { Colors, Typography, Spacing, BorderRadius } from '../../theme';
+import { Colors, Typography, Spacing, BorderRadius, Shadows } from '../../theme';
+import { b2bFirestoreService, MonthlyStats, TaxInvoice, Settlement } from '../../services/b2b-firestore-service';
+import { auth } from '../../services/firebase';
 
 type NavigationProp = StackNavigationProp<any>;
 
@@ -21,85 +23,16 @@ interface Props {
   navigation: NavigationProp;
 }
 
-interface MonthlyStats {
-  totalDeliveries: number;
-  totalAmount: number;
-  avgCostPerDelivery: number;
-}
-
-interface TaxInvoice {
-  id: string;
-  invoiceNumber: string;
-  period: string;
-  totalAmount: number;
-  status: 'issued' | 'paid';
-  issuedAt: string;
-}
-
-interface Settlement {
-  id: string;
-  period: string;
-  totalAmount: number;
-  status: 'pending' | 'completed';
-  transferredAt?: string;
-}
-
-// TODO: Firebase 연동 후 실제 데이터 사용
-const dummyStats: MonthlyStats = {
-  totalDeliveries: 127,
-  totalAmount: 635000,
-  avgCostPerDelivery: 5000,
-};
-
-const dummyTaxInvoices: TaxInvoice[] = [
-  {
-    id: '1',
-    invoiceNumber: 'TAX-202601-0001',
-    period: '2026년 1월',
-    totalAmount: 635000,
-    status: 'issued',
-    issuedAt: '2026-02-01',
-  },
-  {
-    id: '2',
-    invoiceNumber: 'TAX-202512-0001',
-    period: '2025년 12월',
-    totalAmount: 580000,
-    status: 'paid',
-    issuedAt: '2026-01-01',
-  },
-  {
-    id: '3',
-    invoiceNumber: 'TAX-202511-0001',
-    period: '2025년 11월',
-    totalAmount: 610000,
-    status: 'paid',
-    issuedAt: '2025-12-01',
-  },
-];
-
-const dummySettlements: Settlement[] = [
-  {
-    id: '1',
-    period: '2026년 1월',
-    totalAmount: 635000,
-    status: 'completed',
-    transferredAt: '2026-02-05',
-  },
-  {
-    id: '2',
-    period: '2025년 12월',
-    totalAmount: 580000,
-    status: 'completed',
-    transferredAt: '2026-01-05',
-  },
-];
-
 export default function B2BDashboardScreen({ navigation }: Props) {
   const [loading, setLoading] = useState(true);
-  const [stats, setStats] = useState<MonthlyStats>(dummyStats);
-  const [taxInvoices, setTaxInvoices] = useState<TaxInvoice[]>(dummyTaxInvoices);
-  const [settlements, setSettlements] = useState<Settlement[]>(dummySettlements);
+  const [stats, setStats] = useState<MonthlyStats>({
+    totalDeliveries: 0,
+    totalAmount: 0,
+    avgCostPerDelivery: 0,
+  });
+  const [taxInvoices, setTaxInvoices] = useState<TaxInvoice[]>([]);
+  const [settlements, setSettlements] = useState<Settlement[]>([]);
+  const [currentPeriod, setCurrentPeriod] = useState<string>('');
 
   useEffect(() => {
     loadDashboardData();
@@ -107,10 +40,41 @@ export default function B2BDashboardScreen({ navigation }: Props) {
 
   const loadDashboardData = async () => {
     try {
-      // TODO: Firebase Firestore에서 데이터 가져오기
-      // const statsData = await getB2BStats();
-      // const invoicesData = await getTaxInvoices();
-      // const settlementsData = await getSettlements();
+      setLoading(true);
+
+      // 현재 사용자 확인
+      const currentUser = auth.currentUser;
+      if (!currentUser) {
+        console.error('No authenticated user');
+        setLoading(false);
+        return;
+      }
+
+      const businessId = currentUser.uid;
+      const { year, month } = b2bFirestoreService.getCurrentYearMonth();
+
+      // 현재 기간 설정
+      setCurrentPeriod(b2bFirestoreService.getPeriodText(year, month));
+
+      // 병렬로 데이터 가져오기
+      const [statsData, invoicesData, settlementsData] = await Promise.all([
+        b2bFirestoreService.getMonthlyStats(businessId, year, month),
+        b2bFirestoreService.getTaxInvoices(businessId, 10),
+        b2bFirestoreService.getSettlements(businessId, 10),
+      ]);
+
+      // 데이터 업데이트
+      if (statsData) {
+        setStats(statsData);
+      }
+
+      if (invoicesData.length > 0) {
+        setTaxInvoices(invoicesData);
+      }
+
+      if (settlementsData.length > 0) {
+        setSettlements(settlementsData);
+      }
 
       setLoading(false);
     } catch (error) {
@@ -172,7 +136,7 @@ export default function B2BDashboardScreen({ navigation }: Props) {
         <View style={styles.statsContainer}>
           <View style={styles.statsHeader}>
             <Text style={styles.statsTitle}>📊 월간 현황</Text>
-            <Text style={styles.statsPeriod}>2026년 2월</Text>
+            <Text style={styles.statsPeriod}>{currentPeriod || '로딩 중...'}</Text>
           </View>
 
           <View style={styles.statsCards}>

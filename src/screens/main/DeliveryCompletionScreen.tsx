@@ -14,6 +14,7 @@ import {
   ActivityIndicator,
   ScrollView,
   Image,
+  Modal,
 } from 'react-native';
 import { StackNavigationProp } from '@react-navigation/stack';
 import * as Location from 'expo-location';
@@ -25,6 +26,7 @@ import {
   type DeliveryCompletionData,
 } from '../../services/delivery-service';
 import { getDeliveryById } from '../../services/delivery-service';
+import QRScanner from '../../components/delivery/QRScanner';
 
 type NavigationProp = StackNavigationProp<any>;
 
@@ -45,6 +47,7 @@ export default function DeliveryCompletionScreen({ navigation, route }: Props) {
   const [notes, setNotes] = useState('');
   const [loading, setLoading] = useState(false);
   const [location, setLocation] = useState<{ latitude: number; longitude: number } | null>(null);
+  const [showQRScanner, setShowQRScanner] = useState(false);
 
   useEffect(() => {
     loadDelivery();
@@ -164,6 +167,29 @@ export default function DeliveryCompletionScreen({ navigation, route }: Props) {
     }
   };
 
+  const handleQRScan = (data: string) => {
+    setShowQRScanner(false);
+
+    // QR 데이터 형식: "GANENGILE:{verificationCode}"
+    // 예: "GANENGILE:123456"
+    if (data.startsWith('GANENGILE:')) {
+      const code = data.split(':')[1];
+      if (code && code.length === 6) {
+        setVerificationCode(code);
+        Alert.alert('QR 스캔 성공', `인증 코드 ${code}가 입력되었습니다.`);
+      } else {
+        Alert.alert('QR 오류', '잘못된 QR 코드 형식입니다.');
+      }
+    } else {
+      Alert.alert('QR 오류', '가는길에 QR 코드가 아닙니다.');
+    }
+  };
+
+  const handleQRError = (error: string) => {
+    setShowQRScanner(false);
+    Alert.alert('카메라 오류', error);
+  };
+
   if (!delivery) {
     return (
       <View style={styles.loadingContainer}>
@@ -228,6 +254,20 @@ export default function DeliveryCompletionScreen({ navigation, route }: Props) {
             <Text style={styles.sectionDesc}>
               수신자에게 6자리 코드를 받아 입력하세요
             </Text>
+
+            <TouchableOpacity
+              style={styles.qrButton}
+              onPress={() => setShowQRScanner(true)}
+            >
+              <Text style={styles.qrButtonText}>📷 QR 코드 스캔</Text>
+            </TouchableOpacity>
+
+            {verificationCode && (
+              <View style={styles.scannedCodeContainer}>
+                <Text style={styles.scannedCodeLabel}>스캔된 코드:</Text>
+                <Text style={styles.scannedCode}>{verificationCode}</Text>
+              </View>
+            )}
 
             <View style={styles.codeInputContainer}>
               <TextInput
@@ -302,6 +342,19 @@ export default function DeliveryCompletionScreen({ navigation, route }: Props) {
           </TouchableOpacity>
         )}
       </ScrollView>
+
+      {/* QR Scanner Modal */}
+      <Modal
+        visible={showQRScanner}
+        animationType="slide"
+        onRequestClose={() => setShowQRScanner(false)}
+      >
+        <QRScanner
+          onScan={handleQRScan}
+          onError={handleQRError}
+          onClose={() => setShowQRScanner(false)}
+        />
+      </Modal>
     </View>
   );
 }
@@ -470,6 +523,39 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
     marginBottom: 8,
+  },
+  qrButton: {
+    alignItems: 'center',
+    backgroundColor: '#000',
+    borderRadius: 12,
+    marginBottom: 16,
+    padding: 20,
+  },
+  qrButtonText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: 'bold',
+  },
+  scannedCode: {
+    backgroundColor: '#E8F5E9',
+    borderColor: '#4CAF50',
+    borderRadius: 8,
+    borderWidth: 2,
+    color: '#333',
+    fontSize: 24,
+    fontWeight: 'bold',
+    letterSpacing: 4,
+    marginBottom: 16,
+    padding: 16,
+    textAlign: 'center',
+  },
+  scannedCodeContainer: {
+    alignItems: 'center',
+  },
+  scannedCodeLabel: {
+    color: '#666',
+    fontSize: 14,
+    marginBottom: 4,
   },
   retakeButton: {
     backgroundColor: '#FF9800',

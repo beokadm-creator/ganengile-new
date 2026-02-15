@@ -176,7 +176,6 @@ export default function UnlockLockerScreen() {
           {
             text: '확인',
             onPress: () => {
-              // TODO: 배송 완료 처리 및 평가 화면으로 이동
               navigation.navigate('Rating' as never, {
                 deliveryId: deliveryId!,
                 gillerId: reservation!.userId,

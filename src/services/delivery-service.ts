@@ -18,8 +18,7 @@ import {
   runTransaction,
 } from 'firebase/firestore';
 import { db } from './firebase';
-import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
-import { storage } from './firebase';
+import { uploadPickupPhoto, uploadDeliveryPhoto } from './storage-service';
 import type { DeliveryStatus, DeliveryRequest } from '../types/delivery';
 
 /**
@@ -155,15 +154,10 @@ export async function verifyPickup(data: PickupVerificationData): Promise<{ succ
     let photoUrl = '';
     if (data.photoUri) {
       try {
-        const photoRef = ref(storage, `pickup-photos/${data.deliveryId}/${Date.now()}.jpg`);
-        // Convert base64 to blob if needed
-        const response = await fetch(data.photoUri);
-        const blob = await response.blob();
-        await uploadBytes(photoRef, blob);
-        photoUrl = await getDownloadURL(photoRef);
-      } catch (error) {
+        photoUrl = await uploadPickupPhoto(data.deliveryId, data.photoUri);
+      } catch (error: any) {
         console.error('Error uploading photo:', error);
-        return { success: false, message: '사진 업로드에 실패했습니다.' };
+        return { success: false, message: error.message || '사진 업로드에 실패했습니다.' };
       }
     }
 
@@ -256,13 +250,10 @@ export async function completeDelivery(data: DeliveryCompletionData): Promise<{ 
     let photoUrl = '';
     if (data.photoUri) {
       try {
-        const photoRef = ref(storage, `delivery-photos/${data.deliveryId}/${Date.now()}.jpg`);
-        const response = await fetch(data.photoUri);
-        const blob = await response.blob();
-        await uploadBytes(photoRef, blob);
-        photoUrl = await getDownloadURL(photoRef);
-      } catch (error) {
+        photoUrl = await uploadDeliveryPhoto(data.deliveryId, data.photoUri);
+      } catch (error: any) {
         console.error('Error uploading photo:', error);
+        // Continue without photo (optional)
       }
     }
 

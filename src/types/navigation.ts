@@ -68,6 +68,7 @@ export type MainStackParamList = {
   EditRoute: { routeId: string };
   RequestDetail: { requestId: string; gillerId?: string };
   DeliveryTracking: { matchId?: string };
+  DeliveryTrackingScreen: { requestId: string };
   MatchingResult: {
     requestId: string;
     success: boolean;

@@ -23,6 +23,7 @@ import {
   updateReservationStatus,
   addReservationPhotos,
 } from '../../services/locker-service';
+import { getDeliveryById } from '../../services/delivery-service';
 import { verifyQRCode, getQRCodeRemainingTime } from '../../services/qrcode-service';
 import { takePhoto, uploadPhotoWithThumbnail } from '../../services/photo-service';
 import type { MainStackNavigationProp } from '../../types/navigation';
@@ -160,16 +161,36 @@ export default function GillerPickupAtLockerScreen() {
         await updateReservationStatus(reservation.reservationId, 'completed');
       }
 
+      // 배송 정보를 가져와서 requestId 추출
+      if (deliveryId) {
+        const delivery = await getDeliveryById(deliveryId);
+        if (delivery && delivery.requestId) {
+          Alert.alert(
+            '✅ 인수 완료',
+            '물품을 수거했습니다.\n\n배송을 시작합니다.',
+            [
+              {
+                text: '확인',
+                onPress: () => {
+                  navigation.navigate('DeliveryTrackingScreen', {
+                    requestId: delivery.requestId,
+                  });
+                },
+              },
+            ]
+          );
+          return;
+        }
+      }
+
+      // fallback: deliveryId나 requestId가 없는 경우
       Alert.alert(
         '✅ 인수 완료',
-        '물품을 수거했습니다.\n\n배송을 시작합니다.',
+        '물품을 수거했습니다.',
         [
           {
             text: '확인',
-            onPress: () => {
-              // TODO: 배송 시작 화면으로 이동
-              navigation.goBack();
-            },
+            onPress: () => navigation.goBack(),
           },
         ]
       );

@@ -378,6 +378,13 @@ export default function ProfileScreen({ navigation: _navigation }: Props) {
         onPress: () => (_navigation as any).navigate('MyRating'),
         color: '#FFA726',
       },
+      {
+        icon: '🎖️',
+        title: '내 배지',
+        subtitle: '획득한 배지 보기',
+        onPress: () => (_navigation as any).navigate('BadgeCollection'),
+        color: '#9C27B0',
+      },
       ...commonItems,
     ];
 

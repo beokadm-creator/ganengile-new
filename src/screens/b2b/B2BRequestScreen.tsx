@@ -17,6 +17,8 @@ import {
 import { StackNavigationProp } from '@react-navigation/stack';
 import { Colors, Typography, Spacing, BorderRadius } from '../../theme';
 import OptimizedStationSelectModal from '../../components/OptimizedStationSelectModal';
+import { B2BDeliveryService } from '../../services/b2b-delivery-service';
+import { requireUserId } from '../../services/firebase';
 
 type NavigationProp = StackNavigationProp<any>;
 
@@ -40,6 +42,12 @@ export default function B2BRequestScreen({ navigation }: Props) {
   const [showPickupModal, setShowPickupModal] = useState(false);
   const [showDeliveryModal, setShowDeliveryModal] = useState(false);
 
+  // B2B 입력 필드 상태 추가
+  const [pickupAddress, setPickupAddress] = useState('');
+  const [deliveryAddress, setDeliveryAddress] = useState('');
+  const [contractId, setContractId] = useState('default');
+  const [weight, setWeight] = useState('1.0');
+
   const handleSubmit = async () => {
     // 유효성 검사
     if (!pickupStation || !deliveryStation) {
@@ -57,24 +65,52 @@ export default function B2BRequestScreen({ navigation }: Props) {
       return;
     }
 
+    // B2B 추가 필드 검증
+    if (!pickupAddress.trim()) {
+      Alert.alert('입력 오류', '출발지 주소를 입력해주세요.');
+      return;
+    }
+
+    if (!deliveryAddress.trim()) {
+      Alert.alert('입력 오류', '도착지 주소를 입력해주세요.');
+      return;
+    }
+
+    const weightNum = parseFloat(weight);
+    if (isNaN(weightNum) || weightNum <= 0) {
+      Alert.alert('입력 오류', '올바른 중량을 입력해주세요. (0보다 커야 합니다)');
+      return;
+    }
+
     setLoading(true);
 
     try {
-      // TODO: Firebase에 B2B 배송 요청 저장
-      // await createB2BDelivery({
-      //   pickupStation,
-      //   deliveryStation,
-      //   requestType,
-      //   reservedTime,
-      //   specialRequest,
-      // });
+      const businessId = await requireUserId();
 
-      // 예상 비용 계산 (임의)
-      const estimatedCost = 5000;
+      // B2B 배송 요청 생성
+      const deliveryId = await B2BDeliveryService.createDelivery({
+        contractId,
+        businessId,
+        pickupLocation: {
+          station: pickupStation.stationName,
+          address: pickupAddress.trim(),
+          latitude: 0,
+          longitude: 0,
+        },
+        dropoffLocation: {
+          station: deliveryStation.stationName,
+          address: deliveryAddress.trim(),
+          latitude: 0,
+          longitude: 0,
+        },
+        scheduledTime: requestType === 'reserved' ? new Date(reservedTime) : new Date(),
+        weight: weightNum,
+        notes: specialRequest,
+      });
 
       Alert.alert(
-        '요청 완료',
-        `배송 요청이 완료되었습니다.\n예상 비용: ${estimatedCost.toLocaleString()}원\n\nB2B 길러를 매칭 중입니다.`,
+        '✅ 요청 완료',
+        `B2B 배송 요청이 완료되었습니다.\n\n요청 ID: ${deliveryId}\n\nB2B 길러를 매칭 중입니다.`,
         [
           {
             text: '확인',
@@ -82,8 +118,9 @@ export default function B2BRequestScreen({ navigation }: Props) {
           },
         ]
       );
-    } catch (error) {
-      Alert.alert('요청 실패', '다시 시도해주세요.');
+    } catch (error: any) {
+      console.error('B2B delivery request error:', error);
+      Alert.alert('요청 실패', error.message || '다시 시도해주세요.');
     } finally {
       setLoading(false);
     }
@@ -177,6 +214,59 @@ export default function B2BRequestScreen({ navigation }: Props) {
             numberOfLines={4}
             textAlignVertical="top"
           />
+        </View>
+
+        {/* B2B 추가 정보 */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>🏢 B2B 배송 정보</Text>
+
+          {/* 기업 계약 ID */}
+          <View style={styles.inputContainer}>
+            <Text style={styles.inputLabel}>기업 계약 ID</Text>
+            <TextInput
+              style={styles.textInput}
+              placeholder="default"
+              value={contractId}
+              onChangeText={setContractId}
+            />
+          </View>
+
+          {/* 출발지 주소 */}
+          <View style={styles.inputContainer}>
+            <Text style={styles.inputLabel}>출발지 주소</Text>
+            <TextInput
+              style={styles.textInput}
+              placeholder="서울시 강남구 테헤란로 123"
+              value={pickupAddress}
+              onChangeText={setPickupAddress}
+            />
+          </View>
+
+          {/* 도착지 주소 */}
+          <View style={styles.inputContainer}>
+            <Text style={styles.inputLabel}>도착지 주소</Text>
+            <TextInput
+              style={styles.textInput}
+              placeholder="서울시 서초구 서초대로 456"
+              value={deliveryAddress}
+              onChangeText={setDeliveryAddress}
+            />
+          </View>
+
+          {/* 중량 */}
+          <View style={styles.inputContainer}>
+            <Text style={styles.inputLabel}>중량 (kg)</Text>
+            <TextInput
+              style={styles.textInput}
+              placeholder="1.0"
+              value={weight}
+              onChangeText={setWeight}
+              keyboardType="decimal-pad"
+            />
+            <Text style={styles.inputNote}>
+              * 위도/경도는 주소 입력 후 자동 변환됩니다 (Geocoding API)
+            </Text>
+          </View>
         </View>
 
         {/* Estimated Cost */}
@@ -359,5 +449,30 @@ const styles = StyleSheet.create({
     ...Typography.bodyBold,
     color: Colors.white,
     fontSize: 18,
+  },
+  // B2B 입력 필드 스타일
+  inputContainer: {
+    marginBottom: Spacing.md,
+  },
+  inputLabel: {
+    ...Typography.body,
+    color: Colors.text.primary,
+    fontWeight: '600',
+    marginBottom: Spacing.xs,
+  },
+  textInput: {
+    backgroundColor: Colors.white,
+    borderRadius: BorderRadius.sm,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    paddingHorizontal: Spacing.md,
+    paddingVertical: Spacing.sm,
+    ...Typography.body,
+    color: Colors.text.primary,
+  },
+  inputNote: {
+    ...Typography.caption,
+    color: Colors.text.tertiary,
+    marginTop: Spacing.xs,
   },
 });
