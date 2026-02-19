@@ -31,7 +31,7 @@ jobs:
       #   run: npx tsc --noEmit
 
       - name: ✅ Skip checks (run locally)
-        run: echo "Lint and type check skipped. Run locally: npm run lint && npx tsc --noEmit"
+        run: echo "Lint and type check skipped. Run locally"
 
   test:
     name: Tests
