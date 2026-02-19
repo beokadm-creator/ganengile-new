@@ -11,8 +11,8 @@
     "test": "jest",
     "test:watch": "jest --watch",
     "test:coverage": "jest --coverage",
-    "lint": "eslint 'screens/**/*.{ts,tsx}' 'components/**/*.{ts,tsx}' 'services/**/*.{ts,tsx}' 'navigation/**/*.{ts,tsx}' 'App.tsx' --max-warnings 100",
-    "lint:fix": "eslint 'screens/**/*.{ts,tsx}' 'components/**/*.{ts,tsx}' 'services/**/*.{ts,tsx}' 'navigation/**/*.{ts,tsx}' 'App.tsx' --fix --max-warnings 100"
+    "lint": "eslint 'src/**/*.{ts,tsx}' 'App.tsx' --max-warnings 100",
+    "lint:fix": "eslint 'src/**/*.{ts,tsx}' 'App.tsx' --fix --max-warnings 100"
   },
   "dependencies": {
     "@expo/vector-icons": "^15.0.3",
