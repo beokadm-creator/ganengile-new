@@ -1,7 +1,7 @@
 import '@testing-library/jest-native/extend-expect';
 
 // Mock Colors theme
-jest.mock('../src/theme/colors', () => ({
+jest.mock('./src/theme/colors', () => ({
   Colors: {
     primary: '#00BCD4',
     secondary: '#4CAF50',
@@ -18,11 +18,11 @@ jest.mock('../src/theme/colors', () => ({
     warning: '#FF9800',
     error: '#F44336',
     white: '#FFFFFF',
-      black: '#000000',
+    black: '#000000',
   },
 }));
 
-jest.mock('../src/theme/typography', () => ({
+jest.mock('./src/theme/typography', () => ({
   Typography: {
     h1: { fontSize: 32, fontWeight: 'bold' },
     h2: { fontSize: 24, fontWeight: 'bold' },
@@ -32,7 +32,7 @@ jest.mock('../src/theme/typography', () => ({
   },
 }));
 
-jest.mock('../src/theme/spacing', () => ({
+jest.mock('./src/theme/spacing', () => ({
   Spacing: {
     xs: 4,
     sm: 8,
