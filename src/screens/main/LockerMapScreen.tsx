@@ -152,8 +152,12 @@ export default function LockerMapScreen({ navigation }: Props) {
         {
           text: '선택',
           onPress: () => {
-            // TODO: 사물함 예약 화면으로 이동
-            Alert.alert('예약 안내', '사물함 예약 기능은 다음 단계에서 구현됩니다.');
+            // 사물함 예약 화면으로 이동
+            navigation.navigate('LockerSelection', {
+              stationId: locker.stationId,
+              stationName: locker.stationName,
+              lockerId: locker.id,
+            });
           },
         },
       ]

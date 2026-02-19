@@ -287,10 +287,136 @@ export class MediaService {
 
   /**
    * 이미지 크기 조정 (썸네일 생성용)
+   * @version 2.1.0 - expo-image-manipulator 사용
    */
   async resizeImage(uri: string, maxWidth: number = 200): Promise<string> {
-    // TODO: 이미지 리사이징 로직 구현 (expo-image-manipulator 사용)
-    return uri;
+    try {
+      const { manipulateAsync, ImageManipulator } = require('expo-image-manipulator');
+
+      // 이미지 정보 가져오기
+      const fileInfo = await FileSystem.getInfoAsync(uri);
+      if (!fileInfo.exists) {
+        throw new Error('File not found');
+      }
+
+      // 원본 이미지 크기 확인
+      const originalSize = fileInfo.size || 0;
+
+      // 이미지 조작 (리사이징)
+      const result = await manipulateAsync(
+        uri,
+        [
+          {
+            resize: {
+              width: maxWidth,
+            },
+          },
+        ],
+        {
+          compress: 0.7,
+          format: ImageManipulator.SaveFormat.JPEG,
+        }
+      );
+
+      console.log(`Image resized: ${originalSize} -> ${result.size} bytes (${maxWidth}px width)`);
+
+      return result.uri;
+    } catch (error) {
+      console.error('Error resizing image:', error);
+      // 실패 시 원본 URI 반환
+      return uri;
+    }
+  }
+
+  /**
+   * 이미지 회전
+   */
+  async rotateImage(uri: string, degrees: number = 0): Promise<string> {
+    try {
+      const { manipulateAsync } = require('expo-image-manipulator');
+
+      const result = await manipulateAsync(
+        uri,
+        [
+          {
+            rotate: degrees,
+          },
+        ],
+        {
+          compress: 0.7,
+          format: 'jpeg',
+        }
+      );
+
+      return result.uri;
+    } catch (error) {
+      console.error('Error rotating image:', error);
+      return uri;
+    }
+  }
+
+  /**
+   * 이미지 자르기 (Crop)
+   */
+  async cropImage(
+    uri: string,
+    originX: number,
+    originY: number,
+    width: number,
+    height: number
+  ): Promise<string> {
+    try {
+      const { manipulateAsync } = require('expo-image-manipulator');
+
+      const result = await manipulateAsync(
+        uri,
+        [
+          {
+            crop: {
+              originX,
+              originY,
+              width,
+              height,
+            },
+          },
+        ],
+        {
+          compress: 0.7,
+          format: 'jpeg',
+        }
+      );
+
+      return result.uri;
+    } catch (error) {
+      console.error('Error cropping image:', error);
+      return uri;
+    }
+  }
+
+  /**
+   * 썸네일 생성 (여러 크기)
+   */
+  async generateThumbnails(uri: string): Promise<{
+    small: string;  // 150px
+    medium: string; // 300px
+    large: string;  // 600px
+  }> {
+    try {
+      const [small, medium, large] = await Promise.all([
+        this.resizeImage(uri, 150),
+        this.resizeImage(uri, 300),
+        this.resizeImage(uri, 600),
+      ]);
+
+      return { small, medium, large };
+    } catch (error) {
+      console.error('Error generating thumbnails:', error);
+      return {
+        small: uri,
+        medium: uri,
+        large: uri,
+      };
+    }
   }
 
   /**

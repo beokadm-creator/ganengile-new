@@ -47,8 +47,14 @@ export class B2BSettlementService {
 
       if (b2bDeliveries === 0) continue; // 배송 건수 0이면 스킵
 
-      // 3. 월 보너스 계산
-      const monthlyBonus = TIER_MONTHLY_BONUSES[giller.tier];
+      // 3. 월 보너스 계산 (길러 등급 조회)
+      const gillerTier = await B2BGillerService.getB2BGillerTier(giller.gillerId);
+      if (!gillerTier) {
+        console.error(`길러 등급을 찾을 수 없습니다: ${giller.gillerId}`);
+        continue;
+      }
+
+      const monthlyBonus = TIER_MONTHLY_BONUSES[gillerTier.tier];
 
       // 4. 총 정산 금액
       const totalSettlement = deliveryEarnings + monthlyBonus;
@@ -242,8 +248,9 @@ export class B2BSettlementService {
       end: new Date(data.periodEnd)
     };
 
-    // TODO: 길러 등급 조회
-    const monthlyBonus = 0; // 임시
+    // 길러 등급 조회
+    const gillerTier = await B2BGillerService.getB2BGillerTier(data.gillerId);
+    const monthlyBonus = gillerTier ? TIER_MONTHLY_BONUSES[gillerTier.tier] : 0;
 
     const settlementData: Omit<B2BSettlement, 'id' | 'status' | 'createdAt'> = {
       gillerId: data.gillerId,
@@ -337,12 +344,57 @@ export class B2BSettlementService {
   /**
    * 정산 재시도 (실패 시)
    */
-  static async retrySettlement(settlementId: string): Promise<void> {
+  static async retrySettlement(settlementId: string, maxRetries: number = 3): Promise<{
+    success: boolean;
+    attempt: number;
+    error?: string;
+  }> {
     const settlement = await this.getSettlement(settlementId);
-    if (!settlement) return;
+    if (!settlement) {
+      return { success: false, attempt: 0, error: '정산을 찾을 수 없습니다' };
+    }
 
-    // TODO: 이체 재시도
-    console.log(`정산 재시도: ${settlementId}`);
+    // 이미 성공한 정산은 재시도하지 않음
+    if (settlement.status === 'paid') {
+      return { success: true, attempt: 0, error: '이미 지급 완료된 정산입니다' };
+    }
+
+    // 계좌 정보 조회
+    const transferInfo = await this.getGillerAccountInfo(settlement.gillerId);
+    if (!transferInfo) {
+      const error = '계좌 정보를 찾을 수 없습니다';
+      await this.markAsFailed(settlementId, error);
+      return { success: false, attempt: 0, error };
+    }
+
+    // 재시도 횟수 확인 (Firestore에 재시도 횟수 저장 필요)
+    // 임시: 최대 3회까지 재시도
+    for (let attempt = 1; attempt <= maxRetries; attempt++) {
+      try {
+        console.log(`정산 재시도: ${settlementId}, 시도 ${attempt}/${maxRetries}`);
+
+        // 이체 실행
+        await this.executeTransfer(settlementId, settlement.totalSettlement, transferInfo);
+
+        // 성공
+        return { success: true, attempt };
+      } catch (error) {
+        console.error(`정산 재시도 실패 (시도 ${attempt}/${maxRetries}):`, error);
+
+        // 마지막 시도 실패 시 실패 처리
+        if (attempt === maxRetries) {
+          const errorMessage = error instanceof Error ? error.message : '알 수 없는 오류';
+          await this.markAsFailed(settlementId, `재시도 ${maxRetries}회 실패: ${errorMessage}`);
+          await this.notifyTransferFailure(settlementId, errorMessage);
+          return { success: false, attempt, error: errorMessage };
+        }
+
+        // 재시도 전 대기 (지수 백오프: 2초, 4초, 8초)
+        await new Promise(resolve => setTimeout(resolve, Math.pow(2, attempt) * 1000));
+      }
+    }
+
+    return { success: false, attempt: maxRetries, error: '최대 재시도 횟수 초과' };
   }
 
   /**
@@ -386,10 +438,12 @@ export class B2BSettlementService {
       platinum: 0
     };
 
-    // TODO: 각 정산의 길러 등급 집계
+    // 각 정산의 길러 등급 집계
     for (const s of settlements) {
-      // TODO: 길러 등급 조회
-      tierBreakdown['silver']++;
+      const gillerTier = await B2BGillerService.getB2BGillerTier(s.gillerId);
+      if (gillerTier && gillerTier.tier in tierBreakdown) {
+        tierBreakdown[gillerTier.tier]++;
+      }
     }
 
     return {
@@ -401,15 +455,89 @@ export class B2BSettlementService {
   }
 
   /**
-   * 정산 확인서 생성 (TODO: PDF 라이브러리)
+   * 정산 확인서 생성 (텍스트 기반, PDF는 선택 사항)
    */
-  static async generateSettlementReport(settlementId: string): Promise<string> {
+  static async generateSettlementReport(settlementId: string): Promise<{
+    success: boolean;
+    reportUrl?: string;
+    reportText?: string;
+    error?: string;
+  }> {
     const settlement = await this.getSettlement(settlementId);
-    if (!settlement) return '';
+    if (!settlement) {
+      return { success: false, error: '정산을 찾을 수 없습니다' };
+    }
 
-    // TODO: PDF 생성
-    const reportUrl = `https://storage.googleapis.com/settlements/${settlementId}.pdf`;
-    return reportUrl;
+    try {
+      // 길러 정보 조회
+      const gillerDoc = await getDoc(doc(db, 'users', settlement.gillerId));
+      const giller = gillerDoc.data();
+
+      // 길러 등급 조회
+      const gillerTier = await B2BGillerService.getB2BGillerTier(settlement.gillerId);
+      const tierName = gillerTier ? gillerTier.tier.toUpperCase() : 'N/A';
+
+      // 정산 확인서 텍스트 생성
+      const reportText = `
+=================================================================
+                    가는길에 B2B 정산 확인서
+=================================================================
+
+정산 ID: ${settlementId}
+생성일자: ${new Date().toLocaleString('ko-KR')}
+
+-----------------------------------------------------------------
+[길러 정보]
+-----------------------------------------------------------------
+길러 ID: ${settlement.gillerId}
+이름: ${giller?.name || 'N/A'}
+등급: ${tierName}
+
+-----------------------------------------------------------------
+[정산 기간]
+-----------------------------------------------------------------
+시작일: ${new Date(settlement.period.start).toLocaleDateString('ko-KR')}
+종료일: ${new Date(settlement.period.end).toLocaleDateString('ko-KR')}
+
+-----------------------------------------------------------------
+[정산 내역]
+-----------------------------------------------------------------
+B2B 배송 건수: ${settlement.b2bDeliveries}건
+배송 수익: ${settlement.deliveryEarnings.toLocaleString('ko-KR')}원
+월간 보너스: ${settlement.monthlyBonus.toLocaleString('ko-KR')}원
+----------------------------------------
+총 정산 금액: ${settlement.totalSettlement.toLocaleString('ko-KR')}원
+
+-----------------------------------------------------------------
+[지급 정보]
+-----------------------------------------------------------------
+상태: ${this.getSettlementStatusLabel(settlement.status)}
+${settlement.status === 'paid' && settlement.transferInfo ? `
+계좌번호: ${settlement.transferInfo.accountNumber}
+은행: ${settlement.transferInfo.bank}
+이체일자: ${new Date(settlement.transferInfo.transferredAt).toLocaleString('ko-KR')}
+거래 ID: ${settlement.transferInfo.transactionId}
+` : ''}
+
+=================================================================
+이 확인서는 가는길에 B2B 정산 시스템에 의해 자동 생성되었습니다.
+문의: support@ganeungile.com
+=================================================================
+      `.trim();
+
+      // TODO: PDF 라이브러리 (expo-pdf, react-native-html-to-pdf) 설치 시 PDF 생성
+      // 현재는 텍스트를 반환하며, 향후 Firebase Storage에 PDF 업로드 가능
+
+      return {
+        success: true,
+        reportText,
+        reportUrl: `https://storage.googleapis.com/settlements/${settlementId}.txt` // 임시 URL
+      };
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : '알 수 없는 오류';
+      console.error('정산 확인서 생성 실패:', error);
+      return { success: false, error: errorMessage };
+    }
   }
 
   /**

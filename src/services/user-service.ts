@@ -1,6 +1,7 @@
 /**
  * User Service
  * Firebase Users Collection 관리 서비스
+ * @version 2.1.0 - 통계 계산 로직 개선
  */
 
 import {
@@ -14,6 +15,8 @@ import {
   query,
   where,
   serverTimestamp,
+  sum,
+  avg,
 } from 'firebase/firestore';
 import { db } from './firebase';
 import { auth } from './firebase';
@@ -148,6 +151,7 @@ export async function updateUserProfile(
  * Get user statistics
  * @param userId User ID
  * @returns User statistics
+ * @version 2.1.0 - 실제 데이터 계산 로직 구현
  */
 export async function getUserStats(userId: string): Promise<{
   totalRequests: number;
@@ -167,19 +171,42 @@ export async function getUserStats(userId: string): Promise<{
     const requestsSnapshot = await getDocs(requestsQuery);
     const totalRequests = requestsSnapshot.size;
 
-    // Get completed deliveries (as giller)
-    // TODO: Add deliveries collection or track in matches
-    const totalDeliveries = 0; // Placeholder
+    // Get completed deliveries (as giller) from deliveries collection
+    const deliveriesQuery = query(
+      collection(db, 'deliveries'),
+      where('gillerId', '==', userId),
+      where('status', '==', 'delivered')
+    );
 
-    // Get total earnings (as giller)
-    // TODO: Calculate from completed deliveries
-    const totalEarnings = 0; // Placeholder
+    const deliveriesSnapshot = await getDocs(deliveriesQuery);
+    const totalDeliveries = deliveriesSnapshot.size;
 
-    // Get average rating
-    // TODO: Calculate from ratings collection
-    const averageRating = 4.5; // Placeholder
+    // Calculate total earnings from completed deliveries
+    let totalEarnings = 0;
+    deliveriesSnapshot.forEach((doc) => {
+      const data = doc.data();
+      totalEarnings += data.fee?.gillerFee || 0;
+    });
 
-    // Calculate completion rate
+    // Get average rating from ratings collection
+    const ratingsQuery = query(
+      collection(db, 'ratings'),
+      where('ratedUserId', '==', userId)
+    );
+
+    const ratingsSnapshot = await getDocs(ratingsQuery);
+    let averageRating = 0;
+
+    if (!ratingsSnapshot.empty) {
+      let totalRating = 0;
+      ratingsSnapshot.forEach((doc) => {
+        const data = doc.data();
+        totalRating += data.rating || 0;
+      });
+      averageRating = totalRating / ratingsSnapshot.size;
+    }
+
+    // Calculate completion rate (as gller)
     const allRequestsQuery = query(
       collection(db, 'requests'),
       where('gllerId', '==', userId)
@@ -194,8 +221,8 @@ export async function getUserStats(userId: string): Promise<{
       totalRequests,
       totalDeliveries,
       totalEarnings,
-      averageRating,
-      completionRate,
+      averageRating: Math.round(averageRating * 10) / 10, // 소수점 1자리
+      completionRate: Math.round(completionRate * 10) / 10,
     };
   } catch (error) {
     console.error('Error fetching user stats:', error);
@@ -205,6 +232,89 @@ export async function getUserStats(userId: string): Promise<{
       totalEarnings: 0,
       averageRating: 0,
       completionRate: 0,
+    };
+  }
+}
+
+/**
+ * Get detailed user statistics (includes recent activity)
+ * @param userId User ID
+ * @returns Detailed user statistics
+ */
+export async function getDetailedUserStats(userId: string): Promise<{
+  totalRequests: number;
+  totalDeliveries: number;
+  totalEarnings: number;
+  averageRating: number;
+  completionRate: number;
+  recent30DaysDeliveries: number;
+  recentPenalties: number;
+  accountAgeDays: number;
+}> {
+  try {
+    const baseStats = await getUserStats(userId);
+
+    // Get user data for additional stats
+    const userDoc = await getDoc(doc(db, 'users', userId));
+    if (!userDoc.exists()) {
+      return {
+        ...baseStats,
+        recent30DaysDeliveries: 0,
+        recentPenalties: 0,
+        accountAgeDays: 0,
+      };
+    }
+
+    const userData = userDoc.data();
+    const createdAt = userData.createdAt?.toDate();
+
+    // Calculate account age in days
+    let accountAgeDays = 0;
+    if (createdAt) {
+      accountAgeDays = Math.floor((Date.now() - createdAt.getTime()) / (1000 * 60 * 60 * 24));
+    }
+
+    // Get recent 30 days deliveries
+    const thirtyDaysAgo = new Date();
+    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+
+    const recentDeliveriesQuery = query(
+      collection(db, 'deliveries'),
+      where('gillerId', '==', userId),
+      where('status', '==', 'delivered'),
+      where('completedAt', '>=', thirtyDaysAgo)
+    );
+
+    const recentDeliveriesSnapshot = await getDocs(recentDeliveriesQuery);
+    const recent30DaysDeliveries = recentDeliveriesSnapshot.size;
+
+    // Get recent penalties (last 30 days)
+    const recentPenaltiesQuery = query(
+      collection(db, 'penalties'),
+      where('userId', '==', userId),
+      where('createdAt', '>=', thirtyDaysAgo)
+    );
+
+    const recentPenaltiesSnapshot = await getDocs(recentPenaltiesQuery);
+    const recentPenalties = recentPenaltiesSnapshot.size;
+
+    return {
+      ...baseStats,
+      recent30DaysDeliveries,
+      recentPenalties,
+      accountAgeDays,
+    };
+  } catch (error) {
+    console.error('Error fetching detailed user stats:', error);
+    return {
+      totalRequests: 0,
+      totalDeliveries: 0,
+      totalEarnings: 0,
+      averageRating: 0,
+      completionRate: 0,
+      recent30DaysDeliveries: 0,
+      recentPenalties: 0,
+      accountAgeDays: 0,
     };
   }
 }

@@ -4,11 +4,26 @@
  */
 
 import { StationInfo } from '../types/route';
+import { pathfindingService } from './PathfindingService';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 export interface ValidationResult {
   isValid: boolean;
   errors: string[];
   warnings: string[];
+}
+
+// AsyncStorage Keys
+const FAVORITE_ROUTES_KEY = '@favorite_routes';
+
+// Favorite Route 타입
+export interface FavoriteRoute {
+  routeId: string;
+  startStation: StationInfo;
+  endStation: StationInfo;
+  departureTime: string;
+  selectedDays: number[];
+  createdAt: string;
 }
 
 /**
@@ -106,26 +121,47 @@ export const validateRouteInput = (
 };
 
 /**
- * 예상 소요 시간 계산 (단순화)
+ * 예상 소요 시간 계산 (PathfindingService 활용)
  */
-export const estimateTravelTime = (
+export const estimateTravelTime = async (
   startStation: StationInfo,
   endStation: StationInfo
-): number => {
-  // TODO: PathfindingService 활용
-  // 현재는 단순 거리 기반 추정
-  const latDiff = Math.abs(startStation.lat - endStation.lat);
-  const lngDiff = Math.abs(startStation.lng - endStation.lng);
-  const distance = Math.sqrt(latDiff * latDiff + lngDiff * lngDiff);
+): Promise<number> => {
+  try {
+    // PathfindingService가 초기화되었는지 확인
+    const result = pathfindingService.calculateETA(
+      startStation.id,
+      endStation.id
+    );
 
-  // 1도 약 111km, 지하철 평균 속도 40km/h
-  const estimatedMinutes = Math.round((distance * 111) / 40 * 60);
+    if (result && result.minutes > 0) {
+      return result.minutes;
+    }
 
-  return Math.max(estimatedMinutes, 10); // 최소 10분
+    // Fallback: 단순 거리 기반 추정
+    const latDiff = Math.abs(startStation.lat - endStation.lat);
+    const lngDiff = Math.abs(startStation.lng - endStation.lng);
+    const distance = Math.sqrt(latDiff * latDiff + lngDiff * lngDiff);
+
+    // 1도 약 111km, 지하철 평균 속도 40km/h
+    const estimatedMinutes = Math.round((distance * 111) / 40 * 60);
+
+    return Math.max(estimatedMinutes, 10); // 최소 10분
+  } catch (error) {
+    console.error('Failed to estimate travel time:', error);
+
+    // Error fallback: 단순 거리 기반 추정
+    const latDiff = Math.abs(startStation.lat - endStation.lat);
+    const lngDiff = Math.abs(startStation.lng - endStation.lng);
+    const distance = Math.sqrt(latDiff * latDiff + lngDiff * lngDiff);
+
+    const estimatedMinutes = Math.round((distance * 111) / 40 * 60);
+    return Math.max(estimatedMinutes, 10);
+  }
 };
 
 /**
- * 동선 저장 후 저장소 최신화
+ * 동선 저장 후 저장소 최신화 (AsyncStorage에 즐겨찾기 저장)
  */
 export const saveRouteToFavorites = async (
   routeId: string,
@@ -135,14 +171,81 @@ export const saveRouteToFavorites = async (
   selectedDays: number[]
 ): Promise<boolean> => {
   try {
-    // TODO: AsyncStorage에 즐겨찾기 저장
-    // const favorites = await getFavoriteRoutes();
-    // await setFavoriteRoutes([...favorites, routeData]);
+    // 기존 즐겨찾기 가져오기
+    const existingFavoritesJson = await AsyncStorage.getItem(FAVORITE_ROUTES_KEY);
+    const existingFavorites: FavoriteRoute[] = existingFavoritesJson
+      ? JSON.parse(existingFavoritesJson)
+      : [];
+
+    // 새로운 즐겨찾기 생성
+    const newFavorite: FavoriteRoute = {
+      routeId,
+      startStation,
+      endStation,
+      departureTime,
+      selectedDays,
+      createdAt: new Date().toISOString(),
+    };
+
+    // 중복 체크 (같은 경로가 이미 있는지)
+    const isDuplicate = existingFavorites.some(
+      (fav) =>
+        fav.startStation.id === startStation.id &&
+        fav.endStation.id === endStation.id &&
+        fav.departureTime === departureTime &&
+        JSON.stringify(fav.selectedDays.sort()) === JSON.stringify(selectedDays.sort())
+    );
+
+    if (isDuplicate) {
+      console.log('Route already exists in favorites:', routeId);
+      return true; // 이미 있으면 성공으로 처리
+    }
+
+    // 즐겨찾기 추가 (최대 20개)
+    const updatedFavorites = [newFavorite, ...existingFavorites].slice(0, 20);
+
+    // AsyncStorage에 저장
+    await AsyncStorage.setItem(FAVORITE_ROUTES_KEY, JSON.stringify(updatedFavorites));
 
     console.log('Route saved to favorites:', routeId);
     return true;
   } catch (error) {
     console.error('Failed to save route to favorites:', error);
+    return false;
+  }
+};
+
+/**
+ * 즐겨찾기 동선 목록 가져오기
+ */
+export const getFavoriteRoutes = async (): Promise<FavoriteRoute[]> => {
+  try {
+    const favoritesJson = await AsyncStorage.getItem(FAVORITE_ROUTES_KEY);
+    return favoritesJson ? JSON.parse(favoritesJson) : [];
+  } catch (error) {
+    console.error('Failed to get favorite routes:', error);
+    return [];
+  }
+};
+
+/**
+ * 즐겨찾기 동선 삭제
+ */
+export const removeFavoriteRoute = async (routeId: string): Promise<boolean> => {
+  try {
+    const existingFavoritesJson = await AsyncStorage.getItem(FAVORITE_ROUTES_KEY);
+    const existingFavorites: FavoriteRoute[] = existingFavoritesJson
+      ? JSON.parse(existingFavoritesJson)
+      : [];
+
+    const updatedFavorites = existingFavorites.filter((fav) => fav.routeId !== routeId);
+
+    await AsyncStorage.setItem(FAVORITE_ROUTES_KEY, JSON.stringify(updatedFavorites));
+
+    console.log('Route removed from favorites:', routeId);
+    return true;
+  } catch (error) {
+    console.error('Failed to remove favorite route:', error);
     return false;
   }
 };

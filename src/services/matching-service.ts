@@ -30,6 +30,45 @@ import { createChatService, getChatRoomByRequestId } from './chat-service';
 import { MessageType } from '../types/chat';
 
 /**
+ * Fetch user stats from users collection
+ * @param userId User ID
+ * @returns User stats
+ */
+async function fetchUserStats(userId: string): Promise<{
+  rating: number;
+  totalDeliveries: number;
+  completedDeliveries: number;
+}> {
+  try {
+    const userDoc = await getDoc(doc(db, 'users', userId));
+
+    if (!userDoc.exists()) {
+      return {
+        rating: 3.5,
+        totalDeliveries: 0,
+        completedDeliveries: 0,
+      };
+    }
+
+    const data = userDoc.data();
+    const stats = data.stats || {};
+
+    return {
+      rating: stats.rating || data.rating || 3.5,
+      totalDeliveries: stats.completedDeliveries || data.gillerInfo?.totalDeliveries || 0,
+      completedDeliveries: stats.completedDeliveries || data.gillerInfo?.totalDeliveries || 0,
+    };
+  } catch (error) {
+    console.error('Error fetching user stats:', error);
+    return {
+      rating: 3.5,
+      totalDeliveries: 0,
+      completedDeliveries: 0,
+    };
+  }
+}
+
+/**
  * Fetch all active giller routes from Firestore
  * @returns Array of giller routes
  */
@@ -55,6 +94,9 @@ export async function fetchActiveGillerRoutes(): Promise<GillerRoute[]> {
         return;
       }
 
+      // Fetch user stats from users collection
+      const userStats = await fetchUserStats(data.userId);
+
       routes.push({
         gillerId: data.userId,
         gillerName: data.gillerName || '익명',
@@ -62,9 +104,9 @@ export async function fetchActiveGillerRoutes(): Promise<GillerRoute[]> {
         endStation,
         departureTime: data.departureTime,
         daysOfWeek: data.daysOfWeek,
-        rating: 4.0,
-        totalDeliveries: 0, // TODO: Fetch from users collection
-        completedDeliveries: 0, // TODO: Fetch from users collection
+        rating: userStats.rating,
+        totalDeliveries: userStats.totalDeliveries,
+        completedDeliveries: userStats.completedDeliveries,
       });
     });
 
@@ -78,13 +120,14 @@ export async function fetchActiveGillerRoutes(): Promise<GillerRoute[]> {
 /**
  * Fetch user info by ID
  * @param userId User ID
- * @returns User data { name, rating, totalDeliveries, completedDeliveries }
+ * @returns User data { name, rating, totalDeliveries, completedDeliveries, profileImage }
  */
 export async function fetchUserInfo(userId: string): Promise<{
   name: string;
   rating: number;
   totalDeliveries: number;
   completedDeliveries: number;
+  profileImage?: string;
 }> {
   try {
     const userDoc = await getDoc(doc(db, 'users', userId));
@@ -95,6 +138,7 @@ export async function fetchUserInfo(userId: string): Promise<{
         rating: 3.5,
         totalDeliveries: 0,
         completedDeliveries: 0,
+        profileImage: undefined,
       };
     }
 
@@ -104,6 +148,7 @@ export async function fetchUserInfo(userId: string): Promise<{
       rating: data.rating || 3.5,
       totalDeliveries: data.gillerInfo?.totalDeliveries || 0,
       completedDeliveries: data.gillerInfo?.totalDeliveries || 0, // Assuming completed = total for now
+      profileImage: data.profilePhoto || data.profileImage || undefined,
     };
   } catch (error) {
     console.error('Error fetching user info:', error);
@@ -112,6 +157,7 @@ export async function fetchUserInfo(userId: string): Promise<{
       rating: 3.5,
       totalDeliveries: 0,
       completedDeliveries: 0,
+      profileImage: undefined,
     };
   }
 }
@@ -122,14 +168,27 @@ export async function fetchUserInfo(userId: string): Promise<{
  * @returns DeliveryRequest object
  */
 export function convertToDeliveryRequest(requestDoc: any): DeliveryRequest {
+  // preferredTime에서 departureTime 추출, 없으면 기본값 사용
+  const departureTime = requestDoc.preferredTime?.departureTime || '08:00';
+  const arrivalTime = requestDoc.preferredTime?.arrivalTime || '09:00';
+
+  // deadline에서 배송 마감 시간 추출
+  const deadlineTime = requestDoc.deadline
+    ? new Date(requestDoc.deadline.toDate?.() || requestDoc.deadline)
+    : new Date();
+
   return {
     requestId: requestDoc.id,
-    pickupStationName: requestDoc.pickupStation.name,
-    deliveryStationName: requestDoc.deliveryStation.name,
-    pickupStartTime: '08:00', // TODO: Add to request schema
-    pickupEndTime: '08:20',
-    deliveryDeadline: '09:00',
-    preferredDays: [1, 2, 3, 4, 5], // TODO: Add to request schema
+    pickupStationName: requestDoc.pickupStation.stationName,
+    deliveryStationName: requestDoc.deliveryStation.stationName,
+    pickupStartTime: departureTime,
+    pickupEndTime: arrivalTime,
+    deliveryDeadline: deadlineTime.toLocaleTimeString('ko-KR', {
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: false,
+    }),
+    preferredDays: [1, 2, 3, 4, 5], // 평일 기본값 (필요시 우선순위 필드 추가)
     packageSize: requestDoc.packageInfo.size,
     packageWeight: requestDoc.packageInfo.weight === 'light' ? 1 :
                    requestDoc.packageInfo.weight === 'medium' ? 3 : 7,
@@ -305,7 +364,7 @@ export async function getMatchingResults(requestId: string) {
         rating: userInfo.rating,
         completedDeliveries: userInfo.completedDeliveries,
         estimatedFee: Math.round(baseFee * (1 + (index * 0.1))), // Slightly higher fee for lower ranked matches
-        profileImage: undefined, // TODO: Add profile image to user data
+        profileImage: userInfo.profileImage || undefined,
       };
     })
   );
