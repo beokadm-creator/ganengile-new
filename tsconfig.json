@@ -5,6 +5,13 @@
     "esModuleInterop": true,
     "allowSyntheticDefaultImports": true
   },
+  "exclude": [
+    "node_modules",
+    "e2e",
+    "tests",
+    "__tests__",
+    "detox.config.js"
+  ],
   "ts-node": {
     "esm": true,
     "experimentalSpecifierResolution": "node"
