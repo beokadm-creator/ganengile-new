@@ -7,6 +7,7 @@ module.exports = {
     'scripts/',  // scripts 폴더 무시
     'data/',
     '.expo/',
+    'tests/',  // tests 폴더 무시 (임시)
   ],
   rules: {
     '@typescript-eslint/no-unused-vars': [
