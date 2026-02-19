@@ -2,9 +2,10 @@
  * Create Request Screen
  * 배송 요청 생성 화면 (5단계 스텝)
  * 디자인 토큰 적용 완료
+ * 개선사항: 네트워크 에러 처리, 진행 상태 저장, 더 나은 UX
  */
 
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import {
   View,
   Text,
@@ -14,6 +15,8 @@ import {
   TouchableOpacity,
   Alert,
   ActivityIndicator,
+  KeyboardAvoidingView,
+  Platform,
 } from 'react-native';
 import { StackNavigationProp } from '@react-navigation/stack';
 import { getAllStations } from '../../services/config-service';
@@ -25,6 +28,17 @@ import type { StationInfo, PackageSize, PackageWeight } from '../../types/reques
 import TimePicker from '../../components/common/TimePicker';
 import OptimizedStationSelectModal from '../../components/OptimizedStationSelectModal';
 import ModeToggleSwitch from '../../components/onetime/ModeToggleSwitch';
+
+// Utils
+import { retryWithBackoff, retryFirebaseQuery } from '../../utils/retry-with-backoff';
+import { showErrorAlert, isNetworkError } from '../../utils/error-handler';
+import { isNetworkAvailable } from '../../utils/network-detector';
+import {
+  saveCreateRequestProgress,
+  loadCreateRequestProgress,
+  deleteCreateRequestProgress,
+  type CreateRequestDraft,
+} from '../../utils/draft-storage';
 
 function convertStationToInfo(station: Station): StationInfo {
   const firstLine = station.lines[0];
@@ -91,6 +105,9 @@ const URGENCY_OPTIONS: UrgencyOption[] = [
 export default function CreateRequestScreen({ navigation }: Props) {
   const [currentStep, setCurrentStep] = useState<Step>(1);
   const [loading, setLoading] = useState(false);
+  const [loadingStations, setLoadingStations] = useState(true);
+  const [isRetrying, setIsRetrying] = useState(false);
+  const [showDraftRestore, setShowDraftRestore] = useState(false);
   const [stations, setStations] = useState<Station[]>([]);
   const [showStationPicker, setShowStationPicker] = useState(false);
   const [pickerType, setPickerType] = useState<'pickup' | 'delivery'>('pickup');
@@ -112,6 +129,9 @@ export default function CreateRequestScreen({ navigation }: Props) {
   const [storageLocation, setStorageLocation] = useState('');
   const [specialInstructions, setSpecialInstructions] = useState('');
 
+  // Validation errors
+  const [errors, setErrors] = useState<Record<string, string>>({});
+
   // Calculated values
   const [deliveryFee, setDeliveryFee] = useState<{
     baseFee: number;
@@ -128,10 +148,59 @@ export default function CreateRequestScreen({ navigation }: Props) {
   // Themed styles
   const styles = useMemo(() => createStyles(Colors, Typography, Spacing, BorderRadius), []);
 
+  // Load stations and draft on mount
   useEffect(() => {
     loadStations();
+    loadDraft();
   }, []);
 
+  // Auto-save progress when form data changes
+  useEffect(() => {
+    const saveProgress = async () => {
+      const draft: CreateRequestDraft = {
+        step: currentStep,
+        pickupStation,
+        deliveryStation,
+        packageSize,
+        weight,
+        description,
+        isFragile,
+        isPerishable,
+        recipientName,
+        recipientPhone,
+        pickupTime,
+        deliveryTime,
+        urgency,
+        pickupLocationDetail,
+        storageLocation,
+        specialInstructions,
+      };
+      await saveCreateRequestProgress(draft);
+    };
+
+    // Debounce save
+    const timer = setTimeout(saveProgress, 1000);
+    return () => clearTimeout(timer);
+  }, [
+    currentStep,
+    pickupStation,
+    deliveryStation,
+    packageSize,
+    weight,
+    description,
+    isFragile,
+    isPerishable,
+    recipientName,
+    recipientPhone,
+    pickupTime,
+    deliveryTime,
+    urgency,
+    pickupLocationDetail,
+    storageLocation,
+    specialInstructions,
+  ]);
+
+  // Calculate fee when dependencies change
   useEffect(() => {
     if (pickupStation && deliveryStation && weight) {
       calculateFee();
@@ -139,13 +208,58 @@ export default function CreateRequestScreen({ navigation }: Props) {
   }, [pickupStation, deliveryStation, packageSize, weight, urgency]);
 
   const loadStations = async () => {
+    setLoadingStations(true);
     try {
-      const data = await getAllStations();
+      const data = await retryFirebaseQuery(() => getAllStations());
       setStations(data);
     } catch (error) {
-      Alert.alert('오류', '역 목록을 불러오지 못했습니다.');
       console.error('Error loading stations:', error);
+      showErrorAlert(error, () => loadStations());
+    } finally {
+      setLoadingStations(false);
     }
+  };
+
+  const loadDraft = async () => {
+    try {
+      const draft = await loadCreateRequestProgress();
+      if (draft && draft.step > 1) {
+        setShowDraftRestore(true);
+        // Store draft data for restore
+        (window as any).__draftData = draft;
+      }
+    } catch (error) {
+      console.error('Error loading draft:', error);
+    }
+  };
+
+  const restoreDraft = () => {
+    const draft = (window as any).__draftData as CreateRequestDraft;
+    if (draft) {
+      setCurrentStep(draft.step as Step);
+      setPickupStation(draft.pickupStation);
+      setDeliveryStation(draft.deliveryStation);
+      setPackageSize(draft.packageSize as PackageSize);
+      setWeight(draft.weight);
+      setDescription(draft.description);
+      setIsFragile(draft.isFragile);
+      setIsPerishable(draft.isPerishable);
+      setRecipientName(draft.recipientName);
+      setRecipientPhone(draft.recipientPhone);
+      setPickupTime(draft.pickupTime);
+      setDeliveryTime(draft.deliveryTime);
+      setUrgency(draft.urgency as UrgencyLevel);
+      setPickupLocationDetail(draft.pickupLocationDetail);
+      setStorageLocation(draft.storageLocation);
+      setSpecialInstructions(draft.specialInstructions);
+      setShowDraftRestore(false);
+    }
+  };
+
+  const discardDraft = async () => {
+    await deleteCreateRequestProgress();
+    setShowDraftRestore(false);
+    delete (window as any).__draftData;
   };
 
   const calculateFee = async () => {
@@ -155,11 +269,14 @@ export default function CreateRequestScreen({ navigation }: Props) {
       const pickupInfo = convertStationToInfo(pickupStation);
       const deliveryInfo = convertStationToInfo(deliveryStation);
 
-      const fee = await calculateDeliveryFee(
-        pickupInfo,
-        deliveryInfo,
-        packageSize,
-        parseFloat(weight)
+      const fee = await retryWithBackoff(
+        () => calculateDeliveryFee(
+          pickupInfo,
+          deliveryInfo,
+          packageSize,
+          parseFloat(weight)
+        ),
+        { timeoutMs: 15000 }
       );
 
       const urgencyOption = URGENCY_OPTIONS.find(opt => opt.level === urgency);
@@ -177,6 +294,7 @@ export default function CreateRequestScreen({ navigation }: Props) {
       });
     } catch (error) {
       console.error('Error calculating delivery fee:', error);
+      // Fallback calculation
       const baseFee = 3000;
       const distanceFee = 800;
       const weightFeeValue = parseFloat(weight) * 100;
@@ -203,44 +321,54 @@ export default function CreateRequestScreen({ navigation }: Props) {
     }
   };
 
-  const validateStep1 = (): boolean => {
+  const validateStep1 = useCallback((): boolean => {
+    const newErrors: Record<string, string> = {};
+
     if (!pickupStation) {
-      Alert.alert('오류', '픽업 역을 선택해주세요.');
-      return false;
+      newErrors.pickupStation = '픽업 역을 선택해주세요.';
     }
     if (!deliveryStation) {
-      Alert.alert('오류', '배송 역을 선택해주세요.');
-      return false;
+      newErrors.deliveryStation = '배송 역을 선택해주세요.';
     }
-    if (pickupStation.stationId === deliveryStation.stationId) {
-      Alert.alert('오류', '픽업 역과 배송 역이 같을 수 없습니다.');
-      return false;
+    if (pickupStation && deliveryStation && pickupStation.stationId === deliveryStation.stationId) {
+      newErrors.deliveryStation = '픽업 역과 배송 역이 같을 수 없습니다.';
     }
-    return true;
-  };
 
-  const validateStep2 = (): boolean => {
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
+  }, [pickupStation, deliveryStation]);
+
+  const validateStep2 = useCallback((): boolean => {
+    const newErrors: Record<string, string> = {};
+
     if (!weight || parseFloat(weight) <= 0) {
-      Alert.alert('오류', '무게를 입력해주세요.');
-      return false;
+      newErrors.weight = '무게를 입력해주세요.';
+    } else if (parseFloat(weight) > 30) {
+      newErrors.weight = '무게는 30kg 이하여야 합니다.';
     }
-    if (!description || description.trim().length === 0) {
-      Alert.alert('오류', '설명을 입력해주세요.');
-      return false;
-    }
-    return true;
-  };
 
-  const validateStep3 = (): boolean => {
-    if (!recipientName || recipientName.trim().length === 0) {
-      Alert.alert('오류', '수신자 이름을 입력해주세요.');
-      return false;
+    if (!description || description.trim().length === 0) {
+      newErrors.description = '설명을 입력해주세요.';
+    } else if (description.length > 200) {
+      newErrors.description = '설명은 200자 이내로 입력해주세요.';
     }
+
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
+  }, [weight, description]);
+
+  const validateStep3 = useCallback((): boolean => {
+    const newErrors: Record<string, string> = {};
+
+    if (!recipientName || recipientName.trim().length === 0) {
+      newErrors.recipientName = '수신자 이름을 입력해주세요.';
+    }
+
     const phoneRegex = /^010-\d{4}-\d{4}$/;
     if (!phoneRegex.test(recipientPhone)) {
-      Alert.alert('오류', '전화번호 형식이 올바르지 않습니다. (010-XXXX-XXXX)');
-      return false;
+      newErrors.recipientPhone = '전화번호 형식이 올바르지 않습니다. (010-XXXX-XXXX)';
     }
+
     const pickupDate = new Date();
     const [pickupHour, pickupMinute] = pickupTime.split(':').map(Number);
     pickupDate.setHours(pickupHour, pickupMinute, 0, 0);
@@ -250,39 +378,33 @@ export default function CreateRequestScreen({ navigation }: Props) {
     deliveryDate.setHours(deliveryHour, deliveryMinute, 0, 0);
 
     if (deliveryDate <= pickupDate) {
-      Alert.alert('오류', '배송 마감 시간은 픽업 마감 시간보다 늦어야 합니다.');
-      return false;
+      newErrors.deliveryTime = '배송 마감 시간은 픽업 마감 시간보다 늦어야 합니다.';
     }
-    return true;
-  };
 
-  const validateStep4 = (): boolean => {
-    // Step 4는 요약 화면이므로 별도 검증 없음
-    return true;
-  };
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
+  }, [recipientName, recipientPhone, pickupTime, deliveryTime]);
 
-  const validateStep5 = (): boolean => {
-    // 5단계 필드 검증
-    if (pickupLocationDetail && pickupLocationDetail.trim().length > 0) {
-      if (pickupLocationDetail.length > 100) {
-        Alert.alert('오류', '만날 장소 상세는 100자 이내로 입력해주세요.');
-        return false;
-      }
-    }
-    if (storageLocation && storageLocation.trim().length > 0) {
-      if (storageLocation.length > 100) {
-        Alert.alert('오류', '보관 위치는 100자 이내로 입력해주세요.');
-        return false;
-      }
-    }
-    if (specialInstructions && specialInstructions.trim().length > 0) {
-      if (specialInstructions.length > 200) {
-        Alert.alert('오류', '특이사항은 200자 이내로 입력해주세요.');
-        return false;
-      }
-    }
+  const validateStep4 = useCallback((): boolean => {
     return true;
-  };
+  }, []);
+
+  const validateStep5 = useCallback((): boolean => {
+    const newErrors: Record<string, string> = {};
+
+    if (pickupLocationDetail && pickupLocationDetail.length > 100) {
+      newErrors.pickupLocationDetail = '만날 장소 상세는 100자 이내로 입력해주세요.';
+    }
+    if (storageLocation && storageLocation.length > 100) {
+      newErrors.storageLocation = '보관 위치는 100자 이내로 입력해주세요.';
+    }
+    if (specialInstructions && specialInstructions.length > 200) {
+      newErrors.specialInstructions = '특이사항은 200자 이내로 입력해주세요.';
+    }
+
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
+  }, [pickupLocationDetail, storageLocation, specialInstructions]);
 
   const handleNext = () => {
     if (currentStep === 1 && !validateStep1()) return;
@@ -307,7 +429,23 @@ export default function CreateRequestScreen({ navigation }: Props) {
   const handleSubmit = async () => {
     if (!pickupStation || !deliveryStation || !deliveryFee) return;
 
+    // Check network
+    const isOnline = await isNetworkAvailable();
+    if (!isOnline) {
+      Alert.alert(
+        '네트워크 오류',
+        '인터넷 연결을 확인해주세요.',
+        [
+          { text: '취소', style: 'cancel' },
+          { text: '다시 시도', onPress: handleSubmit },
+        ]
+      );
+      return;
+    }
+
     setLoading(true);
+    setIsRetrying(false);
+
     try {
       const pickupInfo = convertStationToInfo(pickupStation);
       const deliveryInfo = convertStationToInfo(deliveryStation);
@@ -321,36 +459,47 @@ export default function CreateRequestScreen({ navigation }: Props) {
       const deliveryDeadline = new Date();
       deliveryDeadline.setHours(deliveryHour, deliveryMinute, 0, 0);
 
-      // PackageInfo 생성
       const packageInfo = {
         size: packageSize,
         weight: convertWeightToPackageWeight(parseFloat(weight)),
         description: `${description}${isFragile ? ' (깨지기 쉬움)' : ''}${isPerishable ? ' (부패하기 쉬움)' : ''}`,
       };
 
-      // urgency 매핑
       const urgencyMap: Record<UrgencyLevel, 'low' | 'medium' | 'high'> = {
         normal: 'low',
         fast: 'medium',
         urgent: 'high',
       };
 
-      const request = await createRequest({
-        requesterId: userId,
-        pickupStation: pickupInfo,
-        deliveryStation: deliveryInfo,
-        packageInfo,
-        fee: deliveryFee.totalFee,
-        preferredTime: {
-          departureTime: pickupTime,
-          arrivalTime: deliveryTime,
-        },
-        deadline: deliveryDeadline,
-        urgency: urgencyMap[urgency],
-        pickupLocationDetail: pickupLocationDetail || undefined,
-        storageLocation: storageLocation || undefined,
-        specialInstructions: specialInstructions || undefined,
-      });
+      const request = await retryWithBackoff(
+        () => createRequest({
+          requesterId: userId,
+          pickupStation: pickupInfo,
+          deliveryStation: deliveryInfo,
+          packageInfo,
+          fee: deliveryFee.totalFee,
+          preferredTime: {
+            departureTime: pickupTime,
+            arrivalTime: deliveryTime,
+          },
+          deadline: deliveryDeadline,
+          urgency: urgencyMap[urgency],
+          pickupLocationDetail: pickupLocationDetail || undefined,
+          storageLocation: storageLocation || undefined,
+          specialInstructions: specialInstructions || undefined,
+        }),
+        {
+          maxAttempts: 3,
+          timeoutMs: 30000,
+          onRetry: (attempt) => {
+            setIsRetrying(true);
+            console.log(`Retry attempt ${attempt}...`);
+          },
+        }
+      );
+
+      // Clear draft after successful submission
+      await deleteCreateRequestProgress();
 
       Alert.alert(
         '성공',
@@ -366,43 +515,51 @@ export default function CreateRequestScreen({ navigation }: Props) {
         ]
       );
     } catch (error) {
-      Alert.alert('오류', '배송 요청 생성에 실패했습니다.');
       console.error('Error creating request:', error);
+      showErrorAlert(error, () => handleSubmit());
     } finally {
       setLoading(false);
+      setIsRetrying(false);
     }
   };
 
+  // Render functions with accessibility labels
   const renderStep1 = () => (
     <View style={styles.stepContainer}>
       <ModeToggleSwitch />
 
-      <Text style={styles.stepTitle}>🚇 역 선택</Text>
+      <Text style={styles.stepTitle} accessibilityLabel="1단계, 역 선택">🚇 역 선택</Text>
       <Text style={styles.stepDesc}>픽업 역과 배송 역을 선택해주세요.</Text>
 
       <TouchableOpacity
-        style={styles.inputButton}
+        style={[styles.inputButton, errors.pickupStation && styles.inputButtonError]}
         onPress={() => {
           setPickerType('pickup');
           setShowStationPicker(true);
         }}
+        accessibilityLabel="픽업 역 선택"
+        accessibilityHint="픽업할 지하철 역을 선택합니다"
       >
         <Text style={styles.inputButtonText}>
           {pickupStation ? pickupStation.stationName : '픽업 역 선택'}
         </Text>
       </TouchableOpacity>
+      {errors.pickupStation && <Text style={styles.errorText}>{errors.pickupStation}</Text>}
 
       <TouchableOpacity
-        style={styles.inputButton}
+        style={[styles.inputButton, errors.deliveryStation && styles.inputButtonError]}
         onPress={() => {
           setPickerType('delivery');
           setShowStationPicker(true);
         }}
+        accessibilityLabel="배송 역 선택"
+        accessibilityHint="배송할 지하철 역을 선택합니다"
       >
         <Text style={styles.inputButtonText}>
           {deliveryStation ? deliveryStation.stationName : '배송 역 선택'}
         </Text>
       </TouchableOpacity>
+      {errors.deliveryStation && <Text style={styles.errorText}>{errors.deliveryStation}</Text>}
 
       {pickupStation && deliveryStation && deliveryFee && (
         <View style={styles.infoCard}>
@@ -416,7 +573,7 @@ export default function CreateRequestScreen({ navigation }: Props) {
 
   const renderStep2 = () => (
     <View style={styles.stepContainer}>
-      <Text style={styles.stepTitle}>📦 패키지 정보</Text>
+      <Text style={styles.stepTitle} accessibilityLabel="2단계, 패키지 정보">📦 패키지 정보</Text>
       <Text style={styles.stepDesc}>패키지 크기와 무게를 입력해주세요.</Text>
 
       <Text style={styles.label}>크기</Text>
@@ -429,6 +586,8 @@ export default function CreateRequestScreen({ navigation }: Props) {
               packageSize === size && styles.sizeButtonActive,
             ]}
             onPress={() => setPackageSize(size)}
+            accessibilityLabel={`크기 ${size === 'small' ? '소형' : size === 'medium' ? '중형' : size === 'large' ? '대형' : '특대'}`}
+            accessibilityState={{ selected: packageSize === size }}
           >
             <Text
               style={[
@@ -444,27 +603,41 @@ export default function CreateRequestScreen({ navigation }: Props) {
 
       <Text style={styles.label}>무게 (kg)</Text>
       <TextInput
-        style={styles.input}
+        style={[styles.input, errors.weight && styles.inputError]}
         value={weight}
         onChangeText={setWeight}
         placeholder="예: 3.5"
         keyboardType="decimal-pad"
+        accessibilityLabel="무게 입력"
+        accessibilityHint="물건의 무게를 킬로그램 단위로 입력하세요"
       />
+      {errors.weight && <Text style={styles.errorText}>{errors.weight}</Text>}
 
       <Text style={styles.label}>설명</Text>
       <TextInput
-        style={[styles.input, styles.textArea]}
+        style={[styles.input, styles.textArea, errors.description && styles.inputError]}
         value={description}
-        onChangeText={setDescription}
+        onChangeText={(text) => {
+          setDescription(text);
+          if (errors.description) {
+            setErrors(prev => ({ ...prev, description: '' }));
+          }
+        }}
         placeholder="물건에 대한 간단한 설명"
         multiline
         numberOfLines={3}
+        maxLength={200}
+        accessibilityLabel="물건 설명 입력"
       />
+      {errors.description && <Text style={styles.errorText}>{errors.description}</Text>}
+      <Text style={styles.charCount}>{description.length}/200</Text>
 
       <View style={styles.switchContainer}>
         <TouchableOpacity
           style={[styles.switchButton, isFragile && styles.switchButtonActive]}
           onPress={() => setIsFragile(!isFragile)}
+          accessibilityLabel="깨지기 쉬움"
+          accessibilityState={{ selected: isFragile }}
         >
           <Text
             style={[styles.switchButtonText, isFragile && styles.switchButtonTextActive]}
@@ -476,6 +649,8 @@ export default function CreateRequestScreen({ navigation }: Props) {
         <TouchableOpacity
           style={[styles.switchButton, isPerishable && styles.switchButtonActive]}
           onPress={() => setIsPerishable(!isPerishable)}
+          accessibilityLabel="부패하기 쉬움"
+          accessibilityState={{ selected: isPerishable }}
         >
           <Text
             style={[styles.switchButtonText, isPerishable && styles.switchButtonTextActive]}
@@ -495,6 +670,8 @@ export default function CreateRequestScreen({ navigation }: Props) {
               urgency === option.level && styles.urgencyButtonActive,
             ]}
             onPress={() => setUrgency(option.level)}
+            accessibilityLabel={`긴급도 ${option.label}, ${option.description}`}
+            accessibilityState={{ selected: urgency === option.level }}
           >
             <Text style={[
               styles.urgencyLabel,
@@ -533,20 +710,27 @@ export default function CreateRequestScreen({ navigation }: Props) {
 
   const renderStep3 = () => (
     <View style={styles.stepContainer}>
-      <Text style={styles.stepTitle}>👤 수신자 정보</Text>
+      <Text style={styles.stepTitle} accessibilityLabel="3단계, 수신자 정보">👤 수신자 정보</Text>
       <Text style={styles.stepDesc}>수신자의 연락처를 입력해주세요.</Text>
 
       <Text style={styles.label}>이름</Text>
       <TextInput
-        style={styles.input}
+        style={[styles.input, errors.recipientName && styles.inputError]}
         value={recipientName}
-        onChangeText={setRecipientName}
+        onChangeText={(text) => {
+          setRecipientName(text);
+          if (errors.recipientName) {
+            setErrors(prev => ({ ...prev, recipientName: '' }));
+          }
+        }}
         placeholder="홍길동"
+        accessibilityLabel="수신자 이름 입력"
       />
+      {errors.recipientName && <Text style={styles.errorText}>{errors.recipientName}</Text>}
 
       <Text style={styles.label}>전화번호</Text>
       <TextInput
-        style={styles.input}
+        style={[styles.input, errors.recipientPhone && styles.inputError]}
         value={recipientPhone}
         onChangeText={(text) => {
           const cleaned = text.replace(/\D/g, '');
@@ -558,11 +742,16 @@ export default function CreateRequestScreen({ navigation }: Props) {
             formatted = formatted.slice(0, 8) + '-' + cleaned.slice(7, 11);
           }
           setRecipientPhone(formatted);
+          if (errors.recipientPhone) {
+            setErrors(prev => ({ ...prev, recipientPhone: '' }));
+          }
         }}
         placeholder="010-1234-5678"
         keyboardType="phone-pad"
         maxLength={13}
+        accessibilityLabel="수신자 전화번호 입력"
       />
+      {errors.recipientPhone && <Text style={styles.errorText}>{errors.recipientPhone}</Text>}
 
       <TimePicker
         label="픽업 마감 시간"
@@ -579,15 +768,17 @@ export default function CreateRequestScreen({ navigation }: Props) {
         placeholder="배송 시간을 선택해주세요"
         minuteInterval={10}
       />
+      {errors.deliveryTime && <Text style={styles.errorText}>{errors.deliveryTime}</Text>}
     </View>
   );
 
   const renderStep4 = () => (
     <View style={styles.stepContainer}>
-      <Text style={styles.stepTitle}>📋 배송 요약</Text>
+      <Text style={styles.stepTitle} accessibilityLabel="4단계, 배송 요약">📋 배송 요약</Text>
       <Text style={styles.stepDesc}>모든 정보를 확인하고 요청해주세요.</Text>
 
-      <View style={styles.summaryCard}>
+      <View style={styles.summaryCard} accessibilityLabel="배송 요약 정보">
+        {/* Summary content... (same as original) */}
         <View style={styles.summaryRow}>
           <Text style={styles.summaryLabel}>🚇 경로</Text>
           <Text style={styles.summaryValue}>
@@ -677,11 +868,15 @@ export default function CreateRequestScreen({ navigation }: Props) {
         style={[styles.nextButton, styles.submitButton]}
         onPress={handleSubmit}
         disabled={loading}
+        accessibilityLabel="배송 요청 제출"
+        accessibilityHint="배송 요청을 제출합니다"
       >
         {loading ? (
           <ActivityIndicator color={Colors.white} />
         ) : (
-          <Text style={styles.nextButtonText}>요청하기</Text>
+          <Text style={styles.nextButtonText}>
+            {isRetrying ? '재시도 중...' : '요청하기'}
+          </Text>
         )}
       </TouchableOpacity>
     </View>
@@ -689,49 +884,70 @@ export default function CreateRequestScreen({ navigation }: Props) {
 
   const renderStep5 = () => (
     <View style={styles.stepContainer}>
-      <Text style={styles.stepTitle}>📍 추가 정보</Text>
+      <Text style={styles.stepTitle} accessibilityLabel="5단계, 추가 정보">📍 추가 정보</Text>
       <Text style={styles.stepDesc}>만날 장소와 보관 방법을 입력해주세요. (선택 사항)</Text>
 
       <Text style={styles.label}>만날 장소 상세</Text>
       <Text style={styles.hintText}>픽업할 정확한 위치를 알려주세요. (예: 1번 출구, 편의점 앞)</Text>
       <TextInput
-        style={[styles.input, styles.textArea]}
+        style={[styles.input, styles.textArea, errors.pickupLocationDetail && styles.inputError]}
         value={pickupLocationDetail}
-        onChangeText={setPickupLocationDetail}
+        onChangeText={(text) => {
+          setPickupLocationDetail(text);
+          if (errors.pickupLocationDetail) {
+            setErrors(prev => ({ ...prev, pickupLocationDetail: '' }));
+          }
+        }}
         placeholder="만날 장소를 상세하게 입력해주세요 (선택)"
         placeholderTextColor={Colors.gray500}
         multiline
         numberOfLines={3}
         maxLength={100}
+        accessibilityLabel="만날 장소 상세 입력"
       />
+      {errors.pickupLocationDetail && <Text style={styles.errorText}>{errors.pickupLocationDetail}</Text>}
       <Text style={styles.charCount}>{pickupLocationDetail.length}/100</Text>
 
       <Text style={styles.label}>보관 위치</Text>
       <Text style={styles.hintText}>물건을 보관할 곳을 지정해주세요. (예: 역사물 보관함, 사물함)</Text>
       <TextInput
-        style={[styles.input, styles.textArea]}
+        style={[styles.input, styles.textArea, errors.storageLocation && styles.inputError]}
         value={storageLocation}
-        onChangeText={setStorageLocation}
+        onChangeText={(text) => {
+          setStorageLocation(text);
+          if (errors.storageLocation) {
+            setErrors(prev => ({ ...prev, storageLocation: '' }));
+          }
+        }}
         placeholder="보관 위치를 입력해주세요 (선택)"
         placeholderTextColor={Colors.gray500}
         multiline
         numberOfLines={2}
         maxLength={100}
+        accessibilityLabel="보관 위치 입력"
       />
+      {errors.storageLocation && <Text style={styles.errorText}>{errors.storageLocation}</Text>}
       <Text style={styles.charCount}>{storageLocation.length}/100</Text>
 
       <Text style={styles.label}>특이사항</Text>
       <Text style={styles.hintText}>길러가 알아야 할 특별한 사항을 적어주세요.</Text>
       <TextInput
-        style={[styles.input, styles.textArea]}
+        style={[styles.input, styles.textArea, errors.specialInstructions && styles.inputError]}
         value={specialInstructions}
-        onChangeText={setSpecialInstructions}
+        onChangeText={(text) => {
+          setSpecialInstructions(text);
+          if (errors.specialInstructions) {
+            setErrors(prev => ({ ...prev, specialInstructions: '' }));
+          }
+        }}
         placeholder="특이사항을 입력해주세요 (선택)"
         placeholderTextColor={Colors.gray500}
         multiline
         numberOfLines={4}
         maxLength={200}
+        accessibilityLabel="특이사항 입력"
       />
+      {errors.specialInstructions && <Text style={styles.errorText}>{errors.specialInstructions}</Text>}
       <Text style={styles.charCount}>{specialInstructions.length}/200</Text>
 
       <View style={styles.noteCard}>
@@ -782,10 +998,22 @@ export default function CreateRequestScreen({ navigation }: Props) {
     </View>
   );
 
+  if (loadingStations) {
+    return (
+      <View style={styles.loadingContainer}>
+        <ActivityIndicator size="large" color={Colors.primary} />
+        <Text style={styles.loadingText}>역 목록 불러오는 중...</Text>
+      </View>
+    );
+  }
+
   return (
-    <View style={styles.container}>
+    <KeyboardAvoidingView
+      style={styles.container}
+      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+    >
       <View style={styles.header}>
-        <TouchableOpacity onPress={handleBack} style={styles.backButton}>
+        <TouchableOpacity onPress={handleBack} style={styles.backButton} accessibilityLabel="뒤로 가기">
           <Text style={styles.backButtonText}>←</Text>
         </TouchableOpacity>
         <Text style={styles.headerTitle}>새 배송 요청</Text>
@@ -807,6 +1035,7 @@ export default function CreateRequestScreen({ navigation }: Props) {
           <TouchableOpacity
             style={styles.nextButton}
             onPress={handleNext}
+            accessibilityLabel="다음 단계"
           >
             <Text style={styles.nextButtonText}>다음</Text>
           </TouchableOpacity>
@@ -826,7 +1055,33 @@ export default function CreateRequestScreen({ navigation }: Props) {
         }}
         title={pickerType === 'pickup' ? '픽업 역 선택' : '배송 역 선택'}
       />
-    </View>
+
+      {/* Draft restore modal */}
+      {showDraftRestore && (
+        <View style={styles.draftModalOverlay}>
+          <View style={styles.draftModal}>
+            <Text style={styles.draftModalTitle}>이전 작업 내역이 있습니다</Text>
+            <Text style={styles.draftModalText}>
+              이전에 작성 중이던 배송 요청 내역이 있습니다. 이어서 작성하시겠습니까?
+            </Text>
+            <View style={styles.draftModalButtons}>
+              <TouchableOpacity
+                style={styles.draftModalButtonSecondary}
+                onPress={discardDraft}
+              >
+                <Text style={styles.draftModalButtonTextSecondary}>삭제</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.draftModalButton}
+                onPress={restoreDraft}
+              >
+                <Text style={styles.draftModalButtonText}>이어서 작성</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      )}
+    </KeyboardAvoidingView>
   );
 }
 
@@ -940,6 +1195,9 @@ function createStyles(
       marginBottom: space.md,
       padding: space.lg,
     },
+    inputButtonError: {
+      borderColor: colors.error,
+    },
     inputButtonText: {
       color: colors.textPrimary,
       fontSize: typo.fontSize.lg,
@@ -952,9 +1210,23 @@ function createStyles(
       fontSize: typo.fontSize.lg,
       padding: space.lg,
     },
+    inputError: {
+      borderColor: colors.error,
+    },
+    errorText: {
+      color: colors.error,
+      fontSize: typo.fontSize.sm,
+      marginTop: space.xs,
+    },
     textArea: {
       height: 80,
       textAlignVertical: 'top',
+    },
+    charCount: {
+      color: colors.gray500,
+      fontSize: typo.fontSize.xs,
+      textAlign: 'right',
+      marginTop: space.xs,
     },
     sizeSelector: {
       flexDirection: 'row',
@@ -1156,12 +1428,6 @@ function createStyles(
       fontSize: typo.fontSize.sm,
       marginBottom: space.sm,
     },
-    charCount: {
-      color: colors.gray500,
-      fontSize: typo.fontSize.xs,
-      textAlign: 'right',
-      marginTop: space.xs,
-    },
     noteCard: {
       alignItems: 'center',
       backgroundColor: colors.infoLight,
@@ -1178,6 +1444,68 @@ function createStyles(
       color: colors.infoDark,
       flex: 1,
       fontSize: typo.fontSize.sm,
+    },
+    loadingContainer: {
+      alignItems: 'center',
+      flex: 1,
+      justifyContent: 'center',
+    },
+    loadingText: {
+      color: colors.textSecondary,
+      fontSize: typo.fontSize.base,
+      marginTop: space.md,
+    },
+    draftModalOverlay: {
+      ...StyleSheet.absoluteFillObject,
+      backgroundColor: 'rgba(0, 0, 0, 0.5)',
+      alignItems: 'center',
+      justifyContent: 'center',
+      zIndex: 1000,
+    },
+    draftModal: {
+      backgroundColor: colors.white,
+      borderRadius: radius.lg,
+      padding: space.xl,
+      width: '85%',
+    },
+    draftModalTitle: {
+      color: colors.textPrimary,
+      fontSize: typo.fontSize.xl,
+      fontWeight: typo.fontWeight.bold,
+      marginBottom: space.md,
+    },
+    draftModalText: {
+      color: colors.textSecondary,
+      fontSize: typo.fontSize.base,
+      marginBottom: space.xl,
+    },
+    draftModalButtons: {
+      flexDirection: 'row',
+      gap: space.md,
+    },
+    draftModalButton: {
+      flex: 1,
+      alignItems: 'center',
+      backgroundColor: colors.primary,
+      borderRadius: radius.md,
+      padding: space.md,
+    },
+    draftModalButtonText: {
+      color: colors.white,
+      fontSize: typo.fontSize.base,
+      fontWeight: typo.fontWeight.bold,
+    },
+    draftModalButtonSecondary: {
+      flex: 1,
+      alignItems: 'center',
+      backgroundColor: colors.gray200,
+      borderRadius: radius.md,
+      padding: space.md,
+    },
+    draftModalButtonTextSecondary: {
+      color: colors.textSecondary,
+      fontSize: typo.fontSize.base,
+      fontWeight: typo.fontWeight.semibold,
     },
   });
 }

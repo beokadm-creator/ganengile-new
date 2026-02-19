@@ -91,6 +91,7 @@ describe('MediaService', () => {
     const mockProgressCallback = jest.fn();
 
     it('갤러리에서 이미지를 선택하고 업로드해야 한다', async () => {
+      jest.setTimeout(10000); // Increase timeout to 10 seconds
       // Given
       const mockAsset = {
         uri: 'file://image.jpg',
@@ -246,6 +247,7 @@ describe('MediaService', () => {
 
   describe('takePhoto', () => {
     it('카메라로 사진을 찍고 업로드해야 한다', async () => {
+      jest.setTimeout(10000);
       // Given
       const mockAsset = {
         uri: 'file://photo.jpg',

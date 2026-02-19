@@ -1,9 +1,10 @@
 /**
  * Delivery Tracking Screen
  * 실시간 배송 추적 화면
+ * 개선사항: 네트워크 에러 처리, 재시도 로직, 더 나은 UX
  */
 
-import React, { useState, useEffect, useContext } from 'react';
+import React, { useState, useEffect, useContext, useCallback, useMemo } from 'react';
 import {
   View,
   Text,
@@ -13,6 +14,7 @@ import {
   TouchableOpacity,
   Dimensions,
   Alert,
+  RefreshControl,
 } from 'react-native';
 import { StackNavigationProp } from '@react-navigation/stack';
 import { getDeliveryByRequestId } from '../../services/delivery-service';
@@ -24,6 +26,11 @@ import type { Request } from '../../types/request';
 import { toTrackingModel, TrackingModel, TrackingEvent } from '../../utils/request-adapters';
 import { formatTimeKR } from '../../utils/date';
 import { startDeliveryTracking, stopDeliveryTracking } from '../../services/location-tracking-service';
+
+// Utils
+import { retryWithBackoff, retryFirebaseQuery } from '../../utils/retry-with-backoff';
+import { showErrorAlert, isNetworkError } from '../../utils/error-handler';
+import { isNetworkAvailable, addNetworkListener } from '../../utils/network-detector';
 
 const { width } = Dimensions.get('window');
 
@@ -41,16 +48,23 @@ interface Props {
 export default function DeliveryTrackingScreen({ navigation, route }: Props) {
   const { requestId } = route.params;
   const { user, currentRole } = useContext(UserContext) as UserContextType;
+
   const [trackingData, setTrackingData] = useState<TrackingModel | null>(null);
   const [trackingEvents, setTrackingEvents] = useState<TrackingEvent[]>([]);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  const [isOnline, setIsOnline] = useState(true);
   const [progress, setProgress] = useState(0);
-  const [actionLoading, setActionLoading] = useState(false);
+  const [retryCount, setRetryCount] = useState(0);
   const [currentLocation, setCurrentLocation] = useState<{ latitude: number; longitude: number } | null>(null);
   const [isTracking, setIsTracking] = useState(false);
 
+  // Memoized values
+  const progressValue = useMemo(() => progress, [progress]);
+
   useEffect(() => {
     loadTrackingData();
+    setupNetworkListener();
 
     // Cleanup: stop location tracking when unmount
     return () => {
@@ -60,10 +74,44 @@ export default function DeliveryTrackingScreen({ navigation, route }: Props) {
     };
   }, [requestId]);
 
+  const setupNetworkListener = () => {
+    const unsubscribe = addNetworkListener((state) => {
+      setIsOnline(state.isOnline);
+
+      // Auto-refresh when coming back online
+      if (state.isOnline && !loading) {
+        loadTrackingData();
+      }
+    });
+
+    return unsubscribe;
+  };
+
   const loadTrackingData = async () => {
+    // Check network first
+    const networkAvailable = await isNetworkAvailable();
+    if (!networkAvailable) {
+      setIsOnline(false);
+      setLoading(false);
+      return;
+    }
+
+    setIsOnline(true);
+    setRetryCount(0);
+
     try {
-      // Try to get delivery first
-      const deliveryData = await getDeliveryByRequestId(requestId);
+      // Try to get delivery first with retry
+      const deliveryData = await retryWithBackoff(
+        () => getDeliveryByRequestId(requestId),
+        {
+          maxAttempts: 3,
+          timeoutMs: 15000,
+          onRetry: (attempt) => {
+            setRetryCount(attempt);
+            console.log(`Retry attempt ${attempt} for delivery data...`);
+          },
+        }
+      );
 
       if (deliveryData) {
         const model = toTrackingModel(deliveryData);
@@ -85,7 +133,7 @@ export default function DeliveryTrackingScreen({ navigation, route }: Props) {
         }
       } else {
         // Fallback to request data
-        const requestData = await getRequestById(requestId);
+        const requestData = await retryFirebaseQuery(() => getRequestById(requestId));
         if (requestData) {
           const model = toTrackingModel(requestData as Request);
           setTrackingData(model);
@@ -95,12 +143,32 @@ export default function DeliveryTrackingScreen({ navigation, route }: Props) {
       }
     } catch (error) {
       console.error('Error loading tracking data:', error);
+
+      // Show user-friendly error
+      if (isNetworkError(error)) {
+        Alert.alert(
+          '네트워크 오류',
+          '배송 정보를 불러오지 못했습니다. 네트워크 연결을 확인해주세요.',
+          [
+            { text: '확인', style: 'cancel' },
+            { text: '다시 시도', onPress: loadTrackingData },
+          ]
+        );
+      } else {
+        showErrorAlert(error, loadTrackingData);
+      }
     } finally {
       setLoading(false);
     }
   };
 
-  const calculateProgress = (status: string) => {
+  const onRefresh = useCallback(async () => {
+    setRefreshing(true);
+    await loadTrackingData();
+    setRefreshing(false);
+  }, [requestId]);
+
+  const calculateProgress = useCallback((status: string) => {
     const progressMap: Record<string, number> = {
       pending: 10,
       matched: 25,
@@ -115,9 +183,9 @@ export default function DeliveryTrackingScreen({ navigation, route }: Props) {
     };
 
     setProgress(progressMap[status] || 0);
-  };
+  }, []);
 
-  const getStatusColor = (status: string): string => {
+  const getStatusColor = useCallback((status: string): string => {
     switch (status) {
       case 'pending':
         return '#FFA726';
@@ -136,9 +204,9 @@ export default function DeliveryTrackingScreen({ navigation, route }: Props) {
       default:
         return '#9E9E9E';
     }
-  };
+  }, []);
 
-  const getStatusText = (status: string): string => {
+  const getStatusText = useCallback((status: string): string => {
     switch (status) {
       case 'pending':
         return '매칭 대기 중';
@@ -157,35 +225,98 @@ export default function DeliveryTrackingScreen({ navigation, route }: Props) {
       default:
         return status;
     }
-  };
+  }, []);
 
-  const formatTime = (date: Date): string => formatTimeKR(date);
+  const formatTime = useCallback((date: Date): string => formatTimeKR(date), []);
 
+  // Loading state
   if (loading) {
     return (
       <View style={styles.loadingContainer}>
         <ActivityIndicator size="large" color="#00BCD4" />
-        <Text style={styles.loadingText}>로딩 중...</Text>
+        <Text style={styles.loadingText}>
+          {retryCount > 0 ? `재시도 중... (${retryCount})` : '로딩 중...'}
+        </Text>
       </View>
     );
   }
 
+  // Offline state
+  if (!isOnline) {
+    return (
+      <View style={styles.container}>
+        <View style={styles.header}>
+          <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
+            <Text style={styles.backButtonText}>←</Text>
+          </TouchableOpacity>
+          <Text style={styles.headerTitle}>배송 추적</Text>
+          <View style={styles.headerSpacer} />
+        </View>
+
+        <View style={styles.offlineContainer}>
+          <Text style={styles.offlineIcon}>📡</Text>
+          <Text style={styles.offlineTitle}>오프라인</Text>
+          <Text style={styles.offlineText}>
+            인터넷 연결을 확인해주세요.
+          </Text>
+          <TouchableOpacity style={styles.retryButton} onPress={loadTrackingData}>
+            <Text style={styles.retryButtonText}>다시 시도</Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+    );
+  }
+
+  // No data state
   if (!trackingData) {
-    return null;
+    return (
+      <View style={styles.container}>
+        <View style={styles.header}>
+          <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
+            <Text style={styles.backButtonText}>←</Text>
+          </TouchableOpacity>
+          <Text style={styles.headerTitle}>배송 추적</Text>
+          <View style={styles.headerSpacer} />
+        </View>
+
+        <View style={styles.errorContainer}>
+          <Text style={styles.errorIcon}>❌</Text>
+          <Text style={styles.errorTitle}>정보를 찾을 수 없음</Text>
+          <Text style={styles.errorText}>
+            배송 정보를 불러올 수 없습니다.
+          </Text>
+          <TouchableOpacity style={styles.retryButton} onPress={loadTrackingData}>
+            <Text style={styles.retryButtonText}>다시 시도</Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+    );
   }
 
   return (
     <View style={styles.container}>
       {/* Header */}
       <View style={styles.header}>
-        <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
+        <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton} accessibilityLabel="뒤로 가기">
           <Text style={styles.backButtonText}>←</Text>
         </TouchableOpacity>
         <Text style={styles.headerTitle}>배송 추적</Text>
-        <View style={styles.headerSpacer} />
+        <TouchableOpacity onPress={onRefresh} style={styles.refreshButton} accessibilityLabel="새로고침">
+          <ActivityIndicator size="small" color={refreshing ? '#00BCD4' : '#999'} animating={refreshing} />
+        </TouchableOpacity>
       </View>
 
-      <ScrollView style={styles.content}>
+      <ScrollView
+        style={styles.content}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={onRefresh}
+            tintColor="#00BCD4"
+            colors={['#00BCD4']}
+          />
+        }
+      >
         {/* Status Banner */}
         <View style={[styles.statusBanner, { backgroundColor: getStatusColor(trackingData.status) }]}>
           <Text style={styles.statusBannerText}>{getStatusText(trackingData.status)}</Text>
@@ -194,9 +325,9 @@ export default function DeliveryTrackingScreen({ navigation, route }: Props) {
         {/* Progress Bar */}
         <View style={styles.progressSection}>
           <View style={styles.progressBarContainer}>
-            <View style={[styles.progressBar, { width: `${progress}%` }]} />
+            <View style={[styles.progressBar, { width: `${progressValue}%` }]} />
           </View>
-          <Text style={styles.progressText}>{progress}%</Text>
+          <Text style={styles.progressText}>{progressValue}%</Text>
         </View>
 
         {/* Route Summary */}
@@ -240,7 +371,10 @@ export default function DeliveryTrackingScreen({ navigation, route }: Props) {
                 <View style={[
                   styles.timelineDot,
                   event.completed && styles.timelineDotCompleted
-                ]}>
+                ]}
+                  accessibilityLabel={event.title}
+                  accessibilityState={{ selected: event.completed }}
+                >
                   {event.completed && (
                     <Text style={styles.timelineDotIcon}>✓</Text>
                   )}
@@ -314,7 +448,10 @@ export default function DeliveryTrackingScreen({ navigation, route }: Props) {
         {/* Help Section */}
         <View style={styles.card}>
           <Text style={styles.cardTitle}>❓ 도움이 필요하신가요?</Text>
-          <TouchableOpacity style={styles.helpButton}>
+          <TouchableOpacity
+            style={styles.helpButton}
+            accessibilityLabel="고객센터 문의"
+          >
             <Text style={styles.helpButtonText}>고객센터 문의</Text>
           </TouchableOpacity>
         </View>
@@ -337,6 +474,7 @@ export default function DeliveryTrackingScreen({ navigation, route }: Props) {
                     });
                   }
                 }}
+                accessibilityLabel="픽업 인증하기"
               >
                 <Text style={styles.actionButtonText}>픽업 인증하기</Text>
               </TouchableOpacity>
@@ -352,6 +490,7 @@ export default function DeliveryTrackingScreen({ navigation, route }: Props) {
                     });
                   }
                 }}
+                accessibilityLabel="배송 완료하기"
               >
                 <Text style={styles.actionButtonText}>배송 완료하기</Text>
               </TouchableOpacity>
@@ -473,6 +612,10 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     textAlign: 'center',
   },
+  refreshButton: {
+    width: 40,
+    alignItems: 'center',
+  },
   helpButton: {
     alignItems: 'center',
     backgroundColor: '#00BCD4',
@@ -512,6 +655,62 @@ const styles = StyleSheet.create({
     color: '#666',
     fontSize: 16,
     marginTop: 12,
+  },
+  offlineContainer: {
+    alignItems: 'center',
+    flex: 1,
+    justifyContent: 'center',
+    padding: 32,
+  },
+  offlineIcon: {
+    fontSize: 60,
+    marginBottom: 16,
+  },
+  offlineText: {
+    color: '#666',
+    fontSize: 14,
+    marginBottom: 24,
+    textAlign: 'center',
+  },
+  offlineTitle: {
+    color: '#333',
+    fontSize: 20,
+    fontWeight: 'bold',
+    marginBottom: 8,
+  },
+  errorContainer: {
+    alignItems: 'center',
+    flex: 1,
+    justifyContent: 'center',
+    padding: 32,
+  },
+  errorIcon: {
+    fontSize: 60,
+    marginBottom: 16,
+  },
+  errorText: {
+    color: '#666',
+    fontSize: 14,
+    marginBottom: 24,
+    textAlign: 'center',
+  },
+  errorTitle: {
+    color: '#333',
+    fontSize: 20,
+    fontWeight: 'bold',
+    marginBottom: 8,
+  },
+  retryButton: {
+    alignItems: 'center',
+    backgroundColor: '#00BCD4',
+    borderRadius: 8,
+    paddingHorizontal: 32,
+    paddingVertical: 12,
+  },
+  retryButtonText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: 'bold',
   },
   progressBar: {
     backgroundColor: '#00BCD4',

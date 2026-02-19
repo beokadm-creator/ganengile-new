@@ -1,5 +1,47 @@
 import '@testing-library/jest-native/extend-expect';
 
+// Mock Colors theme
+jest.mock('../src/theme/colors', () => ({
+  Colors: {
+    primary: '#00BCD4',
+    secondary: '#4CAF50',
+    accent: '#FF9800',
+    text: {
+      primary: '#212121',
+      secondary: '#757575',
+    },
+    background: {
+      primary: '#FFFFFF',
+      secondary: '#F5F5F5',
+    },
+    success: '#4CAF50',
+    warning: '#FF9800',
+    error: '#F44336',
+    white: '#FFFFFF',
+      black: '#000000',
+  },
+}));
+
+jest.mock('../src/theme/typography', () => ({
+  Typography: {
+    h1: { fontSize: 32, fontWeight: 'bold' },
+    h2: { fontSize: 24, fontWeight: 'bold' },
+    body: { fontSize: 16 },
+    bodyBold: { fontSize: 16, fontWeight: '600' },
+    caption: { fontSize: 12 },
+  },
+}));
+
+jest.mock('../src/theme/spacing', () => ({
+  Spacing: {
+    xs: 4,
+    sm: 8,
+    md: 16,
+    lg: 24,
+    xl: 32,
+  },
+}));
+
 // Mock AsyncStorage
 jest.mock('@react-native-async-storage/async-storage', () => ({
   getItem: jest.fn(),
@@ -156,3 +198,8 @@ global.console = {
 // Export mock utilities for tests to use
 global.__mockFirestoreData = mockFirestoreData;
 global.__clearMockFirestore = () => mockFirestoreData.clear();
+
+// Global fail function for tests
+global.fail = (message: string) => {
+  throw new Error(`Test failed: ${message}`);
+};
