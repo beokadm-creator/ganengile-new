@@ -385,6 +385,13 @@ export default function ProfileScreen({ navigation: _navigation }: Props) {
         onPress: () => (_navigation as any).navigate('BadgeCollection'),
         color: '#9C27B0',
       },
+      {
+        icon: '🚀',
+        title: '길러 승급',
+        subtitle: '전문 길러로 승급 신청',
+        onPress: () => (_navigation as any).navigate('GillerLevelUpgrade'),
+        color: '#FF5722',
+      },
       ...commonItems,
     ];
 

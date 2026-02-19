@@ -1,12 +1,12 @@
 /**
  * Giller Level Upgrade Screen
- * 길러 승급 신청 화면 (P1-1)
+ * 길러 승급 신청 화면
  *
- * 기능:
- * - 승급 기준 안내 (50건, 평점 4.5+, 30일 가입)
- * - 현재 달성 현황 표시
- * - 승급 신청 버튼
- * - 승급 심사 대기 알림
+ * 일반 길러가 전문 길러로 승급을 신청하는 화면
+ * - 승급 조건 안내
+ * - 현재 등급 및 진행률 표시
+ * - 승급 신청 폼
+ * - 제출 및 검증
  */
 
 import React, { useState, useEffect } from 'react';
@@ -15,198 +15,98 @@ import {
   Text,
   StyleSheet,
   ScrollView,
+  TextInput,
   TouchableOpacity,
-  ActivityIndicator,
   Alert,
+  ActivityIndicator,
 } from 'react-native';
-import { StackNavigationProp } from '@react-navigation/stack';
-import { doc, getDoc, updateDoc, getFirestore } from 'firebase/firestore';
-import { requireUserId } from '../../services/firebase';
-import { ProfessionalGillerService } from '../../services/ProfessionalGillerService';
-import { Colors, Typography, Spacing, BorderRadius } from '../../theme';
+import { Ionicons } from '@expo/vector-icons';
+import { createGillerService } from '../../services/giller-service';
+import type { GillerProfile } from '../../types/giller';
+import { GillerType } from '../../types/giller';
 
-type NavigationProp = StackNavigationProp<any>;
-
-interface Props {
-  navigation: NavigationProp;
-}
-
-interface GillerStats {
-  completedDeliveries: number;
-  rating: number;
-  memberDays: number;
-  recentPenalties: number;
-  totalDeliveries: number;
-  avgMonthlyDeliveries: number;
-}
-
-interface UpgradeCriteria {
-  completedDeliveries: number;
-  rating: number;
-  memberDays: number;
-  noRecentPenalties: boolean;
-}
-
-type GillerLevel = 'normal' | 'professional' | 'master';
+type Props = {
+  navigation: any;
+};
 
 export default function GillerLevelUpgradeScreen({ navigation }: Props) {
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
-  const [currentLevel, setCurrentLevel] = useState<GillerLevel>('normal');
-  const [stats, setStats] = useState<GillerStats | null>(null);
-  const [canUpgrade, setCanUpgrade] = useState(false);
-  const [upgradeTo, setUpgradeTo] = useState<GillerLevel | null>(null);
-  const [pendingRequests, setPendingRequests] = useState<string[]>([]);
+  const [profile, setProfile] = useState<GillerProfile | null>(null);
+  const [eligibility, setEligibility] = useState<{
+    isEligible: boolean;
+    score: number;
+    breakdown: {
+      completedDeliveries: number;
+      rating: number;
+      accountAge: number;
+      penalties: number;
+      activity: number;
+    };
+  } | null>(null);
 
-  // 승급 기준
-  const upgradeCriteria: Record<GillerLevel, UpgradeCriteria> = {
-    professional: {
-      completedDeliveries: 50,
-      rating: 4.5,
-      memberDays: 30,
-      noRecentPenalties: true,
-    },
-    master: {
-      completedDeliveries: 100,
-      rating: 4.8,
-      memberDays: 90,
-      noRecentPenalties: true,
-    },
-  };
-
-  // 등급별 혜택
-  const levelBenefits: Record<GillerLevel, string[]> = {
-    normal: ['동선 5개', '일일 10건', '요금 보너스 없음'],
-    professional: ['동선 10개', '일일 20건', '요금 15% 보너스', '우선 매칭'],
-    master: ['동선 15개', '일일 30건', '요금 25% 보너스', '최우선 매칭', '멘토 배지'],
-  };
+  const [reason, setReason] = useState('');
+  const [activity, setActivity] = useState('');
 
   useEffect(() => {
-    loadUserStats();
+    loadProfile();
   }, []);
 
-  const loadUserStats = async () => {
+  const loadProfile = async () => {
     try {
       setLoading(true);
+      const gillerService = createGillerService();
+      const profileData = await gillerService.getGillerProfile();
 
-      const db = getFirestore();
-      const userId = requireUserId();
-      const userRef = doc(db, 'users', userId);
-      const userDoc = await getDoc(userRef);
-
-      if (userDoc.exists()) {
-        const userData = userDoc.data();
-
-        // 현재 등급
-        setCurrentLevel(userData.gillerLevel || 'normal');
-
-        // 통계
-        const statsData: GillerStats = {
-          completedDeliveries: userData.stats?.completedDeliveries || 0,
-          rating: userData.stats?.rating || 0,
-          memberDays: calculateMemberDays(userData.createdAt?.toDate()),
-          recentPenalties: userData.stats?.recentPenalties || 0,
-          totalDeliveries: userData.stats?.totalDeliveries || 0,
-          avgMonthlyDeliveries: calculateAvgMonthlyDeliveries(
-            userData.stats?.completedDeliveries || 0,
-            calculateMemberDays(userData.createdAt?.toDate())
-          ),
-        };
-        setStats(statsData);
-
-        // 승급 가능 여부 확인
-        checkUpgradeEligibility(userData);
-
-        // 대기 중인 신청
-        const pending = userData.pendingUpgrades || [];
-        setPendingRequests(pending);
+      if (!profileData) {
+        Alert.alert('오류', '길러 프로필을 찾을 수 없습니다.');
+        navigation.goBack();
+        return;
       }
+
+      setProfile(profileData);
+
+      // 승급 자격 확인
+      const eligibilityData = await gillerService.checkPromotionEligibility();
+      setEligibility(eligibilityData);
     } catch (error) {
-      console.error('Error loading user stats:', error);
-      Alert.alert('오류', '통계를 불러올 수 없습니다.');
+      console.error('Failed to load profile:', error);
+      Alert.alert('오류', '프로필 로딩에 실패했습니다.');
+      navigation.goBack();
     } finally {
       setLoading(false);
     }
   };
 
-  const calculateMemberDays = (createdAt?: Date): number => {
-    if (!createdAt) return 0;
-    const diff = Date.now() - createdAt.getTime();
-    return Math.floor(diff / (1000 * 60 * 60 * 24));
-  };
-
-  const calculateAvgMonthlyDeliveries = (deliveries: number, days: number): number => {
-    if (days === 0) return 0;
-    return Math.round((deliveries / days) * 30);
-  };
-
-  const checkUpgradeEligibility = (userData: any) => {
-    const currentLevel = userData.gillerLevel || 'normal';
-
-    // 일반 → 전문가
-    if (currentLevel === 'normal') {
-      const criteria = upgradeCriteria.professional;
-      const eligible =
-        (userData.stats?.completedDeliveries || 0) >= criteria.completedDeliveries &&
-        (userData.stats?.rating || 0) >= criteria.rating &&
-        calculateMemberDays(userData.createdAt?.toDate()) >= criteria.memberDays &&
-        (userData.stats?.recentPenalties || 0) === 0;
-
-      if (eligible) {
-        setCanUpgrade(true);
-        setUpgradeTo('professional');
-      }
+  const handleSubmit = async () => {
+    if (!eligibility?.isEligible) {
+      Alert.alert(
+        '승급 불가',
+        '승급 기준을 충족하지 못했습니다.\n조건을 다시 확인해주세요.'
+      );
+      return;
     }
-    // 전문가 → 마스터
-    else if (currentLevel === 'professional') {
-      const criteria = upgradeCriteria.master;
-      const eligible =
-        (userData.stats?.completedDeliveries || 0) >= criteria.completedDeliveries &&
-        (userData.stats?.rating || 0) >= criteria.rating &&
-        calculateMemberDays(userData.createdAt?.toDate()) >= criteria.memberDays &&
-        (userData.stats?.recentPenalties || 0) === 0;
 
-      if (eligible) {
-        setCanUpgrade(true);
-        setUpgradeTo('master');
-      }
+    if (!reason.trim()) {
+      Alert.alert('입력 필요', '승급 사유를 입력해주세요.');
+      return;
     }
-  };
 
-  const handleUpgradeRequest = async () => {
-    if (!upgradeTo) return;
+    if (!activity.trim()) {
+      Alert.alert('입력 필요', '활동 내역을 입력해주세요.');
+      return;
+    }
 
-    Alert.alert(
-      '승급 신청 확인',
-      `${getLevelLabel(upgradeTo)}(으)로 승급을 신청하시겠습니까?\n\n심사는 1~3일 소요됩니다.`,
-      [
-        { text: '취소', style: 'cancel' },
-        {
-          text: '신청',
-          style: 'default',
-          onPress: submitUpgradeRequest,
-        },
-      ]
-    );
-  };
-
-  const submitUpgradeRequest = async () => {
     try {
       setSubmitting(true);
+      const gillerService = createGillerService();
 
-      const db = getFirestore();
-      const userId = requireUserId();
-      const userRef = doc(db, 'users', userId);
-
-      // 승급 신청 추가
-      await updateDoc(userRef, {
-        pendingUpgrades: [...pendingRequests, upgradeTo],
-        upgradeRequestedAt: new Date(),
-      });
+      // 전문 길러로 승급
+      await gillerService.promoteToProfessional();
 
       Alert.alert(
-        '신청 완료',
-        '승급 신청이 완료되었습니다.\n심사 결과는 알림으로 전달해드립니다.',
+        '승급 완료',
+        '축하합니다!\n전문 길러로 승급되었습니다.\n\n혜택이 즉시 적용됩니다.',
         [
           {
             text: '확인',
@@ -214,427 +114,552 @@ export default function GillerLevelUpgradeScreen({ navigation }: Props) {
           },
         ]
       );
-    } catch (error) {
-      console.error('Error submitting upgrade request:', error);
-      Alert.alert('오류', '승급 신청에 실패했습니다.');
+    } catch (error: any) {
+      console.error('Promotion failed:', error);
+      Alert.alert(
+        '승급 실패',
+        error.message || '승급 처리 중 오류가 발생했습니다.'
+      );
     } finally {
       setSubmitting(false);
     }
   };
 
-  const getLevelLabel = (level: GillerLevel): string => {
-    switch (level) {
-      case 'normal':
-        return '일반 길러';
-      case 'professional':
-        return '전문가 길러';
-      case 'master':
-        return '마스터 길러';
-    }
-  };
-
-  const getLevelColor = (level: GillerLevel): string => {
-    switch (level) {
-      case 'normal':
-        return '#9E9E9E'; // Gray
-      case 'professional':
-        return '#FFD700'; // Gold
-      case 'master':
-        return '#4CAF50'; // Green
-    }
-  };
-
-  const renderCriteriaCard = (targetLevel: GillerLevel) => {
-    const criteria = upgradeCriteria[targetLevel];
-    const levelColor = getLevelColor(targetLevel);
-
-    return (
-      <View style={[styles.criteriaCard, { borderColor: levelColor }]}>
-        <View style={styles.criteriaHeader}>
-          <Text style={[styles.criteriaTitle, { color: levelColor }]}>
-            {getLevelLabel(targetLevel)} 승급 기준
-          </Text>
-        </View>
-
-        {/* 완료 건수 */}
-        <View style={styles.criteriaItem}>
-          <View style={styles.criteriaLabel}>
-            <Text style={styles.criteriaIcon}>📦</Text>
-            <Text style={styles.criteriaLabelText}>완료 건수</Text>
-          </View>
-          <View style={styles.criteriaValue}>
-            <Text
-              style={[
-                styles.criteriaValueText,
-                stats && stats.completedDeliveries >= criteria.completedDeliveries
-                  ? styles.criteriaMet
-                  : styles.criteriaNotMet,
-              ]}
-            >
-              {stats?.completedDeliveries || 0} / {criteria.completedDeliveries}건
-            </Text>
-          </View>
-        </View>
-
-        {/* 평점 */}
-        <View style={styles.criteriaItem}>
-          <View style={styles.criteriaLabel}>
-            <Text style={styles.criteriaIcon}>⭐</Text>
-            <Text style={styles.criteriaLabelText}>평점</Text>
-          </View>
-          <View style={styles.criteriaValue}>
-            <Text
-              style={[
-                styles.criteriaValueText,
-                stats && stats.rating >= criteria.rating
-                  ? styles.criteriaMet
-                  : styles.criteriaNotMet,
-              ]}
-            >
-              {stats?.rating.toFixed(1) || '0.0'} / {criteria.rating.toFixed(1)}
-            </Text>
-          </View>
-        </View>
-
-        {/* 가입 기간 */}
-        <View style={styles.criteriaItem}>
-          <View style={styles.criteriaLabel}>
-            <Text style={styles.criteriaIcon}>📅</Text>
-            <Text style={styles.criteriaLabelText}>가입 기간</Text>
-          </View>
-          <View style={styles.criteriaValue}>
-            <Text
-              style={[
-                styles.criteriaValueText,
-                stats && stats.memberDays >= criteria.memberDays
-                  ? styles.criteriaMet
-                  : styles.criteriaNotMet,
-              ]}
-            >
-              {stats?.memberDays || 0}일 / {criteria.memberDays}일
-            </Text>
-          </View>
-        </View>
-
-        {/* 최근 페널티 */}
-        <View style={styles.criteriaItem}>
-          <View style={styles.criteriaLabel}>
-            <Text style={styles.criteriaIcon}>✅</Text>
-            <Text style={styles.criteriaLabelText}>최근 페널티</Text>
-          </View>
-          <View style={styles.criteriaValue}>
-            <Text
-              style={[
-                styles.criteriaValueText,
-                stats && stats.recentPenalties === 0
-                  ? styles.criteriaMet
-                  : styles.criteriaNotMet,
-              ]}
-            >
-              {stats?.recentPenalties || 0}회 / 0회
-            </Text>
-          </View>
-        </View>
-      </View>
-    );
-  };
-
-  const renderBenefitsCard = (level: GillerLevel) => {
-    const benefits = levelBenefits[level];
-    const levelColor = getLevelColor(level);
-
-    return (
-      <View style={[styles.benefitsCard, { backgroundColor: levelColor + '20' }]}>
-        <Text style={[styles.benefitsTitle, { color: levelColor }]}>
-          {getLevelLabel(level)} 혜택
-        </Text>
-        {benefits.map((benefit, index) => (
-          <View key={index} style={styles.benefitItem}>
-            <Text style={styles.benefitIcon}>•</Text>
-            <Text style={styles.benefitText}>{benefit}</Text>
-          </View>
-        ))}
-      </View>
-    );
-  };
-
   if (loading) {
     return (
-      <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color={Colors.primary} />
-        <Text style={styles.loadingText}>통계를 불러오는 중...</Text>
+      <View style={styles.centerContainer}>
+        <ActivityIndicator size="large" color="#00BCD4" />
+        <Text style={styles.loadingText}>프로필 로딩 중...</Text>
       </View>
     );
   }
 
+  if (!profile || !eligibility) {
+    return null;
+  }
+
+  const isProfessional = profile.gillerType === GillerType.PROFESSIONAL;
+
+  // 등급별 색상
+  const getLevelColor = () => {
+    if (isProfessional) return '#FF5722'; // Professional: 빨간색
+    return '#FFC107'; // Regular: 금색
+  };
+
+  const getLevelName = () => {
+    if (isProfessional) return '전문 길러';
+    return '일반 길러';
+  };
+
+  // 다음 등급 혜택
+  const nextBenefits = isProfessional
+    ? []
+    : [
+        '최대 동시 배송: 3개 → 5개',
+        '우선 매칭',
+        '프리미엄 수수료 (15%)',
+        '전용 배지',
+        '통계 및 분석',
+      ];
+
   return (
-    <View style={styles.container}>
-      {/* 헤더 */}
-      <View style={styles.header}>
-        <Text style={styles.headerTitle}>길러 승급 신청</Text>
-        <Text style={styles.headerSubtitle}>
-          현재: {getLevelLabel(currentLevel)}
-        </Text>
+    <ScrollView style={styles.container}>
+      {/* 헤더: 현재 등급 */}
+      <View style={[styles.header, { backgroundColor: getLevelColor() + '20' }]}>
+        <View style={styles.levelBadge}>
+          <Ionicons name="trophy" size={48} color={getLevelColor()} />
+          <Text style={[styles.levelText, { color: getLevelColor() }]}>
+            {getLevelName()}
+          </Text>
+        </View>
+
+        {isProfessional ? (
+          <View style={styles.alreadyProfessional}>
+            <Ionicons name="checkmark-circle" size={24} color="#4CAF50" />
+            <Text style={styles.alreadyText}>이미 전문 길러입니다</Text>
+          </View>
+        ) : (
+          <TouchableOpacity
+            style={styles.upgradeButton}
+            onPress={handleSubmit}
+            disabled={!eligibility.isEligible || submitting}
+          >
+            {submitting ? (
+              <ActivityIndicator color="#fff" />
+            ) : (
+              <>
+                <Ionicons name="rocket" size={20} color="#fff" />
+                <Text style={styles.upgradeButtonText}>
+                  전문 길러 승급 신청
+                </Text>
+              </>
+            )}
+          </TouchableOpacity>
+        )}
       </View>
 
-      <ScrollView
-        style={styles.content}
-        showsVerticalScrollIndicator={false}
-      >
-        {/* 대기 중인 신청 */}
-        {pendingRequests.length > 0 && (
-          <View style={styles.pendingSection}>
-            <Text style={styles.pendingTitle}>심사 대기 중</Text>
-            {pendingRequests.map((level, index) => (
-              <View key={index} style={styles.pendingCard}>
-                <Text style={styles.pendingText}>
-                  {getLevelLabel(level as GillerLevel)} 승급 심사 중
-                </Text>
-                <Text style={styles.pendingSubtext}>심사는 1~3일 소요됩니다</Text>
+      {/* 승급 조건 안내 */}
+      <View style={styles.section}>
+        <Text style={styles.sectionTitle}>승급 기준</Text>
+
+        <View style={styles.criteriaCard}>
+          {/* 배송 건수 */}
+          <View style={styles.criteriaRow}>
+            <View style={styles.criteriaInfo}>
+              <Ionicons name="cube" size={24} color="#00BCD4" />
+              <Text style={styles.criteriaLabel}>완료 배송</Text>
+            </View>
+            <View style={styles.progressContainer}>
+              <View style={styles.progressBar}>
+                <View
+                  style={[
+                    styles.progressFill,
+                    {
+                      width: `${Math.min(
+                        (profile.stats.totalCompletedDeliveries / 50) * 100,
+                        100
+                      )}%`,
+                      backgroundColor:
+                        profile.stats.totalCompletedDeliveries >= 50
+                          ? '#4CAF50'
+                          : '#FFC107',
+                    },
+                  ]}
+                />
+              </View>
+              <Text style={styles.progressText}>
+                {profile.stats.totalCompletedDeliveries}/50건
+              </Text>
+            </View>
+          </View>
+
+          {/* 평점 */}
+          <View style={styles.criteriaRow}>
+            <View style={styles.criteriaInfo}>
+              <Ionicons name="star" size={24} color="#FFC107" />
+              <Text style={styles.criteriaLabel}>평점</Text>
+            </View>
+            <View style={styles.progressContainer}>
+              <View style={styles.progressBar}>
+                <View
+                  style={[
+                    styles.progressFill,
+                    {
+                      width: `${Math.min(
+                        (profile.stats.rating / 4.5) * 100,
+                        100
+                      )}%`,
+                      backgroundColor:
+                        profile.stats.rating >= 4.5 ? '#4CAF50' : '#FFC107',
+                    },
+                  ]}
+                />
+              </View>
+              <Text style={styles.progressText}>
+                {profile.stats.rating.toFixed(1)}/4.5점
+              </Text>
+            </View>
+          </View>
+
+          {/* 계정 기간 */}
+          <View style={styles.criteriaRow}>
+            <View style={styles.criteriaInfo}>
+              <Ionicons name="calendar" size={24} color="#9C27B0" />
+              <Text style={styles.criteriaLabel}>가입 기간</Text>
+            </View>
+            <View style={styles.progressContainer}>
+              <View style={styles.progressBar}>
+                <View
+                  style={[
+                    styles.progressFill,
+                    {
+                      width: `${Math.min(
+                        (profile.stats.accountAgeDays / 30) * 100,
+                        100
+                      )}%`,
+                      backgroundColor:
+                        profile.stats.accountAgeDays >= 30
+                          ? '#4CAF50'
+                          : '#FFC107',
+                    },
+                  ]}
+                />
+              </View>
+              <Text style={styles.progressText}>
+                {profile.stats.accountAgeDays}/30일
+              </Text>
+            </View>
+          </View>
+
+          {/* 페널티 */}
+          <View style={styles.criteriaRow}>
+            <View style={styles.criteriaInfo}>
+              <Ionicons
+                name="warning"
+                size={24}
+                color={profile.stats.recentPenalties === 0 ? '#4CAF50' : '#F44336'}
+              />
+              <Text style={styles.criteriaLabel}>최근 페널티</Text>
+            </View>
+            <View style={styles.progressContainer}>
+              <View style={styles.progressBar}>
+                <View
+                  style={[
+                    styles.progressFill,
+                    {
+                      width: '100%',
+                      backgroundColor:
+                        profile.stats.recentPenalties === 0
+                          ? '#4CAF50'
+                          : '#F44336',
+                    },
+                  ]}
+                />
+              </View>
+              <Text
+                style={[
+                  styles.progressText,
+                  {
+                    color:
+                      profile.stats.recentPenalties === 0
+                        ? '#4CAF50'
+                        : '#F44336',
+                  },
+                ]}
+              >
+                {profile.stats.recentPenalties === 0 ? '없음' : '있음'}
+              </Text>
+            </View>
+          </View>
+        </View>
+
+        {/* 총 점수 */}
+        <View style={styles.scoreCard}>
+          <Text style={styles.scoreLabel}>승급 점수</Text>
+          <View style={styles.scoreValueContainer}>
+            <Text style={[styles.scoreValue, {
+              color: eligibility.isEligible ? '#4CAF50' : '#FFC107'
+            }]}>
+              {eligibility.score.toFixed(0)}
+            </Text>
+            <Text style={styles.scoreMax}>/80점</Text>
+          </View>
+          <Text style={[
+            styles.scoreStatus,
+            { color: eligibility.isEligible ? '#4CAF50' : '#F44336' }
+          ]}>
+            {eligibility.isEligible ? '✅ 승급 가능' : '⏳ 조건 충족 필요'}
+          </Text>
+        </View>
+      </View>
+
+      {/* 다음 등급 혜택 */}
+      {!isProfessional && (
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>전문 길러 혜택</Text>
+          <View style={styles.benefitsCard}>
+            {nextBenefits.map((benefit, index) => (
+              <View key={index} style={styles.benefitRow}>
+                <Ionicons name="checkmark-circle" size={20} color="#4CAF50" />
+                <Text style={styles.benefitText}>{benefit}</Text>
               </View>
             ))}
           </View>
-        )}
+        </View>
+      )}
 
-        {/* 현재 등급 혜택 */}
-        {renderBenefitsCard(currentLevel)}
+      {/* 승급 신청 폼 */}
+      {!isProfessional && eligibility.isEligible && (
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>승급 신청</Text>
 
-        {/* 승급 가능 여부 */}
-        {upgradeTo && (
-          <>
-            {/* 승급 기준 */}
-            {renderCriteriaCard(upgradeTo!)}
+          <View style={styles.formCard}>
+            <Text style={styles.inputLabel}>승급 사유</Text>
+            <TextInput
+              style={styles.textInput}
+              placeholder="전문 길러가 되고 싶은 이유를 입력해주세요."
+              value={reason}
+              onChangeText={setReason}
+              multiline
+              numberOfLines={4}
+              textAlignVertical="top"
+            />
 
-            {/* 승급 후 혜택 */}
-            {renderBenefitsCard(upgradeTo!)}
+            <Text style={styles.inputLabel}>활동 내역</Text>
+            <TextInput
+              style={styles.textInput}
+              placeholder="최근 활동 내역을 간단히 설명해주세요."
+              value={activity}
+              onChangeText={setActivity}
+              multiline
+              numberOfLines={3}
+              textAlignVertical="top"
+            />
 
-            {/* 승급 신청 버튼 */}
-            {canUpgrade ? (
-              <TouchableOpacity
-                style={[styles.upgradeButton, submitting && styles.upgradeButtonDisabled]}
-                onPress={handleUpgradeRequest}
-                disabled={submitting || pendingRequests.length > 0}
-              >
-                <Text style={styles.upgradeButtonText}>
-                  {submitting ? '신청 중...' : `${getLevelLabel(upgradeTo!)}로 승급`}
-                </Text>
-              </TouchableOpacity>
-            ) : (
-              <View style={styles.notEligibleContainer}>
-                <Text style={styles.notEligibleIcon}>🔒</Text>
-                <Text style={styles.notEligibleText}>
-                  아직 승급 기준을 충족하지 못했습니다.
-                </Text>
-                <Text style={styles.notEligibleSubtext}>
-                  계속 활동하시면 승급 기회가 올 것입니다!
-                </Text>
-              </View>
-            )}
-          </>
-        )}
+            <TouchableOpacity
+              style={[styles.submitButton, submitting && styles.submitButtonDisabled]}
+              onPress={handleSubmit}
+              disabled={submitting}
+            >
+              {submitting ? (
+                <ActivityIndicator color="#fff" />
+              ) : (
+                <>
+                  <Ionicons name="send" size={20} color="#fff" />
+                  <Text style={styles.submitButtonText}>승급 신청하기</Text>
+                </>
+              )}
+            </TouchableOpacity>
+          </View>
+        </View>
+      )}
 
-        {/* 이미 최고 등급 */}
-        {currentLevel === 'master' && (
-          <View style={styles.masterContainer}>
-            <Text style={styles.masterIcon}>👑</Text>
-            <Text style={styles.masterText}>최고 등급입니다!</Text>
-            <Text style={styles.masterSubtext}>
-              마스터 길러로서 모든 혜택을 누리고 계십니다.
+      {!isProfessional && !eligibility.isEligible && (
+        <View style={styles.section}>
+          <View style={styles.notEligibleCard}>
+            <Ionicons name="information-circle" size={32} color="#FFC107" />
+            <Text style={styles.notEligibleTitle}>승급 조건 미충족</Text>
+            <Text style={styles.notEligibleText}>
+              승급 기준(80점)을 충족하지 못했습니다.
+              {'\n'}
+              계속 활동하여 조건을 충족시켜주세요!
             </Text>
           </View>
-        )}
-      </ScrollView>
-    </View>
+        </View>
+      )}
+    </ScrollView>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: Colors.background,
+    backgroundColor: '#f5f5f5',
   },
-  header: {
-    paddingHorizontal: Spacing.md,
-    paddingTop: Spacing.lg,
-    paddingBottom: Spacing.sm,
-    backgroundColor: Colors.surface,
-  },
-  headerTitle: {
-    ...Typography.h2,
-    color: Colors.text,
-    marginBottom: Spacing.xs,
-  },
-  headerSubtitle: {
-    ...Typography.body2,
-    color: Colors.textSecondary,
-  },
-  content: {
-    flex: 1,
-  },
-  loadingContainer: {
+  centerContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
+    backgroundColor: '#f5f5f5',
   },
   loadingText: {
-    ...Typography.body1,
-    color: Colors.textSecondary,
-    marginTop: Spacing.md,
+    marginTop: 16,
+    fontSize: 16,
+    color: '#666',
   },
-  pendingSection: {
-    backgroundColor: '#FFF3E0',
-    margin: Spacing.md,
-    padding: Spacing.md,
-    borderRadius: BorderRadius.lg,
-  },
-  pendingTitle: {
-    ...Typography.h3,
-    color: '#F57C00',
-    marginBottom: Spacing.sm,
-  },
-  pendingCard: {
-    backgroundColor: Colors.surface,
-    padding: Spacing.md,
-    borderRadius: BorderRadius.md,
-    marginBottom: Spacing.xs,
-  },
-  pendingText: {
-    ...Typography.body1,
-    color: Colors.text,
-    marginBottom: Spacing.xs,
-  },
-  pendingSubtext: {
-    ...Typography.caption,
-    color: Colors.textSecondary,
-  },
-  criteriaCard: {
-    backgroundColor: Colors.surface,
-    margin: Spacing.md,
-    padding: Spacing.lg,
-    borderRadius: BorderRadius.lg,
-    borderWidth: 2,
-  },
-  criteriaHeader: {
-    marginBottom: Spacing.md,
-  },
-  criteriaTitle: {
-    ...Typography.h3,
-    fontWeight: '700',
-  },
-  criteriaItem: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
+  header: {
+    padding: 24,
     alignItems: 'center',
-    paddingVertical: Spacing.sm,
     borderBottomWidth: 1,
-    borderBottomColor: Colors.border,
+    borderBottomColor: '#e0e0e0',
   },
-  criteriaLabel: {
+  levelBadge: {
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  levelText: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    marginTop: 8,
+  },
+  alreadyProfessional: {
     flexDirection: 'row',
     alignItems: 'center',
-    flex: 1,
+    backgroundColor: '#4CAF5020',
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 20,
   },
-  criteriaIcon: {
-    fontSize: 20,
-    marginRight: Spacing.sm,
-  },
-  criteriaLabelText: {
-    ...Typography.body1,
-    color: Colors.text,
-  },
-  criteriaValue: {
-    alignItems: 'flex-end',
-  },
-  criteriaValueText: {
-    ...Typography.body1,
+  alreadyText: {
+    marginLeft: 8,
+    fontSize: 16,
+    color: '#4CAF50',
     fontWeight: '600',
   },
-  criteriaMet: {
-    color: '#4CAF50',
-  },
-  criteriaNotMet: {
-    color: '#FF5252',
-  },
-  benefitsCard: {
-    margin: Spacing.md,
-    padding: Spacing.lg,
-    borderRadius: BorderRadius.lg,
-  },
-  benefitsTitle: {
-    ...Typography.h3,
-    fontWeight: '700',
-    marginBottom: Spacing.md,
-  },
-  benefitItem: {
+  upgradeButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: Spacing.xs,
-  },
-  benefitIcon: {
-    fontSize: 20,
-    marginRight: Spacing.sm,
-    color: Colors.textSecondary,
-  },
-  benefitText: {
-    ...Typography.body1,
-    color: Colors.text,
-  },
-  upgradeButton: {
-    backgroundColor: Colors.primary,
-    margin: Spacing.md,
-    padding: Spacing.lg,
-    borderRadius: BorderRadius.lg,
-    alignItems: 'center',
-  },
-  upgradeButtonDisabled: {
-    backgroundColor: Colors.border,
+    backgroundColor: '#00BCD4',
+    paddingHorizontal: 24,
+    paddingVertical: 12,
+    borderRadius: 24,
   },
   upgradeButtonText: {
-    ...Typography.h3,
-    color: Colors.white,
-    fontWeight: '700',
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: 'bold',
+    marginLeft: 8,
   },
-  notEligibleContainer: {
-    backgroundColor: Colors.surface,
-    margin: Spacing.md,
-    padding: Spacing.xl,
-    borderRadius: BorderRadius.lg,
+  section: {
+    padding: 16,
+  },
+  sectionTitle: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: '#333',
+    marginBottom: 16,
+  },
+  criteriaCard: {
+    backgroundColor: '#fff',
+    borderRadius: 12,
+    padding: 16,
+    elevation: 2,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+  },
+  criteriaRow: {
+    marginBottom: 16,
+  },
+  criteriaInfo: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  criteriaLabel: {
+    marginLeft: 8,
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#333',
+  },
+  progressContainer: {
+    flexDirection: 'row',
     alignItems: 'center',
   },
-  notEligibleIcon: {
+  progressBar: {
+    flex: 1,
+    height: 8,
+    backgroundColor: '#e0e0e0',
+    borderRadius: 4,
+    overflow: 'hidden',
+    marginRight: 8,
+  },
+  progressFill: {
+    height: '100%',
+    borderRadius: 4,
+  },
+  progressText: {
+    fontSize: 14,
+    color: '#666',
+    fontWeight: '600',
+  },
+  scoreCard: {
+    backgroundColor: '#fff',
+    borderRadius: 12,
+    padding: 20,
+    alignItems: 'center',
+    marginTop: 16,
+    elevation: 2,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+  },
+  scoreLabel: {
+    fontSize: 14,
+    color: '#666',
+    marginBottom: 8,
+  },
+  scoreValueContainer: {
+    flexDirection: 'row',
+    alignItems: 'baseline',
+  },
+  scoreValue: {
     fontSize: 48,
-    marginBottom: Spacing.md,
+    fontWeight: 'bold',
+  },
+  scoreMax: {
+    fontSize: 24,
+    color: '#999',
+    marginLeft: 4,
+  },
+  scoreStatus: {
+    fontSize: 16,
+    fontWeight: '600',
+    marginTop: 8,
+  },
+  benefitsCard: {
+    backgroundColor: '#fff',
+    borderRadius: 12,
+    padding: 16,
+    elevation: 2,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+  },
+  benefitRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  benefitText: {
+    marginLeft: 8,
+    fontSize: 16,
+    color: '#333',
+    flex: 1,
+  },
+  formCard: {
+    backgroundColor: '#fff',
+    borderRadius: 12,
+    padding: 16,
+    elevation: 2,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+  },
+  inputLabel: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#333',
+    marginTop: 16,
+    marginBottom: 8,
+  },
+  textInput: {
+    backgroundColor: '#f5f5f5',
+    borderRadius: 8,
+    padding: 12,
+    fontSize: 16,
+    color: '#333',
+    minHeight: 80,
+  },
+  submitButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#00BCD4',
+    padding: 16,
+    borderRadius: 8,
+    marginTop: 24,
+  },
+  submitButtonDisabled: {
+    backgroundColor: '#ccc',
+  },
+  submitButtonText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: 'bold',
+    marginLeft: 8,
+  },
+  notEligibleCard: {
+    backgroundColor: '#FFC10720',
+    borderRadius: 12,
+    padding: 20,
+    alignItems: 'center',
+  },
+  notEligibleTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#FFC107',
+    marginTop: 8,
   },
   notEligibleText: {
-    ...Typography.h3,
-    color: Colors.text,
+    fontSize: 14,
+    color: '#666',
     textAlign: 'center',
-    marginBottom: Spacing.xs,
-  },
-  notEligibleSubtext: {
-    ...Typography.body2,
-    color: Colors.textSecondary,
-    textAlign: 'center',
-  },
-  masterContainer: {
-    backgroundColor: '#FFF3E0',
-    margin: Spacing.md,
-    padding: Spacing.xl,
-    borderRadius: BorderRadius.lg,
-    alignItems: 'center',
-  },
-  masterIcon: {
-    fontSize: 64,
-    marginBottom: Spacing.md,
-  },
-  masterText: {
-    ...Typography.h2,
-    color: '#F57C00',
-    marginBottom: Spacing.xs,
-  },
-  masterSubtext: {
-    ...Typography.body1,
-    color: Colors.textSecondary,
-    textAlign: 'center',
+    marginTop: 8,
+    lineHeight: 22,
   },
 });

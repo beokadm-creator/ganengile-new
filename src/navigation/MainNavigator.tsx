@@ -37,6 +37,7 @@ import MyRatingScreen from '../screens/main/MyRatingScreen';
 import CustomerServiceScreen from '../screens/main/CustomerServiceScreen';
 import TermsScreen from '../screens/main/TermsScreen';
 import GillerPickupFromLockerScreen from '../screens/requester/GillerPickupFromLockerScreen';
+import GillerLevelUpgradeScreen from '../screens/main/GillerLevelUpgradeScreen';
 
 const Tab = createBottomTabNavigator<MainTabParamList>();
 const Stack = createStackNavigator();
@@ -289,6 +290,14 @@ export default function MainNavigator() {
         options={{
           headerShown: true,
           title: '내 평가',
+        }}
+      />
+      <Stack.Screen
+        name="GillerLevelUpgrade"
+        component={GillerLevelUpgradeScreen}
+        options={{
+          headerShown: true,
+          title: '길러 승급',
         }}
       />
       <Stack.Screen
