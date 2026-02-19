@@ -11,8 +11,8 @@
     "test": "jest",
     "test:watch": "jest --watch",
     "test:coverage": "jest --coverage",
-    "lint": "eslint . --ext .ts,.tsx,.js,.jsx",
-    "lint:fix": "eslint . --ext .ts,.tsx,.js,.jsx --fix"
+    "lint": "eslint . --ext .ts,.tsx,.js,.jsx --ignore-pattern 'tests/**' --ignore-pattern '__tests__/**'",
+    "lint:fix": "eslint . --ext .ts,.tsx,.js,.jsx --fix --ignore-pattern 'tests/**' --ignore-pattern '__tests__/**'"
   },
   "dependencies": {
     "@expo/vector-icons": "^15.0.3",
