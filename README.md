@@ -223,6 +223,77 @@ npm run android
 
 ---
 
+## 🤖 GitHub Actions (CI/CD)
+
+### 개요
+자동화된 파이프라인으로 코드 품질, 테스트, 배포를 관리합니다.
+
+### 워크플로우
+
+#### 1. CI (지속적 통합)
+**파일:** `.github/workflows/ci.yml`
+
+**트리거:** Push/PR to `main`, `develop`
+
+**작업:**
+- ✅ ESLint 검사
+- ✅ TypeScript 타입 체크
+- ✅ Jest 테스트 실행
+- ✅ 웹 빌드 검증
+
+#### 2. Firebase 배포
+**파일:** `.github/workflows/deploy-firebase.yml`
+
+**트리거:** 수동 (workflow_dispatch)
+
+**옵션:**
+- Target: `firestore` | `hosting` | `functions` | `all`
+- Environment: `production` | `staging`
+
+**실행 방법:**
+1. GitHub 저장소 → Actions 탭
+2. "Deploy to Firebase" 선택
+3. Target과 Environment 선택
+4. "Run workflow" 클릭
+
+#### 3. EAS Build
+**파일:** `.github/workflows/eas-build.yml`
+
+**트리거:** Push to `main`/`develop`, Tag `v*`, 수동
+
+**옵션:**
+- Platform: `all` | `ios` | `android`
+- Profile: `production` | `preview`
+
+### 필수 Secret 설정
+
+GitHub Repository → Settings → Secrets and variables → Actions
+
+```bash
+# Firebase Service Account (JSON 형식)
+FIREBASE_SERVICE_ACCOUNT={"type":"service_account",...}
+
+# Expo Token
+EXPO_TOKEN=your_expo_token_here
+```
+
+### Firebase Service Account 생성
+
+```bash
+# Firebase Console → Project Settings → Service Accounts
+# "Generate new private key" 클릭
+# 다운로드된 JSON 파일의 내용을 GitHub Secret에 저장
+```
+
+### GitHub Actions 사용 이점
+
+- 🔄 **자동화:** Push 시 자동 검증
+- 🛡️ **안전성:** 테스트 실패 시 조기 발견
+- ⚡ **속도:** 배포 시간 단축
+- 📊 **가시성:** Workflow 실행 기록
+
+---
+
 ## 🛡️ 개발 원칙
 
 ### 안전성 우선

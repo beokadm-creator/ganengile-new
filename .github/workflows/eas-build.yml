@@ -1,0 +1,66 @@
+name: EAS Build
+
+on:
+  push:
+    branches: [ main, develop ]
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      platform:
+        description: 'Build platform'
+        required: true
+        type: choice
+        options:
+          - all
+          - ios
+          - android
+      profile:
+        description: 'Build profile'
+        required: true
+        type: choice
+        options:
+          - production
+          - preview
+
+jobs:
+  build:
+    name: Build EAS
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: 📥 Checkout code
+        uses: actions/checkout@v4
+      
+      - name: 📦 Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+      
+      - name: 🔧 Setup EAS
+        uses: expo/expo-github-action@v8
+        with:
+          eas-version: latest
+          token: ${{ secrets.EXPO_TOKEN }}
+      
+      - name: 🔐 Setup Expo
+        run: |
+          npm ci --legacy-peer-deps
+          npx expo login --non-interactive
+      
+      - name: 🏗️ Build with EAS
+        env:
+          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+        run: |
+          PLATFORM=${{ github.event.inputs.platform || 'all' }}
+          PROFILE=${{ github.event.inputs.profile || 'preview' }}
+          
+          case $PLATFORM in
+            all)
+              eas build --platform all --profile $PROFILE --non-interactive
+              ;;
+            ios|android)
+              eas build --platform $PLATFORM --profile $PROFILE --non-interactive
+              ;;
+          esac
