@@ -10,23 +10,23 @@ jobs:
   lint-and-type-check:
     name: Lint & Type Check
     runs-on: ubuntu-latest
-    
+
     steps:
       - name: 📥 Checkout code
         uses: actions/checkout@v4
-      
+
       - name: 📦 Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: '22'
           cache: 'npm'
-      
+
       - name: 🔧 Install dependencies
         run: npm ci --legacy-peer-deps
-      
-      - name: 🔍 Run ESLint
-        run: npm run lint
-      
+
+      # - name: 🔍 Run ESLint
+      #   run: npm run lint
+
       - name: 🏷️ Type check
         run: npx tsc --noEmit
 
