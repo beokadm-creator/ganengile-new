@@ -42,7 +42,9 @@ try {
 }
 export const messaging: Messaging | null = messagingInstance;
 
-// ==================== Auth Helpers ====================
+// Export app instance as both default and named export
+export const firebaseApp = app;
+export default app;
 
 /**
  * 현재 로그인된 사용자의 ID를 가져옵니다.

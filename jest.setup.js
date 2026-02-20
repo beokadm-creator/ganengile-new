@@ -54,6 +54,23 @@ jest.mock('@react-native-async-storage/async-storage', () => ({
   multiRemove: jest.fn(),
 }));
 
+// Mock expo-file-system
+jest.mock('expo-file-system', () => ({
+  FileSystem: {
+    EncodingType: {
+      Base64: 'base64',
+      UTF8: 'utf8',
+    },
+  },
+  getInfoAsync: jest.fn(),
+  readAsStringAsync: jest.fn(() => Promise.resolve('VGVzdA==')), // Simple valid base64: "Test"
+  deleteAsync: jest.fn(),
+  EncodingType: {
+    Base64: 'base64',
+    UTF8: 'utf8',
+  },
+}));
+
 // Mock Firebase modules with in-memory storage
 const mockFirestoreData = new Map();
 let mockDocIdCounter = 0;
@@ -162,8 +179,54 @@ jest.mock('firebase/firestore', () => ({
   serverTimestamp: jest.fn(() => new Date()),
 }));
 
+// Mock Firebase Storage
+const mockStorageInstance = {};
+const mockGetStorage = jest.fn(() => mockStorageInstance);
+const mockRef = jest.fn().mockImplementation((storageOrPath, path?) => {
+  const refPath = path ? path : (typeof storageOrPath === 'string' ? storageOrPath : 'mock/path');
+  return {
+    ref: refPath,
+    toString: () => refPath,
+  };
+});
+const mockUploadBytesResumable = jest.fn((storageRef, blob, options?) => {
+  // Call onProgress callback immediately (synchronously for tests)
+  if (options?.onProgress) {
+    setTimeout(() => {
+      const mockSnapshot = {
+        bytesTransferred: 1024 * 1024,
+        totalBytes: 1024 * 1024,
+        state: 'success',
+        ref: storageRef,
+        metadata: { contentType: 'image/jpeg' },
+      };
+      options.onProgress(mockSnapshot);
+    }, 0);
+  }
+
+  // Return a promise that resolves immediately
+  return Promise.resolve({
+    bytesTransferred: 1024 * 1024,
+    totalBytes: 1024 * 1024,
+    ref: storageRef,
+    snapshot: {
+      bytesTransferred: 1024 * 1024,
+      totalBytes: 1024 * 1024,
+      state: 'success',
+      ref: storageRef,
+      metadata: { contentType: 'image/jpeg' },
+    },
+  });
+});
+const mockGetDownloadURL = jest.fn(() => 'https://storage.url/mock.jpg');
+const mockDeleteObject = jest.fn();
+
 jest.mock('firebase/storage', () => ({
-  getStorage: jest.fn(),
+  getStorage: mockGetStorage,
+  ref: mockRef,
+  uploadBytesResumable: mockUploadBytesResumable,
+  getDownloadURL: mockGetDownloadURL,
+  deleteObject: mockDeleteObject,
 }));
 
 jest.mock('firebase/messaging', () => ({

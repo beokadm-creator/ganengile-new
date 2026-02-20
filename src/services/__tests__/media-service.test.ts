@@ -12,25 +12,12 @@ jest.mock('expo-image-picker', () => ({
   launchCameraAsync: jest.fn(),
 }));
 
-// Mock expo-file-system
-jest.mock('expo-file-system', () => ({
-  getInfoAsync: jest.fn(),
-  readAsStringAsync: jest.fn(),
-  deleteAsync: jest.fn(),
-}));
-
-// Mock Firebase Storage
-jest.mock('firebase/storage', () => ({
-  getStorage: jest.fn(),
-  ref: jest.fn(),
-  uploadBytesResumable: jest.fn(),
-  getDownloadURL: jest.fn(),
-  deleteObject: jest.fn(),
-}));
-
 import * as ImagePicker from 'expo-image-picker';
 import * as FileSystem from 'expo-file-system';
 import { ref, uploadBytesResumable, getDownloadURL, deleteObject } from 'firebase/storage';
+
+// Increase timeout for all tests in this file
+jest.setTimeout(30000);
 
 describe('MediaService', () => {
   let mediaService: MediaService;

@@ -230,7 +230,7 @@ export class MediaService {
     try {
       // 파일을 읽어서 ArrayBuffer로 변환
       const fileData = await FileSystem.readAsStringAsync(uri, {
-        encoding: FileSystem.EncodingType.Base64,
+        encoding: 'base64' as any, // Type casting for compatibility
       });
 
       // Base64를 Blob으로 변환
