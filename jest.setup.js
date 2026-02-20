@@ -271,8 +271,14 @@ global.fail = (message: string) => {
 global.setupFirebaseMocks = () => {
   // Clear existing mock data
   global.__clearMockFirestore();
+  
+  // Reset mock counters
+  mockDocIdCounter = 0;
 };
 
 global.clearFirebaseMocks = () => {
   jest.clearAllMocks();
+  
+  // Clear mock data
+  global.__clearMockFirestore();
 };
