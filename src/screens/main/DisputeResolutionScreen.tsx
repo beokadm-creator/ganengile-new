@@ -263,7 +263,6 @@ export default function DisputeResolutionScreen({ navigation, route }: Props) {
                 </View>
               </View>
             </View>
-            </View>
 
             {/* 해결 결과 */}
             {dispute.resolution && (

@@ -304,10 +304,10 @@ export default function LockerSelectionScreen({ navigation, route }: Props) {
             <Text style={styles.statusBadgeText}>{statusText}</Text>
           </View>
         </View>
-          <View style={[styles.providerBadge, { backgroundColor: providerColor }]}>
-            <Text style={styles.providerBadgeText}>{locker.provider}</Text>
-          </View>
-        </View>
+      </View>
+      <View style={[styles.providerBadge, { backgroundColor: providerColor }]}>
+        <Text style={styles.providerBadgeText}>{locker.provider}</Text>
+      </View>
 
         {/* 가격 정보 */}
         <View style={styles.pricingInfo}>

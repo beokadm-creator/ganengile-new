@@ -184,16 +184,6 @@ export const DeliveryTrackingScreen: React.FC<DeliveryTrackingScreenProps> = ({
   );
 };
 
-      {/* 긴급 연락 버튼 */}
-      <TouchableOpacity
-        style={styles.emergencyButton}
-        onPress={handleEmergencyContact}>
-        <Text style={styles.emergencyButtonText}>🚨 긴급 연락</Text>
-      </TouchableOpacity>
-    </ScrollView>
-  );
-};
-
 const styles = StyleSheet.create({
   container: {
     flex: 1,
