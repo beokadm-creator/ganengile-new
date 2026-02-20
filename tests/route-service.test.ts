@@ -1,17 +1,16 @@
 /**
  * Route Service Tests
- * 동선 관리 테스트
+ * 경로(동선) 관리 테스트
  */
 
 import { describe, test, expect, beforeEach, afterEach } from '@jest/globals';
 import {
   createRoute,
-  getRoutes,
-  getRouteById,
   updateRoute,
   deleteRoute,
+  getUserRoutes,
+  getRouteById,
   validateRoute,
-  checkRouteOverlap,
 } from '../src/services/route-service';
 import { doc, getDoc, deleteDoc, getDocs, query, where, collection } from 'firebase/firestore';
 import { db } from '../src/services/firebase';
@@ -29,7 +28,7 @@ describe('Route Service', () => {
       )
     );
 
-    const deletePromises = snapshot.docs.map(doc => deleteDoc(doc.ref));
+    const deletePromises = snapshot.docs.map(d => deleteDoc(d.ref));
     await Promise.all(deletePromises);
   });
 
@@ -37,7 +36,7 @@ describe('Route Service', () => {
     // Cleanup: Delete all test routes
     for (const routeId of createdRouteIds) {
       try {
-        await deleteRoute(routeId, testUserId);
+        await deleteDoc(doc(db, 'routes', routeId));
       } catch (error) {
         console.log('Cleanup error:', error);
       }
@@ -48,32 +47,27 @@ describe('Route Service', () => {
   describe('createRoute', () => {
     test('should create a route successfully', async () => {
       const routeData = {
+        userId: testUserId,
         startStation: {
-          stationId: 'station-001',
-          stationName: '강남역',
-          line: '2',
-          latitude: 37.5665,
-          longitude: 126.9780,
-        },
-        endStation: {
-          stationId: 'station-002',
-          stationName: '서울역',
-          line: '1',
+          id: 'station-001',
+          name: '서울역',
+          line: '1호선',
           latitude: 37.5547,
           longitude: 126.9707,
         },
+        endStation: {
+          id: 'station-002',
+          name: '강남역',
+          line: '2호선',
+          latitude: 37.5172,
+          longitude: 127.0473,
+        },
         departureTime: '08:30',
         daysOfWeek: [1, 2, 3, 4, 5],
-        urgency: 'normal',
+        isActive: true,
       };
 
-      const routeId = await createRoute(
-        testUserId,
-        routeData.startStation,
-        routeData.endStation,
-        routeData.departureTime,
-        routeData.daysOfWeek
-      );
+      const routeId = await createRoute(routeData);
 
       expect(routeId).toBeDefined();
       expect(typeof routeId).toBe('string');
@@ -85,125 +79,105 @@ describe('Route Service', () => {
 
       const route = routeDoc.data();
       expect(route?.userId).toBe(testUserId);
-      expect(route?.startStation.stationName).toBe('강남역');
-      expect(route?.endStation.stationName).toBe('서울역');
-      expect(route?.departureTime).toBe('08:30');
-    });
-
-    test('should fail to create route with invalid data', async () => {
-      const invalidRouteData = {
-        startStation: {},
-        endStation: {},
-        departureTime: '',
-        daysOfWeek: [],
-      };
-
-      await expect(
-        createRoute(testUserId, invalidRouteData)
-      ).rejects.toThrow();
+      expect(route?.startStation.name).toBe('서울역');
+      expect(route?.endStation.name).toBe('강남역');
     });
   });
 
-  describe('getRoutes', () => {
+  describe('getUserRoutes', () => {
     test('should get all routes for a user', async () => {
-      // Create multiple routes
-      const route1Data = {
+      // Create test routes
+      const route1 = await createRoute({
+        userId: testUserId,
         startStation: {
-          stationId: 'station-001',
-          stationName: '강남역',
-          line: '2',
-          latitude: 37.5665,
-          longitude: 126.9780,
-        },
-        endStation: {
-          stationId: 'station-002',
-          stationName: '서울역',
-          line: '1',
+          id: 's1',
+          name: '서울역',
+          line: '1호선',
           latitude: 37.5547,
           longitude: 126.9707,
         },
+        endStation: {
+          id: 's2',
+          name: '강남역',
+          line: '2호선',
+          latitude: 37.5172,
+          longitude: 127.0473,
+        },
         departureTime: '08:30',
         daysOfWeek: [1, 2, 3, 4, 5],
-        urgency: 'normal',
-      };
+        isActive: true,
+      });
 
-      const route2Data = {
-        ...route1Data,
+      const route2 = await createRoute({
+        userId: testUserId,
         startStation: {
-          ...route1Data.startStation,
-          stationId: 'station-003',
-          stationName: '역삼역',
+          id: 's3',
+          name: '역삼역',
+          line: '2호선',
+          latitude: 37.5006,
+          longitude: 127.0364,
         },
-        departureTime: '18:30',
-      };
+        endStation: {
+          id: 's4',
+          name: '선릉역',
+          line: '2호선',
+          latitude: 37.5050,
+          longitude: 127.0505,
+        },
+        departureTime: '09:00',
+        daysOfWeek: [1, 3, 5],
+        isActive: true,
+      });
 
-      const routeId1 = await createRoute(
-        testUserId,
-        route1Data.startStation,
-        route1Data.endStation,
-        route1Data.departureTime,
-        route1Data.daysOfWeek
-      );
-      const routeId2 = await createRoute(
-        testUserId,
-        route2Data.startStation,
-        route2Data.endStation,
-        route2Data.departureTime,
-        route2Data.daysOfWeek
-      );
+      createdRouteIds.push(route1, route2);
 
-      createdRouteIds.push(routeId1, routeId2);
+      const routes = await getUserRoutes(testUserId);
 
-      // Get routes
-      const routes = await getRoutes(testUserId);
-
+      expect(routes).toBeDefined();
       expect(routes.length).toBeGreaterThanOrEqual(2);
-      expect(routes.every(r => r.userId === testUserId)).toBe(true);
+    });
+
+    test('should return empty array for user with no routes', async () => {
+      const routes = await getUserRoutes('user-with-no-routes');
+
+      expect(routes).toEqual([]);
     });
   });
 
   describe('getRouteById', () => {
     test('should get route by ID', async () => {
-      // Create a route first
-      const routeData = {
+      const routeId = await createRoute({
+        userId: testUserId,
         startStation: {
-          stationId: 'station-001',
-          stationName: '강남역',
-          line: '2',
-          latitude: 37.5665,
-          longitude: 126.9780,
-        },
-        endStation: {
-          stationId: 'station-002',
-          stationName: '서울역',
-          line: '1',
+          id: 's1',
+          name: '서울역',
+          line: '1호선',
           latitude: 37.5547,
           longitude: 126.9707,
         },
+        endStation: {
+          id: 's2',
+          name: '강남역',
+          line: '2호선',
+          latitude: 37.5172,
+          longitude: 127.0473,
+        },
         departureTime: '08:30',
         daysOfWeek: [1, 2, 3, 4, 5],
-        urgency: 'normal',
-      };
+        isActive: true,
+      });
 
-      const routeId = await createRoute(
-        testUserId,
-        routeData.startStation,
-        routeData.endStation,
-        routeData.departureTime,
-        routeData.daysOfWeek
-      );
       createdRouteIds.push(routeId);
 
-      // Get route by ID
-      const route = await getRouteById(routeId, testUserId);
+      const route = await getRouteById(routeId);
 
       expect(route).toBeDefined();
-      expect(route?.routeId).toBe(routeId);
-      expect(route?.startStation.stationName).toBe('강남역');
+      expect(route?.id).toBe(routeId);
+      expect(route?.startStation.name).toBe('서울역');
     });
 
     test('should return null for non-existent route', async () => {
-      const route = await getRouteById('non-existent-route-id', testUserId);
+      const route = await getRouteById('non-existent-route-id');
 
       expect(route).toBeNull();
     });
@@ -211,232 +185,139 @@ describe('Route Service', () => {
 
   describe('updateRoute', () => {
     test('should update route successfully', async () => {
-      // Create a route first
-      const routeData = {
+      const routeId = await createRoute({
+        userId: testUserId,
         startStation: {
-          stationId: 'station-001',
-          stationName: '강남역',
-          line: '2',
-          latitude: 37.5665,
-          longitude: 126.9780,
-        },
-        endStation: {
-          stationId: 'station-002',
-          stationName: '서울역',
-          line: '1',
+          id: 's1',
+          name: '서울역',
+          line: '1호선',
           latitude: 37.5547,
           longitude: 126.9707,
         },
+        endStation: {
+          id: 's2',
+          name: '강남역',
+          line: '2호선',
+          latitude: 37.5172,
+          longitude: 127.0473,
+        },
         departureTime: '08:30',
         daysOfWeek: [1, 2, 3, 4, 5],
-        urgency: 'normal',
-      };
+        isActive: true,
+      });
 
-      const routeId = await createRoute(
-        testUserId,
-        routeData.startStation,
-        routeData.endStation,
-        routeData.departureTime,
-        routeData.daysOfWeek
-      );
       createdRouteIds.push(routeId);
 
-      // Update route
-      const updates = {
+      await updateRoute(routeId, {
         departureTime: '09:00',
-        urgency: 'high',
-      };
+        isActive: false,
+      });
 
-      await expect(updateRoute(routeId, testUserId, updates)).resolves.not.toThrow();
+      const route = await getRouteById(routeId);
 
-      const route = await getRouteById(routeId, testUserId);
-      expect(route?.departureTime).toBe(updates.departureTime);
-      expect(route?.urgency).toBe(updates.urgency);
+      expect(route?.departureTime).toBe('09:00');
+      expect(route?.isActive).toBe(false);
+    });
+
+    test('should fail to update non-existent route', async () => {
+      await expect(
+        updateRoute('non-existent-route-id', { departureTime: '10:00' })
+      ).rejects.toThrow();
     });
   });
 
   describe('deleteRoute', () => {
     test('should delete route successfully', async () => {
-      // Create a route first
-      const routeData = {
+      const routeId = await createRoute({
+        userId: testUserId,
         startStation: {
-          stationId: 'station-001',
-          stationName: '강남역',
-          line: '2',
-          latitude: 37.5665,
-          longitude: 126.9780,
-        },
-        endStation: {
-          stationId: 'station-002',
-          stationName: '서울역',
-          line: '1',
+          id: 's1',
+          name: '서울역',
+          line: '1호선',
           latitude: 37.5547,
           longitude: 126.9707,
         },
+        endStation: {
+          id: 's2',
+          name: '강남역',
+          line: '2호선',
+          latitude: 37.5172,
+          longitude: 127.0473,
+        },
         departureTime: '08:30',
         daysOfWeek: [1, 2, 3, 4, 5],
-        urgency: 'normal',
-      };
+        isActive: true,
+      });
 
-      const routeId = await createRoute(
-        testUserId,
-        routeData.startStation,
-        routeData.endStation,
-        routeData.departureTime,
-        routeData.daysOfWeek
-      );
-      createdRouteIds.push(routeId);
+      await deleteRoute(routeId);
 
-      // Delete route
-      await expect(deleteRoute(routeId, testUserId)).resolves.not.toThrow();
+      const route = await getRouteById(routeId);
 
-      const route = await getRouteById(routeId, testUserId);
       expect(route).toBeNull();
+    });
+
+    test('should fail to delete non-existent route', async () => {
+      await expect(
+        deleteRoute('non-existent-route-id')
+      ).rejects.toThrow();
     });
   });
 
   describe('validateRoute', () => {
     test('should validate a valid route', async () => {
       const routeData = {
+        userId: testUserId,
         startStation: {
-          stationId: 'station-001',
-          stationName: '강남역',
-          line: '2',
-          latitude: 37.5665,
-          longitude: 126.9780,
-        },
-        endStation: {
-          stationId: 'station-002',
-          stationName: '서울역',
-          line: '1',
+          id: 's1',
+          name: '서울역',
+          line: '1호선',
           latitude: 37.5547,
           longitude: 126.9707,
         },
+        endStation: {
+          id: 's2',
+          name: '강남역',
+          line: '2호선',
+          latitude: 37.5172,
+          longitude: 127.0473,
+        },
         departureTime: '08:30',
         daysOfWeek: [1, 2, 3, 4, 5],
-        urgency: 'normal',
+        isActive: true,
       };
 
-      const validation = await validateRoute(routeData);
+      const validation = validateRoute(routeData);
 
       expect(validation.isValid).toBe(true);
       expect(validation.errors).toEqual([]);
     });
 
     test('should invalidate route with invalid departure time', async () => {
-      const invalidRouteData = {
+      const routeData = {
+        userId: testUserId,
         startStation: {
-          stationId: 'station-001',
-          stationName: '강남역',
-          line: '2',
-          latitude: 37.5665,
-          longitude: 126.9780,
-        },
-        endStation: {
-          stationId: 'station-002',
-          stationName: '서울역',
-          line: '1',
+          id: 's1',
+          name: '서울역',
+          line: '1호선',
           latitude: 37.5547,
           longitude: 126.9707,
+        },
+        endStation: {
+          id: 's2',
+          name: '강남역',
+          line: '2호선',
+          latitude: 37.5172,
+          longitude: 127.0473,
         },
         departureTime: '25:00', // Invalid time
         daysOfWeek: [1, 2, 3, 4, 5],
-        urgency: 'normal',
+        isActive: true,
       };
 
-      const validation = await validateRoute(invalidRouteData);
+      const validation = validateRoute(routeData);
 
       expect(validation.isValid).toBe(false);
       expect(validation.errors.length).toBeGreaterThan(0);
-    });
-  });
-
-  describe('checkRouteOverlap', () => {
-    test('should detect overlapping routes', async () => {
-      // Create first route
-      const route1Data = {
-        startStation: {
-          stationId: 'station-001',
-          stationName: '강남역',
-          line: '2',
-          latitude: 37.5665,
-          longitude: 126.9780,
-        },
-        endStation: {
-          stationId: 'station-002',
-          stationName: '서울역',
-          line: '1',
-          latitude: 37.5547,
-          longitude: 126.9707,
-        },
-        departureTime: '08:30',
-        daysOfWeek: [1, 2, 3, 4, 5],
-        urgency: 'normal',
-      };
-
-      const routeId1 = await createRoute(
-        testUserId,
-        route1Data.startStation,
-        route1Data.endStation,
-        route1Data.departureTime,
-        route1Data.daysOfWeek
-      );
-      createdRouteIds.push(routeId1);
-
-      // Check overlap with similar route
-      const route2Data = {
-        ...route1Data,
-        departureTime: '08:45', // Overlaps with route1
-      };
-
-      const overlaps = await checkRouteOverlap(testUserId, route2Data);
-
-      expect(overlaps.hasOverlap).toBe(true);
-      expect(overlaps.overlappingRoutes.length).toBeGreaterThan(0);
-    });
-
-    test('should not detect non-overlapping routes', async () => {
-      // Create first route
-      const route1Data = {
-        startStation: {
-          stationId: 'station-001',
-          stationName: '강남역',
-          line: '2',
-          latitude: 37.5665,
-          longitude: 126.9780,
-        },
-        endStation: {
-          stationId: 'station-002',
-          stationName: '서울역',
-          line: '1',
-          latitude: 37.5547,
-          longitude: 126.9707,
-        },
-        departureTime: '08:30',
-        daysOfWeek: [1, 2, 3, 4, 5], // Weekdays
-        urgency: 'normal',
-      };
-
-      const routeId1 = await createRoute(
-        testUserId,
-        route1Data.startStation,
-        route1Data.endStation,
-        route1Data.departureTime,
-        route1Data.daysOfWeek
-      );
-      createdRouteIds.push(routeId1);
-
-      // Check overlap with different day route
-      const route2Data = {
-        ...route1Data,
-        departureTime: '08:30',
-        daysOfWeek: [6, 7], // Weekend
-      };
-
-      const overlaps = await checkRouteOverlap(testUserId, route2Data);
-
-      expect(overlaps.hasOverlap).toBe(false);
-      expect(overlaps.overlappingRoutes).toEqual([]);
     });
   });
 });

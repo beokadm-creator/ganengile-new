@@ -50,7 +50,7 @@ describe('Rating Service', () => {
   describe('submitRating', () => {
     test('should submit a rating successfully', async () => {
       const ratingId = await submitRating(
-        testMatchId,
+        'test-match-submit-1',
         testUserId,
         testGillerId,
         5,
@@ -65,10 +65,10 @@ describe('Rating Service', () => {
       createdRatingIds.push(ratingId);
 
       const ratingDoc = await getDoc(doc(db, 'ratings', ratingId));
-      expect(ratingDoc.exists()).toBe(true);
+      expect(ratingDoc.exists).toBe(true);
 
       const ratingData = ratingDoc.data();
-      expect(ratingData?.matchId).toBe(testMatchId);
+      expect(ratingData?.matchId).toBe('test-match-submit-1');
       expect(ratingData?.fromUserId).toBe(testUserId);
       expect(ratingData?.toUserId).toBe(testGillerId);
       expect(ratingData?.rating).toBe(5);
@@ -79,7 +79,7 @@ describe('Rating Service', () => {
 
     test('should fail to submit duplicate rating for same match', async () => {
       const ratingId1 = await submitRating(
-        testMatchId2,
+        'test-match-duplicate',
         testUserId,
         testGillerId,
         4,
@@ -91,23 +91,23 @@ describe('Rating Service', () => {
       createdRatingIds.push(ratingId1);
 
       await expect(
-        submitRating(testMatchId2, testUserId, testGillerId, 5, [], undefined, false)
+        submitRating('test-match-duplicate', testUserId, testGillerId, 5, [], undefined, false)
       ).rejects.toThrow('Already rated this match');
     });
 
     test('should fail to submit rating out of range', async () => {
       await expect(
-        submitRating(testMatchId, testUserId, testGillerId, 6, [], undefined, false)
+        submitRating('test-match-range-1', testUserId, testGillerId, 6, [], undefined, false)
       ).rejects.toThrow('Rating must be between 1 and 5');
 
       await expect(
-        submitRating(testMatchId, testUserId, testGillerId, 0, [], undefined, false)
+        submitRating('test-match-range-2', testUserId, testGillerId, 0, [], undefined, false)
       ).rejects.toThrow('Rating must be between 1 and 5');
     });
 
     test('should submit rating without comment', async () => {
       const ratingId = await submitRating(
-        testMatchId,
+        'test-match-no-comment',
         testUserId,
         testGillerId,
         3,
@@ -127,7 +127,7 @@ describe('Rating Service', () => {
 
     test('should submit anonymous rating', async () => {
       const ratingId = await submitRating(
-        testMatchId,
+        'test-match-anonymous',
         testUserId,
         testGillerId,
         5,
