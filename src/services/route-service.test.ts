@@ -21,11 +21,11 @@ import {
   collection,
 } from 'firebase/firestore';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { db } from '../firebase';
+import { db } from './firebase';
 
 // Mock Firebase and AsyncStorage
 jest.mock('firebase/firestore');
-jest.mock('../firebase');
+jest.mock('./firebase');
 jest.mock('@react-native-async-storage/async-storage');
 
 describe('RouteService', () => {

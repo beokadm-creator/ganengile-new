@@ -13,7 +13,7 @@ import { db } from '../firebase';
 
 // Mock Firebase
 jest.mock('firebase/firestore');
-jest.mock('../firebase');
+jest.mock('./firebase');
 
 describe('ConfigService', () => {
   beforeEach(() => {

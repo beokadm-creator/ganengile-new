@@ -42,16 +42,6 @@ jest.mock('../../data/matching-engine', () => ({
   getTopMatches: jest.fn(),
 }));
 
-jest.mock('../../data/subway-stations', () => ({
-  getStationByName: jest.fn((name) => ({
-    name,
-    line: '1호선',
-    id: name,
-    latitude: 37.5,
-    longitude: 126.9,
-  })),
-}));
-
 import {
   collection,
   query,
@@ -141,15 +131,6 @@ describe('Matching Service', () => {
       (where as jest.Mock).mockReturnValue(mockQuery);
       (query as jest.Mock).mockReturnValue(mockQuery);
       (getDocs as jest.Mock).mockResolvedValue(mockSnapshot);
-      jest.spyOn(require('../../data/subway-stations'), 'getStationByName')
-        .mockReturnValueOnce(null)
-        .mockReturnValueOnce({
-          name: '강남역',
-          line: '2호선',
-          id: '강남역',
-          latitude: 37.5,
-          longitude: 127.0,
-        });
 
       // When
       const result = await fetchActiveGillerRoutes();
