@@ -79,7 +79,7 @@ export default function QRScanner({ onScan, onError, onClose }: Props) {
           <View style={styles.cornerBottomRight} />
         </View>
 
-        <Text style={styles instruction}>
+        <Text style={styles.instruction}>
           QR 코드를 스캔해주세요
         </Text>
 
