@@ -38,6 +38,7 @@ import {
   getDeliveriesUntilNextGrade,
   getGradeProgress,
 } from '../../services/grade-service';
+import { BadgeService } from '../../services/BadgeService';
 import Modal from '../../components/common/Modal';
 import TextInputModal from '../../components/common/TextInputModal';
 
@@ -84,6 +85,11 @@ export default function ProfileScreen({ navigation: _navigation }: Props) {
   } | null>(null);
 
   const [verification, setVerification] = useState<any>(null);
+  const [badgeTier, setBadgeTier] = useState<{
+    frame: 'none' | 'bronze' | 'silver' | 'gold' | 'platinum';
+    tier: 'none' | 'bronze' | 'silver' | 'gold' | 'platinum';
+    total: number;
+  } | null>(null);
   const [editModal, setEditModal] = useState<{
     type: EditModalType;
     visible: boolean;
@@ -138,6 +144,10 @@ export default function ProfileScreen({ navigation: _navigation }: Props) {
       if (userVerification) {
         setVerification(userVerification);
       }
+
+      // 배지 티어 계산
+      const tierInfo = BadgeService.calculateBadgeTier(user.badges);
+      setBadgeTier(tierInfo);
     } catch (error) {
       console.error('Error loading user data:', error);
     } finally {
@@ -402,12 +412,60 @@ export default function ProfileScreen({ navigation: _navigation }: Props) {
 
   const menuItems = getMenuItems();
 
+  // 배지 프레임 스타일 계산
+  const getBadgeFrameStyle = () => {
+    if (!badgeTier || badgeTier.frame === 'none') return null;
+
+    const frameColors = {
+      bronze: {
+        borderColor: '#CD7F32',
+        shadowColor: 'rgba(205, 127, 50, 0.6)',
+      },
+      silver: {
+        borderColor: '#C0C0C0',
+        shadowColor: 'rgba(192, 192, 192, 0.6)',
+      },
+      gold: {
+        borderColor: '#FFD700',
+        shadowColor: 'rgba(255, 215, 0, 0.6)',
+      },
+      platinum: {
+        borderColor: '#E5E4E2',
+        shadowColor: 'rgba(229, 228, 226, 0.8)',
+      },
+    };
+
+    return frameColors[badgeTier.frame];
+  };
+
+  const getBadgeFrameIcon = () => {
+    if (!badgeTier || badgeTier.total < 10) return null;
+
+    if (badgeTier.total >= 13) return '👑'; // Platinum
+    if (badgeTier.total >= 9) return '⭐'; // Gold
+    if (badgeTier.total >= 5) return '💎'; // Silver
+    return '🎖️'; // Bronze
+  };
+
   return (
     <View style={styles.container}>
       {/* Header */}
       <View style={styles.header}>
         <View style={styles.profileHeader}>
           <TouchableOpacity style={styles.avatarContainer} onPress={handlePhotoUpload}>
+            {/* 배지 프레임 */}
+            {badgeTier && badgeTier.frame !== 'none' && (
+              <View style={[
+                styles.badgeFrame,
+                getBadgeFrameStyle(),
+              ]}>
+                {badgeTier.total >= 10 && (
+                  <View style={styles.badgeFrameIcon}>
+                    <Text style={styles.badgeFrameIconText}>{getBadgeFrameIcon()}</Text>
+                  </View>
+                )}
+              </View>
+            )}
             {profile.profilePhotoUrl ? (
               <Image source={{ uri: profile.profilePhotoUrl }} style={styles.avatarImage} />
             ) : (
@@ -448,6 +506,14 @@ export default function ProfileScreen({ navigation: _navigation }: Props) {
               <View style={[styles.gradeBadge, { backgroundColor: gradeInfo.color }]}>
                 <Text style={styles.gradeIcon}>{gradeInfo.icon}</Text>
                 <Text style={styles.gradeText}>{gradeInfo.nameKo} 길러</Text>
+              </View>
+            )}
+
+            {/* Badge Count */}
+            {badgeTier && badgeTier.total > 0 && (
+              <View style={styles.badgeCountBadge}>
+                <Text style={styles.badgeCountIcon}>🏆</Text>
+                <Text style={styles.badgeCountText}>배지 {badgeTier.total}개</Text>
               </View>
             )}
           </View>
@@ -686,6 +752,61 @@ const styles = StyleSheet.create({
   },
   avatarText: {
     fontSize: 32,
+  },
+  badgeFrame: {
+    position: 'absolute',
+    top: -8,
+    left: -8,
+    width: 86,
+    height: 86,
+    borderRadius: 43,
+    borderWidth: 4,
+    backgroundColor: 'transparent',
+    zIndex: -1,
+    elevation: 4,
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 1,
+    shadowRadius: 8,
+  },
+  badgeFrameIcon: {
+    position: 'absolute',
+    bottom: -8,
+    right: -8,
+    backgroundColor: '#fff',
+    borderRadius: 16,
+    width: 28,
+    height: 28,
+    alignItems: 'center',
+    justifyContent: 'center',
+    elevation: 4,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 4,
+  },
+  badgeFrameIconText: {
+    fontSize: 16,
+  },
+  badgeCountBadge: {
+    alignItems: 'center',
+    backgroundColor: 'rgba(255, 215, 0, 0.2)',
+    borderRadius: 16,
+    flexDirection: 'row',
+    marginTop: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    alignSelf: 'flex-start',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 215, 0, 0.5)',
+  },
+  badgeCountIcon: {
+    fontSize: 14,
+    marginRight: 6,
+  },
+  badgeCountText: {
+    color: '#FFD700',
+    fontSize: 12,
+    fontWeight: 'bold',
   },
   bankAccountCard: {
     alignItems: 'center',
