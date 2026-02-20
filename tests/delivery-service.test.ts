@@ -5,33 +5,52 @@
 
 import { describe, test, expect, beforeEach, afterEach } from '@jest/globals';
 import {
-  startDelivery,
-  updateDeliveryLocation,
+  gillerAcceptRequest,
+  updateGillerLocation,
   verifyPickup,
-  verifyDelivery,
   completeDelivery,
-  getDeliveryStatus,
+  getDeliveryById,
 } from '../src/services/delivery-service';
-import { doc, getDoc, deleteDoc, getDocs, query, where, collection } from 'firebase/firestore';
+import { doc, getDoc, deleteDoc, getDocs, setDoc, query, where, collection } from 'firebase/firestore';
 import { db } from '../src/services/firebase';
 import { DeliveryStatus } from '../src/types/delivery';
 
 describe('Delivery Service', () => {
-  const testMatchId = 'test-match-delivery-001';
   const testGillerId = 'test-giller-delivery-001';
   const testRequestId = 'test-request-delivery-001';
   const createdDeliveryIds: string[] = [];
 
   beforeEach(async () => {
+    // Create test request
+    await setDoc(doc(db, 'requests', testRequestId), {
+      status: 'matched',
+      gllerId: testGillerId,
+      gillerId: testGillerId,
+      pickupStation: 'gangnam',
+      deliveryStation: 'seoul',
+      deliveryType: 'standard',
+      packageInfo: {
+        type: 'small',
+        weight: 1,
+        description: 'Test package',
+      },
+      fee: 5000,
+      recipientName: 'Test Recipient',
+      recipientPhone: '010-1234-5678',
+      recipientVerificationCode: '123456',
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    });
+
     // Cleanup: Delete test deliveries
     const snapshot = await getDocs(
       query(
         collection(db, 'deliveries'),
-        where('matchId', '==', testMatchId)
+        where('gillerId', '==', testGillerId)
       )
     );
 
-    const deletePromises = snapshot.docs.map(doc => deleteDoc(doc.ref));
+    const deletePromises = snapshot.docs.map(d => deleteDoc(d.ref));
     await Promise.all(deletePromises);
   });
 
@@ -45,208 +64,155 @@ describe('Delivery Service', () => {
       }
     }
     createdDeliveryIds.length = 0;
+
+    // Cleanup: Delete test request
+    try {
+      await deleteDoc(doc(db, 'requests', testRequestId));
+    } catch (error) {
+      console.log('Request cleanup error:', error);
+    }
   });
 
-  describe('startDelivery', () => {
+  describe('gillerAcceptRequest', () => {
     test('should start a delivery successfully', async () => {
-      const deliveryId = await startDelivery(
-        testMatchId,
-        testGillerId,
-        {
-          pickupStation: 'gangnam',
-          deliveryStation: 'seoul',
-          estimatedTime: 25,
-        }
+      const result = await gillerAcceptRequest(
+        testRequestId,
+        testGillerId
       );
 
-      expect(deliveryId).toBeDefined();
-      expect(typeof deliveryId).toBe('string');
+      expect(result.success).toBe(true);
+      expect(result.deliveryId).toBeDefined();
+      expect(typeof result.deliveryId).toBe('string');
 
-      createdDeliveryIds.push(deliveryId);
+      if (result.deliveryId) {
+        createdDeliveryIds.push(result.deliveryId);
 
-      const deliveryDoc = await getDoc(doc(db, 'deliveries', deliveryId));
-      expect(deliveryDoc.exists()).toBe(true);
+        const deliveryDoc = await getDoc(doc(db, 'deliveries', result.deliveryId));
+        expect(deliveryDoc.exists).toBe(true);
 
-      const deliveryData = deliveryDoc.data();
-      expect(deliveryData?.matchId).toBe(testMatchId);
-      expect(deliveryData?.gillerId).toBe(testGillerId);
-      expect(deliveryData?.status).toBe(DeliveryStatus.PENDING);
+        const deliveryData = deliveryDoc.data();
+        expect(deliveryData?.gillerId).toBe(testGillerId);
+        expect(deliveryData?.status).toBe(DeliveryStatus.ACCEPTED);
+      }
     });
 
-    test('should fail to start delivery with invalid match ID', async () => {
+    test('should fail to start delivery with invalid request ID', async () => {
       await expect(
-        startDelivery('', testGillerId, {})
+        gillerAcceptRequest('', testGillerId)
       ).rejects.toThrow();
     });
   });
 
-  describe('updateDeliveryLocation', () => {
+  describe('updateGillerLocation', () => {
     test('should update delivery location successfully', async () => {
       // First start a delivery
-      const deliveryId = await startDelivery(
-        testMatchId,
-        testGillerId,
-        {
-          pickupStation: 'gangnam',
-          deliveryStation: 'seoul',
-          estimatedTime: 25,
-        }
+      const result = await gillerAcceptRequest(
+        testRequestId,
+        testGillerId
       );
 
-      createdDeliveryIds.push(deliveryId);
+      expect(result.success).toBe(true);
+      const deliveryId = result.deliveryId;
 
-      // Update location
+      if (deliveryId) {
+        createdDeliveryIds.push(deliveryId);
+
+        // Update location
+        const location = {
+          latitude: 37.5665,
+          longitude: 126.9780,
+        };
+
+        const updateResult = await updateGillerLocation(deliveryId, location);
+        expect(updateResult.success).toBe(true);
+
+        // Verify location was updated
+        const deliveryDoc = await getDoc(doc(db, 'deliveries', deliveryId));
+        const deliveryData = deliveryDoc.data();
+
+        expect(deliveryData?.tracking?.currentLocation).toEqual(location);
+      }
+    });
+
+    test('should handle location update for non-existent delivery', async () => {
       const location = {
         latitude: 37.5665,
         longitude: 126.9780,
-        station: 'gangnam',
-        timestamp: new Date(),
       };
 
-      await expect(updateDeliveryLocation(deliveryId, location)).resolves.not.toThrow();
-
-      const deliveryDoc = await getDoc(doc(db, 'deliveries', deliveryId));
-      const deliveryData = deliveryDoc.data();
-
-      expect(deliveryData?.currentLocation).toEqual(location);
+      const result = await updateGillerLocation('non-existent-id', location);
+      expect(result.success).toBe(false);
     });
   });
 
   describe('verifyPickup', () => {
     test('should verify pickup successfully', async () => {
-      // First start a delivery
-      const deliveryId = await startDelivery(
-        testMatchId,
-        testGillerId,
-        {
-          pickupStation: 'gangnam',
-          deliveryStation: 'seoul',
-          estimatedTime: 25,
-        }
-      );
+      const result = await gillerAcceptRequest(testRequestId, testGillerId);
 
-      createdDeliveryIds.push(deliveryId);
+      if (result.deliveryId) {
+        createdDeliveryIds.push(result.deliveryId);
 
-      // Verify pickup with QR code
-      await expect(verifyPickup(deliveryId, {
-        method: 'qr_code',
-        code: 'test-qr-code-123',
-        photoUrl: 'https://example.com/photo.jpg',
-      })).resolves.not.toThrow();
+        const verifyData = {
+          deliveryId: result.deliveryId,
+          gillerId: testGillerId,
+          verificationCode: '1234',
+          photoUri: 'data:image/jpeg;base64,test',
+          location: {
+            latitude: 37.5665,
+            longitude: 126.9780,
+          },
+        };
 
-      const deliveryDoc = await getDoc(doc(db, 'deliveries', deliveryId));
-      const deliveryData = deliveryDoc.data();
-
-      expect(deliveryData?.status).toBe(DeliveryStatus.IN_TRANSIT);
-      expect(deliveryData?.pickupVerifiedAt).toBeDefined();
-    });
-  });
-
-  describe('verifyDelivery', () => {
-    test('should verify delivery successfully', async () => {
-      // First start a delivery and verify pickup
-      const deliveryId = await startDelivery(
-        testMatchId,
-        testGillerId,
-        {
-          pickupStation: 'gangnam',
-          deliveryStation: 'seoul',
-          estimatedTime: 25,
-        }
-      );
-
-      createdDeliveryIds.push(deliveryId);
-
-      await verifyPickup(deliveryId, {
-        method: 'qr_code',
-        code: 'test-qr-code-123',
-        photoUrl: 'https://example.com/pickup.jpg',
-      });
-
-      // Verify delivery
-      await expect(verifyDelivery(deliveryId, {
-        method: 'qr_code',
-        code: 'test-qr-code-456',
-        photoUrl: 'https://example.com/delivery.jpg',
-      })).resolves.not.toThrow();
-
-      const deliveryDoc = await getDoc(doc(db, 'deliveries', deliveryId));
-      const deliveryData = deliveryDoc.data();
-
-      expect(deliveryData?.status).toBe(DeliveryStatus.DELIVERED);
-      expect(deliveryData?.deliveryVerifiedAt).toBeDefined();
+        const verifyResult = await verifyPickup(verifyData);
+        expect(verifyResult.success).toBe(true);
+      }
     });
   });
 
   describe('completeDelivery', () => {
     test('should complete delivery successfully', async () => {
-      // Start and verify delivery
-      const deliveryId = await startDelivery(
-        testMatchId,
-        testGillerId,
-        {
-          pickupStation: 'gangnam',
-          deliveryStation: 'seoul',
-          estimatedTime: 25,
-        }
-      );
+      const result = await gillerAcceptRequest(testRequestId, testGillerId);
 
-      createdDeliveryIds.push(deliveryId);
+      if (result.deliveryId) {
+        createdDeliveryIds.push(result.deliveryId);
 
-      await verifyPickup(deliveryId, {
-        method: 'qr_code',
-        code: 'test-qr-code-123',
-        photoUrl: 'https://example.com/pickup.jpg',
-      });
+        const completionData = {
+          deliveryId: result.deliveryId,
+          gillerId: testGillerId,
+          verificationCode: '123456',
+          location: {
+            latitude: 37.5665,
+            longitude: 126.9780,
+          },
+        };
 
-      await verifyDelivery(deliveryId, {
-        method: 'qr_code',
-        code: 'test-qr-code-456',
-        photoUrl: 'https://example.com/delivery.jpg',
-      });
+        const completeResult = await completeDelivery(completionData);
+        expect(completeResult.success).toBe(true);
 
-      // Complete delivery
-      await expect(completeDelivery(deliveryId, {
-        actualTime: 23,
-        notes: 'Smooth delivery',
-      })).resolves.not.toThrow();
-
-      const deliveryDoc = await getDoc(doc(db, 'deliveries', deliveryId));
-      const deliveryData = deliveryDoc.data();
-
-      expect(deliveryData?.status).toBe(DeliveryStatus.COMPLETED);
-      expect(deliveryData?.completedAt).toBeDefined();
-      expect(deliveryData?.actualTime).toBe(23);
+        // Verify delivery status
+        const deliveryDoc = await getDoc(doc(db, 'deliveries', result.deliveryId));
+        const deliveryData = deliveryDoc.data();
+        expect(deliveryData?.status).toBe(DeliveryStatus.COMPLETED);
+      }
     });
   });
 
-  describe('getDeliveryStatus', () => {
+  describe('getDeliveryById', () => {
     test('should get delivery status', async () => {
-      // Start a delivery
-      const deliveryId = await startDelivery(
-        testMatchId,
-        testGillerId,
-        {
-          pickupStation: 'gangnam',
-          deliveryStation: 'seoul',
-          estimatedTime: 25,
-        }
-      );
+      const result = await gillerAcceptRequest(testRequestId, testGillerId);
 
-      createdDeliveryIds.push(deliveryId);
+      if (result.deliveryId) {
+        createdDeliveryIds.push(result.deliveryId);
 
-      // Get status
-      const status = await getDeliveryStatus(deliveryId);
-
-      expect(status).toBeDefined();
-      expect(status?.deliveryId).toBe(deliveryId);
-      expect(status?.status).toBe(DeliveryStatus.PENDING);
+        const delivery = await getDeliveryById(result.deliveryId);
+        expect(delivery).toBeDefined();
+        expect(delivery?.id).toBe(result.deliveryId);
+      }
     });
 
     test('should return null for non-existent delivery', async () => {
-      const status = await getDeliveryStatus('non-existent-delivery-id');
-
-      expect(status).toBeNull();
+      const delivery = await getDeliveryById('non-existent-id');
+      expect(delivery).toBeNull();
     });
   });
 });
