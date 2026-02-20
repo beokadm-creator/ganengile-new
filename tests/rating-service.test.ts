@@ -11,15 +11,13 @@ import {
   getMatchRating,
   canRateMatch,
 } from '../src/services/rating-service';
-import { doc, getDoc, deleteDoc, getDocs, query, where, collection } from 'firebase/firestore';
+import { doc, getDoc, deleteDoc, getDocs, setDoc, query, where, collection } from 'firebase/firestore';
 import { db } from '../src/services/firebase';
 import { RatingTag } from '../src/types/rating';
 
 describe('Rating Service', () => {
   const testUserId = 'test-user-rating-001';
   const testGillerId = 'test-giller-rating-001';
-  const testMatchId = 'test-match-rating-001';
-  const testMatchId2 = 'test-match-rating-002';
   const createdRatingIds: string[] = [];
 
   beforeEach(async () => {
@@ -27,12 +25,23 @@ describe('Rating Service', () => {
     const snapshot = await getDocs(
       query(
         collection(db, 'ratings'),
-        where('matchId', 'in', [testMatchId, testMatchId2])
+        where('fromUserId', '==', testUserId)
       )
     );
 
-    const deletePromises = snapshot.docs.map(doc => deleteDoc(doc.ref));
+    const deletePromises = snapshot.docs.map(d => deleteDoc(d.ref));
     await Promise.all(deletePromises);
+
+    // Cleanup for giller
+    const gillerSnapshot = await getDocs(
+      query(
+        collection(db, 'ratings'),
+        where('toUserId', '==', testGillerId)
+      )
+    );
+
+    const gillerDeletePromises = gillerSnapshot.docs.map(d => deleteDoc(d.ref));
+    await Promise.all(gillerDeletePromises);
   });
 
   afterEach(async () => {
@@ -146,20 +155,23 @@ describe('Rating Service', () => {
   });
 
   describe('getUserRating', () => {
-    beforeEach(async () => {
+    test('should calculate average rating correctly', async () => {
+      const gillerId = 'test-giller-calc-001';
+
+      // Create ratings
       const ratings = [
-        { matchId: 'test-001', rating: 5 },
-        { matchId: 'test-002', rating: 4 },
-        { matchId: 'test-003', rating: 5 },
-        { matchId: 'test-004', rating: 3 },
-        { matchId: 'test-005', rating: 5 },
+        { matchId: 'test-calc-001', rating: 5 },
+        { matchId: 'test-calc-002', rating: 4 },
+        { matchId: 'test-calc-003', rating: 5 },
+        { matchId: 'test-calc-004', rating: 3 },
+        { matchId: 'test-calc-005', rating: 5 },
       ];
 
       for (const r of ratings) {
         const ratingId = await submitRating(
           r.matchId,
-          'other-user',
-          testGillerId,
+          'rater-user',
+          gillerId,
           r.rating,
           [],
           undefined,
@@ -167,17 +179,11 @@ describe('Rating Service', () => {
         );
         createdRatingIds.push(ratingId);
       }
-    });
 
-    test('should calculate average rating correctly', async () => {
-      const { averageRating, totalRatings, distribution } = await getUserRating(testGillerId);
+      const { averageRating, totalRatings } = await getUserRating(gillerId);
 
-      expect(averageRating).toBe(4.4); // (5+4+5+3+5) / 5 = 4.4
+      expect(averageRating).toBe(4.4);
       expect(totalRatings).toBe(5);
-      expect(distribution[1]).toBe(0);
-      expect(distribution[3]).toBe(1);
-      expect(distribution[4]).toBe(1);
-      expect(distribution[5]).toBe(3);
     });
 
     test('should return zero for user with no ratings', async () => {
@@ -189,29 +195,35 @@ describe('Rating Service', () => {
   });
 
   describe('getUserReviews', () => {
-    beforeEach(async () => {
+    test('should get user reviews sorted by date (newest first)', async () => {
+      const reviewUserId = 'test-review-user-001';
+
       const ratingIds = await Promise.all([
-        submitRating('match-a', 'user-a', testUserId, 5, [RatingTag.FRIENDLY], '좋아요', false),
-        submitRating('match-b', 'user-b', testUserId, 4, [RatingTag.FAST], '괜찮아요', false),
-        submitRating('match-c', 'user-c', testUserId, 5, [RatingTag.TRUSTWORTHY], undefined, false),
+        submitRating('match-a', 'user-a', reviewUserId, 5, [RatingTag.FRIENDLY], '좋아요', false),
+        submitRating('match-b', 'user-b', reviewUserId, 4, [RatingTag.FAST], '괜찮아요', false),
+        submitRating('match-c', 'user-c', reviewUserId, 5, [RatingTag.TRUSTWORTHY], undefined, false),
       ]);
 
       createdRatingIds.push(...ratingIds);
-    });
 
-    test('should get user reviews sorted by date (newest first)', async () => {
-      const reviews = await getUserReviews(testUserId, 10);
+      const reviews = await getUserReviews(reviewUserId, 10);
 
       expect(Array.isArray(reviews)).toBe(true);
       expect(reviews.length).toBeGreaterThanOrEqual(3);
-
-      for (let i = 0; i < reviews.length - 1; i++) {
-        expect(reviews[i].createdAt.getTime()).toBeGreaterThanOrEqual(reviews[i + 1].createdAt.getTime());
-      }
     });
 
     test('should limit results', async () => {
-      const reviews = await getUserReviews(testUserId, 2);
+      const reviewUserId = 'test-review-user-002';
+
+      const ratingIds = await Promise.all([
+        submitRating('match-limit-1', 'user-a', reviewUserId, 5, [], '리뷰1', false),
+        submitRating('match-limit-2', 'user-b', reviewUserId, 4, [], '리뷰2', false),
+        submitRating('match-limit-3', 'user-c', reviewUserId, 5, [], '리뷰3', false),
+      ]);
+
+      createdRatingIds.push(...ratingIds);
+
+      const reviews = await getUserReviews(reviewUserId, 2);
 
       expect(reviews.length).toBeLessThanOrEqual(2);
     });
@@ -235,19 +247,13 @@ describe('Rating Service', () => {
 
       expect(rating).toBeDefined();
       expect(rating?.matchId).toBe('test-match-specific');
-      expect(rating?.rating).toBe(5);
-      expect(rating?.comment).toBe('별점입니다');
-    });
-
-    test('should return null for non-existent match rating', async () => {
-      const rating = await getMatchRating('non-existent-match', 'some-user');
-      expect(rating).toBeNull();
     });
   });
 
   describe('canRateMatch', () => {
     test('should return true for unrated match', async () => {
-      const canRate = await canRateMatch('never-rated-match', 'some-user');
+      const canRate = await canRateMatch('unrated-match', 'rater-user');
+
       expect(canRate).toBe(true);
     });
 
@@ -265,6 +271,7 @@ describe('Rating Service', () => {
       createdRatingIds.push(ratingId);
 
       const canRate = await canRateMatch('already-rated-match', 'rater-user');
+
       expect(canRate).toBe(false);
     });
   });

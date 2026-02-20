@@ -50,17 +50,21 @@ describe('Route Service', () => {
         userId: testUserId,
         startStation: {
           id: 'station-001',
-          name: '서울역',
+          stationId: 'station-001',
+          stationName: '서울역',
           line: '1호선',
-          latitude: 37.5547,
-          longitude: 126.9707,
+          lineCode: 'L1',
+          lat: 37.5547,
+          lng: 126.9707,
         },
         endStation: {
           id: 'station-002',
-          name: '강남역',
+          stationId: 'station-002',
+          stationName: '강남역',
           line: '2호선',
-          latitude: 37.5172,
-          longitude: 127.0473,
+          lineCode: 'L2',
+          lat: 37.5172,
+          lng: 127.0473,
         },
         departureTime: '08:30',
         daysOfWeek: [1, 2, 3, 4, 5],
@@ -79,8 +83,8 @@ describe('Route Service', () => {
 
       const route = routeDoc.data();
       expect(route?.userId).toBe(testUserId);
-      expect(route?.startStation.name).toBe('서울역');
-      expect(route?.endStation.name).toBe('강남역');
+      expect(route?.startStation.stationName).toBe('서울역');
+      expect(route?.endStation.stationName).toBe('강남역');
     });
   });
 

@@ -49,6 +49,7 @@ describe('User Service', () => {
 
       expect(result).toBeDefined();
       expect(result.uid).toBe(testUserId);
+      expect(result.email).toBe('test@example.com');
 
       const userDoc = await getDoc(doc(db, 'users', testUserId));
       expect(userDoc.exists).toBe(true);
