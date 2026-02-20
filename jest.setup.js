@@ -233,6 +233,9 @@ jest.mock('firebase/storage', () => ({
 
 jest.mock('firebase/messaging', () => ({
   getMessaging: jest.fn(() => null),
+  getToken: jest.fn(),
+  onMessage: jest.fn(),
+  onTokenRefresh: jest.fn(),
 }));
 
 // Mock react-native-gesture-handler
