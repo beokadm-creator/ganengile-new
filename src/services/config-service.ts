@@ -114,7 +114,7 @@ export async function getStationConfig(stationId: string): Promise<Station | nul
     const docRef = doc(db, 'config_stations', stationId);
     const docSnapshot = await getDoc(docRef);
 
-    if (!docSnapshot.exists()) {
+    if (!docSnapshot.exists) {
       return null;
     }
 
@@ -358,7 +358,7 @@ export async function getExpressTrainConfig(expressId: string): Promise<ExpressT
     const docRef = doc(db, 'config_express_trains', expressId);
     const docSnapshot = await getDoc(docRef);
 
-    if (!docSnapshot.exists()) {
+    if (!docSnapshot.exists) {
       return null;
     }
 
@@ -535,7 +535,7 @@ export async function getAlgorithmParams(paramId: string = 'matching-weights-v1'
     const docRef = doc(db, 'config_algorithm_params', paramId);
     const docSnapshot = await getDoc(docRef);
 
-    if (!docSnapshot.exists()) {
+    if (!docSnapshot.exists) {
       return null;
     }
 

@@ -725,7 +725,7 @@ export async function getPayment(paymentId: string): Promise<Payment | null> {
     const docRef = doc(db, 'payments', paymentId);
     const docSnapshot = await getDoc(docRef);
 
-    if (!docSnapshot.exists()) {
+    if (!docSnapshot.exists) {
       return null;
     }
 

@@ -126,7 +126,7 @@ export class TransferMatchingService {
     const stationRef = doc(db, 'config_stations', stationId);
     const stationDoc = await getDoc(stationRef);
 
-    if (!stationDoc.exists()) {
+    if (!stationDoc.exists) {
       return null;
     }
 

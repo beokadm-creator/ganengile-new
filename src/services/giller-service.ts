@@ -68,7 +68,7 @@ export class GillerService {
     const docRef = doc(db, GILLERS_COLLECTION, targetUserId);
     const docSnap = await getDoc(docRef);
 
-    if (!docSnap.exists()) {
+    if (!docSnap.exists) {
       return null;
     }
 
@@ -98,7 +98,7 @@ export class GillerService {
     const docRef = doc(db, GILLERS_COLLECTION, userId);
     const docSnap = await getDoc(docRef);
 
-    if (docSnap.exists()) {
+    if (docSnap.exists) {
       return; // 이미 존재
     }
 

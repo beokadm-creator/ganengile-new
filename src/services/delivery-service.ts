@@ -63,7 +63,7 @@ export async function gillerAcceptRequest(
     const requestRef = doc(db, 'requests', requestId);
     const requestDoc = await getDoc(requestRef);
 
-    if (!requestDoc.exists()) {
+    if (!requestDoc.exists) {
       return { success: false, message: '요청을 찾을 수 없습니다.' };
     }
 
@@ -134,7 +134,7 @@ export async function verifyPickup(data: PickupVerificationData): Promise<{ succ
     const deliveryRef = doc(db, 'deliveries', data.deliveryId);
     const deliveryDoc = await getDoc(deliveryRef);
 
-    if (!deliveryDoc.exists()) {
+    if (!deliveryDoc.exists) {
       return { success: false, message: '배송 정보를 찾을 수 없습니다.' };
     }
 
@@ -231,7 +231,7 @@ export async function completeDelivery(data: DeliveryCompletionData): Promise<{ 
     const deliveryRef = doc(db, 'deliveries', data.deliveryId);
     const deliveryDoc = await getDoc(deliveryRef);
 
-    if (!deliveryDoc.exists()) {
+    if (!deliveryDoc.exists) {
       return { success: false, message: '배송 정보를 찾을 수 없습니다.' };
     }
 
@@ -304,7 +304,7 @@ export async function markAsArrived(deliveryId: string): Promise<{ success: bool
     const deliveryRef = doc(db, 'deliveries', deliveryId);
     const deliveryDoc = await getDoc(deliveryRef);
 
-    if (!deliveryDoc.exists()) {
+    if (!deliveryDoc.exists) {
       return { success: false, message: '배송 정보를 찾을 수 없습니다.' };
     }
 
@@ -343,7 +343,7 @@ export async function getDeliveryById(deliveryId: string): Promise<DeliveryReque
     const deliveryRef = doc(db, 'deliveries', deliveryId);
     const deliveryDoc = await getDoc(deliveryRef);
 
-    if (!deliveryDoc.exists()) {
+    if (!deliveryDoc.exists) {
       return null;
     }
 
@@ -469,7 +469,7 @@ export async function markAsDroppedAtLocker(
     const deliveryRef = doc(db, 'deliveries', deliveryId);
     const deliveryDoc = await getDoc(deliveryRef);
 
-    if (!deliveryDoc.exists()) {
+    if (!deliveryDoc.exists) {
       return { success: false, message: '배송 정보를 찾을 수 없습니다.' };
     }
 

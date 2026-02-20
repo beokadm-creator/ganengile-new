@@ -101,7 +101,7 @@ export class NotificationService {
     const docRef = doc(db, NOTIFICATION_SETTINGS_COLLECTION, this.userId);
     const docSnap = await getDoc(docRef);
 
-    if (docSnap.exists()) {
+    if (docSnap.exists) {
       await updateDoc(docRef, { fcmToken: token, updatedAt: serverTimestamp() });
     } else {
       await setDoc(docRef, {
@@ -138,7 +138,7 @@ export class NotificationService {
     const docRef = doc(db, NOTIFICATION_SETTINGS_COLLECTION, this.userId);
     const docSnap = await getDoc(docRef);
 
-    if (!docSnap.exists()) {
+    if (!docSnap.exists) {
       return null;
     }
 
@@ -160,7 +160,7 @@ export class NotificationService {
     const docRef = doc(db, NOTIFICATION_SETTINGS_COLLECTION, this.userId);
 
     const unsubscribe = onSnapshot(docRef, (docSnap) => {
-      if (docSnap.exists()) {
+      if (docSnap.exists) {
         const data = docSnap.data();
         listener({
           userId: data.userId,

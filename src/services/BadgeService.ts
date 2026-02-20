@@ -22,7 +22,7 @@ export class BadgeService {
       const badgeRef = doc(db, 'badges', badgeData.id);
       const badgeDoc = await getDoc(badgeRef);
 
-      if (!badgeDoc.exists()) {
+      if (!badgeDoc.exists) {
         // 배지 문서 생성 (Admin SDK 필요)
         console.log(`Creating badge: ${badgeData.name}`);
         // Firebase Functions를 통해 생성하거나 Admin SDK 사용 필요
@@ -74,7 +74,7 @@ export class BadgeService {
     const userRef = doc(db, 'users', userId);
     const userDoc = await getDoc(userRef);
 
-    if (!userDoc.exists()) return false;
+    if (!userDoc.exists) return false;
 
     const user = userDoc.data() as User;
 

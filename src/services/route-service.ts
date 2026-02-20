@@ -672,7 +672,7 @@ export async function getRoute(routeId: string, userId: string): Promise<Route |
     const docRef = doc(db, 'routes', routeId);
     const docSnapshot = await getDoc(docRef);
 
-    if (!docSnapshot.exists()) {
+    if (!docSnapshot.exists) {
       return null;
     }
 

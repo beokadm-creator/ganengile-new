@@ -31,7 +31,7 @@ export async function getUserVerification(
     const verificationRef = doc(db, 'users', userId, VERIFICATION_COLLECTION, userId);
     const docSnapshot = await getDoc(verificationRef);
 
-    if (!docSnapshot.exists()) {
+    if (!docSnapshot.exists) {
       return null;
     }
 

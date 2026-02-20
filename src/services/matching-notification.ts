@@ -82,7 +82,7 @@ async function getUserFCMToken(userId: string): Promise<string | null> {
   try {
     const userDoc = await getDoc(doc(db, 'users', userId));
 
-    if (!userDoc.exists()) {
+    if (!userDoc.exists) {
       return null;
     }
 

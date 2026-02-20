@@ -124,7 +124,7 @@ export async function getRequestById(requestId: string): Promise<Request | null>
     const docRef = doc(db, 'requests', requestId);
     const docSnapshot = await getDoc(docRef);
 
-    if (!docSnapshot.exists()) {
+    if (!docSnapshot.exists) {
       return null;
     }
 

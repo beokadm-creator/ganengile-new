@@ -38,7 +38,7 @@ export function subscribeToDeliveryTracking(
 
   // Firestore 실시간 리스너
   const unsubscribe = onSnapshot(deliveryDoc, (docSnapshot) => {
-    if (!docSnapshot.exists()) {
+    if (!docSnapshot.exists) {
       console.warn(`Delivery ${requestId} not found`);
       return;
     }

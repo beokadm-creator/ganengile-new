@@ -42,7 +42,7 @@ export async function calculateBadgeBonus(userId: string): Promise<{
   try {
     const userDoc = await getDoc(doc(db, 'users', userId));
 
-    if (!userDoc.exists()) {
+    if (!userDoc.exists) {
       return { feeBonus: 0, priorityBoost: 0 };
     }
 
@@ -83,7 +83,7 @@ async function fetchUserStats(userId: string): Promise<{
   try {
     const userDoc = await getDoc(doc(db, 'users', userId));
 
-    if (!userDoc.exists()) {
+    if (!userDoc.exists) {
       return {
         rating: 3.5,
         totalDeliveries: 0,
@@ -178,7 +178,7 @@ export async function fetchUserInfo(userId: string): Promise<{
   try {
     const userDoc = await getDoc(doc(db, 'users', userId));
 
-    if (!userDoc.exists()) {
+    if (!userDoc.exists) {
       return {
         name: '익명',
         rating: 3.5,
@@ -255,7 +255,7 @@ export async function findMatchesForRequest(
     // 1. Fetch request
     const requestDoc = await getDoc(doc(db, 'requests', requestId));
 
-    if (!requestDoc.exists()) {
+    if (!requestDoc.exists) {
       throw new Error('Request not found');
     }
 
@@ -430,7 +430,7 @@ export async function acceptRequest(
     const requestRef = doc(db, 'requests', requestId);
     const requestDoc = await getDoc(requestRef);
 
-    if (!requestDoc.exists()) {
+    if (!requestDoc.exists) {
       return { success: false, message: '요청을 찾을 수 없습니다.' };
     }
 

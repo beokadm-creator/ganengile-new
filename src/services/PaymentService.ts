@@ -129,7 +129,7 @@ export class PaymentService {
     const paymentRef = doc(db, PAYMENT_COLLECTIONS.PAYMENTS, paymentId);
     const paymentDoc = await getDoc(paymentRef);
 
-    if (!paymentDoc.exists()) {
+    if (!paymentDoc.exists) {
       return null;
     }
 

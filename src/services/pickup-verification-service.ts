@@ -48,7 +48,7 @@ export class PickupVerificationService {
       const deliveryRef = doc(db, this.DELIVERIES_COLLECTION, data.deliveryId);
       const deliveryDoc = await getDoc(deliveryRef);
 
-      if (deliveryDoc.exists()) {
+      if (deliveryDoc.exists) {
         await updateDoc(deliveryRef, {
           status: 'picked_up',
           pickupVerifiedAt: serverTimestamp(),

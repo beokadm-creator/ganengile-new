@@ -216,7 +216,7 @@ async function updateUserRatingStats(userId: string): Promise<void> {
     const userRef = doc(db, 'users', userId);
     const userSnap = await getDoc(userRef);
 
-    if (userSnap.exists()) {
+    if (userSnap.exists) {
       await updateDoc(userRef, {
         rating: stats.averageRating,
         totalRatings: stats.totalRatings,
@@ -265,7 +265,7 @@ export async function getUserReviews(userId: string, limit: number = 20): Promis
       if (!data.isAnonymous) {
         try {
           const userDoc = await getDoc(doc(db, 'users', fromUserId));
-          if (userDoc.exists()) {
+          if (userDoc.exists) {
             const userData = userDoc.data();
             fromUserName = userData.name || '사용자';
             fromUserProfileImage = userData.profileImage;

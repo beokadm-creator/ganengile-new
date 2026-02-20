@@ -88,7 +88,7 @@ export class LockerService {
     const docRef = doc(db, LOCKERS_COLLECTION, lockerId);
     const docSnap = await getDoc(docRef);
 
-    if (!docSnap.exists()) {
+    if (!docSnap.exists) {
       return null;
     }
 
@@ -153,7 +153,7 @@ export class LockerService {
     const docRef = doc(db, RESERVATIONS_COLLECTION, reservationId);
     const docSnap = await getDoc(docRef);
 
-    if (!docSnap.exists()) {
+    if (!docSnap.exists) {
       return null;
     }
 

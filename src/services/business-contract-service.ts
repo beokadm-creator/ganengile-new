@@ -95,7 +95,7 @@ export class BusinessContractService {
    */
   static async getContract(contractId: string): Promise<BusinessContract | null> {
     const contractDoc = await getDoc(doc(db, COLLECTION, contractId));
-    if (!contractDoc.exists()) {
+    if (!contractDoc.exists) {
       return null;
     }
     return {

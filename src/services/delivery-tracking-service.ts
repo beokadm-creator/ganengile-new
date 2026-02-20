@@ -69,7 +69,7 @@ export class DeliveryTrackingService {
       this.unsubscribe = onSnapshot(
         deliveryRef,
         (docSnapshot) => {
-          if (docSnapshot.exists()) {
+          if (docSnapshot.exists) {
             const data = docSnapshot.data();
             
             // 진척률 계산 (개선된 로직)
@@ -321,7 +321,7 @@ export class DeliveryTrackingService {
       const deliveryRef = doc(db, 'deliveries', deliveryId);
       const docSnapshot = await getDoc(deliveryRef);
 
-      if (docSnapshot.exists()) {
+      if (docSnapshot.exists) {
         const data = docSnapshot.data();
         
         // 진척률 계산

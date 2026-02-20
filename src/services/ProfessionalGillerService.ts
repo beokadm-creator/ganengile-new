@@ -102,7 +102,7 @@ export class ProfessionalGillerService {
     const userRef = doc(db, 'users', userId);
     const userDoc = await getDoc(userRef);
 
-    if (!userDoc.exists()) {
+    if (!userDoc.exists) {
       throw new Error('User not found');
     }
 
@@ -135,7 +135,7 @@ export class ProfessionalGillerService {
     const userRef = doc(db, 'users', userId);
     const userDoc = await getDoc(userRef);
 
-    if (!userDoc.exists()) {
+    if (!userDoc.exists) {
       throw new Error('User not found');
     }
 
@@ -214,7 +214,7 @@ export class ProfessionalGillerService {
     const userRef = doc(db, 'users', userId);
     const userDoc = await getDoc(userRef);
 
-    if (!userDoc.exists()) {
+    if (!userDoc.exists) {
       throw new Error('User not found');
     }
 
@@ -289,7 +289,7 @@ export class ProfessionalGillerService {
     const userRef = doc(db, 'users', userId);
     const userDoc = await getDoc(userRef);
 
-    if (!userDoc.exists()) {
+    if (!userDoc.exists) {
       return 'normal';
     }
 

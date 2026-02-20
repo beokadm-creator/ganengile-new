@@ -293,7 +293,7 @@ export class B2BFirestoreService {
     try {
       const businessDoc = await getDoc(doc(db, this.USERS_COLLECTION, businessId));
 
-      if (businessDoc.exists()) {
+      if (businessDoc.exists) {
         return {
           id: businessDoc.id,
           ...businessDoc.data(),

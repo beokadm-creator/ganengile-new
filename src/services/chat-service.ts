@@ -250,7 +250,7 @@ export class ChatService {
     const docRef = doc(db, CHAT_ROOMS_COLLECTION, chatRoomId);
     const docSnap = await getDoc(docRef);
 
-    if (!docSnap.exists()) {
+    if (!docSnap.exists) {
       return null;
     }
 

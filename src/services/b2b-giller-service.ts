@@ -31,7 +31,7 @@ export class B2BGillerService {
   static async registerB2BGiller(gillerId: string): Promise<void> {
     // 1. 길러 기본 정보 조회
     const gillerDoc = await getDoc(doc(db, GILLER_COLLECTION, gillerId));
-    if (!gillerDoc.exists()) {
+    if (!gillerDoc.exists) {
       throw new Error('길러를 찾을 수 없습니다');
     }
 

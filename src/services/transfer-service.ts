@@ -197,7 +197,7 @@ export class TransferService {
     const docRef = doc(db, TRANSFER_MATCHES_COLLECTION, matchId);
     const docSnap = await getDoc(docRef);
 
-    if (!docSnap.exists()) {
+    if (!docSnap.exists) {
       return null;
     }
 

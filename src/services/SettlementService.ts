@@ -84,7 +84,7 @@ export class SettlementService {
     const paymentRef = doc(db, PAYMENT_COLLECTIONS.PAYMENTS, paymentId);
     const paymentDoc = await getDoc(paymentRef);
 
-    if (!paymentDoc.exists()) {
+    if (!paymentDoc.exists) {
       throw new Error(`Payment not found: ${paymentId}`);
     }
 
@@ -97,7 +97,7 @@ export class SettlementService {
     const gillerRef = doc(db, 'users', payment.gllerId);
     const gillerDoc = await getDoc(gillerRef);
 
-    if (!gillerDoc.exists()) {
+    if (!gillerDoc.exists) {
       throw new Error(`Giller not found: ${payment.gllerId}`);
     }
 
@@ -138,7 +138,7 @@ export class SettlementService {
     const settlementRef = doc(db, PAYMENT_COLLECTIONS.SETTLEMENTS, settlementId);
     const settlementDoc = await getDoc(settlementRef);
 
-    if (!settlementDoc.exists()) {
+    if (!settlementDoc.exists) {
       return null;
     }
 
@@ -318,7 +318,7 @@ export class SettlementService {
     const userRef = doc(db, 'users', gillerId);
     const userDoc = await getDoc(userRef);
 
-    if (!userDoc.exists()) {
+    if (!userDoc.exists) {
       throw new Error(`User not found: ${gillerId}`);
     }
 
@@ -346,7 +346,7 @@ export class SettlementService {
     const userRef = doc(db, 'users', gillerId);
     const userDoc = await getDoc(userRef);
 
-    if (!userDoc.exists()) {
+    if (!userDoc.exists) {
       return [];
     }
 
@@ -361,7 +361,7 @@ export class SettlementService {
     const userRef = doc(db, 'users', gillerId);
     const userDoc = await getDoc(userRef);
 
-    if (!userDoc.exists()) {
+    if (!userDoc.exists) {
       throw new Error(`User not found: ${gillerId}`);
     }
 

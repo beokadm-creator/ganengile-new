@@ -128,7 +128,7 @@ export class PhotoService {
     const docRef = doc(db, PHOTOS_COLLECTION, photoId);
     const docSnap = await getDoc(docRef);
 
-    if (!docSnap.exists()) {
+    if (!docSnap.exists) {
       throw new Error('Photo not found');
     }
 

@@ -26,7 +26,7 @@ export async function getUserProfile(userId: string): Promise<UserProfile | null
     const profileRef = doc(db, 'users', userId, PROFILE_COLLECTION, userId);
     const docSnapshot = await getDoc(profileRef);
 
-    if (!docSnapshot.exists()) {
+    if (!docSnapshot.exists) {
       return null;
     }
 

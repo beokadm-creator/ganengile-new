@@ -176,7 +176,7 @@ export class TaxInvoiceService {
    */
   static async getInvoice(invoiceId: string): Promise<TaxInvoice | null> {
     const invoiceDoc = await getDoc(doc(db, INVOICE_COLLECTION, invoiceId));
-    if (!invoiceDoc.exists()) {
+    if (!invoiceDoc.exists) {
       return null;
     }
     return {

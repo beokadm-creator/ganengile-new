@@ -191,7 +191,7 @@ export class B2BSettlementService {
    */
   static async getSettlement(settlementId: string): Promise<B2BSettlement | null> {
     const settlementDoc = await getDoc(doc(db, SETTLEMENT_COLLECTION, settlementId));
-    if (!settlementDoc.exists()) {
+    if (!settlementDoc.exists) {
       return null;
     }
     return {

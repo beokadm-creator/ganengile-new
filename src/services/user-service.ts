@@ -61,7 +61,7 @@ export async function getUserById(userId: string): Promise<User | null> {
     const docRef = doc(db, 'users', userId);
     const docSnapshot = await getDoc(docRef);
 
-    if (!docSnapshot.exists()) {
+    if (!docSnapshot.exists) {
       return null;
     }
 
@@ -256,7 +256,7 @@ export async function getDetailedUserStats(userId: string): Promise<{
 
     // Get user data for additional stats
     const userDoc = await getDoc(doc(db, 'users', userId));
-    if (!userDoc.exists()) {
+    if (!userDoc.exists) {
       return {
         ...baseStats,
         recent30DaysDeliveries: 0,

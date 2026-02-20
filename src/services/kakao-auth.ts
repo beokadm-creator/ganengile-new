@@ -122,7 +122,7 @@ export async function linkKakaoToFirebase(
 
     let customToken: string;
 
-    if (userDoc.exists()) {
+    if (userDoc.exists) {
       // 기존 사용자: Firebase Admin SDK로 커스텀 토큰 생성 필요
       // 클라이언트에서 직접 처리할 수 없으므로, Firebase Functions를 통하거나
       // 익명 로그인 후 계정 연결 방식 사용
@@ -200,7 +200,7 @@ export async function loginWithKakao(): Promise<{ success: boolean; uid?: string
     // Firestore에서 사용자 확인
     const userDoc = await getDoc(doc(db, 'users', `kakao_${kakaoUserInfo.id}`));
 
-    if (userDoc.exists()) {
+    if (userDoc.exists) {
       const userData = userDoc.data();
 
       // Custom Token으로 Firebase 로그인 (백엔드 필요)
