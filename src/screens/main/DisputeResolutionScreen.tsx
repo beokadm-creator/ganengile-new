@@ -279,7 +279,6 @@ export default function DisputeResolutionScreen({ navigation, route }: Props) {
                       </Text>
                     </View>
                   </View>
-                  </View>
 
                   {/* 사유 */}
                   <View style={styles.resolutionItem}>
