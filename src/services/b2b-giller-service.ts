@@ -264,7 +264,7 @@ export class B2BGillerService {
   static async checkB2BEligibility(gillerId: string): Promise<{
     eligible: boolean;
     currentTier?: string;
-    requiredFor?: { [key in B2BGillerTier['tier']?: B2BGillerCriteria };
+    requiredFor?: Partial<Record<B2BGillerTier['tier'], B2BGillerCriteria>>;
   }> {
     const tier = await this.getB2BGillerTier(gillerId);
     

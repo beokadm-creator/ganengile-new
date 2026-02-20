@@ -49,7 +49,7 @@ export default function QRScanner({ onScan, onError, onClose }: Props) {
       <View style={styles.container}>
         <Text style={styles.errorText}>카메라 접근 권한이 없습니다.</Text>
         <Text style={styles.subText}>
-          설정 > 개인정보 보호 > 카메라에서 권한을 허용해주세요.
+          설정 {'>'} 개인정보 보호 {'>'} 카메라에서 권한을 허용해주세요.
         </Text>
         {onClose && (
           <TouchableOpacity style={styles.closeButton} onPress={onClose}>
