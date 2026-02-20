@@ -10,11 +10,18 @@ export interface Match {
 
 export interface GillerRoute {
   gillerId: string;
-  routeId: string;
+  gillerName?: string;
+  routeId?: string;
   departureStation: string;
   arrivalStation: string;
-  dayOfWeek: string[];
+  dayOfWeek?: string[];
+  daysOfWeek?: number[];
   departureTime: string;
+  rating?: number;
+  totalDeliveries?: number;
+  completedDeliveries?: number;
+  badgeBonus?: number; // 0.05 to 0.20 (5% to 20%)
+  priorityBoost?: number; // 0 to 20
 }
 
 export interface DeliveryRequest {
@@ -44,8 +51,14 @@ export function matchGillersToRequest(
       score += 30;
     }
 
-    // 요일 일치 확인
-    if (route.dayOfWeek.includes(request.dayOfWeek)) {
+    // 요일 일치 확인 (daysOfWeek 배열 사용)
+    if (route.daysOfWeek && route.daysOfWeek.length > 0) {
+      const today = new Date().getDay();
+      const dayOfWeek = today === 0 ? 7 : today; // Convert to 1-7 (Mon-Sun)
+      if (route.daysOfWeek.includes(dayOfWeek)) {
+        score += 10;
+      }
+    } else if (route.dayOfWeek && route.dayOfWeek.includes(request.dayOfWeek)) {
       score += 10;
     }
 
@@ -54,6 +67,11 @@ export function matchGillersToRequest(
     const requestHour = parseInt(request.time.split(':')[0]);
     if (Math.abs(routeHour - requestHour) <= 1) {
       score += 10;
+    }
+
+    // 배지 우선순위 부스트 적용
+    if (route.priorityBoost && route.priorityBoost > 0) {
+      score += route.priorityBoost;
     }
 
     matches.push({

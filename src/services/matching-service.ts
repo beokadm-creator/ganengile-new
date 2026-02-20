@@ -28,6 +28,47 @@ import {
 } from './matching-notification';
 import { createChatService, getChatRoomByRequestId } from './chat-service';
 import { MessageType } from '../types/chat';
+import { BadgeService } from './BadgeService';
+
+/**
+ * Calculate badge bonus for fee adjustment
+ * @param userId User ID
+ * @returns Badge bonus percentage and priority boost
+ */
+export async function calculateBadgeBonus(userId: string): Promise<{
+  feeBonus: number; // 0.05 to 0.20 (5% to 20%)
+  priorityBoost: number; // 0 to 20 (priority score boost)
+}> {
+  try {
+    const userDoc = await getDoc(doc(db, 'users', userId));
+
+    if (!userDoc.exists()) {
+      return { feeBonus: 0, priorityBoost: 0 };
+    }
+
+    const user = userDoc.data();
+    const badgeTier = BadgeService.calculateBadgeTier(user.badges);
+
+    // 배지 보너스 로직
+    // Bronze (3개): 요금 5% 보너스
+    // Silver (5개): 요금 10% 보너스
+    // Gold (7개): 요금 15% 보너스 + 우선순위
+    // Platinum (10개): 요금 20% 보너스 + 높은 우선순위
+    const bonusConfig = {
+      bronze: { feeBonus: 0.05, priorityBoost: 0 },
+      silver: { feeBonus: 0.10, priorityBoost: 0 },
+      gold: { feeBonus: 0.15, priorityBoost: 10 },
+      platinum: { feeBonus: 0.20, priorityBoost: 20 },
+      none: { feeBonus: 0, priorityBoost: 0 },
+    };
+
+    const tier = badgeTier.tier || 'none';
+    return bonusConfig[tier];
+  } catch (error) {
+    console.error('Error calculating badge bonus:', error);
+    return { feeBonus: 0, priorityBoost: 0 };
+  }
+}
 
 /**
  * Fetch user stats from users collection
@@ -97,6 +138,9 @@ export async function fetchActiveGillerRoutes(): Promise<GillerRoute[]> {
       // Fetch user stats from users collection
       const userStats = await fetchUserStats(data.userId);
 
+      // Calculate badge bonus
+      const badgeBonus = await calculateBadgeBonus(data.userId);
+
       routes.push({
         gillerId: data.userId,
         gillerName: data.gillerName || '익명',
@@ -107,6 +151,8 @@ export async function fetchActiveGillerRoutes(): Promise<GillerRoute[]> {
         rating: userStats.rating,
         totalDeliveries: userStats.totalDeliveries,
         completedDeliveries: userStats.completedDeliveries,
+        badgeBonus: badgeBonus.feeBonus,
+        priorityBoost: badgeBonus.priorityBoost,
       });
     });
 

@@ -25,6 +25,7 @@ import {
   Timestamp,
 } from 'firebase/firestore';
 import { db } from './firebase';
+import { calculateBadgeBonus } from './matching-service';
 
 // ==================== Constants ====================
 
@@ -196,9 +197,15 @@ export async function createGillerEarning(
   isTaxable: boolean = true
 ): Promise<string> {
   try {
-    // 1. 플랫폼 수수료 10%
-    const platformFee = Math.round(amount * TAX_RATES.PLATFORM_FEE);
-    const afterFee = amount - platformFee;
+    // 0. 배지 보너스 계산 (P2-9)
+    const { feeBonus: badgeBonus } = await calculateBadgeBonus(userId);
+    const baseAmount = amount;
+    const bonusAmount = Math.round(baseAmount * badgeBonus);
+    const totalAmount = baseAmount + bonusAmount; // 배지 보너스가 포함된 총 금액
+
+    // 1. 플랫폼 수수료 10% (총 금액 기준)
+    const platformFee = Math.round(totalAmount * TAX_RATES.PLATFORM_FEE);
+    const afterFee = totalAmount - platformFee;
 
     // 2. 세금 계산 (수수료 차감 후 금액 기준)
     let tax = 0;
@@ -212,18 +219,21 @@ export async function createGillerEarning(
     const paymentData = {
       userId,
       type: PaymentType.GILLER_EARNING,
-      amount, // 세전 금액
+      amount: totalAmount, // 세전 금액 (배지 보너스 포함)
       fee: platformFee,
       tax, // 원천징수세
       netAmount, // 최종 수익 (세후)
       status: PaymentStatus.COMPLETED,
       requestId,
-      description: '배송 완료 수익',
+      description: `배송 완료 수익${badgeBonus > 0 ? ` (배지 보너스 ${(badgeBonus * 100).toFixed(0)}%)` : ''}`,
       metadata: {
         platformFeeRate: TAX_RATES.PLATFORM_FEE,
         taxRate: isTaxable ? TAX_RATES.BUSINESS_INCOME_TAX : 0,
         taxWithheld: tax,
         isTaxable,
+        baseAmount, // 기본 요금
+        bonusAmount, // 배지 보너스
+        badgeBonusRate: badgeBonus, // 배지 보너스율
       } as PaymentMetadata,
       createdAt: serverTimestamp(),
       completedAt: serverTimestamp(),
@@ -232,7 +242,11 @@ export async function createGillerEarning(
     const docRef = await addDoc(collection(db, 'payments'), paymentData);
 
     console.log(`✅ Giller earning created: ${docRef.id}`);
-    console.log(`   - 세전: ${amount.toLocaleString()}원`);
+    console.log(`   - 기본 요금: ${baseAmount.toLocaleString()}원`);
+    if (badgeBonus > 0) {
+      console.log(`   - 배지 보너스(${(badgeBonus * 100).toFixed(0)}%): +${bonusAmount.toLocaleString()}원`);
+    }
+    console.log(`   - 세전 총액: ${totalAmount.toLocaleString()}원`);
     console.log(`   - 수수료(10%): ${platformFee.toLocaleString()}원`);
     console.log(`   - 세금(3.3%): ${tax.toLocaleString()}원`);
     console.log(`   - 세후 수익: ${netAmount.toLocaleString()}원`);
