@@ -338,7 +338,6 @@ export default function DisputeResolutionScreen({ navigation, route }: Props) {
                 </>
               )}
             </View>
-            </View>
 
             {/* 처리 이력 */}
             <View style={styles.section}>
