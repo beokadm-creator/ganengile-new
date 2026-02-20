@@ -266,3 +266,13 @@ global.__clearMockFirestore = () => mockFirestoreData.clear();
 global.fail = (message: string) => {
   throw new Error(`Test failed: ${message}`);
 };
+
+// Global Firebase mock helpers for tests
+global.setupFirebaseMocks = () => {
+  // Clear existing mock data
+  global.__clearMockFirestore();
+};
+
+global.clearFirebaseMocks = () => {
+  jest.clearAllMocks();
+};

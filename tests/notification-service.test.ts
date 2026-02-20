@@ -12,25 +12,8 @@ import { doc, getDoc, deleteDoc } from 'firebase/firestore';
 import { db } from '../src/services/firebase';
 import { NotificationType } from '../src/types/chat';
 
-// Mock Firebase modules
-jest.mock('../src/services/firebase', () => ({
-  db: {},
-  messaging: {},
-  requireUserId: jest.fn(() => 'test-user-notification-001'),
-}));
-
-jest.mock('firebase/firestore', () => ({
-  doc: jest.fn(),
-  getDoc: jest.fn(),
-  setDoc: jest.fn(),
-  updateDoc: jest.fn(),
-  deleteDoc: jest.fn(),
-  collection: jest.fn(),
-  query: jest.fn(),
-  where: jest.fn(),
-  onSnapshot: jest.fn(),
-  serverTimestamp: jest.fn(() => new Date()),
-}));
+// Note: Firebase mocks are now in jest.setup.js
+// setupFirebaseMocks and clearFirebaseMocks are available globally
 
 describe('Notification Service', () => {
   const testUserId = 'test-user-notification-001';

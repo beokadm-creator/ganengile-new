@@ -1,77 +1,15 @@
 /**
  * User Service Tests
- * 사용자 관리 테스트 (Mock 단순화)
+ * 사용자 관리 테스트
  */
 
 import { describe, test, expect, beforeEach, afterEach, jest } from '@jest/globals';
 import { UserRole } from '../src/types/user';
 
-// Mock user storage for testing
-const mockUsers = new Map<string, any>();
+// Note: Firebase mocks are now in jest.setup.js
+// Global mockFirestoreData is used for storage
 
-// Mock all Firebase functions
-const mockGetDoc = jest.fn((docRef: any) => {
-  const userId = docRef.id;
-  const mockUser = mockUsers.get(userId);
-
-  return Promise.resolve({
-    exists: !!mockUser,
-    id: userId,
-    data: () => mockUser,
-    ref: docRef
-  });
-});
-
-const mockUpdateDoc = jest.fn((docRef: any, data: any) => {
-  const userId = docRef.id;
-  const existing = mockUsers.get(userId);
-
-  if (existing) {
-    const updated = { ...existing, ...data };
-    mockUsers.set(userId, updated);
-  }
-
-  return Promise.resolve();
-});
-
-const mockSetDoc = jest.fn((docRef: any, data: any) => {
-  const userId = docRef.id;
-  mockUsers.set(userId, data);
-  return Promise.resolve();
-});
-
-const mockDeleteDoc = jest.fn((docRef: any) => {
-  const userId = docRef.id;
-  mockUsers.delete(userId);
-  return Promise.resolve();
-});
-
-const mockDoc = jest.fn((db: any, path: string, id?: string) => ({
-  id: id || path.split('/').pop(),
-  path: path,
-  parent: null
-}));
-
-// Setup mocks before tests
-jest.mock('../src/services/firebase', () => ({
-  db: {}
-}));
-
-jest.mock('firebase/firestore', () => ({
-  getDoc: mockGetDoc,
-  updateDoc: mockUpdateDoc,
-  setDoc: mockSetDoc,
-  deleteDoc: mockDeleteDoc,
-  doc: mockDoc,
-  collection: jest.fn(),
-  query: jest.fn(),
-  where: jest.fn(),
-  addDoc: jest.fn(),
-  getDocs: jest.fn(),
-  serverTimestamp: jest.fn(() => ({ toDate: () => new Date() }))
-}));
-
-// Now import services after mocks are set up
+// Import services
 import {
   createUser,
   getUserById,
@@ -86,13 +24,13 @@ describe('User Service', () => {
 
   beforeEach(() => {
     // Clear mock storage before each test
-    mockUsers.clear();
+    (global as any).__clearMockFirestore();
   });
 
   afterEach(async () => {
     // Cleanup: Delete all test users
     for (const userId of testUserIds) {
-      mockUsers.delete(userId);
+      (global as any).__mockFirestoreData.delete(userId);
     }
     testUserIds.length = 0;
   });
@@ -110,7 +48,7 @@ describe('User Service', () => {
       testUserIds.push(userId);
 
       // Verify user was created in mock storage
-      const mockUser = mockUsers.get(testUserId);
+      const mockUser = (global as any).__mockFirestoreData.get(testUserId);
       expect(mockUser).toBeDefined();
       expect(mockUser.email).toBe('test@example.com');
       expect(mockUser.name).toBe('Test User');
@@ -132,7 +70,7 @@ describe('User Service', () => {
 
       expect(userId2).toBe(testUserId);
 
-      const mockUser = mockUsers.get(testUserId);
+      const mockUser = (global as any).__mockFirestoreData.get(testUserId);
       // Overwritten
       expect(mockUser.email).toBe('test2@example.com');
       expect(mockUser.name).toBe('Test User 2');
