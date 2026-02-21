@@ -4,35 +4,35 @@ service cloud.firestore {
     // ==================== Config Collections (Read-Only) ====================
     
     // C1: Config stations - read only for authenticated users
-    match /config_stations/{**} {
-      allow read: if request.auth != null && 
+    match /config_stations/{stationId} {
+      allow read: if request.auth != null &&
                   request.auth.token.signInProvider != 'anonymous';
       allow write: if false;
     }
-    
+
     // C2: Config travel times - read only for authenticated users
-    match /config_travel_times/{**} {
-      allow read: if request.auth != null && 
+    match /config_travel_times/{timeId} {
+      allow read: if request.auth != null &&
                   request.auth.token.signInProvider != 'anonymous';
       allow write: if false;
     }
-    
+
     // C3: Config express trains - read only for authenticated users
-    match /config_express_trains/{**} {
-      allow read: if request.auth != null && 
+    match /config_express_trains/{trainId} {
+      allow read: if request.auth != null &&
                   request.auth.token.signInProvider != 'anonymous';
       allow write: if false;
     }
-    
+
     // C4: Config congestion - read only for authenticated users
-    match /config_congestion/{**} {
-      allow read: if request.auth != null && 
+    match /config_congestion/{congestionId} {
+      allow read: if request.auth != null &&
                   request.auth.token.signInProvider != 'anonymous';
       allow write: if false;
     }
     
     // C5: Config algorithm params - read only for authenticated users
-    match /config_algorithm_params/{**} {
+    match /config_algorithm_params/{documentId} {
       allow read: if request.auth != null && 
                   request.auth.token.signInProvider != 'anonymous';
       allow write: if false;
