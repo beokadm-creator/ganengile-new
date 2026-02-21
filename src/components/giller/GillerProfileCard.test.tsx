@@ -4,7 +4,7 @@
 
 import React from 'react';
 import { render, fireEvent } from '@testing-library/react-native';
-import { GillerProfileCard } from '../GillerProfileCard';
+import GillerProfileCard from './GillerProfileCard';
 
 describe('GillerProfileCard Component', () => {
   const mockGiller = {
