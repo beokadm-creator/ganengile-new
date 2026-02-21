@@ -1,223 +1,222 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
+    // ==================== Helper Functions ====================
+
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+
     // ==================== Config Collections (Read-Only) ====================
-    
-    // C1: Config stations - read only for authenticated users
+
     match /config_stations/{stationId} {
-      allow read: if request.auth != null &&
-                  request.auth.token.signInProvider != 'anonymous';
+      allow read: if isAuthenticated();
       allow write: if false;
     }
 
-    // C2: Config travel times - read only for authenticated users
     match /config_travel_times/{timeId} {
-      allow read: if request.auth != null &&
-                  request.auth.token.signInProvider != 'anonymous';
+      allow read: if isAuthenticated();
       allow write: if false;
     }
 
-    // C3: Config express trains - read only for authenticated users
     match /config_express_trains/{trainId} {
-      allow read: if request.auth != null &&
-                  request.auth.token.signInProvider != 'anonymous';
+      allow read: if isAuthenticated();
       allow write: if false;
     }
 
-    // C4: Config congestion - read only for authenticated users
     match /config_congestion/{congestionId} {
-      allow read: if request.auth != null &&
-                  request.auth.token.signInProvider != 'anonymous';
+      allow read: if isAuthenticated();
       allow write: if false;
     }
-    
-    // C5: Config algorithm params - read only for authenticated users
+
     match /config_algorithm_params/{documentId} {
-      allow read: if request.auth != null && 
-                  request.auth.token.signInProvider != 'anonymous';
+      allow read: if isAuthenticated();
       allow write: if false;
     }
-    
+
     // ==================== Users Collection ====================
-    
-    // U1: Users can read all user profiles (public)
-    match /users/{userId}/{publicFields} {
-      // Public fields: name, rating, completedDeliveries, isVerified
-      allow read: if request.auth != null;
-      allow write: if false;
-    }
-    
-    // U2: Users own their data
+
     match /users/{userId} {
-      allow read: if request.auth != null && 
-                  request.auth.uid == userId;
-      allow write: if request.auth.uid == userId;
-      allow delete: if request.auth.uid == userId;
+      // 읽기: 본인 또는 인증된 사용자
+      allow read: if isOwner(userId) || isAuthenticated();
+
+      // 쓰기: 본인만
+      allow write: if isOwner(userId);
+
+      // 삭제: 본인만
+      allow delete: if isOwner(userId);
     }
-    
-    // U3: User profile is writable by owner
-    match /users/{userId}/profile {
-      allow read: if request.auth != null;
-      allow write: if request.auth.uid == userId;
-      allow delete: if false;
-    }
-    
-    // U4: Giller info is writable only by giller
-    match /users/{userId}/gillerInfo {
-      allow read: if request.auth != null;
-      allow write: if request.auth.uid == userId && 
-                  request.resource.data.role == 'giller';
-      allow delete: if false;
-    }
-    
-    // U5: Gller info is readable by authenticated users
-    match /users/{userId}/gllerInfo {
-      allow read: if request.auth != null &&
-                  (request.resource.data.role == 'gller' ||
-                   request.resource.data.role == 'giller');
-      allow write: if false;
-    }
-    
+
     // ==================== Routes Collection ====================
-    
-    // R1: Routes are readable by all authenticated users
+
     match /routes/{routeId} {
-      allow read: if request.auth != null;
+      // 읽기: 인증된 사용자
+      allow read: if isAuthenticated();
+
+      // 쓰기: 본인만
+      allow write: if isOwner(resource.data.userId);
+
+      // 삭제: 본인만
+      allow delete: if isOwner(resource.data.userId);
     }
-    
-    // R2: Route owners can manage their routes
-    match /routes/{routeId} {
-      allow read: if request.auth != null;
-      allow write: if request.auth.uid == resource.data.userId &&
-                   resource.data.isActive == true;
-      allow delete: if request.auth.uid == resource.data.userId;
-    }
-    
-    // R3: Only active routes can be modified
-    match /routes/{routeId} {
-      allow write: if request.auth.uid == resource.data.userId &&
-                   resource.data.isActive == true;
-    }
-    
+
     // ==================== Requests Collection ====================
-    
-    // Q1: Requests are readable by requester and matched giller
+
     match /requests/{requestId} {
-      allow read: if request.auth != null &&
-                  (request.auth.uid == resource.data.requesterId ||
-                   request.auth.uid == resource.data.matchedGillerId);
+      // 읽기: 본인(gller/giller) 또는 관리자
+      allow read: if isAuthenticated() &&
+                  (isOwner(resource.data.userId) ||
+                   isOwner(resource.data.gllerId) ||
+                   isOwner(resource.data.gillerId));
+
+      // 쓰기: 본인만
+      allow write: if isOwner(resource.data.userId);
+
+      // 삭제: 본인만
+      allow delete: if isOwner(resource.data.userId);
     }
-    
-    // Q2: Requesters can create and manage their requests
-    match /requests/{requestId} {
-      allow create: if request.auth != null &&
-                     request.auth.uid == request.resource.data.requesterId;
-      allow read: if request.auth != null &&
-                      request.auth.uid == request.resource.data.requesterId;
-      allow update: if request.auth.uid == request.resource.data.requesterId;
-      allow delete: if request.auth.uid == request.resource.data.requesterId &&
-                      resource.data.status in ['pending', 'cancelled'];
-    }
-    
-    // Q3: Matched gillers can update match status
-    match /requests/{requestId} {
-      allow update: if request.auth.uid in resource.data.matchedGillers;
-    }
-    
+
     // ==================== Matches Collection ====================
-    
-    // M1: Matches are readable by both parties
+
     match /matches/{matchId} {
-      allow read: if request.auth != null &&
-                  (request.auth.uid == resource.data.requesterId ||
-                   request.auth.uid == resource.data.gillerId);
+      // 읽기: 관련된 사용자 (requester, gller/giller)
+      allow read: if isAuthenticated() &&
+                  (isOwner(resource.data.userId) ||
+                   isOwner(resource.data.gllerId) ||
+                   isOwner(resource.data.gillerId));
+
+      // 쓰기: 시스템 또는 본인
+      allow write: if isOwner(resource.data.userId);
+
+      // 삭제: 시스템만
+      allow delete: if false;
     }
-    
-    // M2: Both parties can update match status
-    match /matches/{matchId} {
-      allow update: if request.auth.uid in [resource.data.requesterId, resource.data.gillerId];
-    }
-    
-    // M3: Requester can delete match
-    match /matches/{matchId} {
-      allow delete: if request.auth.uid == resource.data.requesterId;
-    }
-    
+
     // ==================== Deliveries Collection ====================
-    
-    // D1: Deliveries are readable by requester and giller
+
     match /deliveries/{deliveryId} {
-      allow read: if request.auth != null &&
-                  (request.auth.uid == resource.data.requesterId ||
-                   request.auth.uid == resource.data.gillerId);
+      // 읽기: gller/giller 또는 requester
+      allow read: if isAuthenticated() &&
+                  (isOwner(resource.data.gllerId) ||
+                   isOwner(resource.data.gillerId) ||
+                   isOwner(resource.data.userId));
+
+      // 쓰기: gller/giller만
+      allow write: if isOwner(resource.data.gllerId) ||
+                   isOwner(resource.data.gillerId);
+
+      // 삭제: 시스템만
+      allow delete: if false;
     }
-    
-    // D2: Giller can update delivery status
-    match /deliveries/{deliveryId} {
-      allow update: if request.auth.uid == resource.data.gillerId;
-    }
-    
-    // D3: Requester can read completed deliveries
-    match /deliveries/{deliveryId} {
-      allow read: if request.auth != null &&
-                      request.auth.uid == resource.data.requesterId &&
-                      resource.data.status == 'completed';
-    }
-    
+
     // ==================== Ratings Collection ====================
-    
-    // R1: Ratings are readable by both parties
+
     match /ratings/{ratingId} {
-      allow read: if request.auth != null &&
-                  (request.auth.uid == resource.data.fromUserId ||
-                   request.auth.uid == resource.data.toUserId);
+      // 읽기: 인증된 사용자
+      allow read: if isAuthenticated();
+
+      // 쓰기: 본인(fromUserId)만
+      allow write: if isOwner(resource.data.fromUserId);
+
+      // 삭제: 시스템만
+      allow delete: if false;
     }
-    
-    // R2: Ratings can be created but not updated
-    match /ratings/{ratingId} {
-      allow create: if request.auth != null;
-      allow update: if false; // Ratings are immutable once created
-    }
-    
-    // ==================== Chats Collection ====================
-    
-    // C1: Chat rooms are readable by participants only
-    match /chats/{chatRoomId} {
-      allow read: if request.auth != null &&
-                      request.auth.uid in resource.data.participants;
-    }
-    
-    // C2: Participants can send messages
-    match /chats/{chatRoomId}/messages {
-      allow create: if request.auth != null &&
-                       request.auth.uid in resource.data.participants;
-      allow read: if request.auth != null &&
-                       request.auth.uid in resource.data.participants;
-    }
-    
-    // C3: Only sender can delete their messages
-    match /chats/{chatRoomId}/messages/{messageId} {
-      allow delete: if request.auth.uid == resource.data.senderId;
-    }
-    
-    // ==================== Settlements Collection ====================
-    
-    // S1: Settlements are readable by giller only
-    match /settlements/{settlementId} {
-      allow read: if request.auth != null &&
-                      request.auth.uid == resource.data.gillerId;
-    }
-    
-    // S2: System creates settlements (read-only for users)
-    match /settlements/{settlementId} {
-      allow create: if false; // Only system can create
-    }
-    
-    // ==================== Deny All Else ====================
-    
-    match /{document=**} {
-      allow read: if false;
+
+    // ==================== Penalties Collection ====================
+
+    match /penalties/{penaltyId} {
+      // 읽기: 본인만
+      allow read: if isOwner(resource.data.userId);
+
+      // 쓰기: 시스템만 (Admin SDK)
       allow write: if false;
+
+      // 삭제: 시스템만
+      allow delete: if false;
+    }
+
+    // ==================== Chats Collection ====================
+
+    match /chats/{chatId} {
+      // 읽기: 참여자만
+      allow read: if isAuthenticated() &&
+                  (request.auth.uid in resource.data.participants);
+
+      // 쓰기: 참여자만
+      allow write: if isAuthenticated() &&
+                   (request.auth.uid in resource.data.participants);
+
+      // 삭제: 참여자 모두 or 시스템
+      allow delete: if false;
+    }
+
+    // ==================== Messages Collection ====================
+
+    match /chats/{chatId}/messages/{messageId} {
+      // 읽기: 채팅방 참여자만
+      allow read: if isAuthenticated();
+      // 메시지는 상위 채팅방 권한을 따름
+
+      // 쓰기: 참여자만
+      allow write: if isAuthenticated();
+      // 메시지는 상위 채팅방 권한을 따름
+
+      // 삭제: 발신자만
+      allow delete: if isOwner(resource.data.senderId);
+    }
+
+    // ==================== B2B Collections ====================
+
+    match /b2b_requests/{requestId} {
+      // 읽기: B2B 회사 또는 길러
+      allow read: if isAuthenticated() &&
+                  (isOwner(resource.data.companyId) ||
+                   request.auth.uid in resource.data.availableGillers);
+
+      // 쓰기: B2B 회사만
+      allow write: if isOwner(resource.data.companyId);
+
+      // 삭제: B2B 회사만
+      allow delete: if isOwner(resource.data.companyId);
+    }
+
+    match /b2b_gillers/{gillerId} {
+      // 읽기: 인증된 사용자
+      allow read: if isAuthenticated();
+
+      // 쓰기: 본인(gller/giller)만
+      allow write: if isOwner(gillerId);
+
+      // 삭제: 본인만
+      allow delete: if isOwner(gillerId);
+    }
+
+    match /b2b_settlements/{settlementId} {
+      // 읽기: B2B 회사만
+      allow read: if isOwner(resource.data.companyId);
+
+      // 쓰기: 시스템만 (Admin SDK)
+      allow write: if false;
+
+      // 삭제: 시스템만
+      allow delete: if false;
+    }
+
+    // ==================== Lockers Collection ====================
+
+    match /lockers/{lockerId} {
+      // 읽기: 인증된 사용자
+      allow read: if isAuthenticated();
+
+      // 쓰기: 시스템만 (Admin SDK)
+      allow write: if false;
+
+      // 삭제: 시스템만
+      allow delete: if false;
     }
   }
 }
