@@ -135,11 +135,18 @@ export async function fetchActiveGillerRoutes(): Promise<GillerRoute[]> {
         return;
       }
 
-      // Fetch user stats from users collection
-      const userStats = await fetchUserStats(data.userId);
+      // Fetch user stats from users collection (using defaults for now)
+      const userStats = {
+        rating: data.rating || 4.5,
+        totalDeliveries: data.totalDeliveries || 0,
+        completedDeliveries: data.completedDeliveries || 0,
+      };
 
-      // Calculate badge bonus
-      const badgeBonus = await calculateBadgeBonus(data.userId);
+      // Calculate badge bonus (using default for now)
+      const badgeBonus = {
+        feeBonus: 0,
+        currentTier: 'none' as const,
+      };
 
       routes.push({
         gillerId: data.userId,

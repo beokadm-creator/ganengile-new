@@ -15,7 +15,7 @@ import {
   Text,
   StyleSheet,
 } from 'react-native';
-import { Colors, Typography, Spacing, BorderRadius } from '../../theme';
+import { Colors, Typography, Spacing, BorderRadius } from '../theme';
 
 export interface TransferInfo {
   hasTransfer: boolean;

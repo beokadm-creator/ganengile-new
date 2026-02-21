@@ -20,7 +20,7 @@ import { CameraView, Camera } from 'expo-camera';
 import * as ImagePicker from 'expo-image-picker';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 
-import { Typography, Colors, Spacing, BorderRadius } from '../../styles';
+import { Typography, Colors, Spacing, BorderRadius } from '../../theme';
 import Button from '../../components/common/Button';
 import Card from '../../components/common/Card';
 import { getReservationByQRCode, openLocker, getLocker } from '../../services/locker-service';
