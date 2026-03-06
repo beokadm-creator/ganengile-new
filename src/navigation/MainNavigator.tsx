@@ -107,50 +107,41 @@ function TabNavigator() {
         headerShown: false,
       })}
     >
-      {/* Common tabs for all roles */}
+      {/* Common tab: Home */}
       <Tab.Screen
         name="Home"
         component={HomeScreen}
         options={{ tabBarLabel: '홈' }}
       />
 
-      {/* Gller-specific tabs */}
+      {/* Gller-specific tab: Requests */}
       {(currentRole === 'gller' || currentRole === 'both') && (
-        <>
-          <Tab.Screen
-            name="Requests"
-            component={RequestsScreen}
-            options={{ tabBarLabel: '요청 목록' }}
-          />
-        </>
+        <Tab.Screen
+          name="Requests"
+          component={RequestsScreen}
+          options={{ tabBarLabel: '요청 목록' }}
+        />
       )}
 
-      {/* Giller-specific tabs */}
+      {/* Giller-specific tab: GillerRequests (배송 매칭) */}
       {(currentRole === 'giller' || currentRole === 'both') && (
-        <>
-          <Tab.Screen
-            name="GillerRequests"
-            component={GillerRequestsScreen}
-            options={{ tabBarLabel: '배송 매칭' }}
-          />
-        </>
+        <Tab.Screen
+          name="GillerRequests"
+          component={GillerRequestsScreen}
+          options={{ tabBarLabel: '배송 매칭' }}
+        />
       )}
 
-      {/* Route Management for both roles (positioned after role-specific tabs) */}
-      <Tab.Screen
-        name="RouteManagement"
-        component={RouteManagementScreen}
-        options={{ tabBarLabel: '동선 관리' }}
-      />
+      {/* Route Management: ONLY for Giller (not Gller) */}
+      {currentRole === 'giller' && (
+        <Tab.Screen
+          name="RouteManagement"
+          component={RouteManagementScreen}
+          options={{ tabBarLabel: '동선 관리' }}
+        />
+      )}
 
-      {/* Chat tab for all */}
-      <Tab.Screen
-        name="ChatList"
-        component={ChatListScreen}
-        options={{ tabBarLabel: '채팅' }}
-      />
-
-      {/* Profile tab for all */}
+      {/* Common tab: Profile */}
       <Tab.Screen
         name="Profile"
         component={ProfileScreen}
