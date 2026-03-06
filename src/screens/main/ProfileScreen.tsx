@@ -41,6 +41,7 @@ import {
 import { BadgeService } from '../../services/BadgeService';
 import Modal from '../../components/common/Modal';
 import TextInputModal from '../../components/common/TextInputModal';
+import BankAccountModal from '../../components/common/BankAccountModal';
 
 type NavigationProp = StackNavigationProp<any>;
 
@@ -105,6 +106,17 @@ export default function ProfileScreen({ navigation: _navigation }: Props) {
 
   const [loadingProfile, setLoadingProfile] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [bankAccountModalVisible, setBankAccountModalVisible] = useState(false);
+  const [selectedBank, setSelectedBank] = useState('');
+  const [editingBankAccount, setEditingBankAccount] = useState<{
+    bankName: string;
+    accountNumber: string;
+    accountHolder: string;
+  }>({
+    bankName: '',
+    accountNumber: '',
+    accountHolder: '',
+  });
 
   useEffect(() => {
     if (user) {
@@ -222,6 +234,59 @@ export default function ProfileScreen({ navigation: _navigation }: Props) {
   const closeEditModal = useCallback(() => {
     setEditModal((prev) => ({ ...prev, visible: false }));
   }, []);
+
+  const openBankAccountModal = useCallback(() => {
+    if (profile?.bankAccount) {
+      setEditingBankAccount({
+        bankName: profile.bankAccount.bankName || '',
+        accountNumber: profile.bankAccount.accountNumber || '',
+        accountHolder: profile.bankAccount.accountHolder || '',
+      });
+      setSelectedBank(profile.bankAccount.bankName || '');
+    }
+    setBankAccountModalVisible(true);
+  }, [profile]);
+
+  const handleSaveBankAccount = async () => {
+    if (!user) return;
+
+    if (!editingBankAccount.bankName || !editingBankAccount.accountNumber) {
+      Alert.alert('알림', '은행과 계좌번호를 입력해주세요.');
+      return;
+    }
+
+    try {
+      setSaving(true);
+
+      const updateData = {
+        name: profile?.name || '',
+        phoneNumber: profile?.phoneNumber || '',
+        bankAccount: {
+          bankName: editingBankAccount.bankName,
+          accountNumber: editingBankAccount.accountNumber,
+          accountHolder: editingBankAccount.accountHolder || user.name || '',
+        },
+      };
+
+      await updateUserProfile(user.uid, updateData);
+
+      setProfile((prev) => {
+        if (!prev) return prev;
+        return {
+          ...prev,
+          bankAccount: updateData.bankAccount,
+        };
+      });
+
+      setBankAccountModalVisible(false);
+      Alert.alert('성공', '계좌 정보가 저장되었습니다.');
+    } catch (error) {
+      console.error('Error saving bank account:', error);
+      Alert.alert('오류', '계좌 정보 저장에 실패했습니다.');
+    } finally {
+      setSaving(false);
+    }
+  };
 
   const handleSaveEdit = async () => {
     if (!user || !editModal.type || !profile) return;
@@ -398,19 +463,19 @@ export default function ProfileScreen({ navigation: _navigation }: Props) {
       onPress: () => (_navigation as any).navigate('GillerRequests'),
       color: '#4CAF50',
     },
-    {
-      icon: '💰',
-      title: '수익 관리',
-      subtitle: '정산 내역, 계좌 정보',
-      onPress: () => (_navigation as any).navigate('Earnings'),
-      color: '#FFC107',
-    },
       {
         icon: '💰',
         title: '수익 관리',
-        subtitle: '총 수익과 정산 내역',
+        subtitle: '정산 내역 확인',
         onPress: () => (_navigation as any).navigate('Earnings'),
         color: '#FFC107',
+      },
+      {
+        icon: '🏦',
+        title: '계좌 정보 관리',
+        subtitle: '정산 계좌 등록/변경',
+        onPress: () => openBankAccountModal(),
+        color: '#2196F3',
       },
       {
         icon: '⭐',
@@ -572,66 +637,6 @@ export default function ProfileScreen({ navigation: _navigation }: Props) {
       </View>
 
       <ScrollView style={styles.content}>
-        {/* Bank Account Section - Giller only */}
-        {isGiller && (
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>계좌 정보</Text>
-          <TouchableOpacity
-            style={styles.bankAccountCard}
-            onPress={() =>
-              openEditModal(
-                'bankName',
-                '은행명',
-                profile.bankAccount?.bankName || '',
-                '은행을 선택해주세요'
-              )
-            }
-          >
-            <Text style={styles.bankLabel}>은행</Text>
-            <Text style={styles.bankValue}>
-              {profile.bankAccount?.bankName || '선택안함'}
-            </Text>
-            <Text style={styles.bankArrow}>›</Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={styles.bankAccountCard}
-            onPress={() =>
-              openEditModal(
-                'accountNumber',
-                '계좌번호',
-                profile.bankAccount?.accountNumber || '',
-                '계좌번호를 입력해주세요'
-              )
-            }
-          >
-            <Text style={styles.bankLabel}>계좌번호</Text>
-            <Text style={styles.bankValue}>
-              {profile.bankAccount?.accountNumber
-                ? maskAccountNumber(profile.bankAccount.accountNumber)
-                : '입력안함'}
-            </Text>
-            <Text style={styles.bankArrow}>›</Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={styles.bankAccountCard}
-            onPress={() =>
-              openEditModal(
-                'accountHolder',
-                '예금주',
-                profile.bankAccount?.accountHolder || '',
-                '예금주 성명을 입력해주세요'
-              )
-            }
-          >
-            <Text style={styles.bankLabel}>예금주</Text>
-            <Text style={styles.bankValue}>
-              {profile.bankAccount?.accountHolder || '입력안함'}
-            </Text>
-            <Text style={styles.bankArrow}>›</Text>
-          </TouchableOpacity>
-        </View>
-        )}
-
         {/* Grade Progress (Giller only)} */}
         {isGiller && gradeInfo && (
           <View style={styles.section}>
@@ -784,6 +789,15 @@ export default function ProfileScreen({ navigation: _navigation }: Props) {
         onChangeText={(text) => setEditModal((prev) => ({ ...prev, value: text }))}
         onConfirm={handleSaveEdit}
         onCancel={closeEditModal}
+      />
+
+      {/* Bank Account Modal */}
+      <BankAccountModal
+        visible={bankAccountModalVisible}
+        onClose={() => setBankAccountModalVisible(false)}
+        onSave={handleSaveBankAccount}
+        initialData={editingBankAccount}
+        loading={saving}
       />
     </View>
   );
