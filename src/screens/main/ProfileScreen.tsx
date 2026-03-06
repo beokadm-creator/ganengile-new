@@ -445,13 +445,6 @@ export default function ProfileScreen({ navigation: _navigation }: Props) {
         onPress: () => (_navigation as any).navigate('Tabs', { screen: 'Requests' }),
         color: '#FF9800',
       },
-      {
-        icon: '🚇',
-        title: '동선 관리',
-        subtitle: '등록된 동선 관리',
-        onPress: () => (_navigation as any).navigate('Tabs', { screen: 'RouteManagement' }),
-        color: '#00BCD4',
-      },
       ...commonItems,
     ];
 
@@ -463,21 +456,28 @@ export default function ProfileScreen({ navigation: _navigation }: Props) {
       onPress: () => (_navigation as any).navigate('GillerRequests'),
       color: '#4CAF50',
     },
-      {
-        icon: '💰',
-        title: '수익 관리',
-        subtitle: '정산 내역 확인',
-        onPress: () => (_navigation as any).navigate('Earnings'),
-        color: '#FFC107',
-      },
-      {
-        icon: '🏦',
-        title: '계좌 정보 관리',
-        subtitle: '정산 계좌 등록/변경',
-        onPress: () => openBankAccountModal(),
-        color: '#2196F3',
-      },
-      {
+    {
+      icon: '🚇',
+      title: '동선 관리',
+      subtitle: '출퇴근 동선 등록/관리',
+      onPress: () => (_navigation as any).navigate('Tabs', { screen: 'RouteManagement' }),
+      color: '#00BCD4',
+    },
+    {
+      icon: '💰',
+      title: '수익 관리',
+      subtitle: '정산 내역 확인',
+      onPress: () => (_navigation as any).navigate('Earnings'),
+      color: '#FFC107',
+    },
+    {
+      icon: '🏦',
+      title: '계좌 정보 관리',
+      subtitle: '정산 계좌 등록/변경',
+      onPress: () => openBankAccountModal(),
+      color: '#2196F3',
+    },
+    {
         icon: '⭐',
         title: '내 평가',
         subtitle: `평균 ${rating?.averageRating.toFixed(1) || 0}점 (${rating?.totalRatings || 0}개)`,
