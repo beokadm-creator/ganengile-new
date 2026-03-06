@@ -215,7 +215,7 @@ export default function CreateRequestScreen({ navigation }: Props) {
     if (pickupStation && deliveryStation && weight) {
       calculateFee();
     }
-  }, [pickupStation, deliveryStation, packageSize, weight, urgency]);
+  }, [pickupStation, deliveryStation, packageSize, weight, urgency, manualAdjustment]);
 
   const loadStations = async () => {
     setLoadingStations(true);
