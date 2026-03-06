@@ -222,6 +222,12 @@ export interface CreateRequestDraft {
 export async function saveCreateRequestProgress(
   draft: CreateRequestDraft
 ): Promise<void> {
+  if (draft.pickupStation && !draft.pickupStation.stationId) {
+    return;
+  }
+  if (draft.deliveryStation && !draft.deliveryStation.stationId) {
+    return;
+  }
   await saveFormProgress('create_request', draft.step, draft);
 }
 
