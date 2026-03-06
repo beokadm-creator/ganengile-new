@@ -99,17 +99,21 @@ service cloud.firestore {
     // ==================== Requests Collection ====================
 
     match /requests/{requestId} {
-      // 읽기: 본인(gller/giller) 또는 관리자
+      // 읽기: 요청자 또는 매칭된 길러
       allow read: if isAuthenticated() &&
-                  (isOwner(resource.data.userId) ||
-                   isOwner(resource.data.gllerId) ||
-                   isOwner(resource.data.gillerId));
+                  (isOwner(resource.data.requesterId) ||
+                   isOwner(resource.data.matchedGillerId));
 
-      // 쓰기: 본인만
-      allow write: if isOwner(resource.data.userId);
+      // 생성: 인증된 사용자 (요청자가 자신의 userId로 생성)
+      allow create: if isAuthenticated();
 
-      // 삭제: 본인만
-      allow delete: if isOwner(resource.data.userId);
+      // 쓰기: 요청자 또는 매칭된 길러
+      allow update: if isAuthenticated() &&
+                    (isOwner(resource.data.requesterId) ||
+                     isOwner(resource.data.matchedGillerId));
+
+      // 삭제: 요청자만
+      allow delete: if isOwner(resource.data.requesterId);
     }
 
     // ==================== Matches Collection ====================
@@ -131,15 +135,13 @@ service cloud.firestore {
     // ==================== Deliveries Collection ====================
 
     match /deliveries/{deliveryId} {
-      // 읽기: gller/giller 또는 requester
+      // 읽기: gller(요청자) 또는 giller(길러)
       allow read: if isAuthenticated() &&
                   (isOwner(resource.data.gllerId) ||
-                   isOwner(resource.data.gillerId) ||
-                   isOwner(resource.data.userId));
+                   isOwner(resource.data.gillerId));
 
-      // 쓰기: gller/giller만
-      allow write: if isOwner(resource.data.gllerId) ||
-                   isOwner(resource.data.gillerId);
+      // 쓰기: giller(길러)만
+      allow write: if isOwner(resource.data.gillerId);
 
       // 삭제: 시스템만
       allow delete: if false;
