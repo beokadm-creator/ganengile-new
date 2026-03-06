@@ -283,6 +283,12 @@ export default function CreateRequestScreen({ navigation }: Props) {
   const calculateFee = async () => {
     if (!pickupStation || !deliveryStation || !weight) return;
 
+    // Validate station data before calculating fee
+    if (!pickupStation.stationId || !deliveryStation.stationId) {
+      console.error('Invalid station data:', { pickupStation, deliveryStation });
+      return;
+    }
+
     try {
       const pickupInfo = convertStationToInfo(pickupStation);
       const deliveryInfo = convertStationToInfo(deliveryStation);
