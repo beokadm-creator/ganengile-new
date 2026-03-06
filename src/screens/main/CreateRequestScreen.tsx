@@ -249,6 +249,18 @@ export default function CreateRequestScreen({ navigation }: Props) {
         areSame: draft.pickupStation?.stationId === draft.deliveryStation?.stationId
       });
       
+      // Validate station data before restoring
+      if (draft.pickupStation && !draft.pickupStation.stationId) {
+        console.warn('Draft has invalid pickupStation (missing stationId), discarding draft');
+        discardDraft();
+        return;
+      }
+      if (draft.deliveryStation && !draft.deliveryStation.stationId) {
+        console.warn('Draft has invalid deliveryStation (missing stationId), discarding draft');
+        discardDraft();
+        return;
+      }
+      
       setCurrentStep(draft.step as Step);
       setPickupStation(draft.pickupStation);
       setDeliveryStation(draft.deliveryStation);
