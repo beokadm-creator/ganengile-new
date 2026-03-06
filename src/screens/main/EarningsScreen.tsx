@@ -1,7 +1,7 @@
 /**
  * Earnings Screen
  * 수익 관리 화면 (길러 전용)
- * 총 수익, 정산 내역, 세금, 출금 기능
+ * 총 수익, 정산 내역, 세금, 출금 기능 + 계좌 정보
  */
 
 import React, { useState, useEffect } from 'react';
@@ -12,10 +12,14 @@ import {
   ScrollView,
   TouchableOpacity,
   ActivityIndicator,
+  Alert,
 } from 'react-native';
 import { StackNavigationProp } from '@react-navigation/stack';
 import { getUserStats } from '../../services/user-service';
 import { useUser } from '../../contexts/UserContext';
+import { doc, getDoc, updateDoc } from 'firebase/firestore';
+import { db } from '../../services/firebase';
+import BankSelectModal from '../../components/common/BankSelectModal';
 
 type NavigationProp = StackNavigationProp<any>;
 
@@ -31,6 +35,12 @@ interface EarningRecord {
   tax: number;
   net: number;
   status: 'completed' | 'pending';
+}
+
+interface BankAccount {
+  bankName: string;
+  accountNumber: string;
+  accountHolder: string;
 }
 
 // 더미데이터
@@ -73,11 +83,15 @@ const dummyEarnings: EarningRecord[] = [
   },
 ];
 
-export default function EarningsScreen({ navigation: _navigation }: Props) {
+export default function EarningsScreen({ navigation }: Props) {
   const { user } = useUser();
   const [loading, setLoading] = useState(true);
   const [stats, setStats] = useState<any>(null);
   const [earnings, setEarnings] = useState<EarningRecord[]>(dummyEarnings);
+  const [bankAccount, setBankAccount] = useState<BankAccount | null>(null);
+  const [bankModalVisible, setBankModalVisible] = useState(false);
+  const [selectedBank, setSelectedBank] = useState('');
+  const [saving, setSaving] = useState(false);
 
   useEffect(() => {
     loadEarnings();
@@ -89,10 +103,44 @@ export default function EarningsScreen({ navigation: _navigation }: Props) {
     try {
       const userStats = await getUserStats(user.uid);
       setStats(userStats);
+
+      // Load bank account info
+      const userDoc = await getDoc(doc(db, 'users', user.uid));
+      const userData = userDoc.data();
+      if (userData?.bankAccount) {
+        setBankAccount(userData.bankAccount);
+      }
     } catch (error) {
       console.error('Error loading earnings:', error);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleUpdateBankAccount = async () => {
+    if (!user) return;
+
+    if (!bankAccount?.bankName || !bankAccount?.accountNumber) {
+      Alert.alert('알림', '모든 항목을 입력해주세요.');
+      return;
+    }
+
+    try {
+      setSaving(true);
+      await updateDoc(doc(db, 'users', user.uid), {
+        bankAccount: {
+          bankName: bankAccount.bankName,
+          accountNumber: bankAccount.accountNumber,
+          accountHolder: user.name, // 가입 시 이름으로 자동 설정
+        },
+        updatedAt: new Date(),
+      });
+      Alert.alert('성공', '계좌 정보가 저장되었습니다.');
+    } catch (error) {
+      console.error('Error updating bank account:', error);
+      Alert.alert('오류', '계좌 정보 저장에 실패했습니다.');
+    } finally {
+      setSaving(false);
     }
   };
 
@@ -202,6 +250,58 @@ export default function EarningsScreen({ navigation: _navigation }: Props) {
           ))}
         </View>
 
+        {/* Bank Account Section */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>정산 계좌 정보</Text>
+
+          <TouchableOpacity
+            style={styles.bankCard}
+            onPress={() => setBankModalVisible(true)}
+          >
+            <View style={styles.bankRow}>
+              <Text style={styles.bankLabel}>은행</Text>
+              <Text style={[styles.bankValue, !bankAccount?.bankName && styles.placeholder]}>
+                {bankAccount?.bankName || '선택안함'}
+              </Text>
+              <Text style={styles.bankArrow}>›</Text>
+            </View>
+
+            <View style={styles.bankRow}>
+              <Text style={styles.bankLabel}>계좌번호</Text>
+              <Text style={[styles.bankValue, !bankAccount?.accountNumber && styles.placeholder]}>
+                {bankAccount?.accountNumber
+                  ? maskAccountNumber(bankAccount.accountNumber)
+                  : '입력안함'
+                }
+              </Text>
+              <Text style={styles.bankArrow}>›</Text>
+            </View>
+
+            <View style={styles.bankRow}>
+              <Text style={styles.bankLabel}>예금주</Text>
+              <Text style={[styles.bankValue, !bankAccount?.accountHolder && styles.placeholder]}>
+                {bankAccount?.accountHolder || '입력안함'}
+                {!bankAccount?.accountHolder && (
+                  <Text style={styles.autoFillHint}> (본인명)</Text>
+                )}
+              </Text>
+              <Text style={styles.bankArrow}>›</Text>
+            </View>
+
+            {bankAccount && (
+              <TouchableOpacity
+                style={[styles.saveButton, saving && styles.saveButtonDisabled]}
+                onPress={handleUpdateBankAccount}
+                disabled={saving}
+              >
+                <Text style={styles.saveButtonText}>
+                  {saving ? '저장 중...' : '저장'}
+                </Text>
+              </TouchableOpacity>
+            )}
+          </TouchableOpacity>
+        </View>
+
         {/* Tax Notice */}
         <View style={styles.noticeBox}>
           <Text style={styles.noticeIcon}>ℹ️</Text>
@@ -211,8 +311,30 @@ export default function EarningsScreen({ navigation: _navigation }: Props) {
           </Text>
         </View>
       </ScrollView>
+
+      {/* Bank Select Modal */}
+      <BankSelectModal
+        visible={bankModalVisible}
+        onClose={() => setBankModalVisible(false)}
+        onSelect={(bankName) => {
+          setBankAccount({
+            ...bankAccount,
+            bankName,
+            accountNumber: bankAccount?.accountNumber || '',
+            accountHolder: user?.name || '', // 본인명으로 자동 채우기
+          });
+          setSelectedBank(bankName);
+        }}
+        selectedBank={selectedBank}
+      />
     </View>
   );
+}
+
+function maskAccountNumber(accountNumber: string): string {
+  if (accountNumber.length <= 4) return accountNumber;
+  const visible = accountNumber.slice(-4);
+  return '*'.repeat(accountNumber.length - 4) + visible;
 }
 
 const styles = StyleSheet.create({

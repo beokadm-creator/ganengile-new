@@ -27,17 +27,24 @@ export async function getUserProfile(userId: string): Promise<UserProfile | null
       console.error('getUserProfile: userId is required');
       return null;
     }
+
+    console.log('🔍 getUserProfile: Fetching profile for userId:', userId);
+
     const profileRef = doc(db, 'users', userId, PROFILE_COLLECTION, userId);
     const docSnapshot = await getDoc(profileRef);
 
     if (!docSnapshot.exists) {
+      console.log('⚠️ getUserProfile: No profile found for userId:', userId);
       return null;
     }
 
     const data = docSnapshot.data();
     if (!data) {
+      console.log('⚠️ getUserProfile: Profile data is empty for userId:', userId);
       return null;
     }
+
+    console.log('✅ getUserProfile: Profile found for userId:', userId);
 
     return {
       userId: data.userId || userId,
@@ -51,7 +58,7 @@ export async function getUserProfile(userId: string): Promise<UserProfile | null
       updatedAt: data.updatedAt,
     };
   } catch (error) {
-    console.error('Error fetching user profile:', error);
+    console.error('❌ Error fetching user profile:', error);
     throw error;
   }
 }

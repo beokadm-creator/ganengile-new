@@ -113,7 +113,12 @@ export default function ProfileScreen({ navigation: _navigation }: Props) {
   }, [user]);
 
   const loadUserData = async () => {
-    if (!user?.uid) return;
+    if (!user?.uid) {
+      console.log('🔴 loadUserData: user.uid is undefined, returning early');
+      return;
+    }
+
+    console.log('🟢 loadUserData: Starting data load for user:', user.uid);
 
     try {
       setLoadingProfile(true);
@@ -125,6 +130,13 @@ export default function ProfileScreen({ navigation: _navigation }: Props) {
           getUserProfile(user.uid),
           getUserVerification(user.uid),
         ]);
+
+      console.log('📊 loadUserData: Data loaded:', {
+        userStats,
+        userRating,
+        userProfile,
+        userVerification
+      });
 
       setStats(userStats);
       setRating({
@@ -139,6 +151,13 @@ export default function ProfileScreen({ navigation: _navigation }: Props) {
           profilePhotoUrl: userProfile.profilePhotoUrl,
           bankAccount: userProfile.bankAccount,
         });
+      } else {
+        console.log('⚠️ userProfile is null, creating default profile');
+        setProfile({
+          name: user.name || '사용자',
+          phoneNumber: user.phoneNumber || '',
+          profilePhotoUrl: user.profilePhoto,
+        });
       }
 
       if (userVerification) {
@@ -149,7 +168,12 @@ export default function ProfileScreen({ navigation: _navigation }: Props) {
       const tierInfo = BadgeService.calculateBadgeTier(user.badges);
       setBadgeTier(tierInfo);
     } catch (error) {
-      console.error('Error loading user data:', error);
+      console.error('❌ Error loading user data:', error);
+      setProfile({
+        name: user.name || '사용자',
+        phoneNumber: user.phoneNumber || '',
+        profilePhotoUrl: user.profilePhoto,
+      });
     } finally {
       setLoadingProfile(false);
     }
@@ -366,14 +390,21 @@ export default function ProfileScreen({ navigation: _navigation }: Props) {
       ...commonItems,
     ];
 
-    const gillerItems: MenuItem[] = [
-      {
-        icon: '🚴',
-        title: '배송 내역',
-        subtitle: '완료한 배송 기록',
-        onPress: () => (_navigation as any).navigate('Tabs', { screen: 'GillerRequests' }),
-        color: '#4CAF50',
-      },
+  const gillerItems: MenuItem[] = [
+    {
+      icon: '🚴',
+      title: '배송 내역',
+      subtitle: '완료한 배송 기록',
+      onPress: () => (_navigation as any).navigate('GillerRequests'),
+      color: '#4CAF50',
+    },
+    {
+      icon: '💰',
+      title: '수익 관리',
+      subtitle: '정산 내역, 계좌 정보',
+      onPress: () => (_navigation as any).navigate('Earnings'),
+      color: '#FFC107',
+    },
       {
         icon: '💰',
         title: '수익 관리',
@@ -541,7 +572,8 @@ export default function ProfileScreen({ navigation: _navigation }: Props) {
       </View>
 
       <ScrollView style={styles.content}>
-        {/* Bank Account Section */}
+        {/* Bank Account Section - Giller only */}
+        {isGiller && (
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>계좌 정보</Text>
           <TouchableOpacity
@@ -598,8 +630,9 @@ export default function ProfileScreen({ navigation: _navigation }: Props) {
             <Text style={styles.bankArrow}>›</Text>
           </TouchableOpacity>
         </View>
+        )}
 
-        {/* Grade Progress (Giller only) */}
+        {/* Grade Progress (Giller only)} */}
         {isGiller && gradeInfo && (
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>길러 등급</Text>
@@ -651,31 +684,63 @@ export default function ProfileScreen({ navigation: _navigation }: Props) {
           </View>
         )}
 
-        {/* Stats Cards */}
+        {/* Stats Cards - Role based */}
         <View style={styles.statsContainer}>
-          <View style={styles.statCard}>
-            <Text style={styles.statIcon}>📦</Text>
-            <Text style={styles.statValue}>{stats?.totalRequests || 0}</Text>
-            <Text style={styles.statLabel}>요청</Text>
-          </View>
+          {isGiller ? (
+            <>
+              {/* Giller stats */}
+              <View style={styles.statCard}>
+                <Text style={styles.statIcon}>🚴</Text>
+                <Text style={styles.statValue}>{stats?.totalDeliveries || 0}</Text>
+                <Text style={styles.statLabel}>배송</Text>
+              </View>
 
-          <View style={styles.statCard}>
-            <Text style={styles.statIcon}>🚴</Text>
-            <Text style={styles.statValue}>{stats?.totalDeliveries || 0}</Text>
-            <Text style={styles.statLabel}>배송</Text>
-          </View>
+              <View style={styles.statCard}>
+                <Text style={styles.statIcon}>⭐</Text>
+                <Text style={styles.statValue}>{rating?.averageRating.toFixed(1) || '0.0'}</Text>
+                <Text style={styles.statLabel}>평점</Text>
+              </View>
 
-          <View style={styles.statCard}>
-            <Text style={styles.statIcon}>⭐</Text>
-            <Text style={styles.statValue}>{rating?.averageRating.toFixed(1) || '0.0'}</Text>
-            <Text style={styles.statLabel}>평점</Text>
-          </View>
+              <View style={styles.statCard}>
+                <Text style={styles.statIcon}>💰</Text>
+                <Text style={styles.statValue}>{((stats?.totalEarnings || 0) / 1000).toFixed(0)}</Text>
+                <Text style={styles.statLabel}>수익(천원)</Text>
+              </View>
 
-          <View style={styles.statCard}>
-            <Text style={styles.statIcon}>✅</Text>
-            <Text style={styles.statValue}>{stats?.completionRate.toFixed(0) || '0'}%</Text>
-            <Text style={styles.statLabel}>완료율</Text>
-          </View>
+              <View style={styles.statCard}>
+                <Text style={styles.statIcon}>✅</Text>
+                <Text style={styles.statValue}>{stats?.completionRate ? stats.completionRate.toFixed(0) : '0'}%</Text>
+                <Text style={styles.statLabel}>완료율</Text>
+              </View>
+            </>
+          ) : (
+            <>
+              {/* Gller stats */}
+              <View style={styles.statCard}>
+                <Text style={styles.statIcon}>📦</Text>
+                <Text style={styles.statValue}>{stats?.totalRequests || 0}</Text>
+                <Text style={styles.statLabel}>요청</Text>
+              </View>
+
+              <View style={styles.statCard}>
+                <Text style={styles.statIcon}>⭐</Text>
+                <Text style={styles.statValue}>{rating?.averageRating.toFixed(1) || '0.0'}</Text>
+                <Text style={styles.statLabel}>평점</Text>
+              </View>
+
+              <View style={styles.statCard}>
+                <Text style={styles.statIcon}>✅</Text>
+                <Text style={styles.statValue}>{stats?.completionRate.toFixed(0) || '0'}%</Text>
+                <Text style={styles.statLabel}>완료율</Text>
+              </View>
+
+              <View style={styles.statCard}>
+                <Text style={styles.statIcon}>🎯</Text>
+                <Text style={styles.statValue}>{user?.pointBalance?.toLocaleString() || '0'}</Text>
+                <Text style={styles.statLabel}>포인트</Text>
+              </View>
+            </>
+          )}
         </View>
 
         {/* Menu Items */}
