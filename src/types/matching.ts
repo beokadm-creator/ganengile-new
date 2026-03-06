@@ -5,7 +5,7 @@
  */
 
 import { Timestamp } from 'firebase/firestore';
-import { StationInfo } from './request';
+import { StationInfo, Request } from './request';
 
 // ===== P1 Part 2: 유연한 매칭 시스템 =====
 
@@ -225,7 +225,8 @@ export interface CreateMatchData {
   estimatedTravelTime: number;
   matchScore: number;
   matchingDetails: Match['matchingDetails'];
-  fee: number;
+  initialNegotiationFee: number;
+  feeBreakdown?: Request['feeBreakdown'];
 }
 
 /**
@@ -244,7 +245,8 @@ export interface MatchResultDisplay {
   reasons: string[];
   pickupStation: StationInfo;
   deliveryStation: StationInfo;
-  fee: number;
+  initialNegotiationFee: number;
+  feeBreakdown?: Request['feeBreakdown'];
 }
 
 /**

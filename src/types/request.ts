@@ -78,8 +78,19 @@ export interface Request {
   itemValue?: number;
   depositAmount?: number;
 
-  // 배송비
-  fee: number;
+  initialNegotiationFee: number;
+
+  feeBreakdown?: {
+    baseFee: number;
+    distanceFee: number;
+    sizeFee: number;
+    weightFee: number;
+    urgencySurcharge: number;
+    manualAdjustment: number;
+    serviceFee: number;
+    vat: number;
+    totalFee: number;
+  };
 
   // 희망 배송 시간
   preferredTime?: {
@@ -129,7 +140,18 @@ export interface CreateRequestData {
   pickupStation: StationInfo;
   deliveryStation: StationInfo;
   packageInfo: PackageInfo;
-  fee: number;
+  initialNegotiationFee: number;
+  feeBreakdown?: {
+    baseFee: number;
+    distanceFee: number;
+    sizeFee: number;
+    weightFee: number;
+    urgencySurcharge: number;
+    manualAdjustment: number;
+    serviceFee: number;
+    vat: number;
+    totalFee: number;
+  };
   itemValue?: number;
   preferredTime?: {
     departureTime: string;
@@ -137,10 +159,10 @@ export interface CreateRequestData {
   };
   deadline: Date;
   urgency?: 'low' | 'medium' | 'high';
-  pickupLocationDetail?: string;    // 만날 장소 상세 (예: 1번 출구, 편의점 앞)
-  storageLocation?: string;          // 보관 위치 (예: 역사물 보관함, 사물함)
-  specialInstructions?: string;      // 특이사항 (예: 비가 오면 우산 필요함)
-  specialRequests?: string[];        // 특별 요청 사항 배열
+  pickupLocationDetail?: string;
+  storageLocation?: string;
+  specialInstructions?: string;
+  specialRequests?: string[];
 }
 
 /**
