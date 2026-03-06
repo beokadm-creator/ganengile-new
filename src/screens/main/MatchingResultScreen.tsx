@@ -9,10 +9,11 @@ import {
   Animated,
 } from 'react-native';
 import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
-import Icon from 'react-native-vector-icons/MaterialIcons';
+import Icon from '@expo/vector-icons';
 import { GillerProfileCard } from '../../components/giller/GillerProfileCard';
 import TransferInfoCard, { TransferInfo } from '../../components/TransferInfoCard';
-import { matchingService } from '../../services/matching-service';
+import { RejectionReasonModal } from '../../components/modals/RejectionReasonModal';
+import * as matchingService from '../../services/matching-service';
 
 type MatchingResultRouteParams = {
   MatchingResult: {
@@ -55,6 +56,8 @@ export const MatchingResultScreen: React.FC = () => {
   const [timeoutReached, setTimeoutReached] = useState(false);
   const [retryCount, setRetryCount] = useState(0);
   const [fadeAnim] = useState(new Animated.Value(0));
+  const [showFeeDetail, setShowFeeDetail] = useState(false);
+  const [requestFeeBreakdown, setRequestFeeBreakdown] = useState<any>(null);
 
   // 타이머 관련 상태 추가
   const [timeLeft, setTimeLeft] = useState(MATCHING_TIMEOUT / 1000); // 초 단위

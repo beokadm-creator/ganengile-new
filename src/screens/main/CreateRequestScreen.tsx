@@ -126,6 +126,7 @@ export default function CreateRequestScreen({ navigation }: Props) {
   const [pickupTime, setPickupTime] = useState('12:00');
   const [deliveryTime, setDeliveryTime] = useState('14:00');
   const [urgency, setUrgency] = useState<UrgencyLevel>('normal');
+  const [manualAdjustment, setManualAdjustment] = useState(0);
   const [pickupLocationDetail, setPickupLocationDetail] = useState('');
   const [storageLocation, setStorageLocation] = useState('');
   const [specialInstructions, setSpecialInstructions] = useState('');
@@ -150,6 +151,8 @@ export default function CreateRequestScreen({ navigation }: Props) {
     totalFee: number;
     estimatedTime: number;
     urgencyFee?: number;
+    urgencySurcharge?: number;
+    manualAdjustment?: number;
   } | null>(null);
 
   // Themed styles
@@ -295,7 +298,6 @@ export default function CreateRequestScreen({ navigation }: Props) {
   const calculateFee = async () => {
     if (!pickupStation || !deliveryStation || !weight) return;
 
-    // Validate station data before calculating fee
     if (!pickupStation.stationId || !deliveryStation.stationId) {
       console.error('Invalid station data:', { pickupStation, deliveryStation });
       return;
@@ -305,42 +307,37 @@ export default function CreateRequestScreen({ navigation }: Props) {
       const pickupInfo = convertStationToInfo(pickupStation);
       const deliveryInfo = convertStationToInfo(deliveryStation);
 
+      const urgencyOption = URGENCY_OPTIONS.find(opt => opt.level === urgency);
+      const urgencySurcharge = Math.round(3000 * (urgencyOption?.surchargeMultiplier || 0));
+
       const fee = await retryWithBackoff(
         () => calculateDeliveryFee(
           pickupInfo,
           deliveryInfo,
           packageSize,
-          parseFloat(weight)
+          parseFloat(weight),
+          urgencySurcharge,
+          manualAdjustment
         ),
         { timeoutMs: 15000 }
       );
 
-      const urgencyOption = URGENCY_OPTIONS.find(opt => opt.level === urgency);
-      const urgencyFee = Math.round(fee.baseFee * (urgencyOption?.surchargeMultiplier || 0));
-
-      const subtotal = fee.baseFee + fee.distanceFee + fee.sizeFee + fee.weightFee + fee.serviceFee + urgencyFee;
-      const vat = Math.round(subtotal * 0.1);
-      const totalFee = subtotal + vat;
-
       setDeliveryFee({
         ...fee,
-        vat,
-        totalFee,
-        urgencyFee,
+        urgencyFee: urgencySurcharge,
       });
     } catch (error) {
       console.error('Error calculating delivery fee:', error);
-      // Fallback calculation
       const baseFee = 3000;
       const distanceFee = 800;
       const weightFeeValue = parseFloat(weight) * 100;
       const sizeFeeValue = packageSize === 'small' ? 0 : packageSize === 'medium' ? 500 : packageSize === 'large' ? 1000 : 2000;
 
       const urgencyOption = URGENCY_OPTIONS.find(opt => opt.level === urgency);
-      const urgencyFee = Math.round(baseFee * (urgencyOption?.surchargeMultiplier || 0));
+      const urgencySurcharge = Math.round(baseFee * (urgencyOption?.surchargeMultiplier || 0));
 
       const serviceFee = 0;
-      const subtotal = baseFee + distanceFee + weightFeeValue + sizeFeeValue + serviceFee + urgencyFee;
+      const subtotal = baseFee + distanceFee + weightFeeValue + sizeFeeValue + serviceFee + urgencySurcharge + manualAdjustment;
       const vat = Math.round(subtotal * 0.1);
 
       setDeliveryFee({
@@ -352,7 +349,9 @@ export default function CreateRequestScreen({ navigation }: Props) {
         vat,
         totalFee: subtotal + vat,
         estimatedTime: 30,
-        urgencyFee,
+        urgencyFee: urgencySurcharge,
+        urgencySurcharge,
+        manualAdjustment,
       });
     }
   };
@@ -525,7 +524,18 @@ export default function CreateRequestScreen({ navigation }: Props) {
           pickupStation: pickupInfo,
           deliveryStation: deliveryInfo,
           packageInfo,
-          fee: deliveryFee.totalFee,
+          initialNegotiationFee: deliveryFee.totalFee,
+          feeBreakdown: {
+            baseFee: deliveryFee.baseFee,
+            distanceFee: deliveryFee.distanceFee,
+            sizeFee: deliveryFee.sizeFee,
+            weightFee: deliveryFee.weightFee,
+            urgencySurcharge: deliveryFee.urgencySurcharge || 0,
+            manualAdjustment: deliveryFee.manualAdjustment || 0,
+            serviceFee: deliveryFee.serviceFee,
+            vat: deliveryFee.vat,
+            totalFee: deliveryFee.totalFee,
+          },
           itemValue: parseFloat(itemValue),
           preferredTime: {
             departureTime: pickupTime,
@@ -771,15 +781,78 @@ export default function CreateRequestScreen({ navigation }: Props) {
       </View>
 
       {deliveryFee && (
-        <View style={styles.feePreviewCard}>
-          <Text style={styles.feePreviewTitle}>예상 배송비</Text>
-          <Text style={styles.feePreviewAmount}>{deliveryFee.totalFee.toLocaleString()}원</Text>
-          {deliveryFee.urgencyFee && deliveryFee.urgencyFee > 0 && (
-            <Text style={styles.feePreviewUrgency}>
-              긴급 surcharge: +{deliveryFee.urgencyFee.toLocaleString()}원
+        <>
+          <View style={styles.manualAdjustmentCard}>
+            <Text style={styles.manualAdjustmentTitle}>💰 추가 요금 조정 (선택)</Text>
+            <Text style={styles.manualAdjustmentDesc}>
+              급하신 경우 요금을 추가하여 빠른 매칭을 유도할 수 있습니다.
             </Text>
-          )}
-        </View>
+            <View style={styles.adjustmentButtons}>
+              {[0, 1000, 2000, 3000, 5000].map((amount) => (
+                <TouchableOpacity
+                  key={amount}
+                  style={[
+                    styles.adjustmentButton,
+                    manualAdjustment === amount && styles.adjustmentButtonActive,
+                  ]}
+                  onPress={() => setManualAdjustment(amount)}
+                >
+                  <Text style={[
+                    styles.adjustmentButtonText,
+                    manualAdjustment === amount && styles.adjustmentButtonTextActive,
+                  ]}>
+                    {amount === 0 ? '없음' : `+${amount.toLocaleString()}원`}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+            <TextInput
+              style={[styles.input, styles.manualInput]}
+              value={manualAdjustment > 5000 ? manualAdjustment.toString() : ''}
+              onChangeText={(text) => {
+                const value = parseInt(text) || 0;
+                setManualAdjustment(value);
+              }}
+              placeholder="직접 입력 (5,000원 이상)"
+              keyboardType="number-pad"
+            />
+          </View>
+
+          <View style={styles.feePreviewCard}>
+            <Text style={styles.feePreviewTitle}>예상 배송비 (초기 협상금액)</Text>
+            <Text style={styles.feePreviewAmount}>{deliveryFee.totalFee.toLocaleString()}원</Text>
+            <View style={styles.feeBreakdownPreview}>
+              <Text style={styles.feeBreakdownText}>
+                기본: {deliveryFee.baseFee.toLocaleString()}원
+              </Text>
+              <Text style={styles.feeBreakdownText}>
+                거리: {deliveryFee.distanceFee.toLocaleString()}원
+              </Text>
+              <Text style={styles.feeBreakdownText}>
+                무게: {deliveryFee.weightFee.toLocaleString()}원
+              </Text>
+              <Text style={styles.feeBreakdownText}>
+                크기: {deliveryFee.sizeFee.toLocaleString()}원
+              </Text>
+              {deliveryFee.urgencySurcharge && deliveryFee.urgencySurcharge > 0 && (
+                <Text style={styles.feeBreakdownUrgency}>
+                  긴급 할증: +{deliveryFee.urgencySurcharge.toLocaleString()}원
+                </Text>
+              )}
+              {deliveryFee.manualAdjustment && deliveryFee.manualAdjustment > 0 && (
+                <Text style={styles.feeBreakdownManual}>
+                  추가 요금: +{deliveryFee.manualAdjustment.toLocaleString()}원
+                </Text>
+              )}
+              <Text style={styles.feeBreakdownText}>
+                VAT: {deliveryFee.vat.toLocaleString()}원
+              </Text>
+            </View>
+            <Text style={styles.feePreviewNote}>
+              * 이 요금은 초기 협상금액이며, 최종 금액은 배송 완료 후 확정됩니다.
+            </Text>
+          </View>
+        </>
       )}
     </View>
   );
@@ -1600,7 +1673,7 @@ function createStyles(
     },
     depositInfoText: {
       fontSize: typo.fontSize.sm,
-      color: colors.text,
+      color: colors.textPrimary,
       marginBottom: space.xs,
     },
     depositInfoNote: {
@@ -1608,6 +1681,81 @@ function createStyles(
       color: colors.gray500,
       marginTop: space.sm,
     },
-
+    manualAdjustmentCard: {
+      backgroundColor: colors.warningLight,
+      borderRadius: radius.md,
+      padding: space.lg,
+      marginTop: space.lg,
+    },
+    manualAdjustmentTitle: {
+      fontSize: typo.fontSize.base,
+      fontWeight: typo.fontWeight.bold,
+      color: colors.warningDark,
+      marginBottom: space.sm,
+    },
+    manualAdjustmentDesc: {
+      fontSize: typo.fontSize.sm,
+      color: colors.textSecondary,
+      marginBottom: space.md,
+    },
+    adjustmentButtons: {
+      flexDirection: 'row',
+      flexWrap: 'wrap',
+      gap: space.sm,
+      marginBottom: space.md,
+    },
+    adjustmentButton: {
+      backgroundColor: colors.white,
+      borderColor: colors.gray300,
+      borderRadius: radius.md,
+      borderWidth: 1,
+      paddingHorizontal: space.md,
+      paddingVertical: space.sm,
+    },
+    adjustmentButtonActive: {
+      backgroundColor: colors.primary,
+      borderColor: colors.primary,
+    },
+    adjustmentButtonText: {
+      fontSize: typo.fontSize.sm,
+      color: colors.textPrimary,
+    },
+    adjustmentButtonTextActive: {
+      color: colors.white,
+      fontWeight: typo.fontWeight.semibold,
+    },
+    manualInput: {
+      marginTop: space.sm,
+    },
+    feeBreakdownPreview: {
+      backgroundColor: colors.white,
+      borderRadius: radius.sm,
+      padding: space.md,
+      marginTop: space.md,
+      marginBottom: space.sm,
+    },
+    feeBreakdownText: {
+      fontSize: typo.fontSize.sm,
+      color: colors.textSecondary,
+      marginBottom: space.xs,
+    },
+    feeBreakdownUrgency: {
+      fontSize: typo.fontSize.sm,
+      color: colors.accent,
+      fontWeight: typo.fontWeight.semibold,
+      marginBottom: space.xs,
+    },
+    feeBreakdownManual: {
+      fontSize: typo.fontSize.sm,
+      color: colors.warning,
+      fontWeight: typo.fontWeight.semibold,
+      marginBottom: space.xs,
+    },
+    feePreviewNote: {
+      fontSize: typo.fontSize.xs,
+      color: colors.gray500,
+      fontStyle: 'italic',
+      marginTop: space.xs,
+    },
   });
 }
