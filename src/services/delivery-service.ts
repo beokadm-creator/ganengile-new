@@ -84,7 +84,7 @@ export async function gillerAcceptRequest(
     // Create delivery document
     const deliveryData = {
       requestId,
-      gllerId: request.gllerId,
+      gllerId: request.requesterId,
       gillerId,
       pickupStation: request.pickupStation,
       deliveryStation: request.deliveryStation,

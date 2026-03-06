@@ -68,7 +68,8 @@ export async function createRequest(
       pickupStation: pickupStation!,
       deliveryStation: deliveryStation!,
       packageInfo: packageInfo,
-      fee: feeInfo?.totalFee || 0,
+      initialNegotiationFee: feeInfo?.totalFee || 0,
+      feeBreakdown: feeInfo,
       preferredTime: {
         departureTime: preferredTime ? preferredTime.toTimeString().slice(0, 5) : '09:00',
         arrivalTime: deadline ? deadline.toTimeString().slice(0, 5) : undefined,
@@ -88,7 +89,8 @@ export async function createRequest(
         pickupStation: requestDataOrUserId.pickupStation,
         deliveryStation: requestDataOrUserId.deliveryStation,
         packageInfo: requestDataOrUserId.packageInfo,
-        fee: requestDataOrUserId.fee,
+        initialNegotiationFee: requestDataOrUserId.initialNegotiationFee,
+        feeBreakdown: requestDataOrUserId.feeBreakdown,
         preferredTime: requestDataOrUserId.preferredTime,
         deadline: requestDataOrUserId.deadline instanceof Timestamp
           ? requestDataOrUserId.deadline
@@ -434,7 +436,7 @@ function validateRequestData(data: CreateRequestData): void {
     throw new Error('Package information is required');
   }
 
-  if (!data.fee || data.fee <= 0) {
+  if (!data.initialNegotiationFee || data.initialNegotiationFee <= 0) {
     throw new Error('Fee must be greater than 0');
   }
 
@@ -473,7 +475,7 @@ export async function getRequestStats(requesterId: string): Promise<{
       (r) => r.status === 'matched' || r.status === 'in_progress'
     ).length;
 
-    const totalFee = allRequests.reduce((sum, r) => sum + r.fee, 0);
+    const totalFee = allRequests.reduce((sum, r) => sum + r.initialNegotiationFee, 0);
     const averageFee = allRequests.length > 0 ? totalFee / allRequests.length : 0;
 
     return {
@@ -569,32 +571,33 @@ export async function calculateDeliveryFee(
   pickupStation: StationInfo,
   deliveryStation: StationInfo,
   packageSize: 'small' | 'medium' | 'large' | 'xl',
-  weight: number
+  weight: number,
+  urgencySurcharge: number = 0,
+  manualAdjustment: number = 0
 ): Promise<{
   baseFee: number;
   distanceFee: number;
   sizeFee: number;
   weightFee: number;
+  urgencySurcharge: number;
+  manualAdjustment: number;
   serviceFee: number;
   vat: number;
   totalFee: number;
-  estimatedTime: number; // 분
+  estimatedTime: number;
 }> {
   try {
-    // 1. 기본 요금 (3,000원)
     const baseFee = 3000;
 
-    // 2. 거리 요금 (Travel Time 기반)
     const travelTimeData = await getTravelTimeConfig(
       pickupStation.stationId,
       deliveryStation.stationId
     );
 
-    const travelTimeSeconds = travelTimeData?.normalTime ?? 1800; // 기본 30분
+    const travelTimeSeconds = travelTimeData?.normalTime ?? 1800;
     const travelTimeMinutes = Math.round(travelTimeSeconds / 60);
     const distanceFee = Math.ceil(travelTimeMinutes / 10) * 500;
 
-    // 3. 크기 요금
     const sizeFees: Record<string, number> = {
       small: 0,
       medium: 500,
@@ -603,17 +606,13 @@ export async function calculateDeliveryFee(
     };
     const sizeFee = sizeFees[packageSize] || 0;
 
-    // 4. 무게 요금 (1kg 초과시 1kg당 300원)
     const weightFee = weight > 1 ? Math.ceil(weight - 1) * 300 : 0;
 
-    // 5. 서비스 요금
     const serviceFee = 0;
 
-    // 부가세 (10%)
-    const subtotal = baseFee + distanceFee + sizeFee + weightFee + serviceFee;
+    const subtotal = baseFee + distanceFee + sizeFee + weightFee + serviceFee + urgencySurcharge + manualAdjustment;
     const vat = Math.round(subtotal * 0.1);
 
-    // 총합
     const totalFee = subtotal + vat;
 
     return {
@@ -621,6 +620,8 @@ export async function calculateDeliveryFee(
       distanceFee,
       sizeFee,
       weightFee,
+      urgencySurcharge,
+      manualAdjustment,
       serviceFee,
       vat,
       totalFee,
@@ -629,19 +630,20 @@ export async function calculateDeliveryFee(
   } catch (error) {
     console.error('Error calculating delivery fee:', error);
 
-    // 에러 시 기본값 반환
     const baseFee = 3000;
     const distanceFee = 1500;
     const sizeFee = 500;
     const weightFee = 300;
     const serviceFee = 0;
-    const subtotal = baseFee + distanceFee + sizeFee + weightFee + serviceFee;
+    const subtotal = baseFee + distanceFee + sizeFee + weightFee + serviceFee + urgencySurcharge + manualAdjustment;
     const vat = Math.round(subtotal * 0.1);
     return {
       baseFee,
       distanceFee,
       sizeFee,
       weightFee,
+      urgencySurcharge,
+      manualAdjustment,
       serviceFee,
       vat,
       totalFee: subtotal + vat,

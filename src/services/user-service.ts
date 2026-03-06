@@ -161,10 +161,9 @@ export async function getUserStats(userId: string): Promise<{
   completionRate: number;
 }> {
   try {
-    // Get completed requests (as gller)
     const requestsQuery = query(
       collection(db, 'requests'),
-      where('gllerId', '==', userId),
+      where('requesterId', '==', userId),
       where('status', '==', 'completed')
     );
 
