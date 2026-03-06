@@ -438,7 +438,7 @@ const styles = StyleSheet.create({
     marginVertical: Spacing.sm,
   },
   deliveryCount: {
-    ...Typography.caption,
+    ...Typography.bodySmall,
     color: Colors.text.tertiary,
     textAlign: 'center',
     marginTop: Spacing.sm,

@@ -650,7 +650,7 @@ const styles = StyleSheet.create({
     borderRadius: 4,
   },
   usageNote: {
-    ...Typography.caption,
+    ...Typography.bodySmall,
     color: Colors.text.tertiary,
   },
   accountCard: {
@@ -678,7 +678,7 @@ const styles = StyleSheet.create({
     paddingVertical: Spacing.xl,
   },
   versionText: {
-    ...Typography.caption,
+    ...Typography.bodySmall,
     color: Colors.text.tertiary,
     marginTop: Spacing.xs,
   },

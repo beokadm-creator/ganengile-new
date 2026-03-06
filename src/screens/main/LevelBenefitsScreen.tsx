@@ -109,7 +109,7 @@ const LEVEL_BENEFITS: LevelBenefit[] = [
   },
 ];
 
-export default function LevelBenefitsScreen({ navigation }: Props) {
+export default function LevelBenefitsScreen({ navigation: _navigation }: Props) {
   const [selectedLevel, setSelectedLevel] = useState<GillerLevel | null>(null);
   const [showRequirements, setShowRequirements] = useState(false);
 
@@ -447,7 +447,7 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
   levelSubtitle: {
-    ...Typography.caption,
+    ...Typography.bodySmall,
     color: Colors.textSecondary,
   },
   levelHeaderRight: {},

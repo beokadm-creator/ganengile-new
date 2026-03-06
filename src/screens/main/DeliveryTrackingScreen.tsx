@@ -135,7 +135,7 @@ export default function DeliveryTrackingScreen({ navigation, route }: Props) {
         // Fallback to request data
         const requestData = await retryFirebaseQuery(() => getRequestById(requestId));
         if (requestData) {
-          const model = toTrackingModel(requestData as Request);
+          const model = toTrackingModel(requestData);
           setTrackingData(model);
           setTrackingEvents(model.trackingEvents || []);
           calculateProgress(model.status);

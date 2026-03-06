@@ -53,7 +53,7 @@ export default function SubscriptionTierSelectionScreen() {
     }
   };
 
-  const handleSelectTier = async (tierId: string) => {
+  const handleSelectTier = (tierId: string) => {
     setSelectedTier(tierId);
   };
 
@@ -344,7 +344,7 @@ const styles = StyleSheet.create({
     borderTopRightRadius: BorderRadius.sm,
   },
   popularBadgeText: {
-    ...Typography.caption,
+    ...Typography.bodySmall,
     color: '#fff',
     fontWeight: 'bold',
   },

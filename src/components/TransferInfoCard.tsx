@@ -14,6 +14,7 @@ import {
   View,
   Text,
   StyleSheet,
+  Platform,
 } from 'react-native';
 import { Colors, Typography, Spacing, BorderRadius } from '../theme';
 
@@ -166,7 +167,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   feeLabel: {
-    ...Typography.caption,
+    ...Typography.bodySmall,
     color: Colors.textSecondary,
     marginBottom: Spacing.xs,
   },
@@ -181,7 +182,7 @@ const styles = StyleSheet.create({
     color: '#FF5252', // Red
   },
   notice: {
-    ...Typography.caption,
+    ...Typography.bodySmall,
     color: Colors.textSecondary,
     textAlign: 'center',
   },

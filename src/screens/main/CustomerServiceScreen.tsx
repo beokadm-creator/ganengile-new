@@ -69,7 +69,7 @@ const faqs: FAQ[] = [
   },
 ];
 
-export default function CustomerServiceScreen({ navigation }: Props) {
+export default function CustomerServiceScreen({ navigation: _navigation }: Props) {
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [selectedCategory, setSelectedCategory] = useState<string>('전체');
   const [inquiryText, setInquiryText] = useState('');

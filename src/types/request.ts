@@ -74,6 +74,10 @@ export interface Request {
   // 패키지 정보
   packageInfo: PackageInfo;
 
+  // 물건 가치 및 보증금
+  itemValue?: number;
+  depositAmount?: number;
+
   // 배송비
   fee: number;
 
@@ -126,6 +130,7 @@ export interface CreateRequestData {
   deliveryStation: StationInfo;
   packageInfo: PackageInfo;
   fee: number;
+  itemValue?: number;
   preferredTime?: {
     departureTime: string;
     arrivalTime?: string;

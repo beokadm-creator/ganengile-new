@@ -110,12 +110,24 @@ function getFirebaseAuthErrorMessage(code: string): string {
 }
 
 /**
+ * Check if the error is a network-related error
+ */
+export function isNetworkError(error: any): boolean {
+  return (
+    error.message?.includes('Network request failed') ||
+    error.message?.includes('timeout') ||
+    error.message?.includes('timed out') ||
+    error.code === 'auth/network-request-failed'
+  );
+}
+
+/**
  * Show error alert with user-friendly message
  */
-export function showErrorAlert(error: any, title: string = '오류'): void {
+export function showErrorAlert(error: any, title: string = '오류', onRetry?: () => void): void {
   const parsedError = parseError(error);
 
-  if (parsedError.actionable) {
+  if (parsedError.actionable || onRetry) {
     Alert.alert(
       title,
       parsedError.userMessage,
@@ -126,7 +138,7 @@ export function showErrorAlert(error: any, title: string = '오류'): void {
         },
         {
           text: '다시 시도',
-          onPress: parsedError.action || undefined,
+          onPress: onRetry || parsedError.action || undefined,
         },
       ]
     );

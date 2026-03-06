@@ -1,9 +1,4 @@
-/**
- * OptimizedStationSelectModal 개선
- * 로딩 인디케이터 추가
- */
-
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -13,33 +8,30 @@ import {
   FlatList,
   StyleSheet,
   ActivityIndicator,
-  Dimensions
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-
-interface Station {
-  id: string;
-  name: string;
-  line: string;
-  region: 'seoul' | 'gyeonggi' | 'incheon';
-}
+import type { Station } from '../types/config';
 
 interface OptimizedStationSelectModalProps {
   visible: boolean;
   onClose: () => void;
   onSelectStation: (station: Station) => void;
-  initialRegion?: 'seoul' | 'gyeonggi' | 'incheon' | 'all';
+  stations?: Station[];
+  title?: string;
+  initialRegion?: string | 'all';
 }
 
 export const OptimizedStationSelectModal: React.FC<OptimizedStationSelectModalProps> = ({
   visible,
   onClose,
   onSelectStation,
+  stations = [],
+  title = '역 선택',
   initialRegion = 'all'
 }) => {
   const [searchText, setSearchText] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
-  const [selectedRegion, setSelectedRegion] = useState<'seoul' | 'gyeonggi' | 'incheon' | 'all'>(initialRegion);
+  const [selectedRegion, setSelectedRegion] = useState<string>(initialRegion);
   const [filteredStations, setFilteredStations] = useState<Station[]>([]);
   const [recentStations, setRecentStations] = useState<Station[]>([]);
   const [favoriteStations, setFavoriteStations] = useState<Station[]>([]);
@@ -61,10 +53,10 @@ export const OptimizedStationSelectModal: React.FC<OptimizedStationSelectModalPr
   useEffect(() => {
     if (debouncedSearch) {
       setIsSearching(true);
-      // 검색 실행 (모의)
-      setTimeout(() => {
+      const timer = setTimeout(() => {
         setIsSearching(false);
       }, 500);
+      return () => clearTimeout(timer);
     } else {
       setIsSearching(false);
     }
@@ -74,9 +66,8 @@ export const OptimizedStationSelectModal: React.FC<OptimizedStationSelectModalPr
   useEffect(() => {
     setIsLoading(true);
 
-    // 필터링 로직 (모의)
-    setTimeout(() => {
-      let filtered = mockStations;
+    const timer = setTimeout(() => {
+      let filtered = stations.length > 0 ? stations : mockStations;
 
       // 지역 필터
       if (selectedRegion !== 'all') {
@@ -87,23 +78,25 @@ export const OptimizedStationSelectModal: React.FC<OptimizedStationSelectModalPr
       if (debouncedSearch) {
         const search = debouncedSearch.toLowerCase();
         filtered = filtered.filter(s =>
-          s.name.toLowerCase().includes(search) ||
-          s.line.toLowerCase().includes(search)
+          s.stationName.toLowerCase().includes(search) ||
+          s.lines.some(l => l.lineName.toLowerCase().includes(search))
         );
       }
 
       setFilteredStations(filtered);
       setIsLoading(false);
     }, 300);
-  }, [debouncedSearch, selectedRegion]);
+
+    return () => clearTimeout(timer);
+  }, [debouncedSearch, selectedRegion, stations]);
 
   // 최근/즐겨찾기 로드
   useEffect(() => {
     loadRecentAndFavoriteStations();
   }, []);
 
-  const loadRecentAndFavoriteStations = async () => {
-    // AsyncStorage에서 로드 (모의)
+  const loadRecentAndFavoriteStations = () => {
+    // mock data for now
     setRecentStations(mockRecentStations);
     setFavoriteStations(mockFavoriteStations);
   };
@@ -114,18 +107,22 @@ export const OptimizedStationSelectModal: React.FC<OptimizedStationSelectModalPr
       onPress={() => onSelectStation(item)}
     >
       <View style={styles.stationInfo}>
-        <View style={[styles.lineBadge, { backgroundColor: getLineColor(item.line) }]}>
-          <Text style={styles.lineText}>{item.line}</Text>
+        <View style={styles.linesContainer}>
+          {item.lines.slice(0, 2).map((line, idx) => (
+            <View key={idx} style={[styles.lineBadge, { backgroundColor: line.lineColor || getLineColor(line.lineName) }]}>
+              <Text style={styles.lineText}>{line.lineName}</Text>
+            </View>
+          ))}
         </View>
-        <Text style={styles.stationName}>{item.name}</Text>
+        <Text style={styles.stationName}>{item.stationName || item.name || '역 이름 없음'}</Text>
       </View>
-      <Text style={styles.regionText}>{getRegionName(item.region)}</Text>
+      <Text style={styles.regionText}>{getRegionName(item.region || item.regionName || 'etc')}</Text>
     </TouchableOpacity>
   );
 
   const renderHeader = () => (
     <View style={styles.header}>
-      <Text style={styles.title}>역 선택</Text>
+      <Text style={styles.title}>{title}</Text>
 
       {/* 지역 필터 */}
       <View style={styles.regionFilter}>
@@ -171,11 +168,11 @@ export const OptimizedStationSelectModal: React.FC<OptimizedStationSelectModalPr
           <Text style={styles.sectionTitle}>⭐ 즐겨찾기</Text>
           {favoriteStations.map(station => (
             <TouchableOpacity
-              key={station.id}
+              key={station.stationId}
               style={styles.stationItem}
               onPress={() => onSelectStation(station)}
             >
-              <Text style={styles.stationName}>{station.name}</Text>
+              <Text style={styles.stationName}>{station.stationName}</Text>
             </TouchableOpacity>
           ))}
         </View>
@@ -187,11 +184,11 @@ export const OptimizedStationSelectModal: React.FC<OptimizedStationSelectModalPr
           <Text style={styles.sectionTitle}>🕐 최근 검색</Text>
           {recentStations.map(station => (
             <TouchableOpacity
-              key={station.id}
+              key={station.stationId}
               style={styles.stationItem}
               onPress={() => onSelectStation(station)}
             >
-              <Text style={styles.stationName}>{station.name}</Text>
+              <Text style={styles.stationName}>{station.stationName}</Text>
             </TouchableOpacity>
           ))}
         </View>
@@ -200,8 +197,8 @@ export const OptimizedStationSelectModal: React.FC<OptimizedStationSelectModalPr
       {/* 전체 목록 로딩 인디케이터 */}
       {isLoading && (
         <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" />
-          <Text style={styles.loadingText}>역 목록 로딩 중...</Text>
+          <ActivityIndicator size="large" color="#00BCD4" />
+          <Text style={styles.loadingText}>역 목록 필터링 중...</Text>
         </View>
       )}
     </View>
@@ -220,7 +217,7 @@ export const OptimizedStationSelectModal: React.FC<OptimizedStationSelectModalPr
         {!isLoading && (
           <FlatList
             data={filteredStations}
-            keyExtractor={item => item.id}
+            keyExtractor={item => item.stationId}
             renderItem={renderStation}
             ListEmptyComponent={
               <View style={styles.emptyContainer}>
@@ -245,23 +242,26 @@ export const OptimizedStationSelectModal: React.FC<OptimizedStationSelectModalPr
   );
 };
 
-// 모의 데이터
+export default OptimizedStationSelectModal;
+
+// 모의 데이터 (Station type 맞춤)
 const mockStations: Station[] = [
-  { id: '1', name: '서울역', line: '1호선', region: 'seoul' },
-  { id: '2', name: '강남역', line: '2호선', region: 'seoul' },
-  { id: '3', name: '역삼역', line: '2호선', region: 'seoul' },
-  { id: '4', name: '선릉역', line: '2호선', region: 'seoul' },
-  { id: '5', name: '삼성역', line: '2호선', region: 'seoul' }
+  {
+    stationId: '1', stationName: '서울역', stationNameEnglish: 'Seoul', region: 'seoul',
+    lines: [{ lineId: '1', lineName: '1호선', lineCode: '1', lineColor: '#1935C0', lineType: 'general' }],
+    location: { latitude: 37.5546, longitude: 126.9706 }, isTransferStation: true, isExpressStop: true, isTerminus: false,
+    facilities: { hasElevator: true, hasEscalator: true }, isActive: true, priority: 1, createdAt: new Date(), updatedAt: new Date()
+  },
+  {
+    stationId: '2', stationName: '강남역', stationNameEnglish: 'Gangnam', region: 'seoul',
+    lines: [{ lineId: '2', lineName: '2호선', lineCode: '2', lineColor: '#009944', lineType: 'general' }],
+    location: { latitude: 37.4979, longitude: 127.0276 }, isTransferStation: true, isExpressStop: false, isTerminus: false,
+    facilities: { hasElevator: true, hasEscalator: true }, isActive: true, priority: 1, createdAt: new Date(), updatedAt: new Date()
+  }
 ];
 
-const mockRecentStations: Station[] = [
-  { id: '1', name: '서울역', line: '1호선', region: 'seoul' },
-  { id: '2', name: '강남역', line: '2호선', region: 'seoul' }
-];
-
-const mockFavoriteStations: Station[] = [
-  { id: '1', name: '서울역', line: '1호선', region: 'seoul' }
-];
+const mockRecentStations: Station[] = [mockStations[0], mockStations[1]];
+const mockFavoriteStations: Station[] = [mockStations[0]];
 
 // 헬퍼 함수
 const getLineColor = (line: string): string => {
@@ -379,14 +379,18 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     flex: 1
   },
+  linesContainer: {
+    flexDirection: 'row',
+    gap: 4,
+    marginRight: 8,
+  },
   lineBadge: {
-    paddingHorizontal: 8,
-    paddingVertical: 4,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
     borderRadius: 4,
-    marginRight: 12
   },
   lineText: {
-    fontSize: 12,
+    fontSize: 10,
     color: '#fff',
     fontWeight: '600'
   },

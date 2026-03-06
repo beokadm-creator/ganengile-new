@@ -28,7 +28,7 @@ export function useMatchingTimeout({
   timeoutSeconds = 30,
   onTimeout,
   onTick,
-  autoRetry = false,
+  autoRetry: _autoRetry = false,
   maxRetries = 3,
 }: UseMatchingTimeoutOptions = {}): UseMatchingTimeoutResult {
   const [remainingSeconds, setRemainingSeconds] = useState(timeoutSeconds);
@@ -36,8 +36,8 @@ export function useMatchingTimeout({
   const [isExpired, setIsExpired] = useState(false);
   const [retryCount, setRetryCount] = useState(0);
 
-  const intervalRef = useRef<NodeJS.Timeout | null>(null);
-  const timeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const intervalRef = useRef<number | null>(null);
+  const timeoutRef = useRef<number | null>(null);
 
   const start = useCallback(() => {
     setIsActive(true);

@@ -53,7 +53,7 @@ export class LockerService {
     stationId?: string,
     size?: string
   ): Promise<Locker[]> {
-    let q = query(
+    const q = query(
       collection(db, LOCKERS_COLLECTION),
       where('status', '==', LockerStatus.AVAILABLE)
     );

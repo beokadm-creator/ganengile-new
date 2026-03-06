@@ -10,3 +10,5 @@ export * from './b2b-delivery';
 export * from './tax-invoice';
 export * from './b2b-giller-tier';
 export * from './b2b-settlement';
+
+export * from './point';

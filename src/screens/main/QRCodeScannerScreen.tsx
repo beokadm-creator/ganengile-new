@@ -444,7 +444,7 @@ const styles = StyleSheet.create({
     marginBottom: Spacing.sm,
   },
   qrInfoLabel: {
-    ...Typography.caption,
+    ...Typography.bodySmall,
     color: Colors.textSecondary,
     marginBottom: Spacing.xs,
   },

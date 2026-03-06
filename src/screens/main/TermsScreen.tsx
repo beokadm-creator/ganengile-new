@@ -158,7 +158,7 @@ const policies: Policy[] = [
   },
 ];
 
-export default function TermsScreen({ navigation }: Props) {
+export default function TermsScreen({ navigation: _navigation }: Props) {
   const [selectedPolicy, setSelectedPolicy] = useState<Policy>(policies[0]);
 
   return (

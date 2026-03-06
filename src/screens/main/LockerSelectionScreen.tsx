@@ -21,7 +21,7 @@ import {
   Image,
 } from 'react-native';
 import { StackNavigationProp } from '@react-navigation/stack';
-import { getFirestore, doc, getDoc, collection, query, where, getDocs, updateDoc, addDoc, serverTimestamp } from 'firebase/firestore';
+import { getFirestore, doc, collection, query, where, getDocs, updateDoc, addDoc, serverTimestamp } from 'firebase/firestore';
 import { requireUserId } from '../../services/firebase';
 import { Colors, Typography, Spacing, BorderRadius } from '../../theme';
 
@@ -493,7 +493,7 @@ const styles = StyleSheet.create({
     borderRadius: BorderRadius.sm,
   },
   statusBadgeText: {
-    ...Typography.caption,
+    ...Typography.bodySmall,
     color: Colors.white,
     fontWeight: '600',
   },
@@ -503,7 +503,7 @@ const styles = StyleSheet.create({
     borderRadius: BorderRadius.sm,
   },
   providerBadgeText: {
-    ...Typography.caption,
+    ...Typography.bodySmall,
     color: Colors.white,
     fontWeight: '600',
   },
@@ -576,7 +576,7 @@ const styles = StyleSheet.create({
     borderRadius: BorderRadius.sm,
   },
   timeSlotBadgeText: {
-    ...Typography.caption,
+    ...Typography.bodySmall,
     color: Colors.white,
     fontWeight: '600',
   },

@@ -46,7 +46,7 @@ interface MonthlyEarnings {
   progressToNext?: number;
 }
 
-export default function B2BGillerScreen({ navigation }: Props) {
+export default function B2BGillerScreen({ navigation: _navigation }: Props) {
   const [loading, setLoading] = useState(true);
   const [deliveries, setDeliveries] = useState<GillerDelivery[]>([]);
   const [earnings, setEarnings] = useState<MonthlyEarnings>({
@@ -425,7 +425,7 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.primary,
   },
   progressText: {
-    ...Typography.caption,
+    ...Typography.bodySmall,
     color: Colors.text.secondary,
     marginTop: Spacing.xs,
     textAlign: 'right',
@@ -456,7 +456,7 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   deliveryStatus: {
-    ...Typography.caption,
+    ...Typography.bodySmall,
     fontWeight: 'bold',
   },
   deliveryDetails: {
@@ -470,7 +470,7 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
   },
   deliveryDate: {
-    ...Typography.caption,
+    ...Typography.bodySmall,
     color: Colors.text.secondary,
   },
   benefitsCard: {
@@ -498,7 +498,7 @@ const styles = StyleSheet.create({
     marginRight: Spacing.md,
   },
   benefitTierName: {
-    ...Typography.caption,
+    ...Typography.bodySmall,
     fontWeight: 'bold',
     color: Colors.white,
   },

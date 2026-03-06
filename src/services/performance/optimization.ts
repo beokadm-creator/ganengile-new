@@ -22,7 +22,7 @@ export function shallowEqual(objA: any, objB: any): boolean {
 
   if (keysA.length !== keysB.length) return false;
 
-  for (let key of keysA) {
+  for (const key of keysA) {
     if (!objB.hasOwnProperty(key) || objA[key] !== objB[key]) {
       return false;
     }

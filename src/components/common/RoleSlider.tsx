@@ -1,9 +1,9 @@
 import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Dimensions, Platform } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { Colors, Spacing, BorderRadius, Shadows, Typography } from '../../theme';
+import { Colors, Spacing, BorderRadius, Typography } from '../../theme';
 
-const SCREEN_WIDTH = Dimensions.get('window').width;
+const _SCREEN_WIDTH = Dimensions.get('window').width;
 
 interface RoleSliderProps {
   currentRole: 'gller' | 'giller' | null;

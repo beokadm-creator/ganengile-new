@@ -6,7 +6,6 @@
 import React, { memo, useCallback, useMemo } from 'react';
 import { StyleSheet, View, Text, TouchableOpacity } from 'react-native';
 import Icon from 'react-native-vector-icons/MaterialIcons';
-import { GillerProfileCard as GillerProfileCardOriginal } from '../giller/GillerProfileCard';
 
 // ==================== Memoized GillerProfileCard ====================
 

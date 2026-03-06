@@ -5,7 +5,42 @@
  */
 
 import NetInfo, { NetInfoState } from '@react-native-community/netinfo';
-import { EventEmitter } from 'events';
+
+/**
+ * Lightweight EventEmitter replacement to avoid Node.js 'events' polyfill issues on Web
+ */
+class EventEmitter {
+  private listeners: { [event: string]: Function[] } = {};
+
+  on(event: string, listener: Function) {
+    if (!this.listeners[event]) {
+      this.listeners[event] = [];
+    }
+    this.listeners[event].push(listener);
+    return this;
+  }
+
+  off(event: string, listener: Function) {
+    if (!this.listeners[event]) return this;
+    this.listeners[event] = this.listeners[event].filter(l => l !== listener);
+    return this;
+  }
+
+  emit(event: string, ...args: any[]) {
+    if (!this.listeners[event]) return false;
+    this.listeners[event].forEach(listener => listener(...args));
+    return true;
+  }
+
+  removeAllListeners(event?: string) {
+    if (event) {
+      delete this.listeners[event];
+    } else {
+      this.listeners = {};
+    }
+    return this;
+  }
+}
 
 export type NetworkStatus = 'online' | 'offline' | 'poor';
 export type ConnectionType = 'wifi' | 'cellular' | 'none' | 'unknown';
@@ -300,7 +335,7 @@ export async function getNetworkQuality(): Promise<'good' | 'poor' | 'offline'> 
 export { detector as networkDetector };
 
 // Export types
-export type { NetworkState };
+// NetworkState already exported at line 48
 
 /**
  * React Hook 형태로 사용하기 위한 유틸리티

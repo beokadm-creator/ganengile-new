@@ -3,7 +3,7 @@
  * 성공 애니메이션 컴포넌트 (체크마크, 컨페티 등)
  */
 
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import {
   View,
   Text,
@@ -29,15 +29,15 @@ export interface SuccessAnimationProps {
  */
 export function SuccessAnimation({
   visible,
-  duration = 2000,
+  duration: _duration = 2000,
   onComplete,
-  type = 'checkmark',
+  type: _type = 'checkmark',
   message,
 }: SuccessAnimationProps) {
-  const scaleAnim = useRef(new Animated.Value(0)).current;
-  const rotateAnim = useRef(new Animated.Value(0)).current;
-  const fadeAnim = useRef(new Animated.Value(0)).current;
-  const pulseAnim = useRef(new Animated.Value(0)).current;
+  const scaleAnim = useMemo(() => new Animated.Value(0), []);
+  const rotateAnim = useMemo(() => new Animated.Value(0), []);
+  const fadeAnim = useMemo(() => new Animated.Value(0), []);
+  const pulseAnim = useMemo(() => new Animated.Value(0), []);
 
   useEffect(() => {
     if (visible) {
@@ -104,8 +104,6 @@ export function SuccessAnimation({
   }, [visible]);
 
   if (!visible) return null;
-
-  const checkmarkPath = 'M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z';
 
   const rotateInterpolate = rotateAnim.interpolate({
     inputRange: [0, 1],
@@ -186,17 +184,29 @@ export function Confetti({
   duration = 3000,
   onComplete,
 }: ConfettiProps) {
-  const particles = useRef<Array<Animated.Value>>(
-    Array.from({ length: count }, () => new Animated.Value(0))
-  ).current;
+  interface ParticleData {
+    anim: Animated.Value;
+    translateXEnd: number;
+    rotateEnd: number;
+    left: number;
+  }
+
+  const [particles] = useState<ParticleData[]>(() =>
+    Array.from({ length: count }, () => ({
+      anim: new Animated.Value(0),
+      translateXEnd: (Math.random() - 0.5) * width,
+      rotateEnd: Math.random() * 720,
+      left: Math.random() * width,
+    }))
+  );
 
   useEffect(() => {
     if (visible) {
-      const animations = particles.map((anim, index) => {
+      const animations = particles.map((particle) => {
         const randomDelay = Math.random() * 500;
         const randomDuration = duration + Math.random() * 1000;
 
-        return Animated.timing(anim, {
+        return Animated.timing(particle.anim, {
           toValue: 1,
           duration: randomDuration,
           delay: randomDelay,
@@ -214,7 +224,7 @@ export function Confetti({
         animations.forEach(a => a.stop());
       };
     }
-  }, [visible]);
+  }, [visible, particles, duration]);
 
   if (!visible) return null;
 
@@ -222,20 +232,21 @@ export function Confetti({
 
   return (
     <View style={styles.confettiContainer}>
-      {particles.map((anim, index) => {
-        const translateX = anim.interpolate({
+      {particles.map((particle, index) => {
+        // Use index for color selection
+        const translateX = particle.anim.interpolate({
           inputRange: [0, 1],
-          outputRange: [0, (Math.random() - 0.5) * width],
+          outputRange: [0, particle.translateXEnd],
         });
 
-        const translateY = anim.interpolate({
+        const translateY = particle.anim.interpolate({
           inputRange: [0, 1],
           outputRange: [0, height + 100],
         });
 
-        const rotate = anim.interpolate({
+        const rotate = particle.anim.interpolate({
           inputRange: [0, 1],
-          outputRange: ['0deg', `${Math.random() * 720}deg`],
+          outputRange: ['0deg', `${particle.rotateEnd}deg`],
         });
 
         const color = colors[index % colors.length];
@@ -252,7 +263,7 @@ export function Confetti({
                   { translateY },
                   { rotate },
                 ],
-                left: Math.random() * width,
+                left: particle.left,
               },
             ]}
           />
@@ -309,6 +320,47 @@ const styles = StyleSheet.create({
     top: -20,
     width: 10,
   },
+  overlayContainer: {
+    ...StyleSheet.absoluteFillObject,
+    alignItems: 'center',
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'center',
+    padding: Spacing.xl,
+    zIndex: 999,
+  },
+  overlayCard: {
+    alignItems: 'center',
+    backgroundColor: Colors.white,
+    borderRadius: BorderRadius.lg,
+    padding: Spacing.xl,
+    width: '100%',
+  },
+  overlayIcon: {
+    alignItems: 'center',
+    backgroundColor: Colors.success,
+    borderRadius: 30,
+    height: 60,
+    justifyContent: 'center',
+    marginBottom: Spacing.md,
+    width: 60,
+  },
+  overlayIconText: {
+    color: Colors.white,
+    fontSize: 30,
+    fontWeight: 'bold',
+  },
+  overlayMessage: {
+    color: Colors.textPrimary,
+    fontSize: 18,
+    fontWeight: Typography.fontWeight.bold,
+    marginBottom: Spacing.sm,
+    textAlign: 'center',
+  },
+  overlaySubmessage: {
+    color: Colors.textSecondary,
+    fontSize: 14,
+    textAlign: 'center',
+  },
 });
 
 /**
@@ -329,8 +381,8 @@ export function SuccessOverlay({
   duration = 2500,
   onComplete,
 }: SuccessOverlayProps) {
-  const fadeAnim = useRef(new Animated.Value(0)).current;
-  const scaleAnim = useRef(new Animated.Value(0.8)).current;
+  const fadeAnim = useMemo(() => new Animated.Value(0), []);
+  const scaleAnim = useMemo(() => new Animated.Value(0.8), []);
 
   useEffect(() => {
     if (visible) {
@@ -388,46 +440,4 @@ export function SuccessOverlay({
   );
 }
 
-const overlayStyles = StyleSheet.create({
-  overlayContainer: {
-    ...StyleSheet.absoluteFillObject,
-    alignItems: 'center',
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
-    justifyContent: 'center',
-    padding: Spacing.xl,
-    zIndex: 999,
-  },
-  overlayCard: {
-    alignItems: 'center',
-    backgroundColor: Colors.white,
-    borderRadius: BorderRadius.lg,
-    padding: Spacing.xl,
-    width: '100%',
-  },
-  overlayIcon: {
-    alignItems: 'center',
-    backgroundColor: Colors.success,
-    borderRadius: 30,
-    height: 60,
-    justifyContent: 'center',
-    marginBottom: Spacing.md,
-    width: 60,
-  },
-  overlayIconText: {
-    color: Colors.white,
-    fontSize: 30,
-    fontWeight: 'bold',
-  },
-  overlayMessage: {
-    color: Colors.textPrimary,
-    fontSize: 18,
-    fontWeight: Typography.fontWeight.bold,
-    marginBottom: Spacing.sm,
-    textAlign: 'center',
-  },
-  overlaySubmessage: {
-    color: Colors.textSecondary,
-    fontSize: 14,
-    textAlign: 'center',
-  },
-});
+

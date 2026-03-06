@@ -6,7 +6,7 @@ import {
   StyleSheet,
   ViewStyle,
 } from 'react-native';
-import { Colors, Spacing, BorderRadius, Typography } from '../../theme';
+import { Colors, Spacing, BorderRadius } from '../../theme';
 
 type ModalVariant = 'center' | 'bottomSheet';
 

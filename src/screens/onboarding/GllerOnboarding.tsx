@@ -78,7 +78,7 @@ export default function GllerOnboarding({ navigation }: GllerOnboardingProps) {
   ];
 
   const resetToMain = (targetTab?: 'RouteManagement') => {
-    const rootNavigation = navigation.getParent() as any;
+    const rootNavigation = navigation.getParent();
     if (rootNavigation?.reset) {
       rootNavigation.reset({
         index: 0,

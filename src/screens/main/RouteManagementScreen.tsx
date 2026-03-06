@@ -3,7 +3,7 @@
  * 등록된 동선을 관리하는 화면
  */
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useCallback } from 'react';
 import {
   View,
   Text,

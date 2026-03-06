@@ -16,7 +16,7 @@ interface DeliveryTrackingScreenProps {
 }
 
 export const DeliveryTrackingScreen: React.FC<DeliveryTrackingScreenProps> = ({
-  navigation,
+  navigation: _navigation,
   route,
 }) => {
   const [deliveryStatus, setDeliveryStatus] = useState<string>('pending');

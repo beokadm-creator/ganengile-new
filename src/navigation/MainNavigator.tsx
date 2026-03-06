@@ -36,6 +36,9 @@ import EarningsScreen from '../screens/main/EarningsScreen';
 import MyRatingScreen from '../screens/main/MyRatingScreen';
 import CustomerServiceScreen from '../screens/main/CustomerServiceScreen';
 import TermsScreen from '../screens/main/TermsScreen';
+import DepositPaymentScreen from '../screens/main/DepositPaymentScreen';
+import PointHistoryScreen from '../screens/main/PointHistoryScreen';
+import PointWithdrawScreen from '../screens/main/PointWithdrawScreen';
 import GillerPickupFromLockerScreen from '../screens/requester/GillerPickupFromLockerScreen';
 import GillerLevelUpgradeScreen from '../screens/main/GillerLevelUpgradeScreen';
 
@@ -48,6 +51,7 @@ function TabBarIcon({ name, focused }: { name: string; focused: boolean }) {
     RouteManagement: '🗺️',
     Requests: '📋',
     GillerRequests: '🚴',
+    ChatList: '💬',
     Profile: '👤',
   };
 
@@ -137,6 +141,13 @@ function TabNavigator() {
         name="RouteManagement"
         component={RouteManagementScreen}
         options={{ tabBarLabel: '동선 관리' }}
+      />
+
+      {/* Chat tab for all */}
+      <Tab.Screen
+        name="ChatList"
+        component={ChatListScreen}
+        options={{ tabBarLabel: '채팅' }}
       />
 
       {/* Profile tab for all */}
@@ -234,6 +245,30 @@ export default function MainNavigator() {
         options={{
           headerShown: true,
           title: '배송 완료',
+        }}
+      />
+      <Stack.Screen
+        name="DepositPayment"
+        component={DepositPaymentScreen}
+        options={{
+          headerShown: true,
+          title: '보증금 결제',
+        }}
+      />
+      <Stack.Screen
+        name="PointHistory"
+        component={PointHistoryScreen}
+        options={{
+          headerShown: true,
+          title: '포인트 내역',
+        }}
+      />
+      <Stack.Screen
+        name="PointWithdraw"
+        component={PointWithdrawScreen}
+        options={{
+          headerShown: true,
+          title: '포인트 출금',
         }}
       />
       <Stack.Screen

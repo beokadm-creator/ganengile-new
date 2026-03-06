@@ -58,6 +58,7 @@ export type MainTabParamList = {
   Requests: undefined;
   GillerRequests: undefined;
   RouteManagement: undefined;
+  ChatList: undefined;
   Profile: undefined;
 };
 

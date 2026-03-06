@@ -823,7 +823,7 @@ export async function getTotalTaxCollected(
   breakdown: { [key: string]: number };
 }> {
   try {
-    let q = query(
+    const q = query(
       collection(db, 'payments'),
       where('type', '==', PaymentType.GILLER_EARNING),
       where('status', '==', PaymentStatus.COMPLETED)

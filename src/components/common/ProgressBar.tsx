@@ -5,7 +5,7 @@
 
 import React from 'react';
 import { View, StyleSheet, ViewStyle } from 'react-native';
-import { Colors, BorderRadius, Spacing } from '../../theme';
+import { Colors, BorderRadius } from '../../theme';
 
 interface ProgressBarProps {
   progress: number; // 0 to 1
@@ -22,7 +22,7 @@ export default function ProgressBar({
   backgroundColor = Colors.gray200,
   height = 8,
   style,
-  showLabel = false,
+  showLabel: _showLabel = false,
 }: ProgressBarProps) {
   const clampedProgress = Math.max(0, Math.min(1, progress));
   const widthValue = clampedProgress * 100;

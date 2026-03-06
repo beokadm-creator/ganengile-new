@@ -11,44 +11,76 @@ service cloud.firestore {
       return isAuthenticated() && request.auth.uid == userId;
     }
 
-    // ==================== Config Collections (Read-Only) ====================
+    // ==================== Config Collections (Read-Only, Public) ====================
 
     match /config_stations/{stationId} {
-      allow read: if isAuthenticated();
+      allow read: if true;  // Public config data
       allow write: if false;
     }
 
     match /config_travel_times/{timeId} {
-      allow read: if isAuthenticated();
+      allow read: if true;  // Public config data
       allow write: if false;
     }
 
     match /config_express_trains/{trainId} {
-      allow read: if isAuthenticated();
+      allow read: if true;  // Public config data
       allow write: if false;
     }
 
     match /config_congestion/{congestionId} {
-      allow read: if isAuthenticated();
+      allow read: if true;  // Public config data
       allow write: if false;
     }
 
     match /config_algorithm_params/{documentId} {
-      allow read: if isAuthenticated();
+      allow read: if true;  // Public config data
       allow write: if false;
     }
 
     // ==================== Users Collection ====================
 
     match /users/{userId} {
-      // 읽기: 본인 또는 인증된 사용자
-      allow read: if isOwner(userId) || isAuthenticated();
-
+      // 임시: 인증된 모든 사용자에게 읽기 허용
+      allow read: if isAuthenticated();
+      
       // 쓰기: 본인만
-      allow write: if isOwner(userId);
-
+      allow create, update: if isOwner(userId);
+      
       // 삭제: 본인만
       allow delete: if isOwner(userId);
+
+      // ==================== Profile Subcollection ====================
+      
+      match /profile/{profileId} {
+        // 읽기: 본인만
+        allow read: if isOwner(userId);
+        
+        // 생성: 본인만
+        allow create: if isOwner(userId);
+        
+        // 업데이트: 본인만
+        allow update: if isOwner(userId);
+        
+        // 삭제: 본인만
+        allow delete: if isOwner(userId);
+      }
+
+      // ==================== Verification Subcollection ====================
+      
+      match /verification/{verificationId} {
+        // 읽기: 본인만
+        allow read: if isOwner(userId);
+        
+        // 생성: 본인만
+        allow create: if isOwner(userId);
+        
+        // 업데이트: 본인만 (또는 관리자)
+        allow update: if isOwner(userId);
+        
+        // 삭제: 시스템만
+        allow delete: if false;
+      }
     }
 
     // ==================== Routes Collection ====================
@@ -217,6 +249,44 @@ service cloud.firestore {
 
       // 삭제: 시스템만
       allow delete: if false;
+    }
+
+    // ==================== Chat Rooms Collection ====================
+
+    match /chatRooms/{chatRoomId} {
+      // 읽기: 참여자만
+      allow read: if isAuthenticated() &&
+        (resource.data.participants.user1.userId == request.auth.uid ||
+         resource.data.participants.user2.userId == request.auth.uid);
+
+      // 생성: 인증된 사용자
+      allow create: if isAuthenticated();
+
+      // 업데이트: 참여자만
+      allow update: if isAuthenticated() &&
+        (resource.data.participants.user1.userId == request.auth.uid ||
+         resource.data.participants.user2.userId == request.auth.uid);
+
+      // 삭제: 참여자만
+      allow delete: if isAuthenticated() &&
+        (resource.data.participants.user1.userId == request.auth.uid ||
+         resource.data.participants.user2.userId == request.auth.uid);
+
+      // 메시지 하위 컬렉션
+      match /messages/{messageId} {
+        // 읽기: 채팅방 참여자만
+        allow read: if isAuthenticated() &&
+          (get(/databases/$(database)/documents/chatRooms/$(chatRoomId)).data.participants.user1.userId == request.auth.uid ||
+           get(/databases/$(database)/documents/chatRooms/$(chatRoomId)).data.participants.user2.userId == request.auth.uid);
+
+        // 생성: 참여자만
+        allow create: if isAuthenticated() &&
+          (get(/databases/$(database)/documents/chatRooms/$(chatRoomId)).data.participants.user1.userId == request.auth.uid ||
+           get(/databases/$(database)/documents/chatRooms/$(chatRoomId)).data.participants.user2.userId == request.auth.uid);
+
+        // 업데이트/삭제: 불가
+        allow update, delete: if false;
+      }
     }
   }
 }

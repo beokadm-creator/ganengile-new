@@ -477,7 +477,7 @@ const styles = StyleSheet.create({
     marginBottom: Spacing.xs,
   },
   locationSubtext: {
-    ...Typography.caption,
+    ...Typography.bodySmall,
     color: Colors.textSecondary,
   },
   switchContainer: {

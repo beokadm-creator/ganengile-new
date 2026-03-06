@@ -73,7 +73,7 @@ const dummyEarnings: EarningRecord[] = [
   },
 ];
 
-export default function EarningsScreen({ navigation }: Props) {
+export default function EarningsScreen({ navigation: _navigation }: Props) {
   const { user } = useUser();
   const [loading, setLoading] = useState(true);
   const [stats, setStats] = useState<any>(null);

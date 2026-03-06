@@ -235,7 +235,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   quickSelectText: {
-    ...Typography.caption,
+    ...Typography.bodySmall,
     color: Colors.text.secondary,
   },
   clearButton: {

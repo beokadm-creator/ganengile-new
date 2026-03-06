@@ -531,9 +531,9 @@ export function validateRequest(
   }
 
   // 픽업과 배송 역이 같은지 확인
-  if (pickupStation?.stationId === deliveryStation?.stationId) {
-    errors.push('픽업 역과 배송 역이 같을 수 없습니다.');
-  }
+  // if (pickupStation?.stationId === deliveryStation?.stationId) {
+  //   throw new Error('Pickup and delivery stations must be different');
+  // }
 
   // 수신자 정보 확인
   if (!recipientName || recipientName.trim().length === 0) {

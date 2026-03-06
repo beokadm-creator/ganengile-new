@@ -13,7 +13,7 @@ import {
   Switch,
   Alert,
 } from 'react-native';
-import { doc, getDoc, updateDoc, onSnapshot } from 'firebase/firestore';
+import { doc, updateDoc, onSnapshot } from 'firebase/firestore';
 import { db } from '../../core/firebase';
 import { useAuth } from '../../contexts/AuthContext';
 import { Colors, Typography, Spacing, BorderRadius } from '../../theme';
@@ -298,7 +298,7 @@ const styles = StyleSheet.create({
     marginBottom: Spacing.xs,
   },
   comparisonItem: {
-    ...Typography.caption,
+    ...Typography.bodySmall,
     color: Colors.text,
     marginBottom: Spacing.xs,
   },
@@ -328,7 +328,7 @@ const styles = StyleSheet.create({
     marginBottom: Spacing.xs,
   },
   warningText: {
-    ...Typography.caption,
+    ...Typography.bodySmall,
     color: '#BF360C',
   },
   registerRouteButton: {

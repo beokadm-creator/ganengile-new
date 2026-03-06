@@ -79,6 +79,10 @@ export interface User {
     marketing: boolean; // 선택적
   };
 
+  pointBalance: number;
+  totalEarnedPoints: number;
+  totalSpentPoints: number;
+
   // ===== P1 신규 필드: 전문 길러 시스템 =====
 
   // 길러 프로필 (전문 길러 시스템)

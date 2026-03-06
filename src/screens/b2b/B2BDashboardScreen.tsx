@@ -289,7 +289,7 @@ const styles = StyleSheet.create({
     marginHorizontal: Spacing.xs,
   },
   statsCardLabel: {
-    ...Typography.caption,
+    ...Typography.bodySmall,
     color: Colors.text.secondary,
     marginBottom: Spacing.xs,
     textAlign: 'center',
@@ -354,7 +354,7 @@ const styles = StyleSheet.create({
     color: Colors.text.primary,
   },
   invoiceStatus: {
-    ...Typography.caption,
+    ...Typography.bodySmall,
     fontWeight: 'bold',
   },
   invoicePeriod: {
@@ -384,7 +384,7 @@ const styles = StyleSheet.create({
     color: Colors.text.primary,
   },
   settlementStatus: {
-    ...Typography.caption,
+    ...Typography.bodySmall,
     fontWeight: 'bold',
   },
   settlementDetails: {
@@ -398,7 +398,7 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
   },
   settlementDate: {
-    ...Typography.caption,
+    ...Typography.bodySmall,
     color: Colors.text.secondary,
   },
 });

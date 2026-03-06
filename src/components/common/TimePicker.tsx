@@ -48,7 +48,7 @@ export default function TimePicker({
   onChange,
   label = '시간 선택',
   placeholder = '시간을 선택해주세요',
-  minuteInterval = 10,
+  minuteInterval: _minuteInterval = 10,
 }: TimePickerProps) {
   const [modalVisible, setModalVisible] = useState(false);
 

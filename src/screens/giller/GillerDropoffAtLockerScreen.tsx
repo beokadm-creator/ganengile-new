@@ -3,7 +3,7 @@
  * 길러가 사물함에 물품을 보관하는 화면
  */
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useCallback } from 'react';
 import {
   View,
   Text,

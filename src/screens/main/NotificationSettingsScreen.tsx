@@ -57,7 +57,7 @@ const NOTIFICATION_LABELS: Record<NotificationType, { title: string; description
   },
 };
 
-export default function NotificationSettingsScreen({ navigation }: Props) {
+export default function NotificationSettingsScreen({ navigation: _navigation }: Props) {
   const [settings, setSettings] = useState<NotificationSettings | null>(null);
   const [loading, setLoading] = useState(true);
 

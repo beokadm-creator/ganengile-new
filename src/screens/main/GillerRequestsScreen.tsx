@@ -13,7 +13,6 @@ import {
   RefreshControl,
   ActivityIndicator,
   TextInput,
-  ScrollView,
   Alert,
 } from 'react-native';
 import { StackNavigationProp } from '@react-navigation/stack';

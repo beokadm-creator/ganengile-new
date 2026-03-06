@@ -113,7 +113,7 @@ export default function ProfileScreen({ navigation: _navigation }: Props) {
   }, [user]);
 
   const loadUserData = async () => {
-    if (!user) return;
+    if (!user?.uid) return;
 
     try {
       setLoadingProfile(true);

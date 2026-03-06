@@ -10,7 +10,6 @@ import { Platform } from 'react-native';
 import { useUser } from '../contexts/UserContext';
 import { createNotificationService } from '../services/notification-service';
 import type { ChatMessage } from '../types/chat';
-import type { MainStackNavigationProp } from '../types/navigation';
 
 // Configure notification behavior
 Notifications.setNotificationHandler({
@@ -49,11 +48,11 @@ export function useNotifications(handlers?: NotificationHandlers) {
     }
 
     const { status: existingStatus } = await Notifications.getPermissionsAsync();
-    let finalStatus = existingStatus as Notifications.PermissionStatus;
+    let finalStatus = existingStatus;
 
     if (existingStatus !== 'granted') {
       const { status } = await Notifications.requestPermissionsAsync();
-      finalStatus = status as Notifications.PermissionStatus;
+      finalStatus = status;
     }
 
     setPermissionStatus(finalStatus);

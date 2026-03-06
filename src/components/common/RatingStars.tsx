@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { View, TouchableOpacity, StyleSheet, Text } from 'react-native';
-import { Colors, Spacing, BorderRadius } from '../../theme';
+import { Colors, Spacing } from '../../theme';
 
 interface RatingStarsProps {
   rating: number;

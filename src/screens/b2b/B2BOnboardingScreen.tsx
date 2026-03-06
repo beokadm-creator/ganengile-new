@@ -315,7 +315,7 @@ const styles = StyleSheet.create({
     textAlignVertical: 'top',
   },
   hint: {
-    ...Typography.caption,
+    ...Typography.bodySmall,
     color: Colors.text.tertiary,
     marginTop: Spacing.xs,
   },

@@ -247,7 +247,7 @@ const styles = StyleSheet.create({
     padding: 12,
   },
   infoText: {
-    ...Typography.caption,
+    ...Typography.bodySmall,
     color: Colors.text.tertiary,
     marginBottom: 4,
     lineHeight: 18,

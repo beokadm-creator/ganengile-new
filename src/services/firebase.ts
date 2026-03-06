@@ -69,4 +69,4 @@ export function requireUserId(): string {
 }
 
 // Export app instance
-export default app;
+// Already exported as default at line 47

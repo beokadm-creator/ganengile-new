@@ -12,7 +12,7 @@ import {
   TouchableOpacity,
   ActivityIndicator,
 } from 'react-native';
-import { doc, getDoc, onSnapshot } from 'firebase/firestore';
+import { doc, onSnapshot } from 'firebase/firestore';
 import { db } from '../../core/firebase';
 import { useAuth } from '../../contexts/AuthContext';
 import { INITIAL_BADGES, findBadgeById, getBadgesByCategory } from '../../data/badges';
@@ -51,7 +51,7 @@ export default function BadgeCollectionScreen() {
 
   const filteredBadges = selectedCategory === 'all'
     ? INITIAL_BADGES
-    : getBadgesByCategory(selectedCategory as BadgeCategory);
+    : getBadgesByCategory(selectedCategory);
 
   const isBadgeEarned = (badgeId: string) => {
     return Object.values(userBadges).flat().includes(badgeId);
@@ -324,7 +324,7 @@ const styles = StyleSheet.create({
     color: Colors.textSecondary,
   },
   badgeTier: {
-    ...Typography.caption,
+    ...Typography.bodySmall,
     color: Colors.textSecondary,
     textAlign: 'center',
   },

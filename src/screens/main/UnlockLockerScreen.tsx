@@ -177,7 +177,7 @@ export default function UnlockLockerScreen() {
             text: '확인',
             onPress: () => {
               navigation.navigate('Rating' as never, {
-                deliveryId: deliveryId!,
+                deliveryId: deliveryId,
                 gillerId: reservation!.userId,
                 gllerId: reservation!.userId,
               });

@@ -33,7 +33,7 @@ export const DeliveryCompletionScreen: React.FC<DeliveryCompletionScreenProps> =
         setPickupPhoto(result.url);
         Alert.alert('알림', '사진 업로드 완료');
       }
-    } catch (error) {
+    } catch (_error) {
       Alert.alert('에러', '사진 업로드 실패');
     } finally {
       setIsUploading(false);
@@ -48,7 +48,7 @@ export const DeliveryCompletionScreen: React.FC<DeliveryCompletionScreenProps> =
         setPickupPhoto(result.url);
         Alert.alert('알림', '사진 촬영 완료');
       }
-    } catch (error) {
+    } catch (_error) {
       Alert.alert('에러', '사진 촬영 실패');
     } finally {
       setIsUploading(false);

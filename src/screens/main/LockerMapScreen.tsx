@@ -470,7 +470,7 @@ const styles = StyleSheet.create({
     borderRadius: BorderRadius.sm,
   },
   lineBadgeText: {
-    ...Typography.caption,
+    ...Typography.bodySmall,
     color: Colors.white,
     fontWeight: '600',
   },
@@ -481,7 +481,7 @@ const styles = StyleSheet.create({
     marginLeft: Spacing.xs,
   },
   typeBadgeText: {
-    ...Typography.caption,
+    ...Typography.bodySmall,
     color: Colors.white,
     fontWeight: '600',
   },
@@ -528,7 +528,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#4CAF50',
   },
   statusBadgeText: {
-    ...Typography.caption,
+    ...Typography.bodySmall,
     color: Colors.white,
     fontWeight: '600',
   },

@@ -515,7 +515,7 @@ const styles = StyleSheet.create({
     marginTop: Spacing.xs,
   },
   statusText: {
-    ...Typography.caption,
+    ...Typography.bodySmall,
     fontWeight: 'bold',
   },
 });

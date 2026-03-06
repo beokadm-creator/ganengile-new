@@ -22,7 +22,7 @@ export const createImageOptions = (
   const {
     width = 300,
     height = 300,
-    quality = 80,
+    quality: _quality = 80,
     format = 'webp'
   } = options;
 
@@ -77,7 +77,7 @@ const supportsWebP = (): boolean => {
 /**
  * 블러 이미지 생성 (로딩 중 플레이스홀더)
  */
-export const createBlurImage = (uri: string, blurAmount: number = 10): any => {
+export const createBlurImage = (uri: string): any => {
   return {
     uri,
     // React Native에서는 블러 효과 적용 필요

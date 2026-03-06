@@ -46,7 +46,7 @@ export const CreateRequestScreen: React.FC<CreateRequestScreenProps> = ({
     }
 
     // 간단 배송비 계산 (예시)
-    let baseFee = 3000;
+    const baseFee = 3000;
     const sizeMultiplier = packageSize === 'small' ? 1 : packageSize === 'medium' ? 1.5 : 2;
     const weightMultiplier = packageWeight === 'light' ? 1 : packageWeight === 'medium' ? 1.3 : 1.6;
     const calculatedFee = baseFee * sizeMultiplier * weightMultiplier;

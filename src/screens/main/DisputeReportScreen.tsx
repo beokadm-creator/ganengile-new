@@ -456,12 +456,12 @@ const styles = StyleSheet.create({
     borderRadius: BorderRadius.sm,
   },
   selectedBadgeText: {
-    ...Typography.caption,
+    ...Typography.bodySmall,
     color: Colors.white,
     fontWeight: '600',
   },
   disputeTypeDescription: {
-    ...Typography.caption,
+    ...Typography.bodySmall,
     color: Colors.textSecondary,
   },
   urgencyLevelsRow: {
@@ -501,7 +501,7 @@ const styles = StyleSheet.create({
     textAlignVertical: 'top',
   },
   charCount: {
-    ...Typography.caption,
+    ...Typography.bodySmall,
     color: Colors.textSecondary,
     textAlign: 'right',
     marginTop: Spacing.xs,
@@ -554,7 +554,7 @@ const styles = StyleSheet.create({
     fontWeight: '300',
   },
   addPhotoLabel: {
-    ...Typography.caption,
+    ...Typography.bodySmall,
     color: Colors.textSecondary,
     marginTop: Spacing.xs,
   },

@@ -26,7 +26,7 @@ import { Colors, Typography, Spacing, BorderRadius } from '../../theme';
 import type { Station } from '../../types/config';
 import type { StationInfo, PackageSize, PackageWeight } from '../../types/request';
 import TimePicker from '../../components/common/TimePicker';
-import OptimizedStationSelectModal from '../../components/OptimizedStationSelectModal';
+import { OptimizedStationSelectModal } from '../../components/OptimizedStationSelectModal';
 import ModeToggleSwitch from '../../components/onetime/ModeToggleSwitch';
 
 // Utils
@@ -118,6 +118,7 @@ export default function CreateRequestScreen({ navigation }: Props) {
   const [packageSize, setPackageSize] = useState<PackageSize>('small' as PackageSize);
   const [weight, setWeight] = useState('');
   const [description, setDescription] = useState('');
+  const [itemValue, setItemValue] = useState('');
   const [isFragile, setIsFragile] = useState(false);
   const [isPerishable, setIsPerishable] = useState(false);
   const [recipientName, setRecipientName] = useState('');
@@ -131,6 +132,12 @@ export default function CreateRequestScreen({ navigation }: Props) {
 
   // Validation errors
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const depositAmount = useMemo(() => {
+    if (itemValue && parseFloat(itemValue) > 0) {
+      return Math.round(parseFloat(itemValue) * 0.8);
+    }
+    return 0;
+  }, [itemValue]);
 
   // Calculated values
   const [deliveryFee, setDeliveryFee] = useState<{
@@ -214,7 +221,7 @@ export default function CreateRequestScreen({ navigation }: Props) {
       setStations(data);
     } catch (error) {
       console.error('Error loading stations:', error);
-      showErrorAlert(error, () => loadStations());
+      showErrorAlert(error, '오류', () => loadStations());
     } finally {
       setLoadingStations(false);
     }
@@ -236,6 +243,12 @@ export default function CreateRequestScreen({ navigation }: Props) {
   const restoreDraft = () => {
     const draft = (window as any).__draftData as CreateRequestDraft;
     if (draft) {
+      console.log('Restoring draft:', {
+        pickupStation: draft.pickupStation?.stationName,
+        deliveryStation: draft.deliveryStation?.stationName,
+        areSame: draft.pickupStation?.stationId === draft.deliveryStation?.stationId
+      });
+      
       setCurrentStep(draft.step as Step);
       setPickupStation(draft.pickupStation);
       setDeliveryStation(draft.deliveryStation);
@@ -253,6 +266,11 @@ export default function CreateRequestScreen({ navigation }: Props) {
       setStorageLocation(draft.storageLocation);
       setSpecialInstructions(draft.specialInstructions);
       setShowDraftRestore(false);
+      
+      if (draft.pickupStation && draft.deliveryStation && 
+          draft.pickupStation.stationId === draft.deliveryStation.stationId) {
+        setErrors({ deliveryStation: '픽업 역과 배송 역이 같을 수 없습니다. 다시 선택해주세요.' });
+      }
     }
   };
 
@@ -323,17 +341,21 @@ export default function CreateRequestScreen({ navigation }: Props) {
 
   const validateStep1 = useCallback((): boolean => {
     const newErrors: Record<string, string> = {};
-
+    
     if (!pickupStation) {
       newErrors.pickupStation = '픽업 역을 선택해주세요.';
     }
     if (!deliveryStation) {
       newErrors.deliveryStation = '배송 역을 선택해주세요.';
     }
-    if (pickupStation && deliveryStation && pickupStation.stationId === deliveryStation.stationId) {
+    
+    const pickupId = pickupStation?.stationId;
+    const deliveryId = deliveryStation?.stationId;
+    
+    if (pickupId && deliveryId && pickupId === deliveryId) {
       newErrors.deliveryStation = '픽업 역과 배송 역이 같을 수 없습니다.';
     }
-
+    
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   }, [pickupStation, deliveryStation]);
@@ -353,9 +375,17 @@ export default function CreateRequestScreen({ navigation }: Props) {
       newErrors.description = '설명은 200자 이내로 입력해주세요.';
     }
 
+    if (!itemValue || parseFloat(itemValue) <= 0) {
+      newErrors.itemValue = '물건 가치를 입력해주세요.';
+    } else if (parseFloat(itemValue) < 10000) {
+      newErrors.itemValue = '물건 가치는 10,000원 이상이어야 합니다.';
+    } else if (parseFloat(itemValue) > 10000000) {
+      newErrors.itemValue = '물건 가치는 10,000,000원 이하여야 합니다.';
+    }
+
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
-  }, [weight, description]);
+  }, [weight, description, itemValue]);
 
   const validateStep3 = useCallback((): boolean => {
     const newErrors: Record<string, string> = {};
@@ -478,6 +508,7 @@ export default function CreateRequestScreen({ navigation }: Props) {
           deliveryStation: deliveryInfo,
           packageInfo,
           fee: deliveryFee.totalFee,
+          itemValue: parseFloat(itemValue),
           preferredTime: {
             departureTime: pickupTime,
             arrivalTime: deliveryTime,
@@ -516,7 +547,7 @@ export default function CreateRequestScreen({ navigation }: Props) {
       );
     } catch (error) {
       console.error('Error creating request:', error);
-      showErrorAlert(error, () => handleSubmit());
+      showErrorAlert(error, '오류', () => handleSubmit());
     } finally {
       setLoading(false);
       setIsRetrying(false);
@@ -631,6 +662,33 @@ export default function CreateRequestScreen({ navigation }: Props) {
       />
       {errors.description && <Text style={styles.errorText}>{errors.description}</Text>}
       <Text style={styles.charCount}>{description.length}/200</Text>
+      <Text style={styles.label}>물건 가치 (원)</Text>
+      <Text style={styles.hintText}>물건의 가치를 입력해주세요. (예: 100,000원)</Text>
+      <TextInput
+        style={[styles.input, errors.itemValue && styles.inputError]}
+        value={itemValue}
+        onChangeText={(text) => {
+          setItemValue(text);
+          if (errors.itemValue) {
+            setErrors(prev => ({ ...prev, itemValue: '' }));
+          }
+        }}
+        placeholder="예: 100000"
+        keyboardType="number-pad"
+        maxLength={10}
+        accessibilityLabel="물건 가치 입력"
+      />
+      {errors.itemValue && <Text style={styles.errorText}>{errors.itemValue}</Text>}
+
+      {depositAmount > 0 && (
+        <View style={styles.depositInfoCard}>
+          <Text style={styles.depositInfoTitle}>보증금 안내</Text>
+          <Text style={styles.depositInfoText}>물건 가치: {parseInt(itemValue).toLocaleString()}원</Text>
+          <Text style={styles.depositInfoText}>보증금 (80%): {depositAmount.toLocaleString()}원</Text>
+          <Text style={styles.depositInfoNote}>길러가 배송을 수락할 때 보증금이 결제됩니다.</Text>
+        </View>
+      )}
+
 
       <View style={styles.switchContainer}>
         <TouchableOpacity
@@ -1045,7 +1103,10 @@ export default function CreateRequestScreen({ navigation }: Props) {
       <OptimizedStationSelectModal
         visible={showStationPicker}
         onClose={() => setShowStationPicker(false)}
+        stations={stations}
         onSelectStation={(station) => {
+          setErrors(prev => ({ ...prev, pickupStation: '', deliveryStation: '' }));
+          
           if (pickerType === 'pickup') {
             setPickupStation(station);
           } else {
@@ -1507,5 +1568,28 @@ function createStyles(
       fontSize: typo.fontSize.base,
       fontWeight: typo.fontWeight.semibold,
     },
+    depositInfoCard: {
+      backgroundColor: colors.accentLight,
+      borderRadius: radius.md,
+      padding: space.md,
+      marginTop: space.md,
+    },
+    depositInfoTitle: {
+      fontSize: typo.fontSize.sm,
+      fontWeight: typo.fontWeight.bold,
+      color: colors.accent,
+      marginBottom: space.xs,
+    },
+    depositInfoText: {
+      fontSize: typo.fontSize.sm,
+      color: colors.text,
+      marginBottom: space.xs,
+    },
+    depositInfoNote: {
+      fontSize: typo.fontSize.xs,
+      color: colors.gray500,
+      marginTop: space.sm,
+    },
+
   });
 }

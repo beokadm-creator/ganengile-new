@@ -11,7 +11,7 @@ import {
   TouchableOpacity,
   Animated,
 } from 'react-native';
-import { doc, getDoc, onSnapshot } from 'firebase/firestore';
+import { doc, onSnapshot, updateDoc } from 'firebase/firestore';
 import { db } from '../../core/firebase';
 import { useAuth } from '../../contexts/AuthContext';
 import { Colors, Typography, Spacing, BorderRadius } from '../../theme';
@@ -22,9 +22,9 @@ interface ModeToggleSwitchProps {
 
 export default function ModeToggleSwitch({ onModeChange }: ModeToggleSwitchProps) {
   const { user } = useAuth();
-  const [onetimeMode, setOnetimeMode] = useState(false);
+  const [onetimeMode, setOnetimeMode] = useState(true);
   const [loading, setLoading] = useState(true);
-  const [animValue] = useState(new Animated.Value(0));
+  const [animValue] = useState(new Animated.Value(1));
 
   useEffect(() => {
     if (!user?.uid) return;
@@ -36,7 +36,7 @@ export default function ModeToggleSwitch({ onModeChange }: ModeToggleSwitchProps
 
         // 애니메이션
         Animated.timing(animValue, {
-          toValue: enabled ? 1 : 0,
+          toValue: enabled ? 0 : 1,
           duration: 200,
           useNativeDriver: true,
         }).start();
@@ -51,9 +51,18 @@ export default function ModeToggleSwitch({ onModeChange }: ModeToggleSwitchProps
     return () => unsubscribe();
   }, [user?.uid]);
 
-  const handleToggle = () => {
-    // 토글 이벤트는 부모 컴포넌트에서 처리
-    // 여기서는 UI만 표시
+  const handleToggle = async () => {
+    if (!user?.uid) return;
+    
+    const newValue = !onetimeMode;
+    
+    try {
+      await updateDoc(doc(db, 'users', user.uid), {
+        onetimeModeEnabled: newValue,
+      });
+    } catch (error) {
+      console.error('Error toggling onetime mode:', error);
+    }
   };
 
   if (loading) {
@@ -102,18 +111,18 @@ export default function ModeToggleSwitch({ onModeChange }: ModeToggleSwitchProps
               <Text
                 style={[
                   styles.toggleLabel,
-                  !onetimeMode && styles.toggleLabelActive,
-                ]}
-              >
-                정기 동선
-              </Text>
-              <Text
-                style={[
-                  styles.toggleLabel,
                   onetimeMode && styles.toggleLabelActive,
                 ]}
               >
                 일회성
+              </Text>
+              <Text
+                style={[
+                  styles.toggleLabel,
+                  !onetimeMode && styles.toggleLabelActive,
+                ]}
+              >
+                정기 동선
               </Text>
             </View>
           </View>
@@ -123,7 +132,7 @@ export default function ModeToggleSwitch({ onModeChange }: ModeToggleSwitchProps
       {/* 상태 텍스트 */}
       <View style={styles.statusContainer}>
         <Text style={styles.statusIcon}>
-          {onetimeMode ? '💫' : '🔄'}
+          {onetimeMode ? '🔥' : '🔄'}
         </Text>
         <Text style={styles.statusText}>
           {onetimeMode ? '일회성 모드' : '정기 동선 모드'}
@@ -208,7 +217,7 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   description: {
-    ...Typography.caption,
+    ...Typography.bodySmall,
     color: Colors.textSecondary,
     marginTop: Spacing.xs,
   },

@@ -21,7 +21,7 @@ export class TransferMatchingService {
     console.log('🔄 Transfer matching started:', request.requestId);
 
     // 1. 선호 환승역이 있으면 해당 역 확인
-    let preferredTransferStations: TransferStation[] = [];
+    const preferredTransferStations: TransferStation[] = [];
 
     if (request.preferredTransferStation) {
       const station = await this.getTransferStation(request.preferredTransferStation);
@@ -140,7 +140,7 @@ export class TransferMatchingService {
     return {
       id: stationId,
       stationId,
-      stationName: station.name,
+      stationName: station.stationName || station.name || '',
       line: station.line,
       lineCode: station.lineCode,
       lat: station.lat,
@@ -180,7 +180,7 @@ export class TransferMatchingService {
         transferStations.push({
           id: doc.id,
           stationId: doc.id,
-          stationName: station.name,
+          stationName: station.stationName || station.name || '',
           line: station.line,
           lineCode: station.lineCode,
           lat: station.lat,

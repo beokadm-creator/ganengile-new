@@ -11,6 +11,7 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 import * as Notifications from 'expo-notifications';
 
 import { UserProvider, useUser } from '../contexts/UserContext';
+import { AuthProvider } from '../contexts/AuthContext';
 import type { RootStackParamList } from '../types/navigation';
 
 import AuthNavigator from './AuthNavigator';
@@ -29,6 +30,8 @@ function AppNavigatorContent() {
 
   // Set up notification listeners on mount - run once on app startup
   useEffect(() => {
+    if (Platform.OS === 'web') return;
+
     notificationResponseListener.current = Notifications.addNotificationResponseReceivedListener(
       (response) => {
         handleNotificationResponse(response);
@@ -87,9 +90,11 @@ function AppNavigatorContent() {
 export default function AppNavigator() {
   return (
     <SafeAreaProvider>
-      <UserProvider>
-        <AppNavigatorContent />
-      </UserProvider>
+      <AuthProvider>
+        <UserProvider>
+          <AppNavigatorContent />
+        </UserProvider>
+      </AuthProvider>
     </SafeAreaProvider>
   );
 }

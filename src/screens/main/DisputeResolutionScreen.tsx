@@ -458,7 +458,7 @@ const styles = StyleSheet.create({
     borderRadius: BorderRadius.sm,
   },
   urgencyBadgeText: {
-    ...Typography.caption,
+    ...Typography.bodySmall,
     color: Colors.white,
     fontWeight: '600',
   },

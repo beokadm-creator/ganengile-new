@@ -216,7 +216,7 @@ export default function GillerPickupFromLockerScreen({ route, navigation }: Prop
 
     try {
       // 사진 업로드 (있는 경우)
-      let proofPhotoUri = photo || '';
+      const proofPhotoUri = photo || '';
 
       // Request 정보를 가져와서 verificationCode 추출
       const { getRequestById } = await import('../../services/request-service');
@@ -277,7 +277,7 @@ export default function GillerPickupFromLockerScreen({ route, navigation }: Prop
     if (cameraPermission === null) {
       return (
         <View style={styles.centerContainer}>
-          <ActivityIndicator size="large" color={Colors.primary.cyan} />
+          <ActivityIndicator size="large" color={Colors.primary} />
           <Text style={styles.loadingText}>카메라 권한 확인 중...</Text>
         </View>
       );
@@ -310,7 +310,7 @@ export default function GillerPickupFromLockerScreen({ route, navigation }: Prop
           <Text style={styles.scanText}>QR코드를 프레임 안에 맞춰주세요</Text>
           {loading && (
             <View style={styles.loadingOverlay}>
-              <ActivityIndicator size="large" color={Colors.primary.cyan} />
+              <ActivityIndicator size="large" color={Colors.primary} />
               <Text style={styles.loadingText}>QR코드 확인 중...</Text>
             </View>
           )}
@@ -554,48 +554,48 @@ export default function GillerPickupFromLockerScreen({ route, navigation }: Prop
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: Colors.background.light,
+    backgroundColor: Colors.background,
   },
   progressBarContainer: {
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: Spacing.md,
     paddingVertical: Spacing.sm,
-    backgroundColor: Colors.background.white,
+    backgroundColor: Colors.white,
     borderBottomWidth: 1,
-    borderBottomColor: Colors.border.light,
+    borderBottomColor: Colors.border,
   },
   progressBar: {
     flex: 1,
     height: 8,
-    backgroundColor: Colors.border.light,
+    backgroundColor: Colors.border,
     borderRadius: BorderRadius.sm,
     overflow: 'hidden',
   },
   progressFill: {
     height: '100%',
-    backgroundColor: Colors.primary.cyan,
+    backgroundColor: Colors.primary,
   },
   progressText: {
-    ...Typography.body.small,
+    ...Typography.bodySmall,
     marginLeft: Spacing.sm,
-    color: Colors.text.secondary,
+    color: Colors.textSecondary,
     fontWeight: '600',
   },
   header: {
     padding: Spacing.lg,
-    backgroundColor: Colors.background.white,
+    backgroundColor: Colors.white,
     borderBottomWidth: 1,
-    borderBottomColor: Colors.border.light,
+    borderBottomColor: Colors.border,
   },
   stepTitle: {
-    ...Typography.heading.h3,
-    color: Colors.text.primary,
+    ...Typography.h3,
+    color: Colors.textPrimary,
     marginBottom: Spacing.xs,
   },
   stepDescription: {
-    ...Typography.body.medium,
-    color: Colors.text.secondary,
+    ...Typography.bodyMedium,
+    color: Colors.textSecondary,
   },
   scrollView: {
     flex: 1,
@@ -609,7 +609,7 @@ const styles = StyleSheet.create({
     height: SCREEN_WIDTH * 1.2,
     borderRadius: BorderRadius.lg,
     overflow: 'hidden',
-    backgroundColor: Colors.text.primary,
+    backgroundColor: Colors.textPrimary,
   },
   camera: {
     flex: 1,
@@ -623,13 +623,13 @@ const styles = StyleSheet.create({
     width: 250,
     height: 250,
     borderWidth: 2,
-    borderColor: Colors.primary.cyan,
+    borderColor: Colors.primary,
     borderRadius: BorderRadius.md,
     backgroundColor: 'rgba(255, 255, 255, 0.1)',
   },
   scanText: {
-    ...Typography.body.medium,
-    color: Colors.background.white,
+    ...Typography.bodyMedium,
+    color: Colors.white,
     marginTop: Spacing.lg,
     textAlign: 'center',
   },
@@ -640,8 +640,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   loadingText: {
-    ...Typography.body.medium,
-    color: Colors.background.white,
+    ...Typography.bodyMedium,
+    color: Colors.white,
     marginTop: Spacing.sm,
   },
 
@@ -650,8 +650,8 @@ const styles = StyleSheet.create({
     padding: Spacing.lg,
   },
   infoTitle: {
-    ...Typography.heading.h4,
-    color: Colors.text.primary,
+    ...Typography.h4,
+    color: Colors.textPrimary,
     marginBottom: Spacing.md,
   },
   infoRow: {
@@ -660,22 +660,22 @@ const styles = StyleSheet.create({
     marginBottom: Spacing.sm,
   },
   infoLabel: {
-    ...Typography.body.medium,
-    color: Colors.text.secondary,
+    ...Typography.bodyMedium,
+    color: Colors.textSecondary,
   },
   infoValue: {
-    ...Typography.body.medium,
-    color: Colors.text.primary,
+    ...Typography.bodyMedium,
+    color: Colors.textPrimary,
     fontWeight: '600',
   },
   divider: {
     height: 1,
-    backgroundColor: Colors.border.light,
+    backgroundColor: Colors.border,
     marginVertical: Spacing.md,
   },
   infoNote: {
-    ...Typography.body.small,
-    color: Colors.text.secondary,
+    ...Typography.bodySmall,
+    color: Colors.textSecondary,
     marginBottom: Spacing.xs,
   },
 
@@ -691,13 +691,13 @@ const styles = StyleSheet.create({
     fontSize: 80,
   },
   openLockerTitle: {
-    ...Typography.heading.h3,
-    color: Colors.text.primary,
+    ...Typography.h3,
+    color: Colors.textPrimary,
     marginBottom: Spacing.sm,
   },
   openLockerDescription: {
-    ...Typography.body.medium,
-    color: Colors.text.secondary,
+    ...Typography.bodyMedium,
+    color: Colors.textSecondary,
     textAlign: 'center',
     marginBottom: Spacing.xl,
   },
@@ -707,14 +707,14 @@ const styles = StyleSheet.create({
     padding: Spacing.lg,
   },
   confirmTitle: {
-    ...Typography.heading.h3,
-    color: Colors.text.primary,
+    ...Typography.h3,
+    color: Colors.textPrimary,
     textAlign: 'center',
     marginBottom: Spacing.sm,
   },
   confirmDescription: {
-    ...Typography.body.medium,
-    color: Colors.text.secondary,
+    ...Typography.bodyMedium,
+    color: Colors.textSecondary,
     textAlign: 'center',
     marginBottom: Spacing.xl,
   },
@@ -724,30 +724,30 @@ const styles = StyleSheet.create({
     marginBottom: Spacing.lg,
   },
   photoNote: {
-    ...Typography.body.medium,
-    color: Colors.text.primary,
+    ...Typography.bodyMedium,
+    color: Colors.textPrimary,
     marginBottom: Spacing.sm,
   },
   retakeButton: {
     padding: Spacing.sm,
   },
   retakeButtonText: {
-    ...Typography.body.small,
-    color: Colors.primary.cyan,
+    ...Typography.bodySmall,
+    color: Colors.primary,
   },
   photoButton: {
     padding: Spacing.xl,
-    backgroundColor: Colors.background.white,
+    backgroundColor: Colors.white,
     borderRadius: BorderRadius.md,
     borderWidth: 2,
-    borderColor: Colors.primary.cyan,
+    borderColor: Colors.primary,
     borderStyle: 'dashed',
     alignItems: 'center',
     marginBottom: Spacing.lg,
   },
   photoButtonText: {
-    ...Typography.body.large,
-    color: Colors.primary.cyan,
+    ...Typography.bodyLarge,
+    color: Colors.primary,
   },
 
   // Complete Step
@@ -760,19 +760,19 @@ const styles = StyleSheet.create({
     marginBottom: Spacing.lg,
   },
   completeTitle: {
-    ...Typography.heading.h2,
-    color: Colors.text.primary,
+    ...Typography.h2,
+    color: Colors.textPrimary,
     marginBottom: Spacing.sm,
   },
   completeDescription: {
-    ...Typography.body.large,
-    color: Colors.text.secondary,
+    ...Typography.bodyLarge,
+    color: Colors.textSecondary,
     textAlign: 'center',
     marginBottom: Spacing.sm,
   },
   completeNote: {
-    ...Typography.body.small,
-    color: Colors.text.tertiary,
+    ...Typography.bodySmall,
+    color: Colors.textTertiary,
   },
 
   // Common
@@ -784,8 +784,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   backButtonText: {
-    ...Typography.body.medium,
-    color: Colors.text.secondary,
+    ...Typography.bodyMedium,
+    color: Colors.textSecondary,
   },
   cancelButton: {
     position: 'absolute',
@@ -795,25 +795,25 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   cancelButtonText: {
-    ...Typography.body.medium,
-    color: Colors.primary.cyan,
+    ...Typography.bodyMedium,
+    color: Colors.primary,
   },
 
   // Error
   errorCard: {
     padding: Spacing.lg,
-    backgroundColor: Colors.error.light,
-    borderColor: Colors.error.main,
+    backgroundColor: Colors.errorLight,
+    borderColor: Colors.error,
     marginBottom: Spacing.md,
   },
   errorTitle: {
-    ...Typography.heading.h5,
-    color: Colors.error.main,
+    ...Typography.h4,
+    color: Colors.error,
     marginBottom: Spacing.xs,
   },
   errorMessage: {
-    ...Typography.body.medium,
-    color: Colors.text.primary,
+    ...Typography.bodyMedium,
+    color: Colors.textPrimary,
     marginBottom: Spacing.sm,
   },
   retryButton: {
@@ -821,8 +821,8 @@ const styles = StyleSheet.create({
     alignItems: 'flex-start',
   },
   retryButtonText: {
-    ...Typography.body.small,
-    color: Colors.primary.cyan,
+    ...Typography.bodySmall,
+    color: Colors.primary,
     fontWeight: '600',
   },
 
@@ -834,8 +834,8 @@ const styles = StyleSheet.create({
     padding: Spacing.xl,
   },
   errorText: {
-    ...Typography.body.medium,
-    color: Colors.text.secondary,
+    ...Typography.bodyMedium,
+    color: Colors.textSecondary,
     marginBottom: Spacing.lg,
     textAlign: 'center',
   },

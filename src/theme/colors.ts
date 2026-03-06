@@ -55,6 +55,20 @@ export const Colors = {
   textSecondary: '#666666',
   textTertiary: '#999999',
   textWhite: '#FFFFFF',
+
+  text: {
+    primary: '#333333',
+    secondary: '#666666',
+    tertiary: '#999999',
+    white: '#FFFFFF',
+    disabled: '#BDBDBD',
+  },
+
+  // Compatibility Aliases for older screens
+  background: '#FAFAFA',
+  surface: '#FFFFFF',
+  border: '#EEEEEE',
+  errorBackground: '#FFCDD2',
 };
 
 export type ColorKeys = keyof typeof Colors;

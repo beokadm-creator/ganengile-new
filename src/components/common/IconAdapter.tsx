@@ -5,7 +5,7 @@
 
 import React from 'react';
 import { Platform } from 'react-native';
-import { MaterialIcons, Ionicons } from '@expo/vector-icons';
+import { MaterialIcons } from '@expo/vector-icons';
 
 // 아이콘 이름 → Emoji 매핑
 const iconEmojiMap: Record<string, string> = {

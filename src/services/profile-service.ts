@@ -23,6 +23,10 @@ const PROFILE_COLLECTION = 'profile';
  */
 export async function getUserProfile(userId: string): Promise<UserProfile | null> {
   try {
+    if (!userId) {
+      console.error('getUserProfile: userId is required');
+      return null;
+    }
     const profileRef = doc(db, 'users', userId, PROFILE_COLLECTION, userId);
     const docSnapshot = await getDoc(profileRef);
 
@@ -31,10 +35,14 @@ export async function getUserProfile(userId: string): Promise<UserProfile | null
     }
 
     const data = docSnapshot.data();
+    if (!data) {
+      return null;
+    }
+
     return {
       userId: data.userId || userId,
       name: data.name || '',
-      phoneNumber: data.phoneNumber,
+      phoneNumber: data.phoneNumber || '',
       profilePhotoUrl: data.profilePhotoUrl,
       bankAccount: data.bankAccount,
       gillerInfo: data.gillerInfo,

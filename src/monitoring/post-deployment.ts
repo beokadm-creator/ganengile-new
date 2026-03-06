@@ -3,7 +3,7 @@
  * Firebase Crashlytics, Performance 모니터링, 사용자 피드백 수집
  */
 
-import { useEffect, useRef } from 'react';
+import { Platform } from 'react-native';
 import { Platform } from 'react-native';
 import * as Analytics from 'expo-firebase-analytics';
 import * as Crashlytics from '@sentry/react-native';
@@ -93,43 +93,39 @@ export const setupUserFeedback = () => {
  * Firebase Crashlytics 통합
  */
 export const setupFirebaseCrashlytics = () => {
-  useEffect(() => {
-    if (__DEV__) return;
+  if (__DEV__) return;
 
-    // Firebase Crashlytics 초기화
-    const crashlytics = require('@sentry/react-native');
-    
-    // 자동 크래시 리포트 활성화
-    if (crashlytics.enableAutoSessionTracking) {
-      crashlytics.enableAutoSessionTracking({
-        sessionSamplingRate: 1.0
-      });
-    }
+  // Firebase Crashlytics 초기화
+  const crashlytics = require('@sentry/react-native');
+  
+  // 자동 크래시 리포트 활성화
+  if (crashlytics.enableAutoSessionTracking) {
+    crashlytics.enableAutoSessionTracking({
+      sessionSamplingRate: 1.0
+    });
+  }
 
-    console.log('✅ Firebase Crashlytics enabled');
-  }, []);
+  console.log('✅ Firebase Crashlytics enabled');
 };
 
 /**
  * 앱 충돌 보고
  */
 export const setupNativeCrashReporting = () => {
-  useEffect(() => {
-    if (__DEV__) return;
+  if (__DEV__) return;
 
-    // 네이티브 충돌 리포트 설정
-    const crashHandler = (error: Error, isFatal: boolean) => {
-      Crashlytics.captureException(error, {
-        level: isFatal ? 'fatal' : 'error'
-      });
-    };
+  // 네이티브 충돌 리포트 설정
+  const crashHandler = (error: Error, isFatal: boolean) => {
+    Crashlytics.captureException(error, {
+      level: isFatal ? 'fatal' : 'error'
+    });
+  };
 
-    // 전역 에러 핸들러
-    global.ErrorUtils = global.ErrorUtils || {};
-    global.ErrorUtils.setGlobalHandler(crashHandler);
+  // 전역 에러 핸들러
+  global.ErrorUtils = global.ErrorUtils || {};
+  global.ErrorUtils.setGlobalHandler(crashHandler);
 
-    console.log('✅ Native crash reporting enabled');
-  }, []);
+  console.log('✅ Native crash reporting enabled');
 };
 
 /**

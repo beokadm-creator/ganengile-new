@@ -16,6 +16,10 @@ import * as FileSystem from 'expo-file-system';
 import { getStorage, ref, uploadBytesResumable, getDownloadURL, deleteObject } from 'firebase/storage';
 import { firebaseApp } from './firebase';
 
+declare global {
+  var atob: (data: string) => string;
+}
+
 export interface MediaUploadResult {
   url: string;
   path: string;

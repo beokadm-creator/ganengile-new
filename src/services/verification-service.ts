@@ -28,6 +28,10 @@ export async function getUserVerification(
   userId: string
 ): Promise<UserVerification | null> {
   try {
+    if (!userId) {
+      console.error('getUserVerification: userId is required');
+      return null;
+    }
     const verificationRef = doc(db, 'users', userId, VERIFICATION_COLLECTION, userId);
     const docSnapshot = await getDoc(verificationRef);
 
@@ -36,6 +40,10 @@ export async function getUserVerification(
     }
 
     const data = docSnapshot.data();
+    if (!data) {
+      return null;
+    }
+
     return {
       userId: data.userId || userId,
       status: data.status || 'pending',

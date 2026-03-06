@@ -3,11 +3,11 @@
  * 배송 방식 선택 및 사물함 연동 확장
  */
 
-import React, { useState } from 'react';
+import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, ScrollView } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { Colors, Spacing, Typography, BorderRadius } from '../../theme';
-import type { DeliveryMethod, DeliveryMethodOption } from '../../types/delivery-method';
+import type { DeliveryMethod } from '../../types/delivery-method';
 import { DELIVERY_METHODS } from '../../types/delivery-method';
 
 // 배송 방식 선택 UI 컴포넌트

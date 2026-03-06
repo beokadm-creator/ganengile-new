@@ -1,9 +1,17 @@
+import { SettlementPeriod } from './b2b-settlement';
+
 /**
  * 세금계산서 타입 정의
- * 
- * B2B 고객사에게 발행하는 세금계산서 정보를 관리합니다.
- * 기획 문서: PLANNING_B2B_BUSINESS.md
  */
+
+/**
+ * 세금계산서 상태
+ */
+export type TaxInvoiceStatus = 
+  | "issued"
+  | "sent"
+  | "paid"
+  | "overdue";
 
 /**
  * 공급받는자 (B2B 고객사) 정보
@@ -45,40 +53,13 @@ export interface TaxInvoiceSupplier {
  * 세금계산서 상세 내역
  */
 export interface TaxInvoiceItems {
-  /** 구독료 */
   subscriptionFee: number;
-  /** 배송 건수 */
   deliveryCount: number;
-  /** 배송비 */
   deliveryFee: number;
-  /** 총액 (부가세 제외) */
   totalAmount: number;
-  /** 부가세 (10%) */
   tax: number;
 }
 
-/**
- * 세금계산서 상태
- */
-export type TaxInvoiceStatus = 
-  | "issued"    // 발행됨
-  | "sent"      // 발송됨
-  | "paid"      // 결제완료
-  | "overdue";  // 연체됨
-
-/**
- * 세금계산서 정산 기간
- */
-export interface SettlementPeriod {
-  /** 정산 기간 시작 */
-  start: Date;
-  /** 정산 기간 종료 */
-  end: Date;
-}
-
-/**
- * 세금계산서 인터페이스
- */
 export interface TaxInvoice {
   /** 세금계산서 ID */
   invoiceId: string;

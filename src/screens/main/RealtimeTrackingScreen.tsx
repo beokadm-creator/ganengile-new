@@ -376,7 +376,7 @@ const styles = StyleSheet.create({
     marginTop: Spacing.sm,
   },
   infoText: {
-    ...Typography.caption,
+    ...Typography.bodySmall,
     color: Colors.textSecondary,
   },
   bottomPanel: {

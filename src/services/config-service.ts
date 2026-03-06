@@ -87,9 +87,9 @@ function convertDocument<T>(
 function convertStation(data: any): Station {
   return {
     stationId: data.stationId,
-    stationName: data.stationName,
-    stationNameEnglish: data.stationNameEnglish,
-    lines: data.lines,
+    stationName: data.stationName || data.name || '',
+    stationNameEnglish: data.stationNameEnglish || data.nameEnglish || '',
+    lines: data.lines || [],
     location: data.location,
     isTransferStation: data.isTransferStation,
     isExpressStop: data.isExpressStop ?? false,

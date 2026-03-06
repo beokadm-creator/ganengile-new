@@ -31,18 +31,18 @@ interface Props {
 
 export default function ModeToggleSwitch({ mode, onModeChange, style }: Props) {
   const [sliderAnim] = useState(new Animated.Value(0));
-  const insets = useSafeAreaInsets();
+  const _insets = useSafeAreaInsets();
 
   useEffect(() => {
     // 모드 변경 시 애니메이션
     Animated.timing(sliderAnim, {
-      toValue: mode === 'regular' ? 0 : 1,
+      toValue: mode === 'onetime' ? 0 : 1,
       duration: 300,
       useNativeDriver: true,
     }).start();
   }, [mode]);
 
-  const handleModeToggle = () => {
+  const _handleModeToggle = () => {
     const newMode: GillerMode = mode === 'regular' ? 'onetime' : 'regular';
     onModeChange(newMode);
   };
@@ -61,9 +61,9 @@ export default function ModeToggleSwitch({ mode, onModeChange, style }: Props) {
       <View style={styles.header}>
         <Text style={styles.headerTitle}>길러 모드</Text>
         <Text style={styles.headerSubtitle}>
-          {mode === 'regular'
-            ? '등록된 동선으로 배송합니다'
-            : '현재 위치에서 일회성 배송을 수락합니다'}
+          {mode === 'onetime'
+            ? '현재 위치에서 일회성 배송을 수락합니다'
+            : '등록된 동선으로 배송합니다'}
         </Text>
       </View>
 
@@ -71,30 +71,9 @@ export default function ModeToggleSwitch({ mode, onModeChange, style }: Props) {
       <View style={styles.toggleContainer}>
         {/* 배경 */}
         <View style={styles.toggleBackground}>
-          {/* 정기 동선 모드 */}
-          <TouchableOpacity
-            style={[styles.modeButton, styles.modeButtonLeft]}
-            onPress={() => onModeChange('regular')}
-            activeOpacity={0.7}
-          >
-            <View style={styles.modeContent}>
-              <Text style={[styles.modeIcon, mode === 'regular' && styles.modeIconActive]}>
-                🗓️
-              </Text>
-              <Text style={[styles.modeTitle, mode === 'regular' && styles.modeTitleActive]}>
-                정기 동선
-              </Text>
-              <Text
-                style={[styles.modeDescription, mode === 'regular' && styles.modeDescriptionActive]}
-              >
-                등록된 동선으로 배송
-              </Text>
-            </View>
-          </TouchableOpacity>
-
           {/* 일회성 모드 */}
           <TouchableOpacity
-            style={[styles.modeButton, styles.modeButtonRight]}
+            style={[styles.modeButton, styles.modeButtonLeft]}
             onPress={() => onModeChange('onetime')}
             activeOpacity={0.7}
           >
@@ -109,6 +88,27 @@ export default function ModeToggleSwitch({ mode, onModeChange, style }: Props) {
                 style={[styles.modeDescription, mode === 'onetime' && styles.modeDescriptionActive]}
               >
                 현재 위치에서 수락
+              </Text>
+            </View>
+          </TouchableOpacity>
+
+          {/* 정기 동선 모드 */}
+          <TouchableOpacity
+            style={[styles.modeButton, styles.modeButtonRight]}
+            onPress={() => onModeChange('regular')}
+            activeOpacity={0.7}
+          >
+            <View style={styles.modeContent}>
+              <Text style={[styles.modeIcon, mode === 'regular' && styles.modeIconActive]}>
+                🗓️
+              </Text>
+              <Text style={[styles.modeTitle, mode === 'regular' && styles.modeTitleActive]}>
+                정기 동선
+              </Text>
+              <Text
+                style={[styles.modeDescription, mode === 'regular' && styles.modeDescriptionActive]}
+              >
+                등록된 동선으로 배송
               </Text>
             </View>
           </TouchableOpacity>
@@ -243,7 +243,7 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
   modeDescription: {
-    ...Typography.caption,
+    ...Typography.bodySmall,
     color: Colors.textDisabled,
     textAlign: 'center',
     paddingHorizontal: Spacing.xs,

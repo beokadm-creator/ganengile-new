@@ -23,7 +23,7 @@ interface Props {
   navigation: NavigationProp;
 }
 
-export default function MyRatingScreen({ navigation }: Props) {
+export default function MyRatingScreen({ navigation: _navigation }: Props) {
   const { user } = useUser();
   const [loading, setLoading] = useState(true);
   const [rating, setRating] = useState<{

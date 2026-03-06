@@ -3,7 +3,7 @@
  * 사물함 위치 지도 컴포넌트
  */
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useCallback } from 'react';
 import {
   View,
   Text,
@@ -18,7 +18,6 @@ import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect } from '@react-navigation/native';
 import type { Locker, LockerSummary } from '../../types/locker';
 import { getAvailableLockers, getLockersByStation, createLockerLocation } from '../../services/locker-service';
-import { getAllStations } from '../../services/config-service';
 import { Colors, Spacing, Typography, BorderRadius } from '../../theme';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');

@@ -670,12 +670,12 @@ const styles = StyleSheet.create({
     marginBottom: Spacing.xs,
   },
   tierBadgeText: {
-    ...Typography.caption,
+    ...Typography.bodySmall,
     color: Colors.white,
     fontWeight: '600',
   },
   earnedDate: {
-    ...Typography.caption,
+    ...Typography.bodySmall,
     color: Colors.textSecondary,
   },
   textNotEarned: {

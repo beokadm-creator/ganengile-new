@@ -350,7 +350,7 @@ const styles = StyleSheet.create({
     ...Shadows.sm,
   },
   stationLabel: {
-    ...Typography.caption,
+    ...Typography.bodySmall,
     color: Colors.text.secondary,
     marginBottom: Spacing.xs,
   },
@@ -432,7 +432,7 @@ const styles = StyleSheet.create({
     marginBottom: Spacing.xs,
   },
   costNote: {
-    ...Typography.caption,
+    ...Typography.bodySmall,
     color: Colors.text.tertiary,
   },
   submitButton: {
@@ -471,7 +471,7 @@ const styles = StyleSheet.create({
     color: Colors.text.primary,
   },
   inputNote: {
-    ...Typography.caption,
+    ...Typography.bodySmall,
     color: Colors.text.tertiary,
     marginTop: Spacing.xs,
   },

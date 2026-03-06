@@ -459,7 +459,7 @@ const styles = StyleSheet.create({
     borderRadius: BorderRadius.sm,
   },
   gradeText: {
-    ...Typography.caption,
+    ...Typography.bodySmall,
     color: '#fff',
     marginLeft: Spacing.xs,
   },
@@ -481,7 +481,7 @@ const styles = StyleSheet.create({
     fontSize: 12,
   },
   moreBadgesText: {
-    ...Typography.caption,
+    ...Typography.bodySmall,
     color: Colors.text.secondary,
   },
   gillerStats: {

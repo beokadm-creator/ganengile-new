@@ -72,7 +72,7 @@ export default function RequestDetailScreen({ navigation, route }: Props) {
         return;
       }
 
-      const typedRequest = requestData as Request;
+      const typedRequest = requestData;
       setRequest(typedRequest);
       setDetailView(toRequestDetailView(typedRequest));
 
