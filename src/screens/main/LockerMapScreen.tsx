@@ -9,7 +9,7 @@
  * - 필터 (공공/민간, 요금)
  */
 
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -18,10 +18,10 @@ import {
   TouchableOpacity,
   ActivityIndicator,
   Alert,
-  Image,
+  Platform,
 } from 'react-native';
 import { StackNavigationProp } from '@react-navigation/stack';
-import { getFirestore, collection, query, where, getDocs, doc, getDoc } from 'firebase/firestore';
+import { getFirestore, collection, query, where, getDocs, getDoc } from 'firebase/firestore';
 import { requireUserId } from '../../services/firebase';
 import { Colors, Typography, Spacing, BorderRadius } from '../../theme';
 

@@ -84,26 +84,28 @@ export async function clearOnboardingData(): Promise<void> {
 /**
  * 현재 사용자 역할 저장
  */
-export async function saveCurrentRole(role: 'gller' | 'giller' | 'both'): Promise<void> {
+export function saveCurrentRole(role: 'gller' | 'giller' | 'both'): Promise<void> {
   try {
     // await AsyncStorage.setItem(KEYS.USER_ROLE, role);
     console.log('💾 Current role saved:', role);
+    return Promise.resolve();
   } catch (error) {
     console.error('Error saving current role:', error);
+    return Promise.reject(error);
   }
 }
 
 /**
  * 현재 사용자 역할 가져오기
  */
-export async function getCurrentRole(): Promise<'gller' | 'giller' | 'both' | null> {
+export function getCurrentRole(): Promise<'gller' | 'giller' | 'both' | null> {
   try {
     // const role = await AsyncStorage.getItem(KEYS.USER_ROLE);
     // return role as 'gller' | 'giller' | 'both' | null;
     console.log('💾 Current role retrieved');
-    return null;
+    return Promise.resolve(null);
   } catch (error) {
     console.error('Error getting current role:', error);
-    return null;
+    return Promise.resolve(null);
   }
 }

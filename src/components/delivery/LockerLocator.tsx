@@ -20,7 +20,7 @@ import type { Locker, LockerSummary } from '../../types/locker';
 import { getAvailableLockers, getLockersByStation, createLockerLocation } from '../../services/locker-service';
 import { Colors, Spacing, Typography, BorderRadius } from '../../theme';
 
-const { width: SCREEN_WIDTH } = Dimensions.get('window');
+const { width: _SCREEN_WIDTH } = Dimensions.get('window');
 
 interface LockerLocatorProps {
   /** 선택된 역 ID (선택사항) */
@@ -33,7 +33,7 @@ interface LockerLocatorProps {
 
 export default function LockerLocator({ selectedStationId, onLockerSelect, onClose }: LockerLocatorProps) {
   const [lockers, setLockers] = useState<LockerLocation[]>([]);
-  const [selectedStation, setSelectedStation] = useState<string | undefined>(selectedStationId);
+  const selectedStation = selectedStationId;
   const [loading, setLoading] = useState(true);
   const [viewMode, setViewMode] = useState<'list' | 'map'>('list');
 

@@ -119,7 +119,6 @@ export default function LevelBenefitsScreen({ navigation: _navigation }: Props) 
 
   const renderLevelCard = (benefit: LevelBenefit, index: number) => {
     const isSelected = selectedLevel === benefit.level;
-    const isLast = index === LEVEL_BENEFITS.length - 1;
 
     return (
       <TouchableOpacity

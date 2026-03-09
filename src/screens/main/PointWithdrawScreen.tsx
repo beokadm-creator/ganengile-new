@@ -26,12 +26,6 @@ export default function PointWithdrawScreen({ navigation }: { navigation: Naviga
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [balance, setBalance] = useState(0);
 
-  const loadBalance = async () => {
-    const userId = 'current-user-id';
-    const bal = await PointService.getBalance(userId);
-    setBalance(bal);
-  };
-
   const validateForm = (): boolean => {
     const newErrors: Record<string, string> = {};
 

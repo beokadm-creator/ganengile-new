@@ -162,11 +162,11 @@ export class OneTimeMatchingService {
   /**
    * 매칭 점수 계산
    */
-  private static async calculateMatchScore(
+  private static calculateMatchScore(
     giller: any,
     request: DeliveryRequestP1,
     nearbyStation: any
-  ): Promise<MatchingResult> {
+  ): MatchingResult {
     // 점수 계산 로직
     const routeScore = this.calculateRouteScore(giller, request);
     const timeScore = this.calculateTimeScore(giller, request);

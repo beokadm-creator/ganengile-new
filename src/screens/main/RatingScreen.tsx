@@ -24,7 +24,7 @@ import { RatingTag, RATING_TAGS } from '../../types/rating';
 
 // Utils
 import { retryWithBackoff, retryFirebaseQuery } from '../../utils/retry-with-backoff';
-import { showErrorAlert, isNetworkError } from '../../utils/error-handler';
+import { showErrorAlert } from '../../utils/error-handler';
 import { isNetworkAvailable } from '../../utils/network-detector';
 import {
   saveRatingDraft,

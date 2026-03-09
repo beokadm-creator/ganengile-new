@@ -191,11 +191,6 @@ export default function DisputeReportScreen({ navigation, deliveryId, matchId }:
     }
   };
 
-  const getDisputeTypeLabel = (type: DisputeType): string => {
-    const found = DISPUTE_TYPES.find((t) => t.type === type);
-    return found?.label || '';
-  };
-
   const getDisputeTypeIcon = (type: DisputeType): string => {
     switch (type) {
       case 'damage':

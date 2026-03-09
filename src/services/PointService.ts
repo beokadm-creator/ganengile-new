@@ -99,7 +99,7 @@ export class PointService {
     });
 
     console.log(`💰 Points earned: ${amount} for user ${userId} (${description})`);
-    return result as PointTransaction;
+    return result;
   }
 
   static async spendPoints(
@@ -164,7 +164,7 @@ export class PointService {
     });
 
     console.log(`💸 Points spent: ${amount} for user ${userId} (${description})`);
-    return result as PointTransaction;
+    return result;
   }
 
   static async getBalance(userId: string): Promise<number> {

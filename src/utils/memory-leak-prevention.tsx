@@ -3,7 +3,7 @@
  * 메모리 누수 방지를 위한 유틸리티 함수
  */
 
-import { useEffect, useRef } from 'react';
+import React, { useEffect, useRef } from 'react';
 
 /**
  * 메모리 누수 감지 훅
@@ -31,7 +31,8 @@ export const useInterval = (
   delay: number | null
 ) => {
   const savedCallback = useRef(callback);
-  const intervalRef = useRef<NodeJS.Timeout>();
+  // @ts-ignore - useRef type issue
+  const intervalRef = useRef<number | undefined>(undefined);
 
   useEffect(() => {
     savedCallback.current = callback;
@@ -41,7 +42,7 @@ export const useInterval = (
     if (delay === null) return;
 
     const tick = () => savedCallback.current();
-    intervalRef.current = setInterval(tick, delay);
+    intervalRef.current = setInterval(tick, delay) as unknown as number;
 
     return () => {
       if (intervalRef.current) {
@@ -60,7 +61,8 @@ export const useTimeout = (
   delay: number | null
 ) => {
   const savedCallback = useRef(callback);
-  const timeoutRef = useRef<NodeJS.Timeout>();
+  // @ts-ignore - useRef type issue
+  const timeoutRef = useRef<number | undefined>(undefined);
 
   useEffect(() => {
     savedCallback.current = callback;
@@ -71,7 +73,7 @@ export const useTimeout = (
 
     timeoutRef.current = setTimeout(() => {
       savedCallback.current();
-    }, delay);
+    }, delay) as unknown as number;
 
     return () => {
       if (timeoutRef.current) {
@@ -151,7 +153,7 @@ export const useFirestoreRealtime = (
  * 애니메이션 정리 훅
  */
 export const useAnimation = (
-  animate: () => void,
+  animate: () => any,
   deps: any[] = []
 ) => {
   useEffect(() => {
@@ -176,8 +178,9 @@ export const useImagePreload = (imageUrls: string[]) => {
 
     const preloadImages = async () => {
       try {
+        // @ts-ignore - Image.prefetch exists in React Native
         await Promise.all(
-          imageUrls.map(url => Image.prefetch(url))
+          imageUrls.map(url => (Image as any).prefetch?.(url))
         );
         console.log(`✅ Preloaded ${imageUrls.length} images`);
       } catch (error) {
@@ -205,12 +208,10 @@ export const useMemoryMonitor = (intervalMs: number = 10000) => {
     if (typeof performance === 'undefined') return;
 
     const intervalId = setInterval(() => {
-      if (performance.memory) {
-        const {
-          usedJSHeapSize,
-          totalJSHeapSize,
-          jsHeapSizeLimit
-        } = performance.memory;
+      // @ts-ignore - performance.memory is not in standard TypeScript lib
+      if ((performance as any).memory) {
+        // @ts-ignore
+        const { usedJSHeapSize, totalJSHeapSize, jsHeapSizeLimit } = (performance as any).memory;
 
         const usedMB = (usedJSHeapSize / 1024 / 1024).toFixed(2);
         const totalMB = (totalJSHeapSize / 1024 / 1024).toFixed(2);

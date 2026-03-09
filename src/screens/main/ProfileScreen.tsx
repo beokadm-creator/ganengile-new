@@ -21,7 +21,6 @@ import { auth } from '../../services/firebase';
 import { getUserStats } from '../../services/user-service';
 import { getUserRating } from '../../services/rating-service';
 import { useUser } from '../../contexts/UserContext';
-import type { User } from '../../types/user';
 import { UserRole } from '../../types/user';
 import {
   getUserProfile,
@@ -39,7 +38,6 @@ import {
   getGradeProgress,
 } from '../../services/grade-service';
 import { BadgeService } from '../../services/BadgeService';
-import Modal from '../../components/common/Modal';
 import TextInputModal from '../../components/common/TextInputModal';
 import BankAccountModal from '../../components/common/BankAccountModal';
 
@@ -107,7 +105,6 @@ export default function ProfileScreen({ navigation: _navigation }: Props) {
   const [loadingProfile, setLoadingProfile] = useState(true);
   const [saving, setSaving] = useState(false);
   const [bankAccountModalVisible, setBankAccountModalVisible] = useState(false);
-  const [selectedBank, setSelectedBank] = useState('');
   const [editingBankAccount, setEditingBankAccount] = useState<{
     bankName: string;
     accountNumber: string;

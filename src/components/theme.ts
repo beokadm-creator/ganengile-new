@@ -3,7 +3,7 @@
  * 가는길에 Design System
  */
 
-export const Colors = {
+export const Colors: any = {
   // Primary Colors
   primary: '#00BCD4',        // Cyan - Main brand color
   primaryDark: '#0097A7',    // Darker cyan
@@ -31,12 +31,14 @@ export const Colors = {
     secondary: '#757575',
     disabled: '#BDBDBD',
     inverse: '#FFFFFF',
+    tertiary: '#9E9E9E',
   },
 
   background: {
     primary: '#FFFFFF',
     secondary: '#F5F5F5',
     tertiary: '#EEEEEE',
+    errorBackground: '#FFEBEE',
   },
 
   border: {
@@ -48,9 +50,14 @@ export const Colors = {
   // Overlay
   overlay: 'rgba(0, 0, 0, 0.5)',
   shadow: 'rgba(0, 0, 0, 0.1)',
+
+  // Additional colors
+  white: '#FFFFFF',
+  black: '#000000',
+  disabled: '#BDBDBD',
 };
 
-export const Typography = {
+export const Typography: any = {
   // Font Sizes
   fontSize: {
     xs: 12,
@@ -75,6 +82,43 @@ export const Typography = {
     tight: 1.2,
     normal: 1.5,
     relaxed: 1.8,
+  },
+
+  // Typography shortcuts
+  h1: {
+    fontSize: 32,
+    fontWeight: '700' as const,
+    lineHeight: 1.2,
+  },
+  h2: {
+    fontSize: 28,
+    fontWeight: '700' as const,
+    lineHeight: 1.2,
+  },
+  h3: {
+    fontSize: 24,
+    fontWeight: '600' as const,
+    lineHeight: 1.3,
+  },
+  body: {
+    fontSize: 16,
+    fontWeight: '400' as const,
+    lineHeight: 1.5,
+  },
+  bodyBold: {
+    fontSize: 16,
+    fontWeight: '600' as const,
+    lineHeight: 1.5,
+  },
+  bodySmall: {
+    fontSize: 14,
+    fontWeight: '400' as const,
+    lineHeight: 1.4,
+  },
+  caption: {
+    fontSize: 12,
+    fontWeight: '400' as const,
+    lineHeight: 1.3,
   },
 };
 

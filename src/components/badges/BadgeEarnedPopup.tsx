@@ -16,8 +16,6 @@ import {
 import { findBadgeById } from '../../data/badges';
 import { Colors, Typography, Spacing, BorderRadius } from '../../theme';
 
-const { height: SCREEN_HEIGHT } = Dimensions.get('window');
-
 interface BadgeEarnedPopupProps {
   visible: boolean;
   badgeId: string | null;

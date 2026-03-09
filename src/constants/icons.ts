@@ -1,5 +1,3 @@
-import { Ionicons } from '@expo/vector-icons';
-
 export const Icons = {
   // Welcome
   celebration: { name: 'celebration', color: '#00BCD4' },

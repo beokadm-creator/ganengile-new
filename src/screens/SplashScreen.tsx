@@ -10,11 +10,9 @@ import {
   StyleSheet,
   Animated,
   Dimensions,
-  Image
 } from 'react-native';
-import Logo from '../assets/logo.png'; // 로고 이미지 (없으면 텍스트로 대체)
 
-const { width, height } = Dimensions.get('window');
+const { width: _width, height } = Dimensions.get('window');
 
 export const SplashScreen: React.FC = () => {
   const fadeAnim = useRef(new Animated.Value(0)).current;

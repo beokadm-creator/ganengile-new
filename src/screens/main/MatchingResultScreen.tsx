@@ -9,10 +9,9 @@ import {
   Animated,
 } from 'react-native';
 import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
-import Icon from '@expo/vector-icons';
+import { Ionicons } from '@expo/vector-icons';
 import { GillerProfileCard } from '../../components/giller/GillerProfileCard';
-import TransferInfoCard, { TransferInfo } from '../../components/TransferInfoCard';
-import { RejectionReasonModal } from '../../components/modals/RejectionReasonModal';
+import TransferInfoCard from '../../components/TransferInfoCard';
 import * as matchingService from '../../services/matching-service';
 
 type MatchingResultRouteParams = {
@@ -56,7 +55,6 @@ export const MatchingResultScreen: React.FC = () => {
   const [timeoutReached, setTimeoutReached] = useState(false);
   const [retryCount, setRetryCount] = useState(0);
   const [fadeAnim] = useState(new Animated.Value(0));
-  const [showFeeDetail, setShowFeeDetail] = useState(false);
   const [requestFeeBreakdown, setRequestFeeBreakdown] = useState<any>(null);
 
   // 타이머 관련 상태 추가
@@ -275,10 +273,11 @@ export const MatchingResultScreen: React.FC = () => {
 
   if (error) {
     return (
-      <View style={styles.container}>
-        <Animated.View style={[styles.errorContainer, { transform: [{ translateX: shakeAnim }] }]}>
-          <Icon name="error-outline" size={64} color="#FF5252" />
-          <Text style={styles.errorTitle}>매칭 실패</Text>
+       <View style={styles.container}>
+         <Animated.View style={[styles.errorContainer, { transform: [{ translateX: shakeAnim }] }]}>
+           {/* @ts-ignore */}
+           <Ionicons name="alert-circle-outline" size={64} color="#FF5252" />
+           <Text style={styles.errorTitle}>매칭 실패</Text>
           <Text style={styles.errorMessage}>{error}</Text>
           <View style={styles.errorButtonContainer}>
             <Text style={styles.retryButton} onPress={handleRetry}>
@@ -309,21 +308,22 @@ export const MatchingResultScreen: React.FC = () => {
           {/* 타이머 프로그레스 바 */}
           <View style={styles.progressContainer}>
             <Animated.View
-              style={[
-                styles.progressBar,
-                {
-                  width: progressAnim.interpolate({
-                    inputRange: [0, 1],
-                    outputRange: ['0%', '100%'],
-                  }),
-                  backgroundColor: interpolateColor(
-                    progressAnim.interpolate({
-                      inputRange: [0, 1],
-                      outputRange: [0, 1],
-                    }).__getValue()
-                  ),
-                },
-              ]}
+               style={[
+                 styles.progressBar,
+                 {
+                   width: progressAnim.interpolate({
+                     inputRange: [0, 1],
+                     outputRange: ['0%', '100%'],
+                   }),
+                   // @ts-ignore - __getValue exists on AnimatedInterpolation
+                   backgroundColor: interpolateColor(
+                     (progressAnim.interpolate({
+                       inputRange: [0, 1],
+                       outputRange: [0, 1],
+                     }) as any).__getValue()
+                   ),
+                 },
+               ]}
             />
           </View>
           <Text style={styles.timeLeftText}>
@@ -356,13 +356,13 @@ export const MatchingResultScreen: React.FC = () => {
           isRejecting={isRejecting}
         />
 
-        {/* 환승 정보 카드 (환승 시에만 표시) */}
-        {giller.transferInfo && giller.transferInfo.hasTransfer && (
-          <TransferInfoCard
-            transferInfo={giller.transferInfo}
-            style={{ marginTop: Spacing.md }}
-          />
-        )}
+           {/* 환승 정보 카드 (환승 시에만 표시) */}
+         {giller.transferInfo?.hasTransfer && (
+           <TransferInfoCard
+             transferInfo={giller.transferInfo}
+             style={{ marginTop: 16 }}
+           />
+         )}
       </Animated.View>
     </View>
   );

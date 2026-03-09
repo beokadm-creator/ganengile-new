@@ -18,7 +18,7 @@ import {
 } from 'react-native';
 import type { MainStackNavigationProp } from '../../types/navigation';
 import { createChatService } from '../../services/chat-service';
-import { MessageType, ChatRoomStatus, type ChatMessage, type ChatRoom } from '../../types/chat';
+import { MessageType, type ChatMessage, type ChatRoom } from '../../types/chat';
 import { useUser } from '../../contexts/UserContext';
 
 type Props = {

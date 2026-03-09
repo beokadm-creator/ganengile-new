@@ -3,7 +3,7 @@
  * 이용자가 사물함에서 물품을 수령하는 화면
  */
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -17,7 +17,6 @@ import { Ionicons } from '@expo/vector-icons';
 import { useRoute, useNavigation } from '@react-navigation/native';
 import { requireUserId } from '../../services/firebase';
 import {
-  getLockerReservation,
   updateReservationStatus,
   addReservationPhotos,
 } from '../../services/locker-service';

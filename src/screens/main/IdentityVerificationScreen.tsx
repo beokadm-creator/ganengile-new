@@ -20,7 +20,6 @@ import { useUser } from '../../contexts/UserContext';
 import {
   uploadIdCardImage,
   submitVerification,
-  getUserVerification,
 } from '../../services/verification-service';
 import { VerificationSubmitData } from '../../types/profile';
 

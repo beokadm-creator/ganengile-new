@@ -8,9 +8,10 @@
   "exclude": [
     "node_modules",
     "e2e",
-    "tests",
     "__tests__",
-    "detox.config.js"
+    "detox.config.js",
+    "jest.setup.ts",
+    "scripts"
   ],
   "ts-node": {
     "esm": true,

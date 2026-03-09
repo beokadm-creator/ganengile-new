@@ -142,7 +142,7 @@ export class ProfessionalGillerService {
     const user = userDoc.data() as User;
     const promotion = user.gillerProfile?.promotion;
 
-    if (!promotion || promotion.status !== 'pending') {
+    if (promotion?.status !== 'pending') {
       return { approved: false, reason: 'No pending promotion application' };
     }
 

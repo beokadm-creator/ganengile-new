@@ -19,10 +19,11 @@ import {
   TouchableOpacity,
   Modal,
   ActivityIndicator,
+  Platform,
 } from 'react-native';
 import { StackNavigationProp } from '@react-navigation/stack';
 import { doc, getDoc, getFirestore } from 'firebase/firestore';
-import { INITIAL_BADGES, getBadgesByCategory, getBadgesByTier, findBadgeById } from '../../data/badges';
+import { INITIAL_BADGES } from '../../data/badges';
 import { BadgeCategory, BadgeTier, User } from '../../types/user';
 import { Colors, Typography, Spacing, BorderRadius } from '../../theme';
 

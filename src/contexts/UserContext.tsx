@@ -4,7 +4,7 @@
  */
 
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
-import { onAuthStateChanged, User as FirebaseUser } from 'firebase/auth';
+import { onAuthStateChanged } from 'firebase/auth';
 import { auth } from '../services/firebase';
 import { getUserById, createUser } from '../services/user-service';
 import { doc, updateDoc, serverTimestamp } from 'firebase/firestore';

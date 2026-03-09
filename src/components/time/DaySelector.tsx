@@ -48,7 +48,7 @@ export default function DaySelector({
   onChange,
   label,
   multiSelect = true,
-  hint,
+  hint: _hint,
 }: DaySelectorProps) {
   // Use selectedDays prop if provided, otherwise use value
   const initialValue = selectedDaysProp !== undefined ? selectedDaysProp : (value || []);

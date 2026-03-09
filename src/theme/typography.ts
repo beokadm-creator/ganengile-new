@@ -38,6 +38,9 @@ export const Typography = {
   h3: { fontSize: 18, fontWeight: '600' as const },
   h4: { fontSize: 16, fontWeight: '600' as const },
   body: { fontSize: 14, fontWeight: '400' as const },
+  body1: { fontSize: 14, fontWeight: '400' as const }, // Alias for body
+  body2: { fontSize: 12, fontWeight: '400' as const }, // Alias for bodySmall
+  bodyBold: { fontSize: 14, fontWeight: '600' as const },
   bodyMedium: { fontSize: 14, fontWeight: '500' as const },
   bodySmall: { fontSize: 12, fontWeight: '400' as const },
   bodyLarge: { fontSize: 16, fontWeight: '400' as const },

@@ -12,12 +12,10 @@ import {
   query,
   where,
   serverTimestamp,
-  uploadBytes,
-  getDownloadURL,
-  ref,
+  getDocs,
 } from 'firebase/firestore';
 import { db } from './firebase';
-import { getStorage, ref as storageRef, uploadBytesResumable, getDownloadURL as getStorageDownloadURL } from 'firebase/storage';
+import { getStorage, ref as storageRef, uploadBytesResumable, getDownloadURL as getStorageDownloadURL, uploadBytes, ref } from 'firebase/storage';
 import type {
   Photo,
   PhotoType,

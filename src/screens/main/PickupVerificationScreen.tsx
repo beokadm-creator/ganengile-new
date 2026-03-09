@@ -24,7 +24,7 @@ import QRScanner from '../../components/delivery/QRScanner';
 
 // Utils
 import { retryWithBackoff } from '../../utils/retry-with-backoff';
-import { showErrorAlert, createPermissionError, isNetworkError } from '../../utils/error-handler';
+import { showErrorAlert, createPermissionError } from '../../utils/error-handler';
 import { getCurrentLocation, ensurePermission, requestCameraPermission } from '../../utils/permission-handler';
 import { isNetworkAvailable } from '../../utils/network-detector';
 import { SuccessOverlay } from '../../utils/success-animation';
@@ -44,7 +44,7 @@ interface Props {
 type VerificationMethod = 'qr' | 'code' | null;
 
 export default function PickupVerificationScreen({ navigation, route }: Props) {
-  const { deliveryId, requestId } = route.params;
+  const { deliveryId } = route.params;
   const [method, setMethod] = useState<VerificationMethod>(null);
   const [verificationCode, setVerificationCode] = useState('');
   const [photoUri, setPhotoUri] = useState<string | null>(null);
@@ -228,7 +228,7 @@ export default function PickupVerificationScreen({ navigation, route }: Props) {
     // 예: "GANENGILE:1234"
     if (data.startsWith('GANENGILE:')) {
       const code = data.split(':')[1];
-      if (code && code.length === 4) {
+      if (code?.length === 4) {
         setVerificationCode(code);
         Alert.alert('QR 스캔 성공', `인증 코드 ${code}가 입력되었습니다.`);
       } else {

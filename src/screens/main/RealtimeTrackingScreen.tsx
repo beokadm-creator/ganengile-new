@@ -16,9 +16,8 @@ import {
 import { StackNavigationProp } from '@react-navigation/stack';
 import MapView, { Marker, Polyline, PROVIDER_GOOGLE } from 'react-native-maps';
 import * as Location from 'expo-location';
-import { doc, onSnapshot, updateDoc, serverTimestamp } from 'firebase/firestore';
+import { doc, onSnapshot } from 'firebase/firestore';
 import { db } from '../../services/firebase';
-import { requireUserId } from '../../services/firebase';
 import { UserContext } from '../../contexts/UserContext';
 import type { UserContextType } from '../../contexts/UserContext';
 import { startDeliveryTracking, stopDeliveryTracking } from '../../services/location-tracking-service';

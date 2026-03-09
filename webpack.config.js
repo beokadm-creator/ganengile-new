@@ -1,6 +1,6 @@
 const path = require('path');
 const webpack = require('webpack');
-const { resolver, getModules } = require('@expo/webpack-config/env');
+const { getModules } = require('@expo/webpack-config/env');
 
 const ROOT = path.resolve(__dirname, '..');
 

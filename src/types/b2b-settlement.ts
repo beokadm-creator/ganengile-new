@@ -1,6 +1,8 @@
+import { B2BGillerTier } from './b2b-giller-tier';
+
 /**
  * B2B 정산 타입 정의
- * 
+ *
  * B2B 길러에 대한 월간 정산 정보를 관리합니다.
  * 기획 문서: PLANNING_B2B_BUSINESS.md
  */

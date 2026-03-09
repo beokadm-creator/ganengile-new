@@ -3,7 +3,7 @@
  * 사용자의 채팅방 목록 표시
  */
 
-import React, { useEffect, useState, useCallback, useRef, useMemo } from 'react';
+import React, { useEffect, useState, useCallback, useRef } from 'react';
 import {
   View,
   Text,

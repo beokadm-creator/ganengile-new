@@ -6,7 +6,7 @@
 import { Alert, Linking, Platform } from 'react-native';
 import {
   Camera,
-  CameraPermissionStatus,
+  PermissionStatus,
 } from 'expo-camera';
 import * as Location from 'expo-location';
 import * as ImagePicker from 'expo-image-picker';
@@ -45,11 +45,11 @@ export function getPermissionStatusText(status: string): string {
  */
 export async function checkCameraPermission(): Promise<PermissionResult> {
   try {
-    const status = await Camera.getCameraPermissionAsync();
+    const status = await Camera.getCameraPermissionsAsync();
     return {
-      granted: status === 'granted',
-      canRequest: status !== 'denied' || Platform.OS === 'ios',
-      status,
+      granted: status.granted,
+      canRequest: status.status !== 'denied' || Platform.OS === 'ios',
+      status: status.status,
     };
   } catch (error) {
     console.error('Error checking camera permission:', error);

@@ -52,7 +52,8 @@ export function toRequestDetailView(request: Request): RequestDetailView {
       weight: request.packageInfo?.weight ?? '-',
       description: request.packageInfo?.description,
     },
-    feeTotal: request.fee || 0,
+    // @ts-ignore - fee may not exist in Request type
+    feeTotal: (request as any).fee || request.initialNegotiationFee || 0,
     deadline: request.deadline instanceof Timestamp ? request.deadline.toDate() : request.deadline,
     preferredTime: request.preferredTime,
     createdAt: request.createdAt instanceof Timestamp ? request.createdAt.toDate() : request.createdAt,

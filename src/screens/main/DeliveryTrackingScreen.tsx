@@ -21,8 +21,6 @@ import { getDeliveryByRequestId } from '../../services/delivery-service';
 import { getRequestById } from '../../services/request-service';
 import { UserContext } from '../../contexts/UserContext';
 import type { UserContextType } from '../../contexts/UserContext';
-import { UserRole } from '../../types/user';
-import type { Request } from '../../types/request';
 import { toTrackingModel, TrackingModel, TrackingEvent } from '../../utils/request-adapters';
 import { formatTimeKR } from '../../utils/date';
 import { startDeliveryTracking, stopDeliveryTracking } from '../../services/location-tracking-service';
@@ -32,7 +30,7 @@ import { retryWithBackoff, retryFirebaseQuery } from '../../utils/retry-with-bac
 import { showErrorAlert, isNetworkError } from '../../utils/error-handler';
 import { isNetworkAvailable, addNetworkListener } from '../../utils/network-detector';
 
-const { width } = Dimensions.get('window');
+const { width: _width } = Dimensions.get('window');
 
 type NavigationProp = StackNavigationProp<any>;
 

@@ -688,7 +688,7 @@ export const reviewPromotion = functions.https.onCall(async (data, context): Pro
     const user = userDoc.data();
     const promotion = user?.gillerProfile?.promotion;
 
-    if (!promotion || promotion.status !== 'pending') {
+    if (promotion?.status !== 'pending') {
       return { approved: false, reason: 'No pending promotion application' };
     }
 

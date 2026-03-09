@@ -70,7 +70,7 @@ export default function Button({
     if (Platform.OS !== 'web') {
       try {
         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-      } catch (_error) {
+      } catch {
         // Ignore haptics errors
       }
     }

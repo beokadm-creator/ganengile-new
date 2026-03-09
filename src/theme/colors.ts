@@ -55,6 +55,7 @@ export const Colors = {
   textSecondary: '#666666',
   textTertiary: '#999999',
   textWhite: '#FFFFFF',
+  textDisabled: '#BDBDBD',
 
   text: {
     primary: '#333333',

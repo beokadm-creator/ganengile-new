@@ -18,6 +18,7 @@ import {
   TouchableOpacity,
   Animated,
   Dimensions,
+  Platform,
 } from 'react-native';
 import { findBadgeById } from '../../data/badges';
 import { Badge } from '../../types/user';

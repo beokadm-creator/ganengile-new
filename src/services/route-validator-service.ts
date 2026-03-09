@@ -47,7 +47,7 @@ export const validateRouteInput = (
     errors.push('도착역을 선택해주세요.');
   }
 
-  if (startStation && endStation && startStation.id === endStation.id) {
+  if (startStation && startStation.id === endStation?.id) {
     errors.push('출발역과 도착역이 같습니다.');
   }
 

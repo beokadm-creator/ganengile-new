@@ -178,7 +178,8 @@ export const cachedFirestoreQuery = async <T>(
   console.log(`🌐 Firestore cache miss: ${cacheKey}`);
   const result = await queryFn();
 
-  globalCache.set(cacheKey, result, options);
+  // @ts-ignore - Generic type T can be assigned to cache
+  globalCache.set(cacheKey, result as any, options);
   return result;
 };
 

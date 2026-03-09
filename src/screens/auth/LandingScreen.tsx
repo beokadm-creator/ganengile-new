@@ -12,13 +12,12 @@ import {
   StyleSheet,
   TouchableOpacity,
   ScrollView,
-  Platform,
 } from 'react-native';
 
 export default function LandingScreen({ navigation }: any) {
   const handleNavigate = (screen: string) => {
     console.log('Navigating to:', screen);
-    if (navigation && navigation.navigate) {
+    if (navigation?.navigate) {
       navigation.navigate(screen);
     }
   };

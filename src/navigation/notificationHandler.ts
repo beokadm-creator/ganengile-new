@@ -5,7 +5,6 @@
 
 import * as Notifications from 'expo-notifications';
 import { navigateFromNotification } from './navigationRef';
-import type { MainStackParamList } from '../types/navigation';
 
 interface NotificationData {
   type: string;
@@ -21,7 +20,7 @@ export function handleNotificationResponse(response: Notifications.NotificationR
 
   const data = rawData as unknown as NotificationData;
 
-  if (!data || !data.type) {
+  if (!data?.type) {
     return;
   }
 

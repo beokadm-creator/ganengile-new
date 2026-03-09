@@ -3,7 +3,7 @@
  * 길러가 사물함에 물품을 보관하는 화면
  */
 
-import React, { useState, useCallback } from 'react';
+import React, { useState } from 'react';
 import {
   View,
   Text,
@@ -25,7 +25,7 @@ import {
 import { generateQRCode } from '../../services/qrcode-service';
 import { takePhoto, uploadPhotoWithThumbnail } from '../../services/photo-service';
 import type { MainStackNavigationProp } from '../../types/navigation';
-import type { Locker, LockerSummary } from '../../types/locker';
+import type { LockerSummary } from '../../types/locker';
 import { Colors, Spacing, Typography, BorderRadius } from '../../theme';
 import LockerLocator from '../../components/delivery/LockerLocator';
 

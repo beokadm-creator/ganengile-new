@@ -30,7 +30,7 @@ const PERFORMANCE_THRESHOLDS = {
 };
 
 describe('P5-3: Performance Tests', () => {
-  let metrics: PerformanceMetrics[] = [];
+  const metrics: PerformanceMetrics[] = [];
 
   // 성능 측정 헬퍼 함수
   const measurePerformance = async (

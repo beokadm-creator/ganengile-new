@@ -13,6 +13,7 @@ import type { ChatMessage } from '../types/chat';
 
 // Configure notification behavior
 Notifications.setNotificationHandler({
+  // eslint-disable-next-line @typescript-eslint/require-await
   handleNotification: async () => ({
     shouldShowAlert: true,
     shouldPlaySound: true,

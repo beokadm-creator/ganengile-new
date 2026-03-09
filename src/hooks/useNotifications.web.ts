@@ -16,15 +16,11 @@ interface MockPermissionStatus {
   status: string;
 }
 
-interface MockSubscription {
-  remove: () => void;
-}
-
 export function useNotifications(_handlers?: NotificationHandlers) {
   /**
    * Request notification permissions (web stub)
    */
-  const requestPermissions = useCallback(async (): Promise<boolean> => {
+  const requestPermissions = useCallback((): boolean => {
     if (Platform.OS === 'web') {
       console.warn('Push notifications not supported on web');
       return false;
@@ -35,7 +31,7 @@ export function useNotifications(_handlers?: NotificationHandlers) {
   /**
    * Register for push notifications (web stub)
    */
-  const registerForPushNotifications = useCallback(async (): Promise<string | null> => {
+  const registerForPushNotifications = useCallback((): string | null => {
     if (Platform.OS === 'web') {
       return null;
     }
@@ -45,11 +41,11 @@ export function useNotifications(_handlers?: NotificationHandlers) {
   /**
    * Send local notification (web stub)
    */
-  const sendLocalNotification = useCallback(async (
+  const sendLocalNotification = useCallback((
     _title: string,
     _body: string,
     _data?: any
-  ): Promise<void> => {
+  ): void => {
     if (Platform.OS === 'web') {
       return;
     }
@@ -58,18 +54,18 @@ export function useNotifications(_handlers?: NotificationHandlers) {
   /**
    * Handle incoming chat message notification (web stub)
    */
-  const handleChatMessageNotification = useCallback(async (
+  const handleChatMessageNotification = useCallback((
     _message: any,
     _senderName: string,
     _chatRoomId: string
-  ): Promise<void> => {
+  ): void => {
     // No-op on web
   }, []);
 
   /**
    * Set badge count (web stub)
    */
-  const setBadgeCount = useCallback(async (_count: number): Promise<void> => {
+  const setBadgeCount = useCallback((_count: number): void => {
     // No-op on web
   }, []);
 

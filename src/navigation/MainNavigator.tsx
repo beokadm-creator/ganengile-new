@@ -25,7 +25,7 @@ import RequestDetailScreen from '../screens/main/RequestDetailScreen';
 import GillerRequestsScreen from '../screens/main/GillerRequestsScreen';
 import DeliveryTrackingScreen from '../screens/main/DeliveryTrackingScreen';
 import RouteManagementScreen from '../screens/main/RouteManagementScreen';
-import MatchingResultScreen from '../screens/main/MatchingResultScreen';
+import { MatchingResultScreen } from '../screens/main/MatchingResultScreen';
 import PickupVerificationScreen from '../screens/main/PickupVerificationScreen';
 import DeliveryCompletionScreen from '../screens/main/DeliveryCompletionScreen';
 import RatingScreen from '../screens/main/RatingScreen';
@@ -66,6 +66,7 @@ function TabBarIcon({ name, focused }: { name: string; focused: boolean }) {
     RouteManagement: { name: 'map' },
     Requests: { name: 'cube' },
     GillerRequests: { name: 'bicycle' },
+    ChatList: { name: 'chatbubbles' },
     Profile: { name: 'person' },
   };
 
@@ -131,6 +132,12 @@ function TabNavigator() {
           options={{ tabBarLabel: '배송 매칭' }}
         />
       )}
+
+      <Tab.Screen
+        name="ChatList"
+        component={ChatListScreen}
+        options={{ tabBarLabel: '채팅' }}
+      />
 
       {/* Route Management: ONLY for Giller (not Gller) */}
       {currentRole === 'giller' && (

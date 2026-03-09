@@ -58,7 +58,7 @@ export function matchGillersToRequest(
       if (route.daysOfWeek.includes(dayOfWeek)) {
         score += 10;
       }
-    } else if (route.dayOfWeek && route.dayOfWeek.includes(request.dayOfWeek)) {
+    } else if (route.dayOfWeek?.includes(request.dayOfWeek)) {
       score += 10;
     }
 

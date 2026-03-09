@@ -39,7 +39,7 @@ export const SettingsScreen: React.FC = () => {
   const [notificationsEnabled, setNotificationsEnabled] = useState(true);
   const [locationEnabled, setLocationEnabled] = useState(true);
   const [emailNotifications, setEmailNotifications] = useState(true);
-  const [darkMode, setDarkMode] = useState(isDark);
+  const [_darkMode, setDarkMode] = useState(isDark);
 
   const handleLogout = () => {
     Alert.alert(

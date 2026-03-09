@@ -18,7 +18,7 @@ import {
   TouchableOpacity,
   ActivityIndicator,
   Alert,
-  Image,
+  Platform,
 } from 'react-native';
 import { StackNavigationProp } from '@react-navigation/stack';
 import { getFirestore, doc, collection, query, where, getDocs, updateDoc, addDoc, serverTimestamp } from 'firebase/firestore';
@@ -137,7 +137,7 @@ export default function LockerSelectionScreen({ navigation, route }: Props) {
     }
   };
 
-  const handleReserve = async () => {
+  const handleReserve = () => {
     if (!selectedLocker || !selectedTimeSlot) {
       Alert.alert('선택 필요', '사물함과 예약 시간을 선택해주세요.');
       return;

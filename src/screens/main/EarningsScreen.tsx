@@ -12,12 +12,10 @@ import {
   ScrollView,
   TouchableOpacity,
   ActivityIndicator,
-  Alert,
 } from 'react-native';
 import { StackNavigationProp } from '@react-navigation/stack';
 import { getUserStats } from '../../services/user-service';
 import { useUser } from '../../contexts/UserContext';
-import { doc, getDoc } from 'firebase/firestore';
 import { db } from '../../services/firebase';
 
 type NavigationProp = StackNavigationProp<any>;

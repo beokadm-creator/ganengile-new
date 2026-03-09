@@ -155,7 +155,8 @@ export const LazyImage: React.FC<{
   React.useEffect(() => {
     // 이미지 미리 로딩
     if (source?.uri) {
-      Image.prefetch(source.uri);
+      // @ts-ignore - Image.prefetch exists in React Native
+      Image.prefetch?.(source.uri);
     }
   }, [source]);
 

@@ -17,9 +17,9 @@ import {
 } from 'react-native';
 import { StackNavigationProp } from '@react-navigation/stack';
 import { getPendingRequests } from '../../services/request-service';
-import { acceptRequest, declineRequest } from '../../services/matching-service';
+import { acceptRequest } from '../../services/matching-service';
 import { requireUserId } from '../../services/firebase';
-import { Colors, Typography, Spacing, BorderRadius } from '../../theme';
+import { Spacing, BorderRadius } from '../../theme';
 import { Ionicons } from '@expo/vector-icons';
 import type { DeliveryRequest } from '../../types/delivery';
 

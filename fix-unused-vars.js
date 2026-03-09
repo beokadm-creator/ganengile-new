@@ -24,7 +24,7 @@ unusedVarLines.forEach(({ file, line, varName }) => {
   if (processedFiles.has(file)) return;
   
   try {
-    let content = fs.readFileSync(file, 'utf-8');
+    const content = fs.readFileSync(file, 'utf-8');
     const lines = content.split('\n');
     
     // Add underscore prefix to unused parameter

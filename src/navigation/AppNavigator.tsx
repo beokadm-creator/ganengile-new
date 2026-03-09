@@ -44,7 +44,7 @@ function AppNavigatorContent() {
       notificationResponseListener.current?.remove();
       notificationReceivedListener.current?.remove();
     };
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  }, []);  
 
   console.log('AppNavigator 렌더링:', {
     userExists: !!user,

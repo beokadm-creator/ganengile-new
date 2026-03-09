@@ -304,7 +304,7 @@ export default function DeliveryCompletionScreen({ navigation, route }: Props) {
     // 예: "GANENGILE:123456"
     if (data.startsWith('GANENGILE:')) {
       const code = data.split(':')[1];
-      if (code && code.length === 6) {
+      if (code?.length === 6) {
         setVerificationCode(code);
         Alert.alert('QR 스캔 성공', `인증 코드 ${code}가 입력되었습니다.`);
       } else {

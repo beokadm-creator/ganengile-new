@@ -133,6 +133,11 @@ export interface User {
     community: string[];   // 커뮤니티 배지 ID
   };
 
+  // 배지 획득 기록 (P1 신규)
+  badgeEarnedAt?: {        // 배지 ID -> 획득 시간 매핑
+    [badgeId: string]: Timestamp;
+  };
+
   // 배지 혜택 (P1 신규)
   badgeBenefits: {
     profileFrame: 'none' | 'bronze' | 'silver' | 'gold' | 'platinum';

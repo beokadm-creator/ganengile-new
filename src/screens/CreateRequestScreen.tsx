@@ -6,29 +6,32 @@ import {
   ScrollView,
   TouchableOpacity,
   Alert,
+  TextInput,
 } from 'react-native';
-import { TextInput, Button, Card } from '../components/common';
-import { Station, Route, TravelTimeService } from '../services';
-import { OptimizedStationSelectModal } from '../components/modals/OptimizedStationSelectModal';
+import { Button, Card } from '../components/common';
 import { createRequest } from '../services/request-service';
 import { processMatchingForRequest } from '../services/matching-service';
-import { auth } from '../firebase';
+import { calculatePhase1DeliveryFee } from '../services/pricing-service';
+import { PackageSize } from '../types/delivery';
+import { StationInfo } from '../types/route';
+import { auth } from '../services/firebase';
 
 interface CreateRequestScreenProps {
   navigation: any;
-  route: Route;
 }
 
 export const CreateRequestScreen: React.FC<CreateRequestScreenProps> = ({
   navigation,
-  route,
 }) => {
-  const [departureStation, setDepartureStation] = useState<Station | null>(null);
-  const [arrivalStation, setArrivalStation] = useState<Station | null>(null);
-  const [packageSize, setPackageSize] = useState<string>('');
-  const [packageWeight, setPackageWeight] = useState<string>('');
+  const [departureStation] = useState<StationInfo | null>(null);
+  const [arrivalStation] = useState<StationInfo | null>(null);
+  const [stationCount, setStationCount] = useState<number>(5);
+  const [packageSize, setPackageSize] = useState<PackageSize>(PackageSize.SMALL);
+  const [packageWeight, setPackageWeight] = useState<string>('light');
+  const [urgency, setUrgency] = useState<'normal' | 'fast' | 'urgent'>('normal');
   const [pickupTime, setPickupTime] = useState<string>('');
   const [deliveryFee, setDeliveryFee] = useState<number>(0);
+  const [feeBreakdown, setFeeBreakdown] = useState<any>(null);
   const [recipientName, setRecipientName] = useState<string>('');
   const [recipientPhone, setRecipientPhone] = useState<string>('');
 
@@ -45,13 +48,21 @@ export const CreateRequestScreen: React.FC<CreateRequestScreenProps> = ({
       return;
     }
 
-    // 간단 배송비 계산 (예시)
-    const baseFee = 3000;
-    const sizeMultiplier = packageSize === 'small' ? 1 : packageSize === 'medium' ? 1.5 : 2;
-    const weightMultiplier = packageWeight === 'light' ? 1 : packageWeight === 'medium' ? 1.3 : 1.6;
-    const calculatedFee = baseFee * sizeMultiplier * weightMultiplier;
+    if (stationCount < 2 || stationCount > 30) {
+      Alert.alert('알림', '역 개수는 2~30개 사이여야 합니다.');
+      return;
+    }
 
-    setDeliveryFee(Math.floor(calculatedFee));
+    const weightValue = packageWeight === 'light' ? 1 : packageWeight === 'medium' ? 3 : 7;
+    const result = calculatePhase1DeliveryFee({
+      stationCount,
+      weight: weightValue,
+      packageSize,
+      urgency,
+    });
+
+    setDeliveryFee(result.totalFee);
+    setFeeBreakdown(result);
   };
 
   const handleSubmit = async () => {
@@ -87,31 +98,37 @@ export const CreateRequestScreen: React.FC<CreateRequestScreenProps> = ({
     }
 
     try {
-      // Firestore에 배송 요청 저장
+      const feeData = feeBreakdown || {
+        baseFee: 0,
+        distanceFee: 0,
+        weightFee: 0,
+        sizeFee: 0,
+        serviceFee: 0,
+        totalFee: deliveryFee,
+        vat: 0,
+        breakdown: {
+          gillerFee: 0,
+          platformFee: 0,
+        },
+      };
+
       const request = await createRequest(
         currentUser.uid,
-        {
-          name: departureStation.name,
-          line: departureStation.line,
-          stationId: departureStation.id,
-        },
-        {
-          name: arrivalStation.name,
-          line: arrivalStation.line,
-          stationId: arrivalStation.id,
-        },
-        'medium',
+        departureStation,
+        arrivalStation,
+        'standard',
         {
           size: packageSize,
-          weight: packageWeight,
+          weight: packageWeight === 'light' ? 1 : packageWeight === 'medium' ? 3 : 7,
+          description: '',
+          isFragile: false,
+          isPerishable: false,
         },
-        {
-          totalFee: deliveryFee,
-        },
-        recipientName.trim(), // 수령인 이름
-        recipientPhone.replace(/-/g, ''), // 수령인 전화번호 (하이픈 제거)
-        new Date(), // preferredTime
-        new Date(Date.now() + 86400000) // deadline (1일 후)
+        feeData,
+        recipientName.trim(),
+        recipientPhone.replace(/-/g, ''),
+        new Date(),
+        new Date(Date.now() + 86400000)
       );
 
       // 매칭 시작
@@ -148,7 +165,7 @@ export const CreateRequestScreen: React.FC<CreateRequestScreenProps> = ({
           style={styles.stationButton}
           onPress={() => handleStationSelect('departure')}>
           <Text style={styles.stationText}>
-            {departureStation ? departureStation.name : '출발역 선택'}
+            {departureStation ? departureStation.stationName : '출발역 선택'}
           </Text>
         </TouchableOpacity>
       </Card>
@@ -159,7 +176,7 @@ export const CreateRequestScreen: React.FC<CreateRequestScreenProps> = ({
           style={styles.stationButton}
           onPress={() => handleStationSelect('arrival')}>
           <Text style={styles.stationText}>
-            {arrivalStation ? arrivalStation.name : '도착역 선택'}
+            {arrivalStation ? arrivalStation.stationName : '도착역 선택'}
           </Text>
         </TouchableOpacity>
       </Card>
@@ -168,20 +185,61 @@ export const CreateRequestScreen: React.FC<CreateRequestScreenProps> = ({
       <Card style={styles.card}>
         <Text style={styles.label}>패키지 크기</Text>
         <View style={styles.optionContainer}>
-          {['small', 'medium', 'large'].map((size) => (
+          {(['small', 'medium', 'large'] as const).map((size) => (
             <TouchableOpacity
               key={size}
               style={[
                 styles.optionButton,
                 packageSize === size && styles.selectedOption,
               ]}
-              onPress={() => setPackageSize(size)}>
+              onPress={() => setPackageSize(size as PackageSize)}>
               <Text
                 style={[
                   styles.optionText,
                   packageSize === size && styles.selectedOptionText,
                 ]}>
                 {size === 'small' ? '소형' : size === 'medium' ? '중형' : '대형'}
+              </Text>
+            </TouchableOpacity>
+          ))}
+        </View>
+      </Card>
+
+      <Card style={styles.card}>
+        <Text style={styles.label}>지하철 역 개수 *</Text>
+        <View style={styles.inputContainer}>
+          <TextInput
+            style={styles.input}
+            placeholder="5"
+            value={stationCount.toString()}
+            onChangeText={(text) => {
+              const count = parseInt(text) || 5;
+              setStationCount(Math.min(30, Math.max(2, count)));
+            }}
+            keyboardType="number-pad"
+            maxLength={2}
+          />
+          <Text style={styles.inputHint}>출발역부터 도착역까지의 역 개수 (2-30)</Text>
+        </View>
+      </Card>
+
+      <Card style={styles.card}>
+        <Text style={styles.label}>긴급도</Text>
+        <View style={styles.optionContainer}>
+          {(['normal', 'fast', 'urgent'] as const).map((level) => (
+            <TouchableOpacity
+              key={level}
+              style={[
+                styles.optionButton,
+                urgency === level && styles.selectedOption,
+              ]}
+              onPress={() => setUrgency(level)}>
+              <Text
+                style={[
+                  styles.optionText,
+                  urgency === level && styles.selectedOptionText,
+                ]}>
+                {level === 'normal' ? '보통' : level === 'fast' ? '빠름' : '긴급'}
               </Text>
             </TouchableOpacity>
           ))}
@@ -385,5 +443,10 @@ const styles = StyleSheet.create({
     fontSize: 16,
     borderWidth: 1,
     borderColor: '#e0e0e0',
+  },
+  inputHint: {
+    fontSize: 12,
+    color: '#999',
+    marginTop: 4,
   },
 });

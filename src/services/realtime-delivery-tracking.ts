@@ -4,7 +4,7 @@
  * 업데이트 주기: 10초
  */
 
-import { doc, onSnapshot, Unsubscribe } from 'firebase/firestore';
+import { doc, onSnapshot, updateDoc, Unsubscribe } from 'firebase/firestore';
 import { db } from './firebase';
 
 export interface GillerLocation {

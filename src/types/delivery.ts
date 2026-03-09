@@ -138,14 +138,31 @@ export interface DeliveryFee {
   /** Service fee */
   serviceFee: number;
 
+  /** Urgency surcharge (if applicable) */
+  urgencySurcharge?: number;
+
   /** Discount amount */
   discount?: number;
+
+  /** Subtotal (before VAT) */
+  subtotal?: number;
 
   /** Total fee */
   totalFee: number;
 
   /** VAT */
   vat: number;
+
+  /** Giller/Platform fee breakdown (Phase 1) */
+  breakdown?: {
+    /** Giller settlement fee (85%) */
+    gillerFee: number;
+    /** Platform fee (15%) */
+    platformFee: number;
+  };
+
+  /** Description text */
+  description?: string;
 }
 
 /**

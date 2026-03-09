@@ -2,12 +2,44 @@ module.exports = {
   extends: ['expo', '@react-native'],
   parser: '@typescript-eslint/parser',
   plugins: ['@typescript-eslint'],
+  env: {
+    jest: true,
+    node: true,
+    'react-native/react-native': true,
+  },
+  // tests 폴더 규칙 완화
+  overrides: [
+    {
+      files: ['tests/**/*.ts', 'tests/**/*.tsx', '**/*.test.ts', '**/*.test.tsx', '**/*.spec.ts', '**/*.spec.tsx'],
+      rules: {
+        'no-undef': 'off',
+        'no-unused-vars': 'off',
+        '@typescript-eslint/no-unsafe-assignment': 'off',
+        '@typescript-eslint/no-unsafe-call': 'off',
+        '@typescript-eslint/no-unsafe-member-access': 'off',
+        '@typescript-eslint/no-unsafe-argument': 'off',
+        '@typescript-eslint/no-unused-vars': 'off',
+        '@typescript-eslint/unbound-method': 'off',
+      },
+    },
+  ],
+  globals: {
+    describe: 'readonly',
+    it: 'readonly',
+    test: 'readonly',
+    expect: 'readonly',
+    beforeEach: 'readonly',
+    afterEach: 'readonly',
+    beforeAll: 'readonly',
+    afterAll: 'readonly',
+    jest: 'readonly',
+  },
   ignorePatterns: [
     'node_modules/',
     'scripts/',  // scripts 폴더 무시
     'data/',
     '.expo/',
-    'tests/',  // tests 폴더 무시 (임시)
+    'tests/',  // tests 폴더 무시
   ],
   rules: {
     '@typescript-eslint/no-unused-vars': [

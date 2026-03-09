@@ -149,11 +149,11 @@ export class LocationService {
   /**
    * 특정 역 근처에 있는지 확인 (반경 200m)
    */
-  async isNearStation(
+  isNearStation(
     currentLocation: LocationData,
     station: StationLocation,
     radius: number = 200
-  ): Promise<boolean> {
+  ): boolean {
     const distance = this.calculateDistance(
       currentLocation.latitude,
       currentLocation.longitude,
@@ -167,10 +167,10 @@ export class LocationService {
   /**
    * 가장 가까운 역 찾기
    */
-  async findNearestStation(
+  findNearestStation(
     currentLocation: LocationData,
     stations: StationLocation[]
-  ): Promise<StationLocation | null> {
+  ): StationLocation | null {
     if (stations.length === 0) {
       return null;
     }

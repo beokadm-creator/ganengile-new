@@ -25,7 +25,6 @@ import { StackNavigationProp } from '@react-navigation/stack';
 import { Camera, useCameraDevice, useCameraPermission } from 'react-native-vision-camera';
 import { verifyQRCode } from '../../services/qrcode-service';
 import { unlockLocker } from '../../services/locker-service';
-import { requireUserId } from '../../services/firebase';
 import { Colors, Typography, Spacing, BorderRadius } from '../../theme';
 
 type NavigationProp = StackNavigationProp<any>;
@@ -43,7 +42,6 @@ interface QRCodeData {
 export default function QRCodeScannerScreen({ navigation }: Props) {
   const [hasPermission, setHasPermission] = useState<boolean | null>(null);
   const [scanned, setScanned] = useState(false);
-  const [loading, setLoading] = useState(false);
   const [verifying, setVerifying] = useState(false);
   const [qrData, setQrData] = useState<QRCodeData | null>(null);
   const [error, setError] = useState<string | null>(null);

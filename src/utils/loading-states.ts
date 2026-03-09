@@ -127,7 +127,8 @@ export function useDebounce<T extends (...args: any[]) => any>(
   fn: T,
   delay: number
 ): (...args: Parameters<T>) => void {
-  const timeoutRef = useRef<NodeJS.Timeout>();
+  // @ts-ignore - useRef type issue
+  const timeoutRef = useRef<number | undefined>(undefined);
 
   return useCallback(
     (...args: Parameters<T>) => {
@@ -137,7 +138,7 @@ export function useDebounce<T extends (...args: any[]) => any>(
 
       timeoutRef.current = setTimeout(() => {
         fn(...args);
-      }, delay);
+      }, delay) as unknown as number;
     },
     [fn, delay]
   );
@@ -151,7 +152,8 @@ export function useThrottle<T extends (...args: any[]) => any>(
   delay: number
 ): (...args: Parameters<T>) => void {
   const lastRun = useRef(Date.now());
-  const timeoutRef = useRef<NodeJS.Timeout>();
+  // @ts-ignore - useRef type issue
+  const timeoutRef = useRef<number | undefined>(undefined);
 
   return useCallback(
     (...args: Parameters<T>) => {
@@ -169,7 +171,7 @@ export function useThrottle<T extends (...args: any[]) => any>(
         timeoutRef.current = setTimeout(() => {
           fn(...args);
           lastRun.current = Date.now();
-        }, delay - timeSinceLastRun);
+        }, delay - timeSinceLastRun) as unknown as number;
       }
     },
     [fn, delay]

@@ -15,7 +15,7 @@ import {
 import { doc, onSnapshot } from 'firebase/firestore';
 import { db } from '../../core/firebase';
 import { useAuth } from '../../contexts/AuthContext';
-import { INITIAL_BADGES, findBadgeById, getBadgesByCategory } from '../../data/badges';
+import { INITIAL_BADGES, getBadgesByCategory } from '../../data/badges';
 import { BadgeCategory } from '../../types/user';
 import { Colors, Typography, Spacing, BorderRadius } from '../../theme';
 

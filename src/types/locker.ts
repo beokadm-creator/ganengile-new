@@ -119,3 +119,14 @@ export interface LockerReservation {
   createdAt: Date | any;
   updatedAt: Date | any;
 }
+
+/**
+ * 사물함 요약 정보
+ */
+export interface LockerSummary {
+  lockerId: string;
+  stationName: string;
+  size: LockerSize;
+  status: LockerStatus;
+  available: boolean;
+}

@@ -1,7 +1,7 @@
 export class TossPaymentService {
   private static readonly CLIENT_KEY = process.env.EXPO_PUBLIC_TOSSPAYMENTS_CLIENT_KEY || '';
 
-  static async chargePayment(
+  static chargePayment(
     amount: number,
     orderId: string,
     orderName: string
@@ -11,20 +11,20 @@ export class TossPaymentService {
 
       const paymentId = `toss_${orderId}_${Date.now()}`;
 
-      return { success: true, paymentId };
+      return Promise.resolve({ success: true, paymentId });
     } catch (error: any) {
       console.error('TossPayments charge failed:', error);
-      return { success: false, error: error.message };
+      return Promise.resolve({ success: false, error: error.message });
     }
   }
 
-  static async getPayment(paymentId: string) {
+  static getPayment(paymentId: string) {
     try {
       console.log(`💳 TossPayments getPayment: ${paymentId}`);
-      return null;
+      return Promise.resolve(null);
     } catch (error) {
       console.error('Get TossPayments payment failed:', error);
-      throw error;
+      return Promise.reject(error);
     }
   }
 

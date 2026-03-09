@@ -23,7 +23,7 @@ export {
  */
 import { collection, doc, getDoc, getDocs, setDoc, updateDoc, deleteDoc, query, where, orderBy, limit, onSnapshot, writeBatch, runTransaction } from 'firebase/firestore';
 import { db } from '../services/firebase';
-import type { CollectionReference, DocumentReference, Query } from 'firebase/firestore';
+import type { CollectionReference, DocumentReference } from 'firebase/firestore';
 
 /**
  * Get collection reference

@@ -11,10 +11,8 @@ import {
   TouchableOpacity,
   ActivityIndicator,
   Alert,
-  RefreshControl,
 } from 'react-native';
 import { Swipeable } from 'react-native-gesture-handler';
-import Animated from 'react-native-reanimated';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { requireUserId } from '../../services/firebase';

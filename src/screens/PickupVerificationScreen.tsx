@@ -11,7 +11,7 @@ import {
 import { CameraView, Camera } from 'expo-camera';
 import { Button, Card } from '../components/common';
 import { locationService, LocationData } from '../services/location-service';
-import { mediaService, MediaUploadResult } from '../services/media-service';
+import { mediaService } from '../services/media-service';
 import QRCodeService from '../services/qrcode-service';
 import { pickupVerificationService, PickupVerificationData } from '../services/pickup-verification-service';
 
@@ -25,7 +25,7 @@ export const PickupVerificationScreen: React.FC<PickupVerificationScreenProps> =
   route,
 }) => {
   const [verificationMethod, setVerificationMethod] = useState<'qr' | 'photo'>('qr');
-  const [isScanning, setIsScanning] = useState(false);
+  const [isScanning] = useState(false);
   const [currentLocation, setCurrentLocation] = useState<string>('');
   const [isVerified, setIsVerified] = useState(false);
   const [verificationCode, setVerificationCode] = useState<string>('');
@@ -77,7 +77,7 @@ export const PickupVerificationScreen: React.FC<PickupVerificationScreenProps> =
   };
 
   // QR 코드 스캔 핸들러
-  const handleBarCodeScanned = ({ type, data }: { type: string; data: string }) => {
+  const handleBarCodeScanned = ({ type: _type, data }: { type: string; data: string }) => {
     if (scannedData) return; // 이미 스캔됨
 
     setScannedData(data);

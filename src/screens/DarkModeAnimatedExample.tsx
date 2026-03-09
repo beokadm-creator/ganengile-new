@@ -4,11 +4,11 @@
  */
 
 import React from 'react';
-import { View, Text, StyleSheet, Animated, useColorScheme } from 'react-native';
+import { View, Text, StyleSheet, Animated } from 'react-native';
 import { useAnimatedColors, ThemeProvider } from '../contexts/ThemeContext';
 
 const HomeScreenContent: React.FC = () => {
-  const { colors, isDark, transitionDuration, transitionOpacity } = useAnimatedColors();
+  const { colors, isDark, transitionDuration, transitionOpacity: _transitionOpacity } = useAnimatedColors();
   const [fadeAnim] = React.useState(new Animated.Value(1));
 
   // Dark Mode 전환 시 fade 애니메이션

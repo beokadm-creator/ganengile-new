@@ -133,7 +133,7 @@ const styles = StyleSheet.create({
   },
   optionText: {
     fontSize: Typography.fontSize.md,
-    fontWeight: Typography.fontWeight.semibold as any,
+    fontWeight: Typography.fontWeight.semibold,
     color: Colors.text.secondary,
   },
   activeText: {
