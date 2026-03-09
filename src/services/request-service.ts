@@ -21,6 +21,11 @@ import {
 } from 'firebase/firestore';
 import { db } from './firebase';
 import { getTravelTimeConfig } from './config-service';
+import {
+  calculatePhase1DeliveryFee,
+  type Phase1PricingParams,
+  type PackageSizeType,
+} from './pricing-service';
 import type {
   Request,
   CreateRequestData,
@@ -560,11 +565,13 @@ export function validateRequest(
 }
 
 /**
- * 배송비 계산
+ * 배송비 계산 (1단계: 지하철 to 지하철)
  * @param pickupStation 픽업 역
  * @param deliveryStation 배송 역
  * @param packageSize 패키지 크기
  * @param weight 무게 (kg)
+ * @param urgencySurcharge 긴급 추가 요금 (기본값: 0)
+ * @param manualAdjustment 수동 조정 금액 (기본값: 0)
  * @returns 배송비 정보
  */
 export async function calculateDeliveryFee(
@@ -582,13 +589,16 @@ export async function calculateDeliveryFee(
   urgencySurcharge: number;
   manualAdjustment: number;
   serviceFee: number;
+  subtotal: number;
   vat: number;
   totalFee: number;
   estimatedTime: number;
+  breakdown?:{
+    gillerFee: number;
+    platformFee: number;
+  };
 }> {
-  try {
-    const baseFee = 3000;
-
+  try{
     const travelTimeData = await getTravelTimeConfig(
       pickupStation.stationId,
       deliveryStation.stationId
@@ -596,66 +606,76 @@ export async function calculateDeliveryFee(
 
     const travelTimeSeconds = travelTimeData?.normalTime ?? 1800;
     const travelTimeMinutes = Math.round(travelTimeSeconds / 60);
-    const distanceFee = Math.ceil(travelTimeMinutes / 10) * 500;
 
-    const sizeFees: Record<string, number> = {
-      small: 0,
-      medium: 500,
-      large: 1000,
-      xl: 1500,
+    const stationCount = Math.max(2, Math.round(travelTimeMinutes / 2.5));
+
+    const pricingParams: Phase1PricingParams = {
+      stationCount,
+      weight,
+      packageSize: packageSize as PackageSizeType,
+      urgency: 'normal',
     };
-    const sizeFee = sizeFees[packageSize] || 0;
 
-    const weightFee = weight > 1 ? Math.ceil(weight - 1) * 300 : 0;
+    const feeResult = calculatePhase1DeliveryFee(pricingParams);
 
-    const serviceFee = 0;
-
-    const subtotal = baseFee + distanceFee + sizeFee + weightFee + serviceFee + urgencySurcharge + manualAdjustment;
+    const subtotal = feeResult.baseFee + feeResult.distanceFee + feeResult.weightFee +
+                     feeResult.sizeFee + feeResult.serviceFee + urgencySurcharge + manualAdjustment;
     const vat = Math.round(subtotal * 0.1);
+    let totalFee = subtotal + vat;
 
-    const totalFee = subtotal + vat;
+    if (totalFee < 3000) totalFee = 3000;
+    if (totalFee > 8000) totalFee = 8000;
+
+    const platformFee = Math.round(totalFee * 0.15);
+    const gillerFee = totalFee - platformFee;
 
     return {
-      baseFee,
-      distanceFee,
-      sizeFee,
-      weightFee,
+      baseFee: feeResult.baseFee,
+      distanceFee: feeResult.distanceFee,
+      sizeFee: feeResult.sizeFee,
+      weightFee: feeResult.weightFee,
       urgencySurcharge,
       manualAdjustment,
-      serviceFee,
+      serviceFee: feeResult.serviceFee,
+      subtotal,
       vat,
       totalFee,
       estimatedTime: travelTimeMinutes,
+      breakdown: {
+        gillerFee,
+        platformFee,
+      },
     };
   } catch (error) {
     console.error('Error calculating delivery fee:', error);
 
-    const baseFee = 3000;
-    const distanceFee = 1500;
-    const sizeFee = 500;
-    const weightFee = 300;
-    const serviceFee = 0;
-    const subtotal = baseFee + distanceFee + sizeFee + weightFee + serviceFee + urgencySurcharge + manualAdjustment;
-    const vat = Math.round(subtotal * 0.1);
+    const stationCount = 5;
+    const pricingParams: Phase1PricingParams = {
+      stationCount,
+      weight,
+      packageSize: packageSize as PackageSizeType,
+      urgency: 'normal',
+    };
+
+    const feeResult = calculatePhase1DeliveryFee(pricingParams);
+
     return {
-      baseFee,
-      distanceFee,
-      sizeFee,
-      weightFee,
+      baseFee: feeResult.baseFee,
+      distanceFee: feeResult.distanceFee,
+      sizeFee: feeResult.sizeFee,
+      weightFee: feeResult.weightFee,
       urgencySurcharge,
       manualAdjustment,
-      serviceFee,
-      vat,
-      totalFee: subtotal + vat,
+      serviceFee: feeResult.serviceFee,
+      subtotal: feeResult.subtotal,
+      vat: feeResult.vat,
+      totalFee: feeResult.totalFee,
       estimatedTime: 30,
+      breakdown: feeResult.breakdown,
     };
   }
 }
 
-/**
- * 요청 ID로 배송 요청 조회 (테스트 호환)
- * userId 검증 포함
- */
 export async function getRequest(requestId: string, userId: string): Promise<Request | null> {
   const request = await getRequestById(requestId);
   if (!request) return null;

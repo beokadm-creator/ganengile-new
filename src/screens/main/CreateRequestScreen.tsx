@@ -19,12 +19,19 @@ import {
   Platform,
 } from 'react-native';
 import { StackNavigationProp } from '@react-navigation/stack';
-import { getAllStations } from '../../services/config-service';
-import { createRequest, calculateDeliveryFee } from '../../services/request-service';
+import { getAllStations, getTravelTimeConfig } from '../../services/config-service';
+import { createRequest } from '../../services/request-service';
+import {
+  calculatePhase1DeliveryFee,
+  type Phase1PricingParams,
+  type DeliveryFeeBreakdown,
+  type PackageSizeType,
+} from '../../services/pricing-service';
 import { requireUserId } from '../../services/firebase';
 import { Colors, Typography, Spacing, BorderRadius } from '../../theme';
 import type { Station } from '../../types/config';
-import type { StationInfo, PackageSize, PackageWeight } from '../../types/request';
+import type { StationInfo, PackageWeight } from '../../types/request';
+import type { PackageSize } from '../../types/request';
 import TimePicker from '../../components/common/TimePicker';
 import { OptimizedStationSelectModal } from '../../components/OptimizedStationSelectModal';
 import ModeToggleSwitch from '../../components/onetime/ModeToggleSwitch';
@@ -304,54 +311,73 @@ export default function CreateRequestScreen({ navigation }: Props) {
     }
 
     try {
-      const pickupInfo = convertStationToInfo(pickupStation);
-      const deliveryInfo = convertStationToInfo(deliveryStation);
-
-      const urgencyOption = URGENCY_OPTIONS.find(opt => opt.level === urgency);
-      const urgencySurcharge = Math.round(3000 * (urgencyOption?.surchargeMultiplier || 0));
-
-      const fee = await retryWithBackoff(
-        () => calculateDeliveryFee(
-          pickupInfo,
-          deliveryInfo,
-          packageSize,
-          parseFloat(weight),
-          urgencySurcharge,
-          manualAdjustment
-        ),
-        { timeoutMs: 15000 }
+      const travelTimeData = await getTravelTimeConfig(
+        pickupStation.stationId,
+        deliveryStation.stationId
       );
 
+      const travelTimeSeconds = travelTimeData?.normalTime ?? 1800;
+      const travelTimeMinutes = Math.round(travelTimeSeconds / 60);
+
+      const stationCount = Math.max(2, Math.round(travelTimeMinutes / 2.5));
+
+      const pricingParams: Phase1PricingParams = {
+        stationCount,
+        weight: parseFloat(weight),
+        packageSize: packageSize as PackageSizeType,
+        urgency,
+      };
+
+      const feeResult = calculatePhase1DeliveryFee(pricingParams);
+
+      const urgencyMultiplier = URGENCY_OPTIONS.find(opt => opt.level === urgency)?.surchargeMultiplier || 0;
+      const urgencySurcharge = Math.round((feeResult.baseFee + feeResult.distanceFee) * urgencyMultiplier);
+
+      const subtotalWithAdjustment = feeResult.totalFee + manualAdjustment - feeResult.vat;
+      const vat = Math.round(subtotalWithAdjustment * 0.1);
+      const totalFee = subtotalWithAdjustment + vat;
+
+      const clampedTotalFee = Math.min(Math.max(totalFee, 3000), 8000);
+      const clampedVat = clampedTotalFee === totalFee ? vat : Math.round((clampedTotalFee / 1.1) * 0.1);
+
       setDeliveryFee({
-        ...fee,
-        urgencyFee: urgencySurcharge,
-      });
-    } catch (error) {
-      console.error('Error calculating delivery fee:', error);
-      const baseFee = 3000;
-      const distanceFee = 800;
-      const weightFeeValue = parseFloat(weight) * 100;
-      const sizeFeeValue = packageSize === 'small' ? 0 : packageSize === 'medium' ? 500 : packageSize === 'large' ? 1000 : 2000;
-
-      const urgencyOption = URGENCY_OPTIONS.find(opt => opt.level === urgency);
-      const urgencySurcharge = Math.round(baseFee * (urgencyOption?.surchargeMultiplier || 0));
-
-      const serviceFee = 0;
-      const subtotal = baseFee + distanceFee + weightFeeValue + sizeFeeValue + serviceFee + urgencySurcharge + manualAdjustment;
-      const vat = Math.round(subtotal * 0.1);
-
-      setDeliveryFee({
-        baseFee,
-        distanceFee,
-        sizeFee: sizeFeeValue,
-        weightFee: weightFeeValue,
-        serviceFee,
-        vat,
-        totalFee: subtotal + vat,
-        estimatedTime: 30,
+        baseFee: feeResult.baseFee,
+        distanceFee: feeResult.distanceFee,
+        sizeFee: feeResult.sizeFee,
+        weightFee: feeResult.weightFee,
+        serviceFee: feeResult.serviceFee,
+        vat: clampedVat,
+        totalFee: clampedTotalFee,
+        estimatedTime: travelTimeMinutes,
         urgencyFee: urgencySurcharge,
         urgencySurcharge,
         manualAdjustment,
+      });
+    } catch (error) {
+      console.error('Error calculating delivery fee:', error);
+
+      const stationCount = 5;
+      const pricingParams: Phase1PricingParams = {
+        stationCount,
+        weight: parseFloat(weight) || 1,
+        packageSize: packageSize as PackageSizeType,
+        urgency,
+      };
+
+      const feeResult = calculatePhase1DeliveryFee(pricingParams);
+
+      setDeliveryFee({
+        baseFee: feeResult.baseFee,
+        distanceFee: feeResult.distanceFee,
+        sizeFee: feeResult.sizeFee,
+        weightFee: feeResult.weightFee,
+        serviceFee: feeResult.serviceFee,
+        vat: feeResult.vat,
+        totalFee: feeResult.totalFee,
+        estimatedTime: 30,
+        urgencyFee: feeResult.urgencySurcharge,
+        urgencySurcharge: feeResult.urgencySurcharge,
+        manualAdjustment: 0,
       });
     }
   };
