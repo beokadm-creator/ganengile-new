@@ -4,7 +4,7 @@
  */
 
 // 메타 데이터 업데이트
-const updateHtmlMeta = () => {
+const _updateHtmlMeta = () => {
   const viewport = document.querySelector('meta[name="viewport"]');
   if (viewport) {
     viewport.setAttribute('content', 'width=device-width, initial-scale=1, maximum-scale=5, user-scalable=yes');
@@ -12,7 +12,7 @@ const updateHtmlMeta = () => {
 };
 
 // Code splitting 라우트 설정
-const lazyLoadRoutes = () => {
+const _lazyLoadRoutes = () => {
   // 메인 번들 크기 줄이기
   const mainBundle = document.querySelector('script[src*="main"]') as HTMLScriptElement;
   if (mainBundle) {

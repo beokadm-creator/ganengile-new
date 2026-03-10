@@ -4,7 +4,7 @@
  */
 
 import React, { memo, useCallback, useMemo } from 'react';
-import { StyleSheet, View, Text, TouchableOpacity } from 'react-native';
+import { StyleSheet, View, Text, TouchableOpacity, Image, FlatList } from 'react-native';
 import Icon from 'react-native-vector-icons/MaterialIcons';
 
 // ==================== Memoized GillerProfileCard ====================
@@ -220,10 +220,6 @@ export const RequestCard = memo<RequestCardProps>((props) => {
     props.onPress(props.request.id);
   }, [props.request.id, props.onPress]);
 
-  const handleAccept = useCallback(() => {
-    props.onAccept(props.request.id);
-  }, [props.request.id, props.onAccept]);
-
   const statusColor = useMemo(() => {
     switch (props.request.status) {
       case 'pending': return '#FF9800';
@@ -263,7 +259,7 @@ export const RequestCard = memo<RequestCardProps>((props) => {
 
 // ==================== Optimized FlatList ====================
 
-export function OptimizedFlatList<T>({
+export function OptimizedFlatList<_T>({
   data,
   renderItem,
   keyExtractor,

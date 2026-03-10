@@ -33,6 +33,16 @@ export default function Toast({
 }: ToastProps) {
   const [fadeAnim] = useState(new Animated.Value(0));
 
+  const hide = () => {
+    Animated.timing(fadeAnim, {
+      toValue: 0,
+      duration: 300,
+      useNativeDriver: true,
+    }).start(() => {
+      onHide();
+    });
+  };
+
   useEffect(() => {
     if (visible) {
       Animated.timing(fadeAnim, {
@@ -50,16 +60,6 @@ export default function Toast({
       hide();
     }
   }, [visible]);
-
-  const hide = () => {
-    Animated.timing(fadeAnim, {
-      toValue: 0,
-      duration: 300,
-      useNativeDriver: true,
-    }).start(() => {
-      onHide();
-    });
-  };
 
   if (!visible) {
     return null;

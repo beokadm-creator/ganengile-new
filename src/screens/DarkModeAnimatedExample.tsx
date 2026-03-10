@@ -4,8 +4,8 @@
  */
 
 import React from 'react';
-import { View, Text, StyleSheet, Animated } from 'react-native';
-import { useAnimatedColors, ThemeProvider } from '../contexts/ThemeContext';
+import { View, Text, StyleSheet, Animated, TouchableOpacity } from 'react-native';
+import { useAnimatedColors, ThemeProvider, useTheme } from '../contexts/ThemeContext';
 
 const HomeScreenContent: React.FC = () => {
   const { colors, isDark, transitionDuration, transitionOpacity: _transitionOpacity } = useAnimatedColors();

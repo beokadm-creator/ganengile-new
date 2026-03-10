@@ -116,8 +116,8 @@ export interface LockerReservation {
   status: 'pending' | 'active' | 'completed' | 'cancelled';
   pickupPhotoUrl?: string;   // 인수 사진 URL
   dropoffPhotoUrl?: string;  // 인계 사진 URL
-  createdAt: Date | any;
-  updatedAt: Date | any;
+  createdAt: Date;
+  updatedAt: Date;
 }
 
 /**

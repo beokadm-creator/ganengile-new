@@ -28,26 +28,26 @@ export function AppDownloadBanner({ visible = true, onDismiss }: AppDownloadBann
   const [showModal, setShowModal] = useState(false);
 
   useEffect(() => {
-    checkBannerStatus();
-  }, []);
+    const checkBannerStatus = async () => {
+      if (Platform.OS === 'web') {
+        try {
+          const dismissed = await AsyncStorage.getItem(BANNER_STORAGE_KEY);
+          const dismissTime = dismissed ? parseInt(dismissed, 10) : 0;
+          const daysSinceDismiss = (Date.now() - dismissTime) / (1000 * 60 * 60 * 24);
 
-  const checkBannerStatus = async () => {
-    if (Platform.OS === 'web') {
-      try {
-        const dismissed = await AsyncStorage.getItem(BANNER_STORAGE_KEY);
-        const dismissTime = dismissed ? parseInt(dismissed, 10) : 0;
-        const daysSinceDismiss = (Date.now() - dismissTime) / (1000 * 60 * 60 * 24);
-
-        // 7일이 지났거나 한번도 안 보여줬으면 보여주기
-        if (!dismissed || daysSinceDismiss >= 7) {
-          setShowBanner(true);
+          // 7일이 지났거나 한번도 안 보여줬으면 보여주기
+          if (!dismissed || daysSinceDismiss >= 7) {
+            setShowBanner(true);
+          }
+        } catch (error) {
+          console.error('Error checking banner status:', error);
+          setShowBanner(true); // 에러 시 보여주기
         }
-      } catch (error) {
-        console.error('Error checking banner status:', error);
-        setShowBanner(true); // 에러 시 보여주기
       }
-    }
-  };
+    };
+
+    void checkBannerStatus();
+  }, []);
 
   const handleDismiss = async () => {
     try {

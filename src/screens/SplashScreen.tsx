@@ -3,7 +3,8 @@
  * 로딩 애니메이션이 적용된 스플래시 화면
  */
 
-import React, { useEffect, useRef } from 'react';
+/* eslint-disable react-hooks/refs */
+import React, { useEffect, useRef, useMemo } from 'react';
 import {
   View,
   Text,
@@ -12,24 +13,24 @@ import {
   Dimensions,
 } from 'react-native';
 
-const { width: _width, height } = Dimensions.get('window');
+const { width: _width } = Dimensions.get('window');
 
 export const SplashScreen: React.FC = () => {
-  const fadeAnim = useRef(new Animated.Value(0)).current;
-  const scaleAnim = useRef(new Animated.Value(0.8)).current;
-  const rotateAnim = useRef(new Animated.Value(0)).current;
-  const translateYAnim = useRef(new Animated.Value(50)).current;
+  const fadeAnimRef = useRef(new Animated.Value(0));
+  const scaleAnimRef = useRef(new Animated.Value(0.8));
+  const rotateAnimRef = useRef(new Animated.Value(0));
+  const translateYAnimRef = useRef(new Animated.Value(50));
 
   useEffect(() => {
     // Fade-in
-    Animated.timing(fadeAnim, {
+    Animated.timing(fadeAnimRef.current, {
       toValue: 1,
       duration: 500,
       useNativeDriver: true
     }).start();
 
     // Scale-up
-    Animated.spring(scaleAnim, {
+    Animated.spring(scaleAnimRef.current, {
       toValue: 1,
       friction: 8,
       tension: 40,
@@ -37,7 +38,7 @@ export const SplashScreen: React.FC = () => {
     }).start();
 
     // Slide up
-    Animated.timing(translateYAnim, {
+    Animated.timing(translateYAnimRef.current, {
       toValue: 0,
       duration: 800,
       useNativeDriver: true
@@ -45,7 +46,7 @@ export const SplashScreen: React.FC = () => {
 
     // Subtle rotation (logo)
     Animated.loop(
-      Animated.timing(rotateAnim, {
+      Animated.timing(rotateAnimRef.current, {
         toValue: 1,
         duration: 3000,
         useNativeDriver: true
@@ -53,17 +54,19 @@ export const SplashScreen: React.FC = () => {
     ).start();
 
     return () => {
-      fadeAnim.removeAllListeners();
-      scaleAnim.removeAllListeners();
-      translateYAnim.removeAllListeners();
-      rotateAnim.removeAllListeners();
+      fadeAnimRef.current.removeAllListeners();
+      scaleAnimRef.current.removeAllListeners();
+      translateYAnimRef.current.removeAllListeners();
+      rotateAnimRef.current.removeAllListeners();
     };
   }, []);
 
-  const rotateInterpolate = rotateAnim.interpolate({
-    inputRange: [0, 1],
-    outputRange: ['0deg', '360deg']
-  });
+  const rotateInterpolate = useMemo(() => {
+    return rotateAnimRef.current.interpolate({
+      inputRange: [0, 1],
+      outputRange: ['0deg', '360deg']
+    });
+  }, []);
 
   return (
     <View style={styles.container}>
@@ -72,7 +75,7 @@ export const SplashScreen: React.FC = () => {
         style={[
           styles.backgroundGradient,
           {
-            opacity: fadeAnim
+            opacity: fadeAnimRef.current
           }
         ]}
       >
@@ -85,10 +88,10 @@ export const SplashScreen: React.FC = () => {
         style={[
           styles.logoContainer,
           {
-            opacity: fadeAnim,
+            opacity: fadeAnimRef.current,
             transform: [
-              { scale: scaleAnim },
-              { translateY: translateYAnim }
+              { scale: scaleAnimRef.current },
+              { translateY: translateYAnimRef.current }
             ]
           }
         ]}
@@ -110,7 +113,7 @@ export const SplashScreen: React.FC = () => {
       </Animated.View>
 
       {/* 로딩 인디케이터 */}
-      <Animated.View style={[styles.loadingContainer, { opacity: fadeAnim }]}>
+      <Animated.View style={[styles.loadingContainer, { opacity: fadeAnimRef.current }]}>
         <LoadingDots />
       </Animated.View>
 
@@ -119,7 +122,7 @@ export const SplashScreen: React.FC = () => {
         style={[
           styles.version,
           {
-            opacity: fadeAnim
+            opacity: fadeAnimRef.current
           }
         ]}
       >
@@ -133,9 +136,9 @@ export const SplashScreen: React.FC = () => {
  * 로딩 도트 애니메이션
  */
 const LoadingDots: React.FC = () => {
-  const dot1Anim = useRef(new Animated.Value(0)).current;
-  const dot2Anim = useRef(new Animated.Value(0)).current;
-  const dot3Anim = useRef(new Animated.Value(0)).current;
+  const dot1AnimRef = useRef(new Animated.Value(0));
+  const dot2AnimRef = useRef(new Animated.Value(0));
+  const dot3AnimRef = useRef(new Animated.Value(0));
 
   useEffect(() => {
     const createAnimation = (anim: Animated.Value) => {
@@ -155,9 +158,9 @@ const LoadingDots: React.FC = () => {
       );
     };
 
-    const anim1 = createAnimation(dot1Anim);
-    const anim2 = createAnimation(dot2Anim);
-    const anim3 = createAnimation(dot3Anim);
+    const anim1 = createAnimation(dot1AnimRef.current);
+    const anim2 = createAnimation(dot2AnimRef.current);
+    const anim3 = createAnimation(dot3AnimRef.current);
 
     anim1.start();
     setTimeout(() => anim2.start(), 200);
@@ -170,28 +173,35 @@ const LoadingDots: React.FC = () => {
     };
   }, []);
 
-  return (
-    <View style={styles.dotsContainer}>
-      {[dot1Anim, dot2Anim, dot3Anim].map((anim, index) => (
-        <Animated.View
-          key={index}
-          style={[
-            styles.dot,
+  const dots = useMemo(() => {
+    return [dot1AnimRef.current, dot2AnimRef.current, dot3AnimRef.current].map((anim, index) => ({
+      key: index,
+      style: [
+        styles.dot,
+        {
+          transform: [
             {
-              transform: [
-                {
-                  scale: anim.interpolate({
-                    inputRange: [0, 1],
-                    outputRange: [1, 1.5]
-                  })
-                }
-              ],
-              opacity: anim.interpolate({
+              scale: anim.interpolate({
                 inputRange: [0, 1],
-                outputRange: [0.3, 1]
+                outputRange: [1, 1.5]
               })
             }
-          ]}
+          ],
+          opacity: anim.interpolate({
+            inputRange: [0, 1],
+            outputRange: [0.3, 1]
+          })
+        }
+      ]
+    }));
+  }, [dot1AnimRef, dot2AnimRef, dot3AnimRef]);
+
+  return (
+    <View style={styles.dotsContainer}>
+      {dots.map((dot) => (
+        <Animated.View
+          key={dot.key}
+          style={dot.style}
         />
       ))}
     </View>

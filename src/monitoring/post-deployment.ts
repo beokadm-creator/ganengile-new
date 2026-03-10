@@ -3,12 +3,17 @@
  * Firebase Crashlytics, Performance 모니터링, 사용자 피드백 수집
  */
 
-// @ts-ignore - Module may not exist
+declare const __DEV__: boolean;
+declare const require: any;
+declare const performance: any;
+
+// @ts-expect-error - Module may not exist
 import { Platform } from 'react-native';
-// @ts-ignore - Module may not exist
+// @ts-expect-error - Module may not exist
 import * as Analytics from 'expo-firebase-analytics';
-// @ts-ignore - Module may not exist
+// @ts-expect-error - Module may not exist
 import * as Crashlytics from '@sentry/react-native';
+import { useEffect } from 'react';
 
 /**
  * 에러 로그 모니터링
@@ -20,7 +25,7 @@ export const setupErrorMonitoring = () => {
   }
 
   // Sentry Crashlytics 초기화
-  // @ts-ignore
+  // @ts-expect-error - Crashlytics.init may not be in type definitions
   Crashlytics.init({
     dsn: (__DEV__ ? undefined : '__SENTRY_DSN__'),
     environment: (__DEV__ ? 'development' : 'production'),
@@ -98,9 +103,10 @@ export const setupUserFeedback = () => {
 export const setupFirebaseCrashlytics = () => {
   if (__DEV__) return;
 
-  // @ts-ignore - Module may not exist
+  // @ts-expect-error - Module may not exist
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
   const crashlytics = require('@sentry/react-native');
-  
+
   // 자동 크래시 리포트 활성화
   if (crashlytics.enableAutoSessionTracking) {
     crashlytics.enableAutoSessionTracking({
@@ -125,9 +131,9 @@ export const setupNativeCrashReporting = () => {
   };
 
   // 전역 에러 핸들러
-  // @ts-ignore - ErrorUtils is not standard
+  // @ts-expect-error - ErrorUtils is not standard
   (global as any).ErrorUtils = (global as any).ErrorUtils || {};
-  // @ts-ignore - ErrorUtils is not standard
+  // @ts-expect-error - ErrorUtils is not standard
   (global as any).ErrorUtils.setGlobalHandler(crashHandler);
 
   console.log('✅ Native crash reporting enabled');
@@ -142,6 +148,7 @@ export const runPostDeploymentChecks = async () => {
       name: 'Firebase 연결 확인',
       check: async () => {
         try {
+          // eslint-disable-next-line @typescript-eslint/no-require-imports
           const firebase = require('firebase/app');
           await firebase.initializeApp();
           console.log('✅ Firebase connection OK');
@@ -174,6 +181,7 @@ export const runPostDeploymentChecks = async () => {
       name: 'FCM 토큰 확인',
       check: async () => {
         try {
+          // eslint-disable-next-line @typescript-eslint/no-require-imports
           const messaging = require('firebase/messaging');
           const token = await messaging.getToken();
           if (token) {
@@ -207,24 +215,19 @@ export const runPostDeploymentChecks = async () => {
  * 성능 모니터링 Hook
  */
 export const usePerformanceMonitor = () => {
-  // @ts-ignore - useEffect imported from React
   useEffect(() => {
     if (__DEV__) return;
 
-    const performanceMonitor = setInterval(async () => {
+    const performanceMonitor = setInterval(() => {
       // 메모리 사용량 확인
-      // @ts-ignore - performance.memory is not standard
-      if ((performance as any).memory) {
-        // @ts-ignore - performance.memory is not standard
-        const used = (performance as any).memory.usedJSHeapSize / 1024 / 1024;
-        // @ts-ignore - performance.memory is not standard
-        const total = (performance as any).memory.totalJSHeapSize / 1024 / 1024;
+      if (performance.memory) {
+        const used = performance.memory.usedJSHeapSize / 1024 / 1024;
+        const total = performance.memory.totalJSHeapSize / 1024 / 1024;
         const percentage = (used / total) * 100;
 
         if (percentage > 80) {
           console.warn(`⚠️ High memory usage: ${percentage.toFixed(1)}%`);
 
-          // @ts-ignore
           Analytics.logEvent('memory_warning', {
             used_mb: used.toFixed(2),
             total_mb: total.toFixed(2),
@@ -247,30 +250,35 @@ export const trackDeploymentVersion = (version: string) => {
   if (__DEV__) return;
 
   // 배포 버전 저장
-  const deploymentKey = `deployment_${version}`;
-  const lastVersion = localStorage.getItem('last_deployment_version');
-  
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const _deploymentKey = `deployment_${version}`;
+  // @ts-expect-error - localStorage may not be defined in React Native
+  const lastVersion = localStorage?.getItem('last_deployment_version');
+
   if (lastVersion !== version) {
     console.log(`📦 New deployment detected: ${lastVersion} → ${version}`);
-    
+
     Analytics.logEvent('app_update', {
       old_version: lastVersion || 'none',
       new_version: version
     });
 
-    localStorage.setItem('last_deployment_version', version);
+    // @ts-expect-error - localStorage may not be defined in React Native
+    localStorage?.setItem('last_deployment_version', version);
   }
 
   // 첫 실행인 경우 온보딩 이벤트
   const firstRunKey = 'first_run_' + version;
-  if (!localStorage.getItem(firstRunKey)) {
+  // @ts-expect-error - localStorage may not be defined in React Native
+  if (!localStorage?.getItem(firstRunKey)) {
     console.log('🎉 First run after deployment');
-    
+
     Analytics.logEvent('first_run', {
       version: version,
       platform: Platform.OS
     });
 
-    localStorage.setItem(firstRunKey, 'true');
+    // @ts-expect-error - localStorage may not be defined in React Native
+    localStorage?.setItem(firstRunKey, 'true');
   }
 };

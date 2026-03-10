@@ -18,15 +18,6 @@ interface Station {
   }>;
 }
 
-interface TravelTime {
-  fromStationId: string;
-  toStationId: string;
-  normalTime: number;
-  expressTime?: number;
-  transferCount: number;
-  lineIds: string[];
-}
-
 export class PathfindingService {
   private stations: Map<string, Station> = new Map();
   private adjacencyList: Map<string, Array<{ to: string; time: number; line: string }>> = new Map();

@@ -11,7 +11,6 @@ import {
   doc,
   getDoc,
   getDocs,
-  addDoc,
   updateDoc,
   setDoc,
   query,
@@ -68,6 +67,9 @@ export async function getUserById(userId: string): Promise<User | null> {
     }
 
     const data = docSnapshot.data();
+    if (!data) {
+      return null;
+    }
     return {
       uid: docSnapshot.id,
       email: data.email || '',
@@ -267,6 +269,14 @@ export async function getDetailedUserStats(userId: string): Promise<{
     }
 
     const userData = userDoc.data();
+    if (!userData) {
+      return {
+        ...baseStats,
+        recent30DaysDeliveries: 0,
+        recentPenalties: 0,
+        accountAgeDays: 0,
+      };
+    }
     const createdAt = userData.createdAt?.toDate();
 
     // Calculate account age in days

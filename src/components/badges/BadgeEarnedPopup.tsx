@@ -11,7 +11,6 @@ import {
   Modal,
   TouchableOpacity,
   Animated,
-  Dimensions,
 } from 'react-native';
 import { findBadgeById } from '../../data/badges';
 import { Colors, Typography, Spacing, BorderRadius } from '../../theme';
@@ -30,6 +29,23 @@ export default function BadgeEarnedPopup({
   const [fadeAnim] = useState(new Animated.Value(0));
   const [scaleAnim] = useState(new Animated.Value(0.5));
   const badge = badgeId ? findBadgeById(badgeId) : null;
+
+  const handleClose = () => {
+    Animated.parallel([
+      Animated.timing(fadeAnim, {
+        toValue: 0,
+        duration: 200,
+        useNativeDriver: true,
+      }),
+      Animated.timing(scaleAnim, {
+        toValue: 0.5,
+        duration: 200,
+        useNativeDriver: true,
+      }),
+    ]).start(() => {
+      onClose();
+    });
+  };
 
   useEffect(() => {
     if (visible) {
@@ -60,23 +76,6 @@ export default function BadgeEarnedPopup({
       scaleAnim.setValue(0.5);
     }
   }, [visible]);
-
-  const handleClose = () => {
-    Animated.parallel([
-      Animated.timing(fadeAnim, {
-        toValue: 0,
-        duration: 200,
-        useNativeDriver: true,
-      }),
-      Animated.timing(scaleAnim, {
-        toValue: 0.5,
-        duration: 200,
-        useNativeDriver: true,
-      }),
-    ]).start(() => {
-      onClose();
-    });
-  };
 
   if (!badge) return null;
 

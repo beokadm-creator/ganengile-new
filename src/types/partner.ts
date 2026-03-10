@@ -4,7 +4,6 @@
  */
 
 import { Timestamp } from 'firebase/firestore';
-import { StationInfo } from './request';
 
 /**
  * 파트너 시설 타입

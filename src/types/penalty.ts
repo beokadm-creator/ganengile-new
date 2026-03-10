@@ -3,8 +3,6 @@
  * 페널티 시스템 관련 타입
  */
 
-import { Timestamp } from 'firebase/firestore';
-
 export enum PenaltyType {
   LATE_ARRIVAL = 'late_arrival',         // 지연
   NO_SHOW = 'no_show',                   // 노쇼

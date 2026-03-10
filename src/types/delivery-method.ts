@@ -15,7 +15,7 @@ export interface DeliveryMethodOption {
   /** 방식 ID */
   id: DeliveryMethod;
   /** 아이콘 */
-  icon: keyof typeof Icons;
+  icon: keyof typeof _Icons;
   /** 라벨 */
   label: string;
   /** 설명 */
@@ -27,7 +27,7 @@ export interface DeliveryMethodOption {
 }
 
 // Icons (임시)
-const Icons = {
+const _Icons = {
   'people': 'people',
   'cube': 'cube',
   'swap': 'swap-horizontal',

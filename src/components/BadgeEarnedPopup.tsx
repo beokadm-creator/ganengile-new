@@ -39,6 +39,7 @@ export default function BadgeEarnedPopup({ visible, badgeId, onClose, onShare }:
   useEffect(() => {
     if (visible && badgeId) {
       const badgeData = findBadgeById(badgeId);
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setBadge(badgeData || null);
 
       // 애니메이션 시작

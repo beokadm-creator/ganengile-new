@@ -8,7 +8,7 @@
 /**
  * B2B 길러 등급
  */
-export type B2BGillerTier = "silver" | "gold" | "platinum";
+export type B2BGillerTierLevel = "silver" | "gold" | "platinum";
 
 /**
  * 등급별 기준 충족 현황
@@ -60,7 +60,7 @@ export interface B2BGillerTier {
   /** 길러 ID */
   gillerId: string;
   /** B2B 등급 */
-  tier: B2BGillerTier;
+  tier: B2BGillerTierLevel;
   
   // 기준 충족 현황
   /** 기준 충족 현황 */
@@ -84,7 +84,7 @@ export interface B2BGillerTier {
 /**
  * 등급별 승급 기준
  */
-export const B2B_TIER_CRITERIA: Record<B2BGillerTier, B2BGillerCriteria> = {
+export const B2B_TIER_CRITERIA: Record<B2BGillerTierLevel, B2BGillerCriteria> = {
   silver: {
     rating: 4.5,
     monthlyDeliveries: 30,
@@ -105,7 +105,7 @@ export const B2B_TIER_CRITERIA: Record<B2BGillerTier, B2BGillerCriteria> = {
 /**
  * 등급별 혜택
  */
-export const B2B_TIER_BENEFITS: Record<B2BGillerTier, B2BGillerBenefits> = {
+export const B2B_TIER_BENEFITS: Record<B2BGillerTierLevel, B2BGillerBenefits> = {
   silver: {
     priorityLevel: 5,
     rateBonus: 20,

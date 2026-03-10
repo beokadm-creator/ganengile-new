@@ -25,9 +25,10 @@ interface ThemeColors {
 
 interface ThemeContextType {
   colorScheme: ColorScheme;
-  setColorScheme: (scheme: ColorScheme) => void;
+  setColorScheme: (scheme: ColorScheme) => Promise<void>;
   colors: ThemeColors;
   isDark: boolean;
+  isTransitioning: boolean;
 }
 
 const ThemeContext = createContext<ThemeContextType | undefined>(undefined);
@@ -78,19 +79,19 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
   // 초기 로드 시 저장된 환경 설정 불러오기
   useEffect(() => {
-    loadThemePreference();
-  }, []);
-
-  const loadThemePreference = async () => {
-    try {
-      const stored = await AsyncStorage.getItem(STORAGE_KEY);
-      if (stored) {
-        setStoredScheme(stored as ColorScheme);
+    const loadThemePreference = async () => {
+      try {
+        const stored = await AsyncStorage.getItem(STORAGE_KEY);
+        if (stored) {
+          setStoredScheme(stored as ColorScheme);
+        }
+      } catch (error) {
+        console.error('Failed to load theme preference:', error);
       }
-    } catch (error) {
-      console.error('Failed to load theme preference:', error);
-    }
-  };
+    };
+
+    void loadThemePreference();
+  }, []);
 
   const setColorScheme = async (scheme: ColorScheme) => {
     // 애니메이션 시작

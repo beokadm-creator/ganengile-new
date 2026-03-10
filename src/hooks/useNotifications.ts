@@ -153,7 +153,8 @@ export function useNotifications(handlers?: NotificationHandlers) {
     }
 
     // Register for push notifications on mount
-    registerForPushNotifications();
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    void registerForPushNotifications();
 
     // Listen for notifications received while app is foregrounded
     notificationListener.current = Notifications.addNotificationReceivedListener(
@@ -165,7 +166,7 @@ export function useNotifications(handlers?: NotificationHandlers) {
     // Listen for notification tap/response
     responseListener.current = Notifications.addNotificationResponseReceivedListener(
       (response) => {
-        const { chatRoomId } = response.notification.request.content.data as any;
+        const { chatRoomId: _chatRoomId } = response.notification.request.content.data as any;
 
         handlers?.onNotificationTapped?.(response);
       }

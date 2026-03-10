@@ -18,7 +18,7 @@ interface OptimizedStationSelectModalProps {
   onSelectStation: (station: Station) => void;
   stations?: Station[];
   title?: string;
-  initialRegion?: string | 'all';
+  initialRegion?: string;
 }
 
 export const OptimizedStationSelectModal: React.FC<OptimizedStationSelectModalProps> = ({
@@ -52,18 +52,21 @@ export const OptimizedStationSelectModal: React.FC<OptimizedStationSelectModalPr
   // 검색어 변경 시 로딩 상태 표시
   useEffect(() => {
     if (debouncedSearch) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setIsSearching(true);
       const timer = setTimeout(() => {
         setIsSearching(false);
       }, 500);
       return () => clearTimeout(timer);
     } else {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setIsSearching(false);
     }
   }, [debouncedSearch]);
 
   // 역 필터링
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setIsLoading(true);
 
     const timer = setTimeout(() => {
@@ -90,16 +93,17 @@ export const OptimizedStationSelectModal: React.FC<OptimizedStationSelectModalPr
     return () => clearTimeout(timer);
   }, [debouncedSearch, selectedRegion, stations]);
 
-  // 최근/즐겨찾기 로드
-  useEffect(() => {
-    loadRecentAndFavoriteStations();
-  }, []);
-
   const loadRecentAndFavoriteStations = () => {
     // mock data for now
     setRecentStations(mockRecentStations);
     setFavoriteStations(mockFavoriteStations);
   };
+
+  // 최근/즐겨찾기 로드
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    loadRecentAndFavoriteStations();
+  }, []);
 
   const renderStation = ({ item }: { item: Station }) => (
     <TouchableOpacity

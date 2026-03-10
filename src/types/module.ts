@@ -19,8 +19,8 @@ export interface Module {
   start(): Promise<void>;
   stop(): Promise<void>;
   
-  on(event: string, handler: Function): void;
-  emit(event: string, data: any): void;
+  on(event: string, handler: (...args: unknown[]) => void): void;
+  emit(event: string, data: unknown): void;
   
   getStatus(): ModuleStatus;
 }

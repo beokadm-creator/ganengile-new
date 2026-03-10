@@ -3,6 +3,8 @@
  * 개발용 연결 확인
  */
 
+declare const require: any;
+
 import { db } from '../services/firebase';
 import { collection, onSnapshot, query, limit } from 'firebase/firestore';
 
@@ -76,7 +78,7 @@ export async function testNetworkConnection(): Promise<boolean> {
     console.log('📡 네트워크 타입:', state.type);
     
     return state.isConnected === true;
-  } catch (error) {
+  } catch (_error) {
     console.warn('⚠️ NetInfo를 사용할 수 없음');
     return true; // NetInfo가 없으면 연결된 것으로 가정
   }

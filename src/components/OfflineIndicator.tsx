@@ -22,6 +22,7 @@ export const OfflineIndicator: React.FC<OfflineIndicatorProps> = ({ height = 40 
 
     if (offline && !isOffline) {
       // 오프라인 상태가 되면 fade-in
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setIsOffline(true);
       Animated.timing(fadeAnim, {
         toValue: 1,
@@ -35,6 +36,7 @@ export const OfflineIndicator: React.FC<OfflineIndicatorProps> = ({ height = 40 
         duration: 300,
         useNativeDriver: true
       }).start(() => {
+        // eslint-disable-next-line react-hooks/set-state-in-effect
         setIsOffline(false);
       });
     }

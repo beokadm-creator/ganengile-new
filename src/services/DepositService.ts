@@ -9,7 +9,6 @@ import {
   where,
   orderBy,
   Timestamp,
-  CollectionReference,
 } from 'firebase/firestore';
 import { db } from '../core/firebase';
 import { PointService } from './PointService';

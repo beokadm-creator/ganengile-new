@@ -68,6 +68,9 @@ export async function gillerAcceptRequest(
     }
 
     const request = requestDoc.data();
+    if (!request) {
+      return { success: false, message: '요청 데이터를 찾을 수 없습니다.' };
+    }
 
     if (request.status !== 'matched') {
       return { success: false, message: '수락할 수 없는 요청입니다.' };
@@ -139,6 +142,9 @@ export async function verifyPickup(data: PickupVerificationData): Promise<{ succ
     }
 
     const delivery = deliveryDoc.data();
+    if (!delivery) {
+      return { success: false, message: '배송 데이터를 찾을 수 없습니다.' };
+    }
 
     if (delivery.status !== 'accepted') {
       return { success: false, message: '픽업 인증을 할 수 없는 상태입니다.' };
@@ -236,6 +242,9 @@ export async function completeDelivery(data: DeliveryCompletionData): Promise<{ 
     }
 
     const delivery = deliveryDoc.data();
+    if (!delivery) {
+      return { success: false, message: '배송 데이터를 찾을 수 없습니다.' };
+    }
 
     if (delivery.status !== 'arrived' && delivery.status !== 'in_transit') {
       return { success: false, message: '배송 완료를 할 수 없는 상태입니다.' };
@@ -309,6 +318,9 @@ export async function markAsArrived(deliveryId: string): Promise<{ success: bool
     }
 
     const delivery = deliveryDoc.data();
+    if (!delivery) {
+      return { success: false, message: '배송 데이터를 찾을 수 없습니다.' };
+    }
 
     if (delivery.status !== 'in_transit') {
       return { success: false, message: '도착 처리를 할 수 없는 상태입니다.' };
@@ -474,6 +486,9 @@ export async function markAsDroppedAtLocker(
     }
 
     const delivery = deliveryDoc.data();
+    if (!delivery) {
+      return { success: false, message: '배송 데이터를 찾을 수 없습니다.' };
+    }
 
     if (delivery.gillerId !== gillerId) {
       return { success: false, message: '권한이 없습니다.' };

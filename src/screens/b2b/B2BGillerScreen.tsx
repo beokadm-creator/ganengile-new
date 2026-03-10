@@ -15,7 +15,7 @@ import { StackNavigationProp } from '@react-navigation/stack';
 import { auth, db } from '../../services/firebase';
 import { collection, query, where, orderBy, limit, getDocs } from 'firebase/firestore';
 import { b2bFirestoreService } from '../../services/b2b-firestore-service';
-import { Colors, Typography, Spacing, BorderRadius } from '../../theme';
+import { Colors, Typography, Spacing, BorderRadius, Shadows } from '../../theme';
 
 type NavigationProp = StackNavigationProp<any>;
 

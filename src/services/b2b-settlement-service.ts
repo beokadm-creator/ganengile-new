@@ -3,7 +3,7 @@
  * 
  * 길러 월간 배송 집계, 수익, 보너스 정산
  */
-import { collection, doc, getDoc, setDoc, updateDoc, query, where, getDocs, addDoc, runTransaction } from 'firebase/firestore';
+import { collection, doc, getDoc, setDoc, updateDoc, query, where, getDocs, addDoc } from 'firebase/firestore';
 import { db } from '../config/firebase';
 import type { 
   B2BSettlement,

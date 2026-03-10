@@ -3,8 +3,6 @@
  * 사진 인증 관련 타입
  */
 
-import { Timestamp } from 'firebase/firestore';
-
 export enum PhotoType {
   PICKUP = 'pickup',       // 인수 사진
   DROPOFF = 'dropoff',     // 인계 사진

@@ -3,8 +3,6 @@
  * QR코드 생성/검증 관련 타입
  */
 
-import { Timestamp } from 'firebase/firestore';
-
 export enum QRCodeType {
   PICKUP = 'pickup',       // 인수용 QR코드
   DROPOFF = 'dropoff',    // 인계용 QR코드

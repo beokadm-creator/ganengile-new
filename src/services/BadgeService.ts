@@ -3,7 +3,7 @@
  * 배지 관련 비즈니스 로직
  */
 
-import { Badge, BadgeCategory, BadgeTier, User } from '../types/user';
+import { Badge, User } from '../types/user';
 import { INITIAL_BADGES } from '../data/badges';
 import { doc, getDoc, updateDoc, arrayUnion } from 'firebase/firestore';
 import { db } from '../core/firebase';
