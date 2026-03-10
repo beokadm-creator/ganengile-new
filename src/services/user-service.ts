@@ -228,7 +228,11 @@ export async function getUserStats(userId: string): Promise<{
       completionRate: Math.round(completionRate * 10) / 10,
     };
   } catch (error) {
-    console.error('Error fetching user stats:', error);
+    // Silently return default stats if permission denied or error occurs
+    // This is expected in development without proper Firestore rules
+    if ((error as any)?.code !== 'permission-denied') {
+      console.error('Error fetching user stats:', error);
+    }
     return {
       totalRequests: 0,
       totalDeliveries: 0,

@@ -8,6 +8,8 @@ import {
   FlatList,
   StyleSheet,
   ActivityIndicator,
+  Platform,
+  ScrollView,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { Station } from '../types/config';
@@ -208,40 +210,80 @@ export const OptimizedStationSelectModal: React.FC<OptimizedStationSelectModalPr
     </View>
   );
 
+  const modalContent = (
+    <View style={[styles.container, { paddingTop: insets.top }]}>
+      {renderHeader()}
+
+      {/* 필터링된 역 목록 */}
+      {!isLoading && (
+        <FlatList
+          data={filteredStations}
+          keyExtractor={item => item.stationId}
+          renderItem={renderStation}
+          ListEmptyComponent={
+            <View style={styles.emptyContainer}>
+              <Text style={styles.emptyText}>
+                {searchText ? '검색 결과가 없습니다' : '역이 없습니다'}
+              </Text>
+            </View>
+          }
+          contentContainerStyle={styles.listContent}
+          maxToRenderPerBatch={10}
+          windowSize={5}
+          initialNumToRender={10}
+        />
+      )}
+
+      {/* 닫기 버튼 */}
+      <TouchableOpacity style={styles.closeButton} onPress={onClose}>
+        <Text style={styles.closeButtonText}>닫기</Text>
+      </TouchableOpacity>
+    </View>
+  );
+
+  // 웹에서는 Modal 대신 absolute positioning 사용
+  if (Platform.OS === 'web') {
+    if (!visible) return null;
+
+    return (
+      <View style={styles.webModalOverlay}>
+        <View style={styles.webModalContent}>
+          <View style={[styles.container, { paddingTop: insets.top }]}>
+            {renderHeader()}
+
+            {/* 필터링된 역 목록 - 웹에서는 ScrollView 사용 */}
+            {!isLoading && (
+              <ScrollView style={styles.webScrollContainer} contentContainerStyle={styles.webScrollContent}>
+                {filteredStations.length === 0 ? (
+                  <View style={styles.emptyContainer}>
+                    <Text style={styles.emptyText}>
+                      {searchText ? '검색 결과가 없습니다' : '역이 없습니다'}
+                    </Text>
+                  </View>
+                ) : (
+                  filteredStations.map(station => renderStation({ item: station }))
+                )}
+              </ScrollView>
+            )}
+
+            {/* 닫기 버튼 */}
+            <TouchableOpacity style={styles.closeButton} onPress={onClose}>
+              <Text style={styles.closeButtonText}>닫기</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </View>
+    );
+  }
+
+  // 네이티브에서는 Modal 사용
   return (
     <Modal
       visible={visible}
       animationType="slide"
       onRequestClose={onClose}
     >
-      <View style={[styles.container, { paddingTop: insets.top }]}>
-        {renderHeader()}
-
-        {/* 필터링된 역 목록 */}
-        {!isLoading && (
-          <FlatList
-            data={filteredStations}
-            keyExtractor={item => item.stationId}
-            renderItem={renderStation}
-            ListEmptyComponent={
-              <View style={styles.emptyContainer}>
-                <Text style={styles.emptyText}>
-                  {searchText ? '검색 결과가 없습니다' : '역이 없습니다'}
-                </Text>
-              </View>
-            }
-            contentContainerStyle={styles.listContent}
-            maxToRenderPerBatch={10}
-            windowSize={5}
-            initialNumToRender={10}
-          />
-        )}
-
-        {/* 닫기 버튼 */}
-        <TouchableOpacity style={styles.closeButton} onPress={onClose}>
-          <Text style={styles.closeButtonText}>닫기</Text>
-        </TouchableOpacity>
-      </View>
+      {modalContent}
     </Modal>
   );
 };
@@ -428,5 +470,36 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
     color: '#fff'
+  },
+  // 웹 전용 모달 스타일
+  webModalOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    zIndex: 9999,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  webModalContent: {
+    width: '90%',
+    maxWidth: 400,
+    maxHeight: '80%',
+    backgroundColor: '#fff',
+    borderRadius: 16,
+    overflow: 'hidden',
+    elevation: 10,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.3,
+    shadowRadius: 20,
+  },
+  webScrollContainer: {
+    flex: 1,
+  },
+  webScrollContent: {
+    paddingBottom: 80,
   }
 });

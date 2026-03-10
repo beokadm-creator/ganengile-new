@@ -7,7 +7,7 @@
 import React from 'react';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { createStackNavigator } from '@react-navigation/stack';
-import { Text, Platform } from 'react-native';
+import { Text, Platform, View, StyleSheet } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import type { MainTabParamList } from '../types/navigation';
@@ -46,21 +46,30 @@ const Tab = createBottomTabNavigator<MainTabParamList>();
 const Stack = createStackNavigator();
 
 function TabBarIcon({ name, focused }: { name: string; focused: boolean }) {
-  const emojiMap: { [key: string]: string } = {
-    Home: '🏠',
-    RouteManagement: '🗺️',
-    Requests: '📋',
-    GillerRequests: '🚴',
-    ChatList: '💬',
-    Profile: '👤',
+  const iconConfig: { [key: string]: { emoji: string; label: string } } = {
+    Home: { emoji: '🏠', label: '홈' },
+    RouteManagement: { emoji: '🛤️', label: '동선' },
+    Requests: { emoji: '📦', label: '요청' },
+    GillerRequests: { emoji: '🚴', label: '매칭' },
+    ChatList: { emoji: '💬', label: '채팅' },
+    Profile: { emoji: '👤', label: '프로필' },
   };
 
-  const emoji = emojiMap[name] || '•';
+  const config = iconConfig[name] || { emoji: '•', label: name };
 
+  // 웹에서는 이모지만 사용 (동그라미 제거)
   if (Platform.OS === 'web') {
-    return <Text style={{ fontSize: 24, opacity: focused ? 1 : 0.5 }}>{emoji}</Text>;
+    return (
+      <Text style={[
+        styles.webIconEmoji,
+        focused && styles.webIconFocused
+      ]}>
+        {config.emoji}
+      </Text>
+    );
   }
 
+  // 네이티브에서는 Ionicons 사용
   const icons: { [key: string]: { name: keyof typeof Ionicons.glyphMap } } = {
     Home: { name: 'home' },
     RouteManagement: { name: 'map' },
@@ -179,6 +188,7 @@ export default function MainNavigator() {
         gestureDirection: 'horizontal',
         cardOverlayEnabled: true,
         cardShadowEnabled: true,
+        cardStyle: { flex: 1 },
       }}
     >
       <Stack.Screen name="Tabs" component={TabNavigator} />
@@ -352,3 +362,18 @@ export default function MainNavigator() {
     </Stack.Navigator>
   );
 }
+
+const styles = StyleSheet.create({
+  webIconContainer: {
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  webIconEmoji: {
+    fontSize: 24,
+    opacity: 0.6,
+  },
+  webIconFocused: {
+    opacity: 1,
+    transform: [{ scale: 1.1 }],
+  },
+});

@@ -53,6 +53,7 @@ Thumbs.db
 
 # Firebase Service Account (CRITICAL SECURITY)
 firebase-service-account.json
+ganengile-firebase-adminsdk-fbsvc-*.json
 *.json
 !package.json
 !package-lock.json

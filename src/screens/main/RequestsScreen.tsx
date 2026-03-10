@@ -134,9 +134,26 @@ export default function RequestsScreen({ navigation }: Props) {
     }
   };
 
-  const formatDate = (date: Date): string => {
+  const formatDate = (date: any): string => {
     const now = new Date();
-    const diff = now.getTime() - date.getTime();
+    let dateObj: Date;
+
+    // Handle Firestore Timestamp
+    if (date && typeof date.toDate === 'function') {
+      dateObj = date.toDate();
+    } else if (date instanceof Date) {
+      dateObj = date;
+    } else if (typeof date === 'string' || typeof date === 'number') {
+      dateObj = new Date(date);
+    } else {
+      return '알 수 없음';
+    }
+
+    if (isNaN(dateObj.getTime())) {
+      return '알 수 없음';
+    }
+
+    const diff = now.getTime() - dateObj.getTime();
     const minutes = Math.floor(diff / 60000);
     const hours = Math.floor(minutes / 60);
     const days = Math.floor(hours / 24);
@@ -188,7 +205,7 @@ export default function RequestsScreen({ navigation }: Props) {
 
         <View style={styles.infoRow}>
           <Text style={styles.infoLabel}>💵 배송비</Text>
-          <Text style={styles.infoValue}>{item.fee.totalFee.toLocaleString()}원</Text>
+          <Text style={styles.infoValue}>{(item.fee?.totalFee || 0).toLocaleString()}원</Text>
         </View>
 
         <View style={styles.infoRow}>
