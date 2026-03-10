@@ -253,6 +253,38 @@ service cloud.firestore {
       allow delete: if false;
     }
 
+    // ==================== Auctions Collection ====================
+
+    match /auctions/{auctionId} {
+      // 읽기: 인증된 사용자
+      allow read: if isAuthenticated();
+
+      // 생성: 인증된 사용자 (임시: 개발 테스트용)
+      allow create: if isAuthenticated();
+
+      // 업데이트: 생성자만
+      allow update: if isOwner(resource.data.gllerId);
+
+      // 삭제: 생성자만
+      allow delete: if isOwner(resource.data.gllerId);
+    }
+
+    // ==================== Bids Collection ====================
+
+    match /bids/{bidId} {
+      // 읽기: 인증된 사용자
+      allow read: if isAuthenticated();
+
+      // 생성: 인증된 사용자 (임시: 개발 테스트용)
+      allow create: if isAuthenticated();
+
+      // 업데이트: 입찰자만
+      allow update: if isOwner(resource.data.gllerId);
+
+      // 삭제: 입찰자만
+      allow delete: if isOwner(resource.data.gllerId);
+    }
+
     // ==================== Chat Rooms Collection ====================
 
     match /chatRooms/{chatRoomId} {

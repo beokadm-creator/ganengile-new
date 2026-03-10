@@ -50,3 +50,13 @@ Thumbs.db
 # Temp
 *.log
 *.tmp
+
+# Firebase Service Account (CRITICAL SECURITY)
+firebase-service-account.json
+*.json
+!package.json
+!package-lock.json
+!tsconfig.json
+!babel.config.js
+!jest.config.js
+!webpack.config.js

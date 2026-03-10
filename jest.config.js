@@ -4,7 +4,7 @@ module.exports = {
   testMatch: ['**/__tests__/**/*.test.(ts|tsx|js)', '**/?(*.)+(spec|test).(ts|tsx|js)'],
   testPathIgnorePatterns: ['/node_modules/', '/e2e/'],
   transformIgnorePatterns: [
-    'node_modules/(?!(react-native|@react-native|@react-native-community|expo|@expo|react-navigation|firebase|@firebase)/)',
+    'node_modules/(?!(react-native|@react-native|@react-native-community|expo|@expo|react-navigation|firebase|@firebase|@firebase/util)/)',
   ],
   setupFilesAfterEnv: ['<rootDir>/jest.setup.ts'],
   collectCoverageFrom: [

@@ -7,6 +7,7 @@ import { ActivityIndicator, View, Platform } from 'react-native';
 import { useFonts } from 'expo-font';
 import { Ionicons, MaterialIcons } from '@expo/vector-icons';
 import AppNavigator from './src/navigation/AppNavigator';
+import { DeviceFrame } from './src/components/DeviceFrame';
 
 export default function App() {
   // 웹 환경에서는 폰트 로딩을 무시하고 바로 렌더링
@@ -24,5 +25,12 @@ export default function App() {
     );
   }
 
-  return <AppNavigator />;
+  // PC에서 접속 시 iPhone 프레임 적용
+  const appContent = <AppNavigator />;
+
+  if (Platform.OS === 'web') {
+    return <DeviceFrame>{appContent}</DeviceFrame>;
+  }
+
+  return appContent;
 }
