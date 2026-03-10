@@ -500,7 +500,24 @@ export default function CreateRequestScreen({ navigation }: Props) {
   };
 
   const handleSubmit = async () => {
-    if (!pickupStation || !deliveryStation || !deliveryFee) return;
+    // 필수 필드 검증 및 피드백
+    if (!pickupStation) {
+      Alert.alert('알림', '픽업 역을 선택해주세요.');
+      setCurrentStep(1);
+      return;
+    }
+    if (!deliveryStation) {
+      Alert.alert('알림', '배송 역을 선택해주세요.');
+      setCurrentStep(1);
+      return;
+    }
+    if (!deliveryFee) {
+      Alert.alert('알림', '배송비를 계산할 수 없습니다. 패키지 정보를 확인해주세요.');
+      setCurrentStep(2);
+      return;
+    }
+
+    // Check network
 
     // Check network
     const isOnline = await isNetworkAvailable();
@@ -1040,9 +1057,9 @@ export default function CreateRequestScreen({ navigation }: Props) {
       </View>
 
       <TouchableOpacity
-        style={[styles.nextButton, styles.submitButton]}
+        style={[styles.nextButton, styles.submitButton, (!pickupStation || !deliveryStation || !deliveryFee) && styles.disabledButton]}
         onPress={handleSubmit}
-        disabled={loading}
+        disabled={loading || !pickupStation || !deliveryStation || !deliveryFee}
         accessibilityLabel="배송 요청 제출"
         accessibilityHint="배송 요청을 제출합니다"
       >
@@ -1596,6 +1613,10 @@ function createStyles(
       color: colors.white,
       fontSize: typo.fontSize.lg,
       fontWeight: typo.fontWeight.bold,
+    },
+    disabledButton: {
+      backgroundColor: colors.gray300,
+      opacity: 0.6,
     },
     submitButton: {
       backgroundColor: colors.secondary,
