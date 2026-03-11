@@ -255,8 +255,8 @@ function validateStationInfo(station: StationInfo): boolean {
     station.stationId &&
     station.stationName &&
     station.line &&
-    typeof station.latitude === 'number' &&
-    typeof station.longitude === 'number'
+    typeof station.lat === 'number' &&
+    typeof station.lng === 'number'
   );
 }
 
@@ -379,19 +379,35 @@ export function validateRoute(
   departureTime: string,
   daysOfWeek: number[]
 ): RouteValidationResult {
+  console.log('[RouteService] validateRoute called', { startStation, endStation, departureTime, daysOfWeek });
   const errors: string[] = [];
   const warnings: string[] = [];
 
+  // Robust null/undefined checks
+  if (!startStation) {
+    errors.push('🚫 출발역 정보가 누락되었습니다.');
+    return { isValid: false, errors, warnings };
+  }
+  if (!endStation) {
+    errors.push('🚫 도착역 정보가 누락되었습니다.');
+    return { isValid: false, errors, warnings };
+  }
+
   if (!validateStationInfo(startStation)) {
+    console.log('[RouteService] startStation validation failed');
     errors.push('🚫 출발역 정보가 올바르지 않습니다.');
   }
 
   if (!validateStationInfo(endStation)) {
+    console.log('[RouteService] endStation validation failed');
     errors.push('🚫 도착역 정보가 올바르지 않습니다.');
   }
 
-  if (startStation.stationId === endStation.stationId) {
-    errors.push('🚫 출발역과 도착역이 같습니다.\n\n다른 역을 선택해주세요.');
+  // Safety check before comparison
+  if (startStation?.stationId && endStation?.stationId) {
+    if (startStation.stationId === endStation.stationId) {
+      errors.push('🚫 출발역과 도착역이 같습니다.\n\n다른 역을 선택해주세요.');
+    }
   }
 
   if (!validateTimeFormat(departureTime)) {
@@ -406,28 +422,24 @@ export function validateRoute(
     if (!isCommuteTime(departureTime)) {
       errors.push('🚫 출퇴근 시간대가 아닙니다.\n\n07:00~22:00 사이 시간을 선택해주세요.\n(지하철 운행 시간: 05:00~01:00)');
     }
-
-    // 혼잡도 경고
-    if (isCongestionTime(departureTime)) {
-      warnings.push('⚠️ 혼잡도가 높은 시간대입니다.\n\n아침 7-9시, 저녁 6-8시는 배송 효율이 낮을 수 있습니다.');
-    }
   }
 
   if (!validateDaysOfWeek(daysOfWeek)) {
     errors.push('🚫 요일 정보가 올바르지 않습니다.\n\n1(월)~7(일) 사이의 숫자를 선택해주세요.');
   }
 
-  if (daysOfWeek.length === 0) {
+  if (!daysOfWeek || daysOfWeek.length === 0) {
     errors.push('🚫 운영 요일을 선택해주세요.\n\n최소 1개 이상의 요일을 선택해야 합니다.');
   }
 
-  const hasWeekend = daysOfWeek.some(day => day === 6 || day === 7);
-  const hasWeekday = daysOfWeek.some(day => day >= 1 && day <= 5);
+  const hasWeekend = daysOfWeek?.some(day => day === 6 || day === 7);
+  const hasWeekday = daysOfWeek?.some(day => day >= 1 && day <= 5);
 
   if (hasWeekend && hasWeekday) {
     warnings.push('ℹ️ 평일과 주말이 모두 포함되어 있습니다.\n\n주말 출퇴근 경로가 맞는지 확인해주세요.');
   }
 
+  console.log('[RouteService] validation result:', { isValid: errors.length === 0, errors, warnings });
   return {
     isValid: errors.length === 0,
     errors,
@@ -467,7 +479,7 @@ export async function validateRouteForCreate(
     const activeRoutes = existingRoutes.filter(route => route.isActive);
 
     if (activeRoutes.length >= 5) {
-      errors.push('🚫 동선을 더 이상 등록할 수 없습니다.\n\n최대 5개까지 등록 가능합니다.\n\n현재: ${activeRoutes.length}개');
+      errors.push(`🚫 동선을 더 이상 등록할 수 없습니다.\n\n최대 5개까지 등록 가능합니다.\n\n현재: ${activeRoutes.length}개`);
       return {
         isValid: false,
         errors,
@@ -477,7 +489,7 @@ export async function validateRouteForCreate(
 
     // 4개인 경우 경고
     if (activeRoutes.length >= 4) {
-      warnings.push('⚠️ 동선이 ${activeRoutes.length}개입니다.\n\n최대 5개까지 등록 가능하며, 5개가 되면 더 이상 등록할 수 없습니다.');
+      warnings.push(`⚠️ 동선이 ${activeRoutes.length}개입니다.\n\n최대 5개까지 등록 가능하며, 5개가 되면 더 이상 등록할 수 없습니다.`);
     }
 
     // 시간대 중복 검사

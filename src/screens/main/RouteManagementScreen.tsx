@@ -12,7 +12,6 @@ import {
   ActivityIndicator,
   Alert,
 } from 'react-native';
-import { Swipeable } from 'react-native-gesture-handler';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { requireUserId } from '../../services/firebase';
@@ -88,77 +87,67 @@ export default function RouteManagementScreen() {
     (navigation as any).navigate('EditRoute', { routeId: route.routeId });
   };
 
-  const renderRightActions = (route: Route) => {
-    return (
-      <View style={styles.swipeActions}>
-        <TouchableOpacity
-          style={[styles.swipeButton, styles.editButton]}
-          onPress={() => handleEdit(route)}
-        >
-          <Ionicons name="create-outline" size={24} color="#fff" />
-          <Text style={styles.swipeButtonText}>편집</Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={[styles.swipeButton, styles.deleteButton]}
-          onPress={() => handleDelete(route.routeId, `${route.startStation.stationName} → ${route.endStation.stationName}`)}
-        >
-          <Ionicons name="trash-outline" size={24} color="#fff" />
-          <Text style={styles.swipeButtonText}>삭제</Text>
-        </TouchableOpacity>
-      </View>
-    );
-  };
-
   const renderRouteCard = (route: Route) => {
     const daysText = route.daysOfWeek.map((d) => DAY_LABELS[d]).join(', ');
     const routeName = `${route.startStation.stationName} → ${route.endStation.stationName}`;
 
     return (
-      <Swipeable
-        key={route.routeId}
-        renderRightActions={() => renderRightActions(route)}
-        friction={2}
-        rightThreshold={40}
-      >
-        <View style={styles.routeCard}>
-          {/* 경로 이름 */}
-          <View style={styles.routeHeader}>
-            <View style={styles.routeIconContainer}>
-              <Ionicons name="train-outline" size={24} color={Colors.primary} />
-            </View>
-            <View style={styles.routeInfo}>
-              <Text style={styles.routeName}>{routeName}</Text>
-              <View style={styles.routeMeta}>
-                <View style={styles.timeTag}>
-                  <Ionicons name="time-outline" size={14} color={Colors.gray600} />
-                  <Text style={styles.timeText}>{route.departureTime}</Text>
-                </View>
-                <View style={styles.daysBadge}>
-                  <Text style={styles.daysText}>{daysText}</Text>
-                </View>
+      <View key={route.routeId} style={styles.routeCard}>
+        {/* 경로 이름 */}
+        <View style={styles.routeHeader}>
+          <View style={styles.routeIconContainer}>
+            <Ionicons name="train-outline" size={24} color={Colors.primary} />
+          </View>
+          <View style={styles.routeInfo}>
+            <Text style={styles.routeName}>{routeName}</Text>
+            <View style={styles.routeMeta}>
+              <View style={styles.timeTag}>
+                <Ionicons name="time-outline" size={14} color={Colors.gray600} />
+                <Text style={styles.timeText}>{route.departureTime}</Text>
+              </View>
+              <View style={styles.daysBadge}>
+                <Text style={styles.daysText}>{daysText}</Text>
               </View>
             </View>
           </View>
+        </View>
 
-          {/* 역 정보 */}
-          <View style={styles.stationsContainer}>
-            <View style={styles.stationInfo}>
-              <View style={styles.stationDot} />
-              <Text style={styles.stationName}>{route.startStation.stationName}</Text>
-            </View>
-            
-            <View style={styles.connector}>
-              <View style={styles.connectorLine} />
-              <Ionicons name="arrow-down" size={16} color={Colors.gray400} />
-            </View>
-            
-            <View style={styles.stationInfo}>
-              <View style={[styles.stationDot, { backgroundColor: Colors.secondary }]} />
-              <Text style={styles.stationName}>{route.endStation.stationName}</Text>
-            </View>
+        {/* 역 정보 */}
+        <View style={styles.stationsContainer}>
+          <View style={styles.stationInfo}>
+            <View style={styles.stationDot} />
+            <Text style={styles.stationName}>{route.startStation.stationName}</Text>
+          </View>
+
+          <View style={styles.connector}>
+            <View style={styles.connectorLine} />
+            <Ionicons name="arrow-down" size={16} color={Colors.gray400} />
+          </View>
+
+          <View style={styles.stationInfo}>
+            <View style={[styles.stationDot, { backgroundColor: Colors.secondary }]} />
+            <Text style={styles.stationName}>{route.endStation.stationName}</Text>
           </View>
         </View>
-      </Swipeable>
+
+        {/* 액션 버튼들 */}
+        <View style={styles.actionButtons}>
+          <TouchableOpacity
+            style={[styles.actionButton, styles.editActionButton]}
+            onPress={() => handleEdit(route)}
+          >
+            <Ionicons name="create-outline" size={18} color={Colors.primary} />
+            <Text style={styles.editActionButtonText}>수정</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.actionButton, styles.deleteActionButton]}
+            onPress={() => handleDelete(route.routeId, routeName)}
+          >
+            <Ionicons name="trash-outline" size={18} color="#f44336" />
+            <Text style={styles.deleteActionButtonText}>삭제</Text>
+          </TouchableOpacity>
+        </View>
+      </View>
     );
   };
 
@@ -191,7 +180,10 @@ export default function RouteManagementScreen() {
           </Text>
           <TouchableOpacity
             style={styles.addButton}
-            onPress={() => navigation.navigate('AddRoute' as never)}
+            onPress={() => {
+              console.log('동선 등록하기 버튼 클릭됨');
+              navigation.navigate('AddRoute' as never);
+            }}
           >
             <Ionicons name="add-circle" size={20} color="#fff" />
             <Text style={styles.addButtonText}>동선 등록하기</Text>
@@ -217,7 +209,10 @@ export default function RouteManagementScreen() {
       {routes.length < MAX_ROUTES && (
         <TouchableOpacity
           style={styles.fab}
-          onPress={() => navigation.navigate('AddRoute' as never)}
+          onPress={() => {
+            console.log('FAB 버튼 클릭됨');
+            navigation.navigate('AddRoute' as never);
+          }}
         >
           <Ionicons name="add" size={28} color="#fff" />
         </TouchableOpacity>
@@ -256,12 +251,6 @@ const styles = StyleSheet.create({
     color: Colors.secondary,
     fontSize: Typography.fontSize.xs,
     fontWeight: Typography.fontWeight.semibold as any,
-  },
-  deleteButton: {
-    backgroundColor: '#f44336',
-  },
-  editButton: {
-    backgroundColor: Colors.primary,
   },
   emptySubtitle: {
     color: Colors.gray500,
@@ -400,27 +389,6 @@ const styles = StyleSheet.create({
     marginTop: Spacing.xs,
     opacity: 0.9,
   },
-  swipeActions: {
-    flexDirection: 'row',
-    width: 160,
-  },
-  swipeButton: {
-    alignItems: 'center',
-    flex: 1,
-    height: '100%',
-    justifyContent: 'center',
-  },
-  swipeButtonText: {
-    color: Colors.white,
-    fontSize: Typography.fontSize.xs,
-    fontWeight: Typography.fontWeight.semibold as any,
-    marginTop: 4,
-  },
-  text: {
-    color: Colors.white,
-    fontSize: Typography.fontSize.xl,
-    fontWeight: Typography.fontWeight.bold as any,
-  },
   timeTag: {
     alignItems: 'center',
     backgroundColor: Colors.gray100,
@@ -438,5 +406,42 @@ const styles = StyleSheet.create({
     color: Colors.white,
     fontSize: Typography.fontSize['2xl'],
     fontWeight: Typography.fontWeight.bold as any,
+  },
+  actionButtons: {
+    flexDirection: 'row',
+    gap: Spacing.sm,
+    marginTop: Spacing.md,
+    paddingTop: Spacing.md,
+    borderTopWidth: 1,
+    borderTopColor: Colors.gray200,
+  },
+  actionButton: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: Spacing.xs,
+    paddingVertical: Spacing.sm,
+    borderRadius: BorderRadius.sm,
+  },
+  editActionButton: {
+    backgroundColor: Colors.primaryLight,
+    borderWidth: 1,
+    borderColor: Colors.primary,
+  },
+  editActionButtonText: {
+    color: Colors.primary,
+    fontSize: Typography.fontSize.sm,
+    fontWeight: Typography.fontWeight.semibold as any,
+  },
+  deleteActionButton: {
+    backgroundColor: '#ffebee',
+    borderWidth: 1,
+    borderColor: '#f44336',
+  },
+  deleteActionButtonText: {
+    color: '#f44336',
+    fontSize: Typography.fontSize.sm,
+    fontWeight: Typography.fontWeight.semibold as any,
   },
 });

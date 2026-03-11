@@ -186,7 +186,11 @@ export default function HomeScreen({ navigation }: HomeScreenProps) {
                 <Button
                   title="첫 동선 등록하기"
                   variant="secondary"
-                  onPress={() => navigation.navigate('AddRoute', {})}
+                  onPress={() => {
+                    console.log('첫 동선 등록하기 버튼 클릭됨');
+                    console.log('네비게이션 시도:', navigation);
+                    navigation.navigate('AddRoute' as never);
+                  }}
                   fullWidth
                 />
               </View>
@@ -201,13 +205,27 @@ export default function HomeScreen({ navigation }: HomeScreenProps) {
                     </Text>
                     <Text style={styles.routeTime}>{route.departureTime} 출발</Text>
                   </View>
-                  <Button
-                    title="삭제"
-                    variant="outline"
-                    size="small"
-                    onPress={() => handleDeleteRoute(route.id)}
-                    style={styles.deleteButton}
-                  />
+                  <View style={styles.routeActions}>
+                    <Button
+                      title="수정"
+                      variant="outline"
+                      size="small"
+                      onPress={() => {
+                        console.log('수정 버튼 클릭:', route.id);
+                        navigation.navigate('AddRoute' as never, {
+                          route: route,
+                        });
+                      }}
+                      style={styles.editButton}
+                    />
+                    <Button
+                      title="삭제"
+                      variant="outline"
+                      size="small"
+                      onPress={() => handleDeleteRoute(route.id)}
+                      style={styles.deleteButton}
+                    />
+                  </View>
                 </View>
                 <View style={styles.routeFooter}>
                   <Text style={styles.routeDays}>{formatDays(route.daysOfWeek)}</Text>
@@ -242,7 +260,11 @@ export default function HomeScreen({ navigation }: HomeScreenProps) {
           <Text style={styles.sectionTitle}>빠른 메뉴</Text>
           <Card
             variant="outlined"
-            onPress={() => navigation.navigate('AddRoute', {})}
+            onPress={() => {
+              console.log('새 동선 등록 버튼 클릭됨');
+              console.log('네비게이션 시도:', navigation);
+              navigation.navigate('AddRoute' as never);
+            }}
             style={styles.quickButton}
           >
             <Text style={styles.quickButtonIcon}>📍</Text>
@@ -333,8 +355,11 @@ const styles = StyleSheet.create({
     fontSize: Typography.fontSize.sm,
     flex: 1,
   },
+  editButton: {
+    marginRight: Spacing.xs,
+  },
   deleteButton: {
-    marginLeft: Spacing.sm,
+    marginLeft: Spacing.xs,
   },
   statRow: {
     flexDirection: 'row',

@@ -1,5 +1,5 @@
 /**
- * Add Route Screen
+ * Add Route Screen - 완전히 새로 작성
  * 동선 (출퇴근 경로) 등록 화면
  */
 
@@ -8,58 +8,42 @@ import {
   View,
   Text,
   StyleSheet,
-  TouchableOpacity,
+  TextInput,
   ScrollView,
   Alert,
   ActivityIndicator,
 } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
-import { useRoute, useNavigation } from '@react-navigation/native';
+import { useNavigation } from '@react-navigation/native';
 import { requireUserId } from '../../services/firebase';
 import { getAllStations } from '../../services/config-service';
-import { createRoute, validateRoute } from '../../services/route-service';
+import { createRoute } from '../../services/route-service';
 import type { MainStackNavigationProp } from '../../types/navigation';
 import type { Station } from '../../types/config';
 import type { StationInfo } from '../../types/route';
 import { Colors, Spacing, Typography, BorderRadius } from '../../theme';
-import Button from '../../components/common/Button';
-import TimePicker from '../../components/common/TimePicker';
-import DaySelector, { DAY_LABELS } from '../../components/common/DaySelector';
-import StationSelectModal from '../../components/common/StationSelectModal';
 
 export default function AddRouteScreen() {
-  const route = useRoute();
   const navigation = useNavigation<MainStackNavigationProp>();
 
+  // State
   const [stations, setStations] = useState<Station[]>([]);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
 
-  const [startStation, setStartStation] = useState<StationInfo | null>(null);
-  const [endStation, setEndStation] = useState<StationInfo | null>(null);
+  // Form data
+  const [startStationName, setStartStationName] = useState('');
+  const [endStationName, setEndStationName] = useState('');
   const [departureTime, setDepartureTime] = useState('08:00');
   const [selectedDays, setSelectedDays] = useState<number[]>([1, 2, 3, 4, 5]);
 
-  const [startStationModalVisible, setStartStationModalVisible] = useState(false);
-  const [endStationModalVisible, setEndStationModalVisible] = useState(false);
+  // UI State
+  const [showStartStationList, setShowStartStationList] = useState(false);
+  const [showEndStationList, setShowEndStationList] = useState(false);
 
+  // Load stations on mount
   useEffect(() => {
-    const params = route.params as { selectedStation?: Station } | undefined;
-    if (params?.selectedStation) {
-      const station = params.selectedStation;
-      const stationInfo: StationInfo = {
-        id: station.stationId,
-        stationId: station.stationId,
-        stationName: station.stationName,
-        line: station.lines[0]?.lineId || '',
-        lineCode: station.lines[0]?.lineCode || '',
-        lat: station.location?.latitude || 0,
-        lng: station.location?.longitude || 0,
-      };
-      setStartStation(stationInfo);
-    }
     loadStations();
-  }, [route.params]);
+  }, []);
 
   const loadStations = async () => {
     try {
@@ -74,340 +58,371 @@ export default function AddRouteScreen() {
     }
   };
 
-  const handleSelectStartStation = (station: Station) => {
-    const stationInfo: StationInfo = {
-      id: station.stationId,
-      stationId: station.stationId,
-      stationName: station.stationName,
-      line: station.lines[0]?.lineId || '',
-      lineCode: station.lines[0]?.lineCode || '',
-      lat: station.location?.latitude || 0,
-      lng: station.location?.longitude || 0,
-    };
-    setStartStation(stationInfo);
-  };
-
-  const handleSelectEndStation = (station: Station) => {
-    const stationInfo: StationInfo = {
-      id: station.stationId,
-      stationId: station.stationId,
-      stationName: station.stationName,
-      line: station.lines[0]?.lineId || '',
-      lineCode: station.lines[0]?.lineCode || '',
-      lat: station.location?.latitude || 0,
-      lng: station.location?.longitude || 0,
-    };
-    setEndStation(stationInfo);
-  };
-
-  const handleSave = () => {
-    if (!startStation || !endStation) {
-      Alert.alert(
-        '역을 선택해주세요',
-        '출발역과 도착역을 모두 선택해야 합니다.',
-        [{ text: '확인' }]
-      );
+  const handleSave = async () => {
+    // Validate
+    if (!startStationName || !endStationName) {
+      Alert.alert('필수 입력', '출발역과 도착역을 모두 선택해주세요.');
       return;
     }
 
     if (selectedDays.length === 0) {
-      Alert.alert(
-        '요일을 선택해주세요',
-        '최소 하나 이상의 요일을 선택해야 합니다.',
-        [{ text: '확인' }]
-      );
+      Alert.alert('필수 입력', '운영 요일을 최소 1개 이상 선택해주세요.');
       return;
     }
 
-    const validation = validateRoute(startStation, endStation, departureTime, selectedDays);
-    if (!validation.isValid) {
-      Alert.alert(
-        '유효성 오류',
-        validation.errors.join('\n\n'),
-        [{ text: '확인' }]
-      );
+    if (startStationName === endStationName) {
+      Alert.alert('입력 오류', '출발역과 도착역이 같습니다.');
       return;
     }
 
-    if (validation.warnings.length > 0) {
-      Alert.alert(
-        '⚠️ 확인해주세요',
-        validation.warnings.join('\n\n'),
-        [
-          { text: '취소', style: 'cancel' },
-          { text: '계속 진행', onPress: saveRoute },
-        ]
-      );
-    } else {
-      saveRoute();
+    // Find station objects
+    const startStation = stations.find(s => s.stationName === startStationName);
+    const endStation = stations.find(s => s.stationName === endStationName);
+
+    if (!startStation || !endStation) {
+      Alert.alert('오류', '선택한 역을 찾을 수 없습니다.');
+      return;
     }
-  };
 
-  const saveRoute = async () => {
-    if (!startStation || !endStation) return;
+    // Convert to StationInfo
+    const startStationInfo: StationInfo = {
+      id: startStation.stationId,
+      stationId: startStation.stationId,
+      stationName: startStation.stationName,
+      line: startStation.lines[0]?.lineId || '',
+      lineCode: startStation.lines[0]?.lineCode || '',
+      lat: startStation.location?.latitude || 0,
+      lng: startStation.location?.longitude || 0,
+    };
 
+    const endStationInfo: StationInfo = {
+      id: endStation.stationId,
+      stationId: endStation.stationId,
+      stationName: endStation.stationName,
+      line: endStation.lines[0]?.lineId || '',
+      lineCode: endStation.lines[0]?.lineCode || '',
+      lat: endStation.location?.latitude || 0,
+      lng: endStation.location?.longitude || 0,
+    };
+
+    // Save
     try {
       setSaving(true);
+      const userId = await requireUserId();
 
-      const userId = requireUserId();
-      await createRoute(userId, startStation, endStation, departureTime, selectedDays);
+      const result = await createRoute(
+        userId,
+        startStationInfo,
+        endStationInfo,
+        departureTime,
+        selectedDays
+      );
 
       Alert.alert(
-        '✅ 동선 등록 완료',
-        `${startStation.stationName} → ${endStation.stationName}\n${departureTime} 출발\n${selectedDays.map(d => DAY_LABELS[d]).join(', ')}요일에 운영합니다.`,
+        '성공',
+        `동선이 등록되었습니다.\n${startStationName} → ${endStationName}`,
         [
           {
             text: '확인',
-            onPress: () => {
-              setStartStation(null);
-              setEndStation(null);
-              setDepartureTime('08:00');
-              setSelectedDays([1, 2, 3, 4, 5]);
-              navigation.goBack();
-            },
+            onPress: () => navigation.goBack(),
           },
         ]
       );
     } catch (error) {
       console.error('동선 저장 실패:', error);
       Alert.alert(
-        '저장 실패',
-        '동선 저장에 실패했습니다. 다시 시도해주세요.',
-        [{ text: '확인' }]
+        '실패',
+        error instanceof Error ? error.message : '동선 저장에 실패했습니다.'
       );
     } finally {
       setSaving(false);
     }
   };
 
+  const toggleDay = (day: number) => {
+    if (selectedDays.includes(day)) {
+      setSelectedDays(selectedDays.filter(d => d !== day));
+    } else {
+      setSelectedDays([...selectedDays, day]);
+    }
+  };
+
+  const dayLabels = ['', '월', '화', '수', '목', '금', '토', '일'];
+
   if (loading) {
     return (
-      <View style={styles.loadingContainer}>
+      <View style={styles.centerContainer}>
         <ActivityIndicator size="large" color={Colors.primary} />
-        <Text style={styles.loadingText}>역 목록 로딩 중...</Text>
+        <Text style={styles.loadingText}>로딩 중...</Text>
       </View>
     );
   }
 
   return (
     <View style={styles.container}>
+      {/* Header */}
       <View style={styles.header}>
-        <Text style={styles.title}>동선 등록</Text>
-        <Text style={styles.subtitle}>출퇴근 경로를 등록하세요</Text>
+        <Text style={styles.headerTitle}>동선 등록</Text>
+        <Text style={styles.headerSubtitle}>출퇴근 경로를 등록하세요</Text>
       </View>
 
       <ScrollView style={styles.content}>
-        {/* 선택 정보 요약 */}
-        {startStation && endStation && (
-          <View style={styles.summaryCard}>
-            <View style={styles.summaryHeader}>
-              <Ionicons name="information-circle" size={20} color={Colors.primary} />
-              <Text style={styles.summaryTitle}>동선 요약</Text>
-            </View>
-            <View style={styles.summaryContent}>
-              <View style={styles.summaryRow}>
-                <Text style={styles.summaryLabel}>경로</Text>
-                <Text style={styles.summaryValue}>
-                  {startStation.stationName} → {endStation.stationName}
+        {/* Start Station */}
+        <View style={styles.field}>
+          <Text style={styles.label}>출발역</Text>
+          <Text
+            style={styles.input}
+            onPress={() => setShowStartStationList(true)}
+          >
+            {startStationName || '출발역 선택'}
+          </Text>
+        </View>
+
+        {/* Start Station List */}
+        {showStartStationList && (
+          <View style={styles.modal}>
+            <View style={styles.modalContent}>
+              <View style={styles.modalHeader}>
+                <Text style={styles.modalTitle}>출발역 선택</Text>
+                <Text style={styles.modalClose} onPress={() => setShowStartStationList(false)}>
+                  ✕
                 </Text>
               </View>
-              <View style={styles.summaryRow}>
-                <Text style={styles.summaryLabel}>출발 시간</Text>
-                <Text style={styles.summaryValue}>{departureTime}</Text>
-              </View>
-              <View style={styles.summaryRow}>
-                <Text style={styles.summaryLabel}>운영 요일</Text>
-                <Text style={styles.summaryValue}>
-                  {selectedDays.map(d => DAY_LABELS[d]).join(', ')}
-                </Text>
-              </View>
+              <ScrollView style={styles.stationList}>
+                {stations.map((station) => (
+                  <Text
+                    key={station.stationId}
+                    style={styles.stationItem}
+                    onPress={() => {
+                      setStartStationName(station.stationName);
+                      setShowStartStationList(false);
+                    }}
+                  >
+                    {station.stationName}
+                  </Text>
+                ))}
+              </ScrollView>
             </View>
           </View>
         )}
 
-        {/* 출발역 */}
-        <View style={styles.section}>
-          <Text style={styles.label}>출발역</Text>
-          <TouchableOpacity
-            style={styles.stationButton}
-            onPress={() => setStartStationModalVisible(true)}
-            activeOpacity={0.7}
-          >
-            <Text style={styles.stationButtonText}>
-              {startStation ? startStation.stationName : '출발역 선택'}
-            </Text>
-            <Text style={styles.stationButtonArrow}>›</Text>
-          </TouchableOpacity>
-        </View>
-
-        {/* 도착역 */}
-        <View style={styles.section}>
+        {/* End Station */}
+        <View style={styles.field}>
           <Text style={styles.label}>도착역</Text>
-          <TouchableOpacity
-            style={styles.stationButton}
-            onPress={() => setEndStationModalVisible(true)}
-            activeOpacity={0.7}
+          <Text
+            style={styles.input}
+            onPress={() => setShowEndStationList(true)}
           >
-            <Text style={styles.stationButtonText}>
-              {endStation ? endStation.stationName : '도착역 선택'}
-            </Text>
-            <Text style={styles.stationButtonArrow}>›</Text>
-          </TouchableOpacity>
+            {endStationName || '도착역 선택'}
+          </Text>
         </View>
 
-        {/* 출발 시간 */}
-        <View style={styles.section}>
-          <TimePicker
-            label="출발 시간"
+        {/* End Station List */}
+        {showEndStationList && (
+          <View style={styles.modal}>
+            <View style={styles.modalContent}>
+              <View style={styles.modalHeader}>
+                <Text style={styles.modalTitle}>도착역 선택</Text>
+                <Text style={styles.modalClose} onPress={() => setShowEndStationList(false)}>
+                  ✕
+                </Text>
+              </View>
+              <ScrollView style={styles.stationList}>
+                {stations.map((station) => (
+                  <Text
+                    key={station.stationId}
+                    style={styles.stationItem}
+                    onPress={() => {
+                      setEndStationName(station.stationName);
+                      setShowEndStationList(false);
+                    }}
+                  >
+                    {station.stationName}
+                  </Text>
+                ))}
+              </ScrollView>
+            </View>
+          </View>
+        )}
+
+        {/* Departure Time */}
+        <View style={styles.field}>
+          <Text style={styles.label}>출발 시간</Text>
+          <TextInput
+            style={styles.input}
             value={departureTime}
-            onChange={setDepartureTime}
-            placeholder="시간을 선택해주세요"
-            minuteInterval={10}
+            onChangeText={setDepartureTime}
+            placeholder="HH:MM (예: 08:00)"
           />
         </View>
 
-        {/* 운영 요일 */}
-        <View style={styles.section}>
-          <DaySelector
-            selectedDays={selectedDays}
-            onChange={setSelectedDays}
-            label="운영 요일"
-            hint="선택된 요일"
-          />
+        {/* Days Selector */}
+        <View style={styles.field}>
+          <Text style={styles.label}>운영 요일</Text>
+          <View style={styles.daysContainer}>
+            {dayLabels.slice(1).map((label, index) => {
+              const day = index + 1;
+              const isSelected = selectedDays.includes(day);
+              return (
+                <Text
+                  key={day}
+                  style={[
+                    styles.dayButton,
+                    isSelected && styles.dayButtonSelected,
+                  ]}
+                  onPress={() => toggleDay(day)}
+                >
+                  {label}
+                </Text>
+              );
+            })}
+          </View>
         </View>
 
-        {/* 등록 버튼 */}
-        <Button
-          title="동선 등록"
-          onPress={handleSave}
-          loading={saving}
-          disabled={saving}
-          variant="primary"
-          size="large"
-          fullWidth
-        />
+        {/* Save Button */}
+        <View
+          style={[styles.saveButton, saving && styles.saveButtonDisabled]}
+          onStartShouldSetResponder={() => !saving && handleSave()}
+        >
+          <Text style={styles.saveButtonText}>
+            {saving ? '저장 중...' : '동선 등록'}
+          </Text>
+        </View>
       </ScrollView>
-
-      {/* 역 선택 모달들 */}
-      <StationSelectModal
-        visible={startStationModalVisible}
-        onClose={() => setStartStationModalVisible(false)}
-        onStationSelect={handleSelectStartStation}
-        title="출발역 선택"
-        stations={stations}
-        searchPlaceholder="역 이름 검색..."
-      />
-
-      <StationSelectModal
-        visible={endStationModalVisible}
-        onClose={() => setEndStationModalVisible(false)}
-        onStationSelect={handleSelectEndStation}
-        title="도착역 선택"
-        stations={stations}
-        searchPlaceholder="역 이름 검색..."
-      />
     </View>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
+    flex: 1,
     backgroundColor: Colors.gray100,
-    flex: 1,
   },
-  content: {
+  centerContainer: {
     flex: 1,
-    padding: Spacing.lg,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: Colors.gray100,
+  },
+  loadingText: {
+    marginTop: Spacing.md,
+    color: Colors.textSecondary,
   },
   header: {
     backgroundColor: Colors.secondary,
     padding: Spacing.lg,
     paddingTop: 60,
   },
-  title: {
-    color: Colors.white,
+  headerTitle: {
     fontSize: Typography.fontSize['3xl'],
     fontWeight: Typography.fontWeight.bold,
-  },
-  subtitle: {
     color: Colors.white,
-    fontSize: Typography.fontSize.base,
-    marginTop: Spacing.xs,
-    opacity: 0.9,
   },
-  section: {
+  headerSubtitle: {
+    fontSize: Typography.fontSize.base,
+    color: Colors.white,
+    opacity: 0.9,
+    marginTop: Spacing.xs,
+  },
+  content: {
+    flex: 1,
+    padding: Spacing.lg,
+  },
+  field: {
     marginBottom: Spacing.lg,
   },
   label: {
-    color: Colors.textPrimary,
     fontSize: Typography.fontSize.sm,
     fontWeight: Typography.fontWeight.semibold,
+    color: Colors.textPrimary,
     marginBottom: Spacing.sm,
   },
-  stationButton: {
-    alignItems: 'center',
+  input: {
     backgroundColor: Colors.white,
+    borderWidth: 1,
     borderColor: Colors.gray300,
     borderRadius: BorderRadius.md,
-    borderWidth: 1,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    padding: Spacing.lg,
-  },
-  stationButtonText: {
-    color: Colors.textPrimary,
+    padding: Spacing.md,
     fontSize: Typography.fontSize.base,
+    color: Colors.textPrimary,
   },
-  stationButtonArrow: {
-    color: Colors.gray400,
-    fontSize: 24,
-    fontWeight: '300',
+  daysContainer: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: Spacing.sm,
   },
-  summaryCard: {
+  dayButton: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: Colors.white,
+    borderWidth: 1,
+    borderColor: Colors.gray300,
+    textAlign: 'center',
+    lineHeight: 42,
+    fontSize: Typography.fontSize.sm,
+    color: Colors.textPrimary,
+  },
+  dayButtonSelected: {
+    backgroundColor: Colors.primary,
+    borderColor: Colors.primary,
+    color: Colors.white,
+  },
+  saveButton: {
+    backgroundColor: Colors.primary,
+    borderRadius: BorderRadius.md,
+    padding: Spacing.lg,
+    alignItems: 'center',
+    marginTop: Spacing.md,
+  },
+  saveButtonDisabled: {
+    opacity: 0.6,
+  },
+  saveButtonText: {
+    color: Colors.white,
+    fontSize: Typography.fontSize.lg,
+    fontWeight: Typography.fontWeight.bold,
+  },
+  modal: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  modalContent: {
     backgroundColor: Colors.white,
     borderRadius: BorderRadius.md,
-    marginBottom: Spacing.lg,
-    overflow: 'hidden',
+    width: '90%',
+    maxHeight: '80%',
   },
-  summaryHeader: {
-    alignItems: 'center',
-    backgroundColor: Colors.primary,
-    flexDirection: 'row',
-    gap: Spacing.xs,
-    padding: Spacing.md,
-  },
-  summaryTitle: {
-    color: Colors.white,
-    fontSize: Typography.fontSize.base,
-    fontWeight: Typography.fontWeight.semibold,
-  },
-  summaryContent: {
-    padding: Spacing.md,
-  },
-  summaryRow: {
+  modalHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    marginBottom: Spacing.sm,
+    alignItems: 'center',
+    padding: Spacing.md,
+    borderBottomWidth: 1,
+    borderBottomColor: Colors.gray200,
   },
-  summaryLabel: {
-    color: Colors.textSecondary,
-    fontSize: Typography.fontSize.sm,
-    fontWeight: Typography.fontWeight.medium,
-  },
-  summaryValue: {
-    color: Colors.textPrimary,
-    fontSize: Typography.fontSize.sm,
+  modalTitle: {
+    fontSize: Typography.fontSize.lg,
     fontWeight: Typography.fontWeight.semibold,
   },
-  loadingContainer: {
-    alignItems: 'center',
-    backgroundColor: Colors.gray100,
-    flex: 1,
-    justifyContent: 'center',
-  },
-  loadingText: {
+  modalClose: {
+    fontSize: 24,
     color: Colors.gray600,
+    padding: Spacing.sm,
+  },
+  stationList: {
+    maxHeight: 400,
+  },
+  stationItem: {
+    padding: Spacing.md,
+    borderBottomWidth: 1,
+    borderBottomColor: Colors.gray100,
     fontSize: Typography.fontSize.base,
-    marginTop: Spacing.md,
   },
 });

@@ -76,17 +76,18 @@ function convertTimestampToDate(timestamp: { seconds: number; nanoseconds?: numb
 
 function convertDocument<T>(
   docSnapshot: QueryDocumentSnapshot,
-  converter: (data: any) => T
+  converter: (data: any, docId: string) => T
 ): T {
   const data = docSnapshot.data();
-  return converter(data);
+  const docId = docSnapshot.id;
+  return converter(data, docId);
 }
 
 // ==================== Station Config ====================
 
-function convertStation(data: any): Station {
+function convertStation(data: any, docId?: string): Station {
   return {
-    stationId: data.stationId,
+    stationId: data.stationId || docId || '',
     stationName: data.stationName || data.name || '',
     stationNameEnglish: data.stationNameEnglish || data.nameEnglish || '',
     lines: data.lines || [],
@@ -207,9 +208,9 @@ export async function getStationsByLine(lineId: string): Promise<Station[]> {
 
 // ==================== Travel Time Config ====================
 
-function convertTravelTime(data: any): TravelTime {
+function convertTravelTime(data: any, docId?: string): TravelTime {
   return {
-    travelTimeId: data.travelTimeId,
+    travelTimeId: data.travelTimeId || docId || '',
     fromStationId: data.fromStationId,
     toStationId: data.toStationId,
     fromStationName: data.fromStationName,
@@ -322,9 +323,9 @@ export async function getTravelTimesFromStation(stationId: string): Promise<Trav
 
 // ==================== Express Train Config ====================
 
-function convertExpressTrain(data: any): ExpressTrain {
+function convertExpressTrain(data: any, docId?: string): ExpressTrain {
   return {
-    expressId: data.expressId,
+    expressId: data.expressId || docId || '',
     lineId: data.lineId,
     lineName: data.lineName,
     type: data.type,
@@ -430,9 +431,9 @@ export async function getExpressTrainsByLine(lineId: string): Promise<ExpressTra
 
 // ==================== Congestion Config ====================
 
-function convertCongestionData(data: any): CongestionData {
+function convertCongestionData(data: any, docId?: string): CongestionData {
   return {
-    congestionId: data.congestionId,
+    congestionId: data.congestionId || docId || '',
     lineId: data.lineId,
     lineName: data.lineName,
     timeSlots: data.timeSlots,
@@ -504,9 +505,9 @@ export async function getAllCongestionConfigs(): Promise<CongestionData[]> {
 
 // ==================== Algorithm Params ====================
 
-function convertAlgorithmParams(data: any): AlgorithmParams {
+function convertAlgorithmParams(data: any, docId?: string): AlgorithmParams {
   return {
-    paramId: data.paramId,
+    paramId: data.paramId || docId || '',
     version: data.version,
     weights: data.weights,
     timeEfficiency: data.timeEfficiency,
