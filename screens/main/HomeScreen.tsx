@@ -180,9 +180,6 @@ export default function HomeScreen({ navigation }: HomeScreenProps) {
               <View style={styles.emptyState}>
                 <Text style={styles.emptyIcon}>📍</Text>
                 <Text style={styles.emptyTitle}>등록된 동선이 없습니다</Text>
-                <Text style={styles.emptyText}>
-                  출퇴근 경로를 등록하고 배송 기회를 받으세요
-                </Text>
                 <Button
                   title="첫 동선 등록하기"
                   variant="secondary"

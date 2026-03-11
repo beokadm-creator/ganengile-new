@@ -72,7 +72,7 @@ export const OptimizedStationSelectModal: React.FC<OptimizedStationSelectModalPr
     setIsLoading(true);
 
     const timer = setTimeout(() => {
-      let filtered = stations.length > 0 ? stations : mockStations;
+      let filtered = stations.length > 0 ? stations : [];
 
       // 지역 필터
       if (selectedRegion !== 'all') {
@@ -96,9 +96,9 @@ export const OptimizedStationSelectModal: React.FC<OptimizedStationSelectModalPr
   }, [debouncedSearch, selectedRegion, stations]);
 
   const loadRecentAndFavoriteStations = () => {
-    // mock data for now
-    setRecentStations(mockRecentStations);
-    setFavoriteStations(mockFavoriteStations);
+    // 실제 역 데이터에서 최근/즐겨찾기 설정 (비워둠)
+    setRecentStations([]);
+    setFavoriteStations([]);
   };
 
   // 최근/즐겨찾기 로드
@@ -303,11 +303,23 @@ const mockStations: Station[] = [
     lines: [{ lineId: '2', lineName: '2호선', lineCode: '2', lineColor: '#009944', lineType: 'general' }],
     location: { latitude: 37.4979, longitude: 127.0276 }, isTransferStation: true, isExpressStop: false, isTerminus: false,
     facilities: { hasElevator: true, hasEscalator: true }, isActive: true, priority: 1, createdAt: new Date(), updatedAt: new Date()
+  },
+  {
+    stationId: '100', stationName: '소요산역', stationNameEnglish: 'So-yosan', region: 'gyeonggi',
+    lines: [{ lineId: '1', lineName: '1호선', lineCode: '1', lineColor: '#1935C0', lineType: 'general' }],
+    location: { latitude: 37.8358, longitude: 126.7856 }, isTransferStation: false, isExpressStop: false, isTerminus: true,
+    facilities: { hasElevator: true, hasEscalator: true }, isActive: true, priority: 1, createdAt: new Date(), updatedAt: new Date()
+  },
+  {
+    stationId: '101', stationName: '덕정역', stationNameEnglish: 'Deokjeong', region: 'gyeonggi',
+    lines: [{ lineId: '1', lineName: '1호선', lineCode: '1', lineColor: '#1935C0', lineType: 'general' }],
+    location: { latitude: 37.8234, longitude: 126.7967 }, isTransferStation: false, isExpressStop: false, isTerminus: false,
+    facilities: { hasElevator: true, hasEscalator: true }, isActive: true, priority: 1, createdAt: new Date(), updatedAt: new Date()
   }
 ];
 
-const mockRecentStations: Station[] = [mockStations[0], mockStations[1]];
-const mockFavoriteStations: Station[] = [mockStations[0]];
+const mockRecentStations: Station[] = [mockStations[2], mockStations[3]]; // 소요산역, 덕정역
+const mockFavoriteStations: Station[] = [mockStations[2]]; // 소요산역
 
 // 헬퍼 함수
 const getLineColor = (line: string): string => {

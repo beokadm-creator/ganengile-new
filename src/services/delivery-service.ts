@@ -72,7 +72,7 @@ export async function gillerAcceptRequest(
       return { success: false, message: '요청 데이터를 찾을 수 없습니다.' };
     }
 
-    if (request.status !== 'matched') {
+    if (request.status !== 'matched' && request.status !== 'pending') {
       return { success: false, message: '수락할 수 없는 요청입니다.' };
     }
 
@@ -93,7 +93,7 @@ export async function gillerAcceptRequest(
       deliveryStation: request.deliveryStation,
       deliveryType: request.deliveryType || 'standard',
       packageInfo: request.packageInfo,
-      fee: request.fee,
+      fee: request.fee || request.feeBreakdown || { totalFee: 3500, deliveryFee: 3500 }, // Fallback for old requests
       recipientInfo: {
         name: request.recipientName,
         phone: request.recipientPhone,

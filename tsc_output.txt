@@ -1,0 +1,699 @@
+functions/src/index.ts(6,28): error TS2307: Cannot find module 'firebase-functions' or its corresponding type declarations.
+functions/src/index.ts(7,24): error TS2307: Cannot find module 'firebase-admin' or its corresponding type declarations.
+functions/src/index.ts(55,20): error TS7006: Parameter 'snapshot' implicitly has an 'any' type.
+functions/src/index.ts(55,30): error TS7006: Parameter 'context' implicitly has an 'any' type.
+functions/src/index.ts(247,20): error TS7006: Parameter 'snapshot' implicitly has an 'any' type.
+functions/src/index.ts(247,30): error TS7006: Parameter 'context' implicitly has an 'any' type.
+functions/src/index.ts(315,20): error TS7006: Parameter 'change' implicitly has an 'any' type.
+functions/src/index.ts(315,28): error TS7006: Parameter 'context' implicitly has an 'any' type.
+functions/src/index.ts(426,83): error TS7006: Parameter 'context' implicitly has an 'any' type.
+functions/src/index.ts(468,83): error TS7006: Parameter 'context' implicitly has an 'any' type.
+functions/src/index.ts(513,17): error TS7006: Parameter '_context' implicitly has an 'any' type.
+functions/src/index.ts(527,38): error TS7006: Parameter 'doc' implicitly has an 'any' type.
+functions/src/index.ts(547,20): error TS7006: Parameter 'snapshot' implicitly has an 'any' type.
+functions/src/index.ts(547,30): error TS7006: Parameter 'context' implicitly has an 'any' type.
+functions/src/index.ts(618,99): error TS7006: Parameter 'context' implicitly has an 'any' type.
+functions/src/index.ts(674,62): error TS7006: Parameter 'data' implicitly has an 'any' type.
+functions/src/index.ts(674,68): error TS7006: Parameter 'context' implicitly has an 'any' type.
+functions/src/index.ts(791,20): error TS7006: Parameter 'change' implicitly has an 'any' type.
+functions/src/index.ts(791,28): error TS7006: Parameter 'context' implicitly has an 'any' type.
+functions/src/index.ts(883,68): error TS7006: Parameter 'data' implicitly has an 'any' type.
+functions/src/index.ts(883,74): error TS7006: Parameter 'context' implicitly has an 'any' type.
+functions/src/index.ts(968,46): error TS7006: Parameter 'context' implicitly has an 'any' type.
+functions/src/index.ts(1196,35): error TS7006: Parameter 'context' implicitly has an 'any' type.
+functions/src/index.ts(1378,33): error TS7006: Parameter 'context' implicitly has an 'any' type.
+functions/src/index.ts(1459,39): error TS7006: Parameter 'doc' implicitly has an 'any' type.
+functions/src/index.ts(1490,33): error TS7006: Parameter 'context' implicitly has an 'any' type.
+functions/src/index.ts(1565,35): error TS7006: Parameter 'context' implicitly has an 'any' type.
+functions/src/index.ts(1710,17): error TS7006: Parameter 'context' implicitly has an 'any' type.
+functions/src/index.ts(1729,17): error TS7006: Parameter 'context' implicitly has an 'any' type.
+functions/src/scheduled/settlement-scheduler.ts(9,24): error TS2307: Cannot find module 'firebase-admin' or its corresponding type declarations.
+functions/src/scheduled/settlement-scheduler.ts(11,3): error TS2305: Module '"../../src/types"' has no exported member 'BusinessContract'.
+functions/src/scheduled/settlement-scheduler.ts(12,3): error TS2724: '"../../src/types"' has no exported member named 'B2BDelivery'. Did you mean 'Delivery'?
+functions/src/scheduled/settlement-scheduler.ts(13,3): error TS2305: Module '"../../src/types"' has no exported member 'B2BGillerTier'.
+functions/src/scheduled/settlement-scheduler.ts(14,3): error TS2305: Module '"../../src/types"' has no exported member 'B2BSettlement'.
+functions/src/scheduled/settlement-scheduler.ts(87,59): error TS7006: Parameter 'doc' implicitly has an 'any' type.
+functions/src/scheduled/settlement-scheduler.ts(96,51): error TS7006: Parameter 'sum' implicitly has an 'any' type.
+functions/src/scheduled/settlement-scheduler.ts(96,56): error TS7006: Parameter 'd' implicitly has an 'any' type.
+functions/src/scheduled/tax-invoice-scheduler.ts(9,24): error TS2307: Cannot find module 'firebase-admin' or its corresponding type declarations.
+functions/src/scheduled/tax-invoice-scheduler.ts(11,3): error TS2305: Module '"../../src/types"' has no exported member 'BusinessContract'.
+functions/src/scheduled/tax-invoice-scheduler.ts(12,3): error TS2724: '"../../src/types"' has no exported member named 'B2BDelivery'. Did you mean 'Delivery'?
+functions/src/scheduled/tax-invoice-scheduler.ts(13,3): error TS2305: Module '"../../src/types"' has no exported member 'TaxInvoice'.
+functions/src/scheduled/tax-invoice-scheduler.ts(14,3): error TS2305: Module '"../../src/types"' has no exported member 'B2BGillerTier'.
+functions/src/scheduled/tax-invoice-scheduler.ts(15,3): error TS2305: Module '"../../src/types"' has no exported member 'B2BSettlement'.
+functions/src/scheduled/tax-invoice-scheduler.ts(85,57): error TS7006: Parameter 'doc' implicitly has an 'any' type.
+functions/src/scheduled/tax-invoice-scheduler.ts(94,45): error TS7006: Parameter 'sum' implicitly has an 'any' type.
+functions/src/scheduled/tax-invoice-scheduler.ts(94,50): error TS7006: Parameter 'd' implicitly has an 'any' type.
+functions/src/types.ts(5,39): error TS2307: Cannot find module 'firebase-admin/firestore' or its corresponding type declarations.
+src/components/BadgeEarnedPopup.tsx(23,31): error TS2307: Cannot find module '../../data/badges' or its corresponding type declarations.
+src/components/BadgeEarnedPopup.tsx(24,23): error TS2307: Cannot find module '../../types/user' or its corresponding type declarations.
+src/components/BadgeEarnedPopup.tsx(25,59): error TS2307: Cannot find module '../../theme' or its corresponding type declarations.
+src/components/badges/BadgeEarnedPopup.tsx(108,17): error TS2769: No overload matches this call.
+  Overload 1 of 2, '(props: TextProps): Text', gave the following error.
+    Type '{ color: { primary: string; secondary: string; tertiary: string; white: string; disabled: string; }; marginBottom: number; textAlign: "center"; fontSize: number; fontWeight: "700"; }' is not assignable to type 'StyleProp<TextStyle>'.
+      Type '{ color: { primary: string; secondary: string; tertiary: string; white: string; disabled: string; }; marginBottom: number; textAlign: "center"; fontSize: number; fontWeight: "700"; }' is not assignable to type 'TextStyle'.
+        Types of property 'color' are incompatible.
+          Type '{ primary: string; secondary: string; tertiary: string; white: string; disabled: string; }' is not assignable to type 'ColorValue | undefined'.
+  Overload 2 of 2, '(props: TextProps, context: any): Text', gave the following error.
+    Type '{ color: { primary: string; secondary: string; tertiary: string; white: string; disabled: string; }; marginBottom: number; textAlign: "center"; fontSize: number; fontWeight: "700"; }' is not assignable to type 'StyleProp<TextStyle>'.
+      Type '{ color: { primary: string; secondary: string; tertiary: string; white: string; disabled: string; }; marginBottom: number; textAlign: "center"; fontSize: number; fontWeight: "700"; }' is not assignable to type 'TextStyle'.
+        Types of property 'color' are incompatible.
+          Type '{ primary: string; secondary: string; tertiary: string; white: string; disabled: string; }' is not assignable to type 'ColorValue | undefined'.
+src/components/badges/BadgeEarnedPopup.tsx(163,34): error TS2345: Argument of type '{ overlay: { flex: number; backgroundColor: string; justifyContent: "center"; alignItems: "center"; padding: number; }; container: { backgroundColor: string; borderRadius: number; padding: number; ... 7 more ...; elevation: number; }; ... 10 more ...; closeButtonText: { ...; }; }' is not assignable to parameter of type '{ overlay: { flex: number; backgroundColor: string; justifyContent: "center"; alignItems: "center"; padding: number; }; container: { backgroundColor: string; borderRadius: number; padding: number; ... 7 more ...; elevation: number; }; ... 10 more ...; closeButtonText: { ...; }; } & NamedStyles<...>'.
+  Property 'badgeName' is incompatible with index signature.
+    Type '{ color: { primary: string; secondary: string; tertiary: string; white: string; disabled: string; }; marginBottom: number; textAlign: "center"; fontSize: number; fontWeight: "700"; }' is not assignable to type 'ViewStyle | TextStyle | ImageStyle'.
+      Types of property 'color' are incompatible.
+        Type '{ primary: string; secondary: string; tertiary: string; white: string; disabled: string; }' is not assignable to type 'ColorValue | undefined'.
+src/components/common/BankSelectModal.tsx(71,14): error TS2739: Type '{ visible: false; value: string; onChangeText: Dispatch<SetStateAction<string>>; placeholder: string; }' is missing the following properties from type 'TextInputModalProps': title, onConfirm, onCancel
+src/components/common/Button.tsx(102,7): error TS2322: Type '(false | ViewStyle | { alignItems: "center"; borderRadius: number; flexDirection: "row"; justifyContent: "center"; overflow: "hidden"; } | { backgroundColor: string; } | { minHeight: number; paddingHorizontal: number; paddingVertical: number; } | { ...; } | { ...; } | { ...; } | undefined)[]' is not assignable to type 'StyleProp<ViewStyle> | ((state: PressableStateCallbackType) => StyleProp<ViewStyle>)'.
+  Type '(false | ViewStyle | { alignItems: "center"; borderRadius: number; flexDirection: "row"; justifyContent: "center"; overflow: "hidden"; } | { backgroundColor: string; } | { minHeight: number; paddingHorizontal: number; paddingVertical: number; } | { ...; } | { ...; } | { ...; } | undefined)[]' is not assignable to type 'RecursiveArray<ViewStyle | Falsy | RegisteredStyle<ViewStyle>>'.
+    The types returned by 'pop()' are incompatible between these types.
+      Type 'false | ViewStyle | { alignItems: "center"; borderRadius: number; flexDirection: "row"; justifyContent: "center"; overflow: "hidden"; } | { backgroundColor: string; } | { minHeight: number; paddingHorizontal: number; paddingVertical: number; } | { ...; } | { ...; } | { ...; } | undefined' is not assignable to type 'ViewStyle | Falsy | RegisteredStyle<ViewStyle> | RecursiveArray<ViewStyle | Falsy | RegisteredStyle<ViewStyle>> | readonly (ViewStyle | ... 1 more ... | RegisteredStyle<...>)[]'.
+        Type '{ cursor: string; }' is not assignable to type 'ViewStyle | Falsy | RegisteredStyle<ViewStyle> | RecursiveArray<ViewStyle | Falsy | RegisteredStyle<ViewStyle>> | readonly (ViewStyle | ... 1 more ... | RegisteredStyle<...>)[]'.
+          Type '{ cursor: string; }' is not assignable to type 'ViewStyle'.
+            Types of property 'cursor' are incompatible.
+              Type 'string' is not assignable to type 'CursorValue | undefined'.
+src/components/delivery/LockerLocator.tsx(20,10): error TS2305: Module '"../../services/locker-service"' has no exported member 'getAvailableLockers'.
+src/components/delivery/LockerLocator.tsx(20,31): error TS2305: Module '"../../services/locker-service"' has no exported member 'getLockersByStation'.
+src/components/delivery/LockerLocator.tsx(20,52): error TS2305: Module '"../../services/locker-service"' has no exported member 'createLockerLocation'.
+src/components/delivery/LockerLocator.tsx(52,69): error TS2339: Property 'availableCount' does not exist on type 'Locker'.
+src/components/delivery/LockerLocator.tsx(55,18): error TS2345: Argument of type 'unknown[]' is not assignable to parameter of type 'SetStateAction<LockerLocation[]>'.
+  Type 'unknown[]' is not assignable to type 'LockerLocation[]'.
+    Type 'unknown' is not assignable to type 'LockerLocation'.
+src/components/delivery/LockerLocator.tsx(75,7): error TS2322: Type '"available" | "occupied" | "maintenance" | "out_of_order"' is not assignable to type 'LockerStatus'.
+  Type '"available"' is not assignable to type 'LockerStatus'.
+src/components/giller/GillerProfileCard.test.tsx(7,8): error TS2613: Module '"C:/Users/whhol/Documents/trae_projects/ganengile/ganengile-temp/src/components/giller/GillerProfileCard"' has no default export. Did you mean to use 'import { GillerProfileCard } from "C:/Users/whhol/Documents/trae_projects/ganengile/ganengile-temp/src/components/giller/GillerProfileCard"' instead?
+src/components/giller/GillerProfileCard.tsx(10,18): error TS2307: Cannot find module 'react-native-vector-icons/MaterialIcons' or its corresponding type declarations.
+src/components/ModeToggleSwitch.tsx(22,59): error TS2307: Cannot find module '../../theme' or its corresponding type declarations.
+src/components/ModeToggleSwitch.tsx(259,5): error TS2322: Type '"calc(100% - 8px)"' is not assignable to type 'DimensionValue | undefined'.
+src/components/onetime/ModeToggleSwitch.tsx(217,5): error TS2322: Type '{ primary: string; secondary: string; tertiary: string; white: string; disabled: string; }' is not assignable to type 'ColorValue | undefined'.
+src/components/OptimizedStationSelectModal.tsx(123,68): error TS2339: Property 'name' does not exist on type 'Station'.
+src/components/OptimizedStationSelectModal.tsx(125,74): error TS2339: Property 'regionName' does not exist on type 'Station'.
+src/components/performance/MemoizedComponents.tsx(8,18): error TS2307: Cannot find module 'react-native-vector-icons/MaterialIcons' or its corresponding type declarations.
+src/components/subway/SubwayMapVisualizer.tsx(13,52): error TS2307: Cannot find module 'react-native-svg' or its corresponding type declarations.
+src/components/subway/SubwayMapVisualizer.tsx(218,40): error TS2339: Property 'secondary' does not exist on type 'string'.
+src/components/subway/SubwayMapVisualizer.tsx(245,40): error TS2339: Property 'secondary' does not exist on type 'string'.
+src/components/time/DaySelector.tsx(234,40): error TS2339: Property 'secondary' does not exist on type 'string'.
+src/components/time/DaySelector.tsx(242,40): error TS2339: Property 'secondary' does not exist on type 'string'.
+src/components/time/DaySelector.tsx(248,40): error TS2339: Property 'secondary' does not exist on type 'string'.
+src/components/time/TimePicker.tsx(269,40): error TS2339: Property 'secondary' does not exist on type 'string'.
+src/components/TransferInfoCard.tsx(136,5): error TS2322: Type '{ primary: string; secondary: string; tertiary: string; white: string; disabled: string; }' is not assignable to type 'ColorValue | undefined'.
+src/components/TransferInfoCard.tsx(156,5): error TS2322: Type '{ primary: string; secondary: string; tertiary: string; white: string; disabled: string; }' is not assignable to type 'ColorValue | undefined'.
+src/hooks/useMatchingTimeout.ts(48,5): error TS2322: Type 'Timeout' is not assignable to type 'number'.
+src/hooks/useMatchingTimeout.ts(147,49): error TS2339: Property 'id' does not exist on type 'Match'.
+src/hooks/useMatchingTimeout.ts(166,49): error TS2339: Property 'id' does not exist on type 'Match'.
+src/hooks/useMatchingTimeout.ts(180,47): error TS2339: Property 'id' does not exist on type 'Match'.
+src/monitoring/post-deployment.ts(10,1): error TS2578: Unused '@ts-expect-error' directive.
+src/monitoring/post-deployment.ts(28,3): error TS2578: Unused '@ts-expect-error' directive.
+src/monitoring/post-deployment.ts(106,3): error TS2578: Unused '@ts-expect-error' directive.
+src/monitoring/post-deployment.ts(134,3): error TS2578: Unused '@ts-expect-error' directive.
+src/monitoring/post-deployment.ts(136,3): error TS2578: Unused '@ts-expect-error' directive.
+src/monitoring/post-deployment.ts(255,3): error TS2578: Unused '@ts-expect-error' directive.
+src/monitoring/post-deployment.ts(266,5): error TS2578: Unused '@ts-expect-error' directive.
+src/monitoring/post-deployment.ts(272,3): error TS2578: Unused '@ts-expect-error' directive.
+src/monitoring/post-deployment.ts(281,5): error TS2578: Unused '@ts-expect-error' directive.
+src/navigation/OnboardingNavigator.tsx(38,11): error TS2322: Type '({ navigation, route }: Props) => Element' is not assignable to type 'ScreenComponentType<ParamListBase, "GllerOnboarding"> | undefined'.
+  Type '({ navigation, route }: Props) => Element' is not assignable to type 'FunctionComponent<{}>'.
+    Types of parameters '__0' and 'props' are incompatible.
+      Type '{}' is missing the following properties from type 'Props': navigation, route
+src/navigation/OnboardingNavigator.tsx(47,11): error TS2322: Type '({ navigation, route }: Props) => Element' is not assignable to type 'ScreenComponentType<ParamListBase, "GillerOnboarding"> | undefined'.
+  Type '({ navigation, route }: Props) => Element' is not assignable to type 'FunctionComponent<{}>'.
+    Types of parameters '__0' and 'props' are incompatible.
+      Type '{}' is missing the following properties from type 'Props': navigation, route
+src/screens/b2b/B2BDashboardScreen.tsx(238,40): error TS2339: Property 'primary' does not exist on type 'string'.
+src/screens/b2b/B2BDashboardScreen.tsx(247,40): error TS2339: Property 'primary' does not exist on type 'string'.
+src/screens/b2b/B2BGillerScreen.tsx(260,50): error TS2769: No overload matches this call.
+  Overload 1 of 2, '(props: ViewProps): View', gave the following error.
+    Type '{ width: `${number}%` | "undefined%"; }' is not assignable to type 'ViewStyle | Falsy | RegisteredStyle<ViewStyle> | RecursiveArray<ViewStyle | Falsy | RegisteredStyle<ViewStyle>> | readonly (ViewStyle | ... 1 more ... | RegisteredStyle<...>)[]'.
+      Types of property 'width' are incompatible.
+        Type '`${number}%` | "undefined%"' is not assignable to type 'DimensionValue | undefined'.
+          Type '"undefined%"' is not assignable to type 'DimensionValue | undefined'.
+  Overload 2 of 2, '(props: ViewProps, context: any): View', gave the following error.
+    Type '{ width: `${number}%` | "undefined%"; }' is not assignable to type 'ViewStyle | Falsy | RegisteredStyle<ViewStyle> | RecursiveArray<ViewStyle | Falsy | RegisteredStyle<ViewStyle>> | readonly (ViewStyle | ... 1 more ... | RegisteredStyle<...>)[]'.
+      Types of property 'width' are incompatible.
+        Type '`${number}%` | "undefined%"' is not assignable to type 'DimensionValue | undefined'.
+          Type '"undefined%"' is not assignable to type 'DimensionValue | undefined'.
+src/screens/b2b/B2BGillerScreen.tsx(295,51): error TS17001: JSX elements cannot have multiple attributes with the same name.
+src/screens/b2b/B2BGillerScreen.tsx(302,51): error TS17001: JSX elements cannot have multiple attributes with the same name.
+src/screens/b2b/B2BGillerScreen.tsx(309,51): error TS17001: JSX elements cannot have multiple attributes with the same name.
+src/screens/b2b/B2BGillerScreen.tsx(323,40): error TS2339: Property 'primary' does not exist on type 'string'.
+src/screens/b2b/B2BGillerScreen.tsx(332,40): error TS2339: Property 'primary' does not exist on type 'string'.
+src/screens/b2b/B2BGillerScreen.tsx(406,40): error TS2339: Property 'secondary' does not exist on type 'string'.
+src/screens/b2b/B2BOnboardingScreen.tsx(275,40): error TS2339: Property 'primary' does not exist on type 'string'.
+src/screens/b2b/B2BOnboardingScreen.tsx(370,40): error TS2339: Property 'secondary' does not exist on type 'string'.
+src/screens/b2b/B2BRequestScreen.tsx(97,11): error TS2353: Object literal may only specify known properties, and 'latitude' does not exist in type 'Location'.
+src/screens/b2b/B2BRequestScreen.tsx(103,11): error TS2353: Object literal may only specify known properties, and 'latitude' does not exist in type 'Location'.
+src/screens/b2b/B2BRequestScreen.tsx(296,11): error TS2322: Type '{ visible: boolean; onClose: () => void; onSelect: (station: any) => void; title: string; }' is not assignable to type 'IntrinsicAttributes & OptimizedStationSelectModalProps'.
+  Property 'onSelect' does not exist on type 'IntrinsicAttributes & OptimizedStationSelectModalProps'.
+src/screens/b2b/B2BRequestScreen.tsx(296,22): error TS7006: Parameter 'station' implicitly has an 'any' type.
+src/screens/b2b/B2BRequestScreen.tsx(306,11): error TS2322: Type '{ visible: boolean; onClose: () => void; onSelect: (station: any) => void; title: string; }' is not assignable to type 'IntrinsicAttributes & OptimizedStationSelectModalProps'.
+  Property 'onSelect' does not exist on type 'IntrinsicAttributes & OptimizedStationSelectModalProps'.
+src/screens/b2b/B2BRequestScreen.tsx(306,22): error TS7006: Parameter 'station' implicitly has an 'any' type.
+src/screens/b2b/B2BRequestScreen.tsx(320,40): error TS2339: Property 'primary' does not exist on type 'string'.
+src/screens/b2b/B2BRequestScreen.tsx(362,12): error TS2304: Cannot find name 'pickupStation'.
+src/screens/b2b/B2BRequestScreen.tsx(362,29): error TS2304: Cannot find name 'deliveryStation'.
+src/screens/b2b/B2BRequestScreen.tsx(420,40): error TS2339: Property 'secondary' does not exist on type 'string'.
+src/screens/b2b/MonthlySettlementScreen.tsx(21,24): error TS2307: Cannot find module 'expo-print' or its corresponding type declarations.
+src/screens/b2b/MonthlySettlementScreen.tsx(22,26): error TS2307: Cannot find module 'expo-sharing' or its corresponding type declarations.
+src/screens/b2b/MonthlySettlementScreen.tsx(64,53): error TS2339: Property 'getMonthlySummary' does not exist on type 'B2BFirestoreService'.
+src/screens/b2b/MonthlySettlementScreen.tsx(71,22): error TS2345: Argument of type 'Settlement[]' is not assignable to parameter of type 'SetStateAction<SettlementItem[]>'.
+  Type 'Settlement[]' is not assignable to type 'SettlementItem[]'.
+    Type 'Settlement' is missing the following properties from type 'SettlementItem': settlementId, deliveryId, date, amount
+src/screens/b2b/MonthlySettlementScreen.tsx(359,40): error TS2339: Property 'primary' does not exist on type 'string'.
+src/screens/b2b/MonthlySettlementScreen.tsx(404,40): error TS2339: Property 'secondary' does not exist on type 'string'.
+src/screens/b2b/MonthlySettlementScreen.tsx(450,40): error TS2339: Property 'secondary' does not exist on type 'string'.
+src/screens/b2b/MonthlySettlementScreen.tsx(488,16): error TS2339: Property 'xs' does not exist on type '{ sm: { shadowColor: string; shadowOffset: { width: number; height: number; }; shadowOpacity: number; shadowRadius: number; elevation: number; }; md: { shadowColor: string; shadowOffset: { width: number; height: number; }; shadowOpacity: number; shadowRadius: number; elevation: number; }; lg: { ...; }; }'.
+src/screens/b2b/SubscriptionTierSelectionScreen.tsx(18,10): error TS2724: '"../../services/business-contract-service"' has no exported member named 'businessContractService'. Did you mean 'BusinessContractService'?
+src/screens/b2b/SubscriptionTierSelectionScreen.tsx(80,28): error TS2322: Type '"B2BDashboard"' is not assignable to type 'keyof MainStackParamList'.
+src/screens/b2b/SubscriptionTierSelectionScreen.tsx(276,40): error TS2339: Property 'primary' does not exist on type 'string'.
+src/screens/b2b/SubscriptionTierSelectionScreen.tsx(438,40): error TS2339: Property 'secondary' does not exist on type 'string'.
+src/screens/b2b/TaxInvoiceRequestScreen.tsx(20,10): error TS2724: '"../../services/tax-invoice-service"' has no exported member named 'taxInvoiceService'. Did you mean 'TaxInvoiceService'?
+src/screens/b2b/TaxInvoiceRequestScreen.tsx(69,40): error TS2339: Property 'businessNumber' does not exist on type '{ id: string; }'.
+src/screens/b2b/TaxInvoiceRequestScreen.tsx(70,37): error TS2339: Property 'companyName' does not exist on type '{ id: string; }'.
+src/screens/b2b/TaxInvoiceRequestScreen.tsx(71,33): error TS2339: Property 'ceoName' does not exist on type '{ id: string; }'.
+src/screens/b2b/TaxInvoiceRequestScreen.tsx(72,33): error TS2339: Property 'address' does not exist on type '{ id: string; }'.
+src/screens/b2b/TaxInvoiceRequestScreen.tsx(73,33): error TS2339: Property 'contact' does not exist on type '{ id: string; }'.
+src/screens/b2b/TaxInvoiceRequestScreen.tsx(353,40): error TS2339: Property 'primary' does not exist on type 'string'.
+src/screens/b2b/TaxInvoiceRequestScreen.tsx(477,40): error TS2339: Property 'primary' does not exist on type 'string'.
+src/screens/b2b/TaxInvoiceRequestScreen.tsx(520,40): error TS2339: Property 'secondary' does not exist on type 'string'.
+src/screens/badges/BadgeCollectionScreen.tsx(232,5): error TS2322: Type '{ primary: string; secondary: string; tertiary: string; white: string; disabled: string; }' is not assignable to type 'ColorValue | undefined'.
+src/screens/badges/BadgeCollectionScreen.tsx(277,5): error TS2322: Type '{ primary: string; secondary: string; tertiary: string; white: string; disabled: string; }' is not assignable to type 'ColorValue | undefined'.
+src/screens/badges/BadgeCollectionScreen.tsx(319,5): error TS2322: Type '{ primary: string; secondary: string; tertiary: string; white: string; disabled: string; }' is not assignable to type 'ColorValue | undefined'.
+src/screens/badges/BadgeCollectionScreen.tsx(356,5): error TS2322: Type '{ primary: string; secondary: string; tertiary: string; white: string; disabled: string; }' is not assignable to type 'ColorValue | undefined'.
+src/screens/DeliveryCompletionScreen.tsx(145,11): error TS2322: Type '{ placeholder: string; value: string; onChangeText: Dispatch<SetStateAction<string>>; style: { marginBottom: number; }; }' is not assignable to type 'IntrinsicAttributes & InputProps'.
+  Property 'style' does not exist on type 'IntrinsicAttributes & InputProps'.
+src/screens/DeliveryTrackingScreen.tsx(96,5): error TS2304: Cannot find name 'Alert'.
+src/screens/giller/GillerDropoffAtLockerScreen.tsx(20,3): error TS2305: Module '"../../services/locker-service"' has no exported member 'getLocker'.
+src/screens/giller/GillerDropoffAtLockerScreen.tsx(21,3): error TS2724: '"../../services/locker-service"' has no exported member named 'createLockerReservation'. Did you mean 'getLockerReservation'?
+src/screens/giller/GillerDropoffAtLockerScreen.tsx(25,10): error TS2614: Module '"../../services/qrcode-service"' has no exported member 'generateQRCode'. Did you mean to use 'import generateQRCode from "../../services/qrcode-service"' instead?
+src/screens/giller/GillerDropoffAtLockerScreen.tsx(26,10): error TS2305: Module '"../../services/photo-service"' has no exported member 'takePhoto'.
+src/screens/giller/GillerDropoffAtLockerScreen.tsx(26,21): error TS2305: Module '"../../services/photo-service"' has no exported member 'uploadPhotoWithThumbnail'.
+src/screens/giller/GillerDropoffAtLockerScreen.tsx(109,27): error TS2339: Property 'name' does not exist on type 'LockerSummary'.
+src/screens/giller/GillerDropoffAtLockerScreen.tsx(170,51): error TS2345: Argument of type 'undefined' is not assignable to parameter of type 'string'.
+src/screens/giller/GillerDropoffAtLockerScreen.tsx(235,72): error TS2339: Property 'name' does not exist on type 'LockerSummary'.
+src/screens/giller/GillerDropoffAtLockerScreen.tsx(240,37): error TS2339: Property 'type' does not exist on type 'LockerSummary'.
+src/screens/giller/GillerDropoffAtLockerScreen.tsx(246,37): error TS2339: Property 'pricePer4Hours' does not exist on type 'LockerSummary'.
+src/screens/giller/GillerPickupAtLockerScreen.tsx(26,10): error TS2614: Module '"../../services/qrcode-service"' has no exported member 'verifyQRCode'. Did you mean to use 'import verifyQRCode from "../../services/qrcode-service"' instead?
+src/screens/giller/GillerPickupAtLockerScreen.tsx(26,24): error TS2614: Module '"../../services/qrcode-service"' has no exported member 'getQRCodeRemainingTime'. Did you mean to use 'import getQRCodeRemainingTime from "../../services/qrcode-service"' instead?
+src/screens/giller/GillerPickupAtLockerScreen.tsx(27,10): error TS2305: Module '"../../services/photo-service"' has no exported member 'takePhoto'.
+src/screens/giller/GillerPickupAtLockerScreen.tsx(27,21): error TS2305: Module '"../../services/photo-service"' has no exported member 'uploadPhotoWithThumbnail'.
+src/screens/giller/GillerPickupAtLockerScreen.tsx(63,60): error TS2551: Property 'reservationType' does not exist on type 'LockerReservation'. Did you mean 'reservationId'?
+src/screens/main/BadgeCollectionScreen.tsx(212,25): error TS2769: No overload matches this call.
+  Overload 1 of 2, '(props: TextProps): Text', gave the following error.
+    Type '{ color: { primary: string; secondary: string; tertiary: string; white: string; disabled: string; }; marginBottom: number; fontSize: number; fontWeight: "600"; }' is not assignable to type 'TextStyle | Falsy | RegisteredStyle<TextStyle> | RecursiveArray<TextStyle | Falsy | RegisteredStyle<TextStyle>> | readonly (TextStyle | ... 1 more ... | RegisteredStyle<...>)[]'.
+      Type '{ color: { primary: string; secondary: string; tertiary: string; white: string; disabled: string; }; marginBottom: number; fontSize: number; fontWeight: "600"; }' is not assignable to type 'TextStyle'.
+        Types of property 'color' are incompatible.
+          Type '{ primary: string; secondary: string; tertiary: string; white: string; disabled: string; }' is not assignable to type 'ColorValue | undefined'.
+  Overload 2 of 2, '(props: TextProps, context: any): Text', gave the following error.
+    Type '{ color: { primary: string; secondary: string; tertiary: string; white: string; disabled: string; }; marginBottom: number; fontSize: number; fontWeight: "600"; }' is not assignable to type 'TextStyle | Falsy | RegisteredStyle<TextStyle> | RecursiveArray<TextStyle | Falsy | RegisteredStyle<TextStyle>> | readonly (TextStyle | ... 1 more ... | RegisteredStyle<...>)[]'.
+      Type '{ color: { primary: string; secondary: string; tertiary: string; white: string; disabled: string; }; marginBottom: number; fontSize: number; fontWeight: "600"; }' is not assignable to type 'TextStyle'.
+        Types of property 'color' are incompatible.
+          Type '{ primary: string; secondary: string; tertiary: string; white: string; disabled: string; }' is not assignable to type 'ColorValue | undefined'.
+src/screens/main/BadgeCollectionScreen.tsx(430,27): error TS2769: No overload matches this call.
+  Overload 1 of 2, '(props: TextProps): Text', gave the following error.
+    Type '{ color: { primary: string; secondary: string; tertiary: string; white: string; disabled: string; }; marginBottom: number; fontSize: number; fontWeight: "700"; }' is not assignable to type 'TextStyle | Falsy | RegisteredStyle<TextStyle> | RecursiveArray<TextStyle | Falsy | RegisteredStyle<TextStyle>> | readonly (TextStyle | ... 1 more ... | RegisteredStyle<...>)[]'.
+      Type '{ color: { primary: string; secondary: string; tertiary: string; white: string; disabled: string; }; marginBottom: number; fontSize: number; fontWeight: "700"; }' is not assignable to type 'TextStyle'.
+        Types of property 'color' are incompatible.
+          Type '{ primary: string; secondary: string; tertiary: string; white: string; disabled: string; }' is not assignable to type 'ColorValue | undefined'.
+  Overload 2 of 2, '(props: TextProps, context: any): Text', gave the following error.
+    Type '{ color: { primary: string; secondary: string; tertiary: string; white: string; disabled: string; }; marginBottom: number; fontSize: number; fontWeight: "700"; }' is not assignable to type 'TextStyle | Falsy | RegisteredStyle<TextStyle> | RecursiveArray<TextStyle | Falsy | RegisteredStyle<TextStyle>> | readonly (TextStyle | ... 1 more ... | RegisteredStyle<...>)[]'.
+      Type '{ color: { primary: string; secondary: string; tertiary: string; white: string; disabled: string; }; marginBottom: number; fontSize: number; fontWeight: "700"; }' is not assignable to type 'TextStyle'.
+        Types of property 'color' are incompatible.
+          Type '{ primary: string; secondary: string; tertiary: string; white: string; disabled: string; }' is not assignable to type 'ColorValue | undefined'.
+src/screens/main/BadgeCollectionScreen.tsx(484,15): error TS2769: No overload matches this call.
+  Overload 1 of 2, '(props: TextProps): Text', gave the following error.
+    Type '{ color: { primary: string; secondary: string; tertiary: string; white: string; disabled: string; }; marginBottom: number; fontSize: number; fontWeight: "700"; }' is not assignable to type 'StyleProp<TextStyle>'.
+      Type '{ color: { primary: string; secondary: string; tertiary: string; white: string; disabled: string; }; marginBottom: number; fontSize: number; fontWeight: "700"; }' is not assignable to type 'TextStyle'.
+        Types of property 'color' are incompatible.
+          Type '{ primary: string; secondary: string; tertiary: string; white: string; disabled: string; }' is not assignable to type 'ColorValue | undefined'.
+  Overload 2 of 2, '(props: TextProps, context: any): Text', gave the following error.
+    Type '{ color: { primary: string; secondary: string; tertiary: string; white: string; disabled: string; }; marginBottom: number; fontSize: number; fontWeight: "700"; }' is not assignable to type 'StyleProp<TextStyle>'.
+      Type '{ color: { primary: string; secondary: string; tertiary: string; white: string; disabled: string; }; marginBottom: number; fontSize: number; fontWeight: "700"; }' is not assignable to type 'TextStyle'.
+        Types of property 'color' are incompatible.
+          Type '{ primary: string; secondary: string; tertiary: string; white: string; disabled: string; }' is not assignable to type 'ColorValue | undefined'.
+src/screens/main/BadgeCollectionScreen.tsx(514,34): error TS2345: Argument of type '{ container: { flex: number; backgroundColor: string; }; header: { paddingHorizontal: number; paddingTop: number; paddingBottom: number; backgroundColor: string; }; headerTitle: { color: { primary: string; secondary: string; tertiary: string; white: string; disabled: string; }; marginBottom: number; fontSize: number...' is not assignable to parameter of type '{ container: { flex: number; backgroundColor: string; }; header: { paddingHorizontal: number; paddingTop: number; paddingBottom: number; backgroundColor: string; }; headerTitle: { color: { primary: string; secondary: string; tertiary: string; white: string; disabled: string; }; marginBottom: number; fontSize: number...'.
+  Property 'headerTitle' is incompatible with index signature.
+    Type '{ color: { primary: string; secondary: string; tertiary: string; white: string; disabled: string; }; marginBottom: number; fontSize: number; fontWeight: "700"; }' is not assignable to type 'ViewStyle | TextStyle | ImageStyle'.
+      Types of property 'color' are incompatible.
+        Type '{ primary: string; secondary: string; tertiary: string; white: string; disabled: string; }' is not assignable to type 'ColorValue | undefined'.
+src/screens/main/CreateAuctionScreen.tsx(132,11): error TS2451: Cannot redeclare block-scoped variable 'validateStep1'.
+src/screens/main/CreateAuctionScreen.tsx(153,11): error TS2451: Cannot redeclare block-scoped variable 'validateStep2'.
+src/screens/main/CreateAuctionScreen.tsx(168,11): error TS2451: Cannot redeclare block-scoped variable 'handleNext'.
+src/screens/main/CreateAuctionScreen.tsx(177,11): error TS2451: Cannot redeclare block-scoped variable 'handleBack'.
+src/screens/main/CreateAuctionScreen.tsx(185,11): error TS2451: Cannot redeclare block-scoped variable 'handleSubmit'.
+src/screens/main/CreateAuctionScreen.tsx(218,11): error TS2353: Object literal may only specify known properties, and 'weight' does not exist in type 'CreateAuctionData'.
+src/screens/main/CreateAuctionScreen.tsx(250,11): error TS2451: Cannot redeclare block-scoped variable 'handleStationSelect'.
+src/screens/main/CreateAuctionScreen.tsx(260,9): error TS2451: Cannot redeclare block-scoped variable 'validateStep1'.
+src/screens/main/CreateAuctionScreen.tsx(281,9): error TS2451: Cannot redeclare block-scoped variable 'validateStep2'.
+src/screens/main/CreateAuctionScreen.tsx(296,9): error TS2451: Cannot redeclare block-scoped variable 'handleNext'.
+src/screens/main/CreateAuctionScreen.tsx(305,9): error TS2451: Cannot redeclare block-scoped variable 'handleBack'.
+src/screens/main/CreateAuctionScreen.tsx(313,9): error TS2451: Cannot redeclare block-scoped variable 'handleSubmit'.
+src/screens/main/CreateAuctionScreen.tsx(346,9): error TS2353: Object literal may only specify known properties, and 'weight' does not exist in type 'CreateAuctionData'.
+src/screens/main/CreateAuctionScreen.tsx(378,9): error TS2451: Cannot redeclare block-scoped variable 'handleStationSelect'.
+src/screens/main/CreateRequestScreen.tsx(63,7): error TS2322: Type 'unknown' is not assignable to type 'number'.
+src/screens/main/CreateRequestScreen.tsx(64,30): error TS2339: Property 'lng' does not exist on type 'StationLocation & Record<"lat", unknown>'.
+src/screens/main/CreateRequestScreen.tsx(689,27): error TS2345: Argument of type '[never, { requestId: string; pickupStationName: string; deliveryStationName: string; deliveryFee: { baseFee: number; distanceFee: number; sizeFee: number; weightFee: number; serviceFee: number; ... 5 more ...; manualAdjustment?: number | undefined; }; }]' is not assignable to parameter of type 'never'.
+src/screens/main/DeliveryCompletionScreen.tsx(94,29): error TS2345: Argument of type '() => Promise<DeliveryRequest | null>' is not assignable to parameter of type 'string'.
+src/screens/main/DeliveryCompletionScreen.tsx(109,7): error TS2322: Type 'string' is not assignable to type 'LocationAccuracy | undefined'.
+src/screens/main/DeliveryCompletionScreen.tsx(151,31): error TS2345: Argument of type '() => Promise<void>' is not assignable to parameter of type 'string'.
+src/screens/main/DeliveryCompletionScreen.tsx(201,29): error TS2345: Argument of type '() => Promise<void>' is not assignable to parameter of type 'string'.
+src/screens/main/DeliveryCompletionScreen.tsx(293,29): error TS2345: Argument of type '() => Promise<void>' is not assignable to parameter of type 'string'.
+src/screens/main/DeliveryTrackingScreen.tsx(156,31): error TS2345: Argument of type '() => Promise<void>' is not assignable to parameter of type 'string'.
+src/screens/main/DepositPaymentScreen.tsx(280,5): error TS2322: Type '{ primary: string; secondary: string; tertiary: string; white: string; disabled: string; }' is not assignable to type 'ColorValue | undefined'.
+src/screens/main/DepositPaymentScreen.tsx(326,5): error TS2322: Type '{ primary: string; secondary: string; tertiary: string; white: string; disabled: string; }' is not assignable to type 'ColorValue | undefined'.
+src/screens/main/DisputeReportScreen.tsx(24,68): error TS2307: Cannot find module 'react-native-image-picker' or its corresponding type declarations.
+src/screens/main/DisputeReportScreen.tsx(26,10): error TS2305: Module '"../../services/photo-service"' has no exported member 'uploadPhoto'.
+src/screens/main/DisputeReportScreen.tsx(239,9): error TS2607: JSX element class does not support attributes because it does not have a 'props' property.
+src/screens/main/DisputeReportScreen.tsx(239,10): error TS2786: 'Image' cannot be used as a JSX component.
+  Its type 'new (width?: number | undefined, height?: number | undefined) => HTMLImageElement' is not a valid JSX element type.
+    Type 'new (width?: number | undefined, height?: number | undefined) => HTMLImageElement' is not assignable to type 'new (props: any, context: any) => Component<any, any, any>'.
+      Type 'HTMLImageElement' is missing the following properties from type 'Component<any, any, any>': context, setState, forceUpdate, render, and 2 more.
+src/screens/main/DisputeReportScreen.tsx(384,5): error TS2322: Type '{ primary: string; secondary: string; tertiary: string; white: string; disabled: string; }' is not assignable to type 'ColorValue | undefined'.
+src/screens/main/DisputeReportScreen.tsx(402,5): error TS2322: Type '{ primary: string; secondary: string; tertiary: string; white: string; disabled: string; }' is not assignable to type 'ColorValue | undefined'.
+src/screens/main/DisputeReportScreen.tsx(445,5): error TS2322: Type '{ primary: string; secondary: string; tertiary: string; white: string; disabled: string; }' is not assignable to type 'ColorValue | undefined'.
+src/screens/main/DisputeReportScreen.tsx(487,5): error TS2322: Type '{ primary: string; secondary: string; tertiary: string; white: string; disabled: string; }' is not assignable to type 'ColorValue | undefined'.
+src/screens/main/DisputeReportScreen.tsx(494,5): error TS2322: Type '{ primary: string; secondary: string; tertiary: string; white: string; disabled: string; }' is not assignable to type 'ColorValue | undefined'.
+src/screens/main/DisputeResolutionScreen.tsx(334,23): error TS2607: JSX element class does not support attributes because it does not have a 'props' property.
+src/screens/main/DisputeResolutionScreen.tsx(334,24): error TS2786: 'Image' cannot be used as a JSX component.
+  Its type 'new (width?: number | undefined, height?: number | undefined) => HTMLImageElement' is not a valid JSX element type.
+    Type 'new (width?: number | undefined, height?: number | undefined) => HTMLImageElement' is not assignable to type 'new (props: any, context: any) => Component<any, any, any>'.
+      Type 'HTMLImageElement' is missing the following properties from type 'Component<any, any, any>': context, setState, forceUpdate, render, and 2 more.
+src/screens/main/DisputeResolutionScreen.tsx(376,12): error TS2304: Cannot find name 'TouchableOpacity'.
+src/screens/main/DisputeResolutionScreen.tsx(381,13): error TS2304: Cannot find name 'TouchableOpacity'.
+src/screens/main/DisputeResolutionScreen.tsx(401,5): error TS2322: Type '{ primary: string; secondary: string; tertiary: string; white: string; disabled: string; }' is not assignable to type 'ColorValue | undefined'.
+src/screens/main/DisputeResolutionScreen.tsx(429,5): error TS2322: Type '{ primary: string; secondary: string; tertiary: string; white: string; disabled: string; }' is not assignable to type 'ColorValue | undefined'.
+src/screens/main/DisputeResolutionScreen.tsx(452,5): error TS2322: Type '{ primary: string; secondary: string; tertiary: string; white: string; disabled: string; }' is not assignable to type 'ColorValue | undefined'.
+src/screens/main/DisputeResolutionScreen.tsx(496,5): error TS2322: Type '{ primary: string; secondary: string; tertiary: string; white: string; disabled: string; }' is not assignable to type 'ColorValue | undefined'.
+src/screens/main/DisputeResolutionScreen.tsx(516,5): error TS2322: Type '{ primary: string; secondary: string; tertiary: string; white: string; disabled: string; }' is not assignable to type 'ColorValue | undefined'.
+src/screens/main/DisputeResolutionScreen.tsx(521,5): error TS2322: Type '{ primary: string; secondary: string; tertiary: string; white: string; disabled: string; }' is not assignable to type 'ColorValue | undefined'.
+src/screens/main/DisputeResolutionScreen.tsx(549,5): error TS2322: Type '{ primary: string; secondary: string; tertiary: string; white: string; disabled: string; }' is not assignable to type 'ColorValue | undefined'.
+src/screens/main/HomeScreen.tsx(196,67): error TS2322: Type '"pending"' is not assignable to type 'RequestStatus | undefined'.
+src/screens/main/LevelBenefitsScreen.tsx(354,5): error TS2322: Type '{ primary: string; secondary: string; tertiary: string; white: string; disabled: string; }' is not assignable to type 'ColorValue | undefined'.
+src/screens/main/LevelBenefitsScreen.tsx(405,5): error TS2322: Type '{ primary: string; secondary: string; tertiary: string; white: string; disabled: string; }' is not assignable to type 'ColorValue | undefined'.
+src/screens/main/LevelBenefitsScreen.tsx(411,5): error TS2322: Type '{ primary: string; secondary: string; tertiary: string; white: string; disabled: string; }' is not assignable to type 'ColorValue | undefined'.
+src/screens/main/LevelBenefitsScreen.tsx(488,5): error TS2322: Type '{ primary: string; secondary: string; tertiary: string; white: string; disabled: string; }' is not assignable to type 'ColorValue | undefined'.
+src/screens/main/LevelBenefitsScreen.tsx(499,5): error TS2322: Type '{ primary: string; secondary: string; tertiary: string; white: string; disabled: string; }' is not assignable to type 'ColorValue | undefined'.
+src/screens/main/LevelBenefitsScreen.tsx(514,5): error TS2322: Type '{ primary: string; secondary: string; tertiary: string; white: string; disabled: string; }' is not assignable to type 'ColorValue | undefined'.
+src/screens/main/LevelBenefitsScreen.tsx(526,5): error TS2322: Type '{ primary: string; secondary: string; tertiary: string; white: string; disabled: string; }' is not assignable to type 'ColorValue | undefined'.
+src/screens/main/LevelBenefitsScreen.tsx(540,5): error TS2322: Type '{ primary: string; secondary: string; tertiary: string; white: string; disabled: string; }' is not assignable to type 'ColorValue | undefined'.
+src/screens/main/LevelBenefitsScreen.tsx(556,5): error TS2322: Type '{ primary: string; secondary: string; tertiary: string; white: string; disabled: string; }' is not assignable to type 'ColorValue | undefined'.
+src/screens/main/LockerMapScreen.tsx(373,5): error TS2322: Type '{ primary: string; secondary: string; tertiary: string; white: string; disabled: string; }' is not assignable to type 'ColorValue | undefined'.
+src/screens/main/LockerMapScreen.tsx(388,5): error TS2322: Type '{ primary: string; secondary: string; tertiary: string; white: string; disabled: string; }' is not assignable to type 'ColorValue | undefined'.
+src/screens/main/LockerMapScreen.tsx(410,5): error TS2322: Type '{ primary: string; secondary: string; tertiary: string; white: string; disabled: string; }' is not assignable to type 'ColorValue | undefined'.
+src/screens/main/LockerMapScreen.tsx(464,5): error TS2322: Type '{ primary: string; secondary: string; tertiary: string; white: string; disabled: string; }' is not assignable to type 'ColorValue | undefined'.
+src/screens/main/LockerMapScreen.tsx(545,5): error TS2322: Type '{ primary: string; secondary: string; tertiary: string; white: string; disabled: string; }' is not assignable to type 'ColorValue | undefined'.
+src/screens/main/LockerSelectionScreen.tsx(133,36): error TS2339: Property 'available' does not exist on type 'TimeSlot'.
+src/screens/main/LockerSelectionScreen.tsx(244,16): error TS2339: Property 'available' does not exist on type 'TimeSlot'.
+src/screens/main/LockerSelectionScreen.tsx(253,21): error TS2339: Property 'available' does not exist on type 'TimeSlot'.
+src/screens/main/LockerSelectionScreen.tsx(257,29): error TS2339: Property 'available' does not exist on type 'TimeSlot'.
+src/screens/main/LockerSelectionScreen.tsx(413,5): error TS2322: Type '{ primary: string; secondary: string; tertiary: string; white: string; disabled: string; }' is not assignable to type 'ColorValue | undefined'.
+src/screens/main/LockerSelectionScreen.tsx(532,5): error TS2322: Type '{ primary: string; secondary: string; tertiary: string; white: string; disabled: string; }' is not assignable to type 'ColorValue | undefined'.
+src/screens/main/LockerSelectionScreen.tsx(559,5): error TS2322: Type '{ primary: string; secondary: string; tertiary: string; white: string; disabled: string; }' is not assignable to type 'ColorValue | undefined'.
+src/screens/main/LockerSelectionScreen.tsx(608,5): error TS2322: Type '{ primary: string; secondary: string; tertiary: string; white: string; disabled: string; }' is not assignable to type 'ColorValue | undefined'.
+src/screens/main/MatchingResultScreen.tsx(40,53): error TS2339: Property 'gillerId' does not exist on type 'Request'.
+src/screens/main/MatchingResultScreen.tsx(41,29): error TS2339: Property 'giller' does not exist on type 'Request'.
+src/screens/main/MatchingResultScreen.tsx(65,25): error TS2345: Argument of type '[never, { gillerId: any; requestId: string; }]' is not assignable to parameter of type 'never'.
+src/screens/main/MatchingResultScreen.tsx(76,25): error TS2345: Argument of type '[never, { requestId: string; }]' is not assignable to parameter of type 'never'.
+src/screens/main/OnetimeModeScreen.tsx(25,25): error TS2307: Cannot find module 'react-native-geolocation-service' or its corresponding type declarations.
+src/screens/main/OnetimeModeScreen.tsx(443,5): error TS2322: Type '{ primary: string; secondary: string; tertiary: string; white: string; disabled: string; }' is not assignable to type 'ColorValue | undefined'.
+src/screens/main/OnetimeModeScreen.tsx(461,5): error TS2322: Type '{ primary: string; secondary: string; tertiary: string; white: string; disabled: string; }' is not assignable to type 'ColorValue | undefined'.
+src/screens/main/OnetimeModeScreen.tsx(476,5): error TS2322: Type '{ primary: string; secondary: string; tertiary: string; white: string; disabled: string; }' is not assignable to type 'ColorValue | undefined'.
+src/screens/main/OnetimeModeScreen.tsx(491,5): error TS2322: Type '{ primary: string; secondary: string; tertiary: string; white: string; disabled: string; }' is not assignable to type 'ColorValue | undefined'.
+src/screens/main/OnetimeModeScreen.tsx(516,5): error TS2322: Type '{ primary: string; secondary: string; tertiary: string; white: string; disabled: string; }' is not assignable to type 'ColorValue | undefined'.
+src/screens/main/OnetimeModeScreen.tsx(545,5): error TS2322: Type '{ primary: string; secondary: string; tertiary: string; white: string; disabled: string; }' is not assignable to type 'ColorValue | undefined'.
+src/screens/main/OnetimeModeScreen.tsx(572,5): error TS2322: Type '{ primary: string; secondary: string; tertiary: string; white: string; disabled: string; }' is not assignable to type 'ColorValue | undefined'.
+src/screens/main/OnetimeModeScreen.tsx(627,5): error TS2322: Type '{ primary: string; secondary: string; tertiary: string; white: string; disabled: string; }' is not assignable to type 'ColorValue | undefined'.
+src/screens/main/OnetimeModeScreen.tsx(652,5): error TS2322: Type '{ primary: string; secondary: string; tertiary: string; white: string; disabled: string; }' is not assignable to type 'ColorValue | undefined'.
+src/screens/main/PickupVerificationScreen.tsx(76,7): error TS2322: Type 'string' is not assignable to type 'LocationAccuracy | undefined'.
+src/screens/main/PickupVerificationScreen.tsx(123,31): error TS2345: Argument of type '() => Promise<void>' is not assignable to parameter of type 'string'.
+src/screens/main/PickupVerificationScreen.tsx(217,29): error TS2345: Argument of type '() => Promise<void>' is not assignable to parameter of type 'string'.
+src/screens/main/PointWithdrawScreen.tsx(115,19): error TS2769: No overload matches this call.
+  Overload 1 of 2, '(props: TextProps): Text', gave the following error.
+    Type '{ marginBottom: number; color: { primary: string; secondary: string; tertiary: string; white: string; disabled: string; }; fontSize: number; fontWeight: "400"; }' is not assignable to type 'StyleProp<TextStyle>'.
+      Type '{ marginBottom: number; color: { primary: string; secondary: string; tertiary: string; white: string; disabled: string; }; fontSize: number; fontWeight: "400"; }' is not assignable to type 'TextStyle'.
+        Types of property 'color' are incompatible.
+          Type '{ primary: string; secondary: string; tertiary: string; white: string; disabled: string; }' is not assignable to type 'ColorValue | undefined'.
+  Overload 2 of 2, '(props: TextProps, context: any): Text', gave the following error.
+    Type '{ marginBottom: number; color: { primary: string; secondary: string; tertiary: string; white: string; disabled: string; }; fontSize: number; fontWeight: "400"; }' is not assignable to type 'StyleProp<TextStyle>'.
+      Type '{ marginBottom: number; color: { primary: string; secondary: string; tertiary: string; white: string; disabled: string; }; fontSize: number; fontWeight: "400"; }' is not assignable to type 'TextStyle'.
+        Types of property 'color' are incompatible.
+          Type '{ primary: string; secondary: string; tertiary: string; white: string; disabled: string; }' is not assignable to type 'ColorValue | undefined'.
+src/screens/main/PointWithdrawScreen.tsx(133,19): error TS2769: No overload matches this call.
+  Overload 1 of 2, '(props: TextProps): Text', gave the following error.
+    Type '{ marginBottom: number; color: { primary: string; secondary: string; tertiary: string; white: string; disabled: string; }; fontSize: number; fontWeight: "400"; }' is not assignable to type 'StyleProp<TextStyle>'.
+      Type '{ marginBottom: number; color: { primary: string; secondary: string; tertiary: string; white: string; disabled: string; }; fontSize: number; fontWeight: "400"; }' is not assignable to type 'TextStyle'.
+        Types of property 'color' are incompatible.
+          Type '{ primary: string; secondary: string; tertiary: string; white: string; disabled: string; }' is not assignable to type 'ColorValue | undefined'.
+  Overload 2 of 2, '(props: TextProps, context: any): Text', gave the following error.
+    Type '{ marginBottom: number; color: { primary: string; secondary: string; tertiary: string; white: string; disabled: string; }; fontSize: number; fontWeight: "400"; }' is not assignable to type 'StyleProp<TextStyle>'.
+      Type '{ marginBottom: number; color: { primary: string; secondary: string; tertiary: string; white: string; disabled: string; }; fontSize: number; fontWeight: "400"; }' is not assignable to type 'TextStyle'.
+        Types of property 'color' are incompatible.
+          Type '{ primary: string; secondary: string; tertiary: string; white: string; disabled: string; }' is not assignable to type 'ColorValue | undefined'.
+src/screens/main/PointWithdrawScreen.tsx(150,19): error TS2769: No overload matches this call.
+  Overload 1 of 2, '(props: TextProps): Text', gave the following error.
+    Type '{ marginBottom: number; color: { primary: string; secondary: string; tertiary: string; white: string; disabled: string; }; fontSize: number; fontWeight: "400"; }' is not assignable to type 'StyleProp<TextStyle>'.
+      Type '{ marginBottom: number; color: { primary: string; secondary: string; tertiary: string; white: string; disabled: string; }; fontSize: number; fontWeight: "400"; }' is not assignable to type 'TextStyle'.
+        Types of property 'color' are incompatible.
+          Type '{ primary: string; secondary: string; tertiary: string; white: string; disabled: string; }' is not assignable to type 'ColorValue | undefined'.
+  Overload 2 of 2, '(props: TextProps, context: any): Text', gave the following error.
+    Type '{ marginBottom: number; color: { primary: string; secondary: string; tertiary: string; white: string; disabled: string; }; fontSize: number; fontWeight: "400"; }' is not assignable to type 'StyleProp<TextStyle>'.
+      Type '{ marginBottom: number; color: { primary: string; secondary: string; tertiary: string; white: string; disabled: string; }; fontSize: number; fontWeight: "400"; }' is not assignable to type 'TextStyle'.
+        Types of property 'color' are incompatible.
+          Type '{ primary: string; secondary: string; tertiary: string; white: string; disabled: string; }' is not assignable to type 'ColorValue | undefined'.
+src/screens/main/PointWithdrawScreen.tsx(169,19): error TS2769: No overload matches this call.
+  Overload 1 of 2, '(props: TextProps): Text', gave the following error.
+    Type '{ marginBottom: number; color: { primary: string; secondary: string; tertiary: string; white: string; disabled: string; }; fontSize: number; fontWeight: "400"; }' is not assignable to type 'StyleProp<TextStyle>'.
+      Type '{ marginBottom: number; color: { primary: string; secondary: string; tertiary: string; white: string; disabled: string; }; fontSize: number; fontWeight: "400"; }' is not assignable to type 'TextStyle'.
+        Types of property 'color' are incompatible.
+          Type '{ primary: string; secondary: string; tertiary: string; white: string; disabled: string; }' is not assignable to type 'ColorValue | undefined'.
+  Overload 2 of 2, '(props: TextProps, context: any): Text', gave the following error.
+    Type '{ marginBottom: number; color: { primary: string; secondary: string; tertiary: string; white: string; disabled: string; }; fontSize: number; fontWeight: "400"; }' is not assignable to type 'StyleProp<TextStyle>'.
+      Type '{ marginBottom: number; color: { primary: string; secondary: string; tertiary: string; white: string; disabled: string; }; fontSize: number; fontWeight: "400"; }' is not assignable to type 'TextStyle'.
+        Types of property 'color' are incompatible.
+          Type '{ primary: string; secondary: string; tertiary: string; white: string; disabled: string; }' is not assignable to type 'ColorValue | undefined'.
+src/screens/main/PointWithdrawScreen.tsx(212,34): error TS2345: Argument of type '{ container: { flex: number; backgroundColor: string; }; scrollContent: { padding: number; }; header: { marginBottom: number; }; headerTitle: { marginBottom: number; fontSize: number; fontWeight: "700"; }; ... 16 more ...; cancelButtonText: { ...; }; }' is not assignable to parameter of type '{ container: { flex: number; backgroundColor: string; }; scrollContent: { padding: number; }; header: { marginBottom: number; }; headerTitle: { marginBottom: number; fontSize: number; fontWeight: "700"; }; ... 16 more ...; cancelButtonText: { ...; }; } & NamedStyles<...>'.
+  Property 'label' is incompatible with index signature.
+    Type '{ marginBottom: number; color: { primary: string; secondary: string; tertiary: string; white: string; disabled: string; }; fontSize: number; fontWeight: "400"; }' is not assignable to type 'ViewStyle | TextStyle | ImageStyle'.
+      Types of property 'color' are incompatible.
+        Type '{ primary: string; secondary: string; tertiary: string; white: string; disabled: string; }' is not assignable to type 'ColorValue | undefined'.
+src/screens/main/ProfileScreen.tsx(242,7): error TS2304: Cannot find name 'setSelectedBank'.
+src/screens/main/QRCodeScannerScreen.tsx(25,62): error TS2307: Cannot find module 'react-native-vision-camera' or its corresponding type declarations.
+src/screens/main/QRCodeScannerScreen.tsx(26,10): error TS2614: Module '"../../services/qrcode-service"' has no exported member 'verifyQRCode'. Did you mean to use 'import verifyQRCode from "../../services/qrcode-service"' instead?
+src/screens/main/QRCodeScannerScreen.tsx(27,10): error TS2305: Module '"../../services/locker-service"' has no exported member 'unlockLocker'.
+src/screens/main/QRCodeScannerScreen.tsx(314,5): error TS2322: Type '{ primary: string; secondary: string; tertiary: string; white: string; disabled: string; }' is not assignable to type 'ColorValue | undefined'.
+src/screens/main/QRCodeScannerScreen.tsx(427,5): error TS2322: Type '{ primary: string; secondary: string; tertiary: string; white: string; disabled: string; }' is not assignable to type 'ColorValue | undefined'.
+src/screens/main/QRCodeScannerScreen.tsx(451,5): error TS2322: Type '{ primary: string; secondary: string; tertiary: string; white: string; disabled: string; }' is not assignable to type 'ColorValue | undefined'.
+src/screens/main/QRCodeScannerScreen.tsx(464,5): error TS2322: Type '{ primary: string; secondary: string; tertiary: string; white: string; disabled: string; }' is not assignable to type 'ColorValue | undefined'.
+src/screens/main/RatingScreen.tsx(100,29): error TS2345: Argument of type '() => Promise<void>' is not assignable to parameter of type 'string'.
+src/screens/main/RatingScreen.tsx(123,23): error TS2345: Argument of type 'string[]' is not assignable to parameter of type 'SetStateAction<RatingTag[]>'.
+  Type 'string[]' is not assignable to type 'RatingTag[]'.
+    Type 'string' is not assignable to type 'RatingTag'.
+src/screens/main/RatingScreen.tsx(218,29): error TS2345: Argument of type '() => Promise<void>' is not assignable to parameter of type 'string'.
+src/screens/main/RealtimeTrackingScreen.tsx(365,19): error TS2339: Property 'subtitle2' does not exist on type '{ fontSize: { xs: number; sm: number; base: number; lg: number; xl: number; '2xl': number; '3xl': number; '4xl': number; '5xl': number; }; fontWeight: { regular: "400"; medium: "500"; semibold: "600"; bold: "700"; }; lineHeight: { ...; }; ... 11 more ...; caption: { ...; }; }'.
+src/screens/main/RealtimeTrackingScreen.tsx(370,19): error TS2339: Property 'h6' does not exist on type '{ fontSize: { xs: number; sm: number; base: number; lg: number; xl: number; '2xl': number; '3xl': number; '4xl': number; '5xl': number; }; fontWeight: { regular: "400"; medium: "500"; semibold: "600"; bold: "700"; }; lineHeight: { ...; }; ... 11 more ...; caption: { ...; }; }'.
+src/screens/main/RealtimeTrackingScreen.tsx(417,19): error TS2339: Property 'button' does not exist on type '{ fontSize: { xs: number; sm: number; base: number; lg: number; xl: number; '2xl': number; '3xl': number; '4xl': number; '5xl': number; }; fontWeight: { regular: "400"; medium: "500"; semibold: "600"; bold: "700"; }; lineHeight: { ...; }; ... 11 more ...; caption: { ...; }; }'.
+src/screens/main/RealtimeTrackingScreen.tsx(422,19): error TS2339: Property 'h6' does not exist on type '{ fontSize: { xs: number; sm: number; base: number; lg: number; xl: number; '2xl': number; '3xl': number; '4xl': number; '5xl': number; }; fontWeight: { regular: "400"; medium: "500"; semibold: "600"; bold: "700"; }; lineHeight: { ...; }; ... 11 more ...; caption: { ...; }; }'.
+src/screens/main/RequestConfirmationScreen.tsx(39,25): error TS2345: Argument of type '[never, { requestId: string; pickupStationName: string | undefined; deliveryStationName: string | undefined; }]' is not assignable to parameter of type 'never'.
+src/screens/main/RequestConfirmationScreen.tsx(47,25): error TS2345: Argument of type '[never, { requestId: string; }]' is not assignable to parameter of type 'never'.
+src/screens/main/RequestsScreen.tsx(223,31): error TS2345: Argument of type '[never, { requestId: string; }]' is not assignable to parameter of type 'never'.
+src/screens/main/tabs/RouteMatchingTab.tsx(46,5): error TS2353: Object literal may only specify known properties, and 'maxDistanceFromStation' does not exist in type 'MatchingFilterOptions | (() => MatchingFilterOptions)'.
+src/screens/main/tabs/RouteMatchingTab.tsx(62,34): error TS2554: Expected 0 arguments, but got 1.
+src/screens/main/tabs/RouteMatchingTab.tsx(122,15): error TS2339: Property 'distance' does not exist on type 'RouteFilteredRequest'.
+src/screens/main/tabs/RouteMatchingTab.tsx(123,52): error TS2339: Property 'distance' does not exist on type 'RouteFilteredRequest'.
+src/screens/main/tabs/RouteMatchingTab.tsx(188,19): error TS2304: Cannot find name 'Radius'.
+src/screens/main/UnlockLockerScreen.tsx(23,10): error TS2614: Module '"../../services/qrcode-service"' has no exported member 'verifyQRCode'. Did you mean to use 'import verifyQRCode from "../../services/qrcode-service"' instead?
+src/screens/main/UnlockLockerScreen.tsx(23,24): error TS2614: Module '"../../services/qrcode-service"' has no exported member 'getQRCodeRemainingTime'. Did you mean to use 'import getQRCodeRemainingTime from "../../services/qrcode-service"' instead?
+src/screens/main/UnlockLockerScreen.tsx(24,10): error TS2305: Module '"../../services/photo-service"' has no exported member 'takePhoto'.
+src/screens/main/UnlockLockerScreen.tsx(24,21): error TS2305: Module '"../../services/photo-service"' has no exported member 'uploadPhotoWithThumbnail'.
+src/screens/main/UnlockLockerScreen.tsx(58,61): error TS2551: Property 'reservationType' does not exist on type 'LockerReservation'. Did you mean 'reservationId'?
+src/screens/main/UnlockLockerScreen.tsx(167,63): error TS2345: Argument of type 'undefined' is not assignable to parameter of type 'string'.
+src/screens/main/UnlockLockerScreen.tsx(178,35): error TS2345: Argument of type '[never, { deliveryId: string; gillerId: string; gllerId: string; }]' is not assignable to parameter of type 'never'.
+src/screens/onboarding/RoleSelectionScreen.tsx(26,24): error TS2345: Argument of type '"gller" | "giller"' is not assignable to parameter of type 'UserRole'.
+  Type '"gller"' is not assignable to type 'UserRole'. Did you mean 'UserRole.GILLER'?
+src/screens/requester/GillerPickupFromLockerScreen.tsx(22,40): error TS2307: Cannot find module '@react-navigation/native-stack' or its corresponding type declarations.
+src/screens/requester/GillerPickupFromLockerScreen.tsx(27,10): error TS2305: Module '"../../services/locker-service"' has no exported member 'getReservationByQRCode'.
+src/screens/requester/GillerPickupFromLockerScreen.tsx(27,34): error TS2305: Module '"../../services/locker-service"' has no exported member 'openLocker'.
+src/screens/requester/GillerPickupFromLockerScreen.tsx(27,46): error TS2305: Module '"../../services/locker-service"' has no exported member 'getLocker'.
+src/screens/requester/GillerPickupFromLockerScreen.tsx(236,35): error TS2339: Property 'verificationCode' does not exist on type 'Request'.
+src/screens/requester/GillerPickupFromLockerScreen.tsx(239,29): error TS2339: Property 'lat' does not exist on type 'Locker'.
+src/screens/requester/GillerPickupFromLockerScreen.tsx(240,30): error TS2339: Property 'lng' does not exist on type 'Locker'.
+src/screens/requester/GillerPickupFromLockerScreen.tsx(304,11): error TS2769: No overload matches this call.
+  Overload 1 of 2, '(props: CameraViewProps): CameraView', gave the following error.
+    Type '((data: string) => Promise<void>) | undefined' is not assignable to type '((scanningResult: BarcodeScanningResult) => void) | undefined'.
+      Type '(data: string) => Promise<void>' is not assignable to type '(scanningResult: BarcodeScanningResult) => void'.
+        Types of parameters 'data' and 'scanningResult' are incompatible.
+          Type 'BarcodeScanningResult' is not assignable to type 'string'.
+  Overload 2 of 2, '(props: CameraViewProps, context: any): CameraView', gave the following error.
+    Type '((data: string) => Promise<void>) | undefined' is not assignable to type '((scanningResult: BarcodeScanningResult) => void) | undefined'.
+      Type '(data: string) => Promise<void>' is not assignable to type '(scanningResult: BarcodeScanningResult) => void'.
+        Types of parameters 'data' and 'scanningResult' are incompatible.
+          Type 'BarcodeScanningResult' is not assignable to type 'string'.
+src/screens/requester/GillerPickupFromLockerScreen.tsx(332,50): error TS2339: Property 'name' does not exist on type 'Locker'.
+src/screens/requester/GillerPickupFromLockerScreen.tsx(337,50): error TS2339: Property 'address' does not exist on type 'Locker'.
+src/screens/requester/GillerPickupFromLockerScreen.tsx(349,50): error TS2339: Property 'pricePer4Hours' does not exist on type 'Locker'.
+src/screens/requester/GillerPickupFromLockerScreen.tsx(355,24): error TS2339: Property 'maxHours' does not exist on type 'Locker'.
+src/screens/requester/GillerPickupFromLockerScreen.tsx(358,28): error TS2339: Property 'openingTime' does not exist on type 'Locker'.
+src/screens/requester/GillerPickupFromLockerScreen.tsx(358,51): error TS2339: Property 'closingTime' does not exist on type 'Locker'.
+src/services/__tests__/matching-service.test.ts(84,19): error TS7006: Parameter 'callback' implicitly has an 'any' type.
+src/services/__tests__/matching-service.test.ts(123,19): error TS7006: Parameter 'callback' implicitly has an 'any' type.
+src/services/__tests__/matching-service.test.ts(346,19): error TS7006: Parameter 'callback' implicitly has an 'any' type.
+src/services/auth-error-handler.ts(45,5): error TS1117: An object literal cannot have multiple properties with the same name.
+src/services/b2b-delivery-service.ts(54,7): error TS2353: Object literal may only specify known properties, and 'status' does not exist in type 'Omit<B2BDelivery, "createdAt" | "updatedAt" | "status" | "id" | "pricing">'.
+src/services/b2b-delivery-service.ts(138,42): error TS2551: Property 'gillerId' does not exist on type '{ giller: B2BGillerTier & { gillerId: string; }; isCompatible: boolean; }'. Did you mean 'giller'?
+src/services/b2b-delivery-service.ts(141,22): error TS2339: Property 'tier' does not exist on type '{ giller: B2BGillerTier & { gillerId: string; }; isCompatible: boolean; }'.
+src/services/b2b-firestore-service.ts(266,13): error TS7034: Variable 'deliveries' implicitly has type 'any[]' in some locations where its type cannot be determined.
+src/services/b2b-firestore-service.ts(277,15): error TS7005: Variable 'deliveries' implicitly has an 'any[]' type.
+src/services/b2b-firestore-service.ts(281,14): error TS7005: Variable 'deliveries' implicitly has an 'any[]' type.
+src/services/b2b-firestore-service.ts(296,11): error TS2774: This condition will always return true since this function is always defined. Did you mean to call it instead?
+src/services/business-contract-service.ts(36,7): error TS2353: Object literal may only specify known properties, and 'status' does not exist in type 'Omit<BusinessContract, "createdAt" | "updatedAt" | "status" | "id">'.
+src/services/config-service.test.ts(10,8): error TS2307: Cannot find module '../config-service' or its corresponding type declarations.
+src/services/config-service.ts(121,37): error TS2345: Argument of type 'DocumentSnapshot<DocumentData, DocumentData>' is not assignable to parameter of type 'QueryDocumentSnapshot<DocumentData, DocumentData>'.
+  The types returned by 'data(...)' are incompatible between these types.
+    Type 'DocumentData | undefined' is not assignable to type 'DocumentData'.
+      Type 'undefined' is not assignable to type 'DocumentData'.
+src/services/config-service.ts(365,42): error TS2345: Argument of type 'DocumentSnapshot<DocumentData, DocumentData>' is not assignable to parameter of type 'QueryDocumentSnapshot<DocumentData, DocumentData>'.
+  The types returned by 'data(...)' are incompatible between these types.
+    Type 'DocumentData | undefined' is not assignable to type 'DocumentData'.
+      Type 'undefined' is not assignable to type 'DocumentData'.
+src/services/config-service.ts(542,36): error TS2345: Argument of type 'DocumentSnapshot<DocumentData, DocumentData>' is not assignable to parameter of type 'QueryDocumentSnapshot<DocumentData, DocumentData>'.
+  The types returned by 'data(...)' are incompatible between these types.
+    Type 'DocumentData | undefined' is not assignable to type 'DocumentData'.
+      Type 'undefined' is not assignable to type 'DocumentData'.
+src/services/giller-service.ts(78,19): error TS18048: 'data' is possibly 'undefined'.
+src/services/giller-service.ts(79,15): error TS18048: 'data' is possibly 'undefined'.
+src/services/giller-service.ts(80,15): error TS18048: 'data' is possibly 'undefined'.
+src/services/giller-service.ts(81,17): error TS18048: 'data' is possibly 'undefined'.
+src/services/giller-service.ts(82,14): error TS18048: 'data' is possibly 'undefined'.
+src/services/giller-service.ts(90,18): error TS18048: 'data' is possibly 'undefined'.
+src/services/giller-service.ts(101,9): error TS2774: This condition will always return true since this function is always defined. Did you mean to call it instead?
+src/services/google-auth.ts(57,11): error TS2488: Type 'AuthSessionResult' must have a '[Symbol.iterator]()' method that returns an iterator.
+src/services/kakao-auth.ts(125,9): error TS2774: This condition will always return true since this function is always defined. Did you mean to call it instead?
+src/services/kakao-auth.ts(203,9): error TS2774: This condition will always return true since this function is always defined. Did you mean to call it instead?
+src/services/location-tracking-service.ts(75,7): error TS2322: Type 'number | null' is not assignable to type 'number | undefined'.
+  Type 'null' is not assignable to type 'number | undefined'.
+src/services/location-tracking-service.ts(146,9): error TS2322: Type 'number | null' is not assignable to type 'number | undefined'.
+  Type 'null' is not assignable to type 'number | undefined'.
+src/services/locker-service.ts(143,12): error TS2352: Conversion of type '{ lockerId: string; userId: string; requestId: string; size: string; startTime: Date; endTime: Date; accessCode: string; qrCode: string; status: string; createdAt: FieldValue; updatedAt: FieldValue; reservationId: string; }' to type 'LockerReservation' may be a mistake because neither type sufficiently overlaps with the other. If this was intentional, convert the expression to 'unknown' first.
+  Types of property 'createdAt' are incompatible.
+    Type 'FieldValue' is missing the following properties from type 'Date': toDateString, toTimeString, toLocaleDateString, toLocaleTimeString, and 37 more.
+src/services/matching-notification.ts(90,12): error TS18048: 'userData' is possibly 'undefined'.
+src/services/matching-service.ts(62,55): error TS18048: 'user' is possibly 'undefined'.
+src/services/matching-service.ts(107,19): error TS18048: 'data' is possibly 'undefined'.
+src/services/matching-service.ts(110,31): error TS18048: 'data' is possibly 'undefined'.
+src/services/matching-service.ts(111,53): error TS18048: 'data' is possibly 'undefined'.
+src/services/matching-service.ts(112,57): error TS18048: 'data' is possibly 'undefined'.
+src/services/matching-service.ts(173,9): error TS2353: Object literal may only specify known properties, and 'badgeBonus' does not exist in type 'GillerRoute'.
+src/services/matching-service.ts(174,35): error TS2339: Property 'priorityBoost' does not exist on type '{ feeBonus: number; currentTier: "none"; }'.
+src/services/matching-service.ts(212,13): error TS18048: 'data' is possibly 'undefined'.
+src/services/matching-service.ts(213,15): error TS18048: 'data' is possibly 'undefined'.
+src/services/matching-service.ts(214,24): error TS18048: 'data' is possibly 'undefined'.
+src/services/matching-service.ts(215,28): error TS18048: 'data' is possibly 'undefined'.
+src/services/matching-service.ts(216,21): error TS18048: 'data' is possibly 'undefined'.
+src/services/matching-service.ts(216,42): error TS18048: 'data' is possibly 'undefined'.
+src/services/matching-service.ts(458,9): error TS18048: 'request' is possibly 'undefined'.
+src/services/matching-service.ts(458,41): error TS18048: 'request' is possibly 'undefined'.
+src/services/matching-service.ts(470,56): error TS18048: 'request' is possibly 'undefined'.
+src/services/matching-service.ts(478,21): error TS18048: 'request' is possibly 'undefined'.
+src/services/matching-service.ts(897,19): error TS18048: 'data' is possibly 'undefined'.
+src/services/matching-service.ts(897,33): error TS18048: 'data' is possibly 'undefined'.
+src/services/matching-service.ts(907,19): error TS18048: 'data' is possibly 'undefined'.
+src/services/matching-service.ts(908,31): error TS18048: 'data' is possibly 'undefined'.
+src/services/matching-service.ts(913,26): error TS18048: 'data' is possibly 'undefined'.
+src/services/matching-service.ts(914,19): error TS18048: 'data' is possibly 'undefined'.
+src/services/matching/TransferMatchingService.ts(136,10): error TS18048: 'station' is possibly 'undefined'.
+src/services/matching/TransferMatchingService.ts(136,35): error TS18048: 'station' is possibly 'undefined'.
+src/services/matching/TransferMatchingService.ts(143,20): error TS18048: 'station' is possibly 'undefined'.
+src/services/matching/TransferMatchingService.ts(143,43): error TS18048: 'station' is possibly 'undefined'.
+src/services/matching/TransferMatchingService.ts(144,13): error TS18048: 'station' is possibly 'undefined'.
+src/services/matching/TransferMatchingService.ts(145,17): error TS18048: 'station' is possibly 'undefined'.
+src/services/matching/TransferMatchingService.ts(146,12): error TS18048: 'station' is possibly 'undefined'.
+src/services/matching/TransferMatchingService.ts(147,12): error TS18048: 'station' is possibly 'undefined'.
+src/services/matching/TransferMatchingService.ts(148,22): error TS18048: 'station' is possibly 'undefined'.
+src/services/matching/TransferMatchingService.ts(149,21): error TS18048: 'station' is possibly 'undefined'.
+src/services/matching/TransferMatchingService.ts(151,22): error TS18048: 'station' is possibly 'undefined'.
+src/services/matching/TransferMatchingService.ts(152,23): error TS18048: 'station' is possibly 'undefined'.
+src/services/matching/TransferMatchingService.ts(153,22): error TS18048: 'station' is possibly 'undefined'.
+src/services/media-service.ts(20,7): error TS2300: Duplicate identifier 'atob'.
+src/services/media-service.ts(198,9): error TS2353: Object literal may only specify known properties, and 'onProgress' does not exist in type 'UploadMetadata'.
+src/services/media-service.ts(198,22): error TS7006: Parameter 'snapshot' implicitly has an 'any' type.
+src/services/notification-service.ts(104,9): error TS2774: This condition will always return true since this function is always defined. Did you mean to call it instead?
+src/services/notification-service.ts(163,11): error TS2774: This condition will always return true since this function is always defined. Did you mean to call it instead?
+src/services/notification-service.ts(166,19): error TS18048: 'data' is possibly 'undefined'.
+src/services/notification-service.ts(167,20): error TS18048: 'data' is possibly 'undefined'.
+src/services/notification-service.ts(168,21): error TS18048: 'data' is possibly 'undefined'.
+src/services/notification-service.ts(169,21): error TS18048: 'data' is possibly 'undefined'.
+src/services/notification-service.ts(170,23): error TS18048: 'data' is possibly 'undefined'.
+src/services/notification-service.ts(171,22): error TS18048: 'data' is possibly 'undefined'.
+src/services/notification-service.ts(172,22): error TS18048: 'data' is possibly 'undefined'.
+src/services/payment-service.ts(735,15): error TS18048: 'data' is possibly 'undefined'.
+src/services/payment-service.ts(736,13): error TS18048: 'data' is possibly 'undefined'.
+src/services/payment-service.ts(737,15): error TS18048: 'data' is possibly 'undefined'.
+src/services/payment-service.ts(738,12): error TS18048: 'data' is possibly 'undefined'.
+src/services/payment-service.ts(739,12): error TS18048: 'data' is possibly 'undefined'.
+src/services/payment-service.ts(740,18): error TS18048: 'data' is possibly 'undefined'.
+src/services/payment-service.ts(741,15): error TS18048: 'data' is possibly 'undefined'.
+src/services/payment-service.ts(742,18): error TS18048: 'data' is possibly 'undefined'.
+src/services/payment-service.ts(743,19): error TS18048: 'data' is possibly 'undefined'.
+src/services/payment-service.ts(744,20): error TS18048: 'data' is possibly 'undefined'.
+src/services/payment-service.ts(745,17): error TS18048: 'data' is possibly 'undefined'.
+src/services/payment-service.ts(746,18): error TS18048: 'data' is possibly 'undefined'.
+src/services/payment-service.ts(747,20): error TS18048: 'data' is possibly 'undefined'.
+src/services/penalty-service.ts(71,13): error TS1361: 'PenaltyType' cannot be used as a value because it was imported using 'import type'.
+src/services/penalty-service.ts(93,9): error TS1361: 'PenaltyType' cannot be used as a value because it was imported using 'import type'.
+src/services/penalty-service.ts(99,12): error TS2352: Conversion of type '{ userId: string; type: PenaltyType; severity: PenaltySeverity; reason: string; lateMinutes: number; fine: number; suspensionDays: number | undefined; isPermanent: boolean; createdAt: FieldValue; createdBy: string; penaltyId: string; }' to type 'Penalty' may be a mistake because neither type sufficiently overlaps with the other. If this was intentional, convert the expression to 'unknown' first.
+  Types of property 'createdAt' are incompatible.
+    Type 'FieldValue' is missing the following properties from type 'Date': toDateString, toTimeString, toLocaleDateString, toLocaleTimeString, and 37 more.
+src/services/penalty-service.ts(113,7): error TS1361: 'PenaltyType' cannot be used as a value because it was imported using 'import type'.
+src/services/penalty-service.ts(129,13): error TS1361: 'PenaltyType' cannot be used as a value because it was imported using 'import type'.
+src/services/penalty-service.ts(130,30): error TS1361: 'PenaltySeverity' cannot be used as a value because it was imported using 'import type'.
+src/services/penalty-service.ts(130,55): error TS1361: 'PenaltySeverity' cannot be used as a value because it was imported using 'import type'.
+src/services/penalty-service.ts(149,12): error TS2352: Conversion of type '{ userId: string; type: PenaltyType; severity: PenaltySeverity; reason: string; noShowCount: number; ratingPenalty: number; fine: number; suspensionDays: number; ... 4 more ...; penaltyId: string; }' to type 'Penalty' may be a mistake because neither type sufficiently overlaps with the other. If this was intentional, convert the expression to 'unknown' first.
+  Types of property 'createdAt' are incompatible.
+    Type 'FieldValue' is missing the following properties from type 'Date': toDateString, toTimeString, toLocaleDateString, toLocaleTimeString, and 37 more.
+src/services/penalty-service.ts(164,7): error TS1361: 'PenaltyType' cannot be used as a value because it was imported using 'import type'.
+src/services/penalty-service.ts(180,23): error TS1361: 'PenaltySeverity' cannot be used as a value because it was imported using 'import type'.
+src/services/penalty-service.ts(180,50): error TS1361: 'PenaltySeverity' cannot be used as a value because it was imported using 'import type'.
+src/services/penalty-service.ts(181,23): error TS1361: 'PenaltySeverity' cannot be used as a value because it was imported using 'import type'.
+src/services/penalty-service.ts(181,46): error TS1361: 'PenaltySeverity' cannot be used as a value because it was imported using 'import type'.
+src/services/penalty-service.ts(185,13): error TS1361: 'PenaltyType' cannot be used as a value because it was imported using 'import type'.
+src/services/penalty-service.ts(199,12): error TS2352: Conversion of type '{ userId: string; type: PenaltyType; severity: PenaltySeverity; reason: string; cancelledAtPickup: boolean; fine: number; suspensionDays: number | undefined; ... 4 more ...; penaltyId: string; }' to type 'Penalty' may be a mistake because neither type sufficiently overlaps with the other. If this was intentional, convert the expression to 'unknown' first.
+  Types of property 'createdAt' are incompatible.
+    Type 'FieldValue' is missing the following properties from type 'Date': toDateString, toTimeString, toLocaleDateString, toLocaleTimeString, and 37 more.
+src/services/penalty-service.ts(224,12): error TS2352: Conversion of type '{ userId: string; type: PenaltyType; severity: PenaltySeverity; message: string; expiresAt: Date; createdAt: FieldValue; warningId: string; }' to type 'Warning' may be a mistake because neither type sufficiently overlaps with the other. If this was intentional, convert the expression to 'unknown' first.
+  Types of property 'createdAt' are incompatible.
+    Type 'FieldValue' is missing the following properties from type 'Date': toDateString, toTimeString, toLocaleDateString, toLocaleTimeString, and 37 more.
+src/services/performance/firestore-optimization.ts(151,20): error TS2345: Argument of type 'QueryOrderByConstraint' is not assignable to parameter of type 'QueryFieldFilterConstraint'.
+  Types of property 'type' are incompatible.
+    Type '"orderBy"' is not assignable to type '"where"'.
+src/services/performance/firestore-optimization.ts(199,25): error TS2304: Cannot find name 'userId'.
+src/services/performance/firestore-optimization.ts(205,25): error TS2304: Cannot find name 'userId'.
+src/services/performance/firestore-optimization.ts(233,27): error TS2304: Cannot find name 'gillerId'.
+src/services/performance/firestore-optimization.ts(242,27): error TS2304: Cannot find name 'gillerId'.
+src/services/performance/monitoring.ts(6,29): error TS2307: Cannot find module 'react-native-performance' or its corresponding type declarations.
+src/services/performance/monitoring.ts(204,16): error TS7017: Element implicitly has an 'any' type because type 'typeof globalThis' has no index signature.
+src/services/performance/monitoring.ts(205,29): error TS7017: Element implicitly has an 'any' type because type 'typeof globalThis' has no index signature.
+src/services/performance/optimization.ts(50,3): error TS2322: Type '(...args: any[]) => any' is not assignable to type 'T'.
+  '(...args: any[]) => any' is assignable to the constraint of type 'T', but 'T' could be instantiated with a different subtype of constraint '(...args: any[]) => any'.
+src/services/performance/optimization.ts(59,14): error TS2503: Cannot find namespace 'React'.
+src/services/performance/optimization.ts(94,20): error TS2345: Argument of type 'string | undefined' is not assignable to parameter of type 'string'.
+  Type 'undefined' is not assignable to type 'string'.
+src/services/performance/optimization.ts(110,22): error TS2554: Expected 1 arguments, but got 0.
+src/services/performance/optimization.ts(131,22): error TS2554: Expected 1 arguments, but got 0.
+src/services/performance/optimization.ts(156,36): error TS2503: Cannot find namespace 'React'.
+src/services/performance/optimization.ts(158,4): error TS2503: Cannot find namespace 'React'.
+src/services/photo-service.ts(70,12): error TS2352: Conversion of type '{ type: PhotoType; userId: string; requestId: string; url: string; thumbnailUrl: string; takenAt: Date; uploadedAt: FieldValue; status: string; metadata: any; photoId: string; }' to type 'Photo' may be a mistake because neither type sufficiently overlaps with the other. If this was intentional, convert the expression to 'unknown' first.
+  Types of property 'uploadedAt' are incompatible.
+    Type 'FieldValue' is missing the following properties from type 'Date': toDateString, toTimeString, toLocaleDateString, toLocaleTimeString, and 37 more.
+src/services/photo-service.ts(116,12): error TS2352: Conversion of type '{ type: PhotoType; userId: string; requestId: string; url: string; thumbnailUrl: string; takenAt: Date; uploadedAt: FieldValue; status: string; metadata: any; photoId: string; }' to type 'Photo' may be a mistake because neither type sufficiently overlaps with the other. If this was intentional, convert the expression to 'unknown' first.
+  Types of property 'uploadedAt' are incompatible.
+    Type 'FieldValue' is missing the following properties from type 'Date': toDateString, toTimeString, toLocaleDateString, toLocaleTimeString, and 37 more.
+src/services/photo-service.ts(170,7): error TS1361: 'PhotoType' cannot be used as a value because it was imported using 'import type'.
+src/services/photo-service.ts(192,7): error TS1361: 'PhotoType' cannot be used as a value because it was imported using 'import type'.
+src/services/photo-service.ts(227,12): error TS2352: Conversion of type '{ reporterId: string; reporterType: "giller" | "requester"; requestId: string; type: "quality" | "damage" | "loss"; description: string; photoUrls: string[]; status: string; createdAt: FieldValue; updatedAt: FieldValue; disputeId: string; }' to type 'Dispute' may be a mistake because neither type sufficiently overlaps with the other. If this was intentional, convert the expression to 'unknown' first.
+  Property 'evidenceUrls' is missing in type '{ reporterId: string; reporterType: "giller" | "requester"; requestId: string; type: "quality" | "damage" | "loss"; description: string; photoUrls: string[]; status: string; createdAt: FieldValue; updatedAt: FieldValue; disputeId: string; }' but required in type 'Dispute'.
+src/services/pickup-verification-service.ts(54,11): error TS2774: This condition will always return true since this function is always defined. Did you mean to call it instead?
+src/services/rating-service.ts(219,9): error TS2774: This condition will always return true since this function is always defined. Did you mean to call it instead?
+src/services/rating-service.ts(268,15): error TS2774: This condition will always return true since this function is always defined. Did you mean to call it instead?
+src/services/rating-service.ts(270,28): error TS18048: 'userData' is possibly 'undefined'.
+src/services/rating-service.ts(271,36): error TS18048: 'userData' is possibly 'undefined'.
+src/services/realtime-delivery-tracking.ts(50,18): error TS18048: 'data' is possibly 'undefined'.
+src/services/realtime-delivery-tracking.ts(51,17): error TS18048: 'data' is possibly 'undefined'.
+src/services/realtime-delivery-tracking.ts(53,19): error TS18048: 'data' is possibly 'undefined'.
+src/services/realtime-delivery-tracking.ts(54,20): error TS18048: 'data' is possibly 'undefined'.
+src/services/realtime-delivery-tracking.ts(55,18): error TS18048: 'data' is possibly 'undefined'.
+src/services/realtime-delivery-tracking.ts(56,20): error TS18048: 'data' is possibly 'undefined'.
+src/services/realtime-delivery-tracking.ts(57,17): error TS18048: 'data' is possibly 'undefined'.
+src/services/realtime-delivery-tracking.ts(59,25): error TS18048: 'data' is possibly 'undefined'.
+src/services/realtime-delivery-tracking.ts(61,15): error TS18048: 'data' is possibly 'undefined'.
+src/services/route-service.test.ts(12,8): error TS2307: Cannot find module '../route-service' or its corresponding type declarations.
+src/services/route-service.ts(258,20): error TS2339: Property 'latitude' does not exist on type 'StationInfo'.
+src/services/route-service.ts(259,20): error TS2339: Property 'longitude' does not exist on type 'StationInfo'.
+src/services/tax-invoice-service.ts(13,3): error TS2459: Module '"../types/tax-invoice"' declares 'SettlementPeriod' locally, but it is not exported.
+src/services/tax-invoice-service.ts(49,20): error TS7053: Element implicitly has an 'any' type because expression of type 'any' can't be used to index type '{ readonly basic: { readonly pricing: { readonly monthly: 50000; readonly perDelivery: 3000; }; readonly features: { readonly maxDeliveries: 20; readonly priority: "low"; readonly support: "email"; readonly insurance: false; readonly analytics: false; }; readonly idealFor: readonly [...]; }; readonly standard: { ......'.
+src/services/tax-invoice-service.ts(53,41): error TS1361: 'TAX_RATE' cannot be used as a value because it was imported using 'import type'.
+src/services/tax-invoice-service.ts(72,19): error TS1361: 'PLATFORM_INFO' cannot be used as a value because it was imported using 'import type'.
+src/services/tax-invoice-service.ts(73,9): error TS2353: Object literal may only specify known properties, and 'status' does not exist in type 'Omit<TaxInvoice, "status" | "invoiceId" | "issueDate" | "pdfUrl">'.
+src/services/tax-invoice-service.ts(270,39): error TS1361: 'TAX_RATE' cannot be used as a value because it was imported using 'import type'.
+src/services/transfer-service.ts(8,10): error TS2724: '"../services/config-service"' has no exported member named 'getStationByName'. Did you mean 'getStationsByLine'?
+src/services/user-service.ts(20,3): error TS2305: Module '"firebase/firestore"' has no exported member 'avg'.
+src/services/user-service.ts(73,5): error TS2739: Type '{ uid: string; email: any; name: any; role: any; agreedTerms: any; createdAt: any; updatedAt: any; isActive: any; hasCompletedOnboarding: any; rating: any; totalRatings: any; profilePhoto: any; fcmToken: any; ... 5 more ...; badgeBenefits: any; }' is missing the following properties from type 'User': pointBalance, totalEarnedPoints, totalSpentPoints
+src/services/user-service.ts(433,11): error TS2739: Type '{ uid: string; email: string; name: string; phoneNumber: string; role: UserRole; agreedTerms: { giller: true; gller: true; privacy: true; marketing: false; }; rating: number; totalRatings: number; ... 8 more ...; updatedAt: any; }' is missing the following properties from type 'User': pointBalance, totalEarnedPoints, totalSpentPoints
+src/types/b2b-settlement.ts(126,43): error TS2344: Type 'B2BGillerTier' does not satisfy the constraint 'string | number | symbol'.
+src/types/index.ts(9,1): error TS2308: Module './business-contract' has already exported a member named 'Location'. Consider explicitly re-exporting to resolve the ambiguity.
+src/types/index.ts(10,1): error TS2308: Module './b2b-delivery' has already exported a member named 'TaxInvoice'. Consider explicitly re-exporting to resolve the ambiguity.
+src/utils/bundle-optimization.ts(65,33): error TS2307: Cannot find module '../screens/ProfileScreen' or its corresponding type declarations.
+src/utils/bundle-optimization.ts(67,30): error TS2307: Cannot find module '../screens/ChatScreen' or its corresponding type declarations.
+src/utils/image-optimization.tsx(148,25): error TS2503: Cannot find namespace 'React'.
+src/utils/image-optimization.tsx(152,9): error TS7031: Binding element 'source' implicitly has an 'any' type.
+src/utils/image-optimization.tsx(152,17): error TS7031: Binding element 'style' implicitly has an 'any' type.
+src/utils/image-optimization.tsx(152,24): error TS7031: Binding element 'onLoad' implicitly has an 'any' type.
+src/utils/network-cache.ts(175,5): error TS2322: Type '{}' is not assignable to type 'T'.
+  'T' could be instantiated with an arbitrary type which could be unrelated to '{}'.
+tests/b2b-services.test.ts(112,27): error TS2345: Argument of type '{ businessId: string; businessName: string; tier: string; }' is not assignable to parameter of type 'CreateB2BContractData'.
+  Type '{ businessId: string; businessName: string; tier: string; }' is missing the following properties from type 'CreateB2BContractData': startDate, endDate, monthlyFee, deliveryLimit, pricePerDelivery
+tests/delivery-service.test.ts(127,29): error TS2339: Property 'success' does not exist on type 'void'.
+tests/delivery-service.test.ts(144,21): error TS2339: Property 'success' does not exist on type 'void'.
+tests/delivery-service.test.ts(209,26): error TS2339: Property 'id' does not exist on type 'DeliveryRequest'.
+tests/firebase-integration.test.ts(71,43): error TS2345: Argument of type '{ requesterId: string; pickupStation: { id: string; stationId: string; stationName: string; line: string; lineCode: string; lat: number; lng: number; }; deliveryStation: { id: string; stationId: string; ... 4 more ...; lng: number; }; ... 4 more ...; urgency: "normal"; }' is not assignable to parameter of type 'CreateRequestData'.
+  Property 'initialNegotiationFee' is missing in type '{ requesterId: string; pickupStation: { id: string; stationId: string; stationName: string; line: string; lineCode: string; lat: number; lng: number; }; deliveryStation: { id: string; stationId: string; ... 4 more ...; lng: number; }; ... 4 more ...; urgency: "normal"; }' but required in type 'CreateRequestData'.
+tests/firebase-mock.ts(7,10): error TS2305: Module '"firebase/messaging"' has no exported member 'getAuth'.
+tests/notification-service.test.ts(28,5): error TS2304: Cannot find name 'setupFirebaseMocks'.
+tests/notification-service.test.ts(35,5): error TS2304: Cannot find name 'clearFirebaseMocks'.
+tests/notification-service.test.ts(72,63): error TS2345: Argument of type '{ title: string; body: string; data: { type: string; requestId: string; }; }' is not assignable to parameter of type 'PushNotificationData'.
+  Property 'type' is missing in type '{ title: string; body: string; data: { type: string; requestId: string; }; }' but required in type 'PushNotificationData'.
+tests/notification-service.test.ts(83,49): error TS2345: Argument of type 'null' is not assignable to parameter of type 'string'.
+tests/notification-service.test.ts(93,78): error TS2554: Expected 0 arguments, but got 1.
+tests/notification-service.test.ts(103,78): error TS2554: Expected 0 arguments, but got 1.
+tests/notification-service.test.ts(123,9): error TS2554: Expected 1 arguments, but got 2.
+tests/notification-service.test.ts(140,9): error TS2554: Expected 1 arguments, but got 2.
+tests/notification-service.test.ts(140,10): error TS7006: Parameter 'settings' implicitly has an 'any' type.
+tests/payment-service.test.ts(26,12): error TS7017: Element implicitly has an 'any' type because type 'typeof globalThis' has no index signature.
+tests/penalty-service.test.ts(90,46): error TS2339: Property 'getPenalties' does not exist on type 'PenaltyService'.
+tests/penalty-service.test.ts(100,52): error TS2339: Property 'getPenalties' does not exist on type 'PenaltyService'.
+tests/penalty-service.test.ts(110,42): error TS2339: Property 'getUserPenaltyScore' does not exist on type 'PenaltyService'.
+tests/penalty-service.test.ts(120,38): error TS2339: Property 'getUserPenaltyScore' does not exist on type 'PenaltyService'.
+tests/penalty-service.test.ts(129,43): error TS2339: Property 'checkPenaltyStatus' does not exist on type 'PenaltyService'.
+tests/penalty-service.test.ts(138,39): error TS2339: Property 'checkPenaltyStatus' does not exist on type 'PenaltyService'.
+tests/penalty-service.test.ts(149,43): error TS2339: Property 'clearPenalty' does not exist on type 'PenaltyService'.
+tests/penalty-service.test.ts(165,54): error TS2339: Property 'LOW' does not exist on type 'typeof PenaltySeverity'.
+tests/penalty-service.test.ts(180,23): error TS2339: Property 'ratingPenalty' does not exist on type 'Penalty'.
+tests/route-service.test.ts(12,3): error TS2724: '"../src/services/route-service"' has no exported member named 'getRouteById'. Did you mean 'getRoute'?
+tests/route-service.test.ts(79,28): error TS2345: Argument of type 'Route' is not assignable to parameter of type 'string'.
+tests/route-service.test.ts(81,37): error TS2769: No overload matches this call.
+  Overload 1 of 3, '(firestore: Firestore, path: string, ...pathSegments: string[]): DocumentReference<DocumentData, DocumentData>', gave the following error.
+    Argument of type 'Route' is not assignable to parameter of type 'string'.
+  Overload 2 of 3, '(reference: CollectionReference<unknown, DocumentData>, path?: string | undefined, ...pathSegments: string[]): DocumentReference<unknown, DocumentData>', gave the following error.
+    Argument of type 'Firestore' is not assignable to parameter of type 'CollectionReference<unknown, DocumentData>'.
+      Type 'Firestore' is missing the following properties from type 'CollectionReference<unknown, DocumentData>': id, path, parent, withConverter, and 2 more.
+  Overload 3 of 3, '(reference: DocumentReference<unknown, DocumentData>, path: string, ...pathSegments: string[]): DocumentReference<DocumentData, DocumentData>', gave the following error.
+    Argument of type 'Firestore' is not assignable to parameter of type 'DocumentReference<unknown, DocumentData>'.
+      Type 'Firestore' is missing the following properties from type 'DocumentReference<unknown, DocumentData>': converter, firestore, id, path, and 2 more.
+tests/route-service.test.ts(96,9): error TS2739: Type '{ id: string; stationName: string; line: string; lat: number; lng: number; }' is missing the following properties from type 'StationInfo': stationId, lineCode
+tests/route-service.test.ts(103,9): error TS2739: Type '{ id: string; stationName: string; line: string; lat: number; lng: number; }' is missing the following properties from type 'StationInfo': stationId, lineCode
+tests/route-service.test.ts(117,9): error TS2739: Type '{ id: string; stationName: string; line: string; lat: number; lng: number; }' is missing the following properties from type 'StationInfo': stationId, lineCode
+tests/route-service.test.ts(124,9): error TS2739: Type '{ id: string; stationName: string; line: string; lat: number; lng: number; }' is missing the following properties from type 'StationInfo': stationId, lineCode
+tests/route-service.test.ts(136,28): error TS2345: Argument of type 'Route' is not assignable to parameter of type 'string'.
+tests/route-service.test.ts(155,9): error TS2739: Type '{ id: string; stationName: string; line: string; lat: number; lng: number; }' is missing the following properties from type 'StationInfo': stationId, lineCode
+tests/route-service.test.ts(162,9): error TS2739: Type '{ id: string; stationName: string; line: string; lat: number; lng: number; }' is missing the following properties from type 'StationInfo': stationId, lineCode
+tests/route-service.test.ts(174,28): error TS2345: Argument of type 'Route' is not assignable to parameter of type 'string'.
+tests/route-service.test.ts(194,9): error TS2739: Type '{ id: string; stationName: string; line: string; lat: number; lng: number; }' is missing the following properties from type 'StationInfo': stationId, lineCode
+tests/route-service.test.ts(201,9): error TS2739: Type '{ id: string; stationName: string; line: string; lat: number; lng: number; }' is missing the following properties from type 'StationInfo': stationId, lineCode
+tests/route-service.test.ts(213,28): error TS2345: Argument of type 'Route' is not assignable to parameter of type 'string'.
+tests/route-service.test.ts(215,13): error TS2554: Expected 3 arguments, but got 2.
+tests/route-service.test.ts(228,9): error TS2554: Expected 3 arguments, but got 2.
+tests/route-service.test.ts(237,9): error TS2739: Type '{ id: string; stationName: string; line: string; lat: number; lng: number; }' is missing the following properties from type 'StationInfo': stationId, lineCode
+tests/route-service.test.ts(244,9): error TS2739: Type '{ id: string; stationName: string; line: string; lat: number; lng: number; }' is missing the following properties from type 'StationInfo': stationId, lineCode
+tests/route-service.test.ts(256,13): error TS2554: Expected 2 arguments, but got 1.
+tests/route-service.test.ts(265,9): error TS2554: Expected 2 arguments, but got 1.
+tests/route-service.test.ts(293,26): error TS2554: Expected 4 arguments, but got 1.
+tests/route-service.test.ts(321,26): error TS2554: Expected 4 arguments, but got 1.
+tests/user-service.test.ts(44,9): error TS2345: Argument of type '"both"' is not assignable to parameter of type 'UserRole | undefined'.
+tests/user-service.test.ts(57,69): error TS2345: Argument of type '"both"' is not assignable to parameter of type 'UserRole | undefined'.
+tests/user-service.test.ts(59,87): error TS2345: Argument of type '"both"' is not assignable to parameter of type 'UserRole | undefined'.
+tests/user-service.test.ts(70,69): error TS2345: Argument of type '"giller"' is not assignable to parameter of type 'UserRole | undefined'.
+tests/user-service.test.ts(88,69): error TS2345: Argument of type '"giller"' is not assignable to parameter of type 'UserRole | undefined'.
+tests/user-service.test.ts(117,13): error TS2554: Expected 3-4 arguments, but got 1.
+tests/user-service.test.ts(122,21): error TS2339: Property 'completedDeliveries' does not exist on type '{ totalRequests: number; totalDeliveries: number; totalEarnings: number; averageRating: number; completionRate: number; }'.
+tests/user-service.test.ts(123,21): error TS2339: Property 'rating' does not exist on type '{ totalRequests: number; totalDeliveries: number; totalEarnings: number; averageRating: number; completionRate: number; }'.
+tests/user-service.test.ts(142,13): error TS2554: Expected 3-4 arguments, but got 1.
+tests/user-service.test.ts(154,79): error TS2345: Argument of type '"both"' is not assignable to parameter of type 'UserRole | undefined'.

@@ -97,19 +97,49 @@ export default function Button({
     </>
   );
 
+  // 웹에서는 HTML button 요소 사용
   return (
-    <Pressable
-      style={buttonStyle}
-      onPress={onPress}
-      onPressIn={handlePressIn}
-      onPressOut={handlePressOut}
+    <button
+      onClick={onPress}
       disabled={disabled || loading}
-      accessibilityLabel={accessibilityLabel || title}
-      accessibilityRole="button"
-      accessibilityState={{ disabled: disabled || loading }}
+      aria-label={accessibilityLabel || title}
+      style={{
+        backgroundColor: variant === 'primary' ? Colors.primary :
+                       variant === 'secondary' ? Colors.secondary :
+                       variant === 'outline' ? 'transparent' :
+                       variant === 'danger' ? Colors.error : 'transparent',
+        borderColor: variant === 'outline' ? Colors.primary : 'transparent',
+        borderRadius: `${BorderRadius.md}px`,
+        borderWidth: variant === 'outline' ? '1px' : '0',
+        color: variant === 'outline' || variant === 'ghost' ? Colors.primary : Colors.white,
+        cursor: (disabled || loading) ? 'not-allowed' : 'pointer',
+        display: 'flex',
+        flexDirection: 'row',
+        fontSize: size === 'large' ? '18px' : size === 'small' ? '14px' : '16px',
+        fontWeight: size === 'large' ? 'bold' : '600',
+        justifyContent: 'center',
+        alignItems: 'center',
+        minHeight: size === 'large' ? '52px' : size === 'small' ? '32px' : '44px',
+        opacity: (disabled || loading) ? 0.6 : 1,
+        padding: size === 'large' ? '16px 24px' : size === 'small' ? '8px 16px' : '12px 16px',
+        width: fullWidth ? '100%' : 'auto',
+        gap: '8px',
+        ...style,
+      }}
     >
-      {content}
-    </Pressable>
+      {loading ? (
+        <ActivityIndicator
+          color={variant === 'outline' || variant === 'ghost' ? Colors.primary : Colors.white}
+          size="small"
+        />
+      ) : (
+        <>
+          {icon && iconPosition === 'left' && <>{icon}</>}
+          <span>{title}</span>
+          {icon && iconPosition === 'right' && <>{icon}</>}
+        </>
+      )}
+    </button>
   );
 }
 

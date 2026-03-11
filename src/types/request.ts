@@ -91,6 +91,17 @@ export interface Request {
     vat: number;
     totalFee: number;
   };
+  fee?: {
+    baseFee: number;
+    distanceFee: number;
+    sizeFee: number;
+    weightFee: number;
+    urgencySurcharge: number;
+    manualAdjustment: number;
+    serviceFee: number;
+    vat: number;
+    totalFee: number;
+  };
 
   // 희망 배송 시간
   preferredTime?: {
@@ -142,6 +153,17 @@ export interface CreateRequestData {
   packageInfo: PackageInfo;
   initialNegotiationFee: number;
   feeBreakdown?: {
+    baseFee: number;
+    distanceFee: number;
+    sizeFee: number;
+    weightFee: number;
+    urgencySurcharge: number;
+    manualAdjustment: number;
+    serviceFee: number;
+    vat: number;
+    totalFee: number;
+  };
+  fee?: {
     baseFee: number;
     distanceFee: number;
     sizeFee: number;

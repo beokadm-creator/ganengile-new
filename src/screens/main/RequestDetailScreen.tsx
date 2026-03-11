@@ -111,13 +111,42 @@ export default function RequestDetailScreen({ navigation, route }: Props) {
     try {
       const userId = requireUserId();
       await cancelRequest(requestId, userId, cancelReason.trim());
+
+      // 로컬 상태 즉시 업데이트
+      if (request) {
+        setRequest({
+          ...request,
+          status: RequestStatus.CANCELLED,
+          cancellationReason: cancelReason.trim(),
+          cancelledAt: new Date() as any,
+        });
+        setDetailView(toRequestDetailView({
+          ...request,
+          status: RequestStatus.CANCELLED,
+          cancellationReason: cancelReason.trim(),
+          cancelledAt: new Date() as any,
+        }));
+      }
+
       setCancelModalVisible(false);
-      Alert.alert('성공', '배송 요청이 취소되었습니다.', [
-        { text: '확인', onPress: () => navigation.goBack() },
-      ]);
-    } catch (error) {
+
+      Alert.alert(
+        '✅ 취소 완료',
+        '배송 요청이 취소되었습니다.\n\n이용해 주셔서 감사합니다. 다음에 또 이용해주세요!',
+        [
+          {
+            text: '확인',
+            onPress: () => navigation.goBack()
+          }
+        ]
+      );
+    } catch (error: any) {
       console.error('Error cancelling request:', error);
-      Alert.alert('오류', '요청 취소에 실패했습니다.');
+      Alert.alert(
+        '❌ 취소 실패',
+        error.message || '요청 취소에 실패했습니다. 다시 시도해주세요.',
+        [{ text: '확인' }]
+      );
     } finally {
       setCancelling(false);
     }
@@ -325,7 +354,7 @@ export default function RequestDetailScreen({ navigation, route }: Props) {
         )}
 
         {/* Actions */}
-        {detailView.status === RequestStatus.PENDING && (
+        {(detailView.status === RequestStatus.PENDING || detailView.status === RequestStatus.MATCHED) && (
           <View style={styles.actions}>
             <TouchableOpacity
               style={[styles.actionButton, styles.cancelButton]}

@@ -71,7 +71,8 @@ export default function RouteManagementScreen() {
           onPress: async () => {
             try {
               const userId = await requireUserId();
-              await deleteRoute(userId, routeId);
+              await deleteRoute(routeId, userId);
+              Alert.alert('성공', '동선이 삭제되었습니다.');
               await loadRoutes();
             } catch (error: any) {
               console.error('Error deleting route:', error);
@@ -96,13 +97,13 @@ export default function RouteManagementScreen() {
         {/* 경로 이름 */}
         <View style={styles.routeHeader}>
           <View style={styles.routeIconContainer}>
-            <Ionicons name="train-outline" size={24} color={Colors.primary} />
+            <Text style={styles.routeIcon}>🚇</Text>
           </View>
           <View style={styles.routeInfo}>
             <Text style={styles.routeName}>{routeName}</Text>
             <View style={styles.routeMeta}>
               <View style={styles.timeTag}>
-                <Ionicons name="time-outline" size={14} color={Colors.gray600} />
+                <Text style={styles.timeIcon}>⏰</Text>
                 <Text style={styles.timeText}>{route.departureTime}</Text>
               </View>
               <View style={styles.daysBadge}>
@@ -121,7 +122,7 @@ export default function RouteManagementScreen() {
 
           <View style={styles.connector}>
             <View style={styles.connectorLine} />
-            <Ionicons name="arrow-down" size={16} color={Colors.gray400} />
+            <Text style={styles.connectorIcon}>↓</Text>
           </View>
 
           <View style={styles.stationInfo}>
@@ -136,14 +137,14 @@ export default function RouteManagementScreen() {
             style={[styles.actionButton, styles.editActionButton]}
             onPress={() => handleEdit(route)}
           >
-            <Ionicons name="create-outline" size={18} color={Colors.primary} />
+            <Text style={styles.actionIcon}>✏️</Text>
             <Text style={styles.editActionButtonText}>수정</Text>
           </TouchableOpacity>
           <TouchableOpacity
             style={[styles.actionButton, styles.deleteActionButton]}
             onPress={() => handleDelete(route.routeId, routeName)}
           >
-            <Ionicons name="trash-outline" size={18} color="#f44336" />
+            <Text style={styles.actionIcon}>🗑️</Text>
             <Text style={styles.deleteActionButtonText}>삭제</Text>
           </TouchableOpacity>
         </View>
@@ -173,7 +174,7 @@ export default function RouteManagementScreen() {
       {/* 동선 목록 */}
       {routes.length === 0 ? (
         <View style={styles.centerContainer}>
-          <Ionicons name="train-outline" size={64} color={Colors.gray300} />
+          <Text style={styles.emptyIcon}>🚇</Text>
           <Text style={styles.emptyTitle}>등록된 동선이 없습니다</Text>
           <Text style={styles.emptySubtitle}>
             출퇴근 경로를 등록하고 매칭받으세요
@@ -185,7 +186,7 @@ export default function RouteManagementScreen() {
               navigation.navigate('AddRoute' as never);
             }}
           >
-            <Ionicons name="add-circle" size={20} color="#fff" />
+            <Text style={styles.addButtonIcon}>➕</Text>
             <Text style={styles.addButtonText}>동선 등록하기</Text>
           </TouchableOpacity>
         </View>
@@ -196,7 +197,7 @@ export default function RouteManagementScreen() {
           {/* 최대 5개 안내 */}
           {routes.length >= MAX_ROUTES && (
             <View style={styles.limitBanner}>
-              <Ionicons name="information-circle" size={20} color={Colors.accent} />
+              <Text style={styles.limitIcon}>ℹ️</Text>
               <Text style={styles.limitText}>
                 최대 {MAX_ROUTES}개의 동선만 등록할 수 있습니다
               </Text>
@@ -214,7 +215,7 @@ export default function RouteManagementScreen() {
             navigation.navigate('AddRoute' as never);
           }}
         >
-          <Ionicons name="add" size={28} color="#fff" />
+          <Text style={styles.fabIcon}>➕</Text>
         </TouchableOpacity>
       )}
     </View>
@@ -443,5 +444,36 @@ const styles = StyleSheet.create({
     color: '#f44336',
     fontSize: Typography.fontSize.sm,
     fontWeight: Typography.fontWeight.semibold as any,
+  },
+  actionIcon: {
+    fontSize: 16,
+  },
+  emptyIcon: {
+    fontSize: 64,
+    marginBottom: Spacing.lg,
+  },
+  addButtonIcon: {
+    fontSize: 20,
+    color: '#fff',
+  },
+  limitIcon: {
+    fontSize: 20,
+    marginRight: Spacing.sm,
+  },
+  fabIcon: {
+    fontSize: 28,
+    color: '#fff',
+    fontWeight: '300',
+  },
+  routeIcon: {
+    fontSize: 24,
+  },
+  timeIcon: {
+    fontSize: 14,
+    marginRight: 4,
+  },
+  connectorIcon: {
+    fontSize: 16,
+    color: Colors.gray400,
   },
 });

@@ -11,11 +11,12 @@ import {
   StyleSheet,
   TouchableOpacity,
   Animated,
+  LayoutChangeEvent,
 } from 'react-native';
 import { doc, onSnapshot, updateDoc } from 'firebase/firestore';
 import { db } from '../../core/firebase';
 import { useAuth } from '../../contexts/AuthContext';
-import { Colors, Typography, Spacing, BorderRadius } from '../../theme';
+import { Colors, Typography, Spacing, BorderRadius, Shadows } from '../../theme';
 
 interface ModeToggleSwitchProps {
   onModeChange?: (onetime: boolean) => void;
@@ -25,7 +26,13 @@ export default function ModeToggleSwitch({ onModeChange }: ModeToggleSwitchProps
   const { user } = useAuth();
   const [onetimeMode, setOnetimeMode] = useState(true);
   const [loading, setLoading] = useState(true);
-  const [animValue] = useState(new Animated.Value(1));
+  const [animValue] = useState(new Animated.Value(0));
+  const [containerWidth, setContainerWidth] = useState(0);
+
+  const onLayout = (event: LayoutChangeEvent) => {
+    const { width } = event.nativeEvent.layout;
+    setContainerWidth(width);
+  };
 
   useEffect(() => {
     if (!user?.uid) return;
@@ -35,10 +42,11 @@ export default function ModeToggleSwitch({ onModeChange }: ModeToggleSwitchProps
         const enabled = doc.data().onetimeModeEnabled || false;
         setOnetimeMode(enabled);
 
-        // 애니메이션
-        Animated.timing(animValue, {
+        // 애니메이션: 일회성(true) -> 0, 정기동선(false) -> 1
+        Animated.spring(animValue, {
           toValue: enabled ? 0 : 1,
-          duration: 200,
+          friction: 8,
+          tension: 40,
           useNativeDriver: true,
         }).start();
 
@@ -76,59 +84,56 @@ export default function ModeToggleSwitch({ onModeChange }: ModeToggleSwitchProps
 
   return (
     <View style={styles.container}>
-      <TouchableOpacity
-        style={styles.toggleButton}
-        onPress={handleToggle}
-        activeOpacity={0.7}
-      >
+      <View style={styles.toggleWrapper} onLayout={onLayout}>
+        {/* 애니메이션 배경 영역 */}
         <Animated.View
           style={[
-            styles.toggleBackground,
+            styles.indicator,
             {
+              width: containerWidth ? (containerWidth - 8) / 2 : '50%',
+              transform: [
+                {
+                  translateX: animValue.interpolate({
+                    inputRange: [0, 1],
+                    outputRange: [4, containerWidth / 2],
+                  }),
+                },
+              ],
               backgroundColor: animValue.interpolate({
                 inputRange: [0, 1],
-                outputRange: ['#4CAF50', '#FF9800'],
+                outputRange: [Colors.primary, Colors.secondary],
               }),
             },
           ]}
+        />
+
+        {/* 버튼 영역 */}
+        <TouchableOpacity
+          style={styles.option}
+          onPress={() => !onetimeMode && handleToggle()}
+          activeOpacity={0.8}
         >
-          <View style={styles.toggleContent}>
-            <Animated.View
-              style={[
-                styles.toggleIndicator,
-                {
-                  transform: [
-                    {
-                      translateX: animValue.interpolate({
-                        inputRange: [0, 1],
-                        outputRange: [0, 120],
-                      }),
-                    },
-                  ],
-                },
-              ]}
-            />
-            <View style={styles.toggleLabels}>
-              <Text
-                style={[
-                  styles.toggleLabel,
-                  onetimeMode && styles.toggleLabelActive,
-                ]}
-              >
-                일회성
-              </Text>
-              <Text
-                style={[
-                  styles.toggleLabel,
-                  !onetimeMode && styles.toggleLabelActive,
-                ]}
-              >
-                정기 동선
-              </Text>
-            </View>
-          </View>
-        </Animated.View>
-      </TouchableOpacity>
+          <Text style={[
+            styles.optionText,
+            onetimeMode && styles.activeText
+          ]}>
+            일회성
+          </Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={styles.option}
+          onPress={() => onetimeMode && handleToggle()}
+          activeOpacity={0.8}
+        >
+          <Text style={[
+            styles.optionText,
+            !onetimeMode && styles.activeText
+          ]}>
+            정기 동선
+          </Text>
+        </TouchableOpacity>
+      </View>
 
       {/* 상태 텍스트 */}
       <View style={styles.statusContainer}>
@@ -152,9 +157,7 @@ export default function ModeToggleSwitch({ onModeChange }: ModeToggleSwitchProps
 
 const styles = StyleSheet.create({
   container: {
-    padding: Spacing.md,
-    backgroundColor: Colors.surface,
-    borderRadius: BorderRadius.md,
+    backgroundColor: Colors.white,
     marginBottom: Spacing.md,
   },
   loading: {
@@ -165,43 +168,37 @@ const styles = StyleSheet.create({
     color: Colors.textSecondary,
     textAlign: 'center',
   },
-  toggleButton: {
-    width: '100%',
-  },
-  toggleBackground: {
-    borderRadius: 24,
-    height: 48,
-    overflow: 'hidden',
-  },
-  toggleContent: {
-    flex: 1,
+  toggleWrapper: {
     flexDirection: 'row',
+    backgroundColor: Colors.gray100,
+    borderRadius: BorderRadius.full,
+    height: 48,
+    padding: 4,
     position: 'relative',
+    ...Shadows.sm,
   },
-  toggleIndicator: {
+  indicator: {
     position: 'absolute',
     top: 4,
-    left: 4,
-    width: 120,
-    height: 40,
-    backgroundColor: 'rgba(255, 255, 255, 0.3)',
-    borderRadius: 20,
+    bottom: 4,
+    borderRadius: BorderRadius.full,
+    zIndex: 0,
+    ...Shadows.md,
   },
-  toggleLabels: {
+  option: {
     flex: 1,
-    flexDirection: 'row',
+    height: '100%',
+    justifyContent: 'center',
     alignItems: 'center',
-    justifyContent: 'space-around',
-    paddingHorizontal: Spacing.sm,
-  },
-  toggleLabel: {
-    ...Typography.body,
-    color: 'rgba(255, 255, 255, 0.7)',
-    fontWeight: '600',
     zIndex: 1,
   },
-  toggleLabelActive: {
-    color: '#fff',
+  optionText: {
+    ...Typography.body,
+    fontWeight: '600',
+    color: Colors.gray600,
+  },
+  activeText: {
+    color: Colors.white,
   },
   statusContainer: {
     flexDirection: 'row',
@@ -214,7 +211,7 @@ const styles = StyleSheet.create({
   },
   statusText: {
     ...Typography.bodySmall,
-    color: Colors.text,
+    color: Colors.text.primary,
     fontWeight: '600',
   },
   description: {

@@ -38,10 +38,13 @@ const generateTimeSteps = (): Array<{ hour: number; minute: number; label: strin
 const TIME_STEPS = generateTimeSteps();
 
 // 빠른 선택 프리셋
-const QUICK_PRESETS = {
-  commute: { hour: 8, minute: 0, label: '출근' },    // 08:00
-  leave: { hour: 18, minute: 0, label: '퇴근' },    // 18:00
-};
+const QUICK_PRESETS = [
+  { hour: 9, minute: 0, label: '09:00' },
+  { hour: 12, minute: 0, label: '12:00' },
+  { hour: 15, minute: 0, label: '15:00' },
+  { hour: 18, minute: 0, label: '18:00' },
+  { hour: 21, minute: 0, label: '21:00' },
+];
 
 export default function TimePicker({
   value,
@@ -65,12 +68,13 @@ export default function TimePicker({
     setSelectedIndex(index);
   };
 
-  const handleQuickSelect = (preset: keyof typeof QUICK_PRESETS) => {
-    const p = QUICK_PRESETS[preset];
-    const timeString = `${String(p.hour).padStart(2, '0')}:${String(p.minute).padStart(2, '0')}`;
-    const newIndex = TIME_STEPS.findIndex(s => s.hour === p.hour && s.minute === p.minute);
-    setSelectedIndex(newIndex);
-    onChange(timeString);
+  const handleQuickSelect = (hour: number, minute: number) => {
+    const timeString = `${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}`;
+    const newIndex = TIME_STEPS.findIndex(s => s.hour === hour && s.minute === minute);
+    if (newIndex !== -1) {
+      setSelectedIndex(newIndex);
+      onChange(timeString);
+    }
   };
 
   const handleConfirm = () => {
@@ -142,31 +146,26 @@ export default function TimePicker({
 
             {/* 빠른 선택 버튼 */}
             <View style={styles.quickSelectContainer}>
-              <TouchableOpacity
-                style={[styles.quickButton, styles.commuteButton]}
-                onPress={() => handleQuickSelect('commute')}
-              >
-                <Ionicons name="sunny-outline" size={20} color={Colors.white} />
-                <Text style={styles.quickButtonText}>{QUICK_PRESETS.commute.label}</Text>
-                <Text style={styles.quickButtonTime}>{QUICK_PRESETS.commute.hour}:00</Text>
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                style={[styles.quickButton, styles.leaveButton]}
-                onPress={() => handleQuickSelect('leave')}
-              >
-                <Ionicons name="moon-outline" size={20} color={Colors.white} />
-                <Text style={styles.quickButtonText}>{QUICK_PRESETS.leave.label}</Text>
-                <Text style={styles.quickButtonTime}>{QUICK_PRESETS.leave.hour}:00</Text>
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                style={[styles.quickButton, styles.customButton]}
-                onPress={() => {}}
-              >
-                <Ionicons name="options-outline" size={20} color={Colors.primary} />
-                <Text style={[styles.quickButtonText, styles.customButtonText]}>커스텀</Text>
-              </TouchableOpacity>
+              {QUICK_PRESETS.map((preset) => {
+                const isSelected = TIME_STEPS[selectedIndex].hour === preset.hour && TIME_STEPS[selectedIndex].minute === preset.minute;
+                return (
+                  <TouchableOpacity
+                    key={preset.label}
+                    style={[
+                      styles.quickButton,
+                      isSelected && styles.quickButtonSelected,
+                    ]}
+                    onPress={() => handleQuickSelect(preset.hour, preset.minute)}
+                  >
+                    <Text style={[
+                      styles.quickButtonText,
+                      isSelected && styles.quickButtonTextSelected
+                    ]}>
+                      {preset.label}
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })}
             </View>
 
             {/* 시간 슬라이더 (가로 스크롤) */}
@@ -298,41 +297,27 @@ const styles = StyleSheet.create({
   // 빠른 선택 버튼
   quickSelectContainer: {
     flexDirection: 'row',
-    gap: Spacing.md,
-    justifyContent: 'space-between',
+    gap: Spacing.sm,
     marginBottom: Spacing.lg,
   },
   quickButton: {
     alignItems: 'center',
+    backgroundColor: Colors.gray100,
     borderRadius: BorderRadius.md,
     flex: 1,
     paddingVertical: Spacing.md,
   },
-  commuteButton: {
+  quickButtonSelected: {
     backgroundColor: Colors.primary,
   },
-  leaveButton: {
-    backgroundColor: Colors.secondary,
-  },
-  customButton: {
-    backgroundColor: Colors.gray100,
-    borderColor: Colors.gray300,
-    borderWidth: 1,
-  },
   quickButtonText: {
-    color: Colors.white,
+    color: Colors.textPrimary,
     fontSize: Typography.fontSize.sm,
-    fontWeight: Typography.fontWeight.semibold,
-    marginTop: Spacing.xs,
+    fontWeight: Typography.fontWeight.medium,
   },
-  customButtonText: {
-    color: Colors.primary,
-  },
-  quickButtonTime: {
+  quickButtonTextSelected: {
     color: Colors.white,
-    fontSize: Typography.fontSize.xs,
-    marginTop: 2,
-    opacity: 0.9,
+    fontWeight: Typography.fontWeight.semibold,
   },
   // 슬라이더
   sliderContainer: {

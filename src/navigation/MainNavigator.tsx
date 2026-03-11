@@ -14,6 +14,9 @@ import type { MainTabParamList } from '../types/navigation';
 import { useUser } from '../contexts/UserContext';
 import { Colors } from '../components';
 
+// Web platform support
+import { Link } from '@react-navigation/web';
+
 // Screens
 import HomeScreen from '../screens/main/HomeScreen';
 import AddRouteScreen from '../screens/main/AddRouteScreen';
@@ -21,6 +24,7 @@ import EditRouteScreen from '../screens/main/EditRouteScreen';
 import RequestsScreen from '../screens/main/RequestsScreen';
 import ProfileScreen from '../screens/main/ProfileScreen';
 import CreateRequestScreen from '../screens/main/CreateRequestScreen';
+import RequestConfirmationScreen from '../screens/main/RequestConfirmationScreen';
 import RequestDetailScreen from '../screens/main/RequestDetailScreen';
 import GillerRequestsScreen from '../screens/main/GillerRequestsScreen';
 import DeliveryTrackingScreen from '../screens/main/DeliveryTrackingScreen';
@@ -153,7 +157,10 @@ function TabNavigator() {
         <Tab.Screen
           name="RouteManagement"
           component={RouteManagementScreen}
-          options={{ tabBarLabel: '동선 관리' }}
+          options={{
+            tabBarLabel: '동선 관리',
+            tabBarAccessibilityLabel: '동선 등록',
+          }}
         />
       )}
 
@@ -198,6 +205,14 @@ export default function MainNavigator() {
         options={{
           headerShown: true,
           title: '배송 요청하기',
+        }}
+      />
+      <Stack.Screen
+        name="RequestConfirmation"
+        component={RequestConfirmationScreen}
+        options={{
+          headerShown: true,
+          title: '요청 완료',
         }}
       />
       <Stack.Screen

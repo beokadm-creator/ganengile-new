@@ -287,3 +287,72 @@ export function estimateDeliveryFee(params: Phase1PricingParams): number {
   const result = calculatePhase1DeliveryFee(params);
   return result.totalFee;
 }
+
+/**
+ * GPS 좌표 기반 두 지점 간 직선 거리 계산 (Haversine 공식)
+ * @param lat1 출발역 위도
+ * @param lng1 출발역 경도
+ * @param lat2 도착역 위도
+ * @param lng2 도착역 경도
+ * @returns 직선 거리 (미터)
+ */
+export function calculateStraightLineDistance(
+  lat1: number, lng1: number,
+  lat2: number, lng2: number
+): number {
+  const R = 6371000; // 지구 반지름 (미터)
+  const φ1 = lat1 * Math.PI / 180;
+  const φ2 = lat2 * Math.PI / 180;
+  const Δφ = (lat2 - lat1) * Math.PI / 180;
+  const Δλ = (lng2 - lng1) * Math.PI / 180;
+
+  const a = Math.sin(Δφ / 2) * Math.sin(Δφ / 2) +
+    Math.cos(φ1) * Math.cos(φ2) *
+    Math.sin(Δλ / 2) * Math.sin(Δλ / 2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+
+  return R * c;
+}
+
+/**
+ * GPS 좌표 기반 예상 역 개수 계산
+ * Firestore에 구간 데이터가 없을 때 사용하는 fallback
+ *
+ * 지하철 노선의 특성:
+ * - 도심 역간 평균 거리: ~1,000m
+ * - 외곽 역간 평균 거리: ~1,500m
+ * - 직선거리 → 실제 노선 거리 보정 계수: 1.3 (노선이 직선이 아니므로)
+ *
+ * @param lat1 출발역 위도
+ * @param lng1 출발역 경도
+ * @param lat2 도착역 위도
+ * @param lng2 도착역 경도
+ * @returns 추정 역 개수 (최소 2)
+ */
+export function estimateStationCountFromCoords(
+  lat1: number, lng1: number,
+  lat2: number, lng2: number
+): number {
+  const straightLineMeters = calculateStraightLineDistance(lat1, lng1, lat2, lng2);
+
+  // 직선거리 → 실제 노선 거리 보정 (노선은 직선이 아니므로 30% 가산)
+  const estimatedRouteMeters = straightLineMeters * 1.3;
+
+  // 역간 평균 거리 1,200m 기준으로 역 개수 추정
+  const AVG_STATION_DISTANCE_METERS = 1200;
+  const estimatedStations = Math.round(estimatedRouteMeters / AVG_STATION_DISTANCE_METERS);
+
+  // 최소 2역, 최대 50역
+  return Math.max(2, Math.min(50, estimatedStations));
+}
+
+/**
+ * 배송비가 최대 요금(8,000원)에 도달했는지 확인
+ * @param params 배송 매개변수
+ * @returns 최대 요금 도달 여부
+ */
+export function isMaxFeeReached(params: Phase1PricingParams): boolean {
+  const result = calculatePhase1DeliveryFee(params);
+  return result.totalFee >= PRICING_CONFIG.MAX_FEE;
+}
+

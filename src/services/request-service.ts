@@ -97,6 +97,8 @@ export async function createRequest(
         packageInfo: requestDataOrUserId.packageInfo,
         initialNegotiationFee: requestDataOrUserId.initialNegotiationFee,
         feeBreakdown: requestDataOrUserId.feeBreakdown,
+        // 길러 앱과의 호환성을 위해 fee 필드 추가
+        fee: requestDataOrUserId.feeBreakdown,
         preferredTime: requestDataOrUserId.preferredTime,
         deadline: requestDataOrUserId.deadline instanceof Timestamp
           ? requestDataOrUserId.deadline

@@ -648,7 +648,7 @@ const styles = StyleSheet.create({
     fontSize: 32,
   },
   badgeIconNotEarned: {
-    filter: 'grayscale(100%)',
+    opacity: 0.3,
   },
   badgeInfo: {
     flex: 1,

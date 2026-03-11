@@ -23,6 +23,7 @@ import { getAllStations, getTravelTimeConfig } from '../../services/config-servi
 import { createRequest } from '../../services/request-service';
 import {
   calculatePhase1DeliveryFee,
+  estimateStationCountFromCoords,
   type Phase1PricingParams,
   type DeliveryFeeBreakdown,
   type PackageSizeType,
@@ -59,12 +60,13 @@ function convertStationToInfo(station: Station): StationInfo {
   if (station.location) {
     // Firebase 데이터: { lng: 127.0612, lat: 37.9175 }
     // 또는 표준 형식: { latitude: 37.9175, longitude: 127.0612 }
-    if ('lat' in station.location) {
-      lat = station.location.lat;
-      lng = station.location.lng;
-    } else if ('latitude' in station.location) {
-      lat = station.location.latitude;
-      lng = station.location.longitude;
+    const loc = station.location as any;
+    if (loc.lat !== undefined) {
+      lat = loc.lat as number;
+      lng = loc.lng as number;
+    } else if (loc.latitude !== undefined) {
+      lat = loc.latitude as number;
+      lng = loc.longitude as number;
     }
   }
 
@@ -116,14 +118,14 @@ const URGENCY_OPTIONS: UrgencyOption[] = [
     level: 'fast',
     label: '빠름',
     description: '15~30분 내 픽업',
-    surchargeMultiplier: 0.2,
+    surchargeMultiplier: 0.1,
     timeWindow: '15~30분 내',
   },
   {
     level: 'urgent',
     label: '매우 빠름',
     description: '15분 내 픽업',
-    surchargeMultiplier: 0.5,
+    surchargeMultiplier: 0.2,
     timeWindow: '15분 내',
   },
 ];
@@ -357,13 +359,26 @@ export default function CreateRequestScreen({ navigation }: Props) {
             deliveryStation.stationId
           );
 
-          if (travelTimeData) {
+                if (travelTimeData) {
             const travelTimeSeconds = travelTimeData.normalTime;
             travelTimeMinutes = Math.round(travelTimeSeconds / 60);
             stationCount = Math.max(2, Math.round(travelTimeMinutes / 2.5));
-            console.log('Travel time data loaded:', { travelTimeMinutes, stationCount });
+            console.log('Travel time data loaded (Firestore):', { travelTimeMinutes, stationCount });
           } else {
-            console.log('No travel time data found, using defaults');
+            // Firestore에 구간 데이터가 없으면 → GPS 좌표 기반 fallback
+            const lat1 = pickupStation.location?.latitude;
+            const lng1 = pickupStation.location?.longitude;
+            const lat2 = deliveryStation.location?.latitude;
+            const lng2 = deliveryStation.location?.longitude;
+
+            if (lat1 && lng1 && lat2 && lng2) {
+              stationCount = estimateStationCountFromCoords(lat1, lng1, lat2, lng2);
+              // 역 개수 → 예상 이동 시간 (역당 2.5분)
+              travelTimeMinutes = stationCount * 2.5;
+              console.log('Travel time estimated (GPS fallback):', { lat1, lng1, lat2, lng2, stationCount, travelTimeMinutes });
+            } else {
+              console.log('No coords available, using default stationCount=5');
+            }
           }
         } catch (error) {
           console.log('Error loading travel time, using defaults:', error);
@@ -383,30 +398,17 @@ export default function CreateRequestScreen({ navigation }: Props) {
       const feeResult = calculatePhase1DeliveryFee(pricingParams);
       console.log('Fee calculation result:', feeResult);
 
-      const urgencyMultiplier = URGENCY_OPTIONS.find(opt => opt.level === urgency)?.surchargeMultiplier || 0;
-      const urgencySurcharge = Math.round((feeResult.baseFee + feeResult.distanceFee) * urgencyMultiplier);
-
-      const subtotalWithAdjustment = feeResult.totalFee + manualAdjustment - feeResult.vat;
-      const vat = Math.round(subtotalWithAdjustment * 0.1);
-      const totalFee = subtotalWithAdjustment + vat;
-
-      const clampedTotalFee = Math.min(Math.max(totalFee, 3000), 8000);
-      const clampedVat = clampedTotalFee === totalFee ? vat : Math.round((clampedTotalFee / 1.1) * 0.1);
-
-      console.log('Final delivery fee:', { totalFee: clampedTotalFee, vat: clampedVat });
-
       setDeliveryFee({
         baseFee: feeResult.baseFee,
         distanceFee: feeResult.distanceFee,
         sizeFee: feeResult.sizeFee,
         weightFee: feeResult.weightFee,
         serviceFee: feeResult.serviceFee,
-        vat: clampedVat,
-        totalFee: clampedTotalFee,
+        vat: feeResult.vat,
+        totalFee: feeResult.totalFee, // manualAdjustment는 UI 표시용으로만 남겨두고 합산하지 않음
         estimatedTime: travelTimeMinutes,
-        urgencyFee: urgencySurcharge,
-        urgencySurcharge,
-        manualAdjustment,
+        urgencySurcharge: feeResult.urgencySurcharge,
+        manualAdjustment: 0, // 일단 0으로 초기화
       });
     } catch (error) {
       console.error('Error calculating delivery fee:', error);
@@ -702,12 +704,12 @@ export default function CreateRequestScreen({ navigation }: Props) {
       console.log('Request created successfully, showing confirmation...');
 
       // 요청 완료 안내 후 매칭 시작
-      navigation.navigate('RequestConfirmation' as never, {
+      navigation.navigate('RequestConfirmation' as any, {
         requestId: request.requestId,
         pickupStationName: pickupStation.stationName,
         deliveryStationName: deliveryStation.stationName,
         deliveryFee: deliveryFee
-      });
+      } as any);
     } catch (error) {
       console.error('Error creating request:', error);
       showErrorAlert(error, '오류', () => handleSubmit());

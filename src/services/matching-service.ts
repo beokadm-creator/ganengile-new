@@ -1,6 +1,5 @@
-/**
-
 // @ts-nocheck - Temporarily suppress TypeScript errors for rapid development
+/**
  * Matching Service
  * Integrates matching engine with Firestore
  */
@@ -31,6 +30,16 @@ import {
 import { createChatService, getChatRoomByRequestId } from './chat-service';
 import { MessageType } from '../types/chat';
 import { BadgeService } from './BadgeService';
+import { getUserActiveRoutes } from './route-service';
+import { locationService, type LocationData } from './location-service';
+import type {
+  RouteMatchScore,
+  LocationFilteredRequest,
+  RouteFilteredRequest,
+  MatchingFilterOptions,
+  GillerMatchingStats,
+} from '../types/matching-extended';
+import type { Route, StationInfo } from '../types/route';
 
 /**
  * Calculate badge bonus for fee adjustment
@@ -627,5 +636,430 @@ export async function rejectMatch(
   } catch (error: any) {
     console.error('Error rejecting match:', error);
     return { success: false, error: error.message || '매칭 거절에 실패했습니다.' };
+  }
+}
+
+// ===== 길러 배송 매칭 시스템 개선 =====
+
+/**
+ * 동선 기반 요청 필터링
+ * @param requests 전체 배송 요청 목록
+ * @param gillerId 길러 ID
+ * @returns 동선이 일치하는 요청 목록과 매칭 점수
+ */
+export async function filterRequestsByGillerRoutes(
+  requests: any[],
+  gillerId: string
+): Promise<RouteFilteredRequest[]> {
+  try {
+    // 1. 길러의 활성 동선 조회
+    const gillerRoutes = await getUserActiveRoutes(gillerId);
+
+    if (gillerRoutes.length === 0) {
+      console.log('[filterRequestsByGillerRoutes] 등록된 동선 없음');
+      return [];
+    }
+
+    // 2. 오늘 요일 계산
+    const today = new Date().getDay();
+    const dayOfWeek = today === 0 ? 7 : today; // 1(월) - 7(일)
+
+    // 3. 오늘 운행 동선 우선 사용, 없으면 전체 활성 동선 사용 (fallback)
+    const todayRoutes = gillerRoutes.filter(route =>
+      route.daysOfWeek.includes(dayOfWeek)
+    );
+    const routesToMatch = todayRoutes.length > 0 ? todayRoutes : gillerRoutes;
+    console.log(`[filterRequestsByGillerRoutes] 오늘 동선: ${todayRoutes.length}개, 매칭 대상: ${routesToMatch.length}개`);
+
+    // 4. 각 요청에 대해 매칭 점수 계산 (최소 점수 10점으로 대폭 완화)
+    const matchedRequests: RouteFilteredRequest[] = [];
+    const MIN_MATCH_SCORE = 10;
+
+    for (const request of requests) {
+      const matchResults: { route: Route; score: RouteMatchScore }[] = [];
+
+      for (const route of routesToMatch) {
+        const score = calculateRouteMatchScore(request, route);
+        if (score.score >= MIN_MATCH_SCORE) {
+          matchResults.push({ route, score });
+        }
+      }
+
+      if (matchResults.length > 0) {
+        // 가장 높은 점수 선택
+        matchResults.sort((a, b) => b.score.score - a.score.score);
+        const bestMatch = matchResults[0];
+
+        matchedRequests.push({
+          ...request,
+          matchScore: bestMatch.score,
+          matchedRouteCount: matchResults.length,
+          matchedRoutes: matchResults.map(m => m.route),
+        });
+      }
+    }
+
+    // 5. 매칭 점수 기반 정렬
+    matchedRequests.sort((a, b) => b.matchScore.score - a.matchScore.score);
+    console.log(`[filterRequestsByGillerRoutes] 매칭된 요청: ${matchedRequests.length}건`);
+
+    return matchedRequests;
+  } catch (error) {
+    console.error('Error filtering requests by giller routes:', error);
+    return [];
+  }
+}
+
+/**
+ * 동선 매칭 점수 계산
+ * @param request 배송 요청
+ * @param route 길러 동선
+ * @returns 매칭 점수 (0-100)
+ */
+export function calculateRouteMatchScore(
+  request: any,
+  route: Route
+): RouteMatchScore {
+  let score = 0;
+
+  // 역이름 유연 비교 ('역' 접미사 무시, 부분 매칭 지원)
+  const normalizeStationName = (name: string) =>
+    (name || '').replace(/역$/, '').trim().toLowerCase();
+
+  const stationNamesMatch = (name1: string, name2: string): boolean => {
+    const n1 = normalizeStationName(name1);
+    const n2 = normalizeStationName(name2);
+    return n1 === n2 || n1.includes(n2) || n2.includes(n1);
+  };
+
+  // 점수 상세
+  const details = {
+    pickupStationScore: 0,
+    deliveryStationScore: 0,
+    dayOfWeekScore: 0,
+    timeScore: 0,
+    directionBonus: 0,
+  };
+
+  // 1. 픽업역 일치: +30점
+  const pickupMatch = stationNamesMatch(
+    route.startStation?.stationName || '',
+    request.pickupStation?.stationName || ''
+  );
+  if (pickupMatch) {
+    details.pickupStationScore = 30;
+    score += 30;
+  }
+
+  // 2. 배송역 일치: +30점
+  const deliveryMatch = stationNamesMatch(
+    route.endStation?.stationName || '',
+    request.deliveryStation?.stationName || ''
+  );
+  if (deliveryMatch) {
+    details.deliveryStationScore = 30;
+    score += 30;
+  }
+
+  // 3. 요일 일치: +10점
+  const today = new Date().getDay();
+  const dayOfWeek = today === 0 ? 7 : today;
+  const dayMatch = route.daysOfWeek.includes(dayOfWeek);
+  if (dayMatch) {
+    details.dayOfWeekScore = 10;
+    score += 10;
+  }
+
+  // 4. 시간대 일치 (±30분): +15점
+  const requestTime = request.preferredTime?.departureTime || '08:00';
+  const [requestHour, requestMinute] = requestTime.split(':').map(Number);
+  const [routeHour, routeMinute] = (route.departureTime || '08:00').split(':').map(Number);
+
+  const requestMinutes = requestHour * 60 + requestMinute;
+  const routeMinutes = routeHour * 60 + routeMinute;
+  const timeDiff = Math.abs(requestMinutes - routeMinutes);
+
+  let timeMatch = 0;
+  if (timeDiff <= 30) {
+    timeMatch = Math.round(15 * (1 - timeDiff / 30)); // 30분일수록 높은 점수
+    details.timeScore = timeMatch;
+    score += timeMatch;
+  }
+
+  // 5. 방향성 보너스: +15점
+  let routeDirection: 'exact' | 'partial' | 'reverse' = 'partial';
+  if (pickupMatch && deliveryMatch) {
+    routeDirection = 'exact';
+    details.directionBonus = 15;
+    score += 15;
+  } else if (pickupMatch || deliveryMatch) {
+    routeDirection = 'partial';
+    details.directionBonus = 5;
+    score += 5;
+  } else {
+    routeDirection = 'reverse';
+    // 역방향은 감점
+    score -= 10;
+  }
+
+  return {
+    score: Math.max(0, Math.min(score, 100)), // 0~100점 범위
+    pickupMatch,
+    deliveryMatch,
+    timeMatch,
+    dayMatch,
+    routeDirection,
+    matchedRouteId: route.routeId,
+    matchedRoute: route,
+    details,
+  };
+}
+
+/**
+ * 위치 기반 요청 필터링
+ * @param requests 전체 배송 요청 목록
+ * @param currentLocation 현재 위치
+ * @param radiusKm 반경 (km, 기본값 30)
+ * @returns 위치 기반 필터링된 요청 목록
+ */
+export async function filterRequestsByLocation(
+  requests: any[],
+  currentLocation: LocationData,
+  radiusKm: number = 30
+): Promise<LocationFilteredRequest[]> {
+  try {
+    const radiusMeters = radiusKm * 1000;
+    const filteredRequests: LocationFilteredRequest[] = [];
+
+    for (const request of requests) {
+      // 픽업역과 배송역 중 더 가까운 역 찾기
+      const pickupDist = locationService.calculateDistance(
+        currentLocation.latitude,
+        currentLocation.longitude,
+        request.pickupStation.lat || request.pickupStation.latitude,
+        request.pickupStation.lng || request.pickupStation.longitude
+      );
+
+      const deliveryDist = locationService.calculateDistance(
+        currentLocation.latitude,
+        currentLocation.longitude,
+        request.deliveryStation.lat || request.deliveryStation.latitude,
+        request.deliveryStation.lng || request.deliveryStation.longitude
+      );
+
+      const minDistance = Math.min(pickupDist, deliveryDist);
+
+      // 반경 내에 있는 경우만 포함
+      if (minDistance <= radiusMeters) {
+        const nearestStation = pickupDist < deliveryDist
+          ? request.pickupStation.stationName
+          : request.deliveryStation.stationName;
+
+        // 예상 시간 (지하철 평균 속도 40km/h 가정)
+        const estimatedTimeMinutes = Math.round(minDistance / 1000 / 40 * 60);
+
+        filteredRequests.push({
+          ...request,
+          metadata: {
+            distanceFromCurrent: Math.round(minDistance),
+            nearestStation,
+            estimatedTimeMinutes,
+          },
+        });
+      }
+    }
+
+    // 거리 기반 정렬
+    filteredRequests.sort((a, b) =>
+      a.metadata.distanceFromCurrent - b.metadata.distanceFromCurrent
+    );
+
+    // 거리 순위 부여
+    filteredRequests.forEach((req, index) => {
+      req.metadata.distanceRank = index + 1;
+    });
+
+    return filteredRequests;
+  } catch (error) {
+    console.error('Error filtering requests by location:', error);
+    return [];
+  }
+}
+
+/**
+ * 길러 통계 조회
+ * @param gillerId 길러 ID
+ * @returns 길러 통계 정보
+ */
+export async function fetchGillerStats(
+  gillerId: string
+): Promise<GillerMatchingStats> {
+  try {
+    const userDoc = await getDoc(doc(db, 'users', gillerId));
+
+    if (!userDoc.exists) {
+      return {
+        gillerId,
+        gillerName: '익명',
+        rating: 3.5,
+        totalDeliveries: 0,
+        completedDeliveries: 0,
+        completionRate: 0,
+        averageResponseTime: 30,
+      };
+    }
+
+    const data = userDoc.data();
+    const stats = data.stats || data.gillerInfo || {};
+
+    const totalDeliveries = stats.completedDeliveries || stats.totalDeliveries || 0;
+    const completedDeliveries = stats.completedDeliveries || totalDeliveries;
+    const completionRate = totalDeliveries > 0
+      ? (completedDeliveries / totalDeliveries) * 100
+      : 0;
+
+    return {
+      gillerId,
+      gillerName: data.name || '익명',
+      rating: stats.rating || data.rating || 3.5,
+      totalDeliveries,
+      completedDeliveries,
+      completionRate: Math.round(completionRate),
+      averageResponseTime: stats.averageResponseTime || 30,
+      professionalLevel: data.professionalLevel || 'regular',
+      badgeBonus: data.badgeBonus || 0,
+    };
+  } catch (error) {
+    console.error('Error fetching giller stats:', error);
+    return {
+      gillerId,
+      gillerName: '익명',
+      rating: 3.5,
+      totalDeliveries: 0,
+      completedDeliveries: 0,
+      completionRate: 0,
+      averageResponseTime: 30,
+    };
+  }
+}
+
+/**
+ * 필터 옵션 적용
+ * @param requests 필터링할 요청 목록
+ * @param filters 필터 옵션
+ * @returns 필터링된 요청 목록
+ */
+export function applyMatchingFilters<T extends LocationFilteredRequest | RouteFilteredRequest>(
+  requests: T[],
+  filters: MatchingFilterOptions
+): T[] {
+  let filtered = [...requests];
+
+  // 호선 필터
+  if (filters.lineFilter && !filters.lineFilter.showAllLines && filters.lineFilter.selectedLines.length > 0) {
+    filtered = filtered.filter((request: any) => {
+      const pickupLine = request.pickupStation.line;
+      const deliveryLine = request.deliveryStation.line;
+      return filters.lineFilter!.selectedLines.some(line =>
+        pickupLine?.includes(line) || deliveryLine?.includes(line)
+      );
+    });
+  }
+
+  // 지역 필터
+  if (filters.regionFilter && !filters.regionFilter.showAllRegions && filters.regionFilter.selectedRegions.length > 0) {
+    filtered = filtered.filter((request: any) => {
+      const pickupRegion = request.pickupStation.region;
+      const deliveryRegion = request.deliveryStation.region;
+      return filters.regionFilter!.selectedRegions.includes(pickupRegion || deliveryRegion);
+    });
+  }
+
+  // 최소 매칭 점수 (동선 매칭인 경우)
+  if (filters.minMatchScore) {
+    filtered = filtered.filter((request: any) =>
+      request.matchScore?.score >= filters.minMatchScore!
+    );
+  }
+
+  // 최대 거리 (위치 매칭인 경우)
+  if (filters.maxDistance) {
+    filtered = filtered.filter((request: any) =>
+      request.metadata?.distanceFromCurrent <= filters.maxDistance!
+    );
+  }
+
+  // 배송비 필터
+  if (filters.minFee) {
+    filtered = filtered.filter((request: any) =>
+      request.fee?.totalFee >= filters.minFee!
+    );
+  }
+
+  if (filters.maxFee) {
+    filtered = filtered.filter((request: any) =>
+      request.fee?.totalFee <= filters.maxFee!
+    );
+  }
+
+  return filtered;
+}
+
+/**
+ * 역 정보 정규화 - Firestore 저장 형태와 관계없이 lat/lng 보장
+ */
+function normalizeStation(station: any): any {
+  if (!station) return station;
+
+  const lat = station.lat ?? station.latitude ?? station.location?.latitude ?? 0;
+  const lng = station.lng ?? station.longitude ?? station.location?.longitude ?? 0;
+
+  return {
+    ...station,
+    lat,
+    lng,
+    latitude: lat,
+    longitude: lng,
+  };
+}
+
+/**
+ * 대기 중인 배송 요청 조회 (길러용)
+ * @returns 대기 중인 요청 목록
+ */
+export async function getPendingGillerRequests(): Promise<any[]> {
+  try {
+    const q = query(
+      collection(db, 'requests'),
+      where('status', '==', 'pending')
+    );
+
+    const snapshot = await getDocs(q);
+    const requests: any[] = [];
+
+    snapshot.forEach((doc) => {
+      const data = doc.data();
+
+      // fee 필드 정규화: fee가 없으면 feeBreakdown 사용
+      const fee = data.fee || data.feeBreakdown || { totalFee: 0, baseFee: 0, distanceFee: 0, weightFee: 0, sizeFee: 0, serviceFee: 0, vat: 0 };
+
+      // 수신자 이름 (채팅 시 필요)
+      const recipientName = data.requesterName || data.senderName || '이용자';
+
+      requests.push({
+        requestId: doc.id,
+        ...data,
+        fee,
+        recipientName,
+        // 역 정보 좌표 정규화
+        pickupStation: normalizeStation(data.pickupStation),
+        deliveryStation: normalizeStation(data.deliveryStation),
+      });
+    });
+
+    return requests;
+  } catch (error) {
+    console.error('Error fetching pending giller requests:', error);
+    return [];
   }
 }

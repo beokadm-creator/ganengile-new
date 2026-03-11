@@ -3,10 +3,13 @@
  */
 
 import React from 'react';
-import { ActivityIndicator, View, Platform, StyleSheet, Dimensions } from 'react-native';
+import { ActivityIndicator, View, Platform, StyleSheet, Dimensions, Text } from 'react-native';
 import { useFonts } from 'expo-font';
 import { Ionicons, MaterialIcons } from '@expo/vector-icons';
 import AppNavigator from './src/navigation/AppNavigator';
+
+// React Native Web imports for better web support
+import { gestureHandlerRootHOC } from 'react-native-gesture-handler';
 
 export default function App() {
   // 웹 환경에서는 폰트 로딩을 무시하고 바로 렌더링
@@ -45,43 +48,43 @@ export default function App() {
     <View style={styles.desktopContainer}>
       {/* 왼쪽 소개 영역 */}
       <View style={styles.introSection}>
-        <View style={styles.titleContainer}>
+        <Text style={styles.titleContainer}>
           가는길에
-        </View>
-        <View style={styles.subtitle}>
+        </Text>
+        <Text style={styles.subtitle}>
           지하철 크라우드 배송 플랫폼
-        </View>
+        </Text>
 
         <View style={styles.featuresContainer}>
           <View style={styles.featureItem}>
-            <View style={styles.featureEmoji}>🚇</View>
+            <Text style={styles.featureEmoji}>🚇</Text>
             <View style={styles.featureTexts}>
-              <View style={styles.featureTitle}>지하철 출퇴근길에</View>
-              <View style={styles.featureDesc}>추가 수익 창출</View>
+              <Text style={styles.featureTitle}>지하철 출퇴근길에</Text>
+              <Text style={styles.featureDesc}>추가 수익 창출</Text>
             </View>
           </View>
 
           <View style={styles.featureItem}>
-            <View style={styles.featureEmoji}>📦</View>
+            <Text style={styles.featureEmoji}>📦</Text>
             <View style={styles.featureTexts}>
-              <View style={styles.featureTitle}>같이 가는 길에</View>
-              <View style={styles.featureDesc}>배송 의뢰</View>
+              <Text style={styles.featureTitle}>같이 가는 길에</Text>
+              <Text style={styles.featureDesc}>배송 의뢰</Text>
             </View>
           </View>
 
           <View style={styles.featureItem}>
-            <View style={styles.featureEmoji}>⚡</View>
+            <Text style={styles.featureEmoji}>⚡</Text>
             <View style={styles.featureTexts}>
-              <View style={styles.featureTitle}>오늘 받아볼 수 있는</View>
-              <View style={styles.featureDesc}>빠른 배송</View>
+              <Text style={styles.featureTitle}>오늘 받아볼 수 있는</Text>
+              <Text style={styles.featureDesc}>빠른 배송</Text>
             </View>
           </View>
         </View>
 
         <View style={styles.priceBox}>
-          <View style={styles.priceTitle}>💰 배송비</View>
-          <View style={styles.priceValue}>5,300원부터</View>
-          <View style={styles.priceDesc}>소형, 1kg, 5개역 기준</View>
+          <Text style={styles.priceTitle}>💰 배송비</Text>
+          <Text style={styles.priceValue}>5,300원부터</Text>
+          <Text style={styles.priceDesc}>소형, 1kg, 5개역 기준</Text>
         </View>
       </View>
 
@@ -96,33 +99,33 @@ export default function App() {
 
       {/* 오른쪽 설명 영역 */}
       <View style={styles.infoSection}>
-        <View style={styles.infoTitle}>서비스 특징</View>
+        <Text style={styles.infoTitle}>서비스 특징</Text>
 
         <View style={styles.infoCard}>
-          <View style={styles.infoCardTitle}>🎯 누구나 길러가 될 수 있습니다</View>
-          <View style={styles.infoCardText}>
+          <Text style={styles.infoCardTitle}>🎯 누구나 길러가 될 수 있습니다</Text>
+          <Text style={styles.infoCardText}>
             • 출퇴근길에 배송하며 추가 수익 창출 {'\n'}
             • 1회 왕복: 4,500원 × 20일 = 90,000원/월 {'\n'}
             • 자유로운 시간에 참여 가능
-          </View>
+          </Text>
         </View>
 
         <View style={styles.infoCard}>
-          <View style={styles.infoCardTitle}>⏰ 오늘 받아보세요</View>
-          <View style={styles.infoCardText}>
+          <Text style={styles.infoCardTitle}>⏰ 오늘 받아보세요</Text>
+          <Text style={styles.infoCardText}>
             • 지하철 to 지하철 배송 (1단계) {'\n'}
             • 긴급: 1-2시간, 일반: 2-3시간 {'\n'}
             • 실시간 경매 시스템
-          </View>
+          </Text>
         </View>
 
         <View style={styles.infoCard}>
-          <View style={styles.infoCardTitle}>💸 합리적인 가격</View>
-          <View style={styles.infoCardText}>
+          <Text style={styles.infoCardTitle}>💸 합리적인 가격</Text>
+          <Text style={styles.infoCardText}>
             • 기본요금: 3,500원 {'\n'}
             • 역 개수 기반 거리료 {'\n'}
             • 서비스 수수료 15% 포함
-          </View>
+          </Text>
         </View>
       </View>
     </View>

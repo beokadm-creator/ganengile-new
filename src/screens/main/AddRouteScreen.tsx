@@ -9,6 +9,7 @@ import {
   Text,
   StyleSheet,
   TextInput,
+  TouchableOpacity,
   ScrollView,
   Alert,
   ActivityIndicator,
@@ -119,12 +120,15 @@ export default function AddRouteScreen() {
       );
 
       Alert.alert(
-        '성공',
-        `동선이 등록되었습니다.\n${startStationName} → ${endStationName}`,
+        '✅ 동선 등록 완료',
+        `동선이 성공적으로 등록되었습니다.\n${startStationName} → ${endStationName}`,
         [
           {
             text: '확인',
-            onPress: () => navigation.goBack(),
+            onPress: () => {
+              // 동선 관리 탭으로 이동
+              navigation.navigate('Tabs', { screen: 'RouteManagement' } as any);
+            },
           },
         ]
       );
@@ -280,14 +284,16 @@ export default function AddRouteScreen() {
         </View>
 
         {/* Save Button */}
-        <View
+        <TouchableOpacity
           style={[styles.saveButton, saving && styles.saveButtonDisabled]}
-          onStartShouldSetResponder={() => !saving && handleSave()}
+          onPress={() => !saving && handleSave()}
+          disabled={saving}
+          activeOpacity={0.8}
         >
           <Text style={styles.saveButtonText}>
             {saving ? '저장 중...' : '동선 등록'}
           </Text>
-        </View>
+        </TouchableOpacity>
       </ScrollView>
     </View>
   );

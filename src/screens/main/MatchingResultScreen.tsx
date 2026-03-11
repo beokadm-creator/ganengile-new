@@ -1,369 +1,215 @@
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   View,
   Text,
   StyleSheet,
   ActivityIndicator,
-  Alert,
-  BackHandler,
-  Animated,
+  ScrollView,
+  TouchableOpacity,
 } from 'react-native';
 import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
-import { GillerProfileCard } from '../../components/giller/GillerProfileCard';
-import TransferInfoCard from '../../components/TransferInfoCard';
-import * as matchingService from '../../services/matching-service';
+import { Colors } from '../../theme';
+import * as requestService from '../../services/request-service';
 
 type MatchingResultRouteParams = {
   MatchingResult: {
     requestId: string;
+    pickupStationName?: string;
+    deliveryStationName?: string;
   };
 };
 
-const MATCHING_TIMEOUT = 30000; // 30 seconds
-
-// 색상 보간 함수 (초록색 → 주황색 → 빨간색)
-const interpolateColor = (progress: number): string => {
-  'worklet';
-  if (progress < 0.5) {
-    // 초록색 → 주황색 (#00BCD4 → #FF9800)
-    const ratio = progress * 2; // 0 → 1
-    const r = Math.round(0 + (255 - 0) * ratio);
-    const g = Math.round(188 + (152 - 188) * ratio);
-    const b = Math.round(212 + (0 - 212) * ratio);
-    return `rgb(${r}, ${g}, ${b})`;
-  } else {
-    // 주황색 → 빨간색 (#FF9800 → #FF5252)
-    const ratio = (progress - 0.5) * 2; // 0 → 1
-    const r = 255;
-    const g = Math.round(152 + (82 - 152) * ratio);
-    const b = Math.round(0 + (82 - 0) * ratio);
-    return `rgb(${r}, ${g}, ${b})`;
-  }
-};
+type RequestStatus = 'pending' | 'matched' | 'in_progress' | 'completed' | 'cancelled';
 
 export const MatchingResultScreen: React.FC = () => {
   const navigation = useNavigation();
   const route = useRoute<RouteProp<MatchingResultRouteParams, 'MatchingResult'>>();
-  const { requestId } = route.params;
+  const { requestId, pickupStationName, deliveryStationName } = route.params;
 
-  const [giller, setGiller] = useState<any>(null);
+  const [status, setStatus] = useState<RequestStatus>('pending');
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [isAccepting, setIsAccepting] = useState(false);
-  const [isRejecting, setIsRejecting] = useState(false);
-  const [timeoutReached, setTimeoutReached] = useState(false);
-  const [retryCount, setRetryCount] = useState(0);
-  const [fadeAnim] = useState(new Animated.Value(0));
-  const [requestFeeBreakdown, setRequestFeeBreakdown] = useState<any>(null);
+  const [giller, setGiller] = useState<any>(null);
+  const [notificationSent, setNotificationSent] = useState(false);
 
-  // 타이머 관련 상태 추가
-  const [timeLeft, setTimeLeft] = useState(MATCHING_TIMEOUT / 1000); // 초 단위
-  const [progressAnim] = useState(new Animated.Value(0));
-
-  // 흔들림 애니메이션용 Animated.Value
-  const [shakeAnim] = useState(new Animated.Value(0));
-
-  // Handle hardware back button
+  // 요청 상태 실시간 감시
   useEffect(() => {
-    const backHandler = BackHandler.addEventListener('hardwareBackPress', () => {
-      Alert.alert(
-        '매칭 취소',
-        '매칭을 취소하고 이전 화면으로 돌아가시겠습니까?',
-        [
-          { text: '아니오', style: 'cancel' },
-          {
-            text: '예',
-            style: 'destructive',
-            onPress: () => navigation.goBack(),
-          },
-        ]
-      );
-      return true;
+    const unsubscribe = requestService.subscribeToRequest(requestId, (request) => {
+      if (request) {
+        setStatus(request.status);
+        if (request.status === 'matched' && (request as any).matchedGillerId) {
+          // 문서에 giller 정보가 같이 포함되어 있다고 가정하거나 별도로 가져와야 함
+          setGiller((request as any).giller || { name: '길러', rating: 5.0 });
+        }
+        setLoading(false);
+      }
     });
 
-    return () => backHandler.remove();
-  }, [navigation]);
-
-  // Find giller for the request
-  const findGiller = useCallback(async () => {
-    try {
-      setLoading(true);
-      setError(null);
-      setTimeoutReached(false);
-
-      const result = await matchingService.findGiller(requestId);
-
-      if (result.success && result.data) {
-        setGiller({
-          ...result.data.giller,
-          rank: result.data.rank, // 순위 추가
-        });
-        fadeIn();
-      } else {
-        setError(result.error || '일시적인 오류가 발생했습니다.');
-        shake(); // 흔들림 애니메이션
+    // 길러들에게 푸시 알림 전송
+    const sendNotifications = async () => {
+      try {
+        await requestService.notifyGillers(requestId);
+        setNotificationSent(true);
+      } catch (error) {
+        console.error('푸시 알림 전송 실패:', error);
       }
-    } catch (err: any) {
-      setError(err.message || '네트워크 오류가 발생했습니다.');
-    } finally {
-      setLoading(false);
-    }
+    };
+
+    sendNotifications();
+
+    return () => {
+      if (unsubscribe) unsubscribe();
+    };
   }, [requestId]);
 
-  // Initial search
-  useEffect(() => {
-    findGiller();
-  }, [findGiller]);
-
-  // 타이머 진행률 애니메이션
-  useEffect(() => {
-    if (loading && !timeoutReached) {
-      // 프로그레스 바 애니메이션 (0% → 100%)
-      Animated.timing(progressAnim, {
-        toValue: 1,
-        duration: MATCHING_TIMEOUT,
-        useNativeDriver: false, // width는 useNativeDriver 지원 안함
-      }).start();
-
-      // 카운트다운 타이머
-      const timer = setInterval(() => {
-        setTimeLeft((prev) => {
-          if (prev <= 1) {
-            clearInterval(timer);
-            return 0;
-          }
-          return prev - 1;
-        });
-      }, 1000);
-
-      // 타임아웃 핸들링
-      const timeoutTimer = setTimeout(() => {
-        if (!giller) {
-          setTimeoutReached(true);
-          setError('매칭 시간이 초과되었습니다. 다시 시도해주세요.');
-          setLoading(false);
-        }
-      }, MATCHING_TIMEOUT);
-
-      return () => {
-        clearInterval(timer);
-        clearTimeout(timeoutTimer);
-      };
-    }
-  }, [loading, giller, timeoutReached]);
-
-  // Fade in animation
-  const fadeIn = useCallback(() => {
-    Animated.timing(fadeAnim, {
-      toValue: 1,
-      duration: 500,
-      useNativeDriver: true,
-    }).start();
-  }, [fadeAnim]);
-
-  // Shake animation (for errors)
-  const shake = useCallback(() => {
-    Animated.sequence([
-      Animated.timing(shakeAnim, { toValue: 10, duration: 50, useNativeDriver: true }),
-      Animated.timing(shakeAnim, { toValue: -10, duration: 50, useNativeDriver: true }),
-      Animated.timing(shakeAnim, { toValue: 10, duration: 50, useNativeDriver: true }),
-      Animated.timing(shakeAnim, { toValue: -10, duration: 50, useNativeDriver: true }),
-      Animated.timing(shakeAnim, { toValue: 0, duration: 50, useNativeDriver: true }),
-    ]).start();
-  }, [shakeAnim]);
-
-  // Handle accept
-  const handleAccept = async () => {
-    try {
-      setIsAccepting(true);
-
-      const result = await matchingService.acceptMatch(requestId, giller.id);
-
-      if (result.success) {
-        // 매칭 성공 애니메이션
-        Animated.spring(fadeAnim, {
-          toValue: 1,
-          friction: 8,
-          tension: 40,
-          useNativeDriver: true,
-        }).start();
-
-        Alert.alert(
-          '매칭 성공',
-          '기일러와 매칭되었습니다. 배송을 시작합니다.',
-          [
-            {
-              text: '확인',
-              onPress: () => {
-                navigation.reset({
-                  index: 0,
-                  routes: [{ name: 'DeliveryTracking' as never }],
-                });
-              },
-            },
-          ]
-        );
-      } else {
-        Alert.alert('오류', result.error || '매칭 수락에 실패했습니다.');
-      }
-    } catch (err: any) {
-      Alert.alert('오류', err.message || '네트워크 오류가 발생했습니다.');
-    } finally {
-      setIsAccepting(false);
-    }
+  const handleGoToChat = () => {
+    navigation.navigate('Chat' as any, {
+      gillerId: giller.id,
+      requestId: requestId,
+    });
   };
 
-  // Handle reject
-  const handleReject = () => {
-    Alert.alert(
-      '거절 확인',
-      '이 기일러를 거절하시겠습니까? 다른 기일러를 찾게 됩니다.',
-      [
-        { text: '취소', style: 'cancel' },
-        {
-          text: '거절',
-          style: 'destructive',
-          onPress: async () => {
-            try {
-              setIsRejecting(true);
-              const result = await matchingService.rejectMatch(requestId, giller.id);
-
-              if (result.success) {
-                // Find another giller
-                setRetryCount((prev) => prev + 1);
-                await findGiller();
-              } else {
-                Alert.alert('오류', result.error || '거절 처리에 실패했습니다.');
-              }
-            } catch (err: any) {
-              Alert.alert('오류', err.message || '네트워크 오류가 발생했습니다.');
-            } finally {
-              setIsRejecting(false);
-            }
-          },
-        },
-      ]
-    );
+  const handleGoHome = () => {
+    navigation.navigate('Tabs', { screen: 'Home' } as any);
   };
 
-  // Retry matching
-  const handleRetry = () => {
-    setGiller(null);
-    setError(null);
-    setRetryCount(0);
-    findGiller();
+  const handleViewRequestDetail = () => {
+    navigation.navigate('RequestDetail' as any, {
+      requestId,
+    });
   };
 
-  // Cancel matching
-  const handleCancel = () => {
-    Alert.alert(
-      '매칭 취소',
-      '매칭을 취소하고 이전 화면으로 돌아가시겠습니까?',
-      [
-        { text: '아니오', style: 'cancel' },
-        {
-          text: '예',
-          style: 'destructive',
-          onPress: () => navigation.goBack(),
-        },
-      ]
-    );
-  };
-
-  if (error) {
-    return (
-       <View style={styles.container}>
-         <Animated.View style={[styles.errorContainer, { transform: [{ translateX: shakeAnim }] }]}>
-           {/* @ts-ignore */}
-           <Ionicons name="alert-circle-outline" size={64} color="#FF5252" />
-           <Text style={styles.errorTitle}>매칭 실패</Text>
-          <Text style={styles.errorMessage}>{error}</Text>
-          <View style={styles.errorButtonContainer}>
-            <Text style={styles.retryButton} onPress={handleRetry}>
-              다시 시도
-            </Text>
-            <Text style={styles.cancelButton} onPress={handleCancel}>
-              취소
-            </Text>
-          </View>
-        </Animated.View>
-      </View>
-    );
-  }
-
-  if (loading) {
+  // 매칭 완료 화면
+  if (status === 'matched' && giller) {
     return (
       <View style={styles.container}>
-        <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color="#00BCD4" />
-          <Text style={styles.loadingText}>기일러를 찾고 있습니다...</Text>
-          <Text style={styles.loadingSubtext}>
-            잠시만 기다려주세요 ({Math.floor(MATCHING_TIMEOUT / 1000)}초 내)
-          </Text>
-          {retryCount > 0 && (
-            <Text style={styles.retryCount}>재시도 횟수: {retryCount}</Text>
-          )}
-
-          {/* 타이머 프로그레스 바 */}
-          <View style={styles.progressContainer}>
-            <Animated.View
-               style={[
-                 styles.progressBar,
-                 {
-                   width: progressAnim.interpolate({
-                     inputRange: [0, 1],
-                     outputRange: ['0%', '100%'],
-                   }),
-                   // @ts-ignore - __getValue exists on AnimatedInterpolation
-                   backgroundColor: interpolateColor(
-                     (progressAnim.interpolate({
-                       inputRange: [0, 1],
-                       outputRange: [0, 1],
-                     }) as any).__getValue()
-                   ),
-                 },
-               ]}
-            />
+        <ScrollView contentContainerStyle={styles.scrollContent}>
+          {/* 성공 아이콘 */}
+          <View style={styles.iconContainer}>
+            <Ionicons name="checkmark-circle" size={100} color={Colors.success} />
           </View>
-          <Text style={styles.timeLeftText}>
-            {timeLeft}초 남음
+
+          <Text style={styles.title}>길러 매칭 완료!</Text>
+          <Text style={styles.message}>
+            {giller.name || '길러'}님과 매칭되었습니다.
           </Text>
-        </View>
-        <Text style={styles.cancelText} onPress={handleCancel}>
-          취소
-        </Text>
+
+          {/* 길러 정보 카드 */}
+          <View style={styles.infoCard}>
+            <View style={styles.gillerInfo}>
+              <View style={styles.avatar}>
+                <Ionicons name="person" size={40} color={Colors.primary} />
+              </View>
+              <View style={styles.gillerDetails}>
+                <Text style={styles.gillerName}>{giller.name || '길러'}</Text>
+                <Text style={styles.gillerRating}>
+                  ⭐ {giller.rating?.toFixed(1) || '0.0'} ({giller.completedDeliveries || 0}건 완료)
+                </Text>
+              </View>
+            </View>
+          </View>
+
+          {/* 안내 메시지 */}
+          <View style={styles.noticeContainer}>
+            <Text style={styles.noticeTitle}>💬 채팅으로 조율하세요</Text>
+            <Text style={styles.noticeText}>
+              길러님과 채팅으로 상세 시간과 장소를 조율해주세요.
+            </Text>
+            <Text style={styles.noticeText}>
+              정확한 픽업 시간과 장소를 미리 정하시면 배송이 원활합니다.
+            </Text>
+          </View>
+
+          {/* 버튼 */}
+          <View style={styles.buttonContainer}>
+            <TouchableOpacity
+              style={[styles.button, styles.primaryButton]}
+              onPress={handleGoToChat}
+            >
+              <Ionicons name="chatbubbles" size={24} color={Colors.white} />
+              <Text style={styles.buttonText}>채팅 시작하기</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={[styles.button, styles.secondaryButton]}
+              onPress={handleViewRequestDetail}
+            >
+              <Text style={styles.secondaryButtonText}>요청 상세 보기</Text>
+            </TouchableOpacity>
+          </View>
+        </ScrollView>
       </View>
     );
   }
 
+  // 매칭 대기 화면
   return (
     <View style={styles.container}>
-      <View style={styles.header}>
-        <Text style={styles.headerTitle}>매칭 완료!</Text>
-        <Text style={styles.headerSubtitle}>
-          기일러를 찾았습니다. 수락 또는 거절해주세요.
-        </Text>
-      </View>
+      <ScrollView contentContainerStyle={styles.scrollContent}>
+        {/* 로딩 인디케이터 */}
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color={Colors.primary} />
+          <Text style={styles.loadingTitle}>길러를 찾고 있습니다...</Text>
+          <Text style={styles.loadingMessage}>
+            해당 경로를 운행하는 길러에게 알림을 보냈습니다.
+          </Text>
+        </View>
 
-      <Animated.View style={{ opacity: fadeAnim }}>
-        <GillerProfileCard
-          giller={giller}
-          rank={giller.rank} // 순위 전달
-          onAccept={handleAccept}
-          onReject={handleReject}
-          isAccepting={isAccepting}
-          isRejecting={isRejecting}
-        />
+        {/* 알림 전송 완료 메시지 */}
+        {notificationSent && (
+          <View style={styles.successContainer}>
+            <Ionicons name="notifications" size={30} color={Colors.success} />
+            <Text style={styles.successText}>
+              알림 전송 완료!
+            </Text>
+            <Text style={styles.successSubtext}>
+              주변 길러들에게 요청 알림을 보냈습니다.
+            </Text>
+          </View>
+        )}
 
-           {/* 환승 정보 카드 (환승 시에만 표시) */}
-         {giller.transferInfo?.hasTransfer && (
-           <TransferInfoCard
-             transferInfo={giller.transferInfo}
-             style={{ marginTop: 16 }}
-           />
-         )}
-      </Animated.View>
+        {/* 경로 정보 */}
+        {(pickupStationName || deliveryStationName) && (
+          <View style={styles.infoCard}>
+            <View style={styles.infoRow}>
+              <Ionicons name="map-outline" size={20} color={Colors.primary} />
+              <Text style={styles.infoText}>
+                {pickupStationName} → {deliveryStationName}
+              </Text>
+            </View>
+          </View>
+        )}
+
+        {/* 안내사항 */}
+        <View style={styles.noticeContainer}>
+          <Text style={styles.noticeTitle}>⏰ 대기 중</Text>
+          <View style={styles.noticeList}>
+            <Text style={styles.noticeItem}>• 길러가 요청을 확인하면 매칭됩니다.</Text>
+            <Text style={styles.noticeItem}>• 매칭되면 알림로 알려드립니다.</Text>
+            <Text style={styles.noticeItem}>• 홈으로 가셔도 알림을 받을 수 있습니다.</Text>
+          </View>
+        </View>
+
+        {/* 버튼 */}
+        <View style={styles.buttonContainer}>
+          <TouchableOpacity
+            style={[styles.button, styles.secondaryButton]}
+            onPress={handleGoHome}
+          >
+            <Text style={styles.secondaryButtonText}>홈으로 가기</Text>
+            <Text style={styles.buttonSubtext}>
+              알림을 받으면 매칭 완료 화면이 나타납니다
+            </Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={[styles.button, styles.tertiaryButton]}
+            onPress={handleViewRequestDetail}
+          >
+            <Text style={styles.tertiaryButtonText}>요청 상세 보기</Text>
+          </TouchableOpacity>
+        </View>
+      </ScrollView>
     </View>
   );
 };
@@ -373,104 +219,184 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#F5F5F5',
   },
-  header: {
+  scrollContent: {
     padding: 20,
-    alignItems: 'center',
+    paddingBottom: 40,
   },
-  headerTitle: {
+  iconContainer: {
+    alignItems: 'center',
+    marginTop: 40,
+    marginBottom: 20,
+  },
+  title: {
     fontSize: 28,
     fontWeight: 'bold',
-    color: '#00BCD4',
+    color: Colors.textPrimary,
+    textAlign: 'center',
     marginBottom: 8,
   },
-  headerSubtitle: {
-    fontSize: 14,
-    color: '#666',
+  message: {
+    fontSize: 16,
+    color: Colors.textSecondary,
     textAlign: 'center',
+    marginBottom: 30,
   },
   loadingContainer: {
-    flex: 1,
-    justifyContent: 'center',
     alignItems: 'center',
-    padding: 20,
+    marginTop: 40,
+    marginBottom: 20,
   },
-  loadingText: {
-    fontSize: 20,
+  loadingTitle: {
+    fontSize: 22,
     fontWeight: 'bold',
-    color: '#333',
+    color: Colors.textPrimary,
     marginTop: 20,
+    marginBottom: 8,
   },
-  loadingSubtext: {
+  loadingMessage: {
     fontSize: 14,
-    color: '#666',
-    marginTop: 8,
-  },
-  retryCount: {
-    fontSize: 12,
-    color: '#FF9800',
-    marginTop: 8,
-  },
-  progressContainer: {
-    width: '80%',
-    height: 8,
-    backgroundColor: '#E0E0E0',
-    borderRadius: 4,
-    marginTop: 20,
-    overflow: 'hidden',
-  },
-  progressBar: {
-    height: '100%',
-    borderRadius: 4,
-  },
-  timeLeftText: {
-    fontSize: 14,
-    color: '#666',
-    marginTop: 12,
-  },
-  cancelText: {
-    fontSize: 16,
-    color: '#666',
+    color: Colors.textSecondary,
     textAlign: 'center',
-    padding: 16,
-    textDecorationLine: 'underline',
   },
-  errorContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: 20,
-  },
-  errorTitle: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: '#333',
-    marginTop: 20,
-  },
-  errorMessage: {
-    fontSize: 16,
-    color: '#666',
-    textAlign: 'center',
-    marginTop: 12,
-    marginBottom: 32,
-  },
-  errorButtonContainer: {
+  successContainer: {
     flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#E8F5E9',
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 20,
+    borderWidth: 1,
+    borderColor: '#4CAF50',
+  },
+  successText: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#2E7D32',
+    marginLeft: 12,
+    flex: 1,
+  },
+  successSubtext: {
+    fontSize: 12,
+    color: '#666',
+    marginLeft: 48,
+    marginTop: 4,
+  },
+  infoCard: {
+    backgroundColor: Colors.white,
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 16,
+    borderWidth: 1,
+    borderColor: Colors.gray200,
+  },
+  infoRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  infoText: {
+    fontSize: 16,
+    color: Colors.textPrimary,
+    fontWeight: '500',
+  },
+  gillerInfo: {
+    flexDirection: 'row',
+    alignItems: 'center',
     gap: 16,
   },
-  retryButton: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    color: '#fff',
-    backgroundColor: '#00BCD4',
-    paddingVertical: 12,
-    paddingHorizontal: 24,
-    borderRadius: 8,
+  avatar: {
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    backgroundColor: '#E3F2FD',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
-  cancelButton: {
+  gillerDetails: {
+    flex: 1,
+  },
+  gillerName: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: Colors.textPrimary,
+    marginBottom: 4,
+  },
+  gillerRating: {
+    fontSize: 14,
+    color: Colors.textSecondary,
+  },
+  noticeContainer: {
+    backgroundColor: '#FFF3E0',
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 16,
+    borderWidth: 1,
+    borderColor: '#FF9800',
+  },
+  noticeTitle: {
     fontSize: 16,
     fontWeight: 'bold',
+    color: '#E65100',
+    marginBottom: 12,
+  },
+  noticeText: {
+    fontSize: 14,
     color: '#666',
-    paddingVertical: 12,
-    paddingHorizontal: 24,
+    lineHeight: 20,
+    marginBottom: 8,
+  },
+  noticeList: {
+    gap: 8,
+  },
+  noticeItem: {
+    fontSize: 14,
+    color: '#666',
+    lineHeight: 20,
+  },
+  buttonContainer: {
+    gap: 12,
+    marginTop: 20,
+  },
+  button: {
+    borderRadius: 12,
+    padding: 16,
+    alignItems: 'center',
+    flexDirection: 'row',
+    justifyContent: 'center',
+    gap: 8,
+  },
+  primaryButton: {
+    backgroundColor: Colors.primary,
+  },
+  buttonText: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: Colors.white,
+  },
+  secondaryButton: {
+    backgroundColor: Colors.white,
+    borderWidth: 2,
+    borderColor: Colors.gray300,
+  },
+  secondaryButtonText: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: Colors.textPrimary,
+    marginBottom: 4,
+  },
+  tertiaryButton: {
+    backgroundColor: 'transparent',
+    borderWidth: 1,
+    borderColor: Colors.primary,
+  },
+  tertiaryButtonText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: Colors.primary,
+  },
+  buttonSubtext: {
+    fontSize: 12,
+    color: Colors.textSecondary,
+    marginTop: 4,
   },
 });

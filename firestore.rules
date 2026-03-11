@@ -89,8 +89,11 @@ service cloud.firestore {
       // 읽기: 인증된 사용자
       allow read: if isAuthenticated();
 
-      // 쓰기: 본인만
-      allow write: if isOwner(resource.data.userId);
+      // 생성: 인증된 사용자 (본인의 userId로 생성)
+      allow create: if isAuthenticated() && isOwner(request.resource.data.userId);
+
+      // 업데이트: 본인만
+      allow update: if isOwner(resource.data.userId);
 
       // 삭제: 본인만
       allow delete: if isOwner(resource.data.userId);
@@ -99,9 +102,10 @@ service cloud.firestore {
     // ==================== Requests Collection ====================
 
     match /requests/{requestId} {
-      // 읽기: 요청자 또는 매칭된 길러
+      // 읽기: 요청자, 매칭된 길러, 또는 공개 상태인 대기 중(pending) 요청
       allow read: if isAuthenticated() &&
-                  (isOwner(resource.data.requesterId) ||
+                  (resource.data.status == 'pending' ||
+                   isOwner(resource.data.requesterId) ||
                    isOwner(resource.data.matchedGillerId));
 
       // 생성: 인증된 사용자 (요청자가 자신의 userId로 생성)
@@ -188,19 +192,22 @@ service cloud.firestore {
       allow delete: if false;
     }
 
-    // ==================== Messages Collection ====================
-
     match /chats/{chatId}/messages/{messageId} {
-      // 읽기: 채팅방 참여자만
       allow read: if isAuthenticated();
-      // 메시지는 상위 채팅방 권한을 따름
-
-      // 쓰기: 참여자만
       allow write: if isAuthenticated();
-      // 메시지는 상위 채팅방 권한을 따름
-
-      // 삭제: 발신자만
       allow delete: if isOwner(resource.data.senderId);
+    }
+
+    // ==================== ChatRooms Collection ====================
+
+    match /chatRooms/{roomId} {
+      allow read: if isAuthenticated();
+      allow write: if isAuthenticated();
+    }
+
+    match /chatRooms/{roomId}/messages/{messageId} {
+      allow read: if isAuthenticated();
+      allow write: if isAuthenticated();
     }
 
     // ==================== B2B Collections ====================

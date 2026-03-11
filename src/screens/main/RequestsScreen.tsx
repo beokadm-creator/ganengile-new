@@ -13,6 +13,7 @@ import {
   RefreshControl,
   ActivityIndicator,
   Alert,
+  Modal,
 } from 'react-native';
 import { StackNavigationProp } from '@react-navigation/stack';
 import { getUserRequests, cancelRequest } from '../../services/request-service';
@@ -29,6 +30,9 @@ export default function RequestsScreen({ navigation }: Props) {
   const [requests, setRequests] = useState<DeliveryRequest[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [cancellingRequestId, setCancellingRequestId] = useState<string | null>(null);
+  const [cancelConfirmVisible, setCancelConfirmVisible] = useState(false);
+  const [requestToCancel, setRequestToCancel] = useState<DeliveryRequest | null>(null);
 
   useEffect(() => {
     loadRequests();
@@ -53,43 +57,84 @@ export default function RequestsScreen({ navigation }: Props) {
   };
 
   const handleCancel = (requestId: string) => {
-    try {
-      const userId = requireUserId();
+    console.log('🔴 Cancel button pressed for request:', requestId);
 
-      // 취소 사유 입력 요청
-      Alert.prompt(
-        '취소 사유',
-        '배송 요청을 취소하는 사유를 입력해주세요.',
+    // 요청 상태 확인
+    const request = requests.find(r => r.requestId === requestId);
+    if (!request) {
+      console.log('❌ Request not found:', requestId);
+      return;
+    }
+
+    console.log('📋 Request status:', request.status);
+
+    // 취소 불가능한 상태 체크
+    if (request.status !== 'pending' && request.status !== 'matched') {
+      console.log('❌ Cannot cancel - invalid status');
+      Alert.alert(
+        '취소 불가',
+        '이미 배송이 진행 중이거나 완료된 요청은 취소할 수 없습니다.',
+        [{ text: '확인' }]
+      );
+      return;
+    }
+
+    console.log('🚀 About to show confirmation modal');
+    setRequestToCancel(request);
+    setCancelConfirmVisible(true);
+  };
+
+  const handleConfirmCancel = async () => {
+    if (!requestToCancel) return;
+
+    console.log('✅ User confirmed cancellation for:', requestToCancel.requestId);
+    try {
+      setCancellingRequestId(requestToCancel.requestId);
+      setCancelConfirmVisible(false);
+
+      const userId = requireUserId();
+      await cancelRequest(requestToCancel.requestId, userId, '사용자 요청으로 취소');
+
+      // 로컬 상태 즉시 업데이트
+      setRequests(prevRequests =>
+        prevRequests.map(req =>
+          req.requestId === requestToCancel.requestId
+            ? { ...req, status: 'cancelled' as any }
+            : req
+        )
+      );
+
+      Alert.alert(
+        '✅ 취소 완료',
+        '배송 요청이 취소되었습니다.\n\n이용해 주셔서 감사합니다. 다음에 또 이용해주세요!',
         [
           {
-            text: '취소',
-            style: 'cancel',
-          },
-          {
             text: '확인',
-            onPress: async (reason: string | undefined) => {
-              if (!reason || reason.trim().length === 0) {
-                Alert.alert('오류', '취소 사유를 입력해주세요.');
-                return;
-              }
-
-              try {
-                await cancelRequest(requestId, userId, reason);
-                Alert.alert('성공', '배송 요청이 취소되었습니다.');
-                await loadRequests(); // 목록 새로고침
-              } catch (error) {
-                console.error('Error cancelling request:', error);
-                Alert.alert('오류', '요청 취소에 실패했습니다.');
-              }
-            },
-          },
-        ],
-        'plain-text',
-        ''
+            onPress: () => {
+              console.log('✅ Cancel completed for:', requestToCancel.requestId);
+              // 확인 후 목록 새로고침
+              loadRequests();
+            }
+          }
+        ]
       );
-    } catch (error) {
-      console.error('Error in cancel flow:', error);
+    } catch (error: any) {
+      console.error('❌ Error cancelling request:', error);
+      Alert.alert(
+        '❌ 취소 실패',
+        error.message || '요청 취소에 실패했습니다. 다시 시도해주세요.',
+        [{ text: '확인' }]
+      );
+    } finally {
+      setCancellingRequestId(null);
+      setRequestToCancel(null);
     }
+  };
+
+  const handleCancelDismiss = () => {
+    console.log('❌ Cancel dialog dismissed');
+    setCancelConfirmVisible(false);
+    setRequestToCancel(null);
   };
 
   const getStatusColor = (status: DeliveryStatus): string => {
@@ -170,61 +215,71 @@ export default function RequestsScreen({ navigation }: Props) {
   };
 
   const renderRequest = ({ item }: { item: DeliveryRequest }) => (
-    <TouchableOpacity
-      style={styles.requestCard}
-      onPress={() => {
-        // 요청 상세 화면으로 이동
-        navigation.navigate('RequestDetail' as never, {
-          requestId: item.requestId,
-        });
-      }}
-    >
-      <View style={styles.requestHeader}>
-        <View style={styles.routeInfo}>
-          <Text style={styles.stationName}>{item.pickupStation.stationName}</Text>
-          <Text style={styles.arrow}>→</Text>
-          <Text style={styles.stationName}>{item.deliveryStation.stationName}</Text>
-        </View>
-        <View style={[styles.statusBadge, { backgroundColor: getStatusColor(item.status) }]}>
-          <Text style={styles.statusText}>{getStatusText(item.status)}</Text>
-        </View>
-      </View>
-
-      <View style={styles.requestBody}>
-        <View style={styles.infoRow}>
-          <Text style={styles.infoLabel}>📦 패키지</Text>
-          <Text style={styles.infoValue}>
-            {item.packageInfo.size === 'small' ? '소형' : item.packageInfo.size === 'medium' ? '중형' : item.packageInfo.size === 'large' ? '대형' : '특대'} ({item.packageInfo.weight}kg)
-          </Text>
+    <View style={styles.requestCard}>
+      <TouchableOpacity
+        style={styles.cardContent}
+        onPress={() => {
+          // 요청 상세 화면으로 이동
+          navigation.navigate('RequestDetail' as never, {
+            requestId: item.requestId,
+          });
+        }}
+      >
+        <View style={styles.requestHeader}>
+          <View style={styles.routeInfo}>
+            <Text style={styles.stationName}>{item.pickupStation.stationName}</Text>
+            <Text style={styles.arrow}>→</Text>
+            <Text style={styles.stationName}>{item.deliveryStation.stationName}</Text>
+          </View>
+          <View style={[styles.statusBadge, { backgroundColor: getStatusColor(item.status) }]}>
+            <Text style={styles.statusText}>{getStatusText(item.status)}</Text>
+          </View>
         </View>
 
-        <View style={styles.infoRow}>
-          <Text style={styles.infoLabel}>👤 수신자</Text>
-          <Text style={styles.infoValue}>{item.recipientName}</Text>
-        </View>
+        <View style={styles.requestBody}>
+          <View style={styles.infoRow}>
+            <Text style={styles.infoLabel}>📦 패키지</Text>
+            <Text style={styles.infoValue}>
+              {item.packageInfo.size === 'small' ? '소형' : item.packageInfo.size === 'medium' ? '중형' : item.packageInfo.size === 'large' ? '대형' : '특대'} ({item.packageInfo.weight}kg)
+            </Text>
+          </View>
 
-        <View style={styles.infoRow}>
-          <Text style={styles.infoLabel}>💵 배송비</Text>
-          <Text style={styles.infoValue}>{(item.fee?.totalFee || 0).toLocaleString()}원</Text>
-        </View>
+          <View style={styles.infoRow}>
+            <Text style={styles.infoLabel}>👤 수신자</Text>
+            <Text style={styles.infoValue}>{item.recipientName}</Text>
+          </View>
 
-        <View style={styles.infoRow}>
-          <Text style={styles.infoLabel}>⏰ 생성일</Text>
-          <Text style={styles.infoValue}>{formatDate(item.createdAt)}</Text>
-        </View>
-      </View>
+          <View style={styles.infoRow}>
+            <Text style={styles.infoLabel}>💵 배송비</Text>
+            <Text style={styles.infoValue}>{(item.fee?.totalFee || 0).toLocaleString()}원</Text>
+          </View>
 
-      {item.status === 'pending' && (
+          <View style={styles.infoRow}>
+            <Text style={styles.infoLabel}>⏰ 생성일</Text>
+            <Text style={styles.infoValue}>{formatDate(item.createdAt)}</Text>
+          </View>
+        </View>
+      </TouchableOpacity>
+
+      {(item.status === 'pending' || item.status === 'matched') && (
         <View style={styles.requestActions}>
           <TouchableOpacity
-            style={[styles.actionButton, styles.cancelButton]}
+            style={[
+              styles.actionButton,
+              styles.cancelButton,
+              cancellingRequestId === item.requestId && styles.disabledButton
+            ]}
             onPress={() => handleCancel(item.requestId)}
+            disabled={cancellingRequestId === item.requestId}
+            activeOpacity={0.8}
           >
-            <Text style={styles.actionButtonText}>취소</Text>
+            <Text style={styles.actionButtonText}>
+              {cancellingRequestId === item.requestId ? '취소 중...' : '요청 취소'}
+            </Text>
           </TouchableOpacity>
         </View>
       )}
-    </TouchableOpacity>
+    </View>
   );
 
   const renderEmptyState = () => (
@@ -263,6 +318,50 @@ export default function RequestsScreen({ navigation }: Props) {
           <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
         }
       />
+
+      {/* 취소 확인 모달 */}
+      <Modal
+        visible={cancelConfirmVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={handleCancelDismiss}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContainer}>
+            <Text style={styles.modalTitle}>
+              {requestToCancel?.status === 'matched'
+                ? '길러와 매칭되었습니다'
+                : '배송 요청 취소'}
+            </Text>
+            <Text style={styles.modalMessage}>
+              {requestToCancel?.status === 'matched'
+                ? '정말로 취소하시겠습니까?'
+                : '정말로 이 배송 요청을 취소하시겠습니까?'}
+            </Text>
+
+            <View style={styles.modalActions}>
+              <TouchableOpacity
+                style={[styles.modalButton, styles.modalCancelButton]}
+                onPress={handleCancelDismiss}
+                disabled={cancellingRequestId !== null}
+              >
+                <Text style={styles.modalCancelButtonText}>아니요</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.modalButton, styles.modalConfirmButton]}
+                onPress={handleConfirmCancel}
+                disabled={cancellingRequestId !== null}
+              >
+                {cancellingRequestId ? (
+                  <ActivityIndicator color="#fff" />
+                ) : (
+                  <Text style={styles.modalConfirmButtonText}>예, 취소합니다</Text>
+                )}
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }
@@ -273,6 +372,9 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     flex: 1,
     paddingVertical: 10,
+  },
+  disabledButton: {
+    opacity: 0.6,
   },
   actionButtonText: {
     color: '#fff',
@@ -353,7 +455,6 @@ const styles = StyleSheet.create({
     borderTopWidth: 1,
     flexDirection: 'row',
     gap: 8,
-    marginTop: 12,
     paddingTop: 12,
   },
   requestBody: {
@@ -365,6 +466,9 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     borderWidth: 1,
     marginBottom: 12,
+    overflow: 'hidden',
+  },
+  cardContent: {
     padding: 16,
   },
   requestHeader: {
@@ -403,5 +507,61 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontSize: 32,
     fontWeight: 'bold',
+  },
+  modalOverlay: {
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+  },
+  modalContainer: {
+    backgroundColor: '#fff',
+    borderRadius: 12,
+    padding: 20,
+    width: '100%',
+    maxWidth: 320,
+  },
+  modalTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#333',
+    marginBottom: 12,
+    textAlign: 'center',
+  },
+  modalMessage: {
+    fontSize: 14,
+    color: '#666',
+    marginBottom: 20,
+    textAlign: 'center',
+    lineHeight: 20,
+  },
+  modalActions: {
+    flexDirection: 'row',
+    gap: 12,
+  },
+  modalButton: {
+    flex: 1,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderRadius: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  modalCancelButton: {
+    backgroundColor: '#f0f0f0',
+  },
+  modalCancelButtonText: {
+    color: '#333',
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  modalConfirmButton: {
+    backgroundColor: '#EF5350',
+  },
+  modalConfirmButtonText: {
+    color: '#fff',
+    fontSize: 14,
+    fontWeight: '600',
   },
 });

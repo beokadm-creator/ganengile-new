@@ -113,14 +113,18 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     padding: 16,
     width: '100%',
+    maxWidth: 400,
+    maxHeight: '80%',
   },
   input: {
     borderColor: '#ddd',
     borderRadius: 8,
     borderWidth: 1,
     minHeight: 80,
+    maxHeight: 120,
     padding: 12,
     textAlignVertical: 'top',
+    fontSize: 14,
   },
   overlay: {
     alignItems: 'center',

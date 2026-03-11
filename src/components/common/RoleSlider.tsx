@@ -62,14 +62,7 @@ export default function RoleSlider({
               >
                 이용자
               </Text>
-              <Text
-                style={[
-                  styles.subtitle,
-                  isGllerActive && styles.activeSubtitle,
-                ]}
-              >
-                배송을 요청하려면
-              </Text>
+
             </View>
           </View>
 
@@ -97,14 +90,7 @@ export default function RoleSlider({
               >
                 길러 모드
               </Text>
-              <Text
-                style={[
-                  styles.subtitle,
-                  !isGllerActive && styles.activeSubtitle,
-                ]}
-              >
-                배송을 하려면
-              </Text>
+
             </View>
           </View>
         </View>

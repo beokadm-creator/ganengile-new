@@ -4,9 +4,57 @@
  */
 
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { Platform } from 'react-native';
 
 const DRAFT_PREFIX = '@ganengile_draft_';
 const FORM_PROGRESS_PREFIX = '@ganengile_form_';
+
+// 웹 환경인지 확인
+const isWeb = Platform.OS === 'web';
+
+// 웹 전용 스토리지 래퍼
+const webStorage = {
+  getItem: async (key: string): Promise<string | null> => {
+    try {
+      return localStorage.getItem(key);
+    } catch (error) {
+      console.error('Web storage getItem error:', error);
+      return null;
+    }
+  },
+  setItem: async (key: string, value: string): Promise<void> => {
+    try {
+      localStorage.setItem(key, value);
+    } catch (error) {
+      console.error('Web storage setItem error:', error);
+    }
+  },
+  removeItem: async (key: string): Promise<void> => {
+    try {
+      localStorage.removeItem(key);
+    } catch (error) {
+      console.error('Web storage removeItem error:', error);
+    }
+  },
+  getAllKeys: async (): Promise<string[]> => {
+    try {
+      return Object.keys(localStorage);
+    } catch (error) {
+      console.error('Web storage getAllKeys error:', error);
+      return [];
+    }
+  },
+  multiRemove: async (keys: string[]): Promise<void> => {
+    try {
+      keys.forEach(key => localStorage.removeItem(key));
+    } catch (error) {
+      console.error('Web storage multiRemove error:', error);
+    }
+  }
+};
+
+// 통합 스토리지 인터페이스
+const storage = isWeb ? webStorage : AsyncStorage;
 
 export interface DraftData<T = any> {
   data: T;
@@ -23,7 +71,7 @@ export async function saveDraft<T>(key: string, data: T): Promise<void> {
       data,
       timestamp: Date.now(),
     };
-    await AsyncStorage.setItem(`${DRAFT_PREFIX}${key}`, JSON.stringify(draft));
+    await storage.setItem(`${DRAFT_PREFIX}${key}`, JSON.stringify(draft));
   } catch (error) {
     console.error('Error saving draft:', error);
   }
@@ -34,7 +82,7 @@ export async function saveDraft<T>(key: string, data: T): Promise<void> {
  */
 export async function loadDraft<T>(key: string): Promise<T | null> {
   try {
-    const json = await AsyncStorage.getItem(`${DRAFT_PREFIX}${key}`);
+    const json = await storage.getItem(`${DRAFT_PREFIX}${key}`);
     if (!json) return null;
 
     const draft: DraftData<T> = JSON.parse(json);
@@ -58,7 +106,7 @@ export async function loadDraft<T>(key: string): Promise<T | null> {
  */
 export async function deleteDraft(key: string): Promise<void> {
   try {
-    await AsyncStorage.removeItem(`${DRAFT_PREFIX}${key}`);
+    await storage.removeItem(`${DRAFT_PREFIX}${key}`);
   } catch (error) {
     console.error('Error deleting draft:', error);
   }
@@ -69,7 +117,7 @@ export async function deleteDraft(key: string): Promise<void> {
  */
 export async function getAllDraftKeys(): Promise<string[]> {
   try {
-    const allKeys = await AsyncStorage.getAllKeys();
+    const allKeys = await storage.getAllKeys();
     return allKeys
       .filter(key => key.startsWith(DRAFT_PREFIX))
       .map(key => key.replace(DRAFT_PREFIX, ''));
@@ -88,7 +136,7 @@ export async function cleanupOldDrafts(): Promise<number> {
     let cleaned = 0;
 
     for (const key of keys) {
-      const json = await AsyncStorage.getItem(`${DRAFT_PREFIX}${key}`);
+      const json = await storage.getItem(`${DRAFT_PREFIX}${key}`);
       if (json) {
         const draft: DraftData = JSON.parse(json);
         const maxAge = 7 * 24 * 60 * 60 * 1000;
@@ -121,7 +169,7 @@ export async function saveFormProgress(
       data,
       timestamp: Date.now(),
     };
-    await AsyncStorage.setItem(`${FORM_PROGRESS_PREFIX}${formId}`, JSON.stringify(formData));
+    await storage.setItem(`${FORM_PROGRESS_PREFIX}${formId}`, JSON.stringify(formData));
   } catch (error) {
     console.error('Error saving form progress:', error);
   }
@@ -134,7 +182,7 @@ export async function loadFormProgress(
   formId: string
 ): Promise<{ step: number; data: Record<string, any> } | null> {
   try {
-    const json = await AsyncStorage.getItem(`${FORM_PROGRESS_PREFIX}${formId}`);
+    const json = await storage.getItem(`${FORM_PROGRESS_PREFIX}${formId}`);
     if (!json) return null;
 
     const formData = JSON.parse(json);
@@ -158,7 +206,7 @@ export async function loadFormProgress(
  */
 export async function deleteFormProgress(formId: string): Promise<void> {
   try {
-    await AsyncStorage.removeItem(`${FORM_PROGRESS_PREFIX}${formId}`);
+    await storage.removeItem(`${FORM_PROGRESS_PREFIX}${formId}`);
   } catch (error) {
     console.error('Error deleting form progress:', error);
   }
@@ -222,12 +270,7 @@ export interface CreateRequestDraft {
 export async function saveCreateRequestProgress(
   draft: CreateRequestDraft
 ): Promise<void> {
-  if (draft.pickupStation && !draft.pickupStation.stationId) {
-    return;
-  }
-  if (draft.deliveryStation && !draft.deliveryStation.stationId) {
-    return;
-  }
+  // stationId 유효성 검사 제거 - 항상 저장되도록 수정
   await saveFormProgress('create_request', draft.step, draft);
 }
 
@@ -252,7 +295,7 @@ export async function deleteCreateRequestProgress(): Promise<void> {
  */
 export async function hasDraft(key: string): Promise<boolean> {
   try {
-    const json = await AsyncStorage.getItem(`${DRAFT_PREFIX}${key}`);
+    const json = await storage.getItem(`${DRAFT_PREFIX}${key}`);
     return json !== null;
   } catch (error) {
     console.error('Error checking draft:', error);
@@ -265,7 +308,7 @@ export async function hasDraft(key: string): Promise<boolean> {
  */
 export async function getDraftAge(key: string): Promise<number | null> {
   try {
-    const json = await AsyncStorage.getItem(`${DRAFT_PREFIX}${key}`);
+    const json = await storage.getItem(`${DRAFT_PREFIX}${key}`);
     if (!json) return null;
 
     const draft: DraftData = JSON.parse(json);
@@ -282,13 +325,13 @@ export async function getDraftAge(key: string): Promise<number | null> {
  */
 export async function clearAllDrafts(): Promise<void> {
   try {
-    const allKeys = await AsyncStorage.getAllKeys();
+    const allKeys = await storage.getAllKeys();
     const draftKeys = allKeys.filter(
       key => key.startsWith(DRAFT_PREFIX) || key.startsWith(FORM_PROGRESS_PREFIX)
     );
 
     if (draftKeys.length > 0) {
-      await AsyncStorage.multiRemove(draftKeys);
+      await storage.multiRemove(draftKeys);
     }
   } catch (error) {
     console.error('Error clearing all drafts:', error);

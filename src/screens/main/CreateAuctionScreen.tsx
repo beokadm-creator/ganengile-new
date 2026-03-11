@@ -12,7 +12,7 @@ import {
   Platform,
 } from 'react-native';
 import { StackNavigationProp } from '@react-navigation/stack';
-import { getAllStations } from '../../services/config-service';
+import { getAllStations, getTravelTimeConfig } from '../../services/config-service';
 import { createAuction } from '../../services/auction-service';
 import {
   calculatePhase1DeliveryFee,
@@ -256,53 +256,6 @@ export default function CreateAuctionScreen({ navigation }: Props) {
       }
       setShowStationPicker(false);
     };
-
-  const calculateFee = async () => {
-    if (!pickupStation || !deliveryStation || !weight) return;
-
-    try {
-      const travelTimeData = await getTravelTimeConfig(
-        pickupStation.stationId,
-        deliveryStation.stationId
-      );
-
-      const travelTimeSeconds = travelTimeData?.normalTime ?? 1800;
-      const travelTimeMinutes = Math.round(travelTimeSeconds / 60);
-      const stationCount = Math.max(2, Math.round(travelTimeMinutes / 2.5));
-
-      const pricingParams: Phase1PricingParams = {
-        stationCount,
-        weight: parseFloat(weight),
-        packageSize: packageSize as PackageSizeType,
-        urgency: 'normal',
-      };
-
-      const feeResult = calculatePhase1DeliveryFee(pricingParams);
-
-      setDeliveryFee({
-        baseFee: feeResult.baseFee,
-        distanceFee: feeResult.distanceFee,
-        sizeFee: feeResult.sizeFee,
-        weightFee: feeResult.weightFee,
-        serviceFee: feeResult.serviceFee,
-        vat: feeResult.vat,
-        totalFee: feeResult.totalFee,
-        estimatedTime: travelTimeMinutes,
-      });
-    } catch (error) {
-      console.error('Error calculating delivery fee:', error);
-      setDeliveryFee({
-        baseFee: 3500,
-        distanceFee: 600,
-        sizeFee: 0,
-        weightFee: 100,
-        serviceFee: 500,
-        vat: 470,
-        totalFee: 5170,
-        estimatedTime: 30,
-      });
-    }
-  };
 
   const validateStep1 = useCallback((): boolean => {
     const newErrors: Record<string, string> = {};

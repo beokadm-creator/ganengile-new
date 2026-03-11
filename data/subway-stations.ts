@@ -52,10 +52,40 @@ export interface TravelTimeInfo {
 }
 
 /**
- * 30 Major Seoul Subway Stations
+ * Deduplicate stations by name + coordinates
+ * Same station with different line combinations should be merged
  */
-export const MAJOR_STATIONS: Station[] = [
-  // 1호선
+export function deduplicateStations(stations: Station[]): Station[] {
+  const stationMap = new Map<string, Station>();
+
+  for (const station of stations) {
+    const key = `${station.stationName}_${station.location.latitude}_${station.location.longitude}`;
+
+    if (stationMap.has(key)) {
+      const existing = stationMap.get(key)!;
+      const existingLineIds = new Set(existing.lines.map(l => l.lineId));
+      
+      for (const line of station.lines) {
+        if (!existingLineIds.has(line.lineId)) {
+          existing.lines.push(line);
+        }
+      }
+      
+      if (station.isTransferStation && !existing.isTransferStation) {
+        existing.isTransferStation = true;
+      }
+    } else {
+      stationMap.set(key, { ...station });
+    }
+  }
+
+  return Array.from(stationMap.values());
+}
+
+/**
+ * 30 Major Seoul Subway Stations (merged)
+ */
+export const MAJOR_STATIONS: Station[] = deduplicateStations([
   {
     stationId: '150',
     stationName: '서울역',
@@ -486,7 +516,7 @@ export const MAJOR_STATIONS: Station[] = [
     isTerminus: false,
     facilities: { hasElevator: true, hasEscalator: true },
   },
-];
+]);
 
 /**
  * Get station by ID
@@ -528,3 +558,9 @@ export function searchStations(query: string): Station[] {
     s.stationNameEnglish.toLowerCase().includes(lowerQuery)
   );
 }
+
+/**
+ * Alias for MAJOR_STATIONS (already deduplicated)
+ * Use this for station selection UI
+ */
+export const DEDUPLICATED_STATIONS = MAJOR_STATIONS;

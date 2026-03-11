@@ -773,8 +773,7 @@ export async function getUserActiveRoutes(userId: string): Promise<Route[]> {
     const q = query(
       collection(db, 'routes'),
       where('userId', '==', userId),
-      where('isActive', '==', true),
-      orderBy('createdAt', 'desc')
+      where('isActive', '==', true)
     );
 
     const snapshot = await getDocs(q);
@@ -783,6 +782,9 @@ export async function getUserActiveRoutes(userId: string): Promise<Route[]> {
     snapshot.forEach((docSnapshot) => {
       routes.push(convertRoute(docSnapshot.data(), docSnapshot.id));
     });
+
+    // Sort client-side to avoid composite index requirement
+    routes.sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
 
     cache.set(cacheKey, routes, USER_ROUTES_CACHE_TTL);
     return routes;

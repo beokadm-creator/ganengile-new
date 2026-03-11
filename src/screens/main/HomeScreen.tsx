@@ -197,19 +197,7 @@ function GllerDashboard({
     <View style={styles.dashboardContainer}>
       {/* Quick Stats */}
       <View style={styles.statsRow}>
-        <TouchableOpacity
-          style={styles.statCard}
-          onPress={() => navigation.navigate('Tabs', { screen: 'Requests' })}
-          activeOpacity={0.7}
-        >
-          <Text style={styles.statNumber}>{stats?.totalRequests || 0}</Text>
-          <Text style={styles.statLabel}>총 요청</Text>
-          <View style={styles.statIconContainer}>
-            <IconLabel name="inventory" label="📦" />
-          </View>
-        </TouchableOpacity>
-
-        {/* 진행 중인 배송 카드 */}
+        {/* 진행 중인 배송 */}
         <TouchableOpacity
           style={styles.statCard}
           onPress={() => navigation.navigate('Tabs', { screen: 'Requests' })}
@@ -222,15 +210,16 @@ function GllerDashboard({
           </View>
         </TouchableOpacity>
 
+        {/* 총 배송 */}
         <TouchableOpacity
           style={styles.statCard}
           onPress={() => navigation.navigate('Tabs', { screen: 'Requests' })}
           activeOpacity={0.7}
         >
-          <Text style={styles.statNumber}>{stats?.completionRate.toFixed(0) || 0}%</Text>
-          <Text style={styles.statLabel}>완료율</Text>
-          <View style={[styles.statIconContainer, { backgroundColor: Colors.secondaryLight }]}>
-            <IconLabel name="check-circle" label="✅" />
+          <Text style={styles.statNumber}>{stats?.totalRequests || 0}</Text>
+          <Text style={styles.statLabel}>총 배송</Text>
+          <View style={styles.statIconContainer}>
+            <IconLabel name="inventory" label="📦" />
           </View>
         </TouchableOpacity>
       </View>
