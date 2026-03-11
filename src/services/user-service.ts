@@ -18,11 +18,14 @@ import {
   serverTimestamp,
   sum,
   avg,
+  orderBy,
 } from 'firebase/firestore';
 import { db } from './firebase';
 import { auth } from './firebase';
 import type { User } from '../types/user';
 import { UserRole } from '../types/user';
+import type { Request } from '../types/request';
+import { getRequestsByRequester as getRequestsByRequesterService } from './request-service';
 
 /**
  * Get current authenticated user
@@ -507,4 +510,13 @@ export async function createUser(
     console.error('Error creating user:', error);
     throw error;
   }
+}
+
+/**
+ * Get requests by requester (wrapper for request-service)
+ * @param requesterId Requester ID
+ * @returns Array of requests
+ */
+export async function getRequestsByRequester(requesterId: string): Promise<Request[]> {
+  return await getRequestsByRequesterService(requesterId);
 }

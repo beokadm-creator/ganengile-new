@@ -3,7 +3,7 @@
  * 역할별 맞춤 대시보드 (이용자/길러/BOTH)
  */
 
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import {
   View,
   Text,
@@ -12,17 +12,19 @@ import {
   TouchableOpacity,
   RefreshControl,
   Platform,
+  ActivityIndicator,
 } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { Colors, Spacing, Typography, BorderRadius, Shadows } from '../../theme';
 import { useUser } from '../../contexts/UserContext';
-import { getUserStats } from '../../services/user-service';
+import { getUserStats, getRequestsByRequester } from '../../services/user-service';
 import StationSelectModal from '../../components/StationSelectModal';
 import { RoleSlider } from '../../components/common';
 import type { MainStackNavigationProp } from '../../types/navigation';
 import type { User } from '../../types/user';
 import type { Station } from '../../types/config';
 import { UserRole } from '../../types/user';
+import type { Request } from '../../types/request';
 
 // 웹에서는 아이콘 대신 텍스트 라벨 사용
 const IconLabel = ({ name, label }: { name: string; label: string }) => {
@@ -49,6 +51,8 @@ export default function HomeScreen({ navigation }: { navigation: MainStackNaviga
   const [refreshing, setRefreshing] = useState(false);
   const [stationModalVisible, setStationModalVisible] = useState(false);
   const [selectedStation, setSelectedStation] = useState<Station | null>(null);
+  const [pendingRequests, setPendingRequests] = useState<Request[]>([]);
+  const [loadingRequests, setLoadingRequests] = useState(true);
 
   // Load stats
   const loadStats = useCallback(async () => {
@@ -64,14 +68,35 @@ export default function HomeScreen({ navigation }: { navigation: MainStackNaviga
     }
   }, [user]);
 
+  // Load pending requests
+  const loadPendingRequests = useCallback(async () => {
+    if (!user) return;
+
+    try {
+      setLoadingRequests(true);
+      const requests = await getRequestsByRequester(user.uid);
+      // Filter for active requests (pending, matched, in_progress)
+      const activeRequests = requests.filter(
+        req => req.status === 'pending' || req.status === 'matched' || req.status === 'in_progress'
+      );
+      setPendingRequests(activeRequests);
+    } catch (error: any) {
+      console.error('Error loading pending requests:', error);
+    } finally {
+      setLoadingRequests(false);
+    }
+  }, [user]);
+
   React.useEffect(() => {
     loadStats();
-  }, [loadStats]);
+    loadPendingRequests();
+  }, [loadStats, loadPendingRequests]);
 
   const onRefresh = () => {
     setRefreshing(true);
     refreshUser();
     loadStats();
+    loadPendingRequests();
   };
 
   // Toggle role for BOTH users
@@ -127,9 +152,6 @@ export default function HomeScreen({ navigation }: { navigation: MainStackNaviga
                 <MaterialIcons name="waving-hand" size={28} color="#FFD54F" style={styles.waveIcon} />
               )}
             </View>
-            <Text style={styles.subtitle}>
-              {currentRole === UserRole.GLER ? '오늘도 편리한 배송을' : '오늘도 좋은 수익을'}
-            </Text>
 
             {/* Role Slider for BOTH users */}
             {user.role === UserRole.BOTH && (
@@ -147,6 +169,8 @@ export default function HomeScreen({ navigation }: { navigation: MainStackNaviga
               stats={stats}
               navigation={navigation}
               openStationModal={openStationModal}
+              pendingRequests={pendingRequests}
+              loadingRequests={loadingRequests}
             />
           ) : (
             <GillerDashboard
@@ -179,14 +203,81 @@ function GllerDashboard({
   stats,
   navigation,
   openStationModal,
+  pendingRequests,
+  loadingRequests,
 }: {
   user: User;
   stats: Stats | null;
   navigation: MainStackNavigationProp;
   openStationModal: () => void;
+  pendingRequests: Request[];
+  loadingRequests: boolean;
 }) {
   return (
     <View style={styles.dashboardContainer}>
+      {/* 진행 중인 요청 섹션 */}
+      {loadingRequests ? (
+        <View style={styles.section}>
+          <View style={styles.sectionHeader}>
+            <Text style={styles.sectionTitle}>진행 중인 배송</Text>
+            <ActivityIndicator size="small" color={Colors.primary} />
+          </View>
+        </View>
+      ) : pendingRequests.length > 0 ? (
+        <View style={styles.section}>
+          <View style={styles.sectionHeader}>
+            <Text style={styles.sectionTitle}>진행 중인 배송</Text>
+            <Text style={styles.sectionSubtitle}>{pendingRequests.length}건</Text>
+          </View>
+
+          {pendingRequests.map((request) => (
+            <TouchableOpacity
+              key={request.requestId}
+              style={styles.requestCard}
+              onPress={() => navigation.navigate('RequestDetail', { requestId: request.requestId })}
+              activeOpacity={0.7}
+            >
+              <View style={styles.requestHeader}>
+                <View style={styles.requestRoute}>
+                  <Text style={styles.stationName}>{request.pickupStation.stationName}</Text>
+                  <Text style={styles.arrow}>→</Text>
+                  <Text style={styles.stationName}>{request.deliveryStation.stationName}</Text>
+                </View>
+                <View style={[
+                  styles.statusBadge,
+                  request.status === 'pending' && styles.statusPending,
+                  request.status === 'matched' && styles.statusMatched,
+                  request.status === 'in_progress' && styles.statusInProgress
+                ]}>
+                  <Text style={styles.statusText}>
+                    {request.status === 'pending' ? '매칭 중' :
+                     request.status === 'matched' ? '매칭 완료' :
+                     request.status === 'in_progress' ? '배송 중' : request.status}
+                  </Text>
+                </View>
+              </View>
+
+              <View style={styles.requestDetails}>
+                <View style={styles.detailItem}>
+                  <Text style={styles.detailLabel}>📦 크기</Text>
+                  <Text style={styles.detailValue}>
+                    {request.packageInfo.size === 'small' ? '소형' :
+                     request.packageInfo.size === 'medium' ? '중형' :
+                     request.packageInfo.size === 'large' ? '대형' : '특대'}
+                  </Text>
+                </View>
+                <View style={styles.detailItem}>
+                  <Text style={styles.detailLabel}>💰 배송비</Text>
+                  <Text style={styles.detailValue}>
+                    {request.initialNegotiationFee.toLocaleString()}원
+                  </Text>
+                </View>
+              </View>
+            </TouchableOpacity>
+          ))}
+        </View>
+      ) : null}
+
       {/* Quick Stats */}
       <View style={styles.statsRow}>
         <TouchableOpacity
@@ -216,7 +307,7 @@ function GllerDashboard({
 
       {/* Quick Actions */}
       <View style={styles.section}>
-        <Text style={styles.sectionTitle}>빠른 시작</Text>
+        <View style={{ height: 0 }} />
 
         <TouchableOpacity
           style={styles.actionCard}
@@ -228,9 +319,6 @@ function GllerDashboard({
           </View>
           <View style={styles.actionContent}>
             <Text style={styles.actionTitle}>배송 요청하기</Text>
-            <Text style={styles.actionSubtitle}>
-              출퇴근길에 짐을 보내보세요
-            </Text>
           </View>
           {Platform.OS === 'web' ? (
             <Text style={styles.actionArrow}>▶</Text>
@@ -249,9 +337,6 @@ function GllerDashboard({
           </View>
           <View style={styles.actionContent}>
             <Text style={styles.actionTitle}>요청 내역</Text>
-            <Text style={styles.actionSubtitle}>
-              배송 요청 내역을 확인하세요
-            </Text>
           </View>
           {Platform.OS === 'web' ? (
             <Text style={styles.actionArrow}>▶</Text>
@@ -324,7 +409,7 @@ function GillerDashboard({
 
       {/* Quick Actions */}
       <View style={styles.section}>
-        <Text style={styles.sectionTitle}>배송 매칭</Text>
+        <View style={{ height: 0 }} />
 
         <TouchableOpacity
           style={styles.actionCard}
@@ -336,9 +421,6 @@ function GillerDashboard({
           </View>
           <View style={styles.actionContent}>
             <Text style={styles.actionTitle}>가능한 배송</Text>
-            <Text style={styles.actionSubtitle}>
-              내 동선과 매칭된 요청을 확인하세요
-            </Text>
           </View>
           {Platform.OS === 'web' ? (
             <Text style={styles.actionArrow}>▶</Text>
@@ -357,9 +439,6 @@ function GillerDashboard({
           </View>
           <View style={styles.actionContent}>
             <Text style={styles.actionTitle}>빠른 동선 추가</Text>
-            <Text style={styles.actionSubtitle}>
-              역을 선택하여 동선을 빠르게 등록하세요
-            </Text>
           </View>
           {Platform.OS === 'web' ? (
             <Text style={styles.actionArrow}>▶</Text>
@@ -378,9 +457,6 @@ function GillerDashboard({
           </View>
           <View style={styles.actionContent}>
             <Text style={styles.actionTitle}>동선 관리</Text>
-            <Text style={styles.actionSubtitle}>
-              루틴/단일 동선을 등록하고 관리하세요
-            </Text>
           </View>
           {Platform.OS === 'web' ? (
             <Text style={styles.actionArrow}>▶</Text>
@@ -399,9 +475,6 @@ function GillerDashboard({
           </View>
           <View style={styles.actionContent}>
             <Text style={styles.actionTitle}>배송 추적</Text>
-            <Text style={styles.actionSubtitle}>
-              진행 중인 배송을 확인하세요
-            </Text>
           </View>
           {Platform.OS === 'web' ? (
             <Text style={styles.actionArrow}>▶</Text>
@@ -655,5 +728,81 @@ const styles = StyleSheet.create({
   scrollContent: {
     flexGrow: 1,
     paddingBottom: Spacing['3xl'],
+  },
+  // 진행 중인 요청 관련 스타일
+  sectionHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: Spacing.md,
+  },
+  sectionSubtitle: {
+    color: Colors.textSecondary,
+    fontSize: Typography.fontSize.sm,
+    fontWeight: Typography.fontWeight.medium,
+  },
+  requestCard: {
+    backgroundColor: Colors.white,
+    borderRadius: BorderRadius.lg,
+    padding: Spacing.lg,
+    marginBottom: Spacing.sm,
+    ...Shadows.sm,
+    borderWidth: 1,
+    borderColor: Colors.gray100,
+  },
+  requestHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: Spacing.sm,
+  },
+  requestRoute: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+  },
+  stationName: {
+    color: Colors.textPrimary,
+    fontSize: Typography.fontSize.sm,
+    fontWeight: Typography.fontWeight.semiBold,
+  },
+  arrow: {
+    marginHorizontal: Spacing.xs,
+    color: Colors.textSecondary,
+  },
+  statusBadge: {
+    paddingHorizontal: Spacing.sm,
+    paddingVertical: Spacing.xs,
+    borderRadius: BorderRadius.sm,
+  },
+  statusPending: {
+    backgroundColor: Colors.warningLight,
+  },
+  statusMatched: {
+    backgroundColor: Colors.primaryLight,
+  },
+  statusInProgress: {
+    backgroundColor: Colors.secondaryLight,
+  },
+  statusText: {
+    fontSize: Typography.fontSize.xs,
+    fontWeight: Typography.fontWeight.bold,
+  },
+  requestDetails: {
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+  },
+  detailItem: {
+    alignItems: 'center',
+  },
+  detailLabel: {
+    fontSize: Typography.fontSize.xs,
+    color: Colors.textSecondary,
+    marginBottom: Spacing.xs,
+  },
+  detailValue: {
+    fontSize: Typography.fontSize.sm,
+    color: Colors.textPrimary,
+    fontWeight: Typography.fontWeight.semiBold,
   },
 });
