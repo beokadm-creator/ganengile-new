@@ -18,6 +18,7 @@ import {
   serverTimestamp,
   Timestamp,
   runTransaction,
+  onSnapshot,
 } from 'firebase/firestore';
 import { db } from './firebase';
 import { getTravelTimeConfig } from './config-service';
@@ -454,7 +455,16 @@ function validateRequestData(data: CreateRequestData): void {
     ? data.deadline.toDate()
     : data.deadline;
 
-  if (deadlineTime <= new Date()) {
+  // Use current time with a small buffer (5 seconds) to account for processing delays
+  const now = new Date(Date.now() - 5000);
+
+  if (deadlineTime <= now) {
+    console.error('Deadline validation failed:', {
+      deadline: deadlineTime,
+      now: now,
+      deadlineMillis: deadlineTime.getTime(),
+      nowMillis: now.getTime()
+    });
     throw new Error('Deadline must be in the future');
   }
 }
@@ -757,5 +767,63 @@ export async function deleteRequest(requestId: string, userId?: string): Promise
     }
   } else {
     await deleteRequestInternal(requestId);
+  }
+}
+
+/**
+ * 요청 상태 실시간 감시
+ * @param requestId 요청 ID
+ * @param callback 상태 변경 콜백
+ * @returns 구독 해제 함수
+ */
+export function subscribeToRequest(
+  requestId: string,
+  callback: (request: Request | null) => void
+): () => void {
+  const docRef = doc(db, 'requests', requestId);
+
+  const unsubscribe = onSnapshot(docRef, (docSnapshot) => {
+    if (docSnapshot.exists()) {
+      const data = docSnapshot.data();
+      callback({
+        requestId: docSnapshot.id,
+        ...data,
+      } as Request);
+    } else {
+      callback(null);
+    }
+  }, (error) => {
+    console.error('Error listening to request:', error);
+    callback(null);
+  });
+
+  return unsubscribe;
+}
+
+/**
+ * 길러들에게 푸시 알림 전송
+ * @param requestId 요청 ID
+ * @returns 전송 결과
+ */
+export async function notifyGillers(requestId: string): Promise<{ success: boolean; error?: string }> {
+  try {
+    // TODO: 실제 푸시 알림 구현 (Firebase Cloud Messaging)
+    // 현재는 더미 구현
+
+    const request = await getRequestById(requestId);
+    if (!request) {
+      return { success: false, error: '요청을 찾을 수 없습니다.' };
+    }
+
+    // 해당 경로와 매칭되는 길러 찾기
+    // TODO: 길러 동선 매칭 로직 구현
+    // const matchedGillers = await findMatchingGillers(request);
+
+    console.log('📱 푸시 알림 전송 (구현 필요):', requestId);
+
+    return { success: true };
+  } catch (error: any) {
+    console.error('Error notifying gillers:', error);
+    return { success: false, error: error.message };
   }
 }

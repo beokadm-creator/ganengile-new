@@ -48,15 +48,34 @@ import {
 } from '../../utils/draft-storage';
 
 function convertStationToInfo(station: Station): StationInfo {
-  const firstLine = station.lines[0];
+  const firstLine = station.lines?.[0];
+  // stationId가 없는 경우 stationName을 ID로 사용 (임시 해결책)
+  const stationId = station.stationId || station.stationName;
+
+  // Firebase location 데이터는 lng, lat 순서로 되어 있음
+  let lat = 37.5546; // 기본값 (서울역)
+  let lng = 126.9706; // 기본값 (서울역)
+
+  if (station.location) {
+    // Firebase 데이터: { lng: 127.0612, lat: 37.9175 }
+    // 또는 표준 형식: { latitude: 37.9175, longitude: 127.0612 }
+    if ('lat' in station.location) {
+      lat = station.location.lat;
+      lng = station.location.lng;
+    } else if ('latitude' in station.location) {
+      lat = station.location.latitude;
+      lng = station.location.longitude;
+    }
+  }
+
   return {
-    id: station.stationId,
-    stationId: station.stationId,
+    id: stationId,
+    stationId: stationId,
     stationName: station.stationName,
     line: firstLine?.lineName || '',
     lineCode: firstLine?.lineCode || '',
-    lat: station.location.latitude,
-    lng: station.location.longitude,
+    lat: lat,
+    lng: lng,
   };
 }
 
@@ -239,11 +258,17 @@ export default function CreateRequestScreen({ navigation }: Props) {
 
   const loadDraft = async () => {
     try {
+      console.log('Loading draft...');
       const draft = await loadCreateRequestProgress();
+      console.log('Draft found:', draft);
+
       if (draft && draft.step > 1) {
+        console.log('Setting showDraftRestore to true');
         setShowDraftRestore(true);
         // Store draft data for restore
         (window as any).__draftData = draft;
+      } else {
+        console.log('No valid draft found or step is 1');
       }
     } catch (error) {
       console.error('Error loading draft:', error);
@@ -303,32 +328,60 @@ export default function CreateRequestScreen({ navigation }: Props) {
   };
 
   const calculateFee = async () => {
-    if (!pickupStation || !deliveryStation || !weight) return;
-
-    if (!pickupStation.stationId || !deliveryStation.stationId) {
-      console.error('Invalid station data:', { pickupStation, deliveryStation });
+    if (!pickupStation || !deliveryStation || !weight) {
+      console.log('Missing required data for fee calculation:', {
+        hasPickupStation: !!pickupStation,
+        hasDeliveryStation: !!deliveryStation,
+        hasWeight: !!weight,
+        weight
+      });
       return;
     }
 
+    if (!pickupStation.stationId || !deliveryStation.stationId) {
+      console.error('Invalid station data:', { pickupStation, deliveryStation });
+      // stationId가 없어도 계산 시도
+    }
+
     try {
-      const travelTimeData = await getTravelTimeConfig(
-        pickupStation.stationId,
-        deliveryStation.stationId
-      );
+      console.log('Starting fee calculation with weight:', weight);
 
-      const travelTimeSeconds = travelTimeData?.normalTime ?? 1800;
-      const travelTimeMinutes = Math.round(travelTimeSeconds / 60);
+      let travelTimeMinutes = 30; // 기본값
+      let stationCount = 5; // 기본값
 
-      const stationCount = Math.max(2, Math.round(travelTimeMinutes / 2.5));
+      // Firebase에서 이동 시간 데이터 가져오기 시도
+      if (pickupStation.stationId && deliveryStation.stationId) {
+        try {
+          const travelTimeData = await getTravelTimeConfig(
+            pickupStation.stationId,
+            deliveryStation.stationId
+          );
+
+          if (travelTimeData) {
+            const travelTimeSeconds = travelTimeData.normalTime;
+            travelTimeMinutes = Math.round(travelTimeSeconds / 60);
+            stationCount = Math.max(2, Math.round(travelTimeMinutes / 2.5));
+            console.log('Travel time data loaded:', { travelTimeMinutes, stationCount });
+          } else {
+            console.log('No travel time data found, using defaults');
+          }
+        } catch (error) {
+          console.log('Error loading travel time, using defaults:', error);
+        }
+      }
+
+      const weightValue = parseFloat(weight) || 1;
+      console.log('Calculating fee with:', { stationCount, weight: weightValue, packageSize, urgency });
 
       const pricingParams: Phase1PricingParams = {
         stationCount,
-        weight: parseFloat(weight),
+        weight: weightValue,
         packageSize: packageSize as PackageSizeType,
         urgency,
       };
 
       const feeResult = calculatePhase1DeliveryFee(pricingParams);
+      console.log('Fee calculation result:', feeResult);
 
       const urgencyMultiplier = URGENCY_OPTIONS.find(opt => opt.level === urgency)?.surchargeMultiplier || 0;
       const urgencySurcharge = Math.round((feeResult.baseFee + feeResult.distanceFee) * urgencyMultiplier);
@@ -339,6 +392,8 @@ export default function CreateRequestScreen({ navigation }: Props) {
 
       const clampedTotalFee = Math.min(Math.max(totalFee, 3000), 8000);
       const clampedVat = clampedTotalFee === totalFee ? vat : Math.round((clampedTotalFee / 1.1) * 0.1);
+
+      console.log('Final delivery fee:', { totalFee: clampedTotalFee, vat: clampedVat });
 
       setDeliveryFee({
         baseFee: feeResult.baseFee,
@@ -356,10 +411,12 @@ export default function CreateRequestScreen({ navigation }: Props) {
     } catch (error) {
       console.error('Error calculating delivery fee:', error);
 
+      // 에러 발생 시 기본값으로 계산
+      const weightValue = parseFloat(weight) || 1;
       const stationCount = 5;
       const pricingParams: Phase1PricingParams = {
         stationCount,
-        weight: parseFloat(weight) || 1,
+        weight: weightValue,
         packageSize: packageSize as PackageSizeType,
         urgency,
       };
@@ -418,10 +475,8 @@ export default function CreateRequestScreen({ navigation }: Props) {
       newErrors.description = '설명은 200자 이내로 입력해주세요.';
     }
 
-    if (!itemValue || parseFloat(itemValue) <= 0) {
-      newErrors.itemValue = '물건 가치를 입력해주세요.';
-    } else if (parseFloat(itemValue) < 10000) {
-      newErrors.itemValue = '물건 가치는 10,000원 이상이어야 합니다.';
+    if (!itemValue || parseFloat(itemValue) < 0) {
+      newErrors.itemValue = '물건 가치를 올바르게 입력해주세요.';
     } else if (parseFloat(itemValue) > 10000000) {
       newErrors.itemValue = '물건 가치는 10,000,000원 이하여야 합니다.';
     }
@@ -511,6 +566,23 @@ export default function CreateRequestScreen({ navigation }: Props) {
       setCurrentStep(1);
       return;
     }
+
+    // stationId가 없는 경우 처리 (임시 해결책)
+    const pickupId = pickupStation.stationId || pickupStation.stationName;
+    const deliveryId = deliveryStation.stationId || deliveryStation.stationName;
+
+    if (!pickupId || !deliveryId) {
+      Alert.alert('오류', '역 정보가 올바르지 않습니다. 다시 선택해주세요.');
+      setCurrentStep(1);
+      return;
+    }
+
+    if (pickupId === deliveryId) {
+      Alert.alert('알림', '픽업 역과 배송 역이 같을 수 없습니다.');
+      setCurrentStep(1);
+      return;
+    }
+
     if (!deliveryFee) {
       Alert.alert('알림', '배송비를 계산할 수 없습니다. 패키지 정보를 확인해주세요.');
       setCurrentStep(2);
@@ -537,23 +609,47 @@ export default function CreateRequestScreen({ navigation }: Props) {
     setIsRetrying(false);
 
     try {
+      // 디버깅용 역 데이터 출력
+      console.log('Pickup Station:', JSON.stringify(pickupStation, null, 2));
+      console.log('Delivery Station:', JSON.stringify(deliveryStation, null, 2));
+
       const pickupInfo = convertStationToInfo(pickupStation);
       const deliveryInfo = convertStationToInfo(deliveryStation);
+
+      console.log('Pickup Info:', JSON.stringify(pickupInfo, null, 2));
+      console.log('Delivery Info:', JSON.stringify(deliveryInfo, null, 2));
+
       const userId = requireUserId();
 
       const [pickupHour, pickupMinute] = pickupTime.split(':').map(Number);
       const pickupDeadline = new Date();
       pickupDeadline.setHours(pickupHour, pickupMinute, 0, 0);
+      // If pickup time has passed today, set it to tomorrow
+      if (pickupDeadline <= new Date()) {
+        pickupDeadline.setDate(pickupDeadline.getDate() + 1);
+      }
 
       const [deliveryHour, deliveryMinute] = deliveryTime.split(':').map(Number);
       const deliveryDeadline = new Date();
       deliveryDeadline.setHours(deliveryHour, deliveryMinute, 0, 0);
+      // If delivery time has passed today, set it to tomorrow
+      if (deliveryDeadline <= new Date()) {
+        deliveryDeadline.setDate(deliveryDeadline.getDate() + 1);
+      }
+      // Ensure delivery deadline is after pickup deadline
+      if (deliveryDeadline <= pickupDeadline) {
+        deliveryDeadline.setDate(deliveryDeadline.getDate() + 1);
+      }
 
       const packageInfo = {
         size: packageSize,
         weight: convertWeightToPackageWeight(parseFloat(weight)),
         description: `${description}${isFragile ? ' (깨지기 쉬움)' : ''}${isPerishable ? ' (부패하기 쉬움)' : ''}`,
       };
+
+      console.log('Creating request with deadline:', deliveryDeadline);
+      console.log('Current time:', new Date());
+      console.log('Deadline is in future:', deliveryDeadline > new Date());
 
       const urgencyMap: Record<UrgencyLevel, 'low' | 'medium' | 'high'> = {
         normal: 'low',
@@ -603,19 +699,15 @@ export default function CreateRequestScreen({ navigation }: Props) {
       // Clear draft after successful submission
       await deleteCreateRequestProgress();
 
-      Alert.alert(
-        '성공',
-        '배송 요청이 생성되었습니다. 길러를 찾고 있습니다...',
-        [
-          {
-            text: '확인',
-            onPress: () => navigation.navigate('MatchingResult', {
-              requestId: request.requestId,
-              success: false,
-            }),
-          },
-        ]
-      );
+      console.log('Request created successfully, showing confirmation...');
+
+      // 요청 완료 안내 후 매칭 시작
+      navigation.navigate('RequestConfirmation' as never, {
+        requestId: request.requestId,
+        pickupStationName: pickupStation.stationName,
+        deliveryStationName: deliveryStation.stationName,
+        deliveryFee: deliveryFee
+      });
     } catch (error) {
       console.error('Error creating request:', error);
       showErrorAlert(error, '오류', () => handleSubmit());
@@ -734,7 +826,7 @@ export default function CreateRequestScreen({ navigation }: Props) {
       {errors.description && <Text style={styles.errorText}>{errors.description}</Text>}
       <Text style={styles.charCount}>{description.length}/200</Text>
       <Text style={styles.label}>물건 가치 (원)</Text>
-      <Text style={styles.hintText}>물건의 가치를 입력해주세요. (예: 100,000원)</Text>
+      <Text style={styles.hintText}>물건의 가치를 입력해주세요. (0원 입력 가능, 예: 100000)</Text>
       <TextInput
         style={[styles.input, errors.itemValue && styles.inputError]}
         value={itemValue}
@@ -744,7 +836,7 @@ export default function CreateRequestScreen({ navigation }: Props) {
             setErrors(prev => ({ ...prev, itemValue: '' }));
           }
         }}
-        placeholder="예: 100000"
+        placeholder="0원 입력 가능 (예: 100000)"
         keyboardType="number-pad"
         maxLength={10}
         accessibilityLabel="물건 가치 입력"
@@ -825,42 +917,6 @@ export default function CreateRequestScreen({ navigation }: Props) {
 
       {deliveryFee && (
         <>
-          <View style={styles.manualAdjustmentCard}>
-            <Text style={styles.manualAdjustmentTitle}>💰 추가 요금 조정 (선택)</Text>
-            <Text style={styles.manualAdjustmentDesc}>
-              급하신 경우 요금을 추가하여 빠른 매칭을 유도할 수 있습니다.
-            </Text>
-            <View style={styles.adjustmentButtons}>
-              {[0, 1000, 2000, 3000, 5000].map((amount) => (
-                <TouchableOpacity
-                  key={amount}
-                  style={[
-                    styles.adjustmentButton,
-                    manualAdjustment === amount && styles.adjustmentButtonActive,
-                  ]}
-                  onPress={() => setManualAdjustment(amount)}
-                >
-                  <Text style={[
-                    styles.adjustmentButtonText,
-                    manualAdjustment === amount && styles.adjustmentButtonTextActive,
-                  ]}>
-                    {amount === 0 ? '없음' : `+${amount.toLocaleString()}원`}
-                  </Text>
-                </TouchableOpacity>
-              ))}
-            </View>
-            <TextInput
-              style={[styles.input, styles.manualInput]}
-              value={manualAdjustment > 5000 ? manualAdjustment.toString() : ''}
-              onChangeText={(text) => {
-                const value = parseInt(text) || 0;
-                setManualAdjustment(value);
-              }}
-              placeholder="직접 입력 (5,000원 이상)"
-              keyboardType="number-pad"
-            />
-          </View>
-
           <View style={styles.feePreviewCard}>
             <Text style={styles.feePreviewTitle}>예상 배송비 (초기 협상금액)</Text>
             <Text style={styles.feePreviewAmount}>{deliveryFee.totalFee.toLocaleString()}원</Text>
@@ -880,11 +936,6 @@ export default function CreateRequestScreen({ navigation }: Props) {
               {deliveryFee.urgencySurcharge && deliveryFee.urgencySurcharge > 0 && (
                 <Text style={styles.feeBreakdownUrgency}>
                   긴급 할증: +{deliveryFee.urgencySurcharge.toLocaleString()}원
-                </Text>
-              )}
-              {deliveryFee.manualAdjustment && deliveryFee.manualAdjustment > 0 && (
-                <Text style={styles.feeBreakdownManual}>
-                  추가 요금: +{deliveryFee.manualAdjustment.toLocaleString()}원
                 </Text>
               )}
               <Text style={styles.feeBreakdownText}>
@@ -970,7 +1021,6 @@ export default function CreateRequestScreen({ navigation }: Props) {
       <Text style={styles.stepDesc}>모든 정보를 확인하고 요청해주세요.</Text>
 
       <View style={styles.summaryCard} accessibilityLabel="배송 요약 정보">
-        {/* Summary content... (same as original) */}
         <View style={styles.summaryRow}>
           <Text style={styles.summaryLabel}>🚇 경로</Text>
           <Text style={styles.summaryValue}>
@@ -1051,6 +1101,11 @@ export default function CreateRequestScreen({ navigation }: Props) {
                 <Text style={styles.feeItemUrgency}>긴급 surcharge: +{deliveryFee.urgencyFee.toLocaleString()}원</Text>
               )}
               <Text style={styles.feeItem}>VAT: {deliveryFee.vat.toLocaleString()}원</Text>
+              <View style={styles.auctionInfo}>
+                <Text style={styles.auctionLabel}>🔨 경매 시작가</Text>
+                <Text style={styles.auctionPrice}>{deliveryFee.totalFee.toLocaleString()}원부터</Text>
+                <Text style={styles.auctionDesc}>길러들이 더 빠른 배송을 위해 입찰할 수 있습니다</Text>
+              </View>
             </View>
           </>
         )}
@@ -1222,7 +1277,7 @@ export default function CreateRequestScreen({ navigation }: Props) {
         {currentStep === 5 && renderStep5()}
       </ScrollView>
 
-      {currentStep < 5 && (
+      {currentStep < 4 && (
         <View style={styles.footer}>
           <TouchableOpacity
             style={styles.nextButton}
@@ -1596,6 +1651,28 @@ function createStyles(
       color: colors.accent,
       fontSize: typo.fontSize.sm,
       marginBottom: space.xs,
+    },
+    auctionInfo: {
+      backgroundColor: colors.primaryLight,
+      borderRadius: radius.md,
+      marginTop: space.sm,
+      padding: space.md,
+    },
+    auctionLabel: {
+      color: colors.primaryDark,
+      fontSize: typo.fontSize.sm,
+      fontWeight: typo.fontWeight.semibold,
+      marginBottom: space.xs,
+    },
+    auctionPrice: {
+      color: colors.primary,
+      fontSize: typo.fontSize.xl,
+      fontWeight: typo.fontWeight.bold,
+      marginBottom: space.xs,
+    },
+    auctionDesc: {
+      color: colors.textSecondary,
+      fontSize: typo.fontSize.xs,
     },
     footer: {
       backgroundColor: colors.white,
