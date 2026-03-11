@@ -84,16 +84,49 @@ export async function gillerAcceptRequest(
       updatedAt: serverTimestamp(),
     });
 
+    // Extract fee information from various possible fields (for compatibility)
+    const rawFee = request.fee || request.feeBreakdown;
+    let confirmedFee = null;
+
+    if (rawFee && typeof rawFee === 'object') {
+      confirmedFee = {
+        totalFee: rawFee.totalFee || request.initialNegotiationFee || 0,
+        deliveryFee: rawFee.deliveryFee || rawFee.baseFee || 0,
+        vat: rawFee.vat || 0,
+        breakdown: rawFee.breakdown || (rawFee.totalFee ? {
+          gillerFee: Math.floor(rawFee.totalFee * 0.85),
+          platformFee: rawFee.totalFee - Math.floor(rawFee.totalFee * 0.85),
+        } : undefined)
+      };
+    } else if (request.initialNegotiationFee || request.totalFee) {
+      const totalAmount = request.initialNegotiationFee || request.totalFee;
+      confirmedFee = {
+        totalFee: totalAmount,
+        deliveryFee: Math.floor(totalAmount / 1.1),
+        vat: totalAmount - Math.floor(totalAmount / 1.1),
+        breakdown: {
+          gillerFee: Math.floor(totalAmount * 0.85),
+          platformFee: totalAmount - Math.floor(totalAmount * 0.85),
+        }
+      };
+    }
+
+    // Block if no valid fee information is found
+    if (!confirmedFee || !confirmedFee.totalFee || confirmedFee.totalFee <= 0) {
+      console.error('Invalid fee information found for request:', requestId, request);
+      return { success: false, message: '배송 요금 정보가 유효하지 않아 수락할 수 없습니다. 고객센터에 문의해주세요.' };
+    }
+
     // Create delivery document
     const deliveryData = {
       requestId,
-      gllerId: request.requesterId,
+      gllerId: request.requesterId || request.gllerId,
       gillerId,
       pickupStation: request.pickupStation,
       deliveryStation: request.deliveryStation,
       deliveryType: request.deliveryType || 'standard',
       packageInfo: request.packageInfo,
-      fee: request.fee || request.feeBreakdown || { totalFee: 3500, deliveryFee: 3500 }, // Fallback for old requests
+      fee: confirmedFee,
       recipientInfo: {
         name: request.recipientName,
         phone: request.recipientPhone,
