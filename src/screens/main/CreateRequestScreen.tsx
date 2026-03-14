@@ -181,6 +181,8 @@ export default function CreateRequestScreen({ navigation }: Props) {
     urgencyFee?: number;
     urgencySurcharge?: number;
     manualAdjustment?: number;
+    gillerFee: number;
+    platformFee: number;
   } | null>(null);
 
   // Themed styles
@@ -329,6 +331,19 @@ export default function CreateRequestScreen({ navigation }: Props) {
     delete (window as any).__draftData;
   };
 
+  const getStationCountFromGPS = (pickup: Station, delivery: Station): number | null => {
+    const loc1 = pickup.location as any;
+    const loc2 = delivery.location as any;
+    const lat1 = loc1?.lat ?? loc1?.latitude;
+    const lng1 = loc1?.lng ?? loc1?.longitude;
+    const lat2 = loc2?.lat ?? loc2?.latitude;
+    const lng2 = loc2?.lng ?? loc2?.longitude;
+    if (lat1 && lng1 && lat2 && lng2) {
+      return estimateStationCountFromCoords(lat1, lng1, lat2, lng2);
+    }
+    return null;
+  };
+
   const calculateFee = async () => {
     if (!pickupStation || !deliveryStation || !weight) {
       console.log('Missing required data for fee calculation:', {
@@ -366,16 +381,11 @@ export default function CreateRequestScreen({ navigation }: Props) {
             console.log('Travel time data loaded (Firestore):', { travelTimeMinutes, stationCount });
           } else {
             // Firestore에 구간 데이터가 없으면 → GPS 좌표 기반 fallback
-            const lat1 = pickupStation.location?.latitude;
-            const lng1 = pickupStation.location?.longitude;
-            const lat2 = deliveryStation.location?.latitude;
-            const lng2 = deliveryStation.location?.longitude;
-
-            if (lat1 && lng1 && lat2 && lng2) {
-              stationCount = estimateStationCountFromCoords(lat1, lng1, lat2, lng2);
-              // 역 개수 → 예상 이동 시간 (역당 2.5분)
+            const gpsCount = getStationCountFromGPS(pickupStation, deliveryStation);
+            if (gpsCount !== null) {
+              stationCount = gpsCount;
               travelTimeMinutes = stationCount * 2.5;
-              console.log('Travel time estimated (GPS fallback):', { lat1, lng1, lat2, lng2, stationCount, travelTimeMinutes });
+              console.log('Travel time estimated (GPS fallback):', { stationCount, travelTimeMinutes });
             } else {
               console.log('No coords available, using default stationCount=5');
             }
@@ -405,10 +415,12 @@ export default function CreateRequestScreen({ navigation }: Props) {
         weightFee: feeResult.weightFee,
         serviceFee: feeResult.serviceFee,
         vat: feeResult.vat,
-        totalFee: feeResult.totalFee, // manualAdjustment는 UI 표시용으로만 남겨두고 합산하지 않음
+        totalFee: feeResult.totalFee,
         estimatedTime: travelTimeMinutes,
         urgencySurcharge: feeResult.urgencySurcharge,
-        manualAdjustment: 0, // 일단 0으로 초기화
+        manualAdjustment: 0,
+        gillerFee: feeResult.gillerFee,
+        platformFee: feeResult.platformFee,
       });
     } catch (error) {
       console.error('Error calculating delivery fee:', error);
@@ -437,6 +449,8 @@ export default function CreateRequestScreen({ navigation }: Props) {
         urgencyFee: feeResult.urgencySurcharge,
         urgencySurcharge: feeResult.urgencySurcharge,
         manualAdjustment: 0,
+        gillerFee: feeResult.gillerFee,
+        platformFee: feeResult.platformFee,
       });
     }
   };
@@ -948,6 +962,15 @@ export default function CreateRequestScreen({ navigation }: Props) {
                 VAT: {deliveryFee.vat.toLocaleString()}원
               </Text>
             </View>
+            <View style={styles.gillerBreakdownPreview}>
+              <Text style={styles.gillerBreakdownTitle}>정산 내역 (참고)</Text>
+              <Text style={styles.gillerBreakdownText}>
+                길러 수령 (85%): {deliveryFee.gillerFee.toLocaleString()}원
+              </Text>
+              <Text style={styles.gillerBreakdownText}>
+                플랫폼 수수료 (15%): {deliveryFee.platformFee.toLocaleString()}원
+              </Text>
+            </View>
             <Text style={styles.feePreviewNote}>
               * 이 요금은 초기 협상금액이며, 최종 금액은 배송 완료 후 확정됩니다.
             </Text>
@@ -1107,6 +1130,15 @@ export default function CreateRequestScreen({ navigation }: Props) {
                 <Text style={styles.feeItemUrgency}>긴급 surcharge: +{deliveryFee.urgencyFee.toLocaleString()}원</Text>
               )}
               <Text style={styles.feeItem}>VAT: {deliveryFee.vat.toLocaleString()}원</Text>
+              <View style={styles.gillerBreakdownSummary}>
+                <Text style={styles.gillerBreakdownTitle}>정산 내역 (참고)</Text>
+                <Text style={styles.gillerBreakdownText}>
+                  길러 수령 (85%): {deliveryFee.gillerFee.toLocaleString()}원
+                </Text>
+                <Text style={styles.gillerBreakdownText}>
+                  플랫폼 수수료 (15%): {deliveryFee.platformFee.toLocaleString()}원
+                </Text>
+              </View>
               <View style={styles.auctionInfo}>
                 <Text style={styles.auctionLabel}>🔨 경매 시작가</Text>
                 <Text style={styles.auctionPrice}>{deliveryFee.totalFee.toLocaleString()}원부터</Text>
@@ -1677,6 +1709,28 @@ function createStyles(
       marginBottom: space.xs,
     },
     auctionDesc: {
+      color: colors.textSecondary,
+      fontSize: typo.fontSize.xs,
+    },
+    gillerBreakdownPreview: {
+      backgroundColor: colors.gray100,
+      borderRadius: radius.sm,
+      marginTop: space.sm,
+      padding: space.sm,
+    },
+    gillerBreakdownSummary: {
+      backgroundColor: colors.gray100,
+      borderRadius: radius.sm,
+      marginTop: space.sm,
+      padding: space.sm,
+    },
+    gillerBreakdownTitle: {
+      color: colors.textSecondary,
+      fontSize: typo.fontSize.xs,
+      fontWeight: typo.fontWeight.semiBold,
+      marginBottom: space.xs,
+    },
+    gillerBreakdownText: {
       color: colors.textSecondary,
       fontSize: typo.fontSize.xs,
     },
