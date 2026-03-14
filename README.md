@@ -1,29 +1,33 @@
-# 가는길에 (GaneunGile) - 지하철 크라우드 배송 플랫폼
+# 가는길에 (GaneunGile)
+
+> 서울 지하철 이용자가 출퇴근길에 배송을 수행하고 수익을 창출하는 크라우드 배송 플랫폼
+
+---
 
 ## 📱 프로젝트 개요
 
-서울 지하철 1~9호선 이용자가 출퇴근길에 배송을 수행하고 수익을 창출하는 크라우드 배송 플랫폼입니다.
+지하철 출퇴근 동선을 활용한 크라우드 배송 서비스입니다.
+**길러(Giller)** 는 자신의 이동 경로에 맞는 배송 요청을 수락해 수익을 얻고,
+**글러(Gller)** 는 지하철 구간 내 빠르고 저렴한 배송을 의뢰합니다.
 
 ### 핵심 가치
 - **기존 동선 활용:** 출퇴근길에 배송하며 추가 수익 창출
-- **시간 효율성:** 지하철 이용 시간을 낭비 없이 활용
-- **유연한 참여:** 특정 시간 고정 없이 필요할 때만 참여 가능
+- **시간 효율성:** 지하철 이동 시간을 활용
+- **유연한 참여:** 원하는 시간에만 참여, 강제성 없음
 
 ---
 
 ## 🛠️ 기술 스택
 
-### Frontend
-- **React Native** - 크로스 플랫폼 모바일 앱
-- **Expo SDK 54** - 개발 및 배포 도구
-- **TypeScript** - 타입 안전성
-- **React Navigation** - 화면 네비게이션
-
-### Backend
-- **Firebase Firestore** - NoSQL 데이터베이스
-- **Firebase Auth** - 사용자 인증
-- **Firebase Hosting** - 웹 배포 (개발/테스트용)
-- **Firebase Functions** - 서버리스 백엔드 (예정)
+| 영역 | 기술 |
+|------|------|
+| Frontend | React Native, Expo SDK 54, TypeScript |
+| Navigation | React Navigation 7 (Stack + Bottom Tabs) |
+| Backend | Firebase Firestore, Firebase Auth, Firebase Functions (Node.js 20) |
+| Hosting | Firebase Hosting (웹 빌드) |
+| Build | EAS Build (iOS / Android) |
+| CI/CD | GitHub Actions |
+| Region | `asia-northeast3` (서울) |
 
 ---
 
@@ -31,176 +35,171 @@
 
 ```
 ganengile-new/
-├── App.tsx              # 메인 엔트리 포인트
-├── screens/             # 화면 컴포넌트
-│   ├── HomeScreen.tsx   # 홈 화면 (현재 경로 목록)
-│   ├── RouteScreen.tsx  # 동선 등록 화면
-│   ├── RequestsScreen.tsx # 배송 요청 목록
-│   └── ProfileScreen.tsx  # 프로필/설정
-├── components/          # 재사용 컴포넌트
-├── services/            # Firebase 연동
-├── hooks/               # 커스텀 React Hooks
-└── types/               # TypeScript 타입 정의
+├── App.tsx                          # 앱 진입점
+├── app.json / eas.json              # Expo / EAS 설정
+├── firebase.json / .firebaserc      # Firebase 설정 (project: ganengile)
+│
+├── src/
+│   ├── navigation/                  # 네비게이터
+│   │   ├── AppNavigator.tsx         # 루트: Auth → Onboarding → Main
+│   │   ├── AuthNavigator.tsx        # Landing, Login, SignUp
+│   │   ├── OnboardingNavigator.tsx  # 역할 선택, 길러 온보딩
+│   │   └── MainNavigator.tsx        # Tab + Stack (전체 화면)
+│   │
+│   ├── screens/
+│   │   ├── auth/                    # Landing, Login, SignUp
+│   │   ├── onboarding/              # RoleSelection, GillerOnboarding
+│   │   ├── main/                    # 앱 핵심 화면 전체
+│   │   ├── b2b/                     # B2B 기업 전용 화면
+│   │   └── giller/                  # 길러 전용 (락커 관련)
+│   │
+│   ├── services/                    # 비즈니스 로직
+│   │   ├── pricing-service.ts       # Phase 1 요금 계산
+│   │   ├── matching-service.ts      # 매칭 알고리즘 + Firestore
+│   │   ├── request-service.ts       # 배송 요청 CRUD
+│   │   ├── delivery-service.ts      # 배송 진행 (픽업~완료)
+│   │   ├── user-service.ts          # 사용자 정보
+│   │   ├── rating-service.ts        # 평가 시스템
+│   │   ├── chat-service.ts          # 채팅
+│   │   ├── notification-service.ts  # FCM 푸시 알림
+│   │   ├── SettlementService.ts     # 정산
+│   │   ├── b2b-*.ts                 # B2B 서비스 모듈
+│   │   └── config-service.ts        # Firestore Config 조회
+│   │
+│   ├── types/                       # TypeScript 타입 정의
+│   ├── contexts/                    # React Context (Auth, User, Theme)
+│   ├── components/                  # 공통 UI 컴포넌트
+│   ├── theme/                       # 디자인 토큰 (colors, spacing, typography)
+│   └── utils/                       # 유틸리티 함수
+│
+├── functions/                       # Firebase Cloud Functions
+│   └── src/
+│       ├── index.ts                 # FCM, 자동매칭, 요금계산, 채팅
+│       └── scheduled/
+│           ├── settlement-scheduler.ts   # 매월 5일 길러 정산
+│           └── tax-invoice-scheduler.ts  # 세금계산서 발행
+│
+├── data/                            # 지하철 정적 데이터
+│   ├── subway-stations.ts           # 역 목록
+│   ├── travel-times.ts              # 구간 소요시간
+│   └── matching-engine.ts           # 매칭 엔진 코어
+│
+└── .github/workflows/
+    ├── deploy-firebase.yml          # Firebase 배포 (수동 트리거)
+    └── eas-build.yml                # EAS 빌드 (main/develop push)
 ```
 
 ---
 
-## ✨ 주요 기능
+## ✨ 구현된 기능
 
-### 1단계: 핵심 인프라 ✅
-- [x] Firebase 프로젝트 설정 (ganengile)
-- [x] Firestore 데이터베이스 구조
-- [x] Firebase Auth (Email/Password)
-- [x] Config 컬렉션 초기화 (역, 경로, 요금)
+### 인증 / 사용자
+- Firebase Auth (이메일/비밀번호)
+- 카카오 로그인 (`kakao-auth.ts`)
+- Google 로그인 (`google-auth.ts`)
+- 역할 시스템: `giller` (배송자) / `gller` (의뢰자) / `both`
+- 길러 등급: `regular` → `professional` → `master`
+- 온보딩 플로우 (역할 선택 → 길러 신원 인증)
 
-### 2단계: 기본 기능 ✅
-- [x] 사용자 역할 시스템 (Giller/Gller/BOTH)
-- [x] 동선 등록 (CRUD, 유효성 검사)
-- [x] 역할 전환 (슬라이더 UI)
+### 배송 요청 생성 (5단계 스텝)
+1. 역 선택 (픽업역 / 배송역)
+2. 패키지 정보 (크기, 무게, 긴급도) + 요금 미리보기
+3. 수신자 정보 + 시간 설정
+4. 전체 요약 확인 + 제출
+5. 추가 정보 (만날 장소, 보관 위치, 특이사항)
 
-### 3단계: 매칭 시스템 🚧
-- [x] **요금 계산 함수** (calculateDeliveryPricing)
-  - 거리 기반 요금 (3,000~8,000원)
-  - 출퇴근 할증 (+20%)
-  - 긴급 surcharge (0%, +20%, +50%)
-  - 환승 보너스
-  - 길러 등급별 보너스
-- [x] **매칭 함수** (matchRequests)
-- [x] **수락 함수** (acceptMatch)
-- [x] **거절 함수** (rejectMatch)
-- [x] **완료 함수** (completeMatch)
-- [ ] 전문 길러 시스템
-- [ ] 배지 시스템
-- [x] 프로젝트 초기 설정 (Expo + TypeScript)
-- [x] Firebase 프로젝트 생성 및 설정
-- [ ] 화면 네비게이션 구조 (Stack Navigator)
-- [ ] Firebase CRUD 연동 (사용자, 경로, 요청)
+### Phase 1 요금 계산 (`pricing-service.ts`)
+| 항목 | 내용 |
+|------|------|
+| 기본료 | 3,500원 |
+| 거리료 | 역 개수 기반 600~2,400원 |
+| 서비스 수수료 | 15% |
+| 부가세 | 10% |
+| 최소/최대 | 3,000원 / 8,000원 |
+| 길러 정산 | 85% (platformFee 15%) |
+| stationCount 산출 | Firestore → GPS Haversine → 기본값 5 |
 
-### 2단계: 핵심 기능
-- [ ] 홈 화면 UI (현재 등록된 경로 목록)
-- [ ] 동선 등록 기능 (출발역 → 도착역, 시간대)
-- [ ] 배송 요청 목록 화면
-- [ ] 경로 매칭 알고리즘
-- [ ] 매칭 결과 화면
-- [ ] 수락/거절 기능
+### 매칭 시스템
+- 자동 매칭 (Cloud Function: `onRequestCreated`)
+- 경로 기반 매칭 점수 계산 (`calculateRouteMatchScore`)
+- 배지 보너스 반영 (`calculateBadgeBonus`)
+- 매칭 수락 / 거절 / 완료
 
-### 3단계: 사용자 관리
-- [ ] 프로필 화면
-- [ ] 평가 시스템
-- [ ] 수익 관리
+### 배송 진행
+- 픽업 인증 (QR 코드)
+- 실시간 위치 추적 (`RealtimeSubwayService`)
+- 락커 연동 (픽업/드롭오프)
+- 배송 완료 처리
 
-### 4단계: 데이터 연동
-- [ ] 서울 지하철역 데이터 연동
-- [ ] 경로 검색 기능
-- [ ] 실시간 지하철 도착 정보 (옵션)
+### 채팅
+- 배송 건별 채팅방 생성
+- 실시간 메시지 (Firestore onSnapshot)
 
----
+### 정산 / 수익
+- 길러 수익 내역 (`EarningsScreen`)
+- 포인트 시스템 (`PointService`)
+- 포인트 출금 (`PointWithdrawScreen`)
+- 월간 자동 정산 스케줄러 (매월 5일)
 
-## 🔐 인증 설정
+### 배지 / 레벨
+- 배지 수집 시스템 (`BadgeService`)
+- 길러 레벨 승급 (`GillerLevelUpgradeScreen`)
+- 배지 획득 팝업 (`BadgeEarnedPopup`)
 
-### Google 로그인 설정
+### B2B (기업 전용)
+- B2B 기업 온보딩 / 계약 (`business-contract-service.ts`)
+- B2B 길러 등급: `silver` / `gold` / `platinum`
+- 월간 배송 집계 + 세금계산서 발행
+- B2B 대시보드 / 정산 화면
 
-Google 로그인을 사용하려면 다음 단계를 완료해야 합니다:
-
-1. **Google Cloud Console 설정**
-   - 프로젝트 생성 및 OAuth 동의 화면 구성
-   - OAuth 클라이언트 ID 생성 (Web, iOS, Android)
-   - 상세 가이드: [Google 로그인 설정 가이드](./docs/GOOGLE_AUTH_SETUP.md)
-
-2. **Firebase Auth 설정**
-   - Firebase Console에서 Google 로그인 활성화
-   - 승인된 도메인 확인
-
-3. **환경 변수 설정**
-   ```bash
-   cp .env.example .env
-   # .env 파일에 Google Client ID 및 Secret 추가
-   EXPO_PUBLIC_GOOGLE_CLIENT_ID=your_google_client_id_here
-   EXPO_PUBLIC_GOOGLE_CLIENT_SECRET=your_google_client_secret_here
-   ```
-
-### 카카오 로그인 설정 (선택)
-
-카카오 로그인도 지원합니다. 자세한 내용은 [`kakao-auth.ts`](./src/services/kakao-auth.ts)를 참고하세요.
+### 기타
+- 다크모드 / 테마 시스템
+- 오프라인 감지 (`OfflineIndicator`)
+- 네트워크 에러 재시도 (`retry-with-backoff.ts`)
+- 작성 중 임시저장 (`draft-storage.ts`)
+- FCM 푸시 알림
+- 분쟁 신고 / 해결 (`DisputeReportScreen`)
 
 ---
 
-## ⚙️ Config 초기화
+## 🔥 Firestore 컬렉션 구조
 
-프로덕션 환경에서는 하드코딩된 대신 **Firestore Config Collections**을 사용하여 지하철 데이터를 관리합니다.
-
-### Config Collections
-
-```javascript
-config_stations           // 역 정보 (30개 주요역)
-config_travel_times       // 소요 시간 매트릭스
-config_express_trains     // 급행 열차 정보
-config_congestion         // 혼잡도 데이터
-config_algorithm_params   // 매칭 알고리즘 파라미터
+```
+users/               사용자 정보 (역할, 등급, 통계)
+routes/              길러 등록 동선 (출발역, 도착역, 시간대)
+requests/            배송 요청 (상태, 요금, 패키지, feeBreakdown)
+matches/             매칭 결과 (requestId, gillerId, status)
+deliveries/          배송 진행 정보 (픽업/완료 타임스탬프)
+ratings/             평가 (matchId, rating 1-5, comment)
+chats/               채팅방 (requestId 연결)
+notifications/       FCM 알림 이력
+points/              포인트 내역
+settlements/         정산 내역
+b2b_contracts/       B2B 계약
+b2b_requests/        B2B 배송 요청
+tax_invoices/        세금계산서
+config_stations/     역 정보 (Firestore Config)
+config_travel_times/ 구간 소요시간
+config_algorithm_params/ 매칭 파라미터
 ```
 
-### 초기화 방법
-
-```bash
-# Config 데이터 초기화 (Firebase에 데이터 저장)
-npm run init-config
-
-# 상세 로그 보기
-npm run init-config -- --verbose
-
-# 기존 데이터 덮어쓰기
-npm run init-config -- --force
-```
-
-### 장점
-- 🔧 Firebase Console에서 실시간 파라미터 수정 가능
-- 📈 A/B 테스트 가능 (v1.0 → v1.1)
-- 🚀 배포 없이 알고리즘 튜닝
-- 📊 지하철 API 연동 시 데이터만 교체
-
----
-
-## 🔥 Firebase Collections
-
-```javascript
-users      // 사용자 정보
-  - uid: string
-  - email: string
-  - name: string
-  - phone: string
-  - rating: number
-  - totalEarnings: number
-
-routes     // 동선 (출발역, 도착역, 시간)
-  - userId: string
-  - startStation: { name: string, line: string, lat: number, lng: number }
-  - endStation: { name: string, line: string, lat: number, lng: number }
-  - departureTime: string // HH:mm format
-  - daysOfWeek: number[] // [1,2,3,4,5] for weekdays
-  - createdAt: Timestamp
-
-requests   // 배송 요청
-  - requesterId: string
-  - pickupStation: { name: string, line: string, ... }
-  - deliveryStation: { name: string, line: string, ... }
-  - packageInfo: { size: string, weight: string, description: string }
-  - fee: number
-  - deadline: Timestamp
-  - status: 'pending' | 'matched' | 'in_progress' | 'completed' | 'cancelled'
-
-matches    // 매칭 정보
-  - requestId: string
-  - courierId: string
-  - routeId: string
-  - status: 'accepted' | 'in_progress' | 'completed'
-  - createdAt: Timestamp
-
-ratings    // 평가
-  - matchId: string
-  - fromUser: string
-  - toUser: string
-  - rating: number // 1-5
-  - comment: string
+### `requests.feeBreakdown` 스키마
+```typescript
+feeBreakdown: {
+  baseFee: number;
+  distanceFee: number;
+  sizeFee: number;
+  weightFee: number;
+  urgencySurcharge: number;
+  manualAdjustment: number;
+  serviceFee: number;
+  vat: number;
+  totalFee: number;
+  breakdown: {
+    gillerFee: number;    // totalFee × 85%
+    platformFee: number;  // totalFee × 15%
+  };
+}
 ```
 
 ---
@@ -211,7 +210,10 @@ ratings    // 평가
 # 의존성 설치
 npm install
 
-# 웹에서 개발 (推荐)
+# 개발 서버 (Expo Go)
+npm start
+
+# 웹 브라우저
 npm run web
 
 # iOS 시뮬레이터
@@ -219,177 +221,115 @@ npm run ios
 
 # 안드로이드 에뮬레이터
 npm run android
+
+# Firestore Config 초기화 (최초 1회)
+npm run init-config
+```
+
+### 환경변수 설정
+
+```bash
+cp .env.example .env
+```
+
+`.env` 필수 항목:
+```
+EXPO_PUBLIC_FIREBASE_API_KEY=
+EXPO_PUBLIC_FIREBASE_AUTH_DOMAIN=
+EXPO_PUBLIC_FIREBASE_PROJECT_ID=ganengile
+EXPO_PUBLIC_FIREBASE_STORAGE_BUCKET=
+EXPO_PUBLIC_FIREBASE_MESSAGING_SENDER_ID=
+EXPO_PUBLIC_FIREBASE_APP_ID=
+EXPO_PUBLIC_GOOGLE_CLIENT_ID=        # Google 로그인 (선택)
 ```
 
 ---
 
 ## 🤖 GitHub Actions (CI/CD)
 
-### 개요
-자동화된 파이프라인으로 코드 품질, 테스트, 배포를 관리합니다.
+### Firebase 배포 (`deploy-firebase.yml`)
+- **트리거:** 수동 (`workflow_dispatch`)
+- **옵션:** Target (`firestore` / `hosting` / `functions` / `all`), Environment (`production` / `staging`)
+- **Node.js:** 20 (Firebase Functions 런타임과 일치)
 
-### 워크플로우
+### EAS 빌드 (`eas-build.yml`)
+- **트리거:** `main` / `develop` push, `v*` 태그, 수동
+- **옵션:** Platform (`all` / `ios` / `android`), Profile (`production` / `preview`)
+- **Node.js:** 20
 
-#### 1. CI (지속적 통합)
-**파일:** `.github/workflows/ci.yml`
-
-**트리거:** Push/PR to `main`, `develop`
-
-**작업:**
-- ✅ ESLint 검사
-- ✅ TypeScript 타입 체크
-- ✅ Jest 테스트 실행
-- ✅ 웹 빌드 검증
-
-#### 2. Firebase 배포
-**파일:** `.github/workflows/deploy-firebase.yml`
-
-**트리거:** 수동 (workflow_dispatch)
-
-**옵션:**
-- Target: `firestore` | `hosting` | `functions` | `all`
-- Environment: `production` | `staging`
-
-**실행 방법:**
-1. GitHub 저장소 → Actions 탭
-2. "Deploy to Firebase" 선택
-3. Target과 Environment 선택
-4. "Run workflow" 클릭
-
-#### 3. EAS Build
-**파일:** `.github/workflows/eas-build.yml`
-
-**트리거:** Push to `main`/`develop`, Tag `v*`, 수동
-
-**옵션:**
-- Platform: `all` | `ios` | `android`
-- Profile: `production` | `preview`
-
-### 필수 Secret 설정
-
-GitHub Repository → Settings → Secrets and variables → Actions
-
-```bash
-# Firebase Service Account (JSON 형식)
-FIREBASE_SERVICE_ACCOUNT={"type":"service_account",...}
-
-# Expo Token
-EXPO_TOKEN=your_expo_token_here
+### 필수 GitHub Secrets
+```
+FIREBASE_SERVICE_ACCOUNT   # Firebase 서비스 계정 JSON
+EXPO_TOKEN                 # Expo 계정 토큰
 ```
 
-### Firebase Service Account 생성
+---
+
+## ⚙️ Firestore Config 초기화
+
+앱 최초 배포 시 Firestore에 지하철 데이터를 초기화합니다.
 
 ```bash
-# Firebase Console → Project Settings → Service Accounts
-# "Generate new private key" 클릭
-# 다운로드된 JSON 파일의 내용을 GitHub Secret에 저장
+npm run init-config
 ```
 
-### GitHub Actions 사용 이점
+초기화 대상:
+- `config_stations` — 역 정보
+- `config_travel_times` — 구간 소요시간
+- `config_express_trains` — 급행 열차
+- `config_congestion` — 혼잡도
+- `config_algorithm_params` — 매칭 알고리즘 파라미터
 
-- 🔄 **자동화:** Push 시 자동 검증
-- 🛡️ **안전성:** 테스트 실패 시 조기 발견
-- ⚡ **속도:** 배포 시간 단축
-- 📊 **가시성:** Workflow 실행 기록
-
----
-
-## 🛡️ 개발 원칙
-
-### 안전성 우선
-- 모든 변경사항은 테스트 후 배포
-- Firebase 보안 규칙 엄격히 적용
-- 사용자 데이터 보호 최우선
-
-### 코드 품질
-- TypeScript strict mode 활용
-- ESLint/Prettier로 코드 스타일 일관성
-- 컴포넌트 재사용성 고려
-
-### 협업 방식
-- **opencode**: AI 개발 에이전트가 코드 작성 및 기능 구현
-- **제미나이 (Gemini):** 디자인 전문가로 UI/UX 설계 담당 (opencode가 소환)
-- **OpenClaw (저)**: 코드 리뷰, QA 검증, 기술적 의사결정, 배포 승인
-- 모든 코드는 리뷰 후 반영
-- UI/UX가 필요할 때는 opencode에게 "제미나이를 소환해라"고 지시
+> Firebase Console에서 실시간 수정 가능 → 재배포 없이 요금/알고리즘 파라미터 튜닝
 
 ---
 
-## 📅 개발 로드맵
-
-### Week 1: 인프라 구축
-- React Navigation 설정
-- 4개 기본 화면 (Home, Route, Requests, Profile)
-- Firebase 연동 기초
-- **제미나이와 협업하여 UI/UX 설계**
-
-### Week 2-3: 핵심 기능 구현
-- 동선 등록/관리
-- 배송 요청 목록
-- 경로 매칭 알고리즘
-- 사용자 인증
-- Firestore CRUD
-
-### Week 4: 사용자 관리
-- 프로필 화면
-- 평가 시스템
-- 수익 관리
-
-### Week 5: 데이터 연동
-- 서울 지하철역 데이터 연동
-- 경로 검색 기능
-- 실시간 지하철 도착 정보
-
-### Week 6: 폴리싱
-- UI/UX 개선
-- 에러 핸들링
-- 테스트 및 배포
-
----
-
-## 🔑 API 설정
-
-### 공공데이터포털 API 발급 (실시간 지하철 정보)
-
-1. **서울교통공사 API**
-   - 접속: https://www.data.go.kr
-   - 검색: "실시간 지하철 도착 정보 조회"
-   - 신청: 서울교통공사 > 지하철 > 실시간 도착 정보
-   - 발급: 즉시 (자동 승인)
-   - 키: `.env` 파일의 `SEOUL_SUBWAY_API_KEY`에 추가
-
-2. **한국철도공사 API** (선택)
-   - 검색: "수도권 전철 열차운행 정보"
-   - 경의중앙선, 경춘선, 수인분당선 등
-   - 키: `.env` 파일의 `KORAIL_API_KEY`에 추가
-
-3. **인천교통공사 API** (선택)
-   - 검색: "인천지하철 실시간 정보"
-   - 키: `.env` 파일의 `INCHEON_SUBWAY_API_KEY`에 추가
+## 🧪 테스트
 
 ```bash
-# .env 파일 예시
-SEOUL_SUBWAY_API_KEY=여기에_키_입력
-KORAIL_API_KEY=여기에_키_입력
-INCHEON_SUBWAY_API_KEY=여기에_키_입력
+npm test                 # 전체 테스트
+npm run test:watch       # Watch 모드
+npm run test:coverage    # 커버리지 리포트
+npm run lint             # ESLint 검사
+npm run lint:fix         # 자동 수정
 ```
 
-### API 사용 혜택
-- ✅ 실시간 열차 도착 정보
-- ✅ 혼잡도 데이터
-- ✅ 지연 정보
-- ✅ 무료 사용
+테스트 위치: `tests/`, `__tests__/`, `src/**/*.test.ts`
 
 ---
 
-## 🔗 관련 링크
+## 📋 개발 현황
 
-- **Firebase Console**: https://console.firebase.google.com/project/ganengile
-- **Expo Dashboard**: https://expo.dev
-- **공공데이터포털**: https://www.data.go.kr
-- **GitHub Repository**: (예정)
+### 완료
+- [x] Firebase 인증 (이메일, Google, 카카오)
+- [x] 역할 시스템 (길러 / 글러 / 둘 다)
+- [x] 배송 요청 생성 5단계 플로우
+- [x] Phase 1 요금 계산 (거리 기반, gillerFee/platformFee)
+- [x] 자동 매칭 Cloud Function
+- [x] 배송 진행 플로우 (픽업 인증 → 완료)
+- [x] 채팅 (실시간)
+- [x] FCM 푸시 알림
+- [x] 평가 시스템
+- [x] 수익 / 포인트 관리
+- [x] 배지 / 레벨 시스템
+- [x] B2B 기업 전용 기능
+- [x] 월간 정산 자동화 (Cloud Function)
+- [x] 세금계산서 발행
+- [x] GitHub Actions Node.js v20 동기화
+
+### 진행 중
+- [ ] EAS Build EXPO_TOKEN 인증 이슈 해결
+- [ ] 실시간 지하철 도착 정보 연동 (공공데이터포털 API)
 
 ---
 
-_개발 시작일: 2026년 2월 4일_  
-_마지막 수정: 2026년 2월 4일_
+## 🔗 링크
+
+- **Firebase Console:** https://console.firebase.google.com/project/ganengile
+- **Expo Dashboard:** https://expo.dev
+- **GitHub Repository:** https://github.com/beokadm-creator/ganengile-new
+
+---
+
+_프로젝트 시작: 2026년 2월_
+_최종 업데이트: 2026년 3월_
