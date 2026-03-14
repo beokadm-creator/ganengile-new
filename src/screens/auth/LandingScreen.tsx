@@ -38,7 +38,7 @@ export default function LandingScreen({ navigation }: any) {
         {/* 강력한 CTA - 회원가입 우선 */}
         <TouchableOpacity
           style={styles.button}
-          onPress={() => handleNavigate('SignUp')}
+          onPress={() => handleNavigate('NewSignUp')}
           activeOpacity={0.8}
         >
           <View style={styles.primaryButton}>

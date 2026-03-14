@@ -9,7 +9,7 @@ import type { AuthStackParamList } from '../types/navigation';
 
 // Screens
 import LandingScreen from '../screens/auth/LandingScreen';
-import SignUpScreen from '../screens/auth/SignUpScreen';
+import NewSignUpScreen from '../screens/auth/NewSignUpScreen';
 import LoginScreen from '../screens/auth/LoginScreen';
 
 const Stack = createStackNavigator<AuthStackParamList>();
@@ -24,7 +24,7 @@ export default function AuthNavigator() {
       }}
     >
       <Stack.Screen name="Landing" component={LandingScreen} />
-      <Stack.Screen name="SignUp" component={SignUpScreen} />
+      <Stack.Screen name="NewSignUp" component={NewSignUpScreen} />
       <Stack.Screen name="Login" component={LoginScreen} />
     </Stack.Navigator>
   );
