@@ -48,7 +48,7 @@ type Props = {
 
 export default function GillerOnboardingScreen({ navigation, route }: Props) {
   const { role } = route.params || { role: 'giller' };
-  const { refreshUser } = useUser();
+  const { refreshUser, completeOnboarding } = useUser();
   const [currentStep, setCurrentStep] = useState(0);
   const scrollViewRef = useRef<ScrollView>(null);
 
@@ -114,16 +114,21 @@ export default function GillerOnboardingScreen({ navigation, route }: Props) {
 
   const handleComplete = async () => {
     try {
+      console.log('🎯 Starting Giller onboarding completion...');
+
       // AsyncStorage에 온보딩 완료 저장
       await AsyncStorage.setItem('@onboarding_completed', 'true');
+      console.log('✅ AsyncStorage saved');
 
-      // UserContext 갱신
-      await refreshUser();
+      // UserContext의 completeOnboarding 호출 (Firestore 업데이트)
+      await completeOnboarding();
+      console.log('✅ Firestore updated');
 
       // Main 화면으로 이동
       navigation.replace('Main');
+      console.log('✅ Navigated to Main');
     } catch (error) {
-      console.error('온보딩 완료 저장 오류:', error);
+      console.error('❌ 온보딩 완료 저장 오류:', error);
       Alert.alert('오류', '온보딩 완료 상태를 저장하는 데 실패했습니다.');
     }
   };
