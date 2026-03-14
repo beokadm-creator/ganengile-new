@@ -676,6 +676,10 @@ export default function CreateRequestScreen({ navigation }: Props) {
             serviceFee: deliveryFee.serviceFee,
             vat: deliveryFee.vat,
             totalFee: deliveryFee.totalFee,
+            breakdown: {
+              gillerFee: deliveryFee.gillerFee,
+              platformFee: deliveryFee.platformFee,
+            },
           },
           itemValue: parseFloat(itemValue),
           preferredTime: {

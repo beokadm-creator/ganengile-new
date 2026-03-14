@@ -101,6 +101,10 @@ export interface Request {
     serviceFee: number;
     vat: number;
     totalFee: number;
+    breakdown?: {
+      gillerFee: number;
+      platformFee: number;
+    };
   };
 
   // 희망 배송 시간
@@ -173,6 +177,10 @@ export interface CreateRequestData {
     serviceFee: number;
     vat: number;
     totalFee: number;
+    breakdown?: {
+      gillerFee: number;
+      platformFee: number;
+    };
   };
   itemValue?: number;
   preferredTime?: {
