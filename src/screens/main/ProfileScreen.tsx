@@ -507,9 +507,9 @@ export default function ProfileScreen({ navigation: _navigation }: Props) {
       },
       {
         icon: '🚀',
-        title: '길러 승급',
-        subtitle: '전문 길러로 승급 신청',
-        onPress: () => (_navigation as any).navigate('GillerLevelUpgrade'),
+        title: '길러 신청',
+        subtitle: '배송 활동을 시작하고 싶으신가요?',
+        onPress: () => (_navigation as any).navigate('GillerApplication'),
         color: '#FF5722',
       },
       ...commonItems,

@@ -73,10 +73,11 @@ function AppNavigatorContent() {
         {!user ? (
           // No user - show Auth flow
           <Stack.Screen name="Auth" component={AuthNavigator} />
-        ) : !user.hasCompletedOnboarding && user.role ? (
+        ) : !user.hasCompletedOnboarding ? (
           // User signed in but hasn't completed onboarding
+          // 모든 신규 사용자는 기본 정보 입력부터 시작
           <Stack.Screen name="Onboarding">
-            {() => <OnboardingNavigator role={user.role} />}
+            {() => <OnboardingNavigator role={user.role || 'both'} />}
           </Stack.Screen>
         ) : (
           // User signed in and completed onboarding - show Main app

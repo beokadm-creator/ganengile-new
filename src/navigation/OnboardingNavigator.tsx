@@ -5,9 +5,9 @@
 
 import React from 'react';
 import { createStackNavigator } from '@react-navigation/stack';
+import BasicInfoOnboarding from '../screens/onboarding/BasicInfoOnboarding';
 import GllerOnboardingScreen from '../screens/onboarding/GllerOnboardingScreen';
-import GillerOnboardingScreen from '../screens/onboarding/GillerOnboardingScreen';
-import RoleSelectionScreen from '../screens/onboarding/RoleSelectionScreen';
+import GillerApplicationOnboarding from '../screens/onboarding/GillerApplicationOnboarding';
 
 const Stack = createStackNavigator();
 
@@ -23,32 +23,27 @@ export default function OnboardingNavigator({ role }: Props) {
         cardStyle: { backgroundColor: '#fff' },
       }}
     >
-      {/* BOTH 역할 사용자는 먼저 역할을 선택함 */}
-      {role === 'both' ? (
-        <Stack.Screen
-          name="RoleSelection"
-          component={RoleSelectionScreen}
-          options={{ gestureEnabled: false }}
-        />
-      ) : null}
+      {/* 모든 사용자: 기본 정보 입력 */}
+      <Stack.Screen
+        name="BasicInfoOnboarding"
+        component={BasicInfoOnboarding}
+        options={{ gestureEnabled: false }}
+      />
 
-      {role === 'gller' || role === 'both' ? (
-        <Stack.Screen
-          name="GllerOnboarding"
-          component={GllerOnboardingScreen}
-          options={{ gestureEnabled: false }}
-          initialParams={{ role }}
-        />
-      ) : null}
+      {/* 이용자 온보딩 */}
+      <Stack.Screen
+        name="GllerOnboarding"
+        component={GllerOnboardingScreen}
+        options={{ gestureEnabled: false }}
+        initialParams={{ role }}
+      />
 
-      {role === 'giller' || role === 'both' ? (
-        <Stack.Screen
-          name="GillerOnboarding"
-          component={GillerOnboardingScreen}
-          options={{ gestureEnabled: false }}
-          initialParams={{ role }}
-        />
-      ) : null}
+      {/* 길러 신청 온보딩 */}
+      <Stack.Screen
+        name="GillerApplication"
+        component={GillerApplicationOnboarding}
+        options={{ gestureEnabled: false }}
+      />
     </Stack.Navigator>
   );
 }
