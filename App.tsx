@@ -34,6 +34,7 @@ export default function App() {
 
   // 웹에서는 화면 너비 확인
   const screenWidth = Dimensions.get('window').width;
+  const screenHeight = Dimensions.get('window').height;
   const isDesktop = screenWidth >= 768;
 
   if (!isDesktop) {
@@ -213,8 +214,8 @@ const styles = StyleSheet.create({
     color: '#B0BEC5',
   },
   iphoneFrame: {
-    width: 474,
-    height: 956,
+    width: 600,
+    height: 1200,
     backgroundColor: '#000000',
     borderRadius: 55,
     borderWidth: 14,
@@ -229,13 +230,13 @@ const styles = StyleSheet.create({
   },
   notch: {
     position: 'absolute',
-    top: 14,
+    top: 18,
     left: '50%',
-    marginLeft: -65,
-    width: 130,
-    height: 38,
+    marginLeft: -82,
+    width: 164,
+    height: 48,
     backgroundColor: '#000000',
-    borderRadius: 22,
+    borderRadius: 28,
     zIndex: 10,
   },
   screenContent: {
@@ -248,13 +249,13 @@ const styles = StyleSheet.create({
   },
   homeIndicator: {
     position: 'absolute',
-    bottom: 10,
+    bottom: 12,
     left: '50%',
-    marginLeft: -75,
-    width: 150,
-    height: 6,
+    marginLeft: -95,
+    width: 190,
+    height: 8,
     backgroundColor: '#FFFFFF',
-    borderRadius: 4,
+    borderRadius: 5,
     zIndex: 10,
   },
   infoSection: {
