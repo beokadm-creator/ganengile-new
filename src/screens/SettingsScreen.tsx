@@ -15,8 +15,7 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '../contexts/ThemeContext';
-import { signOut } from 'firebase/auth';
-import { auth } from '../services/firebase';
+import { useUser } from '../contexts/UserContext';
 
 interface SettingsSection {
   title: string;
@@ -36,31 +35,49 @@ interface SettingsItem {
 export const SettingsScreen: React.FC = () => {
   const insets = useSafeAreaInsets();
   const { colors, isDark, setColorScheme } = useTheme();
+  const { logout } = useUser();
   const [notificationsEnabled, setNotificationsEnabled] = useState(true);
   const [locationEnabled, setLocationEnabled] = useState(true);
   const [emailNotifications, setEmailNotifications] = useState(true);
   const [_darkMode, setDarkMode] = useState(isDark);
 
   const handleLogout = () => {
-    Alert.alert(
-      '로그아웃',
-      '정말 로그아웃하시겠습니까?',
-      [
-        { text: '취소', style: 'cancel' },
-        {
-          text: '로그아웃',
-          style: 'destructive',
-          onPress: async () => {
-            try {
-              await signOut(auth);
-              console.log('User logged out');
-            } catch (error) {
-              console.error('Logout error:', error);
-            }
-          }
+    const confirmLogout = async () => {
+      console.log('✅ User confirmed logout');
+      try {
+        await logout();
+        console.log('✅ User logged out successfully');
+      } catch (error) {
+        console.error('❌ Logout error:', error);
+        if (typeof window !== 'undefined') {
+          window.alert('로그아웃에 실패했습니다.');
+        } else {
+          Alert.alert('오류', '로그아웃에 실패했습니다.');
         }
-      ]
-    );
+      }
+    };
+
+    // Web 환경에서는 window.confirm 사용
+    if (typeof window !== 'undefined') {
+      const confirmed = window.confirm('정말 로그아웃하시겠습니까?');
+      if (confirmed) {
+        confirmLogout();
+      }
+    } else {
+      // Native 환경에서는 Alert 사용
+      Alert.alert(
+        '로그아웃',
+        '정말 로그아웃하시겠습니까?',
+        [
+          { text: '취소', style: 'cancel' },
+          {
+            text: '로그아웃',
+            style: 'destructive',
+            onPress: confirmLogout
+          }
+        ]
+      );
+    }
   };
 
   const settingsSections: SettingsSection[] = [

@@ -16,8 +16,6 @@ import {
 } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 import { StackNavigationProp } from '@react-navigation/stack';
-import { signOut } from 'firebase/auth';
-import { auth } from '../../services/firebase';
 import { getUserStats } from '../../services/user-service';
 import { getUserRating } from '../../services/rating-service';
 import { useUser } from '../../contexts/UserContext';
@@ -66,7 +64,7 @@ interface MenuItem {
 type EditModalType = 'name' | 'phone' | 'bankName' | 'accountNumber' | 'accountHolder' | null;
 
 export default function ProfileScreen({ navigation: _navigation }: Props) {
-  const { user, currentRole, switchRole, loading, refreshUser } = useUser();
+  const { user, currentRole, switchRole, loading, refreshUser, logout } = useUser();
   const [stats, setStats] = useState<UserStats | null>(null);
   const [rating, setRating] = useState<{
     averageRating: number;
@@ -189,20 +187,39 @@ export default function ProfileScreen({ navigation: _navigation }: Props) {
   };
 
   const handleLogout = () => {
-    Alert.alert('로그아웃', '정말 로그아웃하시겠습니까?', [
-      { text: '취소', style: 'cancel' },
-      {
-        text: '확인',
-        onPress: async () => {
-          try {
-            await signOut(auth);
-          } catch (error) {
-            console.error('Logout error:', error);
-            Alert.alert('오류', '로그아웃에 실패했습니다.');
-          }
-        },
-      },
-    ]);
+    console.log('🔘 Logout button clicked');
+
+    const confirmLogout = async () => {
+      console.log('✅ User confirmed logout');
+      try {
+        await logout();
+        console.log('✅ Logout function completed');
+        // UserContext의 logout이 모든 정리를 담당
+        // 네비게이션은 onAuthStateChanged가 자동으로 처리
+      } catch (error) {
+        console.error('❌ Logout error:', error);
+        // Web 환경에서는 window.confirm, Native에서는 Alert 사용
+        if (typeof window !== 'undefined') {
+          window.alert('로그아웃에 실패했습니다.');
+        } else {
+          Alert.alert('오류', '로그아웃에 실패했습니다.');
+        }
+      }
+    };
+
+    // Web 환경에서는 window.confirm 사용
+    if (typeof window !== 'undefined') {
+      const confirmed = window.confirm('정말 로그아웃하시겠습니까?');
+      if (confirmed) {
+        confirmLogout();
+      }
+    } else {
+      // Native 환경에서는 Alert 사용
+      Alert.alert('로그아웃', '정말 로그아웃하시겠습니까?', [
+        { text: '취소', style: 'cancel' },
+        { text: '확인', onPress: confirmLogout },
+      ]);
+    }
   };
 
   const toggleRole = () => {

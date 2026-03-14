@@ -4,13 +4,14 @@
  */
 
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
-import { onAuthStateChanged } from 'firebase/auth';
+import { onAuthStateChanged, signOut } from 'firebase/auth';
 import { auth } from '../services/firebase';
 import { getUserById, createUser } from '../services/user-service';
 import { doc, updateDoc, serverTimestamp } from 'firebase/firestore';
 import { db } from '../services/firebase';
 import type { User } from '../types/user';
 import { UserRole } from '../types/user';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 interface UserContextType {
   user: User | null;
@@ -19,6 +20,7 @@ interface UserContextType {
   switchRole: (role: UserRole) => void;
   refreshUser: () => Promise<void>;
   completeOnboarding: () => Promise<void>;
+  logout: () => Promise<void>;
 }
 
 export type { UserContextType };
@@ -104,6 +106,47 @@ export function UserProvider({ children }: UserProviderProps) {
     }
   };
 
+  const logout = async () => {
+    console.log('🚪 Starting logout process...');
+    try {
+      // Firebase Auth 로그아웃
+      console.log('1️⃣ Signing out from Firebase Auth...');
+      await signOut(auth);
+      console.log('✅ Firebase Auth signOut successful');
+
+      // UserContext 상태 초기화
+      console.log('2️⃣ Clearing UserContext state...');
+      setUser(null);
+      setCurrentRole(null);
+      setLoading(false);
+      console.log('✅ UserContext state cleared');
+
+      // Web 환경에서는 localStorage, Native에서는 AsyncStorage 정리
+      console.log('3️⃣ Clearing local storage...');
+      try {
+        if (typeof window !== 'undefined' && window.localStorage) {
+          // Web 환경: localStorage 사용
+          localStorage.removeItem('@user_email');
+          localStorage.removeItem('@user_data');
+          localStorage.removeItem('@auth_state');
+          console.log('✅ localStorage cleared (Web)');
+        } else {
+          // Native 환경: AsyncStorage 사용
+          await AsyncStorage.removeItem('@user_email');
+          await AsyncStorage.multiRemove(['@user_email', '@user_data', '@auth_state']);
+          console.log('✅ AsyncStorage cleared (Native)');
+        }
+      } catch (storageError) {
+        console.warn('⚠️ Storage cleanup warning:', storageError);
+      }
+
+      console.log('🎉 Logout completed successfully!');
+    } catch (error) {
+      console.error('❌ Logout error:', error);
+      throw error;
+    }
+  };
+
   return (
     <UserContext.Provider
       value={{
@@ -113,6 +156,7 @@ export function UserProvider({ children }: UserProviderProps) {
         switchRole,
         refreshUser,
         completeOnboarding,
+        logout,
       }}
     >
       {children}
