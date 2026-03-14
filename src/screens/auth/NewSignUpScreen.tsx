@@ -167,6 +167,26 @@ export default function NewSignUpScreen({ navigation }: Props) {
     }
   };
 
+  const handleGoogleSignUp = async () => {
+    setLoading(true);
+    try {
+      // Google로 간편회원가입
+      const { handleGoogleSignIn } = await import('../../services/google-auth');
+      const result = await handleGoogleSignIn();
+
+      if (result?.user) {
+        // Google 로그인 성공 시 필요한 추가 정보 수집을 위해 Step 2로 이동
+        // 기본 정보는 Google에서 가져오므로 PASS 인증부터 진행
+        setStep(2);
+      }
+    } catch (error: any) {
+      console.error('Google signup error:', error);
+      Alert.alert('Google 회원가입 실패', error.message || 'Google 회원가입에 실패했습니다.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const handleSignUp = async () => {
     if (!validateStep1() || !validateStep3()) return;
 
@@ -363,6 +383,24 @@ export default function NewSignUpScreen({ navigation }: Props) {
         onChangeText={(text) => setForm({ ...form, confirmPassword: text })}
         secureTextEntry
       />
+
+      {/* Google 간편회원가입 버튼 */}
+      <View style={styles.divider}>
+        <View style={styles.dividerLine} />
+        <Text style={styles.dividerText}>또는</Text>
+        <View style={styles.dividerLine} />
+      </View>
+
+      <TouchableOpacity
+        style={[styles.button, styles.googleButton]}
+        onPress={handleGoogleSignUp}
+        disabled={loading}
+      >
+        <View style={styles.googleButtonContent}>
+          <Text style={styles.googleIcon}>G</Text>
+          <Text style={styles.googleButtonText}>Google로 간편회원가입</Text>
+        </View>
+      </TouchableOpacity>
     </View>
   );
 
@@ -831,5 +869,46 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontSize: 16,
     fontWeight: 'bold',
+  },
+  button: {
+    borderRadius: 8,
+    marginTop: 12,
+    padding: 16,
+  },
+  googleButton: {
+    backgroundColor: '#fff',
+    borderWidth: 1,
+    borderColor: '#ddd',
+  },
+  googleButtonContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  googleIcon: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: '#4285F4',
+    marginRight: 12,
+  },
+  googleButtonText: {
+    color: '#333',
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  divider: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginVertical: 20,
+  },
+  dividerLine: {
+    flex: 1,
+    height: 1,
+    backgroundColor: '#ddd',
+  },
+  dividerText: {
+    marginHorizontal: 12,
+    color: '#999',
+    fontSize: 14,
   },
 });
