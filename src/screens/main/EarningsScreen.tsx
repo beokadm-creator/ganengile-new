@@ -4,7 +4,7 @@
  * 총 수익, 정산 내역, 세금, 출금 기능 + 계좌 정보
  */
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   View,
   Text,
@@ -12,11 +12,17 @@ import {
   ScrollView,
   TouchableOpacity,
   ActivityIndicator,
+  RefreshControl,
 } from 'react-native';
 import { StackNavigationProp } from '@react-navigation/stack';
-import { getUserStats } from '../../services/user-service';
 import { useUser } from '../../contexts/UserContext';
-import { db } from '../../services/firebase';
+import {
+  getUserPayments,
+  getUserMonthlyEarnings,
+  Payment,
+  PaymentType,
+  PaymentStatus,
+} from '../../services/payment-service';
 
 type NavigationProp = StackNavigationProp<any>;
 
@@ -24,84 +30,64 @@ interface Props {
   navigation: NavigationProp;
 }
 
-interface EarningRecord {
-  id: string;
-  date: string;
-  amount: number;
-  fee: number;
-  tax: number;
-  net: number;
-  status: 'completed' | 'pending';
-}
-
-interface BankAccount {
-  bankName: string;
-  accountNumber: string;
-  accountHolder: string;
-}
-
-// 더미데이터
-const dummyEarnings: EarningRecord[] = [
-  {
-    id: '1',
-    date: '2026-02-10',
-    amount: 5000,
-    fee: 500,
-    tax: 149,
-    net: 4351,
-    status: 'completed',
-  },
-  {
-    id: '2',
-    date: '2026-02-09',
-    amount: 5000,
-    fee: 500,
-    tax: 149,
-    net: 4351,
-    status: 'completed',
-  },
-  {
-    id: '3',
-    date: '2026-02-08',
-    amount: 9000,
-    fee: 900,
-    tax: 267,
-    net: 7833,
-    status: 'completed',
-  },
-  {
-    id: '4',
-    date: '2026-02-07',
-    amount: 5000,
-    fee: 500,
-    tax: 149,
-    net: 4351,
-    status: 'pending',
-  },
-];
-
 export default function EarningsScreen({ navigation }: Props) {
   const { user } = useUser();
   const [loading, setLoading] = useState(true);
-  const [stats, setStats] = useState<any>(null);
-  const [earnings, setEarnings] = useState<EarningRecord[]>(dummyEarnings);
+  const [refreshing, setRefreshing] = useState(false);
+  const [payments, setPayments] = useState<Payment[]>([]);
+  const [monthlySummary, setMonthlySummary] = useState<{
+    total: number;
+    platformFee: number;
+    taxWithheld: number;
+    netIncome: number;
+    count: number;
+  } | null>(null);
 
-  useEffect(() => {
-    loadEarnings();
-  }, []);
-
-  const loadEarnings = async () => {
+  const loadEarnings = useCallback(async () => {
     if (!user) return;
 
     try {
-      const userStats = await getUserStats(user.uid);
-      setStats(userStats);
+      const now = new Date();
+      const [allPayments, monthly] = await Promise.all([
+        getUserPayments(user.uid, 30),
+        getUserMonthlyEarnings(user.uid, now.getFullYear(), now.getMonth() + 1),
+      ]);
+
+      // 길러 수익만 필터
+      const earningPayments = allPayments.filter(
+        (p) => p.type === PaymentType.GILLER_EARNING && p.status === PaymentStatus.COMPLETED
+      );
+
+      setPayments(earningPayments);
+      setMonthlySummary({
+        total: monthly.total,
+        platformFee: monthly.platformFee,
+        taxWithheld: monthly.taxWithheld,
+        netIncome: monthly.netIncome,
+        count: monthly.count,
+      });
     } catch (error) {
       console.error('Error loading earnings:', error);
     } finally {
       setLoading(false);
+      setRefreshing(false);
     }
+  }, [user]);
+
+  useEffect(() => {
+    loadEarnings();
+  }, [loadEarnings]);
+
+  const onRefresh = () => {
+    setRefreshing(true);
+    loadEarnings();
   };
+
+  // 전체 합계 계산
+  const totalGross = payments.reduce((sum, p) => sum + (p.amount || 0), 0);
+  const totalFees = payments.reduce((sum, p) => sum + (p.fee || 0), 0);
+  const totalTax = payments.reduce((sum, p) => sum + (p.tax || 0), 0);
+  const totalNet = payments.reduce((sum, p) => sum + (p.netAmount || 0), 0);
 
   if (loading) {
     return (
@@ -112,12 +98,6 @@ export default function EarningsScreen({ navigation }: Props) {
     );
   }
 
-  // 계산
-  const totalEarnings = earnings.reduce((sum, e) => sum + e.amount, 0);
-  const totalFees = earnings.reduce((sum, e) => sum + e.fee, 0);
-  const totalTax = earnings.reduce((sum, e) => sum + e.tax, 0);
-  const totalNet = earnings.reduce((sum, e) => sum + e.net, 0);
-
   return (
     <View style={styles.container}>
       {/* Header */}
@@ -126,16 +106,48 @@ export default function EarningsScreen({ navigation }: Props) {
         <Text style={styles.headerSubtitle}>총 수익과 정산 내역</Text>
       </View>
 
-      <ScrollView style={styles.content}>
-        {/* Summary Cards */}
+      <ScrollView
+        style={styles.content}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
+      >
+        {/* 이번 달 요약 */}
+        {monthlySummary && (
+          <View style={styles.monthlyCard}>
+            <Text style={styles.monthlyTitle}>이번 달 수익</Text>
+            <Text style={styles.monthlyCount}>{monthlySummary.count}건 완료</Text>
+            <View style={styles.monthlyRow}>
+              <Text style={styles.monthlyLabel}>총 수익 (세전)</Text>
+              <Text style={styles.monthlyValue}>₩{monthlySummary.total.toLocaleString()}</Text>
+            </View>
+            <View style={styles.monthlyRow}>
+              <Text style={styles.monthlyLabel}>플랫폼 수수료 (15%)</Text>
+              <Text style={[styles.monthlyValue, { color: '#f44336' }]}>
+                -₩{monthlySummary.platformFee.toLocaleString()}
+              </Text>
+            </View>
+            <View style={styles.monthlyRow}>
+              <Text style={styles.monthlyLabel}>원천징수세 (3.3%)</Text>
+              <Text style={[styles.monthlyValue, { color: '#f44336' }]}>
+                -₩{monthlySummary.taxWithheld.toLocaleString()}
+              </Text>
+            </View>
+            <View style={[styles.monthlyRow, styles.monthlyTotalRow]}>
+              <Text style={styles.monthlyTotalLabel}>실수익</Text>
+              <Text style={styles.monthlyTotalValue}>₩{monthlySummary.netIncome.toLocaleString()}</Text>
+            </View>
+          </View>
+        )}
+
+        {/* Summary Cards (전체) */}
         <View style={styles.summaryContainer}>
+          <Text style={styles.sectionTitle}>전체 수익 요약</Text>
           <View style={styles.summaryCard}>
             <Text style={styles.summaryLabel}>총 수익 (세전)</Text>
-            <Text style={styles.summaryValue}>₩{totalEarnings.toLocaleString()}</Text>
+            <Text style={styles.summaryValue}>₩{totalGross.toLocaleString()}</Text>
           </View>
 
           <View style={styles.summaryCard}>
-            <Text style={styles.summaryLabel}>플랫폼 수수료</Text>
+            <Text style={styles.summaryLabel}>플랫폼 수수료 (15%)</Text>
             <Text style={[styles.summaryValue, { color: '#f44336' }]}>
               -₩{totalFees.toLocaleString()}
             </Text>
@@ -166,47 +178,59 @@ export default function EarningsScreen({ navigation }: Props) {
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>수익 내역</Text>
 
-          {earnings.map((earning) => (
-            <View key={earning.id} style={styles.recordCard}>
-              <View style={styles.recordHeader}>
-                <Text style={styles.recordDate}>{earning.date}</Text>
-                <View style={[
-                  styles.statusBadge,
-                  earning.status === 'completed' ? styles.statusCompleted : styles.statusPending
-                ]}>
-                  <Text style={styles.statusText}>
-                    {earning.status === 'completed' ? '지급 완료' : '지급 대기'}
-                  </Text>
-                </View>
-              </View>
-
-              <View style={styles.recordDetails}>
-                <View style={styles.recordRow}>
-                  <Text style={styles.recordLabel}>기본 요금</Text>
-                  <Text style={styles.recordValue}>₩{earning.amount.toLocaleString()}</Text>
-                </View>
-
-                <View style={styles.recordRow}>
-                  <Text style={styles.recordLabel}>수수료 (10%)</Text>
-                  <Text style={[styles.recordValue, { color: '#f44336' }]}>
-                    -₩{earning.fee.toLocaleString()}
-                  </Text>
-                </View>
-
-                <View style={styles.recordRow}>
-                  <Text style={styles.recordLabel}>세금 (3.3%)</Text>
-                  <Text style={[styles.recordValue, { color: '#f44336' }]}>
-                    -₩{earning.tax.toLocaleString()}
-                  </Text>
-                </View>
-
-                <View style={[styles.recordRow, styles.recordRowTotal]}>
-                  <Text style={styles.recordLabelTotal}>실수익</Text>
-                  <Text style={styles.recordValueTotal}>₩{earning.net.toLocaleString()}</Text>
-                </View>
-              </View>
+          {payments.length === 0 ? (
+            <View style={styles.emptyContainer}>
+              <Text style={styles.emptyText}>아직 수익 내역이 없습니다.</Text>
+              <Text style={styles.emptySubtext}>배송을 완료하면 수익이 쌓입니다.</Text>
             </View>
-          ))}
+          ) : (
+            payments.map((payment) => (
+              <View key={payment.paymentId} style={styles.recordCard}>
+                <View style={styles.recordHeader}>
+                  <Text style={styles.recordDate}>
+                    {payment.createdAt instanceof Date
+                      ? payment.createdAt.toLocaleDateString('ko-KR')
+                      : '날짜 없음'}
+                  </Text>
+                  <View style={[styles.statusBadge, styles.statusCompleted]}>
+                    <Text style={styles.statusText}>지급 완료</Text>
+                  </View>
+                </View>
+
+                <View style={styles.recordDetails}>
+                  <View style={styles.recordRow}>
+                    <Text style={styles.recordLabel}>기본 요금</Text>
+                    <Text style={styles.recordValue}>₩{(payment.amount || 0).toLocaleString()}</Text>
+                  </View>
+
+                  <View style={styles.recordRow}>
+                    <Text style={styles.recordLabel}>수수료 (15%)</Text>
+                    <Text style={[styles.recordValue, { color: '#f44336' }]}>
+                      -₩{(payment.fee || 0).toLocaleString()}
+                    </Text>
+                  </View>
+
+                  <View style={styles.recordRow}>
+                    <Text style={styles.recordLabel}>세금 (3.3%)</Text>
+                    <Text style={[styles.recordValue, { color: '#f44336' }]}>
+                      -₩{(payment.tax || 0).toLocaleString()}
+                    </Text>
+                  </View>
+
+                  <View style={[styles.recordRow, styles.recordRowTotal]}>
+                    <Text style={styles.recordLabelTotal}>실수익</Text>
+                    <Text style={styles.recordValueTotal}>
+                      ₩{(payment.netAmount || 0).toLocaleString()}
+                    </Text>
+                  </View>
+
+                  {payment.description && (
+                    <Text style={styles.recordDescription}>{payment.description}</Text>
+                  )}
+                </View>
+              </View>
+            ))
+          )}
         </View>
 
         {/* Tax Notice */}
@@ -258,6 +282,60 @@ const styles = StyleSheet.create({
   content: {
     flex: 1,
     padding: 16,
+  },
+  monthlyCard: {
+    backgroundColor: '#fff',
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 16,
+    borderLeftWidth: 4,
+    borderLeftColor: '#FFC107',
+    elevation: 2,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
+  },
+  monthlyTitle: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#333',
+    marginBottom: 4,
+  },
+  monthlyCount: {
+    fontSize: 12,
+    color: '#999',
+    marginBottom: 12,
+  },
+  monthlyRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    paddingVertical: 4,
+  },
+  monthlyLabel: {
+    fontSize: 13,
+    color: '#666',
+  },
+  monthlyValue: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#333',
+  },
+  monthlyTotalRow: {
+    borderTopWidth: 1,
+    borderTopColor: '#f0f0f0',
+    marginTop: 8,
+    paddingTop: 8,
+  },
+  monthlyTotalLabel: {
+    fontSize: 15,
+    fontWeight: 'bold',
+    color: '#333',
+  },
+  monthlyTotalValue: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#FFC107',
   },
   summaryContainer: {
     backgroundColor: '#fff',
@@ -330,6 +408,21 @@ const styles = StyleSheet.create({
     color: '#333',
     marginBottom: 12,
   },
+  emptyContainer: {
+    backgroundColor: '#fff',
+    borderRadius: 12,
+    padding: 32,
+    alignItems: 'center',
+  },
+  emptyText: {
+    fontSize: 16,
+    color: '#666',
+    marginBottom: 8,
+  },
+  emptySubtext: {
+    fontSize: 13,
+    color: '#999',
+  },
   recordCard: {
     backgroundColor: '#fff',
     borderRadius: 12,
@@ -360,12 +453,10 @@ const styles = StyleSheet.create({
   statusCompleted: {
     backgroundColor: '#E8F5E9',
   },
-  statusPending: {
-    backgroundColor: '#FFF3E0',
-  },
   statusText: {
     fontSize: 12,
     fontWeight: '600',
+    color: '#2E7D32',
   },
   recordDetails: {
     borderTopColor: '#f0f0f0',
@@ -401,6 +492,11 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: 'bold',
     color: '#FFC107',
+  },
+  recordDescription: {
+    fontSize: 12,
+    color: '#999',
+    marginTop: 8,
   },
   noticeBox: {
     backgroundColor: '#E3F2FD',

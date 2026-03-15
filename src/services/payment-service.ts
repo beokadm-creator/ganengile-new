@@ -35,7 +35,7 @@ import { calculateBadgeBonus } from './matching-service';
 export const TAX_RATES = {
   BUSINESS_INCOME_TAX: 0.033, // 사업소득세 3.3% (지방소득세 포함)
   LOCAL_INCOME_TAX: 0.0033,   // 지방소득세 0.33% (3.3% 내 포함)
-  PLATFORM_FEE: 0.1,          // 플랫폼 수수료 10%
+  PLATFORM_FEE: 0.15,         // 플랫폼 수수료 15% (pricing-service와 일치)
 } as const;
 
 /**
@@ -151,9 +151,9 @@ export async function createRequestPayment(
       userId,
       type: PaymentType.REQUEST_FEE,
       amount,
-      fee: Math.round(amount * TAX_RATES.PLATFORM_FEE), // 10% platform fee
+      fee: Math.round(amount * TAX_RATES.PLATFORM_FEE), // 15% platform fee
       tax: 0, // 글러는 세금 없음 (요청자)
-      netAmount: Math.round(amount * 0.9), // 90% to giller
+      netAmount: Math.round(amount * (1 - TAX_RATES.PLATFORM_FEE)), // 85% to giller
       status: PaymentStatus.PENDING,
       requestId,
       description: '배송 요청 수수료',
@@ -203,7 +203,7 @@ export async function createGillerEarning(
     const bonusAmount = Math.round(baseAmount * badgeBonus);
     const totalAmount = baseAmount + bonusAmount; // 배지 보너스가 포함된 총 금액
 
-    // 1. 플랫폼 수수료 10% (총 금액 기준)
+    // 1. 플랫폼 수수료 15% (총 금액 기준, pricing-service 기준과 동일)
     const platformFee = Math.round(totalAmount * TAX_RATES.PLATFORM_FEE);
     const afterFee = totalAmount - platformFee;
 
@@ -247,7 +247,7 @@ export async function createGillerEarning(
       console.log(`   - 배지 보너스(${(badgeBonus * 100).toFixed(0)}%): +${bonusAmount.toLocaleString()}원`);
     }
     console.log(`   - 세전 총액: ${totalAmount.toLocaleString()}원`);
-    console.log(`   - 수수료(10%): ${platformFee.toLocaleString()}원`);
+    console.log(`   - 수수료(15%): ${platformFee.toLocaleString()}원`);
     console.log(`   - 세금(3.3%): ${tax.toLocaleString()}원`);
     console.log(`   - 세후 수익: ${netAmount.toLocaleString()}원`);
 

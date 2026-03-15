@@ -371,15 +371,72 @@ export const onRequestStatusChanged = functions.firestore
 
     // Check if status changed to 'completed'
     if (before.status !== 'completed' && after.status === 'completed') {
-      const { gllerId } = after;
+      const { gllerId } = after; // gllerId = 요청자 (이용자)
+      const gillerId: string = (after as any).matchedGillerId || ''; // 실제 배송한 길러
 
+      const requestId = context.params.requestId;
+
+      // 1. 길러 수익 레코드 생성 (플랫폼 수수료 15% + 원천징수세 3.3%)
+      if (gillerId) {
+        try {
+          const totalFee: number = after.fee?.totalFee || 0;
+
+          if (totalFee > 0) {
+            const PLATFORM_FEE_RATE = 0.15;
+            const TAX_RATE = 0.033;
+
+            const platformFee = Math.round(totalFee * PLATFORM_FEE_RATE);
+            const afterFee = totalFee - platformFee;
+            const tax = Math.round(afterFee * TAX_RATE);
+            const netAmount = afterFee - tax;
+
+            // payments 컬렉션에 수익 레코드 생성
+            const paymentRef = db.collection('payments').doc();
+            await paymentRef.set({
+              paymentId: paymentRef.id,
+              userId: gillerId,
+              type: 'giller_earning',
+              amount: totalFee,
+              fee: platformFee,
+              tax,
+              netAmount,
+              status: 'completed',
+              requestId,
+              description: '배송 완료 수익',
+              metadata: {
+                platformFeeRate: PLATFORM_FEE_RATE,
+                taxRate: TAX_RATE,
+                taxWithheld: tax,
+                isTaxable: true,
+              },
+              createdAt: admin.firestore.FieldValue.serverTimestamp(),
+              completedAt: admin.firestore.FieldValue.serverTimestamp(),
+            });
+
+            // 길러 사용자 문서 totalEarnings, totalTaxWithheld 업데이트
+            await db.collection('users').doc(gillerId).update({
+              totalEarnings: admin.firestore.FieldValue.increment(netAmount),
+              totalTaxWithheld: admin.firestore.FieldValue.increment(tax),
+              earningsUpdatedAt: admin.firestore.FieldValue.serverTimestamp(),
+            });
+
+            console.warn(`✅ Giller earning created for ${gillerId}: ${netAmount}원 net (fee: ${platformFee}원, tax: ${tax}원)`);
+          } else {
+            console.warn(`⚠️ No fee info for request ${requestId}, skipping earning creation`);
+          }
+        } catch (error) {
+          console.error('❌ Error creating giller earning:', error);
+          // 수익 생성 실패해도 알림은 계속 전송
+        }
+      }
+
+      // 2. 이용자(gller)에게 배송 완료 FCM 알림 전송
       if (!gllerId) {
-        console.warn('⚠️ No gller ID');
+        console.warn('⚠️ No gller ID for notification');
         return null;
       }
 
       try {
-        // Get gller's FCM token
         const gllerDoc = await db.collection('users').doc(gllerId).get();
 
         if (!gllerDoc.exists) {
@@ -395,20 +452,17 @@ export const onRequestStatusChanged = functions.firestore
           return null;
         }
 
-        // Get giller name
         const gillerName = after.gillerName ?? '길러';
-
-        // Send notification
         const title = '🎉 배송이 완료되었습니다';
         const body = `${gillerName}님이 배송을 완료했습니다.`;
 
         await sendFCM(fcmToken, title, body, {
           type: 'delivery_completed',
-          requestId: context.params.requestId,
+          requestId,
           screen: 'RequestDetail',
         });
 
-        console.warn('✅ Delivery completed notification sent:', context.params.requestId);
+        console.warn('✅ Delivery completed notification sent:', requestId);
         return null;
       } catch (error) {
         console.error('❌ Error sending delivery completed notification:', error);
