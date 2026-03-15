@@ -126,7 +126,7 @@ export default function UsersPage() {
                   </td>
                   <td className="px-4 py-3">
                     <span className={`px-2 py-1 rounded-full text-xs font-medium ${ROLE_COLOR[item.role] ?? 'bg-gray-100 text-gray-600'}`}>
-                      {ROLE_LABEL[item.role] ?? item.role || '-'}
+                      {(ROLE_LABEL[item.role] ?? item.role) || '-'}
                     </span>
                     {item.gillerApplicationStatus === 'pending' && (
                       <span className="ml-1 px-2 py-1 rounded-full text-xs bg-yellow-100 text-yellow-700">심사중</span>
