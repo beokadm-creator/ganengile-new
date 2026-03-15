@@ -24,5 +24,11 @@
   },
   "storage": {
     "rules": "storage.rules"
-  }
+  },
+  "apphosting": [
+    {
+      "backendId": "ganengile-admin",
+      "rootDir": "admin-web"
+    }
+  ]
 }
