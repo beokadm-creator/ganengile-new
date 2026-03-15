@@ -54,9 +54,9 @@ export async function signInWithGoogleNative(): Promise<User> {
       responseType: 'token',
     });
 
-    const [result, response] = await request.promptAsync(discovery);
+    const response = await request.promptAsync(discovery);
 
-    if (result === 'success' && response.params) {
+    if (response.type === 'success' && response.params) {
       const { access_token } = response.params;
 
       // Firebase credential 생성

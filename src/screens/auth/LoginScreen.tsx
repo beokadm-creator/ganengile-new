@@ -56,11 +56,10 @@ export default function LoginScreen({ navigation }: any) {
       let errorMessage = '로그인에 실패했습니다.';
 
       switch (error.code) {
+        case 'auth/invalid-credential':
         case 'auth/user-not-found':
-          errorMessage = '등록되지 않은 이메일입니다. 회원가입을 먼저 진행해주세요.';
-          break;
         case 'auth/wrong-password':
-          errorMessage = '비밀번호가 올바르지 않습니다. 다시 확인해주세요.';
+          errorMessage = '이메일 또는 비밀번호가 올바르지 않습니다.';
           break;
         case 'auth/invalid-email':
           errorMessage = '이메일 형식이 올바르지 않습니다.';

@@ -63,7 +63,7 @@ export async function getUserById(userId: string): Promise<User | null> {
     const docRef = doc(db, 'users', userId);
     const docSnapshot = await getDoc(docRef);
 
-    if (!docSnapshot.exists) {
+    if (!docSnapshot.exists()) {
       return null;
     }
 
