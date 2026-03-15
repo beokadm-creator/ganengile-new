@@ -77,7 +77,7 @@ function AppNavigatorContent() {
           // User signed in but hasn't completed onboarding
           // 모든 신규 사용자는 기본 정보 입력부터 시작
           <Stack.Screen name="Onboarding">
-            {() => <OnboardingNavigator role={user.role || 'both'} />}
+            {() => <OnboardingNavigator />}
           </Stack.Screen>
         ) : (
           // User signed in and completed onboarding - show Main app

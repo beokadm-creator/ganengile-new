@@ -49,6 +49,7 @@ import GillerPickupAtLockerScreen from '../screens/giller/GillerPickupAtLockerSc
 import LockerMapScreen from '../screens/main/LockerMapScreen';
 import DisputeReportScreen from '../screens/main/DisputeReportScreen';
 import GillerLevelUpgradeScreen from '../screens/main/GillerLevelUpgradeScreen';
+import GillerApplyScreen from '../screens/main/GillerApplyScreen';
 
 const Tab = createBottomTabNavigator<MainTabParamList>();
 const Stack = createStackNavigator();
@@ -408,6 +409,14 @@ export default function MainNavigator() {
         options={{
           headerShown: true,
           title: '분쟁 신고',
+        }}
+      />
+      <Stack.Screen
+        name="GillerApply"
+        component={GillerApplyScreen}
+        options={{
+          headerShown: true,
+          title: '길러 신청',
         }}
       />
     </Stack.Navigator>

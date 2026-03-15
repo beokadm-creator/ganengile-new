@@ -39,14 +39,8 @@ export interface GillerRouteData {
 }
 
 export type OnboardingStackParamList = {
-  // 글러 온보딩 (3단계 슬라이드)
+  BasicInfoOnboarding: undefined;
   GllerOnboarding: undefined;
-
-  // 길러 온보딩 (4단계 슬라이드)
-  GillerOnboarding: undefined;
-
-  // 신원 확인 (길러 필수)
-  IdentityVerification: undefined;
 };
 
 export type OnboardingNavigationProp = StackNavigationProp<OnboardingStackParamList>;
@@ -117,6 +111,7 @@ export type MainStackParamList = {
   DepositPayment: undefined;
   PointHistory: undefined;
   PointWithdraw: undefined;
+  GillerApply: undefined;
 };
 
 export type MainTabNavigationProp = BottomTabNavigationProp<MainTabParamList>;
@@ -156,14 +151,6 @@ export type LoginScreenProps = {
 };
 
 export type GllerOnboardingProps = {
-  navigation: OnboardingNavigationProp;
-};
-
-export type GillerOnboardingProps = {
-  navigation: OnboardingNavigationProp;
-};
-
-export type IdentityVerificationProps = {
   navigation: OnboardingNavigationProp;
 };
 

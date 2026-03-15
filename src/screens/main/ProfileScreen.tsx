@@ -510,13 +510,20 @@ export default function ProfileScreen({ navigation: _navigation }: Props) {
         onPress: () => (_navigation as any).navigate('BadgeCollection'),
         color: '#9C27B0',
       },
-      {
+      ...(user.role !== UserRole.GILLER && user.gillerApplicationStatus !== 'pending' ? [{
         icon: '🚀',
         title: '길러 신청',
         subtitle: '배송 활동을 시작하고 싶으신가요?',
-        onPress: () => (_navigation as any).navigate('GillerApplication'),
+        onPress: () => (_navigation as any).navigate('GillerApply'),
         color: '#FF5722',
-      },
+      }] : []),
+      ...(user.gillerApplicationStatus === 'pending' ? [{
+        icon: '🔍',
+        title: '길러 신청 심사 중',
+        subtitle: '관리자가 심사 중입니다. 잠시 기다려주세요.',
+        onPress: () => {},
+        color: '#FF9800',
+      }] : []),
       ...commonItems,
     ];
 

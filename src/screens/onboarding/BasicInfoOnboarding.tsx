@@ -116,23 +116,26 @@ export default function BasicInfoOnboarding({ navigation }: Props) {
         email: user.email,
         name: basicInfo.name.trim(),
         phoneNumber: basicInfo.phoneNumber.trim(),
-        role: UserRole.BOTH, // 기본적으로 BOTH로 설정
+        role: UserRole.GLER, // 모든 신규 가입자는 이용자로 시작
         agreedTerms: {
           service: termsAgreed.service,
           privacy: termsAgreed.privacy,
           marketing: termsAgreed.marketing,
         },
-        hasCompletedOnboarding: false, // 길러 신청 전까지 false
+        hasCompletedOnboarding: false,
         isActive: true,
+        pointBalance: 0,
+        totalEarnedPoints: 0,
+        totalSpentPoints: 0,
         createdAt: serverTimestamp(),
         updatedAt: serverTimestamp(),
       }, { merge: true });
 
       console.log('✅ Basic info saved to Firestore');
 
-      // 다음 온보딩 단계로 이동 (BOTH 역할이므로 역할 선택 화면으로)
-      navigation.navigate('RoleSelection');
-      console.log('✅ Navigated to RoleSelection');
+      // 서비스 소개 온보딩으로 이동
+      navigation.navigate('GllerOnboarding');
+      console.log('✅ Navigated to GllerOnboarding');
     } catch (error) {
       console.error('❌ Error saving basic info:', error);
       Alert.alert('오류', '기본 정보 저장에 실패했습니다. 다시 시도해주세요.');
