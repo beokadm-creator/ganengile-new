@@ -63,7 +63,7 @@ export async function gillerAcceptRequest(
     const requestRef = doc(db, 'requests', requestId);
     const requestDoc = await getDoc(requestRef);
 
-    if (!requestDoc.exists) {
+    if (!requestDoc.exists()) {
       return { success: false, message: '요청을 찾을 수 없습니다.' };
     }
 

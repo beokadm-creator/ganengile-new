@@ -551,6 +551,11 @@ export const onChatMessageCreated = functions.firestore
       return null;
     }
 
+    // 시스템 메시지는 FCM 알림 전송 불필요
+    if (message.type === 'system') {
+      return null;
+    }
+
     const { chatRoomId } = context.params;
 
     try {
@@ -1408,7 +1413,7 @@ export const acceptMatch = functions.https.onCall(
       // Check if match is still pending
       if (match.status !== 'pending') {
         console.warn('⚠️ Match not in pending status:', match.status);
-        return { success: false };
+        return { success: false, message: '이미 처리된 요청입니다.' };
       }
 
       // 2. Create delivery document
@@ -1520,7 +1525,7 @@ export const rejectMatch = functions.https.onCall(
       // Check if match is still pending
       if (match.status !== 'pending') {
         console.warn('⚠️ Match not in pending status:', match.status);
-        return { success: false };
+        return { success: false, message: '이미 처리된 요청입니다.' };
       }
 
       // 2. Update match status

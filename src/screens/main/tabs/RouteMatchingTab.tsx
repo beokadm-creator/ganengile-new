@@ -48,6 +48,7 @@ export default function RouteMatchingTab({ navigation }: Props) {
   });
 
   const [isFilterModalVisible, setIsFilterModalVisible] = useState(false);
+  const [acceptingRequestId, setAcceptingRequestId] = useState<string | null>(null);
 
   // Load data on mount
   useEffect(() => {
@@ -136,8 +137,10 @@ export default function RouteMatchingTab({ navigation }: Props) {
   };
 
   const handleAccept = async (request: RouteFilteredRequest) => {
+    if (acceptingRequestId) return; // 중복 클릭 방지
     try {
       if (!gillerId) return;
+      setAcceptingRequestId(request.requestId);
 
       const { gillerAcceptRequest } = await import('../../../services/delivery-service');
       const result = await gillerAcceptRequest(request.requestId, gillerId);
@@ -191,6 +194,8 @@ export default function RouteMatchingTab({ navigation }: Props) {
     } catch (error) {
       console.error('Error accepting request:', error);
       Alert.alert('오류', '수락 처리에 실패했습니다.');
+    } finally {
+      setAcceptingRequestId(null);
     }
   };
 

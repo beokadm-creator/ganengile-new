@@ -151,6 +151,7 @@ export interface ChatMessage {
   content: string;
   timestamp: FirestoreTimestamp;
   read: boolean;
+  type?: string;
 }
 
 // ==================== Delivery Types ====================
@@ -276,6 +277,7 @@ export interface AcceptMatchData {
 export interface AcceptMatchResult {
   success: boolean;
   deliveryId?: string;
+  message?: string;
 }
 
 export interface RejectMatchData {
@@ -285,6 +287,7 @@ export interface RejectMatchData {
 
 export interface RejectMatchResult {
   success: boolean;
+  message?: string;
 }
 
 export interface CompleteMatchData {

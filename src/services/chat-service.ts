@@ -94,20 +94,28 @@ export class ChatService {
    * 두 사용자 간의 채팅방 찾기 또는 생성
    */
   async findOrCreateChatRoom(otherUserId: string, data?: CreateChatRoomData): Promise<ChatRoom> {
-    const q = query(
+    // 정방향 검색 (내가 user1)
+    const q1 = query(
       collection(db, CHAT_ROOMS_COLLECTION),
       where('participants.user1.userId', '==', this.userId),
       where('participants.user2.userId', '==', otherUserId)
     );
+    const snap1 = await getDocs(q1);
+    if (!snap1.empty) {
+      const d = snap1.docs[0];
+      return { chatRoomId: d.id, ...d.data() } as ChatRoom;
+    }
 
-    const querySnapshot = await getDocs(q);
-
-    if (!querySnapshot.empty) {
-      const doc = querySnapshot.docs[0];
-      return {
-        chatRoomId: doc.id,
-        ...doc.data(),
-      } as ChatRoom;
+    // 역방향 검색 (상대가 user1)
+    const q2 = query(
+      collection(db, CHAT_ROOMS_COLLECTION),
+      where('participants.user1.userId', '==', otherUserId),
+      where('participants.user2.userId', '==', this.userId)
+    );
+    const snap2 = await getDocs(q2);
+    if (!snap2.empty) {
+      const d = snap2.docs[0];
+      return { chatRoomId: d.id, ...d.data() } as ChatRoom;
     }
 
     if (!data) {
@@ -156,6 +164,16 @@ export class ChatService {
   }
 
   /**
+   * 채팅방에서 사용자 위치 조회 (Firestore에서 직접 조회)
+   */
+  private async fetchUserPosition(chatRoomId: string): Promise<1 | 2> {
+    const chatRoomDoc = await getDoc(doc(db, CHAT_ROOMS_COLLECTION, chatRoomId));
+    if (!chatRoomDoc.exists()) return 2;
+    const data = chatRoomDoc.data();
+    return data.participants.user1.userId === this.userId ? 1 : 2;
+  }
+
+  /**
    * 메시지 전송
    */
   async sendMessage(data: CreateMessageData): Promise<ChatMessage> {
@@ -175,6 +193,10 @@ export class ChatService {
       messageData
     );
 
+    // 수신자(상대방)의 미읽음 카운트 증가
+    const senderPosition = await this.fetchUserPosition(data.chatRoomId);
+    const receiverPosition = senderPosition === 1 ? 2 : 1;
+
     const chatRoomRef = doc(db, CHAT_ROOMS_COLLECTION, data.chatRoomId);
     await updateDoc(chatRoomRef, {
       lastMessage: {
@@ -183,7 +205,7 @@ export class ChatService {
         timestamp: serverTimestamp(),
       },
       updatedAt: serverTimestamp(),
-      [`unreadCounts.user${this.getUserIdPosition(data.chatRoomId)}`]: increment(1),
+      [`unreadCounts.user${receiverPosition}`]: increment(1),
     });
 
     return {
@@ -197,7 +219,7 @@ export class ChatService {
    */
   async markMessagesAsRead(chatRoomId: string): Promise<void> {
     const chatRoomRef = doc(db, CHAT_ROOMS_COLLECTION, chatRoomId);
-    const userPosition = this.getUserIdPosition(chatRoomId);
+    const userPosition = await this.fetchUserPosition(chatRoomId);
 
     await updateDoc(chatRoomRef, {
       [`unreadCounts.user${userPosition}`]: 0,
@@ -281,20 +303,6 @@ export class ChatService {
     });
   }
 
-  /**
-   * 사용자의 채팅방 내 위치 반환 (user1 또는 user2)
-   */
-  private getUserIdPosition(chatRoomId: string): 1 | 2 {
-    const chatRoom = this.getChatRoomFromCache(chatRoomId);
-    if (chatRoom?.participants.user1.userId === this.userId) {
-      return 1;
-    }
-    return 2;
-  }
-
-  private getChatRoomFromCache(chatRoomId: string): ChatRoom | null {
-    return null;
-  }
 }
 
 /**
