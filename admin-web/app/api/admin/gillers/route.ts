@@ -37,7 +37,21 @@ export async function PATCH(req: NextRequest) {
   if (action === 'approve') {
     const data = snap.data()!;
     if (data.userId) {
-      await db.collection('users').doc(data.userId).update({ role: 'giller', isGiller: true, gillerApprovedAt: new Date() });
+      await db.collection('users').doc(data.userId).update({
+        role: 'giller',
+        isGiller: true,
+        gillerApplicationStatus: 'approved',
+        gillerApprovedAt: new Date(),
+        updatedAt: new Date(),
+      });
+    }
+  } else if (action === 'reject') {
+    const data = snap.data()!;
+    if (data.userId) {
+      await db.collection('users').doc(data.userId).update({
+        gillerApplicationStatus: 'rejected',
+        updatedAt: new Date(),
+      });
     }
   }
 

@@ -22,10 +22,15 @@ export default function PointBalancesPage() {
 
   async function loadData() {
     setLoading(true);
-    const res = await fetch(`/api/admin/points?search=${encodeURIComponent(search)}`);
-    const json = await res.json();
-    setItems(json.items ?? []);
-    setLoading(false);
+    try {
+      const res = await fetch(`/api/admin/points?search=${encodeURIComponent(search)}`);
+      const json = await res.json();
+      setItems(json.items ?? []);
+    } catch {
+      setItems([]);
+    } finally {
+      setLoading(false);
+    }
   }
 
   useEffect(() => { loadData(); }, []);
@@ -33,15 +38,18 @@ export default function PointBalancesPage() {
   async function handleAdjust() {
     if (!selected || !form.amount || !form.reason) return;
     setProcessing(true);
-    await fetch('/api/admin/points', {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ userId: selected.id, ...form }),
-    });
-    setSelected(null);
-    setForm({ type: 'earn', amount: '', reason: '' });
-    await loadData();
-    setProcessing(false);
+    try {
+      await fetch('/api/admin/points', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId: selected.id, ...form }),
+      });
+      setSelected(null);
+      setForm({ type: 'earn', amount: '', reason: '' });
+      await loadData();
+    } finally {
+      setProcessing(false);
+    }
   }
 
   return (

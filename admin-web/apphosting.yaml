@@ -21,5 +21,7 @@ env:
     value: https://ganengile-admin--ganengile.us-central1.hosted.app
   - variable: ADMIN_UID
     secret: ADMIN_UID
+  - variable: ADMIN_SECRET
+    secret: ADMIN_SECRET
   - variable: NODE_ENV
     value: production

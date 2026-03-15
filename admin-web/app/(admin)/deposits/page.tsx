@@ -29,10 +29,15 @@ export default function DepositsPage() {
 
   async function loadData(status: string) {
     setLoading(true);
-    const res = await fetch(`/api/admin/deposits?status=${status}`);
-    const json = await res.json();
-    setItems(json.items ?? []);
-    setLoading(false);
+    try {
+      const res = await fetch(`/api/admin/deposits?status=${status}`);
+      const json = await res.json();
+      setItems(json.items ?? []);
+    } catch {
+      setItems([]);
+    } finally {
+      setLoading(false);
+    }
   }
 
   useEffect(() => { loadData(tab); }, [tab]);
@@ -41,13 +46,16 @@ export default function DepositsPage() {
     const confirmed = confirm(action === 'refund' ? '보증금을 환급하시겠습니까?' : '사고로 인한 보증금을 차감하시겠습니까?');
     if (!confirmed) return;
     setProcessing(depositId);
-    await fetch('/api/admin/deposits', {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ depositId, action }),
-    });
-    await loadData(tab);
-    setProcessing(null);
+    try {
+      await fetch('/api/admin/deposits', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ depositId, action }),
+      });
+      await loadData(tab);
+    } finally {
+      setProcessing(null);
+    }
   }
 
   const totalAmount = items.reduce((s, i) => s + i.depositAmount, 0);

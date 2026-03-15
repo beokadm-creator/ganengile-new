@@ -42,7 +42,11 @@ export async function PATCH(req: NextRequest) {
       const userSnap = await userRef.get();
       if (userSnap.exists) {
         const current = userSnap.data()?.pointBalance ?? 0;
-        await userRef.update({ pointBalance: current + data.pointAmount });
+        const currentEarned = userSnap.data()?.totalEarnedPoints ?? 0;
+        await userRef.update({
+          pointBalance: current + data.pointAmount,
+          totalEarnedPoints: currentEarned + data.pointAmount,
+        });
         await db.collection('point_transactions').add({
           userId: data.userId, amount: data.pointAmount, type: 'earn',
           category: 'deposit_refund', description: `보증금 환급 (${data.depositAmount.toLocaleString()}원)`,

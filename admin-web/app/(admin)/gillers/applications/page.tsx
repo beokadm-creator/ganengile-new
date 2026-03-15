@@ -26,10 +26,15 @@ export default function GillerApplicationsPage() {
 
   async function loadData(status: string) {
     setLoading(true);
-    const res = await fetch(`/api/admin/gillers?status=${status}`);
-    const json = await res.json();
-    setItems(json.items ?? []);
-    setLoading(false);
+    try {
+      const res = await fetch(`/api/admin/gillers?status=${status}`);
+      const json = await res.json();
+      setItems(json.items ?? []);
+    } catch {
+      setItems([]);
+    } finally {
+      setLoading(false);
+    }
   }
 
   useEffect(() => { loadData(tab); }, [tab]);
@@ -37,15 +42,18 @@ export default function GillerApplicationsPage() {
   async function handleAction(action: 'approve' | 'reject' | 'review') {
     if (!selected) return;
     setProcessing(true);
-    await fetch('/api/admin/gillers', {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ applicationId: selected.id, action, note }),
-    });
-    setSelected(null);
-    setNote('');
-    await loadData(tab);
-    setProcessing(false);
+    try {
+      await fetch('/api/admin/gillers', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ applicationId: selected.id, action, note }),
+      });
+      setSelected(null);
+      setNote('');
+      await loadData(tab);
+    } finally {
+      setProcessing(false);
+    }
   }
 
   const TABS = [

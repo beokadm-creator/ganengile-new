@@ -44,7 +44,11 @@ export async function PATCH(req: NextRequest) {
     const userSnap = await userRef.get();
     if (userSnap.exists) {
       const currentBalance = userSnap.data()?.pointBalance ?? 0;
-      await userRef.update({ pointBalance: currentBalance + data.amount });
+      const currentSpent = userSnap.data()?.totalSpentPoints ?? 0;
+      await userRef.update({
+        pointBalance: currentBalance + data.amount,
+        totalSpentPoints: Math.max(0, currentSpent - data.amount),
+      });
       // Record refund transaction
       await db.collection('point_transactions').add({
         userId: data.userId,

@@ -46,7 +46,8 @@ export default function DashboardPage() {
   useEffect(() => {
     fetch('/api/admin/dashboard')
       .then((r) => r.json())
-      .then((d) => { setStats(d); setLoading(false); });
+      .then((d) => { setStats(d); setLoading(false); })
+      .catch(() => setLoading(false));
   }, []);
 
   const now = new Date();

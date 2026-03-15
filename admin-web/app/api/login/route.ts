@@ -17,9 +17,14 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: '관리자 권한이 없습니다.' }, { status: 403 });
     }
 
-    // 검증 성공 — 세션 쿠키에 UID 저장
+    // 검증 성공 — 세션 쿠키에 ADMIN_SECRET 저장 (UID 노출 방지)
+    const secret = process.env.ADMIN_SECRET;
+    if (!secret) {
+      console.error('ADMIN_SECRET env var not set');
+      return NextResponse.json({ error: '서버 설정 오류' }, { status: 500 });
+    }
     const res = NextResponse.json({ ok: true });
-    res.cookies.set('admin_token', decoded.uid, {
+    res.cookies.set('admin_token', secret, {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
       sameSite: 'lax',

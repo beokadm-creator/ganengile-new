@@ -26,15 +26,14 @@ import * as ImagePicker from 'expo-image-picker';
 import { getFirestore, collection, addDoc, serverTimestamp } from 'firebase/firestore';
 import { uploadPhoto } from '../../services/storage-service';
 import { requireUserId } from '../../services/firebase';
+import { useUser } from '../../contexts/UserContext';
 import { Colors, Typography, Spacing, BorderRadius } from '../../theme';
 
 type NavigationProp = StackNavigationProp<any>;
 
 interface Props {
   navigation: NavigationProp;
-  // deliveryId나 matchId를 받을 수 있음
-  deliveryId?: string;
-  matchId?: string;
+  route?: { params?: { requestId?: string; deliveryId?: string; matchId?: string } };
 }
 
 type DisputeType = 'damage' | 'loss' | 'delay' | 'other';
@@ -49,7 +48,11 @@ interface DisputeData {
   matchId?: string;
 }
 
-export default function DisputeReportScreen({ navigation, deliveryId, matchId }: Props) {
+export default function DisputeReportScreen({ navigation, route }: Props) {
+  const { user } = useUser();
+  const requestId = route?.params?.requestId;
+  const deliveryId = route?.params?.deliveryId;
+  const matchId = route?.params?.matchId;
   const [loading, setLoading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   
@@ -154,22 +157,20 @@ export default function DisputeReportScreen({ navigation, deliveryId, matchId }:
 
       const db = getFirestore();
       const userId = requireUserId();
+      const reporterType = user?.role === 'giller' ? 'giller' : 'requester';
 
-      // 분쟁 데이터 생성
-      const disputeData: DisputeData = {
+      // Firestore에 저장 (disputes 컬렉션) — 어드민이 기대하는 필드명 사용
+      await addDoc(collection(db, 'disputes'), {
+        reporterId: userId,
+        reporterType,
+        requestId: requestId ?? '',
         type: disputeType,
         description: description.trim(),
-        photos,
+        photoUrls: photos,     // admin reads as photoUrls
         urgency,
-        deliveryId,
-        matchId,
-      };
-
-      // Firestore에 저장 (disputes 컬렉션)
-      await addDoc(collection(db, 'disputes'), {
-        ...disputeData,
-        reporterId: userId,
-        status: 'pending', // pending, investigating, resolved
+        deliveryId: deliveryId ?? '',
+        matchId: matchId ?? '',
+        status: 'pending',
         createdAt: serverTimestamp(),
       });
 

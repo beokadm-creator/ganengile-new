@@ -16,7 +16,7 @@ import {
   Platform,
 } from 'react-native';
 import { useUser } from '../../contexts/UserContext';
-import { doc, updateDoc, serverTimestamp } from 'firebase/firestore';
+import { doc, updateDoc, addDoc, collection, serverTimestamp } from 'firebase/firestore';
 import { db } from '../../services/firebase';
 
 type Props = {
@@ -49,6 +49,10 @@ export default function GillerApplicationOnboarding({ navigation }: Props) {
   const [currentStep, setCurrentStep] = useState(1);
   const [testMode, setTestMode] = useState(true); // 테스트 모드
 
+  const [phone, setPhone] = useState('');
+  const [routeDescription, setRouteDescription] = useState('');
+  const [selfIntroduction, setSelfIntroduction] = useState('');
+
   const [gillerInfo, setGillerInfo] = useState<GillerInfo>({
     activeDays: {
       weekdays: true,
@@ -80,6 +84,14 @@ export default function GillerApplicationOnboarding({ navigation }: Props) {
   };
 
   const validateStep1 = (): boolean => {
+    if (!phone.trim()) {
+      Alert.alert('입력 오류', '연락처를 입력해주세요.');
+      return false;
+    }
+    if (!routeDescription.trim()) {
+      Alert.alert('입력 오류', '주로 이용하는 노선을 입력해주세요.');
+      return false;
+    }
     const hasActiveDay = Object.values(gillerInfo.activeDays).some(Boolean);
     if (!hasActiveDay) {
       Alert.alert('입력 오류', '활동 가능한 요일을 하나 이상 선택해주세요.');
@@ -159,35 +171,42 @@ export default function GillerApplicationOnboarding({ navigation }: Props) {
     setLoading(true);
 
     try {
-      console.log('🎯 Processing Giller application...');
-
-      // 길러 정보 저장
-      const userRef = doc(db, 'users', user.uid);
-      await updateDoc(userRef, {
-        'gillerInfo.activeDays': gillerInfo.activeDays,
-        'gillerInfo.activeTime': gillerInfo.activeTime,
-        'gillerInfo.bankAccount': gillerInfo.bankAccount,
-        'gillerInfo.passAuthData': {
-          ci: passAuthData.ci, // 실제로는 암호화 필요
+      // 1. giller_applications 컬렉션에 신청서 저장 (관리자 심사 대기)
+      await addDoc(collection(db, 'giller_applications'), {
+        userId: user.uid,
+        userName: user.name,
+        phone: phone.trim(),
+        routeDescription: routeDescription.trim(),
+        selfIntroduction: selfIntroduction.trim(),
+        activeDays: gillerInfo.activeDays,
+        activeTime: gillerInfo.activeTime,
+        passAuthData: {
+          ci: passAuthData.ci,
           name: passAuthData.name,
           birthday: passAuthData.birthday,
         },
-        'gillerInfo.isVerified': true, // 테스트 모드에서는 자동 인증
-        'gillerInfo.appliedAt': serverTimestamp(),
-        role: 'giller', // 길러로 변경
+        status: 'pending',
+        createdAt: serverTimestamp(),
+      });
+
+      // 2. 사용자 계정에 신청 중 상태 + 계좌 정보 저장 (role은 관리자 승인 후 변경됨)
+      const userRef = doc(db, 'users', user.uid);
+      await updateDoc(userRef, {
+        gillerApplicationStatus: 'pending',
+        'gillerInfo.activeDays': gillerInfo.activeDays,
+        'gillerInfo.activeTime': gillerInfo.activeTime,
+        'gillerInfo.bankAccount': gillerInfo.bankAccount,
         hasCompletedOnboarding: true,
         updatedAt: serverTimestamp(),
       });
 
-      console.log('✅ Giller info saved');
-
-      // UserContext 갱신
       await refreshUser();
-      console.log('✅ UserContext refreshed');
 
-      // 메인 화면으로 이동
-      navigation.replace('Main');
-      console.log('✅ Navigated to Main');
+      Alert.alert(
+        '신청 완료',
+        '길러 신청이 접수되었습니다.\n\n관리자 심사 후 승인 결과를 알려드립니다.',
+        [{ text: '확인', onPress: () => navigation.replace('Main') }]
+      );
     } catch (error) {
       console.error('❌ Error processing Giller application:', error);
       Alert.alert('오류', '길러 신청 처리에 실패했습니다. 다시 시도해주세요.');
@@ -198,10 +217,43 @@ export default function GillerApplicationOnboarding({ navigation }: Props) {
 
   const renderStep1 = () => (
     <View style={styles.stepContainer}>
-      <Text style={styles.stepTitle}>활동 시간 설정</Text>
+      <Text style={styles.stepTitle}>기본 정보 입력</Text>
       <Text style={styles.stepDescription}>
-        언제 배송 활동을 하실 수 있나요?
+        연락처와 주로 이용하는 노선을 입력해주세요.
       </Text>
+
+      <View style={styles.formGroup}>
+        <Text style={styles.label}>연락처 *</Text>
+        <TextInput
+          style={styles.input}
+          placeholder="010-0000-0000"
+          value={phone}
+          onChangeText={setPhone}
+          keyboardType="phone-pad"
+        />
+      </View>
+
+      <View style={styles.formGroup}>
+        <Text style={styles.label}>주 이용 노선 *</Text>
+        <TextInput
+          style={styles.input}
+          placeholder="예: 2호선 강남역 ↔ 홍대입구역"
+          value={routeDescription}
+          onChangeText={setRouteDescription}
+        />
+      </View>
+
+      <View style={styles.formGroup}>
+        <Text style={styles.label}>자기소개 (선택)</Text>
+        <TextInput
+          style={[styles.input, { height: 80, textAlignVertical: 'top' }]}
+          placeholder="간단한 자기소개를 입력해주세요."
+          value={selfIntroduction}
+          onChangeText={setSelfIntroduction}
+          multiline
+          numberOfLines={3}
+        />
+      </View>
 
       <View style={styles.formGroup}>
         <Text style={styles.label}>활동 요일</Text>

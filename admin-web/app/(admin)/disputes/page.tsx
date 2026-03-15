@@ -41,10 +41,15 @@ export default function DisputesPage() {
 
   async function loadData(status: string) {
     setLoading(true);
-    const res = await fetch(`/api/admin/disputes?status=${status}`);
-    const json = await res.json();
-    setItems(json.items ?? []);
-    setLoading(false);
+    try {
+      const res = await fetch(`/api/admin/disputes?status=${status}`);
+      const json = await res.json();
+      setItems(json.items ?? []);
+    } catch {
+      setItems([]);
+    } finally {
+      setLoading(false);
+    }
   }
 
   useEffect(() => { loadData(tab); }, [tab]);
@@ -52,20 +57,23 @@ export default function DisputesPage() {
   async function handleResolve() {
     if (!selected) return;
     setProcessing(true);
-    await fetch('/api/admin/disputes', {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        disputeId: selected.id,
-        responsibility: form.responsibility,
-        compensation: Number(form.compensation) || 0,
-        note: form.note,
-      }),
-    });
-    setSelected(null);
-    setForm({ responsibility: 'giller', compensation: '', note: '' });
-    await loadData(tab);
-    setProcessing(false);
+    try {
+      await fetch('/api/admin/disputes', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          disputeId: selected.id,
+          responsibility: form.responsibility,
+          compensation: Number(form.compensation) || 0,
+          note: form.note,
+        }),
+      });
+      setSelected(null);
+      setForm({ responsibility: 'giller', compensation: '', note: '' });
+      await loadData(tab);
+    } finally {
+      setProcessing(false);
+    }
   }
 
   return (

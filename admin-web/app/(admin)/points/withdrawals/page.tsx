@@ -25,10 +25,15 @@ export default function WithdrawalsPage() {
 
   async function loadData(status: string) {
     setLoading(true);
-    const res = await fetch(`/api/admin/withdrawals?status=${status}`);
-    const json = await res.json();
-    setItems(json.items ?? []);
-    setLoading(false);
+    try {
+      const res = await fetch(`/api/admin/withdrawals?status=${status}`);
+      const json = await res.json();
+      setItems(json.items ?? []);
+    } catch {
+      setItems([]);
+    } finally {
+      setLoading(false);
+    }
   }
 
   useEffect(() => { loadData(tab); }, [tab]);
@@ -36,15 +41,18 @@ export default function WithdrawalsPage() {
   async function handleAction(action: 'approve' | 'reject') {
     if (!selected) return;
     setProcessing(true);
-    await fetch('/api/admin/withdrawals', {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ requestId: selected.id, action, note }),
-    });
-    setSelected(null);
-    setNote('');
-    await loadData(tab);
-    setProcessing(false);
+    try {
+      await fetch('/api/admin/withdrawals', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ requestId: selected.id, action, note }),
+      });
+      setSelected(null);
+      setNote('');
+      await loadData(tab);
+    } finally {
+      setProcessing(false);
+    }
   }
 
   const totalPending = items.reduce((s, i) => s + i.amount, 0);

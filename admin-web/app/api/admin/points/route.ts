@@ -46,7 +46,13 @@ export async function PATCH(req: NextRequest) {
   const delta = type === 'earn' ? Number(amount) : -Number(amount);
   const newBalance = Math.max(0, current + delta);
 
-  await userRef.update({ pointBalance: newBalance, updatedAt: new Date() });
+  const totalUpdate: Record<string, any> = { pointBalance: newBalance, updatedAt: new Date() };
+  if (type === 'earn') {
+    totalUpdate.totalEarnedPoints = (userSnap.data()?.totalEarnedPoints ?? 0) + Number(amount);
+  } else {
+    totalUpdate.totalSpentPoints = (userSnap.data()?.totalSpentPoints ?? 0) + Number(amount);
+  }
+  await userRef.update(totalUpdate);
 
   await db.collection('point_transactions').add({
     userId,

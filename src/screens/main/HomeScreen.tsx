@@ -123,6 +123,22 @@ export default function HomeScreen({ navigation }: { navigation: MainStackNaviga
         </View>
       ) : (
         <>
+          {/* 길러 신청 심사 중 배너 */}
+          {user.gillerApplicationStatus === 'pending' && (
+            <View style={styles.applicationBanner}>
+              <Text style={styles.applicationBannerText}>
+                🔍 길러 신청이 심사 중입니다. 승인 후 길러 기능이 활성화됩니다.
+              </Text>
+            </View>
+          )}
+          {user.gillerApplicationStatus === 'rejected' && (
+            <View style={[styles.applicationBanner, styles.applicationBannerRejected]}>
+              <Text style={[styles.applicationBannerText, styles.applicationBannerTextRejected]}>
+                ❌ 길러 신청이 반려되었습니다. 고객센터에 문의해주세요.
+              </Text>
+            </View>
+          )}
+
           {/* Header */}
           <View style={styles.header}>
             <View style={styles.headerGreeting}>
@@ -510,6 +526,28 @@ function GillerDashboard({
 }
 
 const styles = StyleSheet.create({
+  applicationBanner: {
+    backgroundColor: '#FFF3CD',
+    borderLeftWidth: 4,
+    borderLeftColor: '#FF9800',
+    paddingHorizontal: Spacing.md,
+    paddingVertical: Spacing.sm,
+    marginHorizontal: Spacing.md,
+    marginTop: Spacing.sm,
+    borderRadius: BorderRadius.sm,
+  },
+  applicationBannerRejected: {
+    backgroundColor: '#FFEBEE',
+    borderLeftColor: '#F44336',
+  },
+  applicationBannerText: {
+    fontSize: 13,
+    color: '#E65100',
+    lineHeight: 18,
+  },
+  applicationBannerTextRejected: {
+    color: '#B71C1C',
+  },
   header: {
     backgroundColor: Colors.primary,
     borderBottomLeftRadius: 32,

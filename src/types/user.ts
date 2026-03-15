@@ -83,6 +83,9 @@ export interface User {
   totalEarnedPoints: number;
   totalSpentPoints: number;
 
+  // 길러 신청 상태 (pending: 심사중, approved: 승인, rejected: 반려)
+  gillerApplicationStatus?: 'pending' | 'approved' | 'rejected';
+
   // ===== P1 신규 필드: 전문 길러 시스템 =====
 
   // 길러 프로필 (전문 길러 시스템)
