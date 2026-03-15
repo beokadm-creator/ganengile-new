@@ -18,7 +18,7 @@ env:
   - variable: NEXT_PUBLIC_FIREBASE_APP_ID
     value: 1:452671511743:web:b0cdbbfae93f80cfcbfa0a
   - variable: NEXTAUTH_URL
-    value: https://ganengile-admin.web.app
+    value: https://ganengile-admin--ganengile.us-central1.hosted.app
   - variable: ADMIN_UID
     secret: ADMIN_UID
   - variable: NODE_ENV
