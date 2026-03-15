@@ -76,10 +76,9 @@ export default function HomeScreen({ navigation }: { navigation: MainStackNaviga
     loadStats();
   }, [loadStats]);
 
-  const onRefresh = () => {
+  const onRefresh = async () => {
     setRefreshing(true);
-    refreshUser();
-    loadStats();
+    await Promise.all([refreshUser(), loadStats()]);
   };
 
   // Toggle role for BOTH users

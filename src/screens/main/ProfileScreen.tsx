@@ -256,7 +256,6 @@ export default function ProfileScreen({ navigation: _navigation }: Props) {
         accountNumber: profile.bankAccount.accountNumber || '',
         accountHolder: profile.bankAccount.accountHolder || '',
       });
-      setSelectedBank(profile.bankAccount.bankName || '');
     }
     setBankAccountModalVisible(true);
   }, [profile]);
@@ -357,6 +356,9 @@ export default function ProfileScreen({ navigation: _navigation }: Props) {
         };
       });
 
+      // UserContext 갱신 (다른 화면에도 즉시 반영)
+      await refreshUser();
+
       closeEditModal();
       Alert.alert('성공', '프로필이 업데이트되었습니다.');
     } catch (error) {
@@ -389,6 +391,9 @@ export default function ProfileScreen({ navigation: _navigation }: Props) {
         ...(prev || { name: '', phoneNumber: '' }),
         profilePhotoUrl: photoUrl,
       }));
+
+      // UserContext 갱신 (다른 화면에도 즉시 반영)
+      await refreshUser();
 
       Alert.alert('성공', '프로필 사진이 업데이트되었습니다.');
     } catch (error) {

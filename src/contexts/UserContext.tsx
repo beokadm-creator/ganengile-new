@@ -80,8 +80,12 @@ export function UserProvider({ children }: UserProviderProps) {
   const refreshUser = async () => {
     const firebaseUser = auth.currentUser;
     if (firebaseUser) {
-      const userData = await getUserById(firebaseUser.uid);
-      setUser(userData);
+      try {
+        const userData = await getUserById(firebaseUser.uid);
+        setUser(userData);
+      } catch (error) {
+        console.error('Error refreshing user:', error);
+      }
     }
   };
 

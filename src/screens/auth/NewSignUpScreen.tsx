@@ -227,34 +227,8 @@ export default function NewSignUpScreen({ navigation }: Props) {
       await setDoc(doc(db, 'users', uid), userData);
       console.log('✅ User data saved to Firestore');
 
-      Alert.alert(
-        '가입 완료',
-        '환영합니다! 가는길에 회원이 되셨습니다.\n\n이제 기본 정보를 입력하시겠습니까?',
-        [
-          {
-            text: '바로 시작하기',
-            onPress: () => {
-              navigation.reset({
-                index: 0,
-                routes: [
-                  { name: 'BasicInfoOnboarding' },
-                ],
-              });
-            },
-          },
-          {
-            text: '나중에',
-            onPress: () => {
-              navigation.reset({
-                index: 0,
-                routes: [
-                  { name: 'Main' },
-                ],
-              });
-            },
-          },
-        ]
-      );
+      // AppNavigator가 hasCompletedOnboarding: false 감지 → 자동으로 Onboarding으로 전환
+      Alert.alert('가입 완료', '환영합니다! 가는길에 회원이 되셨습니다.');
     } catch (error: any) {
       console.error('Sign up error:', error);
       let errorMessage = '회원가입에 실패했습니다.';
