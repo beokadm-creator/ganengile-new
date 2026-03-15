@@ -16,7 +16,7 @@ import { TossPaymentService } from './TossPaymentService';
 import type { Deposit, DepositStatus, DepositPaymentMethod } from '../types/point';
 import { DEPOSIT_RATE } from '../types/point';
 
-const DEPOSITS_COLLECTION = 'Deposits';
+const DEPOSITS_COLLECTION = 'deposits';
 
 export class DepositService {
   static async payDeposit(
@@ -82,7 +82,6 @@ export class DepositService {
         updatedAt: Timestamp.now(),
       };
 
-      await addDoc(depositRef, depositData);
       const newDepositRef = await addDoc(depositRef, depositData);
 
       const depositId = newDepositRef.id;

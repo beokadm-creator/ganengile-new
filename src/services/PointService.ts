@@ -23,9 +23,9 @@ import type {
 } from '../types/point';
 import { DEPOSIT_RATE, WITHDRAW_MIN_AMOUNT } from '../types/point';
 
-const TRANSACTIONS_COLLECTION = 'PointTransactions';
-const WITHDRAW_COLLECTION = 'WithdrawRequests';
-const USERS_COLLECTION = 'Users';
+const TRANSACTIONS_COLLECTION = 'point_transactions';
+const WITHDRAW_COLLECTION = 'withdraw_requests';
+const USERS_COLLECTION = 'users'; // payment-service, Cloud Function과 동일 컬렉션
 
 interface PointBalance {
   balance: number;
@@ -155,7 +155,7 @@ export class PointService {
 
       transaction.update(userRef, {
         pointBalance: balanceAfter,
-        totalSpentPoints: (userData?.totalSpentPoints || 1) + amount,
+        totalSpentPoints: (userData?.totalSpentPoints || 0) + amount,
         updatedAt: Timestamp.now(),
       });
 
