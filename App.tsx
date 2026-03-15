@@ -244,7 +244,6 @@ const styles = StyleSheet.create({
     marginTop: 14,
     marginBottom: 14,
     backgroundColor: '#FFFFFF',
-    overflow: 'hidden', // 화면 밖으로 나가는 컨텐츠 숨기기
     position: 'relative',
   },
   homeIndicator: {
