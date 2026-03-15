@@ -3,7 +3,7 @@
  * 역할별 맞춤 대시보드 (이용자/길러/BOTH)
  */
 
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import {
   View,
   Text,
@@ -17,6 +17,7 @@ import { MaterialIcons } from '@expo/vector-icons';
 import { Colors, Spacing, Typography, BorderRadius, Shadows } from '../../theme';
 import { useUser } from '../../contexts/UserContext';
 import { getUserStats, getRequestsByRequester } from '../../services/user-service';
+import { getGillerDeliveries } from '../../services/delivery-service';
 import StationSelectModal from '../../components/StationSelectModal';
 import { RoleSlider } from '../../components/common';
 import type { MainStackNavigationProp } from '../../types/navigation';
@@ -287,8 +288,63 @@ function GillerDashboard({
   navigation: MainStackNavigationProp;
   openStationModal: () => void;
 }) {
+  const [activeDelivery, setActiveDelivery] = useState<any>(null);
+
+  useEffect(() => {
+    const loadActiveDelivery = async () => {
+      try {
+        const accepted = await getGillerDeliveries(user.uid, 'accepted' as any);
+        if (accepted.length > 0) {
+          setActiveDelivery(accepted[0]);
+          return;
+        }
+        const inTransit = await getGillerDeliveries(user.uid, 'in_transit' as any);
+        if (inTransit.length > 0) {
+          setActiveDelivery(inTransit[0]);
+        }
+      } catch (e) {
+        // 조용히 실패
+      }
+    };
+    loadActiveDelivery();
+  }, [user.uid]);
+
+  const statusLabel: Record<string, string> = {
+    accepted: '수락됨 - 픽업 대기',
+    in_transit: '배송 중',
+    arrived: '목적지 도착',
+  };
+
   return (
     <View style={styles.dashboardContainer}>
+      {/* 진행 중인 배송 카드 */}
+      {activeDelivery && (
+        <TouchableOpacity
+          style={styles.activeDeliveryCard}
+          onPress={() => navigation.navigate('DeliveryTracking', { requestId: activeDelivery.requestId })}
+          activeOpacity={0.8}
+        >
+          <View style={styles.activeDeliveryHeader}>
+            <Text style={styles.activeDeliveryBadge}>진행 중</Text>
+            <Text style={styles.activeDeliveryStatus}>
+              {statusLabel[activeDelivery.status] || activeDelivery.status}
+            </Text>
+          </View>
+          <View style={styles.activeDeliveryRoute}>
+            <Text style={styles.activeDeliveryStation}>
+              {activeDelivery.pickupStation?.stationName || '픽업 역'}
+            </Text>
+            <Text style={styles.activeDeliveryArrow}> → </Text>
+            <Text style={styles.activeDeliveryStation}>
+              {activeDelivery.deliveryStation?.stationName || '배송 역'}
+            </Text>
+          </View>
+          <Text style={styles.activeDeliveryAction}>
+            {activeDelivery.status === 'accepted' ? '👆 탭하여 픽업 인증 시작' : '👆 탭하여 배송 완료 처리'}
+          </Text>
+        </TouchableOpacity>
+      )}
+
       {/* Quick Stats */}
       <View style={styles.statsRow}>
         <TouchableOpacity
@@ -398,26 +454,28 @@ function GillerDashboard({
           )}
         </TouchableOpacity>
 
-        <TouchableOpacity
-          style={styles.actionCard}
-          onPress={() => navigation.navigate('DeliveryTracking', {})}
-          activeOpacity={0.7}
-        >
-          <View style={[styles.actionIcon, styles.actionIconPurple]}>
-            <IconLabel name="location-on" label="📍" />
-          </View>
-          <View style={styles.actionContent}>
-            <Text style={styles.actionTitle}>배송 추적</Text>
-            <Text style={styles.actionSubtitle}>
-              진행 중인 배송을 확인하세요
-            </Text>
-          </View>
-          {Platform.OS === 'web' ? (
-            <Text style={styles.actionArrow}>▶</Text>
-          ) : (
-            <MaterialIcons name="chevron-right" size={24} color={Colors.gray400} style={styles.actionArrow} />
-          )}
-        </TouchableOpacity>
+        {activeDelivery && (
+          <TouchableOpacity
+            style={styles.actionCard}
+            onPress={() => navigation.navigate('DeliveryTracking', { requestId: activeDelivery.requestId })}
+            activeOpacity={0.7}
+          >
+            <View style={[styles.actionIcon, styles.actionIconPurple]}>
+              <IconLabel name="location-on" label="📍" />
+            </View>
+            <View style={styles.actionContent}>
+              <Text style={styles.actionTitle}>배송 진행하기</Text>
+              <Text style={styles.actionSubtitle}>
+                {statusLabel[activeDelivery.status] || '진행 중인 배송이 있습니다'}
+              </Text>
+            </View>
+            {Platform.OS === 'web' ? (
+              <Text style={styles.actionArrow}>▶</Text>
+            ) : (
+              <MaterialIcons name="chevron-right" size={24} color={Colors.gray400} style={styles.actionArrow} />
+            )}
+          </TouchableOpacity>
+        )}
       </View>
 
       {/* Performance */}
@@ -481,6 +539,50 @@ const styles = StyleSheet.create({
   },
   iconLabel: {
     fontSize: 16,
+  },
+  activeDeliveryCard: {
+    backgroundColor: Colors.primary,
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 16,
+  },
+  activeDeliveryHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 8,
+    gap: 8,
+  },
+  activeDeliveryBadge: {
+    backgroundColor: 'rgba(255,255,255,0.3)',
+    color: Colors.white,
+    fontSize: 11,
+    fontWeight: 'bold',
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 8,
+  },
+  activeDeliveryStatus: {
+    color: Colors.white,
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  activeDeliveryRoute: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  activeDeliveryStation: {
+    color: Colors.white,
+    fontSize: 16,
+    fontWeight: 'bold',
+  },
+  activeDeliveryArrow: {
+    color: 'rgba(255,255,255,0.7)',
+    fontSize: 16,
+  },
+  activeDeliveryAction: {
+    color: 'rgba(255,255,255,0.85)',
+    fontSize: 12,
   },
   subtitle: {
     color: Colors.white,

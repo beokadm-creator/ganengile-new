@@ -44,7 +44,18 @@ interface Props {
 }
 
 export default function DeliveryTrackingScreen({ navigation, route }: Props) {
-  const { requestId } = route.params;
+  const { requestId } = route.params || {};
+
+  // requestId 없으면 홈으로 복귀
+  useEffect(() => {
+    if (!requestId) {
+      navigation.goBack();
+    }
+  }, [requestId]);
+
+  if (!requestId) {
+    return null;
+  }
   const { user, currentRole } = useContext(UserContext) as UserContextType;
 
   const [trackingData, setTrackingData] = useState<TrackingModel | null>(null);

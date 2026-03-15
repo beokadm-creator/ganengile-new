@@ -173,7 +173,7 @@ export default function RouteMatchingTab({ navigation }: Props) {
           `배송자가 배송을 수락했습니다.\n받는 분 연락처: ${maskedPhone}`
         );
 
-        Alert.alert('성공', '배송 수락 완료! 채팅으로 이동합니다.', [
+        Alert.alert('배송 수락 완료!', '의뢰인과 채팅하거나 픽업을 진행하세요.', [
           {
             text: '채팅하기',
             onPress: () => {
@@ -181,6 +181,15 @@ export default function RouteMatchingTab({ navigation }: Props) {
                 chatRoomId: chatRoom.chatRoomId,
                 otherUserId: request.gllerId,
                 otherUserName: request.gllerName || '의뢰인',
+              });
+            },
+          },
+          {
+            text: '배송 시작하기',
+            style: 'default',
+            onPress: () => {
+              navigation.navigate('DeliveryTracking', {
+                requestId: request.requestId,
               });
             },
           },
