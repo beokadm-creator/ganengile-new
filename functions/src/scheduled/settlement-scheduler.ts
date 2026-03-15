@@ -9,8 +9,6 @@
 
 import * as admin from 'firebase-admin';
 
-const db = admin.firestore();
-
 /**
  * 매월 5일 길러 정산 스케줄러
  *
@@ -28,6 +26,7 @@ export const gillerSettlementScheduler = async (): Promise<{
 }> => {
   console.warn('💰 [Giller Settlement Scheduler] Started at:', new Date().toISOString());
 
+  const db = admin.firestore();
   const now = new Date();
   const timeZone = 'Asia/Seoul';
 

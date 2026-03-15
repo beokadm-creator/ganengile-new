@@ -9,8 +9,6 @@
 
 import * as admin from 'firebase-admin';
 
-const db = admin.firestore();
-
 /**
  * 매월 1일 세금계산서 발행 스케줄러
  *
@@ -26,6 +24,7 @@ export const taxInvoiceScheduler = async (): Promise<{
 }> => {
   console.warn('🧾 [Tax Invoice Scheduler] Started at:', new Date().toISOString());
 
+  const db = admin.firestore();
   const now = new Date();
   const timeZone = 'Asia/Seoul';
 
