@@ -138,8 +138,8 @@ export async function fetchActiveGillerRoutes(): Promise<GillerRoute[]> {
       const data = docSnapshot.data();
 
       // Convert Firestore data to GillerRoute format
-      const startStation = getStationByName(data.startStation.name);
-      const endStation = getStationByName(data.endStation.name);
+      const startStation = getStationByName(data.startStation.stationName);
+      const endStation = getStationByName(data.endStation.stationName);
 
       if (!startStation || !endStation) {
         console.warn(`Station not found for route ${docSnapshot.id}`);
@@ -196,7 +196,7 @@ export async function fetchUserInfo(userId: string): Promise<{
   try {
     const userDoc = await getDoc(doc(db, 'users', userId));
 
-    if (!userDoc.exists) {
+    if (!userDoc.exists()) {
       return {
         name: '익명',
         rating: 3.5,
@@ -312,13 +312,14 @@ export async function findMatchesForRequest(
 export async function createMatchDocument(
   requestId: string,
   gillerId: string,
-  matchScore: MatchingResult
+  matchScore: MatchingResult,
+  gllerId: string = ''
 ): Promise<string> {
   try {
     const matchData = {
       requestId,
-      gllerId: matchScore.scores.ratingRawScore > 0 ? requestId : '',
-      gillerId,
+      gllerId,   // 요청자(이용자) ID
+      gillerId,  // 배송자 ID
       matchScore: matchScore.totalScore,
       matchingDetails: {
         routeScore: matchScore.scores.pickupMatchScore + matchScore.scores.deliveryMatchScore,
@@ -358,16 +359,17 @@ export async function processMatchingForRequest(
       return 0;
     }
 
-    // 2. Create match documents for each
+    // 2. 요청 문서에서 requesterId(이용자 ID) 조회
+    const requestDoc = await getDoc(doc(db, 'requests', requestId));
+    const request = requestDoc.data();
+    const requesterId = request?.requesterId || '';
+
+    // 3. Create match documents for each
     const matchPromises = matches.map((match) =>
-      createMatchDocument(requestId, match.gillerId, match)
+      createMatchDocument(requestId, match.gillerId, match, requesterId)
     );
 
     await Promise.all(matchPromises);
-
-    // 3. Send FCM notifications to gillers
-    const requestDoc = await getDoc(doc(db, 'requests', requestId));
-    const request = requestDoc.data();
 
     if (request) {
       const notificationPromises = matches.map((match) =>

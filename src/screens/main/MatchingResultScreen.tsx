@@ -11,6 +11,7 @@ import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import { Colors } from '../../theme';
 import * as requestService from '../../services/request-service';
+import { fetchUserInfo } from '../../services/matching-service';
 
 type MatchingResultRouteParams = {
   MatchingResult: {
@@ -34,12 +35,13 @@ export const MatchingResultScreen: React.FC = () => {
 
   // 요청 상태 실시간 감시
   useEffect(() => {
-    const unsubscribe = requestService.subscribeToRequest(requestId, (request) => {
+    const unsubscribe = requestService.subscribeToRequest(requestId, async (request) => {
       if (request) {
         setStatus(request.status);
         if (request.status === 'matched' && (request as any).matchedGillerId) {
-          // 문서에 giller 정보가 같이 포함되어 있다고 가정하거나 별도로 가져와야 함
-          setGiller((request as any).giller || { name: '길러', rating: 5.0 });
+          // matchedGillerId로 길러 정보 별도 조회
+          const gillerInfo = await fetchUserInfo((request as any).matchedGillerId);
+          setGiller({ id: (request as any).matchedGillerId, ...gillerInfo });
         }
         setLoading(false);
       }
