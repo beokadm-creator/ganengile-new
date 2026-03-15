@@ -44,6 +44,10 @@ import DepositPaymentScreen from '../screens/main/DepositPaymentScreen';
 import PointHistoryScreen from '../screens/main/PointHistoryScreen';
 import PointWithdrawScreen from '../screens/main/PointWithdrawScreen';
 import GillerPickupFromLockerScreen from '../screens/requester/GillerPickupFromLockerScreen';
+import GillerDropoffAtLockerScreen from '../screens/giller/GillerDropoffAtLockerScreen';
+import GillerPickupAtLockerScreen from '../screens/giller/GillerPickupAtLockerScreen';
+import LockerMapScreen from '../screens/main/LockerMapScreen';
+import DisputeReportScreen from '../screens/main/DisputeReportScreen';
 import GillerLevelUpgradeScreen from '../screens/main/GillerLevelUpgradeScreen';
 
 const Tab = createBottomTabNavigator<MainTabParamList>();
@@ -372,6 +376,38 @@ export default function MainNavigator() {
         options={{
           headerShown: true,
           title: '약관 및 정책',
+        }}
+      />
+      <Stack.Screen
+        name="GillerDropoffAtLocker"
+        component={GillerDropoffAtLockerScreen as any}
+        options={{
+          headerShown: true,
+          title: '사물함 보관',
+        }}
+      />
+      <Stack.Screen
+        name="GillerPickupAtLocker"
+        component={GillerPickupAtLockerScreen as any}
+        options={{
+          headerShown: true,
+          title: '사물함 수거',
+        }}
+      />
+      <Stack.Screen
+        name="LockerMap"
+        component={LockerMapScreen as any}
+        options={{
+          headerShown: true,
+          title: '사물함 지도',
+        }}
+      />
+      <Stack.Screen
+        name="DisputeReport"
+        component={DisputeReportScreen as any}
+        options={{
+          headerShown: true,
+          title: '분쟁 신고',
         }}
       />
     </Stack.Navigator>

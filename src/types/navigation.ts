@@ -68,8 +68,7 @@ export type MainStackParamList = {
   AddRoute: { selectedStation?: import('../types/config').Station };
   EditRoute: { routeId: string };
   RequestDetail: { requestId: string; gillerId?: string };
-  DeliveryTracking: { matchId?: string };
-  DeliveryTrackingScreen: { requestId: string };
+  DeliveryTracking: { requestId?: string; matchId?: string };
   MatchingResult: {
     requestId: string;
     success: boolean;
@@ -98,6 +97,26 @@ export type MainStackParamList = {
   GillerPickupFromLocker: {
     requestId: string;
   };
+  GillerDropoffAtLocker: {
+    deliveryId: string;
+  };
+  GillerPickupAtLocker: {
+    deliveryId: string;
+  };
+  LockerMap: undefined;
+  DisputeReport: {
+    deliveryId?: string;
+    matchId?: string;
+  };
+  Earnings: undefined;
+  MyRating: undefined;
+  GillerLevelUpgrade: undefined;
+  CustomerService: undefined;
+  Terms: undefined;
+  RequestConfirmation: { requestId: string };
+  DepositPayment: undefined;
+  PointHistory: undefined;
+  PointWithdraw: undefined;
 };
 
 export type MainTabNavigationProp = BottomTabNavigationProp<MainTabParamList>;

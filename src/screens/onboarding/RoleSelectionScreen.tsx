@@ -12,6 +12,7 @@ import {
   Platform,
 } from 'react-native';
 import { useUser } from '../../contexts/UserContext';
+import { UserRole } from '../../types/user';
 
 type Props = {
   navigation: any;
@@ -23,10 +24,10 @@ export default function RoleSelectionScreen({ navigation }: Props) {
   const handleRoleSelect = async (role: 'gller' | 'giller') => {
     try {
       // 역할 전환
-      await switchRole(role === 'gller' ? 'gller' : 'giller');
+      await switchRole(role === 'gller' ? UserRole.GLER : UserRole.GILLER);
 
       // 해당 역할의 온보딩으로 이동
-      navigation.replace(role === 'gller' ? 'GllerOnboarding' : 'GillerOnboarding', {
+      navigation.replace(role === 'gller' ? 'GllerOnboarding' : 'GillerApplication', {
         role,
       });
     } catch (error) {

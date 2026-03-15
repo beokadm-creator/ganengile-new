@@ -130,9 +130,9 @@ export default function BasicInfoOnboarding({ navigation }: Props) {
 
       console.log('✅ Basic info saved to Firestore');
 
-      // 다음 온보딩 단계로 이동
-      navigation.navigate('GllerOnboarding');
-      console.log('✅ Navigated to GllerOnboarding');
+      // 다음 온보딩 단계로 이동 (BOTH 역할이므로 역할 선택 화면으로)
+      navigation.navigate('RoleSelection');
+      console.log('✅ Navigated to RoleSelection');
     } catch (error) {
       console.error('❌ Error saving basic info:', error);
       Alert.alert('오류', '기본 정보 저장에 실패했습니다. 다시 시도해주세요.');

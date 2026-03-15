@@ -8,6 +8,7 @@ import { createStackNavigator } from '@react-navigation/stack';
 import BasicInfoOnboarding from '../screens/onboarding/BasicInfoOnboarding';
 import GllerOnboardingScreen from '../screens/onboarding/GllerOnboardingScreen';
 import GillerApplicationOnboarding from '../screens/onboarding/GillerApplicationOnboarding';
+import RoleSelectionScreen from '../screens/onboarding/RoleSelectionScreen';
 
 const Stack = createStackNavigator();
 
@@ -36,6 +37,13 @@ export default function OnboardingNavigator({ role }: Props) {
         component={GllerOnboardingScreen}
         options={{ gestureEnabled: false }}
         initialParams={{ role }}
+      />
+
+      {/* 역할 선택 (BOTH 역할 사용자) */}
+      <Stack.Screen
+        name="RoleSelection"
+        component={RoleSelectionScreen}
+        options={{ gestureEnabled: false }}
       />
 
       {/* 길러 신청 온보딩 */}

@@ -164,7 +164,7 @@ export default function DeliveryTrackingScreen({ navigation, route }: Props) {
           ]
         );
       } else {
-        showErrorAlert(error, loadTrackingData);
+        showErrorAlert(error, '배송 정보 로딩 오류', loadTrackingData);
       }
     } finally {
       setLoading(false);
@@ -489,21 +489,56 @@ export default function DeliveryTrackingScreen({ navigation, route }: Props) {
               </TouchableOpacity>
             )}
             {trackingData.status === 'in_transit' && (
-              <TouchableOpacity
-                style={styles.actionButton}
-                onPress={() => {
-                  const delivery = trackingData as any;
-                  if (delivery.deliveryId) {
-                    navigation.navigate('DeliveryCompletion', {
-                      deliveryId: delivery.deliveryId,
-                    });
-                  }
-                }}
-                accessibilityLabel="배송 완료하기"
-              >
-                <Text style={styles.actionButtonText}>배송 완료하기</Text>
-              </TouchableOpacity>
+              <>
+                <TouchableOpacity
+                  style={styles.actionButton}
+                  onPress={() => {
+                    const delivery = trackingData as any;
+                    if (delivery.deliveryId) {
+                      navigation.navigate('DeliveryCompletion', {
+                        deliveryId: delivery.deliveryId,
+                      });
+                    }
+                  }}
+                  accessibilityLabel="배송 완료하기"
+                >
+                  <Text style={styles.actionButtonText}>배송 완료하기</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[styles.actionButton, styles.actionButtonSecondary]}
+                  onPress={() => {
+                    const delivery = trackingData as any;
+                    if (delivery.deliveryId) {
+                      navigation.navigate('GillerDropoffAtLocker', {
+                        deliveryId: delivery.deliveryId,
+                      });
+                    }
+                  }}
+                  accessibilityLabel="사물함에 보관하기"
+                >
+                  <Text style={styles.actionButtonSecondaryText}>🔒 사물함에 보관하기</Text>
+                </TouchableOpacity>
+              </>
             )}
+          </View>
+        )}
+
+        {/* 분쟁 신고 (이용자/길러 공통) */}
+        {trackingData &&
+         (trackingData.status === 'in_transit' || trackingData.status === 'completed') && (
+          <View style={styles.card}>
+            <TouchableOpacity
+              style={[styles.actionButton, styles.actionButtonDanger]}
+              onPress={() => {
+                const delivery = trackingData as any;
+                navigation.navigate('DisputeReport', {
+                  deliveryId: delivery.deliveryId,
+                });
+              }}
+              accessibilityLabel="분쟁 신고"
+            >
+              <Text style={styles.actionButtonDangerText}>⚠️ 분쟁 신고</Text>
+            </TouchableOpacity>
           </View>
         )}
 
@@ -533,6 +568,28 @@ const styles = StyleSheet.create({
   },
   actionButtonText: {
     color: '#fff',
+    fontSize: 16,
+    fontWeight: 'bold',
+  },
+  actionButtonSecondary: {
+    backgroundColor: '#fff',
+    borderColor: '#4CAF50',
+    borderWidth: 1,
+    marginTop: 8,
+  },
+  actionButtonSecondaryText: {
+    color: '#4CAF50',
+    fontSize: 16,
+    fontWeight: 'bold',
+  },
+  actionButtonDanger: {
+    backgroundColor: '#FFF3E0',
+    borderColor: '#FF5722',
+    borderWidth: 1,
+    marginTop: 8,
+  },
+  actionButtonDangerText: {
+    color: '#FF5722',
     fontSize: 16,
     fontWeight: 'bold',
   },

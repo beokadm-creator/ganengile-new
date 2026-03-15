@@ -171,7 +171,7 @@ export default function GillerPickupAtLockerScreen() {
               {
                 text: '확인',
                 onPress: () => {
-                  navigation.navigate('DeliveryTrackingScreen', {
+                  navigation.navigate('DeliveryTracking', {
                     requestId: delivery.requestId,
                   });
                 },
