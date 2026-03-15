@@ -21,7 +21,7 @@ import {
   ActivityIndicator,
 } from 'react-native';
 import { StackNavigationProp } from '@react-navigation/stack';
-import { launchImageLibrary, ImagePickerResponse, AssetType } from 'react-native-image-picker';
+import * as ImagePicker from 'expo-image-picker';
 import { getFirestore, collection, addDoc, serverTimestamp } from 'firebase/firestore';
 import { uploadPhoto } from '../../services/photo-service';
 import { requireUserId } from '../../services/firebase';
@@ -103,14 +103,13 @@ export default function DisputeReportScreen({ navigation, deliveryId, matchId }:
 
   const handlePhotoSelect = async () => {
     try {
-      const result: ImagePickerResponse = await launchImageLibrary({
-        mediaType: 'photo',
-        selectionLimit: 3,
-        assetType: AssetType.Photos,
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        allowsMultipleSelection: true,
         quality: 0.8,
       });
 
-      if (result.assets) {
+      if (!result.canceled && result.assets) {
         const uploadedPhotos: string[] = [];
 
         for (const asset of result.assets) {
