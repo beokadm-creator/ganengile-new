@@ -168,7 +168,7 @@ export default function LandingScreen({ navigation }: any) {
 
         <TouchableOpacity
           style={styles.button}
-          onPress={() => handleNavigate('SignUp')}
+          onPress={() => handleNavigate('NewSignUp')}
           activeOpacity={0.8}
         >
           <View style={styles.primaryButton}>

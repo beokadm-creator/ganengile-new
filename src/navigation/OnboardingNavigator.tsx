@@ -9,6 +9,7 @@ import BasicInfoOnboarding from '../screens/onboarding/BasicInfoOnboarding';
 import GllerOnboardingScreen from '../screens/onboarding/GllerOnboardingScreen';
 import GillerApplicationOnboarding from '../screens/onboarding/GillerApplicationOnboarding';
 import RoleSelectionScreen from '../screens/onboarding/RoleSelectionScreen';
+import IdentityVerification from '../screens/onboarding/IdentityVerification';
 
 const Stack = createStackNavigator();
 
@@ -50,6 +51,13 @@ export default function OnboardingNavigator({ role }: Props) {
       <Stack.Screen
         name="GillerApplication"
         component={GillerApplicationOnboarding}
+        options={{ gestureEnabled: false }}
+      />
+
+      {/* 길러 신원 확인 */}
+      <Stack.Screen
+        name="IdentityVerification"
+        component={IdentityVerification}
         options={{ gestureEnabled: false }}
       />
     </Stack.Navigator>

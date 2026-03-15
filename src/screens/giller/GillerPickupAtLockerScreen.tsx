@@ -60,7 +60,7 @@ export default function GillerPickupAtLockerScreen() {
       // 배송의 인수 예약 조회
       const { getDeliveryReservations } = await import('../../services/locker-service');
       const reservations = await getDeliveryReservations(deliveryId);
-      const pickupReservation = reservations.find((r) => r.reservationType === 'giller_pickup');
+      const pickupReservation = reservations.find((r) => r.type === 'giller_pickup') ?? reservations[0];
 
       if (!pickupReservation) {
         Alert.alert(
@@ -99,8 +99,8 @@ export default function GillerPickupAtLockerScreen() {
         return;
       }
 
-      // 예약 ID 확인
-      if (reservation && verification.reservation?.reservationId !== reservation.reservationId) {
+      // 예약 ID 확인 (QR 데이터의 id가 deliveryId와 일치하는지)
+      if (reservation && verification.data?.id && verification.data.id !== reservation.reservationId) {
         Alert.alert(
           'QR코드 불일치',
           '이 배송의 QR코드가 아닙니다.\n\n올바른 QR코드를 스캔해주세요.'

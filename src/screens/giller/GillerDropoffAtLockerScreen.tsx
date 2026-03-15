@@ -22,7 +22,7 @@ import {
   updateReservationStatus,
   addReservationPhotos,
 } from '../../services/locker-service';
-import { generateQRCode } from '../../services/qrcode-service';
+import QRCodeService from '../../services/qrcode-service';
 import { takePhoto, uploadPhotoWithThumbnail } from '../../services/photo-service';
 import type { MainStackNavigationProp } from '../../types/navigation';
 import type { LockerSummary } from '../../types/locker';
@@ -56,7 +56,7 @@ export default function GillerDropoffAtLockerScreen() {
         return;
       }
 
-      if (lockerDetail.availableCount <= 0) {
+      if (lockerDetail.availability.available <= 0) {
         Alert.alert('사용 불가', '이 사물함은 사용 가능한 공간이 없습니다.');
         return;
       }
@@ -78,13 +78,8 @@ export default function GillerDropoffAtLockerScreen() {
       setLoading(true);
       const userId = await requireUserId();
 
-      // QR코드 생성
-      const qrCode = generateQRCode(
-        `temp-${deliveryId}`, // 임시 예약 ID
-        selectedLocker.lockerId,
-        userId,
-        'giller_dropoff'
-      );
+      // QR코드 생성 (사물함 인계용)
+      const qrCode = QRCodeService.generatePickupQRCode(deliveryId, userId);
 
       // 예약 생성
       const now = new Date();
@@ -106,7 +101,7 @@ export default function GillerDropoffAtLockerScreen() {
 
       Alert.alert(
         '✅ 사물함 예약 완료',
-        `${selectedLocker.name}\n\nQR코드가 생성되었습니다.\n\n이용자에게 QR코드를 전송하세요.`,
+        `${selectedLocker.stationName}\n\nQR코드가 생성되었습니다.\n\n이용자에게 QR코드를 전송하세요.`,
         [
           { text: '취소', style: 'cancel' },
           {
@@ -167,7 +162,7 @@ export default function GillerDropoffAtLockerScreen() {
 
       // 1. 예약에 사진 저장
       if (dropoffPhotoUrl) {
-        await addReservationPhotos(reservationId, undefined, dropoffPhotoUrl);
+        await addReservationPhotos(reservationId, '', dropoffPhotoUrl);
       }
 
       // 2. 예약 상태 업데이트 (completed)
@@ -232,18 +227,18 @@ export default function GillerDropoffAtLockerScreen() {
               <View style={styles.lockerInfo}>
                 <View style={styles.lockerInfoRow}>
                   <Text style={styles.lockerInfoLabel}>사물함:</Text>
-                  <Text style={styles.lockerInfoValue}>{selectedLocker.name}</Text>
+                  <Text style={styles.lockerInfoValue}>{selectedLocker.stationName}</Text>
                 </View>
                 <View style={styles.lockerInfoRow}>
                   <Text style={styles.lockerInfoLabel}>유형:</Text>
                   <Text style={styles.lockerInfoValue}>
-                    {selectedLocker.type === 'public' ? '공공' : '민간'}
+                    {selectedLocker.status === 'available' ? '사용 가능' : '점유 중'}
                   </Text>
                 </View>
                 <View style={styles.lockerInfoRow}>
-                  <Text style={styles.lockerInfoLabel}>요금:</Text>
+                  <Text style={styles.lockerInfoLabel}>상태:</Text>
                   <Text style={styles.lockerInfoValue}>
-                    {selectedLocker.pricePer4Hours.toLocaleString()}원/4시간
+                    {selectedLocker.status === 'available' ? '사용 가능' : '사용 중'}
                   </Text>
                 </View>
               </View>

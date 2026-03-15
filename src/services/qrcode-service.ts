@@ -134,3 +134,44 @@ export class QRCodeService {
 }
 
 export default QRCodeService;
+
+// ==================== Standalone named exports ====================
+
+/**
+ * QR 코드 문자열 검증
+ * Returns { isValid, data, error }
+ */
+export function verifyQRCode(qrString: string): {
+  isValid: boolean;
+  data?: QRCodeData;
+  error?: string;
+} {
+  try {
+    const parsed = JSON.parse(qrString) as QRCodeData;
+    if (!parsed.type || !parsed.id || !parsed.timestamp) {
+      return { isValid: false, error: '유효하지 않은 QR코드 형식입니다.' };
+    }
+    const oneDay = 24 * 60 * 60 * 1000;
+    if (Date.now() - parsed.timestamp > oneDay) {
+      return { isValid: false, error: 'QR코드가 만료되었습니다.' };
+    }
+    return { isValid: true, data: parsed };
+  } catch {
+    return { isValid: false, error: 'QR코드를 파싱할 수 없습니다.' };
+  }
+}
+
+/**
+ * QR 코드 남은 유효 시간 반환 (분 단위)
+ * Returns 0 if expired or invalid
+ */
+export function getQRCodeRemainingTime(qrCode: string): number {
+  try {
+    const parsed = JSON.parse(qrCode) as QRCodeData;
+    const oneDay = 24 * 60 * 60 * 1000;
+    const remaining = oneDay - (Date.now() - parsed.timestamp);
+    return Math.max(0, Math.floor(remaining / 60000));
+  } catch {
+    return 0;
+  }
+}

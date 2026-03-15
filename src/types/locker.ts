@@ -108,12 +108,13 @@ export interface LockerReservation {
   userId: string;
   requestId: string;
   deliveryId?: string;
+  type?: string;             // 예약 유형 (giller_dropoff, giller_pickup, requester_pickup)
   size: LockerSize;
   startTime: Date;
   endTime: Date;
   accessCode: string;    // 4자리 PIN 코드
   qrCode: string;        // 사물함 개방 QR코드
-  status: 'pending' | 'active' | 'completed' | 'cancelled';
+  status: 'pending' | 'active' | 'in_use' | 'completed' | 'cancelled';
   pickupPhotoUrl?: string;   // 인수 사진 URL
   dropoffPhotoUrl?: string;  // 인계 사진 URL
   createdAt: Date;

@@ -19,11 +19,12 @@ import {
   TextInput,
   Alert,
   ActivityIndicator,
+  Image,
 } from 'react-native';
 import { StackNavigationProp } from '@react-navigation/stack';
 import * as ImagePicker from 'expo-image-picker';
 import { getFirestore, collection, addDoc, serverTimestamp } from 'firebase/firestore';
-import { uploadPhoto } from '../../services/photo-service';
+import { uploadPhoto } from '../../services/storage-service';
 import { requireUserId } from '../../services/firebase';
 import { Colors, Typography, Spacing, BorderRadius } from '../../theme';
 
@@ -115,7 +116,7 @@ export default function DisputeReportScreen({ navigation, deliveryId, matchId }:
         for (const asset of result.assets) {
           if (asset.uri) {
             setLoading(true);
-            const photoUrl = await uploadPhoto(asset.uri, 'disputes');
+            const photoUrl = await uploadPhoto(`disputes/${Date.now()}_${asset.uri.split('/').pop()}`, asset.uri);
             uploadedPhotos.push(photoUrl);
             setLoading(false);
           }
@@ -380,7 +381,7 @@ const styles = StyleSheet.create({
   },
   headerTitle: {
     ...Typography.h2,
-    color: Colors.text,
+    color: Colors.text.primary,
     marginBottom: Spacing.xs,
   },
   headerSubtitle: {
@@ -398,7 +399,7 @@ const styles = StyleSheet.create({
   },
   sectionTitle: {
     ...Typography.h3,
-    color: Colors.text,
+    color: Colors.text.primary,
     marginBottom: Spacing.sm,
   },
   sectionDescription: {
@@ -441,7 +442,7 @@ const styles = StyleSheet.create({
   },
   disputeTypeLabel: {
     ...Typography.body1,
-    color: Colors.text,
+    color: Colors.text.primary,
     fontWeight: '600',
   },
   selectedBadge: {
@@ -483,14 +484,14 @@ const styles = StyleSheet.create({
   },
   urgencyLabel: {
     ...Typography.body1,
-    color: Colors.text,
+    color: Colors.text.primary,
   },
   descriptionInput: {
     backgroundColor: Colors.background,
     borderRadius: BorderRadius.md,
     padding: Spacing.md,
     ...Typography.body1,
-    color: Colors.text,
+    color: Colors.text.primary,
     height: 120,
     textAlignVertical: 'top',
   },

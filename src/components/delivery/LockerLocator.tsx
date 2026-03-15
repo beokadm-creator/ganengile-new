@@ -17,6 +17,7 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect } from '@react-navigation/native';
 import type { Locker, LockerSummary } from '../../types/locker';
+import { LockerStatus } from '../../types/locker';
 import { getAvailableLockers, getLockersByStation, createLockerLocation } from '../../services/locker-service';
 import { Colors, Spacing, Typography, BorderRadius } from '../../theme';
 
@@ -32,7 +33,7 @@ interface LockerLocatorProps {
 }
 
 export default function LockerLocator({ selectedStationId, onLockerSelect, onClose }: LockerLocatorProps) {
-  const [lockers, setLockers] = useState<LockerLocation[]>([]);
+  const [lockers, setLockers] = useState<any[]>([]);
   const selectedStation = selectedStationId;
   const [loading, setLoading] = useState(true);
   const [viewMode, setViewMode] = useState<'list' | 'map'>('list');
@@ -49,7 +50,7 @@ export default function LockerLocator({ selectedStationId, onLockerSelect, onClo
       }
 
       const locations = lockerList
-        .filter((locker) => locker.status === 'available' && locker.availableCount > 0)
+        .filter((locker) => locker.status === LockerStatus.AVAILABLE && (locker.availability?.available ?? 1) > 0)
         .map(createLockerLocation);
 
       setLockers(locations);
@@ -67,16 +68,13 @@ export default function LockerLocator({ selectedStationId, onLockerSelect, onClo
     }, [selectedStation])
   );
 
-  const handleLockerSelect = (locker: LockerLocation) => {
+  const handleLockerSelect = (locker: any) => {
     const summary: LockerSummary = {
       lockerId: locker.lockerId,
-      name: locker.name,
-      type: locker.stationName.includes('공공') ? 'public' : 'private',
-      status: locker.status,
-      stationName: locker.stationName,
-      pricePer4Hours: 0,
-      availableCount: locker.isAvailable ? 1 : 0,
-      totalCapacity: 0,
+      stationName: locker.stationName ?? locker.name ?? '',
+      size: locker.size ?? 'medium' as any,
+      status: locker.isAvailable ? LockerStatus.AVAILABLE : LockerStatus.OCCUPIED,
+      available: locker.isAvailable ?? true,
     };
     onLockerSelect(summary);
   };

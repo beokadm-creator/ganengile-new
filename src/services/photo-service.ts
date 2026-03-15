@@ -16,7 +16,7 @@ import {
 } from 'firebase/firestore';
 import { db } from './firebase';
 import { getStorage, ref as storageRef, uploadBytesResumable, getDownloadURL as getStorageDownloadURL, uploadBytes, ref } from 'firebase/storage';
-import type {
+import {
   Photo,
   PhotoType,
   PhotoStatus,
@@ -70,7 +70,7 @@ export class PhotoService {
     return {
       photoId: docRef.id,
       ...photoData,
-    } as Photo;
+    } as unknown as Photo;
   }
 
   /**
@@ -116,7 +116,7 @@ export class PhotoService {
     return {
       photoId: docRef.id,
       ...photoData,
-    } as Photo;
+    } as unknown as Photo;
   }
 
   /**
@@ -133,7 +133,7 @@ export class PhotoService {
     const photo = {
       photoId: docSnap.id,
       ...docSnap.data(),
-    } as Photo;
+    } as unknown as Photo;
 
     // TODO: AI 기반 검증 로직 (현재는 mock)
     // 실제로는 TensorFlow.js 또는 외부 API 사용
@@ -227,7 +227,7 @@ export class PhotoService {
     return {
       disputeId: docRef.id,
       ...disputeData,
-    } as Dispute;
+    } as unknown as Dispute;
   }
 
   /**
@@ -266,7 +266,7 @@ export class PhotoService {
       photos.push({
         photoId: doc.id,
         ...doc.data(),
-      } as Photo);
+      } as unknown as Photo);
     });
 
     return photos;
@@ -287,4 +287,37 @@ export class PhotoService {
 
 export function createPhotoService(): PhotoService {
   return new PhotoService();
+}
+
+// ==================== Standalone named exports ====================
+
+import * as ImagePicker from 'expo-image-picker';
+import { uploadPhoto as uploadToStorage } from './storage-service';
+
+/**
+ * 카메라 앱을 열어 사진을 촬영하고 로컬 URI를 반환
+ * Returns null if cancelled
+ */
+export async function takePhoto(): Promise<string | null> {
+  const permission = await ImagePicker.requestCameraPermissionsAsync();
+  if (!permission.granted) return null;
+  const result = await ImagePicker.launchCameraAsync({
+    mediaTypes: ImagePicker.MediaTypeOptions.Images,
+    quality: 0.85,
+  });
+  if (result.canceled || !result.assets[0]) return null;
+  return result.assets[0].uri;
+}
+
+/**
+ * URI를 Firebase Storage에 업로드하고 { url } 반환
+ */
+export async function uploadPhotoWithThumbnail(
+  uri: string,
+  userId: string,
+  type: string
+): Promise<{ url: string }> {
+  const path = `photos/${userId}/${type}_${Date.now()}.jpg`;
+  const url = await uploadToStorage(path, uri);
+  return { url };
 }

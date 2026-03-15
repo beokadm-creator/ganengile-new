@@ -12,7 +12,7 @@ import type { UserRole } from './user';
 
 export type AuthStackParamList = {
   Landing: undefined;
-  SignUp: undefined;
+  NewSignUp: undefined;
   Login: undefined;
 };
 
