@@ -16,7 +16,6 @@ import {
   NativeScrollEvent,
 } from 'react-native';
 import { ScrollView } from 'react-native';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useUser } from '../../contexts/UserContext';
 import type { StackNavigationProp } from '@react-navigation/stack';
 
@@ -48,7 +47,7 @@ type Props = {
 
 export default function GillerOnboardingScreen({ navigation, route }: Props) {
   const { role } = route.params || { role: 'giller' };
-  const { refreshUser, completeOnboarding } = useUser();
+  const { completeOnboarding } = useUser();
   const [currentStep, setCurrentStep] = useState(0);
   const scrollViewRef = useRef<ScrollView>(null);
 
@@ -114,19 +113,9 @@ export default function GillerOnboardingScreen({ navigation, route }: Props) {
 
   const handleComplete = async () => {
     try {
-      console.log('🎯 Starting Giller onboarding completion...');
-
-      // AsyncStorage에 온보딩 완료 저장
-      await AsyncStorage.setItem('@onboarding_completed', 'true');
-      console.log('✅ AsyncStorage saved');
-
-      // UserContext의 completeOnboarding 호출 (Firestore 업데이트)
+      // Firestore hasCompletedOnboarding = true 저장 + 로컬 상태 업데이트
       await completeOnboarding();
-      console.log('✅ Firestore updated');
-
-      // Main 화면으로 이동
-      navigation.replace('Main');
-      console.log('✅ Navigated to Main');
+      // AppNavigator가 hasCompletedOnboarding 변경을 감지해 자동으로 Main으로 전환
     } catch (error) {
       console.error('❌ 온보딩 완료 저장 오류:', error);
       Alert.alert('오류', '온보딩 완료 상태를 저장하는 데 실패했습니다.');
