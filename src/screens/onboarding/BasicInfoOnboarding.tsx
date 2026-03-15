@@ -19,8 +19,6 @@ import {
 import { useUser } from '../../contexts/UserContext';
 import { doc, setDoc, serverTimestamp } from 'firebase/firestore';
 import { db, auth } from '../../services/firebase';
-import AsyncStorage from '@react-native-async-storage/async-storage';
-import { createUser } from '../../services/user-service';
 import { UserRole } from '../../types/user';
 
 type Props = {
@@ -39,7 +37,7 @@ interface TermsAgreement {
 }
 
 export default function BasicInfoOnboarding({ navigation }: Props) {
-  const { user, refreshUser, completeOnboarding } = useUser();
+  const { user } = useUser();
   const [loading, setLoading] = useState(false);
   const [currentStep, setCurrentStep] = useState(1);
 
@@ -132,17 +130,9 @@ export default function BasicInfoOnboarding({ navigation }: Props) {
 
       console.log('✅ Basic info saved to Firestore');
 
-      // AsyncStorage에 온보딩 완료 저장
-      await AsyncStorage.setItem('@onboarding_completed', 'true');
-      console.log('✅ AsyncStorage saved');
-
-      // UserContext 갱신
-      await refreshUser();
-      console.log('✅ UserContext refreshed');
-
-      // 메인 화면으로 이동
-      navigation.replace('Main');
-      console.log('✅ Navigated to Main');
+      // 다음 온보딩 단계로 이동
+      navigation.navigate('GllerOnboarding');
+      console.log('✅ Navigated to GllerOnboarding');
     } catch (error) {
       console.error('❌ Error saving basic info:', error);
       Alert.alert('오류', '기본 정보 저장에 실패했습니다. 다시 시도해주세요.');
