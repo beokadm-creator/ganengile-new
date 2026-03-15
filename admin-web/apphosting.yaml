@@ -1,0 +1,25 @@
+runConfig:
+  runtime: nodejs20
+  concurrency: 10
+  minInstances: 0
+  maxInstances: 3
+
+env:
+  - variable: NEXT_PUBLIC_FIREBASE_API_KEY
+    value: AIzaSyBjHwXdTZ_uq_GdtUubGxQc_gFQ9v1dCkQ
+  - variable: NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN
+    value: ganengile.firebaseapp.com
+  - variable: NEXT_PUBLIC_FIREBASE_PROJECT_ID
+    value: ganengile
+  - variable: NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET
+    value: ganengile.firebasestorage.app
+  - variable: NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID
+    value: 452671511743
+  - variable: NEXT_PUBLIC_FIREBASE_APP_ID
+    value: 1:452671511743:web:b0cdbbfae93f80cfcbfa0a
+  - variable: NEXTAUTH_URL
+    value: https://ganengile-admin.web.app
+  - variable: ADMIN_UID
+    secret: ADMIN_UID
+  - variable: NODE_ENV
+    value: production

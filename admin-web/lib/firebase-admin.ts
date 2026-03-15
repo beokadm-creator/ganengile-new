@@ -12,15 +12,15 @@ export function getAdminApp(): App {
     return adminApp;
   }
 
-  // Service account key from env (JSON string)
   const serviceAccountKey = process.env.FIREBASE_SERVICE_ACCOUNT_KEY;
   if (serviceAccountKey) {
+    // 로컬 개발: .env.local에 서비스 계정 키 JSON 문자열
     adminApp = initializeApp({
       credential: cert(JSON.parse(serviceAccountKey)),
       projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID,
     });
   } else {
-    // Dev fallback: uses GOOGLE_APPLICATION_CREDENTIALS or emulator
+    // Firebase App Hosting / Cloud Run: Application Default Credentials 자동 사용
     adminApp = initializeApp({
       projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID ?? 'ganengile',
     });
