@@ -40,7 +40,7 @@ export function getCurrentUser(): Partial<User> | null {
     uid: currentUser.uid,
     email: currentUser.email || '',
     name: currentUser.displayName || '',
-    role: UserRole.GILLER, // Default role
+    role: UserRole.GLER, // Default role
     createdAt: new Date() as any, // Placeholder
     updatedAt: new Date() as any,
     isActive: true,
@@ -75,7 +75,7 @@ export async function getUserById(userId: string): Promise<User | null> {
       uid: docSnapshot.id,
       email: data.email || '',
       name: data.name || '',
-      role: data.role || UserRole.GILLER,
+      role: data.role || UserRole.GLER,
       agreedTerms: data.agreedTerms || {
         giller: false,
         gller: false,
@@ -91,6 +91,7 @@ export async function getUserById(userId: string): Promise<User | null> {
       profilePhoto: data.profilePhoto,
       fcmToken: data.fcmToken,
       isVerified: data.isVerified,
+      gillerApplicationStatus: data.gillerApplicationStatus,
       gillerInfo: data.gillerInfo,
       gllerInfo: data.gllerInfo,
       // P1 추가 필드
@@ -426,7 +427,7 @@ export async function createUser(
   userId: string,
   email: string,
   name: string,
-  role: UserRole = UserRole.BOTH
+  role: UserRole = UserRole.GLER
 ): Promise<User> {
   try {
     const userRef = doc(db, 'users', userId);
@@ -452,7 +453,7 @@ export async function createUser(
       rating: 5.0,
       totalRatings: 0,
       isActive: true,
-      isVerified: true,
+      isVerified: false,
 
       // 길러 정보
       gillerInfo: {

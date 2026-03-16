@@ -20,6 +20,7 @@ import {
   query,
   where,
   orderBy,
+  limit,
   serverTimestamp,
   increment,
   Timestamp,
@@ -263,6 +264,30 @@ export async function createGillerEarning(
   } catch (error) {
     console.error('Error creating giller earning:', error);
     throw error;
+  }
+}
+
+/**
+ * Check if giller earning already exists for a request
+ */
+export async function hasGillerEarningForRequest(
+  userId: string,
+  requestId: string
+): Promise<boolean> {
+  try {
+    const q = query(
+      collection(db, 'payments'),
+      where('userId', '==', userId),
+      where('type', '==', PaymentType.GILLER_EARNING),
+      where('requestId', '==', requestId),
+      limit(1)
+    );
+
+    const snapshot = await getDocs(q);
+    return !snapshot.empty;
+  } catch (error) {
+    console.error('Error checking giller earning for request:', error);
+    return false;
   }
 }
 

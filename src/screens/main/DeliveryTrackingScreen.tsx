@@ -184,6 +184,8 @@ export default function DeliveryTrackingScreen({ navigation, route }: Props) {
       accepted: 40,
       in_transit: 60,
       arrived: 80,
+      at_locker: 85,
+      delivered: 90,
       completed: 100,
       cancelled: 0,
       quote_requested: 5,
@@ -206,6 +208,10 @@ export default function DeliveryTrackingScreen({ navigation, route }: Props) {
         return '#AB47BC';
       case 'arrived':
         return '#66BB6A';
+      case 'at_locker':
+        return '#7CB342';
+      case 'delivered':
+        return '#8BC34A';
       case 'completed':
         return '#4CAF50';
       case 'cancelled':
@@ -227,6 +233,10 @@ export default function DeliveryTrackingScreen({ navigation, route }: Props) {
         return '배송 중';
       case 'arrived':
         return '도착 완료';
+      case 'at_locker':
+        return '사물함 보관 완료';
+      case 'delivered':
+        return '수령 확인 대기';
       case 'completed':
         return '배송 완료';
       case 'cancelled':
@@ -525,7 +535,7 @@ export default function DeliveryTrackingScreen({ navigation, route }: Props) {
 
         {/* 분쟁 신고 (이용자/길러 공통) */}
         {trackingData &&
-         (trackingData.status === 'in_transit' || trackingData.status === 'completed') && (
+         (trackingData.status === 'in_transit' || trackingData.status === 'delivered' || trackingData.status === 'completed') && (
           <View style={styles.card}>
             <TouchableOpacity
               style={[styles.actionButton, styles.actionButtonDanger]}
@@ -550,6 +560,8 @@ export default function DeliveryTrackingScreen({ navigation, route }: Props) {
               {trackingData.status === 'accepted' && '길러가 매칭을 수락했습니다.'}
               {trackingData.status === 'in_transit' && '길러가 배송 중입니다.'}
               {trackingData.status === 'arrived' && '길러가 도착했습니다.'}
+              {trackingData.status === 'at_locker' && '사물함에 물품이 보관되었습니다.'}
+              {trackingData.status === 'delivered' && '배송이 완료되어 수령 확인을 기다리고 있습니다.'}
               {trackingData.status === 'completed' && '배송이 완료되었습니다.'}
             </Text>
           </View>

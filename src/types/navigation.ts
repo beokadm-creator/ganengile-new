@@ -112,6 +112,7 @@ export type MainStackParamList = {
   PointHistory: undefined;
   PointWithdraw: undefined;
   GillerApply: undefined;
+  IdentityVerification: undefined;
 };
 
 export type MainTabNavigationProp = BottomTabNavigationProp<MainTabParamList>;

@@ -13,6 +13,7 @@ import {
   getDoc,
   addDoc,
   updateDoc,
+  serverTimestamp,
 } from 'firebase/firestore';
 import { db } from '../services/firebase';
 import { gillerAcceptRequest } from './delivery-service';
@@ -360,7 +361,8 @@ export async function processMatchingForRequest(
     }
 
     // 2. 요청 문서에서 requesterId(이용자 ID) 조회
-    const requestDoc = await getDoc(doc(db, 'requests', requestId));
+    const requestRef = doc(db, 'requests', requestId);
+    const requestDoc = await getDoc(requestRef);
     const request = requestDoc.data();
     const requesterId = request?.requesterId || '';
 
@@ -372,6 +374,14 @@ export async function processMatchingForRequest(
     await Promise.all(matchPromises);
 
     if (request) {
+      if (request.status === 'pending') {
+        await updateDoc(requestRef, {
+          status: 'matched',
+          matchedAt: serverTimestamp(),
+          updatedAt: serverTimestamp(),
+        });
+      }
+
       const notificationPromises = matches.map((match) =>
         sendMatchFoundNotification(
           match.gillerId,
@@ -1033,7 +1043,7 @@ export async function getPendingGillerRequests(): Promise<any[]> {
   try {
     const q = query(
       collection(db, 'requests'),
-      where('status', '==', 'pending')
+      where('status', 'in', ['pending', 'matched'])
     );
 
     const snapshot = await getDocs(q);

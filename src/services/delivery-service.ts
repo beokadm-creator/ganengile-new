@@ -19,6 +19,8 @@ import {
 } from 'firebase/firestore';
 import { db } from './firebase';
 import { uploadPickupPhoto, uploadDeliveryPhoto } from './storage-service';
+import { DepositService } from './DepositService';
+import { createGillerEarning, hasGillerEarningForRequest } from './payment-service';
 import type { DeliveryStatus, DeliveryRequest } from '../types/delivery';
 
 /**
@@ -45,6 +47,20 @@ export interface DeliveryCompletionData {
   verificationCode: string; // Recipient's 6-digit code
   photoUri?: string;
   location: {
+    latitude: number;
+    longitude: number;
+  };
+  notes?: string;
+}
+
+/**
+ * Requester confirmation data
+ */
+export interface RequesterConfirmationData {
+  deliveryId: string;
+  requesterId: string;
+  photoUri?: string;
+  location?: {
     latitude: number;
     longitude: number;
   };
@@ -301,23 +317,23 @@ export async function completeDelivery(data: DeliveryCompletionData): Promise<{ 
 
     // Update delivery status
     await updateDoc(deliveryRef, {
-      status: 'completed' as DeliveryStatus,
+      status: 'delivered' as DeliveryStatus,
       'tracking.actualDeliveryTime': serverTimestamp(),
       deliveryPhotos: photoUrl ? [photoUrl] : [],
       deliveryLocation: data.location,
       completionNote: data.notes,
-      completedAt: serverTimestamp(),
+      deliveredAt: serverTimestamp(),
       'tracking.events': [
         ...delivery.tracking.events,
         {
           type: 'delivered',
           timestamp: new Date(),
-          description: '배송이 완료되었습니다',
+          description: '배송이 완료되었습니다 (수령 확인 대기)',
           actorId: data.gillerId,
           location: data.location,
         },
       ],
-      'tracking.progress': 100,
+      'tracking.progress': 90,
       updatedAt: serverTimestamp(),
     });
 
@@ -325,16 +341,202 @@ export async function completeDelivery(data: DeliveryCompletionData): Promise<{ 
     if (delivery.requestId) {
       const requestRef = doc(db, 'requests', delivery.requestId);
       await updateDoc(requestRef, {
-        status: 'completed' as DeliveryStatus,
+        status: 'delivered' as DeliveryStatus,
         deliveredAt: serverTimestamp(),
         updatedAt: serverTimestamp(),
       });
     }
 
-    return { success: true, message: '배송이 완료되었습니다.' };
+    return { success: true, message: '배송 전달이 완료되었습니다. 수령자 확인을 기다립니다.' };
   } catch (error) {
     console.error('Error completing delivery:', error);
     return { success: false, message: '배송 완료에 실패했습니다.' };
+  }
+}
+
+/**
+ * Requester confirms delivery after receiving the item
+ * Finalizes settlement: refund deposit and create giller earning
+ */
+export async function confirmDeliveryByRequester(
+  data: RequesterConfirmationData
+): Promise<{ success: boolean; message: string }> {
+  try {
+    const deliveryRef = doc(db, 'deliveries', data.deliveryId);
+    const deliveryDoc = await getDoc(deliveryRef);
+
+    if (!deliveryDoc.exists()) {
+      return { success: false, message: '배송 정보를 찾을 수 없습니다.' };
+    }
+
+    const delivery = deliveryDoc.data();
+    if (!delivery) {
+      return { success: false, message: '배송 데이터를 찾을 수 없습니다.' };
+    }
+
+    if (delivery.status === 'cancelled') {
+      return { success: false, message: '취소된 배송은 확인할 수 없습니다.' };
+    }
+
+    const requestId = delivery.requestId;
+    if (!requestId) {
+      return { success: false, message: '요청 정보를 찾을 수 없습니다.' };
+    }
+
+    const requestRef = doc(db, 'requests', requestId);
+    const requestDoc = await getDoc(requestRef);
+    if (!requestDoc.exists()) {
+      return { success: false, message: '요청 정보를 찾을 수 없습니다.' };
+    }
+    const request = requestDoc.data();
+
+    const requesterId = request?.requesterId || delivery.gllerId;
+    if (requesterId && requesterId !== data.requesterId) {
+      return { success: false, message: '권한이 없습니다.' };
+    }
+
+    const confirmableStatuses = new Set(['delivered', 'at_locker', 'completed']);
+    if (!confirmableStatuses.has(delivery.status)) {
+      return { success: false, message: '수령 확인 대기 상태가 아닙니다.' };
+    }
+
+    let photoUrl = '';
+    if (data.photoUri) {
+      try {
+        photoUrl = await uploadDeliveryPhoto(data.deliveryId, data.photoUri);
+      } catch (error: any) {
+        console.error('Error uploading confirmation photo:', error);
+      }
+    }
+
+    if (delivery.requesterConfirmedAt) {
+      return { success: true, message: '이미 수령 확인이 완료되었습니다.' };
+    }
+
+    const settlementRef = doc(db, 'settlements', requestId);
+    const trackingEvents = Array.isArray(delivery.tracking?.events) ? delivery.tracking.events : [];
+
+    const txResult = await runTransaction(db, async (tx) => {
+      const settlementSnap = await tx.get(settlementRef);
+      if (settlementSnap.exists() && settlementSnap.data()?.status === 'completed') {
+        return { alreadyCompleted: true };
+      }
+
+      const now = serverTimestamp();
+
+      if (!settlementSnap.exists()) {
+        tx.set(settlementRef, {
+          requestId,
+          deliveryId: data.deliveryId,
+          gillerId: delivery.gillerId,
+          requesterId: data.requesterId,
+          status: 'processing',
+          createdAt: now,
+          updatedAt: now,
+        });
+      } else {
+        tx.update(settlementRef, {
+          status: 'processing',
+          updatedAt: now,
+        });
+      }
+
+      tx.update(deliveryRef, {
+        status: 'completed' as DeliveryStatus,
+        requesterConfirmedAt: now,
+        requesterConfirmedBy: data.requesterId,
+        confirmationPhotos: photoUrl ? [photoUrl] : [],
+        confirmationNote: data.notes,
+        'tracking.events': [
+          ...trackingEvents,
+          {
+            type: 'confirmed_by_requester',
+            timestamp: new Date(),
+            description: '수령자가 배송을 확인했습니다',
+            actorId: data.requesterId,
+            location: data.location,
+          },
+        ],
+        'tracking.progress': 100,
+        updatedAt: now,
+      });
+
+      tx.update(requestRef, {
+        status: 'completed' as DeliveryStatus,
+        requesterConfirmedAt: now,
+        requesterConfirmedBy: data.requesterId,
+        updatedAt: now,
+      });
+
+      return { alreadyCompleted: false };
+    });
+
+    if (txResult.alreadyCompleted) {
+      return { success: true, message: '이미 수령 확인이 완료되었습니다.' };
+    }
+
+    // Settlement: refund deposit and create earning (idempotent checks)
+    const feeAmount =
+      delivery?.fee?.totalFee ||
+      request?.fee?.totalFee ||
+      request?.initialNegotiationFee ||
+      0;
+
+    let refundStatus: 'refunded' | 'skipped' | 'failed' = 'skipped';
+    let depositId: string | undefined;
+    let depositAmount: number | undefined;
+    let earningPaymentId: string | undefined;
+
+    try {
+      if (requestId) {
+        const deposit = await DepositService.getDepositByRequestId(requestId);
+        if (deposit) {
+          depositId = deposit.depositId;
+          depositAmount = deposit.depositAmount;
+          if (deposit.status === 'paid') {
+            const refundResult = await DepositService.refundDeposit(deposit.depositId);
+            refundStatus = refundResult.success ? 'refunded' : 'failed';
+          } else {
+            refundStatus = 'skipped';
+          }
+        }
+      }
+
+      if (delivery.gillerId && feeAmount > 0) {
+        const alreadyEarned = await hasGillerEarningForRequest(delivery.gillerId, requestId);
+        if (!alreadyEarned) {
+          earningPaymentId = await createGillerEarning(delivery.gillerId, requestId, feeAmount);
+        }
+      }
+
+      await updateDoc(settlementRef, {
+        status: 'completed',
+        depositId: depositId ?? null,
+        depositAmount: depositAmount ?? null,
+        refundStatus,
+        earningPaymentId: earningPaymentId ?? null,
+        earningAmount: feeAmount || null,
+        settledAt: serverTimestamp(),
+        updatedAt: serverTimestamp(),
+      });
+    } catch (error: any) {
+      await updateDoc(settlementRef, {
+        status: 'failed',
+        depositId: depositId ?? null,
+        depositAmount: depositAmount ?? null,
+        refundStatus,
+        earningPaymentId: earningPaymentId ?? null,
+        earningAmount: feeAmount || null,
+        errorMessage: error?.message || '정산 처리 실패',
+        updatedAt: serverTimestamp(),
+      });
+      return { success: false, message: '정산 처리에 실패했습니다.' };
+    }
+
+    return { success: true, message: '수령 확인이 완료되었습니다.' };
+  } catch (error) {
+    console.error('Error confirming delivery:', error);
+    return { success: false, message: '수령 확인에 실패했습니다.' };
   }
 }
 

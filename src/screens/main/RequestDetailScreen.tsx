@@ -17,6 +17,7 @@ import { StackNavigationProp } from '@react-navigation/stack';
 import { getRequest, cancelRequest } from '../../services/request-service';
 import { requireUserId } from '../../services/firebase';
 import { getMatchingResults } from '../../services/matching-service';
+import { confirmDeliveryByRequester, getDeliveryByRequestId } from '../../services/delivery-service';
 import type { Request } from '../../types/request';
 import { RequestStatus } from '../../types/request';
 import { toRequestDetailView } from '../../utils/request-adapters';
@@ -55,6 +56,7 @@ export default function RequestDetailScreen({ navigation, route }: Props) {
   const [cancelling, setCancelling] = useState(false);
   const [cancelModalVisible, setCancelModalVisible] = useState(false);
   const [cancelReason, setCancelReason] = useState('');
+  const [confirming, setConfirming] = useState(false);
 
   useEffect(() => {
     loadData();
@@ -77,7 +79,7 @@ export default function RequestDetailScreen({ navigation, route }: Props) {
       setDetailView(toRequestDetailView(typedRequest));
 
       // 매칭 결과 조회 (PENDING 상태인 경우만)
-      if ((requestData as any).status === 'pending') {
+      if ((requestData as any).status === 'pending' || (requestData as any).status === 'matched') {
         try {
           const matchingResults = await getMatchingResults(requestId);
           setMatches(matchingResults);
@@ -152,14 +154,49 @@ export default function RequestDetailScreen({ navigation, route }: Props) {
     }
   };
 
+  const handleConfirmDelivery = async () => {
+    if (!detailView) return;
+    setConfirming(true);
+    try {
+      const requesterId = await requireUserId();
+      const delivery = await getDeliveryByRequestId(detailView.requestId);
+      if (!delivery?.deliveryId) {
+        Alert.alert('오류', '배송 정보를 찾을 수 없습니다.');
+        return;
+      }
+      const result = await confirmDeliveryByRequester({
+        deliveryId: delivery.deliveryId,
+        requesterId,
+      });
+      if (result.success) {
+        Alert.alert('완료', result.message);
+        await loadRequest();
+      } else {
+        Alert.alert('실패', result.message);
+      }
+    } catch (error: any) {
+      Alert.alert('오류', error?.message || '수령 확인에 실패했습니다.');
+    } finally {
+      setConfirming(false);
+    }
+  };
+
   const getStatusColor = (status: RequestStatus): string => {
     switch (status) {
       case RequestStatus.PENDING:
         return '#FFA726';
       case RequestStatus.MATCHED:
         return '#42A5F5';
-      case RequestStatus.IN_PROGRESS:
+      case RequestStatus.ACCEPTED:
+        return '#26C6DA';
+      case RequestStatus.IN_TRANSIT:
         return '#AB47BC';
+      case RequestStatus.ARRIVED:
+        return '#66BB6A';
+      case RequestStatus.AT_LOCKER:
+        return '#7CB342';
+      case RequestStatus.DELIVERED:
+        return '#8BC34A';
       case RequestStatus.COMPLETED:
         return '#4CAF50';
       case RequestStatus.CANCELLED:
@@ -175,8 +212,16 @@ export default function RequestDetailScreen({ navigation, route }: Props) {
         return '매칭 대기 중';
       case RequestStatus.MATCHED:
         return '매칭 완료';
-      case RequestStatus.IN_PROGRESS:
+      case RequestStatus.ACCEPTED:
+        return '수락 완료';
+      case RequestStatus.IN_TRANSIT:
         return '배송 중';
+      case RequestStatus.ARRIVED:
+        return '도착 완료';
+      case RequestStatus.AT_LOCKER:
+        return '사물함 보관 완료';
+      case RequestStatus.DELIVERED:
+        return '수령 확인 대기';
       case RequestStatus.COMPLETED:
         return '배송 완료';
       case RequestStatus.CANCELLED:
@@ -369,6 +414,22 @@ export default function RequestDetailScreen({ navigation, route }: Props) {
             </TouchableOpacity>
           </View>
         )}
+
+        {detailView.status === RequestStatus.DELIVERED && (
+          <View style={styles.actions}>
+            <TouchableOpacity
+              style={[styles.actionButton, styles.confirmButton]}
+              onPress={handleConfirmDelivery}
+              disabled={confirming}
+            >
+              {confirming ? (
+                <ActivityIndicator color="#fff" />
+              ) : (
+                <Text style={styles.actionButtonText}>수령 확인</Text>
+              )}
+            </TouchableOpacity>
+          </View>
+        )}
       </ScrollView>
 
       <TextInputModal
@@ -420,6 +481,9 @@ const styles = StyleSheet.create({
   },
   cancelButton: {
     backgroundColor: '#EF5350',
+  },
+  confirmButton: {
+    backgroundColor: '#4CAF50',
   },
   cancelledCard: {
     backgroundColor: '#FFEBEE',

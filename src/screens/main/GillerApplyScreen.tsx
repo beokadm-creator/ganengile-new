@@ -10,7 +10,7 @@
  * → 관리자 승인 후 role: 'giller' 활성화
  */
 
-import React, { useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import {
   View,
   Text,
@@ -27,6 +27,10 @@ import { useUser } from '../../contexts/UserContext';
 import { doc, updateDoc, addDoc, collection, serverTimestamp } from 'firebase/firestore';
 import { db } from '../../services/firebase';
 import type { StackNavigationProp } from '@react-navigation/stack';
+import { useFocusEffect } from '@react-navigation/native';
+import { getUserVerification, getVerificationStatusDisplay } from '../../services/verification-service';
+import type { UserVerification } from '../../types/profile';
+import { PASS_TEST_MODE } from '../../config/feature-flags';
 
 type Props = { navigation: StackNavigationProp<any> };
 
@@ -42,16 +46,38 @@ export default function GillerApplyScreen({ navigation }: Props) {
   const [routeDescription, setRouteDescription] = useState('');
   const [selfIntroduction, setSelfIntroduction] = useState('');
 
-  // Step 3 — PASS 인증 (테스트 모드)
-  const [passTestMode] = useState(true); // TODO: 실제 PASS API 연동 시 false로
-  const [passName, setPassName] = useState(user?.name || '');
-  const [passBirthday, setPassBirthday] = useState('');
-  const [passVerified, setPassVerified] = useState(false);
+  // Step 3 — 신원 인증
+  const passTestMode = PASS_TEST_MODE;
+  const [verification, setVerification] = useState<UserVerification | null>(null);
+  const [verificationLoading, setVerificationLoading] = useState(false);
 
   // Step 4 — 계좌 정보
   const [bankName, setBankName] = useState('');
   const [accountNumber, setAccountNumber] = useState('');
   const [accountHolder, setAccountHolder] = useState(user?.name || '');
+
+  const loadVerification = useCallback(async () => {
+    if (!user?.uid) return;
+    setVerificationLoading(true);
+    try {
+      const data = await getUserVerification(user.uid);
+      setVerification(data);
+    } catch (error) {
+      console.error('Verification load error:', error);
+    } finally {
+      setVerificationLoading(false);
+    }
+  }, [user?.uid]);
+
+  useEffect(() => {
+    loadVerification();
+  }, [loadVerification]);
+
+  useFocusEffect(
+    useCallback(() => {
+      loadVerification();
+    }, [loadVerification])
+  );
 
   // ─── Validation ─────────────────────────────────────
 
@@ -65,12 +91,16 @@ export default function GillerApplyScreen({ navigation }: Props) {
 
   const validateStep3 = () => {
     if (passTestMode) {
-      setPassVerified(true);
       return true;
     }
-    if (!passName.trim()) { Alert.alert('필수 입력', '이름을 입력해주세요.'); return false; }
-    if (!/^\d{8}$/.test(passBirthday)) { Alert.alert('형식 오류', '생년월일 8자리를 입력해주세요. (예: 19900101)'); return false; }
-    if (!passVerified) { Alert.alert('인증 필요', 'PASS 본인인증을 완료해주세요.'); return false; }
+    if (!verification) {
+      Alert.alert('인증 필요', '신원 인증을 제출해주세요.');
+      return false;
+    }
+    if (verification.status === 'rejected') {
+      Alert.alert('인증 반려', '신원 인증이 반려되었습니다. 다시 제출해주세요.');
+      return false;
+    }
     return true;
   };
 
@@ -111,9 +141,7 @@ export default function GillerApplyScreen({ navigation }: Props) {
         phone: phone.trim(),
         routeDescription: routeDescription.trim(),
         selfIntroduction: selfIntroduction.trim(),
-        passAuthData: passTestMode
-          ? { ci: `TEST_CI_${Date.now()}`, name: user.name, birthday: '19900101', testMode: true }
-          : { name: passName.trim(), birthday: passBirthday.trim() },
+        verificationStatus: passTestMode ? 'approved' : verification?.status ?? 'not_submitted',
         bankAccount: {
           bankName: bankName.trim(),
           accountNumber: accountNumber.replace(/-/g, ''),
@@ -161,7 +189,7 @@ export default function GillerApplyScreen({ navigation }: Props) {
 
       <View style={styles.infoCard}>
         <Text style={styles.infoCardTitle}>📋 신청 절차</Text>
-        {['기본 정보 입력 (연락처, 노선)', 'PASS 본인인증', '정산 계좌 등록', '관리자 심사 (1~3 영업일)'].map((t, i) => (
+        {['기본 정보 입력 (연락처, 노선)', '신원 인증 제출', '정산 계좌 등록', '관리자 심사 (1~3 영업일)'].map((t, i) => (
           <View key={i} style={styles.infoRow}>
             <View style={styles.stepBadge}><Text style={styles.stepBadgeText}>{i + 1}</Text></View>
             <Text style={styles.infoText}>{t}</Text>
@@ -186,7 +214,7 @@ export default function GillerApplyScreen({ navigation }: Props) {
 
       <View style={[styles.infoCard, styles.warningCard]}>
         <Text style={styles.warningText}>
-          ⚠️ 현재 PASS 인증 및 계좌 인증은 테스트 모드로 운영됩니다. 정식 서비스 출시 전 실제 인증으로 전환될 예정입니다.
+          ⚠️ 현재 신원 인증 및 계좌 인증은 테스트 모드로 운영될 수 있습니다. 정식 서비스 출시 전 실제 인증으로 전환될 예정입니다.
         </Text>
       </View>
     </ScrollView>
@@ -236,47 +264,39 @@ export default function GillerApplyScreen({ navigation }: Props) {
 
   const renderStep3 = () => (
     <ScrollView style={styles.stepContent} showsVerticalScrollIndicator={false}>
-      <Text style={styles.stepTitle}>본인인증</Text>
+      <Text style={styles.stepTitle}>신원 인증</Text>
       <Text style={styles.stepDescription}>
-        안전한 배송 서비스를 위해 신원 확인이 필요합니다.
+        길러 활동을 위해 신원 인증을 제출해주세요.
       </Text>
 
-      {/* 테스트 모드 배너 */}
-      <View style={styles.testBanner}>
-        <Text style={styles.testBannerTitle}>🧪 테스트 모드</Text>
-        <Text style={styles.testBannerText}>
-          현재 실제 PASS 인증 API가 연동되지 않아 테스트 모드로 진행됩니다.{'\n'}
-          정식 서비스 전 실명 인증으로 전환됩니다.
-        </Text>
-      </View>
-
-      {passTestMode ? (
-        <View style={styles.verifiedBox}>
-          <Text style={styles.verifiedIcon}>✅</Text>
-          <Text style={styles.verifiedText}>테스트 모드: 자동으로 인증 처리됩니다</Text>
+      {passTestMode && (
+        <View style={styles.testBanner}>
+          <Text style={styles.testBannerTitle}>🧪 테스트 모드</Text>
+          <Text style={styles.testBannerText}>
+            테스트 모드에서는 인증 제출 없이 다음 단계로 진행됩니다.{'\n'}
+            정식 서비스 전 실명 인증으로 전환됩니다.
+          </Text>
         </View>
-      ) : (
+      )}
+
+      {!passTestMode && (
         <>
-          <View style={styles.field}>
-            <Text style={styles.label}>이름 *</Text>
-            <TextInput style={styles.input} placeholder="실명 입력" value={passName} onChangeText={setPassName} />
-          </View>
-          <View style={styles.field}>
-            <Text style={styles.label}>생년월일 *</Text>
-            <TextInput
-              style={styles.input}
-              placeholder="YYYYMMDD (예: 19900101)"
-              value={passBirthday}
-              onChangeText={setPassBirthday}
-              keyboardType="number-pad"
-              maxLength={8}
-            />
+          <View style={styles.verifiedBox}>
+            <Text style={styles.verifiedIcon}>
+              {verification ? getVerificationStatusDisplay(verification).icon : '❓'}
+            </Text>
+            <Text style={styles.verifiedText}>
+              {verification
+                ? getVerificationStatusDisplay(verification).description
+                : '신원 인증을 제출해주세요.'}
+            </Text>
           </View>
           <TouchableOpacity
             style={styles.passButton}
-            onPress={() => Alert.alert('PASS 인증', '현재 준비 중입니다.')}
+            disabled={verificationLoading}
+            onPress={() => navigation.navigate('IdentityVerification')}
           >
-            <Text style={styles.passButtonText}>📱 PASS 본인인증 시작</Text>
+            <Text style={styles.passButtonText}>신원 인증 제출하기</Text>
           </TouchableOpacity>
         </>
       )}

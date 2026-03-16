@@ -38,6 +38,7 @@ import {
 import { BadgeService } from '../../services/BadgeService';
 import TextInputModal from '../../components/common/TextInputModal';
 import BankAccountModal from '../../components/common/BankAccountModal';
+import { PASS_TEST_MODE } from '../../config/feature-flags';
 
 type NavigationProp = StackNavigationProp<any>;
 
@@ -430,6 +431,13 @@ export default function ProfileScreen({ navigation: _navigation }: Props) {
   }
 
   const isGiller = currentRole === UserRole.GILLER || user.role === UserRole.GILLER;
+  const canAccessGiller =
+    PASS_TEST_MODE ||
+    (user.gillerApplicationStatus === 'approved' && user.isVerified);
+  const needsVerification = !user.isVerified;
+  const canApplyGiller =
+    user.gillerApplicationStatus !== 'pending' &&
+    user.gillerApplicationStatus !== 'approved';
 
   const commonItems: MenuItem[] = [
     {
@@ -464,10 +472,24 @@ export default function ProfileScreen({ navigation: _navigation }: Props) {
         onPress: () => (_navigation as any).navigate('Tabs', { screen: 'Requests' }),
         color: '#FF9800',
       },
+      ...(needsVerification ? [{
+        icon: '🪪',
+        title: '신원 인증',
+        subtitle: verificationDisplay.description,
+        onPress: () => (_navigation as any).navigate('IdentityVerification'),
+        color: '#3F51B5',
+      }] : []),
       ...commonItems,
     ];
 
-  const gillerItems: MenuItem[] = [
+    const gillerItems: MenuItem[] = [
+    ...(needsVerification ? [{
+      icon: '🪪',
+      title: '신원 인증',
+      subtitle: verificationDisplay.description,
+      onPress: () => (_navigation as any).navigate('IdentityVerification'),
+      color: '#3F51B5',
+    }] : []),
     {
       icon: '🚴',
       title: '배송 내역',
@@ -510,7 +532,7 @@ export default function ProfileScreen({ navigation: _navigation }: Props) {
         onPress: () => (_navigation as any).navigate('BadgeCollection'),
         color: '#9C27B0',
       },
-      ...(user.role !== UserRole.GILLER && user.gillerApplicationStatus !== 'pending' ? [{
+      ...(canApplyGiller ? [{
         icon: '🚀',
         title: '길러 신청',
         subtitle: '배송 활동을 시작하고 싶으신가요?',
@@ -528,7 +550,28 @@ export default function ProfileScreen({ navigation: _navigation }: Props) {
     ];
 
     if (currentRole === UserRole.GLER) return gllerItems;
-    if (currentRole === UserRole.GILLER) return gillerItems;
+    if (currentRole === UserRole.GILLER) {
+      if (!canAccessGiller) {
+        return [
+          ...(needsVerification ? [{
+            icon: '🪪',
+            title: '신원 인증',
+            subtitle: verificationDisplay.description,
+            onPress: () => (_navigation as any).navigate('IdentityVerification'),
+            color: '#3F51B5',
+          }] : []),
+          ...(canApplyGiller ? [{
+            icon: '🚀',
+            title: '길러 신청',
+            subtitle: '배송 활동을 시작하고 싶으신가요?',
+            onPress: () => (_navigation as any).navigate('GillerApply'),
+            color: '#FF5722',
+          }] : []),
+          ...commonItems,
+        ];
+      }
+      return gillerItems;
+    }
     return commonItems;
   };
 

@@ -260,6 +260,17 @@ service cloud.firestore {
       allow delete: if false;
     }
 
+    match /non_subway_lockers/{lockerId} {
+      // 읽기: 인증된 사용자
+      allow read: if isAuthenticated();
+
+      // 쓰기: 시스템만 (Admin SDK)
+      allow write: if false;
+
+      // 삭제: 시스템만
+      allow delete: if false;
+    }
+
     // ==================== Auctions Collection ====================
 
     match /auctions/{auctionId} {

@@ -149,6 +149,10 @@ export default function RequestsScreen({ navigation }: Props) {
         return '#AB47BC'; // Purple
       case 'arrived':
         return '#66BB6A'; // Green
+      case 'at_locker':
+        return '#7CB342'; // Green
+      case 'delivered':
+        return '#8BC34A'; // Light Green
       case 'completed':
         return '#4CAF50'; // Dark Green
       case 'cancelled':
@@ -170,6 +174,10 @@ export default function RequestsScreen({ navigation }: Props) {
         return '배송 중';
       case 'arrived':
         return '도착 완료';
+      case 'at_locker':
+        return '사물함 보관 완료';
+      case 'delivered':
+        return '수령 확인 대기';
       case 'completed':
         return '배송 완료';
       case 'cancelled':

@@ -75,6 +75,7 @@ export interface Locker {
   status: LockerStatus;
   qrCode: string;
   accessMethod: 'qr' | 'nfc' | 'pin' | 'app';
+  isSubway?: boolean;
 }
 
 /**

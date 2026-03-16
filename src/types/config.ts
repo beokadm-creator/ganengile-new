@@ -37,6 +37,14 @@ export interface Station {
   isActive: boolean;
   region: string;
   priority: number;
+  kric?: {
+    stationCode?: string;
+    lineCode?: string;
+    railOprIsttCd?: string;
+  };
+  fare?: {
+    stationCode?: string;
+  };
   createdAt: Date;
   updatedAt: Date;
 }

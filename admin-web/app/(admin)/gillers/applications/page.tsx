@@ -11,6 +11,23 @@ interface GillerApplication {
   routeDescription?: string;
   idCardUrl?: string;
   selfIntroduction?: string;
+  verificationStatus?: string;
+  passAuthData?: {
+    name?: string;
+    birthday?: string;
+    testMode?: boolean;
+  };
+  bankAccount?: {
+    bankName?: string;
+    accountNumber?: string;
+    accountHolder?: string;
+  };
+  activeDays?: {
+    weekdays?: boolean;
+    saturday?: boolean;
+    sunday?: boolean;
+  };
+  activeTime?: string;
   status: string;
   createdAt: { seconds: number } | string;
   adminNote?: string;
@@ -43,11 +60,16 @@ export default function GillerApplicationsPage() {
     if (!selected) return;
     setProcessing(true);
     try {
-      await fetch('/api/admin/gillers', {
+      const res = await fetch('/api/admin/gillers', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ applicationId: selected.id, action, note }),
       });
+      const json = await res.json();
+      if (!res.ok) {
+        alert(json.error || '처리 중 오류가 발생했습니다.');
+        return;
+      }
       setSelected(null);
       setNote('');
       await loadData(tab);
@@ -100,6 +122,7 @@ export default function GillerApplicationsPage() {
                 <th className="px-4 py-3 text-left">운행 노선</th>
                 <th className="px-4 py-3 text-left">신청일</th>
                 <th className="px-4 py-3 text-left">상태</th>
+                <th className="px-4 py-3 text-left">신원 인증</th>
                 {tab === 'pending' && <th className="px-4 py-3 text-left">액션</th>}
               </tr>
             </thead>
@@ -113,6 +136,11 @@ export default function GillerApplicationsPage() {
                   <td className="px-4 py-3">
                     <span className={`px-2 py-1 rounded-full text-xs font-medium ${statusColor(item.status)}`}>
                       {statusLabel(item.status)}
+                    </span>
+                  </td>
+                  <td className="px-4 py-3">
+                    <span className={`px-2 py-1 rounded-full text-xs font-medium ${statusColor(item.verificationStatus || 'not_submitted')}`}>
+                      {statusLabel(item.verificationStatus || 'not_submitted')}
                     </span>
                   </td>
                   {(tab === 'pending' || tab === 'in_review') && (
@@ -180,6 +208,37 @@ export default function GillerApplicationsPage() {
               </div>
 
               <div className="border-t pt-4 space-y-3">
+                <div className="bg-gray-50 rounded-lg p-4 text-sm space-y-2">
+                  <div className="flex justify-between">
+                    <span className="text-gray-500">신원 인증</span>
+                    <span className="font-medium">
+                      {statusLabel(selected.verificationStatus || 'not_submitted')}
+                    </span>
+                  </div>
+                  {selected.bankAccount && (
+                    <>
+                      <div className="flex justify-between">
+                        <span className="text-gray-500">은행</span>
+                        <span>{selected.bankAccount.bankName || '-'}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-gray-500">계좌번호</span>
+                        <span>{selected.bankAccount.accountNumber || '-'}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-gray-500">예금주</span>
+                        <span>{selected.bankAccount.accountHolder || '-'}</span>
+                      </div>
+                    </>
+                  )}
+                  {selected.passAuthData?.name && (
+                    <div className="flex justify-between">
+                      <span className="text-gray-500">PASS 이름</span>
+                      <span>{selected.passAuthData.name}</span>
+                    </div>
+                  )}
+                </div>
+
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">심사 메모</label>
                   <textarea
@@ -195,7 +254,7 @@ export default function GillerApplicationsPage() {
               <div className="flex gap-2 mt-4">
                 <button
                   onClick={() => handleAction('approve')}
-                  disabled={processing}
+                  disabled={processing || selected.verificationStatus !== 'approved'}
                   className="flex-1 bg-green-600 text-white py-2 rounded-lg text-sm font-semibold hover:bg-green-700 disabled:opacity-50"
                 >
                   ✅ 승인

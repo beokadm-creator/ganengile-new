@@ -210,4 +210,30 @@ export class DepositService {
     const snapshot = await getDocs(q);
     return snapshot.docs.map((doc) => doc.data() as Deposit);
   }
+
+  static async getDepositByRequestId(
+    requestId: string
+  ): Promise<Deposit | null> {
+    try {
+      const q = query(
+        collection(db, DEPOSITS_COLLECTION),
+        where('requestId', '==', requestId),
+        orderBy('createdAt', 'desc')
+      );
+
+      const snapshot = await getDocs(q);
+      if (snapshot.empty) {
+        return null;
+      }
+
+      const docSnap = snapshot.docs[0];
+      return {
+        depositId: docSnap.id,
+        ...(docSnap.data() as Deposit),
+      };
+    } catch (error) {
+      console.error('Error fetching deposit by request ID:', error);
+      return null;
+    }
+  }
 }

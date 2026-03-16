@@ -25,6 +25,12 @@ export enum DeliveryStatus {
   /** Courier arrived at destination station */
   ARRIVED = 'arrived',
 
+  /** Dropped off at locker */
+  AT_LOCKER = 'at_locker',
+
+  /** Delivered by courier, waiting for requester confirmation */
+  DELIVERED = 'delivered',
+
   /** Delivery completed */
   COMPLETED = 'completed',
 

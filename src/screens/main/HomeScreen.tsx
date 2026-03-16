@@ -24,6 +24,7 @@ import type { MainStackNavigationProp } from '../../types/navigation';
 import type { User } from '../../types/user';
 import type { Station } from '../../types/config';
 import { UserRole } from '../../types/user';
+import { PASS_TEST_MODE } from '../../config/feature-flags';
 
 // 웹에서는 아이콘 대신 텍스트 라벨 사용
 const IconLabel = ({ name, label }: { name: string; label: string }) => {
@@ -107,6 +108,10 @@ export default function HomeScreen({ navigation }: { navigation: MainStackNaviga
     setStationModalVisible(false);
   };
 
+  const canAccessGiller =
+    PASS_TEST_MODE ||
+    (user?.gillerApplicationStatus === 'approved' && user?.isVerified);
+
   return (
     <ScrollView
       style={styles.container}
@@ -165,7 +170,7 @@ export default function HomeScreen({ navigation }: { navigation: MainStackNaviga
           </View>
 
           {/* Role-specific content */}
-          {!currentRole || currentRole === UserRole.GLER ? (
+          {!currentRole || currentRole === UserRole.GLER || (!canAccessGiller && currentRole === UserRole.GILLER) ? (
             <GllerDashboard
               user={user}
               stats={stats}

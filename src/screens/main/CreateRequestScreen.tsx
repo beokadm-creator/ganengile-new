@@ -19,7 +19,7 @@ import {
   Platform,
 } from 'react-native';
 import { StackNavigationProp } from '@react-navigation/stack';
-import { getAllStations, getTravelTimeConfig } from '../../services/config-service';
+import { getAllStations, getTravelTimeConfig, getStationConfig } from '../../services/config-service';
 import { createRequest } from '../../services/request-service';
 import {
   calculatePhase1DeliveryFee,
@@ -28,6 +28,7 @@ import {
   type DeliveryFeeBreakdown,
   type PackageSizeType,
 } from '../../services/pricing-service';
+import { getRealtimeFare } from '../../services/fare-service';
 import { requireUserId } from '../../services/firebase';
 import { Colors, Typography, Spacing, BorderRadius } from '../../theme';
 import type { Station } from '../../types/config';
@@ -174,10 +175,12 @@ export default function CreateRequestScreen({ navigation }: Props) {
     distanceFee: number;
     sizeFee: number;
     weightFee: number;
+    publicFare?: number;
     serviceFee: number;
     vat: number;
     totalFee: number;
     estimatedTime: number;
+    stationCount: number;
     urgencyFee?: number;
     urgencySurcharge?: number;
     manualAdjustment?: number;
@@ -244,6 +247,8 @@ export default function CreateRequestScreen({ navigation }: Props) {
   useEffect(() => {
     if (pickupStation && deliveryStation && weight) {
       calculateFee();
+    } else if (!weight || !pickupStation || !deliveryStation) {
+      setDeliveryFee(null);
     }
   }, [pickupStation, deliveryStation, packageSize, weight, urgency, manualAdjustment]);
 
@@ -344,6 +349,23 @@ export default function CreateRequestScreen({ navigation }: Props) {
     return null;
   };
 
+  const sanitizeWeightInput = (input: string) => {
+    const normalized = input.replace(/,/g, '.').replace(/[^0-9.]/g, '');
+    if (!normalized) return '';
+    const firstDot = normalized.indexOf('.');
+    let value = normalized;
+    if (firstDot >= 0) {
+      const head = normalized.slice(0, firstDot + 1);
+      const tail = normalized.slice(firstDot + 1).replace(/\./g, '');
+      const [intPart, decPart] = `${head}${tail}`.split('.');
+      value = decPart ? `${intPart}.${decPart.slice(0, 2)}` : `${intPart}.`;
+    }
+    if (value.startsWith('.')) {
+      value = `0${value}`;
+    }
+    return value;
+  };
+
   const calculateFee = async () => {
     if (!pickupStation || !deliveryStation || !weight) {
       console.log('Missing required data for fee calculation:', {
@@ -395,14 +417,38 @@ export default function CreateRequestScreen({ navigation }: Props) {
         }
       }
 
-      const weightValue = parseFloat(weight) || 1;
+      const weightRaw = parseFloat(weight);
+      const weightValue = Number.isFinite(weightRaw) ? weightRaw : 0;
+      if (weightValue <= 0) {
+        setDeliveryFee(null);
+        return;
+      }
       console.log('Calculating fee with:', { stationCount, weight: weightValue, packageSize, urgency });
+
+      let publicFare = 0;
+      try {
+        const [pickupConfig, deliveryConfig] = await Promise.all([
+          pickupStation.stationId ? getStationConfig(pickupStation.stationId) : null,
+          deliveryStation.stationId ? getStationConfig(deliveryStation.stationId) : null,
+        ]);
+        const dptreStnCd = pickupConfig?.fare?.stationCode;
+        const avrlStnCd = deliveryConfig?.fare?.stationCode;
+        if (dptreStnCd && avrlStnCd) {
+          const fareResult = await getRealtimeFare(dptreStnCd, avrlStnCd);
+          if (fareResult?.fare) {
+            publicFare = fareResult.fare;
+          }
+        }
+      } catch (error) {
+        console.log('Fare API not available, using 0 fare:', error);
+      }
 
       const pricingParams: Phase1PricingParams = {
         stationCount,
         weight: weightValue,
         packageSize: packageSize as PackageSizeType,
         urgency,
+        publicFare,
       };
 
       const feeResult = calculatePhase1DeliveryFee(pricingParams);
@@ -413,20 +459,28 @@ export default function CreateRequestScreen({ navigation }: Props) {
         distanceFee: feeResult.distanceFee,
         sizeFee: feeResult.sizeFee,
         weightFee: feeResult.weightFee,
+        publicFare: feeResult.publicFare,
         serviceFee: feeResult.serviceFee,
         vat: feeResult.vat,
         totalFee: feeResult.totalFee,
         estimatedTime: travelTimeMinutes,
+        stationCount,
+        urgencyFee: feeResult.urgencySurcharge,
         urgencySurcharge: feeResult.urgencySurcharge,
         manualAdjustment: 0,
-        gillerFee: feeResult.gillerFee,
-        platformFee: feeResult.platformFee,
+        gillerFee: feeResult.breakdown.gillerFee,
+        platformFee: feeResult.breakdown.platformFee,
       });
     } catch (error) {
       console.error('Error calculating delivery fee:', error);
 
       // 에러 발생 시 기본값으로 계산
-      const weightValue = parseFloat(weight) || 1;
+      const weightRaw = parseFloat(weight);
+      const weightValue = Number.isFinite(weightRaw) ? weightRaw : 0;
+      if (weightValue <= 0) {
+        setDeliveryFee(null);
+        return;
+      }
       const stationCount = 5;
       const pricingParams: Phase1PricingParams = {
         stationCount,
@@ -442,15 +496,17 @@ export default function CreateRequestScreen({ navigation }: Props) {
         distanceFee: feeResult.distanceFee,
         sizeFee: feeResult.sizeFee,
         weightFee: feeResult.weightFee,
+        publicFare: feeResult.publicFare,
         serviceFee: feeResult.serviceFee,
         vat: feeResult.vat,
         totalFee: feeResult.totalFee,
         estimatedTime: 30,
+        stationCount,
         urgencyFee: feeResult.urgencySurcharge,
         urgencySurcharge: feeResult.urgencySurcharge,
         manualAdjustment: 0,
-        gillerFee: feeResult.gillerFee,
-        platformFee: feeResult.platformFee,
+        gillerFee: feeResult.breakdown.gillerFee,
+        platformFee: feeResult.breakdown.platformFee,
       });
     }
   };
@@ -686,6 +742,7 @@ export default function CreateRequestScreen({ navigation }: Props) {
             sizeFee: deliveryFee.sizeFee,
             weightFee: deliveryFee.weightFee,
             urgencySurcharge: deliveryFee.urgencySurcharge || 0,
+            publicFare: deliveryFee.publicFare || 0,
             manualAdjustment: deliveryFee.manualAdjustment || 0,
             serviceFee: deliveryFee.serviceFee,
             vat: deliveryFee.vat,
@@ -778,7 +835,7 @@ export default function CreateRequestScreen({ navigation }: Props) {
       {pickupStation && deliveryStation && deliveryFee && (
         <View style={styles.infoCard}>
           <Text style={styles.infoText}>
-            예상 소요시간: 약 {deliveryFee.estimatedTime}분
+            예상 소요시간: 약 {deliveryFee.estimatedTime}분 · 기준 역수: {deliveryFee.stationCount}개
           </Text>
         </View>
       )}
@@ -819,8 +876,14 @@ export default function CreateRequestScreen({ navigation }: Props) {
       <TextInput
         style={[styles.input, errors.weight && styles.inputError]}
         value={weight}
-        onChangeText={setWeight}
-        placeholder="예: 3.5"
+        onChangeText={(text) => {
+          const sanitized = sanitizeWeightInput(text);
+          setWeight(sanitized);
+          if (errors.weight) {
+            setErrors(prev => ({ ...prev, weight: '' }));
+          }
+        }}
+        placeholder="예: 3.5 (최대 30kg)"
         keyboardType="decimal-pad"
         accessibilityLabel="무게 입력"
         accessibilityHint="물건의 무게를 킬로그램 단위로 입력하세요"
@@ -944,8 +1007,13 @@ export default function CreateRequestScreen({ navigation }: Props) {
               <Text style={styles.feeBreakdownText}>
                 기본: {deliveryFee.baseFee.toLocaleString()}원
               </Text>
+              {deliveryFee.publicFare && deliveryFee.publicFare > 0 && (
+                <Text style={styles.feeBreakdownText}>
+                  운임: {deliveryFee.publicFare.toLocaleString()}원
+                </Text>
+              )}
               <Text style={styles.feeBreakdownText}>
-                거리: {deliveryFee.distanceFee.toLocaleString()}원
+                거리: {deliveryFee.distanceFee.toLocaleString()}원 (기준 {deliveryFee.stationCount}개 역)
               </Text>
               <Text style={styles.feeBreakdownText}>
                 무게: {deliveryFee.weightFee.toLocaleString()}원
@@ -959,7 +1027,13 @@ export default function CreateRequestScreen({ navigation }: Props) {
                 </Text>
               )}
               <Text style={styles.feeBreakdownText}>
+                서비스 수수료: {deliveryFee.serviceFee.toLocaleString()}원
+              </Text>
+              <Text style={styles.feeBreakdownText}>
                 VAT: {deliveryFee.vat.toLocaleString()}원
+              </Text>
+              <Text style={styles.feeBreakdownNote}>
+                합계 = (기본+거리+무게+크기+긴급+운임+수수료) + VAT
               </Text>
             </View>
             <View style={styles.gillerBreakdownPreview}>
@@ -973,6 +1047,9 @@ export default function CreateRequestScreen({ navigation }: Props) {
             </View>
             <Text style={styles.feePreviewNote}>
               * 이 요금은 초기 협상금액이며, 최종 금액은 배송 완료 후 확정됩니다.
+            </Text>
+            <Text style={styles.feePreviewNote}>
+              * 최소 3,000원 / 최대 8,000원 범위가 적용됩니다.
             </Text>
           </View>
         </>
@@ -1123,13 +1200,22 @@ export default function CreateRequestScreen({ navigation }: Props) {
             </View>
             <View style={styles.feeBreakdown}>
               <Text style={styles.feeItem}>기본: {deliveryFee.baseFee.toLocaleString()}원</Text>
-              <Text style={styles.feeItem}>거리: {deliveryFee.distanceFee.toLocaleString()}원</Text>
+              {deliveryFee.publicFare && deliveryFee.publicFare > 0 && (
+                <Text style={styles.feeItem}>운임: {deliveryFee.publicFare.toLocaleString()}원</Text>
+              )}
+              <Text style={styles.feeItem}>
+                거리: {deliveryFee.distanceFee.toLocaleString()}원 (기준 {deliveryFee.stationCount}개 역)
+              </Text>
               <Text style={styles.feeItem}>무게: {deliveryFee.weightFee.toLocaleString()}원</Text>
               <Text style={styles.feeItem}>크기: {deliveryFee.sizeFee.toLocaleString()}원</Text>
               {deliveryFee.urgencyFee && deliveryFee.urgencyFee > 0 && (
                 <Text style={styles.feeItemUrgency}>긴급 surcharge: +{deliveryFee.urgencyFee.toLocaleString()}원</Text>
               )}
+              <Text style={styles.feeItem}>서비스 수수료: {deliveryFee.serviceFee.toLocaleString()}원</Text>
               <Text style={styles.feeItem}>VAT: {deliveryFee.vat.toLocaleString()}원</Text>
+              <Text style={styles.feeItemNote}>
+                합계 = (기본+거리+무게+크기+긴급+운임+수수료) + VAT
+              </Text>
               <View style={styles.gillerBreakdownSummary}>
                 <Text style={styles.gillerBreakdownTitle}>정산 내역 (참고)</Text>
                 <Text style={styles.gillerBreakdownText}>
@@ -1685,6 +1771,11 @@ function createStyles(
       fontSize: typo.fontSize.sm,
       marginBottom: space.xs,
     },
+    feeItemNote: {
+      color: colors.gray500,
+      fontSize: typo.fontSize.xs,
+      marginTop: space.xs,
+    },
     feeItemUrgency: {
       color: colors.accent,
       fontSize: typo.fontSize.sm,
@@ -1922,6 +2013,11 @@ function createStyles(
       fontSize: typo.fontSize.sm,
       color: colors.textSecondary,
       marginBottom: space.xs,
+    },
+    feeBreakdownNote: {
+      fontSize: typo.fontSize.xs,
+      color: colors.gray500,
+      marginTop: space.xs,
     },
     feeBreakdownUrgency: {
       fontSize: typo.fontSize.sm,

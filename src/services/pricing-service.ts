@@ -29,6 +29,8 @@ export interface Phase1PricingParams {
   packageSize?: PackageSizeType;
   /** 긴급도 (기본값: normal) */
   urgency?: 'normal' | 'fast' | 'urgent';
+  /** 공공요금(지하철 운임 등) */
+  publicFare?: number;
 }
 
 /**
@@ -45,6 +47,8 @@ export interface DeliveryFeeBreakdown {
   sizeFee: number;
   /** 긴급 surcharge */
   urgencySurcharge: number;
+  /** 공공요금 (지하철 운임 등) */
+  publicFare: number;
   /** 서비스 수수료 (15%) */
   serviceFee: number;
   /** 부가세 제외 합계 */
@@ -111,6 +115,7 @@ export function calculatePhase1DeliveryFee(params: Phase1PricingParams): Deliver
     weight = 1,
     packageSize = 'small',
     urgency = 'normal',
+    publicFare = 0,
   } = params;
 
   // 1. 기본 배송비
@@ -133,7 +138,7 @@ export function calculatePhase1DeliveryFee(params: Phase1PricingParams): Deliver
   const serviceFee = calculateServiceFee(feeBeforeService, PRICING_CONFIG.PLATFORM_FEE_RATE);
 
   // 7. 부가세 (VAT 10%)
-  const subtotal = baseFee + distanceFee + weightFee + sizeFee + urgencySurcharge + serviceFee;
+  const subtotal = baseFee + distanceFee + weightFee + sizeFee + urgencySurcharge + serviceFee + publicFare;
   const vat = Math.round(subtotal * PRICING_CONFIG.VAT_RATE);
 
   // 8. 최종 배송비
@@ -159,6 +164,7 @@ export function calculatePhase1DeliveryFee(params: Phase1PricingParams): Deliver
     weightFee,
     sizeFee,
     urgencySurcharge,
+    publicFare,
     serviceFee,
     subtotal,
     vat,
@@ -355,4 +361,3 @@ export function isMaxFeeReached(params: Phase1PricingParams): boolean {
   const result = calculatePhase1DeliveryFee(params);
   return result.totalFee >= PRICING_CONFIG.MAX_FEE;
 }
-
