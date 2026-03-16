@@ -65,11 +65,11 @@ export default function GillerOnboardingScreen({ navigation, route }: Props) {
     {
       title: '얼마나 하나요?',
       emoji: '💵',
-      description: '거리와 시간대에 따라\n다르지만 평균 3,000~8,000원입니다.',
+      description: '거리와 시간대에 따라\n다르지만 평균 3,000~10,000원입니다.',
       highlights: [
         { label: '최소 요금', value: '3,000원' },
         { label: '평균 요금', value: '5,000원' },
-        { label: '최대 요금', value: '8,000원' },
+        { label: '최대 요금', value: '10,000원' },
       ],
     },
     {

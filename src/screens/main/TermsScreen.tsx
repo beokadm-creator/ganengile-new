@@ -4,15 +4,17 @@
  * 이용약관, 개인정보처리방침, 보증금 정책 등
  */
 
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   View,
   Text,
   StyleSheet,
   ScrollView,
   TouchableOpacity,
+  ActivityIndicator,
 } from 'react-native';
 import { StackNavigationProp } from '@react-navigation/stack';
+import { getPolicyConfigs } from '../../services/config-service';
 
 type NavigationProp = StackNavigationProp<any>;
 
@@ -27,8 +29,8 @@ interface Policy {
   effectiveDate: string;
 }
 
-// 더미데이터
-const policies: Policy[] = [
+// 기본값 (config_policies가 비어있을 때만 사용)
+const defaultPolicies: Policy[] = [
   {
     id: 'terms',
     title: '이용약관',
@@ -159,7 +161,42 @@ const policies: Policy[] = [
 ];
 
 export default function TermsScreen({ navigation: _navigation }: Props) {
-  const [selectedPolicy, setSelectedPolicy] = useState<Policy>(policies[0]);
+  const [policies, setPolicies] = useState<Policy[]>(defaultPolicies);
+  const [selectedPolicy, setSelectedPolicy] = useState<Policy>(defaultPolicies[0]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const loadPolicies = async () => {
+      try {
+        const configs = await getPolicyConfigs();
+        if (configs.length > 0) {
+          const loaded = configs.map((item) => ({
+            id: item.policyId,
+            title: item.title,
+            content: item.content,
+            effectiveDate: item.effectiveDate,
+          }));
+          setPolicies(loaded);
+          setSelectedPolicy(loaded[0]);
+        }
+      } catch (error) {
+        console.error('약관 config 로드 실패, 기본값 사용:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    void loadPolicies();
+  }, []);
+
+  if (loading) {
+    return (
+      <View style={styles.loadingContainer}>
+        <ActivityIndicator size="large" color="#00BCD4" />
+        <Text style={styles.loadingText}>약관을 불러오는 중입니다...</Text>
+      </View>
+    );
+  }
 
   return (
     <View style={styles.container}>
@@ -252,6 +289,17 @@ export default function TermsScreen({ navigation: _navigation }: Props) {
 }
 
 const styles = StyleSheet.create({
+  loadingContainer: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#f5f5f5',
+  },
+  loadingText: {
+    marginTop: 12,
+    color: '#666',
+    fontSize: 14,
+  },
   container: {
     flex: 1,
     backgroundColor: '#f5f5f5',

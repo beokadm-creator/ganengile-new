@@ -45,6 +45,7 @@ export enum PackageWeight {
 export interface PackageInfo {
   size: PackageSize;
   weight: PackageWeight;
+  weightKg?: number;    // 입력한 실제 무게(kg)
   description: string;  // 내역물 설명
   imageUrl?: string;    // 물품 사진 (선택)
 }

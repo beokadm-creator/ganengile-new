@@ -15,7 +15,6 @@ import {
   Alert,
   ScrollView,
   Modal,
-  Switch,
 } from 'react-native';
 import { StackNavigationProp } from '@react-navigation/stack';
 import {
@@ -219,7 +218,7 @@ export default function RouteMatchingTab({ navigation }: Props) {
   };
 
   // 배지 색상
-  const renderMatchScoreBadge = (score: RouteMatchScore) => (
+  const _renderMatchScoreBadge = (score: RouteMatchScore) => (
     <View style={[styles.matchScoreBadge, { backgroundColor: getMatchScoreColor(score.score) }]}>
       <Text style={styles.matchScoreText}>{score.score}%</Text>
       <Text style={styles.matchScoreLabel}>매칭</Text>

@@ -7,6 +7,8 @@
     "android": "expo run:android",
     "ios": "expo run:ios",
     "web": "expo start --web",
+    "web:export": "expo export --platform web && node scripts/postexport-web-assets.mjs",
+    "web:deploy": "npm run web:export && firebase deploy --only hosting --project ganengile",
     "init-config": "ts-node scripts/init-config.ts",
     "test": "jest",
     "test:watch": "jest --watch",

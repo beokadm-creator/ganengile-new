@@ -8,6 +8,7 @@ const NAV = [
   { href: '/users', label: '👥 사용자 관리' },
   { href: '/gillers/applications', label: '🔍 길러 심사', indent: true },
   { href: '/verifications', label: '🪪 신원 인증', indent: true },
+  { href: '/integrations/identity', label: '🔐 CI 인증 설정', indent: true },
   { href: '/deliveries', label: '📦 배송 관리' },
   { href: '/points/withdrawals', label: '💸 출금 처리', badge: 'hot' },
   { href: '/points/balances', label: '💰 포인트 잔액' },

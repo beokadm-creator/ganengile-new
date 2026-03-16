@@ -10,6 +10,8 @@ interface Stats {
   activeDeliveries: number;
   todayRequests: number;
   totalUsers: number;
+  fareCount: number;
+  fareLatestUpdatedAt: string | null;
 }
 
 function StatCard({ label, value, href, color }: { label: string; value: number; href?: string; color: string }) {
@@ -52,6 +54,9 @@ export default function DashboardPage() {
 
   const now = new Date();
   const dateStr = now.toLocaleDateString('ko-KR', { year: 'numeric', month: 'long', day: 'numeric', weekday: 'long' });
+  const fareUpdatedLabel = stats?.fareLatestUpdatedAt
+    ? new Date(stats.fareLatestUpdatedAt).toLocaleString('ko-KR')
+    : '없음';
 
   return (
     <div className="p-6">
@@ -85,6 +90,19 @@ export default function DashboardPage() {
             <StatCard label="대기 출금 신청" value={stats.pendingWithdrawals} href="/points/withdrawals" color={stats.pendingWithdrawals > 0 ? 'text-red-600' : 'text-gray-400'} />
             <StatCard label="미처리 분쟁" value={stats.pendingDisputes} href="/disputes" color={stats.pendingDisputes > 0 ? 'text-red-600' : 'text-gray-400'} />
             <StatCard label="길러 심사 대기" value={stats.pendingGillerApps} href="/gillers/applications" color={stats.pendingGillerApps > 0 ? 'text-yellow-600' : 'text-gray-400'} />
+          </div>
+
+          <h2 className="text-sm font-semibold text-gray-700 mb-2">운임 캐시 모니터링</h2>
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-6">
+            <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-5">
+              <p className="text-sm text-gray-500 mb-1">config_fares 총 건수</p>
+              <p className="text-3xl font-bold text-emerald-600">{stats.fareCount.toLocaleString()}</p>
+            </div>
+            <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-5">
+              <p className="text-sm text-gray-500 mb-1">최신 갱신 시각</p>
+              <p className="text-lg font-semibold text-gray-800">{fareUpdatedLabel}</p>
+              <p className="text-xs text-gray-400 mt-1">기준: config_fares.updatedAt</p>
+            </div>
           </div>
 
           {/* Quick Links */}

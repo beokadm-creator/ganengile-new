@@ -5,7 +5,7 @@
  */
 
 import React from 'react';
-import { View, StyleSheet, Dimensions, Platform } from 'react-native';
+import { View, StyleSheet, Platform } from 'react-native';
 
 interface DeviceFrameProps {
   children: React.ReactNode;
@@ -193,14 +193,10 @@ export const DeviceFrame: React.FC<DeviceFrameProps> = ({ children }) => {
             💸 합리적인 가격
           </h3>
           <div style={{ fontSize: '14px', color: '#E0E0E0', lineHeight: '22px', whiteSpace: 'pre-line' }}>
-            {'• 기본요금: 3,500원\n• 역 개수 기반 거리료\n• 서비스 수수료 15% 포함'}
+            {'• 기본요금: 2,000원\n• 역 개수 기반 거리료\n• 플랫폼 수수료 10% 기준'}
           </div>
         </div>
       </div>
     </div>
   );
 };
-
-const styles = StyleSheet.create({
-  // Styles are only used on native
-});

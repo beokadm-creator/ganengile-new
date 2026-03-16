@@ -17,7 +17,6 @@ import {
   limit,
   serverTimestamp,
   Timestamp,
-  runTransaction,
   onSnapshot,
 } from 'firebase/firestore';
 import { db } from './firebase';
@@ -25,6 +24,7 @@ import { getTravelTimeConfig } from './config-service';
 import { processMatchingForRequest } from './matching-service';
 import {
   calculatePhase1DeliveryFee,
+  PRICING_POLICY,
   type Phase1PricingParams,
   type PackageSizeType,
 } from './pricing-service';
@@ -642,10 +642,10 @@ export async function calculateDeliveryFee(
     const vat = Math.round(subtotal * 0.1);
     let totalFee = subtotal + vat;
 
-    if (totalFee < 3000) totalFee = 3000;
-    if (totalFee > 8000) totalFee = 8000;
+    if (totalFee < PRICING_POLICY.MIN_FEE) totalFee = PRICING_POLICY.MIN_FEE;
+    if (totalFee > PRICING_POLICY.MAX_FEE) totalFee = PRICING_POLICY.MAX_FEE;
 
-    const platformFee = Math.round(totalFee * 0.15);
+    const platformFee = Math.round(totalFee * PRICING_POLICY.PLATFORM_FEE_RATE);
     const gillerFee = totalFee - platformFee;
 
     return {

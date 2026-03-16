@@ -31,6 +31,7 @@ interface GillerApplication {
   status: string;
   createdAt: { seconds: number } | string;
   adminNote?: string;
+  isSynthetic?: boolean;
 }
 
 export default function GillerApplicationsPage() {
@@ -40,14 +41,22 @@ export default function GillerApplicationsPage() {
   const [selected, setSelected] = useState<GillerApplication | null>(null);
   const [note, setNote] = useState('');
   const [processing, setProcessing] = useState(false);
+  const [errorMessage, setErrorMessage] = useState('');
 
   async function loadData(status: string) {
     setLoading(true);
     try {
       const res = await fetch(`/api/admin/gillers?status=${status}`);
       const json = await res.json();
+      if (!res.ok) {
+        setErrorMessage(json?.error || '목록 조회에 실패했습니다.');
+        setItems([]);
+        return;
+      }
+      setErrorMessage('');
       setItems(json.items ?? []);
     } catch {
+      setErrorMessage('목록 조회 중 네트워크 오류가 발생했습니다.');
       setItems([]);
     } finally {
       setLoading(false);
@@ -88,8 +97,8 @@ export default function GillerApplicationsPage() {
   return (
     <div className="p-6">
       <div className="mb-6">
-        <h1 className="text-2xl font-bold">🔍 길러 신청 심사</h1>
-        <p className="text-gray-500 text-sm mt-1">길러(배달원) 신청을 검토하고 승인/반려합니다.</p>
+        <h1 className="text-2xl font-bold">🔍 길러 승급 요청 목록</h1>
+        <p className="text-gray-500 text-sm mt-1">길러 승급 요청(신청)을 검토하고 승인/반려합니다.</p>
       </div>
 
       <div className="flex gap-2 mb-4">
@@ -105,6 +114,12 @@ export default function GillerApplicationsPage() {
           </button>
         ))}
       </div>
+
+      {errorMessage && (
+        <div className="mb-4 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+          {errorMessage}
+        </div>
+      )}
 
       {loading ? (
         <div className="flex items-center justify-center py-20 text-gray-400">로딩중...</div>
@@ -145,12 +160,16 @@ export default function GillerApplicationsPage() {
                   </td>
                   {(tab === 'pending' || tab === 'in_review') && (
                     <td className="px-4 py-3">
-                      <button
-                        onClick={() => setSelected(item)}
-                        className="bg-indigo-600 text-white px-3 py-1.5 rounded-md text-xs font-medium hover:bg-indigo-700"
-                      >
-                        심사하기
-                      </button>
+                      {item.isSynthetic ? (
+                        <span className="text-xs text-gray-500">원본 신청서 없음</span>
+                      ) : (
+                        <button
+                          onClick={() => setSelected(item)}
+                          className="bg-indigo-600 text-white px-3 py-1.5 rounded-md text-xs font-medium hover:bg-indigo-700"
+                        >
+                          심사하기
+                        </button>
+                      )}
                     </td>
                   )}
                 </tr>

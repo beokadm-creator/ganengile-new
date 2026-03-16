@@ -12,6 +12,7 @@ import {
   ScrollView,
   Alert,
   ActivityIndicator,
+  Platform,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useRoute, useNavigation } from '@react-navigation/native';
@@ -226,12 +227,17 @@ export default function EditRouteScreen() {
       setSaving(true);
       const userId = await requireUserId();
 
-      await updateRoute(routeId, userId, {
+      const updatedRoute = await updateRoute(routeId, userId, {
         startStation,
         endStation,
         departureTime,
         daysOfWeek: selectedDays,
       });
+
+      if (!updatedRoute) {
+        Alert.alert('저장 실패', '동선 수정 권한이 없거나 동선을 찾을 수 없습니다.');
+        return;
+      }
 
       Alert.alert(
         '✅ 동선 수정 완료',
@@ -259,6 +265,42 @@ export default function EditRouteScreen() {
     if (!originalRoute) return;
 
     const routeName = `${originalRoute.startStation.stationName} → ${originalRoute.endStation.stationName}`;
+    const executeDelete = async () => {
+      try {
+        const userId = await requireUserId();
+        const { deleteRoute } = await import('../../services/route-service');
+        const deleted = await deleteRoute(routeId, userId);
+
+        if (!deleted) {
+          Alert.alert('삭제 실패', '권한이 없거나 이미 삭제된 동선입니다.');
+          return;
+        }
+
+        Alert.alert('삭제 완료', '동선이 삭제되었습니다.', [
+          {
+            text: '확인',
+            onPress: () => navigation.goBack(),
+          },
+        ]);
+      } catch (error) {
+        console.error('동선 삭제 실패:', error);
+        Alert.alert(
+          '삭제 실패',
+          '동선 삭제에 실패했습니다. 다시 시도해주세요.',
+          [{ text: '확인' }]
+        );
+      }
+    };
+
+    if (Platform.OS === 'web') {
+      const confirmed = window.confirm(
+        `${routeName}\n\n이 동선을 삭제하시겠습니까?\n삭제된 동선은 복구할 수 없습니다.`
+      );
+      if (confirmed) {
+        void executeDelete();
+      }
+      return;
+    }
 
     Alert.alert(
       '동선 삭제',
@@ -268,29 +310,8 @@ export default function EditRouteScreen() {
         {
           text: '삭제',
           style: 'destructive',
-          onPress: async () => {
-            try {
-              const userId = await requireUserId();
-              const { deleteRoute } = await import('../../services/route-service');
-              await deleteRoute(routeId, userId);
-              Alert.alert(
-                '삭제 완료',
-                '동선이 삭제되었습니다.',
-                [
-                  {
-                    text: '확인',
-                    onPress: () => navigation.goBack(),
-                  },
-                ]
-              );
-            } catch (error) {
-              console.error('동선 삭제 실패:', error);
-              Alert.alert(
-                '삭제 실패',
-                '동선 삭제에 실패했습니다. 다시 시도해주세요.',
-                [{ text: '확인' }]
-              );
-            }
+          onPress: () => {
+            void executeDelete();
           },
         },
       ]
@@ -407,7 +428,7 @@ export default function EditRouteScreen() {
 
         {/* 저장 버튼 */}
         <Button
-          title="저장하기"
+          title={hasChanges ? '변경사항 저장하기' : '변경사항 없음'}
           onPress={handleSave}
           loading={saving}
           disabled={saving || !hasChanges}
@@ -416,6 +437,11 @@ export default function EditRouteScreen() {
           fullWidth
           style={{ marginBottom: Spacing.md }}
         />
+        {!hasChanges && (
+          <Text style={styles.noChangesHint}>
+            수정한 내용이 있으면 저장 버튼이 활성화됩니다.
+          </Text>
+        )}
 
         {/* 삭제 버튼 */}
         <TouchableOpacity
@@ -585,5 +611,11 @@ const styles = StyleSheet.create({
     color: Colors.gray600,
     fontSize: Typography.fontSize.base,
     marginTop: Spacing.md,
+  },
+  noChangesHint: {
+    color: Colors.gray500,
+    fontSize: Typography.fontSize.sm,
+    marginBottom: Spacing.md,
+    textAlign: 'center',
   },
 });

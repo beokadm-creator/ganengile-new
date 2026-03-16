@@ -8,9 +8,6 @@ import { useFonts } from 'expo-font';
 import { Ionicons, MaterialIcons } from '@expo/vector-icons';
 import AppNavigator from './src/navigation/AppNavigator';
 
-// React Native Web imports for better web support
-import { gestureHandlerRootHOC } from 'react-native-gesture-handler';
-
 export default function App() {
   // 웹 환경에서는 폰트 로딩을 무시하고 바로 렌더링
   const [fontsLoaded] = useFonts({
@@ -34,7 +31,6 @@ export default function App() {
 
   // 웹에서는 화면 너비 확인
   const screenWidth = Dimensions.get('window').width;
-  const screenHeight = Dimensions.get('window').height;
   const isDesktop = screenWidth >= 768;
 
   if (!isDesktop) {
@@ -42,7 +38,7 @@ export default function App() {
     return <AppNavigator />;
   }
 
-  // PC 웹 - NavigationContainer 전체를 iPhone 프레임 안에 넣기
+  // PC 웹 - 모바일 미리보기 레이아웃 (노치 없는 풀스크린 목업)
   const appContent = <AppNavigator />;
 
   return (
@@ -89,13 +85,11 @@ export default function App() {
         </View>
       </View>
 
-      {/* iPhone 프레임 - 안에 AppNavigator 전체가 들어감 */}
-      <View style={styles.iphoneFrame}>
-        <View style={styles.notch} />
+      {/* 모바일 미리보기 프레임 */}
+      <View style={styles.previewFrame}>
         <View style={styles.screenContent}>
           {appContent}
         </View>
-        <View style={styles.homeIndicator} />
       </View>
 
       {/* 오른쪽 설명 영역 */}
@@ -141,11 +135,12 @@ const styles = StyleSheet.create({
   },
   desktopContainer: {
     width: '100%',
-    height: '100%',
+    minHeight: '100%',
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    padding: 40,
+    paddingVertical: 24,
+    paddingHorizontal: 40,
     gap: 60,
     backgroundColor: '#0f0f23',
   },
@@ -213,49 +208,26 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: '#B0BEC5',
   },
-  iphoneFrame: {
-    width: 600,
-    height: 1200,
-    backgroundColor: '#000000',
-    borderRadius: 55,
-    borderWidth: 14,
-    borderColor: '#2c2c2c',
+  previewFrame: {
+    width: 460,
+    height: 920,
+    backgroundColor: '#111827',
+    borderRadius: 34,
+    borderWidth: 8,
+    borderColor: '#1f2937',
     shadowColor: '#00BCD4',
-    shadowOffset: { width: 0, height: 25 },
-    shadowOpacity: 0.6,
-    shadowRadius: 40,
-    elevation: 60,
+    shadowOffset: { width: 0, height: 18 },
+    shadowOpacity: 0.35,
+    shadowRadius: 28,
+    elevation: 30,
     position: 'relative',
     overflow: 'hidden',
   },
-  notch: {
-    position: 'absolute',
-    top: 18,
-    left: '50%',
-    marginLeft: -82,
-    width: 164,
-    height: 48,
-    backgroundColor: '#000000',
-    borderRadius: 28,
-    zIndex: 10,
-  },
   screenContent: {
     flex: 1,
-    marginTop: 14,
-    marginBottom: 14,
     backgroundColor: '#FFFFFF',
     position: 'relative',
-  },
-  homeIndicator: {
-    position: 'absolute',
-    bottom: 12,
-    left: '50%',
-    marginLeft: -95,
-    width: 190,
-    height: 8,
-    backgroundColor: '#FFFFFF',
-    borderRadius: 5,
-    zIndex: 10,
+    paddingBottom: 10,
   },
   infoSection: {
     width: 350,

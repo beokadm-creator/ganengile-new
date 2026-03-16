@@ -104,7 +104,7 @@ export const setupFirebaseCrashlytics = () => {
   if (__DEV__) return;
 
   // @ts-expect-error - Module may not exist
-  // eslint-disable-next-line @typescript-eslint/no-require-imports
+   
   const crashlytics = require('@sentry/react-native');
 
   // 자동 크래시 리포트 활성화
@@ -148,7 +148,7 @@ export const runPostDeploymentChecks = async () => {
       name: 'Firebase 연결 확인',
       check: async () => {
         try {
-          // eslint-disable-next-line @typescript-eslint/no-require-imports
+           
           const firebase = require('firebase/app');
           await firebase.initializeApp();
           console.log('✅ Firebase connection OK');
@@ -181,7 +181,7 @@ export const runPostDeploymentChecks = async () => {
       name: 'FCM 토큰 확인',
       check: async () => {
         try {
-          // eslint-disable-next-line @typescript-eslint/no-require-imports
+           
           const messaging = require('firebase/messaging');
           const token = await messaging.getToken();
           if (token) {
@@ -250,7 +250,7 @@ export const trackDeploymentVersion = (version: string) => {
   if (__DEV__) return;
 
   // 배포 버전 저장
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+   
   const _deploymentKey = `deployment_${version}`;
   // @ts-expect-error - localStorage may not be defined in React Native
   const lastVersion = localStorage?.getItem('last_deployment_version');

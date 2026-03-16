@@ -42,6 +42,152 @@ import type {
 } from '../types/matching-extended';
 import type { Route, StationInfo } from '../types/route';
 
+function normalizeStationName(name?: string): string {
+  return (name || '').replace(/\s+/g, '').replace(/역$/, '').toLowerCase();
+}
+
+function namesLooselyEqual(a?: string, b?: string): boolean {
+  const na = normalizeStationName(a);
+  const nb = normalizeStationName(b);
+  if (!na || !nb) return false;
+  return na === nb || na.includes(nb) || nb.includes(na);
+}
+
+function normalizeRouteForMatching(routeData: any, routeId: string): Route | null {
+  if (!routeData?.userId || !routeData?.startStation || !routeData?.endStation) {
+    return null;
+  }
+
+  const startStation = {
+    stationId: routeData.startStation.stationId || routeData.startStation.id,
+    stationName: routeData.startStation.stationName || '',
+    line: routeData.startStation.line || routeData.startStation.lineName || '',
+    lat: routeData.startStation.lat ?? routeData.startStation.latitude ?? 0,
+    lng: routeData.startStation.lng ?? routeData.startStation.longitude ?? 0,
+  };
+
+  const endStation = {
+    stationId: routeData.endStation.stationId || routeData.endStation.id,
+    stationName: routeData.endStation.stationName || '',
+    line: routeData.endStation.line || routeData.endStation.lineName || '',
+    lat: routeData.endStation.lat ?? routeData.endStation.latitude ?? 0,
+    lng: routeData.endStation.lng ?? routeData.endStation.longitude ?? 0,
+  };
+
+  if (!startStation.stationName || !endStation.stationName) {
+    return null;
+  }
+
+  return {
+    routeId,
+    userId: routeData.userId,
+    startStation,
+    endStation,
+    departureTime: routeData.departureTime || '08:00',
+    daysOfWeek: Array.isArray(routeData.daysOfWeek) && routeData.daysOfWeek.length > 0
+      ? routeData.daysOfWeek
+      : [1, 2, 3, 4, 5, 6, 7],
+    isActive: routeData.isActive !== false,
+    createdAt: new Date(),
+    updatedAt: new Date(),
+  } as Route;
+}
+
+async function findMatchesByRouteHeuristic(requestData: any, topN: number): Promise<MatchingResult[]> {
+  const snapshot = await getDocs(query(collection(db, 'routes'), where('isActive', '==', true)));
+  const today = new Date().getDay();
+  const dayOfWeek = today === 0 ? 7 : today;
+  const requestPickup = requestData?.pickupStation?.stationName || '';
+  const requestDelivery = requestData?.deliveryStation?.stationName || '';
+
+  const routeCandidates: Array<{
+    gillerId: string;
+    route: Route;
+    routeScore: RouteMatchScore;
+  }> = [];
+
+  snapshot.forEach((routeDoc) => {
+    const route = normalizeRouteForMatching(routeDoc.data(), routeDoc.id);
+    if (!route) return;
+
+    const routeScore = calculateRouteMatchScore(requestData, route);
+    const loosePickup = namesLooselyEqual(route.startStation.stationName, requestPickup);
+    const looseDelivery = namesLooselyEqual(route.endStation.stationName, requestDelivery);
+    const isTodayRoute = route.daysOfWeek.includes(dayOfWeek);
+    const adjustedScore = routeScore.score + (isTodayRoute ? 10 : 0) + ((loosePickup || looseDelivery) ? 5 : 0);
+
+    if (adjustedScore < 10) return;
+
+    routeCandidates.push({
+      gillerId: route.userId,
+      route,
+      routeScore: {
+        ...routeScore,
+        score: Math.min(100, adjustedScore),
+      },
+    });
+  });
+
+  routeCandidates.sort((a, b) => b.routeScore.score - a.routeScore.score);
+  const uniqueByGiller = new Map<string, typeof routeCandidates[number]>();
+  for (const candidate of routeCandidates) {
+    if (!uniqueByGiller.has(candidate.gillerId)) {
+      uniqueByGiller.set(candidate.gillerId, candidate);
+    }
+  }
+
+  const topCandidates = Array.from(uniqueByGiller.values()).slice(0, Math.max(topN * 2, 10));
+  const hydrated = await Promise.all(topCandidates.map(async (candidate) => {
+    const [userInfo, userStats] = await Promise.all([
+      fetchUserInfo(candidate.gillerId),
+      fetchUserStats(candidate.gillerId),
+    ]);
+    return { ...candidate, userInfo, userStats };
+  }));
+
+  return hydrated
+    .map((item) => {
+      const routeMatchScore = Math.min(50, Math.round(item.routeScore.score * 0.5));
+      const timeMatchScore = Math.min(30, Math.round((item.routeScore.details.timeScore + item.routeScore.details.dayOfWeekScore) * 1.2));
+      const ratingScore = Math.min(15, Math.round(((item.userStats.rating - 1) / 4) * 15));
+      const completionRate = item.userStats.totalDeliveries > 0
+        ? (item.userStats.completedDeliveries / item.userStats.totalDeliveries)
+        : 0.5;
+      const completionRateScore = Math.min(5, Math.round(completionRate * 5));
+      const totalScore = routeMatchScore + timeMatchScore + ratingScore + completionRateScore;
+
+      return {
+        gillerId: item.gillerId,
+        gillerName: item.userInfo.name || '길러',
+        totalScore,
+        routeMatchScore,
+        timeMatchScore,
+        ratingScore,
+        completionRateScore,
+        scores: {
+          pickupMatchScore: item.routeScore.details.pickupStationScore,
+          deliveryMatchScore: item.routeScore.details.deliveryStationScore,
+          departureTimeMatchScore: item.routeScore.details.timeScore,
+          scheduleFlexibilityScore: item.routeScore.details.dayOfWeekScore,
+          ratingRawScore: ratingScore,
+          completionRateRawScore: completionRateScore,
+        },
+        routeDetails: {
+          travelTime: Math.max(1200, Math.round(3600 - item.routeScore.score * 20)),
+          isExpressAvailable: false,
+          transferCount: item.routeScore.routeDirection === 'exact' ? 0 : 1,
+          congestionLevel: 'medium' as const,
+        },
+        reasons: [
+          item.routeScore.pickupMatch ? '픽업 역이 동선과 일치합니다.' : '픽업 역 인접 동선입니다.',
+          item.routeScore.deliveryMatch ? '도착 역이 동선과 일치합니다.' : '도착 역 인접 동선입니다.',
+        ],
+      } as MatchingResult;
+    })
+    .sort((a, b) => b.totalScore - a.totalScore)
+    .slice(0, topN);
+}
+
 /**
  * Calculate badge bonus for fee adjustment
  * @param userId User ID
@@ -54,7 +200,7 @@ export async function calculateBadgeBonus(userId: string): Promise<{
   try {
     const userDoc = await getDoc(doc(db, 'users', userId));
 
-    if (!userDoc.exists) {
+    if (!userDoc.exists()) {
       return { feeBonus: 0, priorityBoost: 0 };
     }
 
@@ -95,7 +241,7 @@ async function fetchUserStats(userId: string): Promise<{
   try {
     const userDoc = await getDoc(doc(db, 'users', userId));
 
-    if (!userDoc.exists) {
+    if (!userDoc.exists()) {
       return {
         rating: 3.5,
         totalDeliveries: 0,
@@ -274,11 +420,12 @@ export async function findMatchesForRequest(
     // 1. Fetch request
     const requestDoc = await getDoc(doc(db, 'requests', requestId));
 
-    if (!requestDoc.exists) {
+    if (!requestDoc.exists()) {
       throw new Error('Request not found');
     }
 
-    const request = convertToDeliveryRequest(requestDoc.data());
+    const requestData = requestDoc.data();
+    const request = convertToDeliveryRequest(requestData);
 
     // 2. Fetch active giller routes
     const gillerRoutes = await fetchActiveGillerRoutes();
@@ -292,14 +439,28 @@ export async function findMatchesForRequest(
       giller.daysOfWeek.includes(dayOfWeek)
     );
 
-    // 4. Find matches
-    const matches = matchGillersToRequest(availableGillers, request);
+    // 4. Find matches (major station engine first)
+    const matches = matchGillersToRequest(availableGillers, request).slice(0, topN);
+    if (matches.length > 0) {
+      return matches;
+    }
 
-    // 5. Return top N
-    return matches.slice(0, topN);
+    // 5. Fallback: route heuristic (works even for stations outside major station dataset)
+    console.warn(`⚠️ Matching engine returned 0 for request ${requestId}. Falling back to route heuristic.`);
+    return await findMatchesByRouteHeuristic(requestData, topN);
   } catch (error) {
     console.error('Error finding matches:', error);
-    throw error;
+    // Engine exception fallback: request/route based heuristic
+    try {
+      const requestDoc = await getDoc(doc(db, 'requests', requestId));
+      if (!requestDoc.exists()) {
+        return [];
+      }
+      return await findMatchesByRouteHeuristic(requestDoc.data(), topN);
+    } catch (fallbackError) {
+      console.error('Error in fallback matching:', fallbackError);
+      throw error;
+    }
   }
 }
 
@@ -460,7 +621,7 @@ export async function acceptRequest(
     const requestRef = doc(db, 'requests', requestId);
     const requestDoc = await getDoc(requestRef);
 
-    if (!requestDoc.exists) {
+    if (!requestDoc.exists()) {
       return { success: false, message: '요청을 찾을 수 없습니다.' };
     }
 
@@ -909,7 +1070,7 @@ export async function fetchGillerStats(
   try {
     const userDoc = await getDoc(doc(db, 'users', gillerId));
 
-    if (!userDoc.exists) {
+    if (!userDoc.exists()) {
       return {
         gillerId,
         gillerName: '익명',

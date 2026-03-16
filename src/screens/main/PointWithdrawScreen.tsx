@@ -24,7 +24,7 @@ export default function PointWithdrawScreen({ navigation }: { navigation: Naviga
   const [accountNumber, setAccountNumber] = useState('');
   const [accountHolder, setAccountHolder] = useState('');
   const [errors, setErrors] = useState<Record<string, string>>({});
-  const [balance, setBalance] = useState(0);
+  const [balance, _setBalance] = useState(0);
 
   const validateForm = (): boolean => {
     const newErrors: Record<string, string> = {};

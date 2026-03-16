@@ -69,6 +69,16 @@ export interface UserVerification {
   birthDate: string;     // 생년월일 (YYYYMMDD)
   personalId?: string;   // 주민등록번호 뒤 7자리 (암호화)
 
+  // 외부 본인인증 (PASS/Kakao CI)
+  externalAuth?: {
+    provider: 'pass' | 'kakao';
+    status: 'started' | 'verified' | 'failed';
+    requestedAt: Timestamp;
+    verifiedAt?: Timestamp;
+  };
+  ciHash?: string;
+  verificationMethod?: 'id_card' | 'ci';
+
   // 심사 정보
   reviewedAt?: Timestamp;
   reviewedBy?: string;   // 심사자 UID
@@ -104,6 +114,8 @@ export interface VerificationSubmitData {
   birthDate: string;
   personalId?: string;
 }
+
+export type VerificationProvider = 'pass' | 'kakao';
 
 /**
  * 은행 목록

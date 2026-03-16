@@ -13,7 +13,6 @@ import {
   Alert,
   ActivityIndicator,
   ScrollView,
-  Platform,
 } from 'react-native';
 import { useUser } from '../../contexts/UserContext';
 import { doc, updateDoc, addDoc, collection, serverTimestamp } from 'firebase/firestore';

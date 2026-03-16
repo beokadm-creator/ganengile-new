@@ -35,6 +35,7 @@ import type { Station } from '../../types/config';
 import type { StationInfo, PackageWeight } from '../../types/request';
 import type { PackageSize } from '../../types/request';
 import TimePicker from '../../components/common/TimePicker';
+import AppTopBar from '../../components/common/AppTopBar';
 import { OptimizedStationSelectModal } from '../../components/OptimizedStationSelectModal';
 import ModeToggleSwitch from '../../components/onetime/ModeToggleSwitch';
 
@@ -181,12 +182,14 @@ export default function CreateRequestScreen({ navigation }: Props) {
     totalFee: number;
     estimatedTime: number;
     stationCount: number;
+    estimationSource?: 'config' | 'gps' | 'fare' | 'default';
     urgencyFee?: number;
     urgencySurcharge?: number;
     manualAdjustment?: number;
     gillerFee: number;
     platformFee: number;
   } | null>(null);
+  const [fareStatus, setFareStatus] = useState<'idle' | 'loading' | 'ok' | 'unavailable'>('idle');
 
   // Themed styles
   const styles = useMemo(() => createStyles(Colors, Typography, Spacing, BorderRadius), []);
@@ -383,23 +386,33 @@ export default function CreateRequestScreen({ navigation }: Props) {
     }
 
     try {
+      setFareStatus('loading');
       console.log('Starting fee calculation with weight:', weight);
 
-      let travelTimeMinutes = 30; // 기본값
-      let stationCount = 5; // 기본값
+      let travelTimeMinutes: number | null = null;
+      let stationCount: number | null = null;
+      let estimationSource: 'config' | 'gps' | 'fare' | 'default' | null = null;
 
       // Firebase에서 이동 시간 데이터 가져오기 시도
       if (pickupStation.stationId && deliveryStation.stationId) {
         try {
-          const travelTimeData = await getTravelTimeConfig(
+          let travelTimeData = await getTravelTimeConfig(
             pickupStation.stationId,
             deliveryStation.stationId
           );
+          // 일부 구간은 단방향 데이터만 저장된 경우가 있어 역방향도 조회
+          if (!travelTimeData) {
+            travelTimeData = await getTravelTimeConfig(
+              deliveryStation.stationId,
+              pickupStation.stationId
+            );
+          }
 
-                if (travelTimeData) {
+          if (travelTimeData) {
             const travelTimeSeconds = travelTimeData.normalTime;
             travelTimeMinutes = Math.round(travelTimeSeconds / 60);
-            stationCount = Math.max(2, Math.round(travelTimeMinutes / 2.5));
+            stationCount = Math.max(2, Math.round((travelTimeMinutes || 0) / 2.5));
+            estimationSource = 'config';
             console.log('Travel time data loaded (Firestore):', { travelTimeMinutes, stationCount });
           } else {
             // Firestore에 구간 데이터가 없으면 → GPS 좌표 기반 fallback
@@ -407,13 +420,14 @@ export default function CreateRequestScreen({ navigation }: Props) {
             if (gpsCount !== null) {
               stationCount = gpsCount;
               travelTimeMinutes = stationCount * 2.5;
+              estimationSource = 'gps';
               console.log('Travel time estimated (GPS fallback):', { stationCount, travelTimeMinutes });
             } else {
-              console.log('No coords available, using default stationCount=5');
+              console.log('No travel-time data and no coords; trying fare distance fallback');
             }
           }
         } catch (error) {
-          console.log('Error loading travel time, using defaults:', error);
+          console.log('Error loading travel time, trying fallbacks:', error);
         }
       }
 
@@ -426,25 +440,52 @@ export default function CreateRequestScreen({ navigation }: Props) {
       console.log('Calculating fee with:', { stationCount, weight: weightValue, packageSize, urgency });
 
       let publicFare = 0;
+      let fareDistanceKm: number | null = null;
       try {
         const [pickupConfig, deliveryConfig] = await Promise.all([
           pickupStation.stationId ? getStationConfig(pickupStation.stationId) : null,
           deliveryStation.stationId ? getStationConfig(deliveryStation.stationId) : null,
         ]);
-        const dptreStnCd = pickupConfig?.fare?.stationCode;
-        const avrlStnCd = deliveryConfig?.fare?.stationCode;
+        const dptreStnCd = pickupConfig?.fare?.stationCode || pickupConfig?.kric?.stationCode;
+        const avrlStnCd = deliveryConfig?.fare?.stationCode || deliveryConfig?.kric?.stationCode;
         if (dptreStnCd && avrlStnCd) {
           const fareResult = await getRealtimeFare(dptreStnCd, avrlStnCd);
           if (fareResult?.fare) {
             publicFare = fareResult.fare;
+            setFareStatus('ok');
+          } else {
+            setFareStatus('unavailable');
           }
+          const movement = Number(fareResult?.raw?.mvmnDstc ?? NaN);
+          if (Number.isFinite(movement) && movement > 0) {
+            fareDistanceKm = movement;
+          }
+        } else {
+          setFareStatus('unavailable');
         }
       } catch (error) {
         console.log('Fare API not available, using 0 fare:', error);
+        setFareStatus('unavailable');
       }
 
+      // 마지막 fallback: 운임 API의 이동거리(km)로 역수/시간 추정
+      if ((!stationCount || !travelTimeMinutes) && fareDistanceKm && fareDistanceKm > 0) {
+        const estimatedStationCount = Math.max(2, Math.round(fareDistanceKm / 1.2) + 1);
+        if (!stationCount) stationCount = estimatedStationCount;
+        if (!travelTimeMinutes) travelTimeMinutes = Math.max(8, Math.round(fareDistanceKm * 3));
+        if (!estimationSource) estimationSource = 'fare';
+      }
+
+      if (!stationCount) {
+        stationCount = 5;
+      }
+      if (!travelTimeMinutes) {
+        travelTimeMinutes = Math.round(stationCount * 2.5);
+      }
+      if (!estimationSource) estimationSource = 'default';
+
       const pricingParams: Phase1PricingParams = {
-        stationCount,
+        stationCount: stationCount,
         weight: weightValue,
         packageSize: packageSize as PackageSizeType,
         urgency,
@@ -465,6 +506,7 @@ export default function CreateRequestScreen({ navigation }: Props) {
         totalFee: feeResult.totalFee,
         estimatedTime: travelTimeMinutes,
         stationCount,
+        estimationSource,
         urgencyFee: feeResult.urgencySurcharge,
         urgencySurcharge: feeResult.urgencySurcharge,
         manualAdjustment: 0,
@@ -473,6 +515,7 @@ export default function CreateRequestScreen({ navigation }: Props) {
       });
     } catch (error) {
       console.error('Error calculating delivery fee:', error);
+      setFareStatus('unavailable');
 
       // 에러 발생 시 기본값으로 계산
       const weightRaw = parseFloat(weight);
@@ -502,6 +545,7 @@ export default function CreateRequestScreen({ navigation }: Props) {
         totalFee: feeResult.totalFee,
         estimatedTime: 30,
         stationCount,
+        estimationSource: 'default',
         urgencyFee: feeResult.urgencySurcharge,
         urgencySurcharge: feeResult.urgencySurcharge,
         manualAdjustment: 0,
@@ -713,9 +757,11 @@ export default function CreateRequestScreen({ navigation }: Props) {
         deliveryDeadline.setDate(deliveryDeadline.getDate() + 1);
       }
 
+      const parsedWeightKg = parseFloat(weight);
       const packageInfo = {
         size: packageSize,
-        weight: convertWeightToPackageWeight(parseFloat(weight)),
+        weight: convertWeightToPackageWeight(parsedWeightKg),
+        weightKg: parsedWeightKg,
         description: `${description}${isFragile ? ' (깨지기 쉬움)' : ''}${isPerishable ? ' (부패하기 쉬움)' : ''}`,
       };
 
@@ -799,7 +845,7 @@ export default function CreateRequestScreen({ navigation }: Props) {
     <View style={styles.stepContainer}>
       <ModeToggleSwitch />
 
-      <Text style={styles.stepTitle} accessibilityLabel="1단계, 역 선택">🚇 역 선택</Text>
+      <Text style={styles.stepTitle} accessibilityLabel="1단계, 역 선택">역 선택</Text>
       <Text style={styles.stepDesc}>픽업 역과 배송 역을 선택해주세요.</Text>
 
       <TouchableOpacity
@@ -837,6 +883,15 @@ export default function CreateRequestScreen({ navigation }: Props) {
           <Text style={styles.infoText}>
             예상 소요시간: 약 {deliveryFee.estimatedTime}분 · 기준 역수: {deliveryFee.stationCount}개
           </Text>
+          <Text style={styles.infoSubText}>
+            계산 기준: {deliveryFee.estimationSource === 'config'
+              ? '실제 구간 데이터'
+              : deliveryFee.estimationSource === 'gps'
+              ? '역 좌표 기반 추정'
+              : deliveryFee.estimationSource === 'fare'
+              ? '운임 API 거리 기반 추정'
+              : '기본 추정값'}
+          </Text>
         </View>
       )}
     </View>
@@ -844,7 +899,7 @@ export default function CreateRequestScreen({ navigation }: Props) {
 
   const renderStep2 = () => (
     <View style={styles.stepContainer}>
-      <Text style={styles.stepTitle} accessibilityLabel="2단계, 패키지 정보">📦 패키지 정보</Text>
+      <Text style={styles.stepTitle} accessibilityLabel="2단계, 패키지 정보">패키지 정보</Text>
       <Text style={styles.stepDesc}>패키지 크기와 무게를 입력해주세요.</Text>
 
       <Text style={styles.label}>크기</Text>
@@ -1012,6 +1067,12 @@ export default function CreateRequestScreen({ navigation }: Props) {
                   운임: {deliveryFee.publicFare.toLocaleString()}원
                 </Text>
               )}
+              {fareStatus === 'loading' && (
+                <Text style={styles.feeBreakdownNote}>운임 조회 중...</Text>
+              )}
+              {fareStatus === 'unavailable' && (
+                <Text style={styles.feeBreakdownNote}>운임 조회 지연으로 현재 운임이 미반영될 수 있습니다.</Text>
+              )}
               <Text style={styles.feeBreakdownText}>
                 거리: {deliveryFee.distanceFee.toLocaleString()}원 (기준 {deliveryFee.stationCount}개 역)
               </Text>
@@ -1019,7 +1080,9 @@ export default function CreateRequestScreen({ navigation }: Props) {
                 무게: {deliveryFee.weightFee.toLocaleString()}원
               </Text>
               <Text style={styles.feeBreakdownText}>
-                크기: {deliveryFee.sizeFee.toLocaleString()}원
+                {deliveryFee.sizeFee > 0
+                  ? `크기: ${deliveryFee.sizeFee.toLocaleString()}원`
+                  : '크기: 추가요금 없음'}
               </Text>
               {deliveryFee.urgencySurcharge && deliveryFee.urgencySurcharge > 0 && (
                 <Text style={styles.feeBreakdownUrgency}>
@@ -1039,17 +1102,17 @@ export default function CreateRequestScreen({ navigation }: Props) {
             <View style={styles.gillerBreakdownPreview}>
               <Text style={styles.gillerBreakdownTitle}>정산 내역 (참고)</Text>
               <Text style={styles.gillerBreakdownText}>
-                길러 수령 (85%): {deliveryFee.gillerFee.toLocaleString()}원
+                길러 수령 ({Math.round((deliveryFee.gillerFee / deliveryFee.totalFee) * 100)}%): {deliveryFee.gillerFee.toLocaleString()}원
               </Text>
               <Text style={styles.gillerBreakdownText}>
-                플랫폼 수수료 (15%): {deliveryFee.platformFee.toLocaleString()}원
+                플랫폼 수수료 ({Math.round((deliveryFee.platformFee / deliveryFee.totalFee) * 100)}%): {deliveryFee.platformFee.toLocaleString()}원
               </Text>
             </View>
             <Text style={styles.feePreviewNote}>
               * 이 요금은 초기 협상금액이며, 최종 금액은 배송 완료 후 확정됩니다.
             </Text>
             <Text style={styles.feePreviewNote}>
-              * 최소 3,000원 / 최대 8,000원 범위가 적용됩니다.
+              * 최소 3,000원 / 최대 10,000원 범위가 적용됩니다.
             </Text>
           </View>
         </>
@@ -1059,7 +1122,7 @@ export default function CreateRequestScreen({ navigation }: Props) {
 
   const renderStep3 = () => (
     <View style={styles.stepContainer}>
-      <Text style={styles.stepTitle} accessibilityLabel="3단계, 수신자 정보">👤 수신자 정보</Text>
+      <Text style={styles.stepTitle} accessibilityLabel="3단계, 수신자 정보">수신자 정보</Text>
       <Text style={styles.stepDesc}>수신자의 연락처를 입력해주세요.</Text>
 
       <Text style={styles.label}>이름</Text>
@@ -1123,19 +1186,19 @@ export default function CreateRequestScreen({ navigation }: Props) {
 
   const renderStep4 = () => (
     <View style={styles.stepContainer}>
-      <Text style={styles.stepTitle} accessibilityLabel="4단계, 배송 요약">📋 배송 요약</Text>
-      <Text style={styles.stepDesc}>모든 정보를 확인하고 요청해주세요.</Text>
+      <Text style={styles.stepTitle} accessibilityLabel="4단계, 배송 요약">배송 요약</Text>
+      <Text style={styles.stepDesc}>모든 정보를 확인한 뒤 다음 단계에서 추가 정보를 입력할 수 있습니다.</Text>
 
       <View style={styles.summaryCard} accessibilityLabel="배송 요약 정보">
         <View style={styles.summaryRow}>
-          <Text style={styles.summaryLabel}>🚇 경로</Text>
+          <Text style={styles.summaryLabel}>경로</Text>
           <Text style={styles.summaryValue}>
             {pickupStation?.stationName} → {deliveryStation?.stationName}
           </Text>
         </View>
 
         <View style={styles.summaryRow}>
-          <Text style={styles.summaryLabel}>📦 패키지</Text>
+          <Text style={styles.summaryLabel}>패키지</Text>
           <Text style={styles.summaryValue}>
             {packageSize === 'small' ? '소형' : packageSize === 'medium' ? '중형' : packageSize === 'large' ? '대형' : '특대'} ({weight}kg)
             {isFragile && ' 🔴'}
@@ -1144,21 +1207,21 @@ export default function CreateRequestScreen({ navigation }: Props) {
         </View>
 
         <View style={styles.summaryRow}>
-          <Text style={styles.summaryLabel}>👤 수신자</Text>
+          <Text style={styles.summaryLabel}>수신자</Text>
           <Text style={styles.summaryValue}>
             {recipientName} ({recipientPhone})
           </Text>
         </View>
 
         <View style={styles.summaryRow}>
-          <Text style={styles.summaryLabel}>⏰ 시간</Text>
+          <Text style={styles.summaryLabel}>시간</Text>
           <Text style={styles.summaryValue}>
             {pickupTime} → {deliveryTime}
           </Text>
         </View>
 
         <View style={styles.summaryRow}>
-          <Text style={styles.summaryLabel}>⚡ 긴급도</Text>
+          <Text style={styles.summaryLabel}>긴급도</Text>
           <Text style={styles.summaryValue}>
             {URGENCY_OPTIONS.find(opt => opt.level === urgency)?.label}
           </Text>
@@ -1168,7 +1231,7 @@ export default function CreateRequestScreen({ navigation }: Props) {
           <>
             <View style={styles.summaryDivider} />
             <View style={styles.summaryRow}>
-              <Text style={styles.summaryLabel}>📍 추가 정보</Text>
+              <Text style={styles.summaryLabel}>추가 정보</Text>
             </View>
             {pickupLocationDetail && (
               <View style={styles.summaryRow}>
@@ -1195,7 +1258,7 @@ export default function CreateRequestScreen({ navigation }: Props) {
           <>
             <View style={styles.summaryDivider} />
             <View style={styles.summaryRow}>
-              <Text style={styles.summaryLabel}>💵 배송비</Text>
+              <Text style={styles.summaryLabel}>배송비</Text>
               <Text style={styles.summaryValueTotal}>{deliveryFee.totalFee.toLocaleString()}원</Text>
             </View>
             <View style={styles.feeBreakdown}>
@@ -1203,11 +1266,21 @@ export default function CreateRequestScreen({ navigation }: Props) {
               {deliveryFee.publicFare && deliveryFee.publicFare > 0 && (
                 <Text style={styles.feeItem}>운임: {deliveryFee.publicFare.toLocaleString()}원</Text>
               )}
+              {fareStatus === 'loading' && (
+                <Text style={styles.feeItemNote}>운임 조회 중...</Text>
+              )}
+              {fareStatus === 'unavailable' && (
+                <Text style={styles.feeItemNote}>운임 조회 지연으로 현재 운임이 미반영될 수 있습니다.</Text>
+              )}
               <Text style={styles.feeItem}>
                 거리: {deliveryFee.distanceFee.toLocaleString()}원 (기준 {deliveryFee.stationCount}개 역)
               </Text>
               <Text style={styles.feeItem}>무게: {deliveryFee.weightFee.toLocaleString()}원</Text>
-              <Text style={styles.feeItem}>크기: {deliveryFee.sizeFee.toLocaleString()}원</Text>
+              <Text style={styles.feeItem}>
+                {deliveryFee.sizeFee > 0
+                  ? `크기: ${deliveryFee.sizeFee.toLocaleString()}원`
+                  : '크기: 추가요금 없음'}
+              </Text>
               {deliveryFee.urgencyFee && deliveryFee.urgencyFee > 0 && (
                 <Text style={styles.feeItemUrgency}>긴급 surcharge: +{deliveryFee.urgencyFee.toLocaleString()}원</Text>
               )}
@@ -1219,14 +1292,14 @@ export default function CreateRequestScreen({ navigation }: Props) {
               <View style={styles.gillerBreakdownSummary}>
                 <Text style={styles.gillerBreakdownTitle}>정산 내역 (참고)</Text>
                 <Text style={styles.gillerBreakdownText}>
-                  길러 수령 (85%): {deliveryFee.gillerFee.toLocaleString()}원
+                  길러 수령 ({Math.round((deliveryFee.gillerFee / deliveryFee.totalFee) * 100)}%): {deliveryFee.gillerFee.toLocaleString()}원
                 </Text>
                 <Text style={styles.gillerBreakdownText}>
-                  플랫폼 수수료 (15%): {deliveryFee.platformFee.toLocaleString()}원
+                  플랫폼 수수료 ({Math.round((deliveryFee.platformFee / deliveryFee.totalFee) * 100)}%): {deliveryFee.platformFee.toLocaleString()}원
                 </Text>
               </View>
               <View style={styles.auctionInfo}>
-                <Text style={styles.auctionLabel}>🔨 경매 시작가</Text>
+                <Text style={styles.auctionLabel}>경매 시작가</Text>
                 <Text style={styles.auctionPrice}>{deliveryFee.totalFee.toLocaleString()}원부터</Text>
                 <Text style={styles.auctionDesc}>길러들이 더 빠른 배송을 위해 입찰할 수 있습니다</Text>
               </View>
@@ -1235,27 +1308,12 @@ export default function CreateRequestScreen({ navigation }: Props) {
         )}
       </View>
 
-      <TouchableOpacity
-        style={[styles.nextButton, styles.submitButton, (!pickupStation || !deliveryStation || !deliveryFee) && styles.disabledButton]}
-        onPress={handleSubmit}
-        disabled={loading || !pickupStation || !deliveryStation || !deliveryFee}
-        accessibilityLabel="배송 요청 제출"
-        accessibilityHint="배송 요청을 제출합니다"
-      >
-        {loading ? (
-          <ActivityIndicator color={Colors.white} />
-        ) : (
-          <Text style={styles.nextButtonText}>
-            {isRetrying ? '재시도 중...' : '요청하기'}
-          </Text>
-        )}
-      </TouchableOpacity>
     </View>
   );
 
   const renderStep5 = () => (
     <View style={styles.stepContainer}>
-      <Text style={styles.stepTitle} accessibilityLabel="5단계, 추가 정보">📍 추가 정보</Text>
+      <Text style={styles.stepTitle} accessibilityLabel="5단계, 추가 정보">추가 정보</Text>
       <Text style={styles.stepDesc}>만날 장소와 보관 방법을 입력해주세요. (선택 사항)</Text>
 
       <Text style={styles.label}>만날 장소 상세</Text>
@@ -1281,6 +1339,13 @@ export default function CreateRequestScreen({ navigation }: Props) {
 
       <Text style={styles.label}>보관 위치</Text>
       <Text style={styles.hintText}>물건을 보관할 곳을 지정해주세요. (예: 역사물 보관함, 사물함)</Text>
+      <TouchableOpacity
+        style={styles.lockerGuideButton}
+        onPress={() => navigation.navigate('LockerMap')}
+        accessibilityLabel="사물함 지도 열기"
+      >
+        <Text style={styles.lockerGuideButtonText}>근처 사물함 지도에서 확인하기</Text>
+      </TouchableOpacity>
       <TextInput
         style={[styles.input, styles.textArea, errors.storageLocation && styles.inputError]}
         value={storageLocation}
@@ -1322,11 +1387,27 @@ export default function CreateRequestScreen({ navigation }: Props) {
       <Text style={styles.charCount}>{specialInstructions.length}/200</Text>
 
       <View style={styles.noteCard}>
-        <Text style={styles.noteIcon}>ℹ️</Text>
+        <Text style={styles.noteIcon}>i</Text>
         <Text style={styles.noteText}>
           이 모든 정보는 선택 사항입니다. 필요한 경우에만 입력해주세요.
         </Text>
       </View>
+
+      <TouchableOpacity
+        style={[styles.nextButton, styles.submitButton, (!pickupStation || !deliveryStation || !deliveryFee) && styles.disabledButton]}
+        onPress={handleSubmit}
+        disabled={loading || !pickupStation || !deliveryStation || !deliveryFee}
+        accessibilityLabel="배송 요청 제출"
+        accessibilityHint="배송 요청을 제출합니다"
+      >
+        {loading ? (
+          <ActivityIndicator color={Colors.white} />
+        ) : (
+          <Text style={styles.nextButtonText}>
+            {isRetrying ? '재시도 중...' : '요청하기'}
+          </Text>
+        )}
+      </TouchableOpacity>
     </View>
   );
 
@@ -1383,13 +1464,7 @@ export default function CreateRequestScreen({ navigation }: Props) {
       style={styles.container}
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
     >
-      <View style={styles.header}>
-        <TouchableOpacity onPress={handleBack} style={styles.backButton} accessibilityLabel="뒤로 가기">
-          <Text style={styles.backButtonText}>←</Text>
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>새 배송 요청</Text>
-        <View style={styles.headerSpacer} />
-      </View>
+      <AppTopBar title="새 배송 요청" onBack={handleBack} />
 
       {renderProgressBar()}
 
@@ -1401,7 +1476,7 @@ export default function CreateRequestScreen({ navigation }: Props) {
         {currentStep === 5 && renderStep5()}
       </ScrollView>
 
-      {currentStep < 4 && (
+      {currentStep < 5 && (
         <View style={styles.footer}>
           <TouchableOpacity
             style={styles.nextButton}
@@ -1703,6 +1778,11 @@ function createStyles(
       color: colors.primaryDark,
       fontSize: typo.fontSize.base,
     },
+    infoSubText: {
+      color: colors.gray600,
+      fontSize: typo.fontSize.xs,
+      marginTop: space.xs,
+    },
     feePreviewCard: {
       alignItems: 'center',
       backgroundColor: colors.primaryLight,
@@ -1854,6 +1934,20 @@ function createStyles(
       color: colors.gray500,
       fontSize: typo.fontSize.sm,
       marginBottom: space.sm,
+    },
+    lockerGuideButton: {
+      borderColor: colors.primary,
+      borderRadius: radius.md,
+      borderWidth: 1,
+      marginBottom: space.sm,
+      paddingHorizontal: space.md,
+      paddingVertical: space.sm,
+    },
+    lockerGuideButtonText: {
+      color: colors.primary,
+      fontSize: typo.fontSize.sm,
+      fontWeight: typo.fontWeight.semibold,
+      textAlign: 'center',
     },
     noteCard: {
       alignItems: 'center',

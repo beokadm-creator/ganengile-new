@@ -48,9 +48,9 @@ export default function BankAccountModal({
     if (visible) {
       // eslint-disable-next-line react-hooks/set-state-in-effect
       setBankName(initialData?.bankName || '');
-      // eslint-disable-next-line react-hooks/set-state-in-effect
+       
       setAccountNumber(initialData?.accountNumber || '');
-      // eslint-disable-next-line react-hooks/set-state-in-effect
+       
       setAccountHolder(initialData?.accountHolder || '');
     }
   }, [visible, initialData]);

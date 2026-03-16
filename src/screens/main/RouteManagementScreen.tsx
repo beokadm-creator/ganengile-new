@@ -3,7 +3,7 @@
  * 등록된 동선을 관리하는 화면
  */
 
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import {
   View,
   Text,
@@ -11,9 +11,9 @@ import {
   TouchableOpacity,
   ActivityIndicator,
   Alert,
+  Platform,
 } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
-import { useNavigation, useFocusEffect } from '@react-navigation/native';
+import { useNavigation, useFocusEffect, useRoute } from '@react-navigation/native';
 import { requireUserId } from '../../services/firebase';
 import { getUserRoutes, deleteRoute } from '../../services/route-service';
 import { DAY_LABELS } from '../../components/common/DaySelector';
@@ -24,12 +24,21 @@ const MAX_ROUTES = 5;
 
 export default function RouteManagementScreen() {
   const navigation = useNavigation();
+  const route = useRoute<any>();
   const [routes, setRoutes] = useState<Route[]>([]);
   const [loading, setLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
+  const [, setRefreshing] = useState(false);
+
+  useEffect(() => {
+    const addedRouteId = route?.params?.justAddedRouteId;
+    if (!addedRouteId) return;
+    Alert.alert('등록 확인', '동선이 정상적으로 등록되었습니다. 목록에서 바로 확인할 수 있습니다.');
+    (navigation as any).setParams?.({ justAddedRouteId: undefined });
+  }, [route?.params?.justAddedRouteId]);
 
   const loadRoutes = async () => {
     try {
+      setLoading(true);
       const userId = await requireUserId();
       const userRoutes = await getUserRoutes(userId);
       
@@ -54,34 +63,48 @@ export default function RouteManagementScreen() {
     }, [])
   );
 
-  const onRefresh = () => {
+  const _onRefresh = () => {
     setRefreshing(true);
     loadRoutes();
   };
 
   const handleDelete = async (routeId: string, routeName: string) => {
-    Alert.alert(
-      '동선 삭제',
-      `${routeName} 동선을 삭제하시겠습니까?`,
-      [
-        { text: '취소', style: 'cancel' },
-        {
-          text: '삭제',
-          style: 'destructive',
-          onPress: async () => {
-            try {
-              const userId = await requireUserId();
-              await deleteRoute(routeId, userId);
-              Alert.alert('성공', '동선이 삭제되었습니다.');
-              await loadRoutes();
-            } catch (error: any) {
-              console.error('Error deleting route:', error);
-              Alert.alert('오류', '동선 삭제에 실패했습니다.');
-            }
-          },
+    const executeDelete = async () => {
+      try {
+        const userId = await requireUserId();
+        const deleted = await deleteRoute(routeId, userId);
+
+        if (!deleted) {
+          Alert.alert('삭제 실패', '권한이 없거나 이미 삭제된 동선입니다.');
+          return;
+        }
+
+        Alert.alert('성공', '동선이 삭제되었습니다.');
+        await loadRoutes();
+      } catch (error: any) {
+        console.error('Error deleting route:', error);
+        Alert.alert('오류', '동선 삭제에 실패했습니다.');
+      }
+    };
+
+    if (Platform.OS === 'web') {
+      const confirmed = window.confirm(`${routeName} 동선을 삭제하시겠습니까?`);
+      if (confirmed) {
+        void executeDelete();
+      }
+      return;
+    }
+
+    Alert.alert('동선 삭제', `${routeName} 동선을 삭제하시겠습니까?`, [
+      { text: '취소', style: 'cancel' },
+      {
+        text: '삭제',
+        style: 'destructive',
+        onPress: () => {
+          void executeDelete();
         },
-      ]
-    );
+      },
+    ]);
   };
 
   const handleEdit = (route: Route) => {

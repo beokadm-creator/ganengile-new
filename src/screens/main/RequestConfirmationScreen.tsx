@@ -1,6 +1,6 @@
 /**
  * Request Confirmation Screen
- * 배송 요청 완료 후 안내 화면
+ * 배송 기본 정보 입력 완료 후 안내 화면
  */
 
 import React, { useState } from 'react';
@@ -10,19 +10,13 @@ import {
   StyleSheet,
   TouchableOpacity,
   ScrollView,
-  ActivityIndicator,
-  Platform,
 } from 'react-native';
 import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
-import { Ionicons } from '@expo/vector-icons';
+import { MaterialIcons } from '@expo/vector-icons';
 import { Colors } from '../../theme';
 
-// 웹에서는 아이콘 대신 텍스트/이모지 사용
-const IconWrapper = ({ name, size, color, emoji }: { name: string; size: number; color: string; emoji?: string }) => {
-  if (Platform.OS === 'web' || emoji) {
-    return <Text style={{ fontSize: size, color }}>{emoji || '📦'}</Text>;
-  }
-  return <Ionicons name={name as any} size={size} color={color} />;
+const IconWrapper = ({ name, size, color }: { name: string; size: number; color: string }) => {
+  return <MaterialIcons name={name as any} size={size} color={color} />;
 };
 
 type RequestConfirmationRouteParams = {
@@ -42,7 +36,7 @@ export default function RequestConfirmationScreen() {
   const route = useRoute<RouteProp<RequestConfirmationRouteParams, 'RequestConfirmation'>>();
   const { requestId, pickupStationName, deliveryStationName, deliveryFee } = route.params;
 
-  const [loading, setLoading] = useState(false);
+  const [_loading, _setLoading] = useState(false);
 
   const handleStartMatching = () => {
     navigation.navigate('MatchingResult' as any, {
@@ -52,7 +46,7 @@ export default function RequestConfirmationScreen() {
     });
   };
 
-  const handleViewRequest = () => {
+  const _handleViewRequest = () => {
     navigation.navigate('RequestDetail' as any, {
       requestId,
     });
@@ -67,20 +61,20 @@ export default function RequestConfirmationScreen() {
       <ScrollView contentContainerStyle={styles.scrollContent}>
         {/* 성공 아이콘 */}
         <View style={styles.iconContainer}>
-          <IconWrapper name="checkmark-circle" size={80} color={Colors.success} emoji="✅" />
+          <IconWrapper name="check-circle" size={80} color={Colors.success} />
         </View>
 
         {/* 메시지 */}
-        <Text style={styles.title}>배송 요청 완료!</Text>
+        <Text style={styles.title}>배송 기본 정보 입력 완료</Text>
         <Text style={styles.message}>
-          요청하신 배송이 등록되었습니다.
+          아래 버튼을 누르면 길러 매칭이 시작됩니다.
         </Text>
 
         {/* 경로 정보 */}
         {(pickupStationName || deliveryStationName) && (
           <View style={styles.infoCard}>
             <View style={styles.infoRow}>
-              <IconWrapper name="map-outline" size={20} color={Colors.primary} emoji="📍" />
+              <IconWrapper name="location-on" size={20} color={Colors.primary} />
               <Text style={styles.infoText}>
                 {pickupStationName} → {deliveryStationName}
               </Text>
@@ -92,7 +86,7 @@ export default function RequestConfirmationScreen() {
         {deliveryFee && (
           <View style={styles.infoCard}>
             <View style={styles.infoRow}>
-              <IconWrapper name="cash-outline" size={20} color={Colors.primary} emoji="💰" />
+              <IconWrapper name="payments" size={20} color={Colors.primary} />
               <View>
                 <Text style={styles.feeAmount}>
                   {deliveryFee.totalFee.toLocaleString()}원
@@ -107,9 +101,9 @@ export default function RequestConfirmationScreen() {
 
         {/* 주의사항 */}
         <View style={styles.noticeContainer}>
-          <Text style={styles.noticeTitle}>⚠️ 이용 안내</Text>
+          <Text style={styles.noticeTitle}>이용 안내</Text>
           <View style={styles.noticeList}>
-            <Text style={styles.noticeItem}>• 길러 매칭은 최대 1분 소요됩니다.</Text>
+            <Text style={styles.noticeItem}>• 길러 매칭은 상황에 따라 시간이 더 소요될 수 있습니다.</Text>
             <Text style={styles.noticeItem}>• 매칭이 완료되면 길러에게 연락이 갑니다.</Text>
             <Text style={styles.noticeItem}>• 길러가 배송을 수락하면 배송이 시작됩니다.</Text>
             <Text style={styles.noticeItemImportant}>• 부재하거나 위법한 물건은 배송할 수 없습니다.</Text>
@@ -129,7 +123,7 @@ export default function RequestConfirmationScreen() {
             onPress={handleStartMatching}
           >
             <Text style={styles.primaryButtonText}>길러 매칭 시작</Text>
-            <Text style={styles.buttonSubtext}>길러에게 알림 보내기</Text>
+            <Text style={styles.buttonSubtext}>버튼을 눌러 매칭을 시작하세요</Text>
           </TouchableOpacity>
 
           <TouchableOpacity

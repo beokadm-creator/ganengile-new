@@ -3,7 +3,9 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { signInWithEmailAndPassword } from 'firebase/auth';
-import { auth } from '@/lib/firebase-client';
+import { getClientAuth } from '@/lib/firebase-client';
+
+export const dynamic = 'force-dynamic';
 
 export default function LoginPage() {
   const router = useRouter();
@@ -18,6 +20,7 @@ export default function LoginPage() {
     setError('');
 
     try {
+      const auth = getClientAuth();
       // 1. Firebase Auth로 로그인
       const credential = await signInWithEmailAndPassword(auth, email, password);
 

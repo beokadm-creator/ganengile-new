@@ -30,6 +30,15 @@ interface CacheEntry<T> {
   expiresAt: number;
 }
 
+export interface PolicyConfig {
+  policyId: string;
+  title: string;
+  content: string[];
+  effectiveDate: string;
+  isActive: boolean;
+  priority?: number;
+}
+
 class ConfigCache {
   private cache: Map<string, CacheEntry<unknown>> = new Map();
 
@@ -684,4 +693,46 @@ export function clearCongestionCache(): void {
 
 export function clearAlgorithmParamsCache(): void {
   cache.clearPattern('^algorithmParams');
+}
+
+// ==================== Policy Config ====================
+
+function convertPolicyConfig(data: any, docId?: string): PolicyConfig {
+  return {
+    policyId: data.policyId || docId || '',
+    title: data.title || '정책',
+    content: Array.isArray(data.content) ? data.content : [],
+    effectiveDate: data.effectiveDate || '',
+    isActive: data.isActive !== false,
+    priority: typeof data.priority === 'number' ? data.priority : 999,
+  };
+}
+
+export async function getPolicyConfigs(): Promise<PolicyConfig[]> {
+  const cacheKey = 'policies:all';
+  const cached = cache.get<PolicyConfig[]>(cacheKey);
+  if (cached) {
+    return cached;
+  }
+
+  try {
+    const q = query(
+      collection(db, 'config_policies'),
+      where('isActive', '==', true)
+    );
+
+    const snapshot = await getDocs(q);
+    const policies: PolicyConfig[] = [];
+
+    snapshot.forEach((docSnapshot) => {
+      policies.push(convertDocument(docSnapshot, convertPolicyConfig));
+    });
+
+    policies.sort((a, b) => (a.priority || 999) - (b.priority || 999));
+    cache.set(cacheKey, policies);
+    return policies;
+  } catch (error) {
+    console.error('Error fetching policy configs:', error);
+    throw error;
+  }
 }

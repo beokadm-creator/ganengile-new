@@ -21,7 +21,7 @@ import {
   Platform,
 } from 'react-native';
 import { StackNavigationProp } from '@react-navigation/stack';
-import { getFirestore, collection, query, where, getDocs, getDoc } from 'firebase/firestore';
+import { getFirestore, collection, query, where, getDocs } from 'firebase/firestore';
 import { requireUserId } from '../../services/firebase';
 import { Colors, Typography, Spacing, BorderRadius } from '../../theme';
 
@@ -82,7 +82,7 @@ export default function LockerMapScreen({ navigation }: Props) {
       setLoading(true);
 
       const db = getFirestore();
-      const userId = requireUserId();
+      const _userId = requireUserId();
 
       // 사물함 컬렉션 로드
       const lockersRef = collection(db, 'lockers');

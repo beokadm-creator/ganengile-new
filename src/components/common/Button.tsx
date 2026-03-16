@@ -1,6 +1,5 @@
 import React, { useState } from 'react';
 import {
-  Pressable,
   Text,
   StyleSheet,
   ViewStyle,
@@ -44,58 +43,6 @@ export default function Button({
   textStyle,
   accessibilityLabel,
 }: ButtonProps) {
-  const [pressed, setPressed] = useState(false);
-
-  const buttonStyle = [
-    styles.button,
-    styles[variant],
-    styles[size],
-    fullWidth && styles.fullWidth,
-    disabled && styles.disabled,
-    pressed && styles.pressed,
-    Platform.OS === 'web' && { cursor: 'pointer' },
-    style,
-  ];
-
-  const textStyleCustom = [
-    styles.text,
-    styles[`${variant}Text`],
-    styles[`${size}Text`],
-    disabled && styles.disabledText,
-    textStyle,
-  ];
-
-  const handlePressIn = () => {
-    setPressed(true);
-    if (Platform.OS !== 'web') {
-      try {
-        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-      } catch {
-        // Ignore haptics errors
-      }
-    }
-  };
-
-  const handlePressOut = () => {
-    setPressed(false);
-  };
-
-  const content = (
-    <>
-      {loading ? (
-        <ActivityIndicator
-          color={variant === 'outline' || variant === 'ghost' ? Colors.primary : Colors.white}
-          size={size === 'small' ? 'small' : 'small'}
-        />
-      ) : (
-        <>
-          {icon && iconPosition === 'left' && <View style={styles.iconLeft}>{icon}</View>}
-          <Text style={textStyleCustom}>{title}</Text>
-          {icon && iconPosition === 'right' && <View style={styles.iconRight}>{icon}</View>}
-        </>
-      )}
-    </>
-  );
 
   // 웹에서는 HTML button 요소 사용
   return (

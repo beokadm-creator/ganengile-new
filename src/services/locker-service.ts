@@ -65,7 +65,7 @@ function mapExternalLocker(raw: any): Locker | null {
   return {
     lockerId: String(lockerId),
     type: LockerType.PUBLIC,
-    operator: (raw?.operator ?? 'seoul_metro') as any,
+    operator: (raw?.operator ?? 'seoul_metro'),
     location: {
       stationId: String(stationId),
       stationName: raw?.stationName ?? raw?.station_name ?? '',

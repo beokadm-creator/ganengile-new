@@ -19,6 +19,7 @@ import { StackNavigationProp } from '@react-navigation/stack';
 import { getUserRequests, cancelRequest } from '../../services/request-service';
 import { requireUserId } from '../../services/firebase';
 import type { DeliveryRequest, DeliveryStatus } from '../../types/delivery';
+import { formatWeightDisplay } from '../../utils/package-weight';
 
 type NavigationProp = StackNavigationProp<any>;
 
@@ -248,7 +249,7 @@ export default function RequestsScreen({ navigation }: Props) {
           <View style={styles.infoRow}>
             <Text style={styles.infoLabel}>📦 패키지</Text>
             <Text style={styles.infoValue}>
-              {item.packageInfo.size === 'small' ? '소형' : item.packageInfo.size === 'medium' ? '중형' : item.packageInfo.size === 'large' ? '대형' : '특대'} ({item.packageInfo.weight}kg)
+              {item.packageInfo.size === 'small' ? '소형' : item.packageInfo.size === 'medium' ? '중형' : item.packageInfo.size === 'large' ? '대형' : '특대'} ({formatWeightDisplay(item.packageInfo.weight, item.packageInfo.weightKg)})
             </Text>
           </View>
 

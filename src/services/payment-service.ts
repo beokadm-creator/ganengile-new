@@ -36,7 +36,7 @@ import { calculateBadgeBonus } from './matching-service';
 export const TAX_RATES = {
   BUSINESS_INCOME_TAX: 0.033, // 사업소득세 3.3% (지방소득세 포함)
   LOCAL_INCOME_TAX: 0.0033,   // 지방소득세 0.33% (3.3% 내 포함)
-  PLATFORM_FEE: 0.15,         // 플랫폼 수수료 15% (pricing-service와 일치)
+  PLATFORM_FEE: 0.1,          // 플랫폼 수수료 10% (pricing-service와 일치)
 } as const;
 
 /**
@@ -104,6 +104,16 @@ export interface PaymentMetadata {
   [key: string]: any;
 }
 
+export interface CreateGillerEarningOptions {
+  /**
+   * true면 amount를 "이미 플랫폼 수수료 차감된 길러 세전 금액"으로 간주
+   * (정산 파이프라인에서 이중 차감 방지용)
+   */
+  platformFeeAlreadyDeducted?: boolean;
+  /** 정산 스냅샷 보관용 플랫폼 수수료 금액 */
+  platformFeeAmount?: number;
+}
+
 /**
  * Tax report (연말정산용)
  */
@@ -152,9 +162,9 @@ export async function createRequestPayment(
       userId,
       type: PaymentType.REQUEST_FEE,
       amount,
-      fee: Math.round(amount * TAX_RATES.PLATFORM_FEE), // 15% platform fee
+      fee: Math.round(amount * TAX_RATES.PLATFORM_FEE), // 10% platform fee
       tax: 0, // 글러는 세금 없음 (요청자)
-      netAmount: Math.round(amount * (1 - TAX_RATES.PLATFORM_FEE)), // 85% to giller
+      netAmount: Math.round(amount * (1 - TAX_RATES.PLATFORM_FEE)), // 90% to giller
       status: PaymentStatus.PENDING,
       requestId,
       description: '배송 요청 수수료',
@@ -195,7 +205,8 @@ export async function createGillerEarning(
   userId: string,
   requestId: string,
   amount: number,
-  isTaxable: boolean = true
+  isTaxable: boolean = true,
+  options?: CreateGillerEarningOptions
 ): Promise<string> {
   try {
     // 0. 배지 보너스 계산 (P2-9)
@@ -204,8 +215,15 @@ export async function createGillerEarning(
     const bonusAmount = Math.round(baseAmount * badgeBonus);
     const totalAmount = baseAmount + bonusAmount; // 배지 보너스가 포함된 총 금액
 
-    // 1. 플랫폼 수수료 15% (총 금액 기준, pricing-service 기준과 동일)
-    const platformFee = Math.round(totalAmount * TAX_RATES.PLATFORM_FEE);
+    const platformFeeAlreadyDeducted = options?.platformFeeAlreadyDeducted === true;
+    const platformFeeSnapshot = options?.platformFeeAmount ?? null;
+
+    // 1. 플랫폼 수수료 차감
+    // - 기본: 기존 동작 유지(총액에서 10% 차감)
+    // - 신규: 정산단에서 이미 차감된 금액이면 추가 차감 금지
+    const platformFee = platformFeeAlreadyDeducted
+      ? 0
+      : Math.round(totalAmount * TAX_RATES.PLATFORM_FEE);
     const afterFee = totalAmount - platformFee;
 
     // 2. 세금 계산 (수수료 차감 후 금액 기준)
@@ -229,6 +247,8 @@ export async function createGillerEarning(
       description: `배송 완료 수익${badgeBonus > 0 ? ` (배지 보너스 ${(badgeBonus * 100).toFixed(0)}%)` : ''}`,
       metadata: {
         platformFeeRate: TAX_RATES.PLATFORM_FEE,
+        platformFeeAlreadyDeducted,
+        platformFeeSnapshot,
         taxRate: isTaxable ? TAX_RATES.BUSINESS_INCOME_TAX : 0,
         taxWithheld: tax,
         isTaxable,
@@ -248,7 +268,14 @@ export async function createGillerEarning(
       console.log(`   - 배지 보너스(${(badgeBonus * 100).toFixed(0)}%): +${bonusAmount.toLocaleString()}원`);
     }
     console.log(`   - 세전 총액: ${totalAmount.toLocaleString()}원`);
-    console.log(`   - 수수료(15%): ${platformFee.toLocaleString()}원`);
+    if (platformFeeAlreadyDeducted) {
+      console.log(`   - 수수료: 정산단에서 이미 차감됨 (추가 차감 없음)`);
+      if (typeof platformFeeSnapshot === 'number') {
+        console.log(`   - 수수료 스냅샷: ${platformFeeSnapshot.toLocaleString()}원`);
+      }
+    } else {
+      console.log(`   - 수수료(10%): ${platformFee.toLocaleString()}원`);
+    }
     console.log(`   - 세금(3.3%): ${tax.toLocaleString()}원`);
     console.log(`   - 세후 수익: ${netAmount.toLocaleString()}원`);
 
@@ -288,6 +315,47 @@ export async function hasGillerEarningForRequest(
   } catch (error) {
     console.error('Error checking giller earning for request:', error);
     return false;
+  }
+}
+
+/**
+ * Get giller earning payment for a request (if exists)
+ */
+export async function getGillerEarningForRequest(
+  userId: string,
+  requestId: string
+): Promise<Payment | null> {
+  try {
+    const q = query(
+      collection(db, 'payments'),
+      where('userId', '==', userId),
+      where('type', '==', PaymentType.GILLER_EARNING),
+      where('requestId', '==', requestId),
+      limit(1)
+    );
+    const snapshot = await getDocs(q);
+    if (snapshot.empty) return null;
+    const docSnapshot = snapshot.docs[0];
+    const data = docSnapshot.data();
+    return {
+      paymentId: docSnapshot.id,
+      userId: data.userId,
+      type: data.type,
+      amount: data.amount,
+      fee: data.fee,
+      tax: data.tax,
+      netAmount: data.netAmount,
+      status: data.status,
+      requestId: data.requestId,
+      deliveryId: data.deliveryId,
+      description: data.description,
+      metadata: data.metadata,
+      createdAt: data.createdAt?.toDate() || new Date(),
+      completedAt: data.completedAt?.toDate(),
+    };
+  } catch (error) {
+    console.error('Error getting giller earning for request:', error);
+    return null;
   }
 }
 

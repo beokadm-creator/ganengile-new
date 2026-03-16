@@ -3,12 +3,12 @@
  * 1단계 배송비 계산 로직
  *
  * 주요 변경사항:
- * - 기본료: 3,000원 → 3,500원
+ * - 기본료: 3,000원 → 2,000원
  * - 거리료: 800원 (고정) → 역 개수 기반 동적 계산
- * - 서비스 수수료: 0원 → 15%
- * - 길러 정산 로직 추가 (길러 85%, 플랫폼 15%)
+ * - 서비스 수수료: 0원 → 10%
+ * - 길러 정산 로직 추가 (길러 90%, 플랫폼 10%)
  * - 최소 배송비: 3,000원
- * - 최대 배송비: 8,000원
+ * - 최대 배송비: 10,000원
  */
 
 /**
@@ -49,7 +49,7 @@ export interface DeliveryFeeBreakdown {
   urgencySurcharge: number;
   /** 공공요금 (지하철 운임 등) */
   publicFare: number;
-  /** 서비스 수수료 (15%) */
+  /** 서비스 수수료 (10%) */
   serviceFee: number;
   /** 부가세 제외 합계 */
   subtotal: number;
@@ -59,9 +59,9 @@ export interface DeliveryFeeBreakdown {
   totalFee: number;
   /** 길러/플랫폼 비용 분배 */
   breakdown: {
-    /** 길러 정산 (85%) */
+    /** 길러 정산 (90%) */
     gillerFee: number;
-    /** 플랫폼 수수료 (15%) */
+    /** 플랫폼 수수료 (10%) */
     platformFee: number;
   };
   /** 설명 텍스트 */
@@ -71,11 +71,18 @@ export interface DeliveryFeeBreakdown {
 /**
  * 상수 설정
  */
-const PRICING_CONFIG = {
-  BASE_FEE: 3500,          // 기본 배송비 (상향 조정)
+export const PRICING_POLICY = {
+  BASE_FEE: 2000,          // 기본 배송비 (서비스 초기 확산 우선)
   MIN_FEE: 3000,           // 최소 배송비 (VAT 포함)
-  MAX_FEE: 8000,           // 최대 배송비 (VAT 포함)
-  PLATFORM_FEE_RATE: 0.15, // 플랫폼 수수료율 15%
+  MAX_FEE: 10000,          // 최대 배송비 (VAT 포함)
+  PLATFORM_FEE_RATE: 0.1,  // 플랫폼 수수료율 10%
+} as const;
+
+const PRICING_CONFIG = {
+  BASE_FEE: PRICING_POLICY.BASE_FEE,
+  MIN_FEE: PRICING_POLICY.MIN_FEE,
+  MAX_FEE: PRICING_POLICY.MAX_FEE,
+  PLATFORM_FEE_RATE: PRICING_POLICY.PLATFORM_FEE_RATE,
   VAT_RATE: 0.1,           // 부가세율 10%
 
   // 거리 수수료 (역 개수 기반)
@@ -133,7 +140,7 @@ export function calculatePhase1DeliveryFee(params: Phase1PricingParams): Deliver
   // 5. 긴급도 surcharge (기본료 + 거리료 기준)
   const urgencySurcharge = calculateUrgencySurcharge(urgency, baseFee + distanceFee);
 
-  // 6. 서비스 수수료 (15%)
+  // 6. 서비스 수수료 (10%)
   const feeBeforeService = baseFee + distanceFee + weightFee + sizeFee;
   const serviceFee = calculateServiceFee(feeBeforeService, PRICING_CONFIG.PLATFORM_FEE_RATE);
 
@@ -152,7 +159,7 @@ export function calculatePhase1DeliveryFee(params: Phase1PricingParams): Deliver
     totalFee = PRICING_CONFIG.MAX_FEE;
   }
 
-  // 9. 길러 비용 분배 (길러 85%, 플랫폼 15%)
+  // 9. 길러 비용 분배 (길러 90%, 플랫폼 10%)
   const breakdown = calculateBreakdown(totalFee);
 
   // 10. 설명 텍스트 생성
@@ -230,10 +237,10 @@ export function calculateUrgencySurcharge(
 /**
  * 서비스 수수료 계산
  * @param feeBeforeService 서비스 수수료 전 금액
- * @param rate 수수료율 (기본값: 0.15)
+ * @param rate 수수료율 (기본값: 0.1)
  * @returns 서비스 수수료
  */
-export function calculateServiceFee(feeBeforeService: number, rate: number = 0.15): number {
+export function calculateServiceFee(feeBeforeService: number, rate: number = 0.1): number {
   return Math.round(feeBeforeService * rate);
 }
 

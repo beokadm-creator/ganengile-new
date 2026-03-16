@@ -10,5 +10,23 @@ const firebaseConfig = {
   appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID,
 };
 
-const app = getApps().length ? getApps()[0] : initializeApp(firebaseConfig);
-export const auth = getAuth(app);
+const hasValidClientConfig = Boolean(
+  firebaseConfig.apiKey &&
+  firebaseConfig.authDomain &&
+  firebaseConfig.projectId &&
+  firebaseConfig.appId
+);
+
+let authSingleton: ReturnType<typeof getAuth> | null = null;
+
+export function getClientAuth() {
+  if (!hasValidClientConfig) {
+    throw new Error('Firebase client configuration is missing.');
+  }
+
+  if (authSingleton) return authSingleton;
+
+  const app = getApps().length ? getApps()[0] : initializeApp(firebaseConfig);
+  authSingleton = getAuth(app);
+  return authSingleton;
+}

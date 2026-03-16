@@ -115,7 +115,7 @@ export default function AddRouteScreen() {
     try {
       setSaving(true);
       const userId = await requireUserId();
-      await createRoute(
+      const createdRoute = await createRoute(
         userId,
         toStationInfo(startStation),
         toStationInfo(endStation),
@@ -124,8 +124,14 @@ export default function AddRouteScreen() {
       );
       Alert.alert(
         '✅ 동선 등록 완료',
-        `${startStationName} → ${endStationName}`,
-        [{ text: '확인', onPress: () => navigation.navigate('Tabs', { screen: 'RouteManagement' } as any) }]
+        `${startStationName} → ${endStationName}\n출발: ${departureTime}\n요일: ${selectedDays.map((d) => DAY_LABELS[d - 1]).join(', ')}`,
+        [{
+          text: '확인',
+          onPress: () => navigation.navigate('Tabs', {
+            screen: 'RouteManagement',
+            params: { justAddedRouteId: createdRoute.routeId },
+          } as any),
+        }]
       );
     } catch (error) {
       Alert.alert('실패', error instanceof Error ? error.message : '동선 저장에 실패했습니다.');

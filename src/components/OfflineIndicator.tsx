@@ -36,7 +36,7 @@ export const OfflineIndicator: React.FC<OfflineIndicatorProps> = ({ height = 40 
         duration: 300,
         useNativeDriver: true
       }).start(() => {
-        // eslint-disable-next-line react-hooks/set-state-in-effect
+         
         setIsOffline(false);
       });
     }

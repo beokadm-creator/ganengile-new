@@ -15,6 +15,15 @@ interface Settlement {
   refundStatus?: string | null;
   earningPaymentId?: string | null;
   earningAmount?: number | null;
+  customerPaidAmount?: number | null;
+  publicFareAmount?: number | null;
+  vatAmount?: number | null;
+  feeSupplyAmount?: number | null;
+  platformServiceFeeAmount?: number | null;
+  platformFeeAmount?: number | null;
+  gillerGrossAmount?: number | null;
+  gillerWithholdingTaxAmount?: number | null;
+  gillerNetAmount?: number | null;
   errorMessage?: string | null;
   createdAt?: { seconds: number } | string;
   settledAt?: { seconds: number } | string;
@@ -103,16 +112,23 @@ export default function SettlementsPage() {
           <p className="text-lg">내역이 없습니다.</p>
         </div>
       ) : (
-        <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
-          <table className="w-full text-sm">
+        <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-x-auto">
+          <table className="w-full text-sm min-w-[1680px]">
             <thead className="bg-gray-50 text-gray-500 text-xs">
               <tr>
                 <th className="px-4 py-3 text-left">요청 ID</th>
                 <th className="px-4 py-3 text-left">길러 UID</th>
                 <th className="px-4 py-3 text-left">요청자 UID</th>
+                <th className="px-4 py-3 text-right">고객 결제</th>
+                <th className="px-4 py-3 text-right">공급가액</th>
+                <th className="px-4 py-3 text-right">VAT</th>
+                <th className="px-4 py-3 text-right">운임(전달금)</th>
+                <th className="px-4 py-3 text-right">플랫폼 수수료</th>
                 <th className="px-4 py-3 text-right">보증금</th>
                 <th className="px-4 py-3 text-left">환급 상태</th>
-                <th className="px-4 py-3 text-right">정산 금액</th>
+                <th className="px-4 py-3 text-right">길러 정산(세전)</th>
+                <th className="px-4 py-3 text-right">원천세(3.3%)</th>
+                <th className="px-4 py-3 text-right">길러 실지급</th>
                 <th className="px-4 py-3 text-left">요금 상세</th>
                 <th className="px-4 py-3 text-left">상태</th>
                 <th className="px-4 py-3 text-left">생성일</th>
@@ -126,13 +142,34 @@ export default function SettlementsPage() {
                   <td className="px-4 py-3 font-mono text-xs text-gray-500">{item.gillerId?.slice(0, 10)}...</td>
                   <td className="px-4 py-3 font-mono text-xs text-gray-500">{item.requesterId?.slice(0, 10)}...</td>
                   <td className="px-4 py-3 text-right font-semibold">
+                    {typeof item.customerPaidAmount === 'number' ? formatKRW(item.customerPaidAmount) : '-'}
+                  </td>
+                  <td className="px-4 py-3 text-right">
+                    {typeof item.feeSupplyAmount === 'number' ? formatKRW(item.feeSupplyAmount) : '-'}
+                  </td>
+                  <td className="px-4 py-3 text-right">
+                    {typeof item.vatAmount === 'number' ? formatKRW(item.vatAmount) : '-'}
+                  </td>
+                  <td className="px-4 py-3 text-right">
+                    {typeof item.publicFareAmount === 'number' ? formatKRW(item.publicFareAmount) : '-'}
+                  </td>
+                  <td className="px-4 py-3 text-right font-semibold text-indigo-600">
+                    {typeof item.platformFeeAmount === 'number' ? formatKRW(item.platformFeeAmount) : '-'}
+                  </td>
+                  <td className="px-4 py-3 text-right font-semibold">
                     {typeof item.depositAmount === 'number' ? formatKRW(item.depositAmount) : '-'}
                   </td>
                   <td className="px-4 py-3 text-xs text-gray-600">
                     {item.refundStatus ? statusLabel(item.refundStatus) : '-'}
                   </td>
                   <td className="px-4 py-3 text-right font-semibold">
-                    {typeof item.earningAmount === 'number' ? formatKRW(item.earningAmount) : '-'}
+                    {typeof item.gillerGrossAmount === 'number' ? formatKRW(item.gillerGrossAmount) : '-'}
+                  </td>
+                  <td className="px-4 py-3 text-right text-red-600">
+                    {typeof item.gillerWithholdingTaxAmount === 'number' ? formatKRW(item.gillerWithholdingTaxAmount) : '-'}
+                  </td>
+                  <td className="px-4 py-3 text-right font-semibold text-green-700">
+                    {typeof item.gillerNetAmount === 'number' ? formatKRW(item.gillerNetAmount) : '-'}
                   </td>
                   <td className="px-4 py-3">
                     <button
@@ -169,6 +206,22 @@ export default function SettlementsPage() {
               <div className="text-red-500 text-sm">{detailError}</div>
             ) : detail ? (
               <div className="space-y-4 text-sm">
+                {detail.settlement ? (
+                  <div className="border rounded-lg p-3 bg-amber-50 border-amber-100">
+                    <div className="text-xs text-amber-700 mb-2">정산/세무 로그</div>
+                    <div className="grid grid-cols-2 gap-2">
+                      <div>고객 결제: {formatKRW(detail.settlement.customerPaidAmount ?? 0)}</div>
+                      <div>공급가액: {formatKRW(detail.settlement.feeSupplyAmount ?? 0)}</div>
+                      <div>VAT: {formatKRW(detail.settlement.vatAmount ?? 0)}</div>
+                      <div>운임(전달금): {formatKRW(detail.settlement.publicFareAmount ?? 0)}</div>
+                      <div>플랫폼 수수료: {formatKRW(detail.settlement.platformFeeAmount ?? 0)}</div>
+                      <div>길러 정산(세전): {formatKRW(detail.settlement.gillerGrossAmount ?? 0)}</div>
+                      <div>원천세(3.3%): {formatKRW(detail.settlement.gillerWithholdingTaxAmount ?? 0)}</div>
+                      <div>길러 실지급: {formatKRW(detail.settlement.gillerNetAmount ?? 0)}</div>
+                    </div>
+                  </div>
+                ) : null}
+
                 <div className="grid grid-cols-2 gap-3">
                   <div>
                     <div className="text-gray-500 text-xs">경로</div>

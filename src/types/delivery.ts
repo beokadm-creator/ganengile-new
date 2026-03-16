@@ -97,6 +97,9 @@ export interface PackageInfo {
   /** Estimated weight (kg) */
   weight: number;
 
+  /** Original entered weight in kg (optional for legacy data) */
+  weightKg?: number;
+
   /** Package description */
   description: string;
 

@@ -19,6 +19,7 @@ import {
 } from '../../services/pricing-service';
 import type { Phase1PricingParams, PackageSizeType } from '../../services/pricing-service';
 import { OptimizedStationSelectModal } from '../../components/OptimizedStationSelectModal';
+import AppTopBar from '../../components/common/AppTopBar';
 import { requireUserId } from '../../services/firebase';
 import { Colors } from '../../theme';
 import type { Station } from '../../types/config';
@@ -116,14 +117,20 @@ export default function CreateAuctionScreen({ navigation }: Props) {
         });
       } catch (error) {
         console.error('Error calculating delivery fee:', error);
+        const fallback = calculatePhase1DeliveryFee({
+          stationCount: 5,
+          weight: parseFloat(weight) || 1,
+          packageSize: packageSize as PackageSizeType,
+          urgency: 'normal',
+        });
         setDeliveryFee({
-          baseFee: 3500,
-          distanceFee: 600,
-          sizeFee: 0,
-          weightFee: 100,
-          serviceFee: 500,
-          vat: 470,
-          totalFee: 5170,
+          baseFee: fallback.baseFee,
+          distanceFee: fallback.distanceFee,
+          sizeFee: fallback.sizeFee,
+          weightFee: fallback.weightFee,
+          serviceFee: fallback.serviceFee,
+          vat: fallback.vat,
+          totalFee: fallback.totalFee,
           estimatedTime: 30,
         });
       }
@@ -170,13 +177,13 @@ export default function CreateAuctionScreen({ navigation }: Props) {
       if (currentStep === 2 && !validateStep2()) return;
 
       if (currentStep < 5) {
-        setCurrentStep((currentStep + 1) as typeof currentStep);
+        setCurrentStep((currentStep + 1));
       }
     };
 
     const handleBack = () => {
       if (currentStep > 1) {
-        setCurrentStep((currentStep - 1) as typeof currentStep);
+        setCurrentStep((currentStep - 1));
       } else {
         navigation.goBack();
       }
@@ -298,13 +305,13 @@ export default function CreateAuctionScreen({ navigation }: Props) {
     if (currentStep === 2 && !validateStep2()) return;
 
     if (currentStep < 5) {
-      setCurrentStep((currentStep + 1) as typeof currentStep);
+      setCurrentStep((currentStep + 1));
     }
   };
 
   const handleBack = () => {
     if (currentStep > 1) {
-      setCurrentStep((currentStep - 1) as typeof currentStep);
+      setCurrentStep((currentStep - 1));
     } else {
       navigation.goBack();
     }
@@ -513,7 +520,9 @@ export default function CreateAuctionScreen({ navigation }: Props) {
               무게: {deliveryFee.weightFee.toLocaleString()}원
             </Text>
             <Text style={styles.feeBreakdownText}>
-              크기: {deliveryFee.sizeFee.toLocaleString()}원
+              {deliveryFee.sizeFee > 0
+                ? `크기: ${deliveryFee.sizeFee.toLocaleString()}원`
+                : '크기: 추가요금 없음'}
             </Text>
             <Text style={styles.feeBreakdownText}>
               서비스 수수료: {deliveryFee.serviceFee.toLocaleString()}원
@@ -598,13 +607,7 @@ export default function CreateAuctionScreen({ navigation }: Props) {
       style={styles.container}
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
     >
-      <View style={styles.header}>
-        <TouchableOpacity onPress={handleBack} style={styles.backButton}>
-          <Text style={styles.backButtonText}>←</Text>
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>새 경매</Text>
-        <View style={styles.headerSpacer} />
-      </View>
+      <AppTopBar title="새 경매" onBack={handleBack} />
 
       <View style={styles.progressContainer}>
         <View style={styles.progressDot}>

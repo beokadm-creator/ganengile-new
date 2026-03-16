@@ -1,9 +1,9 @@
 /**
  * Identity Verification Screen
- * 신원 인증 화면 - 신분증 업로드 및 정보 제출
+ * PASS/Kakao CI 기반 신원 인증 시작 화면
  */
 
-import React, { useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   View,
   Text,
@@ -12,16 +12,21 @@ import {
   Alert,
   ActivityIndicator,
   ScrollView,
-  TextInput,
+  Platform,
 } from 'react-native';
-import * as ImagePicker from 'expo-image-picker';
+import * as WebBrowser from 'expo-web-browser';
+import * as Crypto from 'expo-crypto';
 import { StackNavigationProp } from '@react-navigation/stack';
 import { useUser } from '../../contexts/UserContext';
 import {
-  uploadIdCardImage,
-  submitVerification,
+  completeCiVerification,
+  completeCiVerificationByApi,
+  getUserVerification,
+  getVerificationStatusDisplay,
+  startCiVerification,
 } from '../../services/verification-service';
-import { VerificationSubmitData } from '../../types/profile';
+import type { UserVerification, VerificationProvider } from '../../types/profile';
+import { PASS_TEST_MODE } from '../../config/feature-flags';
 
 type NavigationProp = StackNavigationProp<any>;
 
@@ -29,465 +34,391 @@ interface Props {
   navigation: NavigationProp;
 }
 
-type IdCardType = 'resident' | 'driver' | 'passport';
+const PROVIDERS: Array<{
+  key: VerificationProvider;
+  title: string;
+  subtitle: string;
+  icon: string;
+  color: string;
+}> = [
+  {
+    key: 'pass',
+    title: 'PASS 인증',
+    subtitle: '통신사 본인인증으로 CI 검증',
+    icon: '🛡️',
+    color: '#2563EB',
+  },
+  {
+    key: 'kakao',
+    title: '카카오 인증',
+    subtitle: '카카오 본인확인으로 CI 검증',
+    icon: '💬',
+    color: '#F59E0B',
+  },
+];
 
 export default function IdentityVerificationScreen({ navigation }: Props) {
-  const { user } = useUser();
-  const [idCardType, setIdCardType] = useState<IdCardType>('resident');
-  const [frontImageUrl, setFrontImageUrl] = useState<string>('');
-  const [backImageUrl, setBackImageUrl] = useState<string>('');
-  const [name, setName] = useState<string>('');
-  const [birthDate, setBirthDate] = useState<string>('');
-  const [personalId, setPersonalId] = useState<string>('');
-  const [loading, setLoading] = useState<boolean>(false);
+  const { user, refreshUser } = useUser();
+  const [verification, setVerification] = useState<UserVerification | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [selectedProvider, setSelectedProvider] = useState<VerificationProvider | null>(null);
+  const [sessionId, setSessionId] = useState<string | null>(null);
+
+  const status = useMemo(() => getVerificationStatusDisplay(verification), [verification]);
+
+  const loadVerification = useCallback(async () => {
+    if (!user?.uid) return;
+    try {
+      const current = await getUserVerification(user.uid);
+      setVerification(current);
+      if (current?.externalAuth?.provider) {
+        setSelectedProvider(current.externalAuth.provider);
+      }
+    } catch (error) {
+      console.error('Failed to load verification:', error);
+    }
+  }, [user?.uid]);
+
+  useEffect(() => {
+    void loadVerification();
+  }, [loadVerification]);
 
   if (!user) {
     return (
-      <View style={styles.loadingContainer}>
+      <View style={styles.centerContainer}>
         <Text style={styles.errorText}>로그인이 필요합니다.</Text>
       </View>
     );
   }
 
-  const handlePickImage = async (type: 'front' | 'back') => {
-    if (!user) return;
-
+  const handleStart = async (provider: VerificationProvider) => {
     try {
-      const result = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: ImagePicker.MediaTypeOptions.Images,
-        allowsEditing: true,
-        quality: 0.8,
-      });
-
-      if (result.canceled) {
-        return;
-      }
-
       setLoading(true);
-      const imageUrl = await uploadIdCardImage(user.uid, result.assets[0].uri, type);
+      setSelectedProvider(provider);
 
-      if (type === 'front') {
-        setFrontImageUrl(imageUrl);
+      const result = await startCiVerification(user.uid, provider);
+      setSessionId(result.sessionId || null);
+      await loadVerification();
+
+      if (result.redirectUrl) {
+        if (Platform.OS === 'web') {
+          if (typeof window !== 'undefined') {
+            window.open(result.redirectUrl, '_blank', 'noopener,noreferrer');
+          }
+        } else {
+          await WebBrowser.openBrowserAsync(result.redirectUrl);
+        }
       } else {
-        setBackImageUrl(imageUrl);
+        Alert.alert(
+          '연동 URL 미설정',
+          `${provider === 'pass' ? 'PASS' : '카카오'} 인증 URL이 아직 설정되지 않았습니다.\n현재는 인증 시작 상태만 기록됩니다.`
+        );
       }
+
+      Alert.alert(
+        '인증 시작됨',
+        '외부 인증을 완료한 뒤 아래 "인증 완료 확인" 버튼으로 상태를 갱신해주세요.'
+      );
     } catch (error) {
-      console.error('Error picking image:', error);
-      Alert.alert('오류', '이미지 업로드에 실패했습니다.');
+      console.error('Failed to start CI verification:', error);
+      Alert.alert('오류', '본인인증 시작에 실패했습니다. 잠시 후 다시 시도해주세요.');
     } finally {
       setLoading(false);
     }
   };
 
-  const handleSubmit = async () => {
-    if (!user) {
-      Alert.alert('알림', '로그인이 필요합니다.');
+  const handleApplyVerificationResult = async () => {
+    if (!selectedProvider) {
+      Alert.alert('안내', '먼저 PASS 또는 카카오 인증을 시작해주세요.');
       return;
     }
 
-    if (!frontImageUrl) {
-      Alert.alert('알림', '신분증 앞면 사진을 업로드해주세요.');
-      return;
-    }
-
-    if (idCardType !== 'passport' && !backImageUrl) {
-      Alert.alert('알림', '신분증 뒷면 사진을 업로드해주세요.');
-      return;
-    }
-
-    if (!name || !birthDate) {
-      Alert.alert('알림', '모든 필수 정보를 입력해주세요.');
+    if (!PASS_TEST_MODE) {
+      Alert.alert('안내', '운영 환경에서는 인증사 콜백으로 자동 반영됩니다.');
       return;
     }
 
     try {
       setLoading(true);
+      let applied = false;
 
-      const submitData: VerificationSubmitData = {
-        idCardType,
-        frontImageUrl,
-        backImageUrl: idCardType !== 'passport' ? backImageUrl : undefined,
-        name,
-        birthDate,
-        personalId: personalId || undefined,
-      };
+      const apiResult = await completeCiVerificationByApi(selectedProvider, sessionId || undefined);
+      if (apiResult.ok && apiResult.ciHash) {
+        applied = true;
+      } else if (PASS_TEST_MODE) {
+        const ciHash = await Crypto.digestStringAsync(
+          Crypto.CryptoDigestAlgorithm.SHA256,
+          `${user.uid}:${selectedProvider}:${Date.now()}`
+        );
+        await completeCiVerification(user.uid, selectedProvider, ciHash);
+        applied = true;
+      }
 
-      await submitVerification(user.uid, submitData);
+      if (!applied) {
+        Alert.alert('안내', '아직 인증 완료 처리가 확인되지 않았습니다. 인증 완료 후 다시 시도해주세요.');
+        return;
+      }
 
-      Alert.alert(
-        '제출 완료',
-        '신원 인증이 제출되었습니다. 심사는 영업일 기준으로 1~3일 소요됩니다.',
-        [{ text: '확인', onPress: () => navigation.goBack() }]
-      );
+      await Promise.all([loadVerification(), refreshUser()]);
+
+      Alert.alert('인증 완료', '본인인증이 완료되었습니다. 다음 단계로 길러 신청(관리자 심사)을 진행해주세요.', [
+        {
+          text: '길러 신청으로 이동',
+          onPress: () => navigation.navigate('GillerApply'),
+        },
+        { text: '닫기', style: 'cancel' },
+      ]);
     } catch (error) {
-      console.error('Error submitting verification:', error);
-      Alert.alert('오류', '인증 제출에 실패했습니다.');
+      console.error('Failed to apply verification result:', error);
+      Alert.alert('오류', '인증 결과 반영에 실패했습니다.');
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <View style={styles.container}>
-      <ScrollView style={styles.content}>
-        {/* Header */}
-        <View style={styles.header}>
-          <Text style={styles.headerTitle}>신원 인증</Text>
-          <Text style={styles.headerSubtitle}>
-            길러로 활동하기 위해 신분증을 제출해주세요
+    <ScrollView style={styles.container} contentContainerStyle={styles.content}>
+      <View style={styles.headerCard}>
+        <Text style={styles.headerTitle}>신원 인증</Text>
+        <Text style={styles.headerSubtitle}>
+          신분증 이미지 업로드 대신 PASS 또는 카카오 본인인증(CI)으로 안전하게 인증합니다.
+        </Text>
+      </View>
+
+      <View style={styles.statusCard}>
+        <Text style={styles.statusTitle}>현재 상태</Text>
+        <View style={[styles.statusBadge, { backgroundColor: `${status.color}22` }]}> 
+          <Text style={[styles.statusBadgeText, { color: status.color }]}>
+            {status.icon} {status.statusKo}
           </Text>
         </View>
+        <Text style={styles.statusDescription}>{status.description}</Text>
+        {status.status === 'approved' && user.gillerApplicationStatus !== 'pending' && user.gillerApplicationStatus !== 'approved' && (
+          <Text style={styles.nextStepText}>다음 단계: 관리자에 길러 승급 요청(신청)을 제출하세요.</Text>
+        )}
+        {user.gillerApplicationStatus === 'pending' && (
+          <Text style={styles.nextStepText}>현재 상태: 길러 신청 심사 중입니다.</Text>
+        )}
+      </View>
 
-        {/* ID Card Type Selection */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>신분증 종류</Text>
-          <View style={styles.cardTypeContainer}>
+      <View style={styles.section}>
+        <Text style={styles.sectionTitle}>인증 수단 선택</Text>
+        {PROVIDERS.map((provider) => {
+          const isSelected = selectedProvider === provider.key;
+          return (
             <TouchableOpacity
-              style={[styles.cardTypeButton, idCardType === 'resident' && styles.cardTypeButtonActive]}
-              onPress={() => setIdCardType('resident')}
-            >
-              <Text style={styles.cardTypeIcon}>🪪</Text>
-              <Text style={styles.cardTypeName}>주민등록증</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[styles.cardTypeButton, idCardType === 'driver' && styles.cardTypeButtonActive]}
-              onPress={() => setIdCardType('driver')}
-            >
-              <Text style={styles.cardTypeIcon}>🚗</Text>
-              <Text style={styles.cardTypeName}>운전면허증</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[styles.cardTypeButton, idCardType === 'passport' && styles.cardTypeButtonActive]}
-              onPress={() => setIdCardType('passport')}
-            >
-              <Text style={styles.cardTypeIcon}>🛂</Text>
-              <Text style={styles.cardTypeName}>여권</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-
-        {/* Photo Upload */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>신분증 사진</Text>
-
-          <TouchableOpacity
-            style={styles.uploadButton}
-            onPress={() => handlePickImage('front')}
-            disabled={loading}
-          >
-            <View style={styles.uploadContent}>
-              <Text style={styles.uploadIcon}>📷</Text>
-              <View style={styles.uploadTextContainer}>
-                <Text style={styles.uploadTitle}>
-                  앞면 {idCardType === 'passport' ? '사진' : '사진 (또는 얼굴이 나온 곳)'}
-                </Text>
-                {frontImageUrl ? (
-                  <Text style={styles.uploadStatus}>✅ 업로드됨</Text>
-                ) : (
-                  <Text style={styles.uploadStatusPlaceholder}>업로드 필요</Text>
-                )}
-              </View>
-              {!loading && <Text style={styles.uploadArrow}>›</Text>}
-            </View>
-            {loading && <ActivityIndicator color="#9C27B0" />}
-          </TouchableOpacity>
-
-          {idCardType !== 'passport' && (
-            <TouchableOpacity
-              style={styles.uploadButton}
-              onPress={() => handlePickImage('back')}
+              key={provider.key}
+              style={[
+                styles.providerCard,
+                isSelected && styles.providerCardSelected,
+                { borderColor: isSelected ? provider.color : '#E5E7EB' },
+              ]}
+              onPress={() => handleStart(provider.key)}
               disabled={loading}
+              activeOpacity={0.85}
             >
-              <View style={styles.uploadContent}>
-                <Text style={styles.uploadIcon}>📷</Text>
-                <View style={styles.uploadTextContainer}>
-                  <Text style={styles.uploadTitle}>뒷면 사진</Text>
-                  {backImageUrl ? (
-                    <Text style={styles.uploadStatus}>✅ 업로드됨</Text>
-                  ) : (
-                    <Text style={styles.uploadStatusPlaceholder}>업로드 필요</Text>
-                  )}
+              <View style={styles.providerLeft}>
+                <Text style={styles.providerIcon}>{provider.icon}</Text>
+                <View>
+                  <Text style={styles.providerTitle}>{provider.title}</Text>
+                  <Text style={styles.providerSubtitle}>{provider.subtitle}</Text>
                 </View>
-                {!loading && <Text style={styles.uploadArrow}>›</Text>}
               </View>
-              {loading && <ActivityIndicator color="#9C27B0" />}
+              <Text style={[styles.providerAction, { color: provider.color }]}>시작</Text>
             </TouchableOpacity>
-          )}
+          );
+        })}
+      </View>
 
-          <View style={styles.photoNoteContainer}>
-            <Text style={styles.photoNoteIcon}>ℹ️</Text>
-            <Text style={styles.photoNoteText}>
-              사진은 선명하게 촬영된본만 가능하며, 확장자는 .jpg 형식만
-              지원합니다.
-            </Text>
-          </View>
-        </View>
+      <View style={styles.noteCard}>
+        <Text style={styles.noteTitle}>보안 원칙</Text>
+        <Text style={styles.noteText}>• 신분증 이미지/주민번호 원본은 저장하지 않습니다.</Text>
+        <Text style={styles.noteText}>• 서비스에는 CI 해시와 인증 결과만 저장합니다.</Text>
+        <Text style={styles.noteText}>• 인증 완료 후 길러 신청 심사로 진행할 수 있습니다.</Text>
+      </View>
 
-        {/* Personal Information */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>신분증 정보</Text>
+      <TouchableOpacity
+        style={[styles.submitButton, loading && styles.submitButtonDisabled]}
+        onPress={handleApplyVerificationResult}
+        disabled={loading}
+      >
+        {loading ? (
+          <ActivityIndicator color="#fff" />
+        ) : (
+          <Text style={styles.submitButtonText}>
+            {PASS_TEST_MODE ? '인증 완료 확인 (테스트)' : '인증 완료 확인'}
+          </Text>
+        )}
+      </TouchableOpacity>
 
-          <View style={styles.inputGroup}>
-            <Text style={styles.inputLabel}>이름 *</Text>
-            <View style={styles.inputContainer}>
-              <Text style={styles.inputPrefix}>이름</Text>
-              <TextInput
-                style={styles.input}
-                placeholder="신분증상 실명"
-                value={name}
-                onChangeText={setName}
-              />
-            </View>
-          </View>
-
-          <View style={styles.inputGroup}>
-            <Text style={styles.inputLabel}>생년월일 *</Text>
-            <View style={styles.inputContainer}>
-              <Text style={styles.inputPrefix}>YYYYMMDD</Text>
-              <TextInput
-                style={styles.input}
-                placeholder="예: 19900101"
-                value={birthDate}
-                onChangeText={setBirthDate}
-                maxLength={8}
-                keyboardType="number-pad"
-              />
-            </View>
-          </View>
-
-          <View style={styles.inputGroup}>
-            <Text style={styles.inputLabel}>주민등록번호 뒤 7자리</Text>
-            <View style={styles.inputContainer}>
-              <Text style={styles.inputPrefix}>•••••••••</Text>
-              <TextInput
-                style={styles.input}
-                placeholder="선택사항 (신원 확인용)"
-                value={personalId}
-                onChangeText={setPersonalId}
-                maxLength={7}
-                keyboardType="number-pad"
-                secureTextEntry
-              />
-            </View>
-          </View>
-
-          <View style={styles.noteContainer}>
-            <Text style={styles.noteIcon}>ℹ️</Text>
-            <Text style={styles.noteText}>
-              제출된 정보는 심사용으로만 사용되며, 마이페이지에서 언제든지 삭제할 수
-              있습니다.
-            </Text>
-          </View>
-        </View>
-
-        {/* Submit Button */}
-        <TouchableOpacity
-          style={[styles.submitButton, (!frontImageUrl || (idCardType !== 'passport' && !backImageUrl)) && styles.submitButtonDisabled]}
-          onPress={handleSubmit}
-          disabled={loading || !frontImageUrl || (idCardType !== 'passport' && !backImageUrl)}
-        >
-          {loading ? (
-            <ActivityIndicator color="#fff" />
-          ) : (
-            <Text style={styles.submitButtonText}>인증 제출하기</Text>
-          )}
-        </TouchableOpacity>
-      </ScrollView>
-    </View>
+      {!PASS_TEST_MODE && (
+        <Text style={styles.footerGuide}>
+          운영 환경에서는 인증사 콜백에서 자동으로 인증 상태가 반영됩니다.
+        </Text>
+      )}
+    </ScrollView>
   );
 }
 
 const styles = StyleSheet.create({
-  cardTypeButton: {
-    alignItems: 'center',
-    backgroundColor: '#f5f5f5',
-    borderRadius: 8,
-    flex: 1,
-    padding: 16,
-    borderWidth: 1,
-    borderColor: '#e0e0e0',
-  },
-  cardTypeButtonActive: {
-    backgroundColor: '#9C27B0',
-    borderColor: '#9C27B0',
-  },
-  cardTypeContainer: {
-    flexDirection: 'row',
-    gap: 12,
-  },
-  cardTypeIcon: {
-    fontSize: 24,
-    marginRight: 8,
-  },
-  cardTypeName: {
-    color: '#333',
-    fontSize: 14,
-    fontWeight: '600',
-  },
   container: {
-    backgroundColor: '#f5f5f5',
     flex: 1,
+    backgroundColor: '#F8FAFC',
   },
   content: {
+    padding: 16,
+    paddingBottom: 28,
+    gap: 12,
+  },
+  centerContainer: {
     flex: 1,
-  },
-  errorText: {
-    color: '#f44336',
-    fontSize: 16,
-    textAlign: 'center',
-  },
-  loadingContainer: {
     alignItems: 'center',
     justifyContent: 'center',
-    flex: 1,
-    backgroundColor: '#f5f5f5',
-  },
-  header: {
-    padding: 20,
-    borderBottomWidth: 1,
-    borderBottomColor: '#e0e0e0',
     backgroundColor: '#fff',
   },
-  headerSubtitle: {
-    color: '#666',
-    fontSize: 14,
-    marginTop: 8,
-    textAlign: 'center',
+  errorText: {
+    fontSize: 15,
+    color: '#374151',
+  },
+  headerCard: {
+    backgroundColor: '#fff',
+    borderRadius: 14,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
   },
   headerTitle: {
-    color: '#333',
-    fontSize: 20,
-    fontWeight: 'bold',
-    textAlign: 'center',
+    fontSize: 22,
+    fontWeight: '700',
+    color: '#111827',
+    marginBottom: 6,
   },
-  inputContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
+  headerSubtitle: {
+    fontSize: 14,
+    lineHeight: 21,
+    color: '#4B5563',
+  },
+  statusCard: {
     backgroundColor: '#fff',
-    borderRadius: 8,
+    borderRadius: 14,
+    padding: 16,
     borderWidth: 1,
-    borderColor: '#e0e0e0',
-    paddingHorizontal: 12,
-    paddingVertical: 12,
+    borderColor: '#E5E7EB',
+    gap: 8,
   },
-  inputGroup: {
-    marginBottom: 16,
+  statusTitle: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: '#111827',
   },
-  inputLabel: {
-    color: '#333',
-    fontSize: 14,
+  statusBadge: {
+    alignSelf: 'flex-start',
+    borderRadius: 999,
+    paddingVertical: 4,
+    paddingHorizontal: 10,
+  },
+  statusBadgeText: {
+    fontSize: 13,
+    fontWeight: '700',
+  },
+  statusDescription: {
+    fontSize: 13,
+    color: '#4B5563',
+    lineHeight: 20,
+  },
+  nextStepText: {
+    marginTop: 2,
+    fontSize: 12,
+    color: '#1F2937',
     fontWeight: '600',
-    marginBottom: 8,
-  },
-  inputPrefix: {
-    color: '#999',
-    fontSize: 14,
-    marginRight: 12,
-  },
-  input: {
-    flex: 1,
-    fontSize: 16,
-    color: '#333',
-  },
-  noteContainer: {
-    flexDirection: 'row',
-    backgroundColor: '#f0f7ff',
-    borderRadius: 8,
-    padding: 12,
-    marginTop: 8,
-  },
-  noteIcon: {
-    fontSize: 16,
-    marginRight: 8,
-  },
-  noteText: {
-    color: '#333',
-    fontSize: 12,
-    flex: 1,
-  },
-  photoNoteContainer: {
-    flexDirection: 'row',
-    backgroundColor: '#fff8dc',
-    borderRadius: 8,
-    padding: 12,
-    marginTop: 12,
-  },
-  photoNoteIcon: {
-    fontSize: 16,
-    marginRight: 8,
-  },
-  photoNoteText: {
-    color: '#333',
-    fontSize: 12,
-    flex: 1,
   },
   section: {
     backgroundColor: '#fff',
-    borderRadius: 12,
+    borderRadius: 14,
     padding: 16,
-    marginBottom: 16,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+    gap: 10,
   },
   sectionTitle: {
-    color: '#333',
-    fontSize: 18,
-    fontWeight: 'bold',
-    marginBottom: 16,
+    fontSize: 15,
+    fontWeight: '700',
+    color: '#111827',
+    marginBottom: 4,
+  },
+  providerCard: {
+    borderRadius: 12,
+    borderWidth: 1,
+    padding: 14,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: '#fff',
+  },
+  providerCardSelected: {
+    backgroundColor: '#F9FAFB',
+  },
+  providerLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    flexShrink: 1,
+  },
+  providerIcon: {
+    fontSize: 24,
+  },
+  providerTitle: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: '#111827',
+  },
+  providerSubtitle: {
+    fontSize: 12,
+    color: '#6B7280',
+    marginTop: 2,
+  },
+  providerAction: {
+    fontSize: 13,
+    fontWeight: '700',
+  },
+  noteCard: {
+    backgroundColor: '#ECFEFF',
+    borderColor: '#BAE6FD',
+    borderRadius: 14,
+    borderWidth: 1,
+    padding: 14,
+    gap: 4,
+  },
+  noteTitle: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#0F172A',
+    marginBottom: 2,
+  },
+  noteText: {
+    fontSize: 12,
+    lineHeight: 18,
+    color: '#0F172A',
   },
   submitButton: {
-    backgroundColor: '#9C27B0',
+    height: 52,
     borderRadius: 12,
-    padding: 16,
+    backgroundColor: '#111827',
     alignItems: 'center',
-    marginHorizontal: 16,
-    marginTop: 16,
+    justifyContent: 'center',
   },
   submitButtonDisabled: {
-    backgroundColor: '#e0e0e0',
+    backgroundColor: '#6B7280',
   },
   submitButtonText: {
     color: '#fff',
-    fontSize: 16,
-    fontWeight: 'bold',
+    fontSize: 15,
+    fontWeight: '700',
   },
-  uploadArrow: {
-    color: '#9C27B0',
-    fontSize: 18,
-  },
-  uploadButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#fff',
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: '#e0e0e0',
-    padding: 16,
-    marginBottom: 12,
-    justifyContent: 'space-between',
-  },
-  uploadContent: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    flex: 1,
-  },
-  uploadIcon: {
-    fontSize: 24,
-    marginRight: 12,
-  },
-  uploadStatus: {
-    color: '#4CAF50',
+  footerGuide: {
+    textAlign: 'center',
     fontSize: 12,
-    fontWeight: '600',
-  },
-  uploadStatusPlaceholder: {
-    color: '#999',
-    fontSize: 12,
-  },
-  uploadTextContainer: {
-    flex: 1,
-  },
-  uploadTitle: {
-    color: '#333',
-    fontSize: 14,
-    fontWeight: '500',
+    lineHeight: 18,
+    color: '#6B7280',
   },
 });

@@ -6,12 +6,30 @@ import {
   ActivityIndicator,
   ScrollView,
   TouchableOpacity,
+  Platform,
 } from 'react-native';
 import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import { Colors } from '../../theme';
 import * as requestService from '../../services/request-service';
 import { fetchUserInfo } from '../../services/matching-service';
+
+const IconWrapper = ({
+  name,
+  size,
+  color,
+  emoji,
+}: {
+  name: string;
+  size: number;
+  color: string;
+  emoji: string;
+}) => {
+  if (Platform.OS === 'web') {
+    return <Text style={{ fontSize: size, color }}>{emoji}</Text>;
+  }
+  return <Ionicons name={name as any} size={size} color={color} />;
+};
 
 type MatchingResultRouteParams = {
   MatchingResult: {
@@ -37,10 +55,12 @@ export const MatchingResultScreen: React.FC = () => {
   const { requestId, pickupStationName, deliveryStationName } = route.params;
 
   const [status, setStatus] = useState<RequestStatus>('pending');
-  const [loading, setLoading] = useState(true);
+  const [_loading, setLoading] = useState(true);
   const [giller, setGiller] = useState<any>(null);
   const [notificationSent, setNotificationSent] = useState(false);
   const [notificationError, setNotificationError] = useState<string | null>(null);
+  const [noMatchMessage, setNoMatchMessage] = useState<string | null>(null);
+  const [showNoMatchMessage, setShowNoMatchMessage] = useState(false);
 
   // 요청 상태 실시간 감시
   useEffect(() => {
@@ -61,7 +81,11 @@ export const MatchingResultScreen: React.FC = () => {
       try {
         const result = await requestService.notifyGillers(requestId);
         if (!result.success) {
-          setNotificationError(result.error || '알림 전송에 실패했습니다.');
+          if (result.error?.includes('매칭 가능한 길러가 없습니다')) {
+            setNoMatchMessage('현재 즉시 매칭 가능한 길러가 아직 없습니다. 요청은 유지되며 순차적으로 재탐색됩니다.');
+          } else {
+            setNotificationError(result.error || '알림 전송에 실패했습니다.');
+          }
           return;
         }
         setNotificationSent(true);
@@ -77,6 +101,17 @@ export const MatchingResultScreen: React.FC = () => {
       if (unsubscribe) unsubscribe();
     };
   }, [requestId]);
+
+  useEffect(() => {
+    if (!noMatchMessage || status !== 'pending') {
+      setShowNoMatchMessage(false);
+      return;
+    }
+    const timer = setTimeout(() => {
+      setShowNoMatchMessage(true);
+    }, 20000);
+    return () => clearTimeout(timer);
+  }, [noMatchMessage, status]);
 
   const handleGoToChat = () => {
     navigation.navigate('Chat' as any, {
@@ -102,7 +137,7 @@ export const MatchingResultScreen: React.FC = () => {
         <ScrollView contentContainerStyle={styles.scrollContent}>
           {/* 성공 아이콘 */}
           <View style={styles.iconContainer}>
-            <Ionicons name="checkmark-circle" size={100} color={Colors.success} />
+            <IconWrapper name="checkmark-circle" size={100} color={Colors.success} emoji="✅" />
           </View>
 
           <Text style={styles.title}>길러 매칭 완료!</Text>
@@ -114,7 +149,7 @@ export const MatchingResultScreen: React.FC = () => {
           <View style={styles.infoCard}>
             <View style={styles.gillerInfo}>
               <View style={styles.avatar}>
-                <Ionicons name="person" size={40} color={Colors.primary} />
+                <IconWrapper name="person" size={40} color={Colors.primary} emoji="👤" />
               </View>
               <View style={styles.gillerDetails}>
                 <Text style={styles.gillerName}>{giller.name || '길러'}</Text>
@@ -142,7 +177,7 @@ export const MatchingResultScreen: React.FC = () => {
               style={[styles.button, styles.primaryButton]}
               onPress={handleGoToChat}
             >
-              <Ionicons name="chatbubbles" size={24} color={Colors.white} />
+              <IconWrapper name="chatbubbles" size={24} color={Colors.white} emoji="💬" />
               <Text style={styles.buttonText}>채팅 시작하기</Text>
             </TouchableOpacity>
 
@@ -174,7 +209,7 @@ export const MatchingResultScreen: React.FC = () => {
         {/* 알림 전송 상태 */}
         {notificationSent && !notificationError && (
           <View style={styles.successContainer}>
-            <Ionicons name="notifications" size={30} color={Colors.success} />
+            <IconWrapper name="notifications" size={30} color={Colors.success} emoji="🔔" />
             <Text style={styles.successText}>
               알림 전송 완료!
             </Text>
@@ -185,8 +220,17 @@ export const MatchingResultScreen: React.FC = () => {
         )}
         {notificationError && (
           <View style={styles.errorContainer}>
-            <Ionicons name="alert-circle" size={30} color={Colors.error} />
+            <IconWrapper name="alert-circle" size={30} color={Colors.error} emoji="⚠️" />
             <Text style={styles.errorText}>{notificationError}</Text>
+          </View>
+        )}
+        {showNoMatchMessage && noMatchMessage && (
+          <View style={styles.pendingContainer}>
+            <Text style={styles.pendingIcon}>🔎</Text>
+            <View style={styles.pendingTextWrap}>
+              <Text style={styles.pendingTitle}>아직 매칭 대기 중입니다</Text>
+              <Text style={styles.pendingText}>{noMatchMessage}</Text>
+            </View>
           </View>
         )}
 
@@ -194,7 +238,7 @@ export const MatchingResultScreen: React.FC = () => {
         {(pickupStationName || deliveryStationName) && (
           <View style={styles.infoCard}>
             <View style={styles.infoRow}>
-              <Ionicons name="map-outline" size={20} color={Colors.primary} />
+              <IconWrapper name="map-outline" size={20} color={Colors.primary} emoji="📍" />
               <Text style={styles.infoText}>
                 {pickupStationName} → {deliveryStationName}
               </Text>
@@ -207,7 +251,7 @@ export const MatchingResultScreen: React.FC = () => {
           <Text style={styles.noticeTitle}>⏰ 대기 중</Text>
           <View style={styles.noticeList}>
             <Text style={styles.noticeItem}>• 길러가 요청을 확인하면 매칭됩니다.</Text>
-            <Text style={styles.noticeItem}>• 매칭되면 알림로 알려드립니다.</Text>
+            <Text style={styles.noticeItem}>• 매칭되면 알림으로 알려드립니다.</Text>
             <Text style={styles.noticeItem}>• 홈으로 가셔도 알림을 받을 수 있습니다.</Text>
           </View>
         </View>
@@ -318,6 +362,34 @@ const styles = StyleSheet.create({
     color: '#C62828',
     marginLeft: 12,
     flex: 1,
+  },
+  pendingContainer: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    backgroundColor: '#FFFDE7',
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 20,
+    borderWidth: 1,
+    borderColor: '#FBC02D',
+  },
+  pendingIcon: {
+    fontSize: 24,
+    marginRight: 10,
+  },
+  pendingTextWrap: {
+    flex: 1,
+  },
+  pendingTitle: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: '#8D6E00',
+    marginBottom: 4,
+  },
+  pendingText: {
+    fontSize: 13,
+    color: '#6D4C41',
+    lineHeight: 19,
   },
   infoCard: {
     backgroundColor: Colors.white,

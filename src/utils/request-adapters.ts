@@ -14,7 +14,7 @@ export interface TrackingModel {
   status: string;
   pickupStation: { stationName: string; line: string };
   deliveryStation: { stationName: string; line: string };
-  packageInfo: { size: string; weight: string | number; description?: string };
+  packageInfo: { size: string; weight: string | number; weightKg?: number; description?: string };
   recipientName?: string;
   recipientVerificationCode?: string;
   createdAt?: Date;
@@ -27,7 +27,7 @@ export interface RequestDetailView {
   status: RequestStatus;
   pickupStation: { stationName: string; line: string };
   deliveryStation: { stationName: string; line: string };
-  packageInfo: { size: string; weight: string | number; description?: string };
+  packageInfo: { size: string; weight: string | number; weightKg?: number; description?: string };
   feeTotal: number;
   deadline?: Date;
   preferredTime?: { departureTime?: string; arrivalTime?: string };
@@ -37,6 +37,9 @@ export interface RequestDetailView {
 }
 
 export function toRequestDetailView(request: Request): RequestDetailView {
+  const rawFee = (request as any).fee;
+  const feeTotal = resolveFeeTotal(rawFee, request.initialNegotiationFee || 0);
+
   return {
     status: request.status,
     pickupStation: {
@@ -50,16 +53,40 @@ export function toRequestDetailView(request: Request): RequestDetailView {
     packageInfo: {
       size: request.packageInfo?.size || '-',
       weight: request.packageInfo?.weight ?? '-',
+      weightKg: request.packageInfo?.weightKg,
       description: request.packageInfo?.description,
     },
-    // @ts-ignore - fee may not exist in Request type
-    feeTotal: (request as any).fee || request.initialNegotiationFee || 0,
+    feeTotal,
     deadline: request.deadline instanceof Timestamp ? request.deadline.toDate() : request.deadline,
     preferredTime: request.preferredTime,
     createdAt: request.createdAt instanceof Timestamp ? request.createdAt.toDate() : request.createdAt,
     cancellationReason: request.cancellationReason,
     cancelledAt: request.cancelledAt instanceof Timestamp ? request.cancelledAt.toDate() : request.cancelledAt,
   };
+}
+
+function resolveFeeTotal(rawFee: unknown, fallback: number): number {
+  const direct = extractNumber(rawFee);
+  if (typeof direct === 'number') return direct;
+
+  if (rawFee && typeof rawFee === 'object') {
+    const totalFee = extractNumber((rawFee as any).totalFee);
+    if (typeof totalFee === 'number') return totalFee;
+
+    const nestedTotalFee = extractNumber((rawFee as any).total?.fee);
+    if (typeof nestedTotalFee === 'number') return nestedTotalFee;
+  }
+
+  return Number.isFinite(fallback) ? fallback : 0;
+}
+
+function extractNumber(value: unknown): number | undefined {
+  if (typeof value === 'number') return Number.isFinite(value) ? value : undefined;
+  if (typeof value === 'string') {
+    const normalized = Number(value.replace(/[^\d.-]/g, ''));
+    return Number.isFinite(normalized) ? normalized : undefined;
+  }
+  return undefined;
 }
 
 export function toTrackingModel(data: any): TrackingModel {
@@ -142,6 +169,7 @@ export function toTrackingModel(data: any): TrackingModel {
     packageInfo: {
       size: data.packageInfo?.size || '-',
       weight: data.packageInfo?.weight ?? '-',
+      weightKg: data.packageInfo?.weightKg,
       description: data.packageInfo?.description,
     },
     recipientName: data.recipientInfo?.name || data.recipientName,

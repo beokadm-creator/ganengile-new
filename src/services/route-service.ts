@@ -684,7 +684,7 @@ export async function getRoute(routeId: string, userId: string): Promise<Route |
     const docRef = doc(db, 'routes', routeId);
     const docSnapshot = await getDoc(docRef);
 
-    if (!docSnapshot.exists) {
+    if (!docSnapshot.exists()) {
       return null;
     }
 
@@ -772,15 +772,17 @@ export async function getUserActiveRoutes(userId: string): Promise<Route[]> {
   try {
     const q = query(
       collection(db, 'routes'),
-      where('userId', '==', userId),
-      where('isActive', '==', true)
+      where('userId', '==', userId)
     );
 
     const snapshot = await getDocs(q);
     const routes: Route[] = [];
 
     snapshot.forEach((docSnapshot) => {
-      routes.push(convertRoute(docSnapshot.data(), docSnapshot.id));
+      const route = convertRoute(docSnapshot.data(), docSnapshot.id);
+      if (route.isActive) {
+        routes.push(route);
+      }
     });
 
     // Sort client-side to avoid composite index requirement

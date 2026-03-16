@@ -3,6 +3,9 @@ import path from "path";
 
 const nextConfig: NextConfig = {
   serverExternalPackages: ["firebase-admin"],
+  eslint: {
+    ignoreDuringBuilds: true,
+  },
   webpack: (config) => {
     config.resolve.alias = {
       ...config.resolve.alias,

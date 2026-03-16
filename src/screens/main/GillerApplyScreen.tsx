@@ -31,6 +31,7 @@ import { useFocusEffect } from '@react-navigation/native';
 import { getUserVerification, getVerificationStatusDisplay } from '../../services/verification-service';
 import type { UserVerification } from '../../types/profile';
 import { PASS_TEST_MODE } from '../../config/feature-flags';
+import AppTopBar from '../../components/common/AppTopBar';
 
 type Props = { navigation: StackNavigationProp<any> };
 
@@ -360,14 +361,7 @@ export default function GillerApplyScreen({ navigation }: Props) {
       style={styles.container}
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
     >
-      {/* 헤더 */}
-      <View style={styles.header}>
-        <TouchableOpacity onPress={goBack} style={styles.backBtn} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
-          <Text style={styles.backText}>← 이전</Text>
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>길러 신청</Text>
-        <View style={styles.placeholder} />
-      </View>
+      <AppTopBar title="길러 신청" onBack={goBack} />
 
       {/* 프로그레스 바 */}
       <View style={styles.progressTrack}>
@@ -406,21 +400,6 @@ const ACCENT = '#4CAF50';
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#fff' },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingTop: 56,
-    paddingBottom: 12,
-    paddingHorizontal: 20,
-    backgroundColor: '#fff',
-    borderBottomWidth: 1,
-    borderBottomColor: '#f0f0f0',
-  },
-  backBtn: { minWidth: 60 },
-  backText: { fontSize: 15, color: ACCENT },
-  headerTitle: { fontSize: 17, fontWeight: 'bold', color: '#333' },
-  placeholder: { minWidth: 60 },
   progressTrack: { height: 4, backgroundColor: '#f0f0f0' },
   progressFill: { height: '100%', backgroundColor: ACCENT },
   progressLabel: { fontSize: 12, color: '#999', textAlign: 'center', marginTop: 8 },

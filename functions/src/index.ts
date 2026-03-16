@@ -5,6 +5,8 @@
 
 import * as functions from 'firebase-functions';
 import * as admin from 'firebase-admin';
+import { createHash, createHmac, randomUUID, timingSafeEqual } from 'crypto';
+import { defineString } from 'firebase-functions/params';
 import {
   User,
   GillerRoute,
@@ -37,12 +39,15 @@ import {
 } from './types';
 import { taxInvoiceScheduler } from './scheduled/tax-invoice-scheduler';
 import { gillerSettlementScheduler } from './scheduled/settlement-scheduler';
+import { fareCacheScheduler } from './scheduled/fare-cache-scheduler';
 
 // Initialize Firebase Admin
 admin.initializeApp();
 
 const db = admin.firestore();
 const fcm = admin.messaging();
+const CI_PASS_URL_PARAM = defineString('CI_PASS_URL', { default: '' });
+const CI_KAKAO_URL_PARAM = defineString('CI_KAKAO_URL', { default: '' });
 
 // ==================== FCM Notification Functions ====================
 
@@ -1796,3 +1801,428 @@ export const scheduledGillerSettlement = functions.pubsub
       return null;
     }
   });
+
+/**
+ * Scheduled Function: Fare Cache Scheduler
+ * 매주 월요일 03:00에 실행되어 역간 운임 캐시(config_fares)를 갱신합니다.
+ */
+export const scheduledFareCacheSync = functions.pubsub
+  .schedule('0 3 * * 1')
+  .timeZone('Asia/Seoul')
+  .onRun(async (_context) => {
+    console.warn('🚇 [Scheduled Fare Cache Sync] Triggered at:', new Date().toISOString());
+    try {
+      const result = await fareCacheScheduler();
+      console.warn('✅ Fare cache scheduler completed:', result);
+      return null;
+    } catch (error) {
+      console.error('❌ Fare cache scheduler error:', error);
+      return null;
+    }
+  });
+
+// ==================== CI Verification APIs (PASS / Kakao) ====================
+
+type CiProvider = 'pass' | 'kakao';
+
+interface StartCiVerificationSessionData {
+  provider: CiProvider;
+}
+
+interface StartCiVerificationSessionResult {
+  sessionId: string;
+  provider: CiProvider;
+  redirectUrl: string;
+  callbackUrl: string;
+}
+
+interface CompleteCiVerificationTestData {
+  provider: CiProvider;
+  sessionId?: string;
+}
+
+interface IdentityIntegrationProviderSettings {
+  enabled?: boolean;
+  startUrl?: string;
+  callbackUrl?: string;
+  apiKey?: string;
+  clientId?: string;
+  webhookSecret?: string;
+  signatureParam?: string;
+  signatureHeader?: string;
+}
+
+interface IdentityIntegrationSettings {
+  pass?: IdentityIntegrationProviderSettings;
+  kakao?: IdentityIntegrationProviderSettings;
+}
+
+const CI_FUNCTION_REGION = 'us-central1';
+
+function getFunctionBaseUrl(): string {
+  const projectId = process.env.GCLOUD_PROJECT;
+  if (!projectId) {
+    throw new Error('GCLOUD_PROJECT is not defined');
+  }
+  return `https://${CI_FUNCTION_REGION}-${projectId}.cloudfunctions.net`;
+}
+
+function assertCiProvider(provider: unknown): asserts provider is CiProvider {
+  if (provider !== 'pass' && provider !== 'kakao') {
+    throw new functions.https.HttpsError('invalid-argument', 'provider must be pass or kakao');
+  }
+}
+
+function buildCiHash(userId: string, provider: CiProvider, seed?: string): string {
+  return createHash('sha256')
+    .update(`${userId}:${provider}:${seed || randomUUID()}`)
+    .digest('hex');
+}
+
+function buildCallbackSigningPayload(
+  sessionId: string,
+  provider: CiProvider,
+  result: string,
+  ciSeed: string
+): string {
+  return `${sessionId}|${provider}|${result}|${ciSeed}`;
+}
+
+function verifyCallbackSignature(
+  payload: string,
+  providedSignature: string,
+  secret: string
+): boolean {
+  const expected = createHmac('sha256', secret).update(payload).digest('hex');
+  try {
+    return timingSafeEqual(Buffer.from(providedSignature), Buffer.from(expected));
+  } catch {
+    return false;
+  }
+}
+
+async function getIdentityIntegrationSettings(): Promise<IdentityIntegrationSettings> {
+  const doc = await db.collection('admin_settings').doc('identity_verification').get();
+  if (!doc.exists) {
+    return {};
+  }
+  return doc.data() as IdentityIntegrationSettings;
+}
+
+async function markCiVerified(params: {
+  userId: string;
+  provider: CiProvider;
+  sessionId: string;
+  ciSeed?: string;
+}): Promise<string> {
+  const { userId, provider, sessionId, ciSeed } = params;
+  const now = admin.firestore.FieldValue.serverTimestamp();
+  const ciHash = buildCiHash(userId, provider, ciSeed || sessionId);
+
+  const verificationRef = db.doc(`users/${userId}/verification/${userId}`);
+  const userRef = db.doc(`users/${userId}`);
+  const profileRef = db.doc(`users/${userId}/profile/${userId}`);
+  const sessionRef = db.collection('verification_sessions').doc(sessionId);
+
+  await db.runTransaction(async (tx) => {
+    tx.set(
+      verificationRef,
+      {
+        userId,
+        status: 'approved',
+        verificationMethod: 'ci',
+        ciHash,
+        externalAuth: {
+          provider,
+          status: 'verified',
+          verifiedAt: now,
+        },
+        reviewedAt: now,
+        reviewedBy: 'ci-provider',
+        updatedAt: now,
+      },
+      { merge: true }
+    );
+
+    tx.set(
+      userRef,
+      {
+        isVerified: true,
+        verificationInfo: {
+          method: 'ci',
+          provider,
+          ciHash,
+          verifiedAt: now,
+        },
+        updatedAt: now,
+      },
+      { merge: true }
+    );
+
+    tx.set(
+      profileRef,
+      {
+        isVerified: true,
+        updatedAt: now,
+      },
+      { merge: true }
+    );
+
+    tx.set(
+      sessionRef,
+      {
+        status: 'completed',
+        ciHash,
+        completedAt: now,
+        updatedAt: now,
+      },
+      { merge: true }
+    );
+  });
+
+  return ciHash;
+}
+
+/**
+ * Callable: CI 인증 세션 시작
+ * - 운영: 반환된 redirectUrl을 PASS/Kakao 본인인증 URL로 사용
+ * - 테스트: 미설정 시 mock 페이지로 리다이렉트
+ */
+export const startCiVerificationSession = functions.https.onCall(
+  async (data: StartCiVerificationSessionData, context): Promise<StartCiVerificationSessionResult> => {
+    if (!context.auth?.uid) {
+      throw new functions.https.HttpsError('unauthenticated', 'User must be authenticated');
+    }
+
+    const provider = data?.provider;
+    assertCiProvider(provider);
+
+    const userId = context.auth.uid;
+    const sessionId = randomUUID();
+    const baseUrl = getFunctionBaseUrl();
+    const settings = await getIdentityIntegrationSettings();
+    const providerSettings = provider === 'pass' ? settings.pass : settings.kakao;
+    const callbackUrl = providerSettings?.callbackUrl || `${baseUrl}/ciVerificationCallback`;
+    const mockUrl = `${baseUrl}/ciMock?sessionId=${encodeURIComponent(sessionId)}&provider=${provider}`;
+    const providerUrlConfig = providerSettings?.startUrl || (
+      provider === 'pass'
+        ? CI_PASS_URL_PARAM.value()
+        : CI_KAKAO_URL_PARAM.value()
+    );
+
+    if (providerSettings?.enabled === false) {
+      throw new functions.https.HttpsError(
+        'failed-precondition',
+        `${provider.toUpperCase()} integration is disabled by admin`
+      );
+    }
+
+    let redirectUrl = mockUrl;
+    if (providerUrlConfig) {
+      const queryParts = [
+        `sessionId=${encodeURIComponent(sessionId)}`,
+        `callbackUrl=${encodeURIComponent(callbackUrl)}`,
+      ];
+      if (providerSettings?.clientId) {
+        queryParts.push(`clientId=${encodeURIComponent(providerSettings.clientId)}`);
+      }
+      redirectUrl = `${providerUrlConfig}${providerUrlConfig.includes('?') ? '&' : '?'}${queryParts.join('&')}`;
+    }
+
+    await db.collection('verification_sessions').doc(sessionId).set({
+      sessionId,
+      userId,
+      provider,
+      status: 'started',
+      callbackUrl,
+      redirectUrl,
+      createdAt: admin.firestore.FieldValue.serverTimestamp(),
+      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+    });
+
+    await db.doc(`users/${userId}/verification/${userId}`).set(
+      {
+        userId,
+        status: 'pending',
+        verificationMethod: 'ci',
+        externalAuth: {
+          provider,
+          status: 'started',
+          requestedAt: admin.firestore.FieldValue.serverTimestamp(),
+        },
+        submittedAt: admin.firestore.FieldValue.serverTimestamp(),
+        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+      },
+      { merge: true }
+    );
+
+    return {
+      sessionId,
+      provider,
+      redirectUrl,
+      callbackUrl,
+    };
+  }
+);
+
+/**
+ * HTTP: 테스트용 CI mock 화면
+ */
+export const ciMock = functions.https.onRequest(async (req, res) => {
+  const sessionId = String(req.query.sessionId || '');
+  const provider = String(req.query.provider || '');
+
+  if (!sessionId || (provider !== 'pass' && provider !== 'kakao')) {
+    res.status(400).send('Invalid query');
+    return;
+  }
+
+  const baseUrl = getFunctionBaseUrl();
+  const successUrl = `${baseUrl}/ciVerificationCallback?sessionId=${encodeURIComponent(sessionId)}&provider=${provider}&result=success&ci=mock-ci-${Date.now()}`;
+  const failUrl = `${baseUrl}/ciVerificationCallback?sessionId=${encodeURIComponent(sessionId)}&provider=${provider}&result=failed`;
+
+  res.set('Content-Type', 'text/html; charset=utf-8');
+  res.status(200).send(`<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>CI Mock Verification</title>
+  </head>
+  <body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; padding: 24px;">
+    <h2>CI 인증 테스트 (${provider.toUpperCase()})</h2>
+    <p>sessionId: ${sessionId}</p>
+    <p>아래 버튼으로 인증 결과 콜백을 시뮬레이션할 수 있습니다.</p>
+    <a href="${successUrl}" style="display:inline-block;margin-right:12px;padding:12px 16px;background:#2563eb;color:#fff;text-decoration:none;border-radius:8px;">성공 콜백</a>
+    <a href="${failUrl}" style="display:inline-block;padding:12px 16px;background:#ef4444;color:#fff;text-decoration:none;border-radius:8px;">실패 콜백</a>
+  </body>
+</html>`);
+});
+
+/**
+ * HTTP: CI 인증 콜백
+ */
+export const ciVerificationCallback = functions.https.onRequest(async (req, res) => {
+  try {
+    const sessionId = String(req.query.sessionId || req.body?.sessionId || '');
+    const provider = String(req.query.provider || req.body?.provider || '');
+    const result = String(req.query.result || req.body?.result || 'success');
+    const ciSeed = String(req.query.ci || req.body?.ci || sessionId);
+
+    if (!sessionId || (provider !== 'pass' && provider !== 'kakao')) {
+      res.status(400).json({ ok: false, message: 'invalid parameters' });
+      return;
+    }
+
+    const sessionRef = db.collection('verification_sessions').doc(sessionId);
+    const sessionSnap = await sessionRef.get();
+    const session = sessionSnap.data();
+
+    if (!sessionSnap.exists || !session?.userId) {
+      res.status(404).json({ ok: false, message: 'session not found' });
+      return;
+    }
+
+    if (session.provider !== provider) {
+      res.status(400).json({ ok: false, message: 'provider mismatch' });
+      return;
+    }
+
+    const settings = await getIdentityIntegrationSettings();
+    const providerSettings = provider === 'pass' ? settings.pass : settings.kakao;
+    const webhookSecret = providerSettings?.webhookSecret;
+    const signatureParam = providerSettings?.signatureParam || 'signature';
+    const signatureHeader = providerSettings?.signatureHeader || 'x-signature';
+
+    if (webhookSecret) {
+      const providedSignature = String(
+        (req.query?.[signatureParam] as string) ||
+          req.body?.[signatureParam] ||
+          req.headers?.[signatureHeader] ||
+          ''
+      );
+      if (!providedSignature) {
+        res.status(401).json({ ok: false, message: 'missing signature' });
+        return;
+      }
+
+      const payload = buildCallbackSigningPayload(sessionId, provider, result, ciSeed);
+      const valid = verifyCallbackSignature(payload, providedSignature, webhookSecret);
+      if (!valid) {
+        res.status(401).json({ ok: false, message: 'invalid signature' });
+        return;
+      }
+    }
+
+    if (result !== 'success') {
+      await sessionRef.set(
+        {
+          status: 'failed',
+          updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+        },
+        { merge: true }
+      );
+
+      await db.doc(`users/${session.userId}/verification/${session.userId}`).set(
+        {
+          status: 'rejected',
+          verificationMethod: 'ci',
+          rejectionReason: '본인인증이 취소되었거나 실패했습니다.',
+          externalAuth: {
+            provider,
+            status: 'failed',
+          },
+          updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+        },
+        { merge: true }
+      );
+
+      res.status(200).json({ ok: false, message: 'verification failed' });
+      return;
+    }
+
+    const ciHash = await markCiVerified({
+      userId: session.userId,
+      provider,
+      sessionId,
+      ciSeed,
+    });
+
+    res.status(200).json({
+      ok: true,
+      sessionId,
+      provider,
+      ciHash,
+      message: 'verification completed',
+    });
+  } catch (error) {
+    console.error('ciVerificationCallback error:', error);
+    res.status(500).json({ ok: false, message: 'internal error' });
+  }
+});
+
+/**
+ * Callable: 테스트 환경에서 인증 완료 강제 처리
+ */
+export const completeCiVerificationTest = functions.https.onCall(
+  async (data: CompleteCiVerificationTestData, context): Promise<{ ok: boolean; ciHash: string }> => {
+    if (!context.auth?.uid) {
+      throw new functions.https.HttpsError('unauthenticated', 'User must be authenticated');
+    }
+
+    const provider = data?.provider;
+    assertCiProvider(provider);
+
+    const userId = context.auth.uid;
+    const sessionId = data?.sessionId || randomUUID();
+
+    const ciHash = await markCiVerified({
+      userId,
+      provider,
+      sessionId,
+      ciSeed: `test-${Date.now()}`,
+    });
+
+    return { ok: true, ciHash };
+  }
+);

@@ -7,15 +7,12 @@
 import React from 'react';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { createStackNavigator } from '@react-navigation/stack';
-import { Text, Platform, View, StyleSheet } from 'react-native';
+import { View, StyleSheet } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Ionicons } from '@expo/vector-icons';
+import { MaterialIcons } from '@expo/vector-icons';
 import type { MainTabParamList } from '../types/navigation';
 import { useUser } from '../contexts/UserContext';
 import { Colors } from '../components';
-
-// Web platform support
-import { Link } from '@react-navigation/web';
 
 // Screens
 import HomeScreen from '../screens/main/HomeScreen';
@@ -57,46 +54,22 @@ const Tab = createBottomTabNavigator<MainTabParamList>();
 const Stack = createStackNavigator();
 
 function TabBarIcon({ name, focused }: { name: string; focused: boolean }) {
-  const iconConfig: { [key: string]: { emoji: string; label: string } } = {
-    Home: { emoji: '🏠', label: '홈' },
-    RouteManagement: { emoji: '🛤️', label: '동선' },
-    Requests: { emoji: '📦', label: '요청' },
-    GillerRequests: { emoji: '🚴', label: '매칭' },
-    ChatList: { emoji: '💬', label: '채팅' },
-    Profile: { emoji: '👤', label: '프로필' },
+  const icons: { [key: string]: { active: keyof typeof MaterialIcons.glyphMap; inactive: keyof typeof MaterialIcons.glyphMap } } = {
+    Home: { active: 'home', inactive: 'home' },
+    RouteManagement: { active: 'alt-route', inactive: 'alt-route' },
+    Requests: { active: 'inventory-2', inactive: 'inventory-2' },
+    GillerRequests: { active: 'pedal-bike', inactive: 'pedal-bike' },
+    ChatList: { active: 'chat', inactive: 'chat-bubble-outline' },
+    Profile: { active: 'person', inactive: 'person-outline' },
   };
 
-  const config = iconConfig[name] || { emoji: '•', label: name };
-
-  // 웹에서는 이모지만 사용 (동그라미 제거)
-  if (Platform.OS === 'web') {
-    return (
-      <Text style={[
-        styles.webIconEmoji,
-        focused && styles.webIconFocused
-      ]}>
-        {config.emoji}
-      </Text>
-    );
-  }
-
-  // 네이티브에서는 Ionicons 사용
-  const icons: { [key: string]: { name: keyof typeof Ionicons.glyphMap } } = {
-    Home: { name: 'home' },
-    RouteManagement: { name: 'map' },
-    Requests: { name: 'cube' },
-    GillerRequests: { name: 'bicycle' },
-    ChatList: { name: 'chatbubbles' },
-    Profile: { name: 'person' },
-  };
-
-  const icon = icons[name as keyof typeof icons] || { name: 'ellipse' };
+  const icon = icons[name as keyof typeof icons] || { active: 'help-outline', inactive: 'help-outline' };
 
   return (
-    <Ionicons
-      name={icon.name}
+    <MaterialIcons
+      name={focused ? icon.active : icon.inactive}
       size={24}
-      color={focused ? Colors.secondary : Colors.text.disabled}
+      color={focused ? '#0F766E' : '#6B7280'}
     />
   );
 }
@@ -106,6 +79,9 @@ function TabNavigator() {
   const insets = useSafeAreaInsets();
   const canAccessGiller =
     PASS_TEST_MODE ||
+    user?.role === 'both' ||
+    user?.role === 'giller' ||
+    (user as any)?.isGiller === true ||
     (user?.gillerApplicationStatus === 'approved' && user?.isVerified);
 
   return (
@@ -114,19 +90,36 @@ function TabNavigator() {
         tabBarIcon: ({ focused }) => (
           <TabBarIcon name={route.name} focused={focused} />
         ),
-        tabBarActiveTintColor: '#4CAF50',
-        tabBarInactiveTintColor: '#999',
+        tabBarActiveTintColor: '#0F766E',
+        tabBarInactiveTintColor: '#6B7280',
         tabBarStyle: {
-          backgroundColor: '#fff',
+          backgroundColor: '#FFFFFF',
           borderTopWidth: 1,
-          borderTopColor: '#e0e0e0',
-          height: 60 + insets.bottom,
-          paddingBottom: insets.bottom,
+          borderTopColor: '#E5E7EB',
+          height: 88 + insets.bottom,
+          paddingBottom: Math.max(insets.bottom, 16),
           paddingTop: 8,
+          paddingHorizontal: 8,
+          shadowColor: '#0F172A',
+          shadowOpacity: 0.06,
+          shadowRadius: 8,
+          shadowOffset: { width: 0, height: -2 },
+          elevation: 8,
+          overflow: 'visible',
+        },
+        tabBarHideOnKeyboard: true,
+        tabBarLabelPosition: 'below-icon',
+        tabBarItemStyle: {
+          minHeight: 58,
+          justifyContent: 'center',
+          alignItems: 'center',
         },
         tabBarLabelStyle: {
-          fontSize: 12,
-          fontWeight: '600',
+          fontSize: 11,
+          fontWeight: '700',
+          letterSpacing: 0.1,
+          lineHeight: 16,
+          marginTop: 2,
         },
         headerShown: false,
       })}
@@ -162,8 +155,8 @@ function TabNavigator() {
         options={{ tabBarLabel: '채팅' }}
       />
 
-      {/* Route Management: ONLY for Giller (not Gller) */}
-      {currentRole === 'giller' && canAccessGiller && (
+      {/* Route Management: for giller and both */}
+      {(currentRole === 'giller' || currentRole === 'both') && canAccessGiller && (
         <Tab.Screen
           name="RouteManagement"
           component={RouteManagementScreen}
@@ -190,17 +183,24 @@ export default function MainNavigator() {
       screenOptions={{
         headerShown: false,
         headerBackTitle: '뒤로',
+        headerBackTitleVisible: false,
         headerTitleAlign: 'center',
-        headerTitleStyle: { fontWeight: 'bold', fontSize: 18 },
+        headerTitleStyle: { fontWeight: '800', fontSize: 18 },
         headerStyle: {
           backgroundColor: '#fff',
-          shadowColor: '#000',
+          shadowColor: '#0F172A',
           shadowOffset: { width: 0, height: 2 },
           shadowOpacity: 0.1,
-          shadowRadius: 4,
-          elevation: 3,
+          shadowRadius: 10,
+          elevation: 6,
         },
-        headerTintColor: '#333',
+        headerTintColor: '#111827',
+        headerLeftContainerStyle: { paddingLeft: 12 },
+        headerBackImage: ({ tintColor }) => (
+          <View style={styles.stackBackIconWrap}>
+            <MaterialIcons name="arrow-back-ios-new" size={22} color={tintColor || '#111827'} />
+          </View>
+        ),
         gestureEnabled: true,
         gestureDirection: 'horizontal',
         cardOverlayEnabled: true,
@@ -213,8 +213,7 @@ export default function MainNavigator() {
         name="CreateRequest"
         component={CreateRequestScreen}
         options={{
-          headerShown: true,
-          title: '배송 요청하기',
+          headerShown: false,
         }}
       />
       <Stack.Screen
@@ -244,16 +243,14 @@ export default function MainNavigator() {
         name="RequestDetail"
         component={RequestDetailScreen as any}
         options={{
-          headerShown: true,
-          title: '요청 상세',
+          headerShown: false,
         }}
       />
       <Stack.Screen
         name="DeliveryTracking"
         component={DeliveryTrackingScreen as any}
         options={{
-          headerShown: true,
-          title: '배송 추적',
+          headerShown: false,
         }}
       />
       <Stack.Screen
@@ -420,8 +417,7 @@ export default function MainNavigator() {
         name="GillerApply"
         component={GillerApplyScreen}
         options={{
-          headerShown: true,
-          title: '길러 신청',
+          headerShown: false,
         }}
       />
       <Stack.Screen
@@ -437,16 +433,14 @@ export default function MainNavigator() {
 }
 
 const styles = StyleSheet.create({
-  webIconContainer: {
+  stackBackIconWrap: {
     alignItems: 'center',
+    backgroundColor: '#F3F4F6',
+    borderColor: '#E5E7EB',
+    borderRadius: 18,
+    borderWidth: 1,
+    height: 36,
     justifyContent: 'center',
-  },
-  webIconEmoji: {
-    fontSize: 24,
-    opacity: 0.6,
-  },
-  webIconFocused: {
-    opacity: 1,
-    transform: [{ scale: 1.1 }],
+    width: 36,
   },
 });

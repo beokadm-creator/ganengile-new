@@ -226,6 +226,32 @@ export default function ProfileScreen({ navigation: _navigation }: Props) {
   const toggleRole = () => {
     if (user?.role === UserRole.BOTH && currentRole) {
       const newRole = currentRole === UserRole.GLER ? UserRole.GILLER : UserRole.GLER;
+      const canAccessGillerMode =
+        PASS_TEST_MODE ||
+        user.role === UserRole.BOTH ||
+        user.role === UserRole.GILLER ||
+        (user as any)?.isGiller === true ||
+        (user.gillerApplicationStatus === 'approved' && user.isVerified);
+
+      if (newRole === UserRole.GILLER && !canAccessGillerMode) {
+        Alert.alert(
+          '길러 모드 이용 안내',
+          user.gillerApplicationStatus === 'pending'
+            ? '길러 신청이 심사 중입니다. 승인 후 길러 모드를 이용할 수 있습니다.'
+            : '길러 모드를 이용하려면 승인 절차가 필요합니다. 지금 신청하시겠어요?',
+          [
+            { text: '취소', style: 'cancel' },
+            user.gillerApplicationStatus !== 'pending'
+              ? {
+                  text: '신청하기',
+                  onPress: () => (_navigation as any).navigate('GillerApply'),
+                }
+              : { text: '확인' },
+          ]
+        );
+        return;
+      }
+
       switchRole(newRole);
       Alert.alert('역할 전환', `${newRole === UserRole.GLER ? '이용자' : '길러'} 모드로 전환했습니다.`, [
         { text: '확인', onPress: () => refreshUser() },
@@ -430,9 +456,14 @@ export default function ProfileScreen({ navigation: _navigation }: Props) {
     );
   }
 
+  const displayName = profile.name?.trim() || user.name?.trim() || '사용자';
+
   const isGiller = currentRole === UserRole.GILLER || user.role === UserRole.GILLER;
   const canAccessGiller =
     PASS_TEST_MODE ||
+    user.role === UserRole.BOTH ||
+    user.role === UserRole.GILLER ||
+    (user as any)?.isGiller === true ||
     (user.gillerApplicationStatus === 'approved' && user.isVerified);
   const needsVerification = !user.isVerified;
   const canApplyGiller =
@@ -645,18 +676,15 @@ export default function ProfileScreen({ navigation: _navigation }: Props) {
           <View style={styles.profileInfo}>
             <TouchableOpacity onPress={() => openEditModal('name', '이름', profile.name)}>
               <View style={styles.nameRow}>
-                <Text style={styles.userName}>{profile.name}</Text>
+                <Text style={styles.userName}>{displayName}</Text>
                 <Text style={styles.editIcon}>✏️</Text>
               </View>
             </TouchableOpacity>
-            <TouchableOpacity onPress={() => openEditModal('phone', '연락처', profile.phoneNumber, '010-0000-0000')}>
+            {!!profile.phoneNumber && (
               <View style={styles.nameRow}>
-                <Text style={styles.userEmail}>
-                  {profile.phoneNumber || '연락처를 추가해주세요'}
-                </Text>
-                <Text style={styles.editIcon}>✏️</Text>
+                <Text style={styles.userEmail}>{profile.phoneNumber}</Text>
               </View>
-            </TouchableOpacity>
+            )}
 
             {/* Verification Badge */}
             {verificationDisplay.status === 'approved' && (

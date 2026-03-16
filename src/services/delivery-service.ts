@@ -20,8 +20,22 @@ import {
 import { db } from './firebase';
 import { uploadPickupPhoto, uploadDeliveryPhoto } from './storage-service';
 import { DepositService } from './DepositService';
-import { createGillerEarning, hasGillerEarningForRequest } from './payment-service';
+import {
+  createGillerEarning,
+  getGillerEarningForRequest,
+  getPayment,
+  hasGillerEarningForRequest,
+} from './payment-service';
 import type { DeliveryStatus, DeliveryRequest } from '../types/delivery';
+
+function toPositiveNumber(...values: unknown[]): number | null {
+  for (const value of values) {
+    if (typeof value === 'number' && Number.isFinite(value) && value >= 0) {
+      return value;
+    }
+  }
+  return null;
+}
 
 /**
  * Pickup verification data
@@ -110,8 +124,8 @@ export async function gillerAcceptRequest(
         deliveryFee: rawFee.deliveryFee || rawFee.baseFee || 0,
         vat: rawFee.vat || 0,
         breakdown: rawFee.breakdown || (rawFee.totalFee ? {
-          gillerFee: Math.floor(rawFee.totalFee * 0.85),
-          platformFee: rawFee.totalFee - Math.floor(rawFee.totalFee * 0.85),
+          gillerFee: Math.floor(rawFee.totalFee * 0.9),
+          platformFee: rawFee.totalFee - Math.floor(rawFee.totalFee * 0.9),
         } : undefined)
       };
     } else if (request.initialNegotiationFee || request.totalFee) {
@@ -121,14 +135,14 @@ export async function gillerAcceptRequest(
         deliveryFee: Math.floor(totalAmount / 1.1),
         vat: totalAmount - Math.floor(totalAmount / 1.1),
         breakdown: {
-          gillerFee: Math.floor(totalAmount * 0.85),
-          platformFee: totalAmount - Math.floor(totalAmount * 0.85),
+          gillerFee: Math.floor(totalAmount * 0.9),
+          platformFee: totalAmount - Math.floor(totalAmount * 0.9),
         }
       };
     }
 
     // Block if no valid fee information is found
-    if (!confirmedFee || !confirmedFee.totalFee || confirmedFee.totalFee <= 0) {
+    if (!confirmedFee?.totalFee || confirmedFee.totalFee <= 0) {
       console.error('Invalid fee information found for request:', requestId, request);
       return { success: false, message: '배송 요금 정보가 유효하지 않아 수락할 수 없습니다. 고객센터에 문의해주세요.' };
     }
@@ -476,6 +490,7 @@ export async function confirmDeliveryByRequester(
     }
 
     // Settlement: refund deposit and create earning (idempotent checks)
+    const feeSource = (request?.fee || request?.feeBreakdown || delivery?.fee || null);
     const feeAmount =
       delivery?.fee?.totalFee ||
       request?.fee?.totalFee ||
@@ -486,6 +501,7 @@ export async function confirmDeliveryByRequester(
     let depositId: string | undefined;
     let depositAmount: number | undefined;
     let earningPaymentId: string | undefined;
+    let earningPayment: Awaited<ReturnType<typeof getPayment>> | null = null;
 
     try {
       if (requestId) {
@@ -502,12 +518,43 @@ export async function confirmDeliveryByRequester(
         }
       }
 
-      if (delivery.gillerId && feeAmount > 0) {
+      const customerPaidAmount = toPositiveNumber(
+        feeSource?.totalFee,
+        request?.initialNegotiationFee,
+        feeAmount
+      ) ?? 0;
+      const publicFareAmount = toPositiveNumber(feeSource?.publicFare) ?? 0;
+      const vatAmount = toPositiveNumber(feeSource?.vat) ?? 0;
+      const feeSupplyAmount = Math.max(0, customerPaidAmount - vatAmount - publicFareAmount);
+      const platformServiceFeeAmount = toPositiveNumber(feeSource?.serviceFee) ?? 0;
+      const platformFeeAmount =
+        toPositiveNumber(feeSource?.breakdown?.platformFee) ??
+        Math.round(customerPaidAmount * 0.1);
+      const gillerGrossAmount =
+        toPositiveNumber(feeSource?.breakdown?.gillerFee) ??
+        Math.max(0, customerPaidAmount - platformFeeAmount);
+
+      if (delivery.gillerId && gillerGrossAmount > 0) {
         const alreadyEarned = await hasGillerEarningForRequest(delivery.gillerId, requestId);
         if (!alreadyEarned) {
-          earningPaymentId = await createGillerEarning(delivery.gillerId, requestId, feeAmount);
+          earningPaymentId = await createGillerEarning(
+            delivery.gillerId,
+            requestId,
+            gillerGrossAmount,
+            true,
+            {
+              platformFeeAlreadyDeducted: true,
+              platformFeeAmount,
+            }
+          );
+          earningPayment = await getPayment(earningPaymentId);
+        } else {
+          earningPayment = await getGillerEarningForRequest(delivery.gillerId, requestId);
+          earningPaymentId = earningPayment?.paymentId;
         }
       }
+      const gillerWithholdingTaxAmount = toPositiveNumber(earningPayment?.tax) ?? Math.round(gillerGrossAmount * 0.033);
+      const gillerNetAmount = toPositiveNumber(earningPayment?.netAmount) ?? Math.max(0, gillerGrossAmount - gillerWithholdingTaxAmount);
 
       await updateDoc(settlementRef, {
         status: 'completed',
@@ -515,7 +562,26 @@ export async function confirmDeliveryByRequester(
         depositAmount: depositAmount ?? null,
         refundStatus,
         earningPaymentId: earningPaymentId ?? null,
-        earningAmount: feeAmount || null,
+        earningAmount: gillerGrossAmount || null,
+        customerPaidAmount,
+        publicFareAmount,
+        vatAmount,
+        feeSupplyAmount,
+        platformServiceFeeAmount,
+        platformFeeAmount,
+        gillerGrossAmount,
+        gillerWithholdingTaxAmount,
+        gillerNetAmount,
+        settlementVersion: 2,
+        pricingSnapshot: feeSource
+          ? {
+              totalFee: feeSource.totalFee ?? null,
+              publicFare: feeSource.publicFare ?? null,
+              vat: feeSource.vat ?? null,
+              serviceFee: feeSource.serviceFee ?? null,
+              breakdown: feeSource.breakdown ?? null,
+            }
+          : null,
         settledAt: serverTimestamp(),
         updatedAt: serverTimestamp(),
       });

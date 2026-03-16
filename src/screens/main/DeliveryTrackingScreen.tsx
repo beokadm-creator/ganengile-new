@@ -24,6 +24,8 @@ import type { UserContextType } from '../../contexts/UserContext';
 import { toTrackingModel, TrackingModel, TrackingEvent } from '../../utils/request-adapters';
 import { formatTimeKR } from '../../utils/date';
 import { startDeliveryTracking, stopDeliveryTracking } from '../../services/location-tracking-service';
+import { formatWeightDisplay } from '../../utils/package-weight';
+import AppTopBar from '../../components/common/AppTopBar';
 
 // Utils
 import { retryWithBackoff, retryFirebaseQuery } from '../../utils/retry-with-backoff';
@@ -56,7 +58,7 @@ export default function DeliveryTrackingScreen({ navigation, route }: Props) {
   if (!requestId) {
     return null;
   }
-  const { user, currentRole } = useContext(UserContext) as UserContextType;
+  const { user: _user, currentRole } = useContext(UserContext) as UserContextType;
 
   const [trackingData, setTrackingData] = useState<TrackingModel | null>(null);
   const [trackingEvents, setTrackingEvents] = useState<TrackingEvent[]>([]);
@@ -65,7 +67,7 @@ export default function DeliveryTrackingScreen({ navigation, route }: Props) {
   const [isOnline, setIsOnline] = useState(true);
   const [progress, setProgress] = useState(0);
   const [retryCount, setRetryCount] = useState(0);
-  const [currentLocation, setCurrentLocation] = useState<{ latitude: number; longitude: number } | null>(null);
+  const [_currentLocation, setCurrentLocation] = useState<{ latitude: number; longitude: number } | null>(null);
   const [isTracking, setIsTracking] = useState(false);
 
   // Memoized values
@@ -264,13 +266,7 @@ export default function DeliveryTrackingScreen({ navigation, route }: Props) {
   if (!isOnline) {
     return (
       <View style={styles.container}>
-        <View style={styles.header}>
-          <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
-            <Text style={styles.backButtonText}>←</Text>
-          </TouchableOpacity>
-          <Text style={styles.headerTitle}>배송 추적</Text>
-          <View style={styles.headerSpacer} />
-        </View>
+        <AppTopBar title="배송 추적" onBack={() => navigation.goBack()} />
 
         <View style={styles.offlineContainer}>
           <Text style={styles.offlineIcon}>📡</Text>
@@ -290,13 +286,7 @@ export default function DeliveryTrackingScreen({ navigation, route }: Props) {
   if (!trackingData) {
     return (
       <View style={styles.container}>
-        <View style={styles.header}>
-          <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
-            <Text style={styles.backButtonText}>←</Text>
-          </TouchableOpacity>
-          <Text style={styles.headerTitle}>배송 추적</Text>
-          <View style={styles.headerSpacer} />
-        </View>
+        <AppTopBar title="배송 추적" onBack={() => navigation.goBack()} />
 
         <View style={styles.errorContainer}>
           <Text style={styles.errorIcon}>❌</Text>
@@ -315,15 +305,15 @@ export default function DeliveryTrackingScreen({ navigation, route }: Props) {
   return (
     <View style={styles.container}>
       {/* Header */}
-      <View style={styles.header}>
-        <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton} accessibilityLabel="뒤로 가기">
-          <Text style={styles.backButtonText}>←</Text>
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>배송 추적</Text>
-        <TouchableOpacity onPress={onRefresh} style={styles.refreshButton} accessibilityLabel="새로고침">
-          <ActivityIndicator size="small" color={refreshing ? '#00BCD4' : '#999'} animating={refreshing} />
-        </TouchableOpacity>
-      </View>
+      <AppTopBar
+        title="배송 추적"
+        onBack={() => navigation.goBack()}
+        rightSlot={(
+          <TouchableOpacity onPress={onRefresh} style={styles.refreshButton} accessibilityLabel="새로고침">
+            <ActivityIndicator size="small" color={refreshing ? '#00BCD4' : '#999'} animating={refreshing} />
+          </TouchableOpacity>
+        )}
+      />
 
       <ScrollView
         style={styles.content}
@@ -433,7 +423,7 @@ export default function DeliveryTrackingScreen({ navigation, route }: Props) {
               {trackingData.packageInfo.size === 'small' ? '소형' :
                trackingData.packageInfo.size === 'medium' ? '중형' :
                trackingData.packageInfo.size === 'large' ? '대형' : trackingData.packageInfo.size}
-              ({trackingData.packageInfo.weight})
+              ({formatWeightDisplay(trackingData.packageInfo.weight, trackingData.packageInfo.weightKg)})
             </Text>
           </View>
           <View style={styles.infoRow}>

@@ -78,7 +78,7 @@ export default function StationSelectModal({
         {searchQuery.length > 0 && filteredStations.length === 0 && (
           <View style={styles.emptyContainer}>
             <Text style={styles.emptyText}>
-              '{searchQuery}'에 대한 검색 결과가 없습니다.
+              &apos;{searchQuery}&apos;에 대한 검색 결과가 없습니다.
             </Text>
           </View>
         )}

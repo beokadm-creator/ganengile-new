@@ -61,7 +61,7 @@ export const OptimizedStationSelectModal: React.FC<OptimizedStationSelectModalPr
       }, 500);
       return () => clearTimeout(timer);
     } else {
-      // eslint-disable-next-line react-hooks/set-state-in-effect
+       
       setIsSearching(false);
     }
   }, [debouncedSearch]);
@@ -318,8 +318,8 @@ const mockStations: Station[] = [
   }
 ];
 
-const mockRecentStations: Station[] = [mockStations[2], mockStations[3]]; // 소요산역, 덕정역
-const mockFavoriteStations: Station[] = [mockStations[2]]; // 소요산역
+const _mockRecentStations: Station[] = [mockStations[2], mockStations[3]]; // 소요산역, 덕정역
+const _mockFavoriteStations: Station[] = [mockStations[2]]; // 소요산역
 
 // 헬퍼 함수
 const getLineColor = (line: string): string => {
@@ -496,9 +496,9 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   webModalContent: {
-    width: '90%',
-    maxWidth: 400,
-    maxHeight: '80%',
+    width: '94%',
+    maxWidth: 760,
+    maxHeight: '88%',
     backgroundColor: '#fff',
     borderRadius: 16,
     overflow: 'hidden',

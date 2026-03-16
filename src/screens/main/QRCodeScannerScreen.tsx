@@ -48,7 +48,7 @@ export default function QRCodeScannerScreen({ navigation }: Props) {
 
   const cameraRef = useRef<any>(null);
   const device = useCameraDevice('back');
-  const { requestPermission, hasPermission: checkPermission } = useCameraPermission();
+  const { requestPermission, hasPermission: _checkPermission } = useCameraPermission();
 
   useEffect(() => {
     requestCameraPermission();

@@ -23,6 +23,8 @@ import { RequestStatus } from '../../types/request';
 import { toRequestDetailView } from '../../utils/request-adapters';
 import { formatDateTimeKR } from '../../utils/date';
 import { TextInputModal } from '../../components/common';
+import AppTopBar from '../../components/common/AppTopBar';
+import { formatWeightDisplay } from '../../utils/package-weight';
 
 type NavigationProp = StackNavigationProp<any>;
 
@@ -158,7 +160,7 @@ export default function RequestDetailScreen({ navigation, route }: Props) {
     if (!detailView) return;
     setConfirming(true);
     try {
-      const requesterId = await requireUserId();
+      const requesterId = requireUserId();
       const delivery = await getDeliveryByRequestId(detailView.requestId);
       if (!delivery?.deliveryId) {
         Alert.alert('오류', '배송 정보를 찾을 수 없습니다.');
@@ -170,7 +172,7 @@ export default function RequestDetailScreen({ navigation, route }: Props) {
       });
       if (result.success) {
         Alert.alert('완료', result.message);
-        await loadRequest();
+        await loadData();
       } else {
         Alert.alert('실패', result.message);
       }
@@ -249,13 +251,7 @@ export default function RequestDetailScreen({ navigation, route }: Props) {
   return (
     <View style={styles.container}>
       {/* Header */}
-      <View style={styles.header}>
-        <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
-          <Text style={styles.backButtonText}>←</Text>
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>요청 상세</Text>
-        <View style={styles.headerSpacer} />
-      </View>
+      <AppTopBar title="요청 상세" onBack={() => navigation.goBack()} />
 
       <ScrollView style={styles.content}>
         {/* Status Badge */}
@@ -265,7 +261,7 @@ export default function RequestDetailScreen({ navigation, route }: Props) {
 
         {/* Route Info */}
         <View style={styles.card}>
-          <Text style={styles.cardTitle}>🚇 배송 경로</Text>
+          <Text style={styles.cardTitle}>배송 경로</Text>
           <View style={styles.routeContainer}>
             <View style={styles.stationInfo}>
               <Text style={styles.stationLabel}>픽업</Text>
@@ -288,7 +284,7 @@ export default function RequestDetailScreen({ navigation, route }: Props) {
 
         {/* Package Info */}
         <View style={styles.card}>
-          <Text style={styles.cardTitle}>📦 패키지 정보</Text>
+          <Text style={styles.cardTitle}>패키지 정보</Text>
           <View style={styles.infoRow}>
             <Text style={styles.infoLabel}>크기</Text>
             <Text style={styles.infoValue}>
@@ -299,7 +295,9 @@ export default function RequestDetailScreen({ navigation, route }: Props) {
           </View>
           <View style={styles.infoRow}>
             <Text style={styles.infoLabel}>무게</Text>
-            <Text style={styles.infoValue}>{detailView.packageInfo.weight}</Text>
+            <Text style={styles.infoValue}>
+              {formatWeightDisplay(detailView.packageInfo.weight, detailView.packageInfo.weightKg)}
+            </Text>
           </View>
           <View style={styles.infoRow}>
             <Text style={styles.infoLabel}>설명</Text>
@@ -309,7 +307,7 @@ export default function RequestDetailScreen({ navigation, route }: Props) {
 
         {/* Time Info */}
         <View style={styles.card}>
-          <Text style={styles.cardTitle}>⏰ 시간 정보</Text>
+          <Text style={styles.cardTitle}>시간 정보</Text>
           <View style={styles.infoRow}>
             <Text style={styles.infoLabel}>요청 마감</Text>
         <Text style={styles.infoValue}>{formatDate(detailView.deadline || null)}</Text>
@@ -328,10 +326,12 @@ export default function RequestDetailScreen({ navigation, route }: Props) {
 
         {/* Fee Info */}
         <View style={styles.card}>
-            <Text style={styles.cardTitle}>💵 배송비</Text>
+            <Text style={styles.cardTitle}>배송비</Text>
           <View style={styles.feeTotal}>
             <Text style={styles.feeTotalLabel}>총합계</Text>
-            <Text style={styles.feeTotalValue}>{detailView.feeTotal.toLocaleString()}원</Text>
+            <Text style={styles.feeTotalValue}>
+              {Number.isFinite(detailView.feeTotal) ? detailView.feeTotal.toLocaleString() : '0'}원
+            </Text>
           </View>
         </View>
 

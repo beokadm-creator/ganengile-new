@@ -23,7 +23,7 @@ import type { UserContextType } from '../../contexts/UserContext';
 import { startDeliveryTracking, stopDeliveryTracking } from '../../services/location-tracking-service';
 import { Colors, Typography, Spacing, BorderRadius } from '../../theme';
 
-const { width, height } = Dimensions.get('window');
+const { _width, _height } = Dimensions.get('window');
 
 type NavigationProp = StackNavigationProp<any>;
 
@@ -49,8 +49,8 @@ interface TrackingData {
 }
 
 export default function RealtimeTrackingScreen({ navigation, route }: Props) {
-  const { deliveryId, requesterId, gillerId, pickupStation, dropoffStation } = route.params;
-  const { user, currentRole } = useContext(UserContext) as UserContextType;
+  const { deliveryId, _requesterId, _gillerId, pickupStation, dropoffStation } = route.params;
+  const { _user, currentRole } = useContext(UserContext) as UserContextType;
 
   const [trackingData, setTrackingData] = useState<TrackingData | null>(null);
   const [currentRegion, setCurrentRegion] = useState({

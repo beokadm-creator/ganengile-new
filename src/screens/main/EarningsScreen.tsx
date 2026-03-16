@@ -120,7 +120,7 @@ export default function EarningsScreen({ navigation }: Props) {
               <Text style={styles.monthlyValue}>₩{monthlySummary.total.toLocaleString()}</Text>
             </View>
             <View style={styles.monthlyRow}>
-              <Text style={styles.monthlyLabel}>플랫폼 수수료 (15%)</Text>
+              <Text style={styles.monthlyLabel}>플랫폼 수수료 (10%)</Text>
               <Text style={[styles.monthlyValue, { color: '#f44336' }]}>
                 -₩{monthlySummary.platformFee.toLocaleString()}
               </Text>
@@ -147,7 +147,7 @@ export default function EarningsScreen({ navigation }: Props) {
           </View>
 
           <View style={styles.summaryCard}>
-            <Text style={styles.summaryLabel}>플랫폼 수수료 (15%)</Text>
+            <Text style={styles.summaryLabel}>플랫폼 수수료 (10%)</Text>
             <Text style={[styles.summaryValue, { color: '#f44336' }]}>
               -₩{totalFees.toLocaleString()}
             </Text>
@@ -204,7 +204,7 @@ export default function EarningsScreen({ navigation }: Props) {
                   </View>
 
                   <View style={styles.recordRow}>
-                    <Text style={styles.recordLabel}>수수료 (15%)</Text>
+                    <Text style={styles.recordLabel}>수수료 (10%)</Text>
                     <Text style={[styles.recordValue, { color: '#f44336' }]}>
                       -₩{(payment.fee || 0).toLocaleString()}
                     </Text>

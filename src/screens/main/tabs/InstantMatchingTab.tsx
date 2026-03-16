@@ -28,6 +28,7 @@ import { locationService, type LocationData } from '../../../services/location-s
 import { requireUserId } from '../../../services/firebase';
 import type { LocationFilteredRequest, MatchingFilterOptions } from '../../../types/matching-extended';
 import { Spacing, BorderRadius, Colors, Shadows } from '../../../theme';
+import { formatWeightDisplay } from '../../../utils/package-weight';
 
 type NavigationProp = StackNavigationProp<any>;
 
@@ -468,7 +469,9 @@ export default function InstantMatchingTab({ navigation }: Props) {
 
           <View style={styles.detailItem}>
             <Text style={styles.detailLabel}>⚖️ 무게</Text>
-            <Text style={styles.detailValue}>{item.packageInfo.weight}kg</Text>
+            <Text style={styles.detailValue}>
+              {formatWeightDisplay(item.packageInfo.weight, item.packageInfo.weightKg)}
+            </Text>
           </View>
 
           <View style={styles.detailItem}>
@@ -539,7 +542,7 @@ export default function InstantMatchingTab({ navigation }: Props) {
               onPress={() => setFilters({ ...filters, maxDistance: filters.maxDistance! + 2000 })}
             >
               <Text style={styles.adjustFilterButtonText}>
-                반경 {formatDistance(filters.maxDistance! + 2000)}로 확장
+                반경 {formatDistance(filters.maxDistance + 2000)}로 확장
               </Text>
             </TouchableOpacity>
           )}

@@ -59,7 +59,7 @@ export default function RatingScreen({ navigation, route }: Props) {
   const [showSuccess, setShowSuccess] = useState(false);
   const [showDraftRestore, setShowDraftRestore] = useState(false);
   const [opponentRating, setOpponentRating] = useState<any>(null);
-  const [delivery, setDelivery] = useState<any>(null);
+  const [_delivery, _setDelivery] = useState<any>(null);
 
   useEffect(() => {
     loadData();

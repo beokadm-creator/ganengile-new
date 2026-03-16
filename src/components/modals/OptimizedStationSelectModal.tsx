@@ -267,7 +267,7 @@ export default function OptimizedStationSelectModal({
                 <View style={styles.emptyContainer}>
                   <Ionicons name="search-outline" size={48} color={Colors.gray300} />
                   <Text style={styles.emptyText}>
-                    '{searchQuery}'에 대한 검색 결과가 없습니다.
+                    &apos;{searchQuery}&apos;에 대한 검색 결과가 없습니다.
                   </Text>
                 </View>
               ) : (

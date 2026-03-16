@@ -12,6 +12,7 @@ import {
   TouchableOpacity,
   RefreshControl,
   Platform,
+  Alert,
 } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { Colors, Spacing, Typography, BorderRadius, Shadows } from '../../theme';
@@ -51,7 +52,8 @@ export default function HomeScreen({ navigation }: { navigation: MainStackNaviga
   const [stats, setStats] = useState<Stats | null>(null);
   const [refreshing, setRefreshing] = useState(false);
   const [stationModalVisible, setStationModalVisible] = useState(false);
-  const [selectedStation, setSelectedStation] = useState<Station | null>(null);
+  const [_selectedStation, _setSelectedStation] = useState<Station | null>(null);
+  const [activeRequest, setActiveRequest] = useState<any>(null);
 
   // Load stats
   const loadStats = useCallback(async () => {
@@ -63,10 +65,11 @@ export default function HomeScreen({ navigation }: { navigation: MainStackNaviga
 
       // Get active requests count
       const requests = await getRequestsByRequester(user.uid);
-      const activeCount = requests.filter(
-        req => req.status === 'pending' || req.status === 'matched' || req.status === 'in_progress'
-      ).length;
+      const activeStatuses = ['pending', 'matched', 'accepted', 'in_transit', 'arrived', 'at_locker', 'delivered'];
+      const activeRequests = requests.filter(req => activeStatuses.includes(req.status as any));
+      const activeCount = activeRequests.length;
       setStats(prev => prev ? { ...prev, activeRequestsCount: activeCount } : null);
+      setActiveRequest(activeRequests[0] || null);
     } catch (error: any) {
       console.error('Error loading stats:', error);
     } finally {
@@ -84,7 +87,7 @@ export default function HomeScreen({ navigation }: { navigation: MainStackNaviga
   };
 
   // Toggle role for BOTH users
-  const toggleRole = () => {
+  const _toggleRole = () => {
     if (user?.role === UserRole.BOTH && currentRole) {
       const newRole = currentRole === UserRole.GLER ? UserRole.GILLER : UserRole.GLER;
       switchRole(newRole);
@@ -110,14 +113,41 @@ export default function HomeScreen({ navigation }: { navigation: MainStackNaviga
 
   const canAccessGiller =
     PASS_TEST_MODE ||
+    user?.role === UserRole.BOTH ||
+    user?.role === UserRole.GILLER ||
+    (user as any)?.isGiller === true ||
     (user?.gillerApplicationStatus === 'approved' && user?.isVerified);
+
+  const handleRoleChange = (newRole: 'gller' | 'giller') => {
+    if (newRole === 'giller' && !canAccessGiller) {
+      Alert.alert(
+        '길러 모드 이용 안내',
+        user?.gillerApplicationStatus === 'pending'
+          ? '길러 신청이 심사 중입니다. 승인 후 길러 모드를 이용할 수 있습니다.'
+          : '길러 모드를 이용하려면 승인 절차가 필요합니다. 지금 신청하시겠어요?',
+        [
+          { text: '취소', style: 'cancel' },
+          user?.gillerApplicationStatus !== 'pending'
+            ? {
+                text: '신청하기',
+                onPress: () => navigation.navigate('GillerApply' as any),
+              }
+            : { text: '확인' },
+        ]
+      );
+      return;
+    }
+    switchRole(newRole === 'gller' ? UserRole.GLER : UserRole.GILLER);
+  };
 
   return (
     <ScrollView
       style={styles.container}
       contentContainerStyle={styles.scrollContent}
-      scrollEnabled={true}
-      bounces={false}
+      scrollEnabled
+      nestedScrollEnabled
+      keyboardShouldPersistTaps="handled"
+      showsVerticalScrollIndicator={false}
       refreshControl={
         <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
       }
@@ -164,7 +194,7 @@ export default function HomeScreen({ navigation }: { navigation: MainStackNaviga
             {user.role === UserRole.BOTH && (
               <RoleSlider
                 currentRole={currentRole === UserRole.GLER ? 'gller' : 'giller'}
-                onRoleChange={(newRole) => switchRole(newRole === 'gller' ? UserRole.GLER : UserRole.GILLER)}
+                onRoleChange={handleRoleChange}
               />
             )}
           </View>
@@ -174,6 +204,7 @@ export default function HomeScreen({ navigation }: { navigation: MainStackNaviga
             <GllerDashboard
               user={user}
               stats={stats}
+              activeRequest={activeRequest}
               navigation={navigation}
               openStationModal={openStationModal}
             />
@@ -206,16 +237,54 @@ export default function HomeScreen({ navigation }: { navigation: MainStackNaviga
 function GllerDashboard({
   user,
   stats,
+  activeRequest,
   navigation,
   openStationModal,
 }: {
   user: User;
   stats: Stats | null;
+  activeRequest: any;
   navigation: MainStackNavigationProp;
   openStationModal: () => void;
 }) {
+  const requesterStatusLabel: Record<string, string> = {
+    pending: '매칭 대기',
+    matched: '길러 매칭됨',
+    accepted: '길러 수락',
+    in_transit: '배송 중',
+    arrived: '도착 완료',
+    at_locker: '사물함 보관',
+    delivered: '수령 확인 대기',
+  };
+  const needsGillerEntry = user.gillerApplicationStatus !== 'approved' || !user.isVerified;
+
   return (
     <View style={styles.dashboardContainer}>
+      {activeRequest && (
+        <TouchableOpacity
+          style={styles.activeDeliveryCard}
+          onPress={() => navigation.navigate('RequestDetail', { requestId: activeRequest.requestId })}
+          activeOpacity={0.8}
+        >
+          <View style={styles.activeDeliveryHeader}>
+            <Text style={styles.activeDeliveryBadge}>진행 중</Text>
+            <Text style={styles.activeDeliveryStatus}>
+              {requesterStatusLabel[activeRequest.status] || activeRequest.status}
+            </Text>
+          </View>
+          <View style={styles.activeDeliveryRoute}>
+            <Text style={styles.activeDeliveryStation}>
+              {activeRequest.pickupStation?.stationName || '픽업 역'}
+            </Text>
+            <Text style={styles.activeDeliveryArrow}> → </Text>
+            <Text style={styles.activeDeliveryStation}>
+              {activeRequest.deliveryStation?.stationName || '배송 역'}
+            </Text>
+          </View>
+          <Text style={styles.activeDeliveryAction}>👆 탭하여 진행 상황 확인</Text>
+        </TouchableOpacity>
+      )}
+
       {/* Quick Stats */}
       <View style={styles.statsRow}>
         {/* 진행 중인 배송 */}
@@ -291,6 +360,20 @@ function GllerDashboard({
           )}
         </TouchableOpacity>
       </View>
+
+      {needsGillerEntry && (
+        <TouchableOpacity
+          style={styles.gillerPromoBanner}
+          activeOpacity={0.85}
+          onPress={() => navigation.navigate('IdentityVerification')}
+        >
+          <Text style={styles.gillerPromoTitle}>🚴 길러를 신청하고 배송해보세요</Text>
+          <Text style={styles.gillerPromoDesc}>
+            신원 인증을 완료하면 길러 신청과 심사 절차를 진행할 수 있어요.
+          </Text>
+          <Text style={styles.gillerPromoAction}>신원 인증 시작하기 →</Text>
+        </TouchableOpacity>
+      )}
     </View>
   );
 }
@@ -559,7 +642,7 @@ const styles = StyleSheet.create({
     borderBottomRightRadius: 32,
     padding: Spacing.xxl,
     paddingTop: 65,
-    paddingBottom: Spacing['3xl'],
+    paddingBottom: Spacing['4xl'],
     ...Shadows.lg,
   },
   headerGreeting: {
@@ -584,10 +667,17 @@ const styles = StyleSheet.create({
     fontSize: 16,
   },
   activeDeliveryCard: {
-    backgroundColor: Colors.primary,
-    borderRadius: 12,
+    backgroundColor: '#0B7B73',
+    borderRadius: 16,
     padding: 16,
     marginBottom: 16,
+    borderWidth: 2,
+    borderColor: '#57D7C8',
+    shadowColor: '#0B7B73',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.24,
+    shadowRadius: 14,
+    elevation: 8,
   },
   activeDeliveryHeader: {
     flexDirection: 'row',
@@ -636,7 +726,7 @@ const styles = StyleSheet.create({
   },
   dashboardContainer: {
     padding: Spacing.lg,
-    marginTop: -Spacing['2xl'],
+    marginTop: -Spacing.lg,
   },
   statsRow: {
     flexDirection: 'row',
@@ -774,6 +864,31 @@ const styles = StyleSheet.create({
   performanceRowLast: {
     borderBottomWidth: 0,
   },
+  gillerPromoBanner: {
+    backgroundColor: '#E8F5E9',
+    borderWidth: 1,
+    borderColor: '#A5D6A7',
+    borderRadius: BorderRadius.lg,
+    padding: Spacing.lg,
+    marginTop: Spacing.md,
+  },
+  gillerPromoTitle: {
+    fontSize: Typography.fontSize.base,
+    fontWeight: Typography.fontWeight.bold,
+    color: '#2E7D32',
+    marginBottom: Spacing.xs,
+  },
+  gillerPromoDesc: {
+    fontSize: Typography.fontSize.sm,
+    color: '#33691E',
+    lineHeight: 20,
+  },
+  gillerPromoAction: {
+    marginTop: Spacing.sm,
+    fontSize: Typography.fontSize.sm,
+    fontWeight: Typography.fontWeight.semibold,
+    color: '#1B5E20',
+  },
   performanceLabel: {
     color: Colors.textSecondary,
     fontSize: Typography.fontSize.sm,
@@ -808,6 +923,6 @@ const styles = StyleSheet.create({
   },
   scrollContent: {
     flexGrow: 1,
-    paddingBottom: Spacing['3xl'],
+    paddingBottom: Spacing['5xl'],
   },
 });

@@ -16,6 +16,8 @@ export async function GET() {
     activeDeliveries,
     todayRequests,
     totalUsers,
+    fareCount,
+    fareLatest,
   ] = await Promise.all([
     db.collection('withdraw_requests').where('status', '==', 'pending').count().get(),
     db.collection('disputes').where('status', '==', 'pending').count().get(),
@@ -23,7 +25,12 @@ export async function GET() {
     db.collection('delivery_requests').where('status', 'in', ['matched', 'picked_up', 'in_locker']).count().get(),
     db.collection('delivery_requests').where('createdAt', '>=', todayStart).count().get(),
     db.collection('users').count().get(),
+    db.collection('config_fares').count().get(),
+    db.collection('config_fares').orderBy('updatedAt', 'desc').limit(1).get(),
   ]);
+
+  const latestFareDoc = fareLatest.docs[0]?.data() as { updatedAt?: { toDate?: () => Date } } | undefined;
+  const latestUpdatedAt = latestFareDoc?.updatedAt?.toDate ? latestFareDoc.updatedAt.toDate().toISOString() : null;
 
   return NextResponse.json({
     pendingWithdrawals: pendingWithdrawals.data().count,
@@ -32,5 +39,7 @@ export async function GET() {
     activeDeliveries: activeDeliveries.data().count,
     todayRequests: todayRequests.data().count,
     totalUsers: totalUsers.data().count,
+    fareCount: fareCount.data().count,
+    fareLatestUpdatedAt: latestUpdatedAt,
   });
 }

@@ -9,7 +9,6 @@ import {
   Text,
   StyleSheet,
   TouchableOpacity,
-  Platform,
 } from 'react-native';
 import { useUser } from '../../contexts/UserContext';
 import { UserRole } from '../../types/user';
