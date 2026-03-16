@@ -21,17 +21,206 @@ import {
   PrivateLocker,
   LockerReservation,
   LockerType,
+  LockerOperator,
   LockerStatus,
+  LockerSize,
 } from '../types/locker';
+import { getStationConfig } from './config-service';
 
 const LOCKERS_COLLECTION = 'lockers';
 const RESERVATIONS_COLLECTION = 'locker_reservations';
+const NON_SUBWAY_LOCKERS_COLLECTION = 'non_subway_lockers';
+const EXTERNAL_LOCKER_API_URL = process.env.EXPO_PUBLIC_LOCKER_API_URL || '';
+const EXTERNAL_LOCKER_API_KEY = process.env.EXPO_PUBLIC_LOCKER_API_KEY || '';
+const KRIC_LOCKER_API_URL =
+  process.env.EXPO_PUBLIC_KRIC_LOCKER_API_URL ||
+  'https://openapi.kric.go.kr/openapi/convenientInfo/stationLocker';
+const KRIC_SERVICE_KEY = process.env.EXPO_PUBLIC_KRIC_SERVICE_KEY || '';
+const KRIC_RAIL_OPR_ISTT_CD = process.env.EXPO_PUBLIC_KRIC_RAIL_OPR_ISTT_CD || 'S1';
+
+function normalizeLockerSize(value?: string): LockerSize {
+  const v = (value || '').toLowerCase();
+  if (v.includes('small') || v.includes('소')) return LockerSize.SMALL;
+  if (v.includes('medium') || v.includes('중')) return LockerSize.MEDIUM;
+  if (v.includes('large') || v.includes('대')) return LockerSize.LARGE;
+  return LockerSize.MEDIUM;
+}
+
+function normalizeLockerStatus(value?: string): LockerStatus {
+  const v = (value || '').toLowerCase();
+  if (v.includes('available') || v.includes('free') || v.includes('empty')) return LockerStatus.AVAILABLE;
+  if (v.includes('occupied') || v.includes('in_use') || v.includes('busy')) return LockerStatus.OCCUPIED;
+  if (v.includes('maintenance') || v.includes('broken')) return LockerStatus.MAINTENANCE;
+  return LockerStatus.AVAILABLE;
+}
+
+function mapExternalLocker(raw: any): Locker | null {
+  const lockerId = raw?.lockerId ?? raw?.id ?? raw?.locker_id;
+  const stationId = raw?.stationId ?? raw?.station_id;
+  if (!lockerId || !stationId) return null;
+
+  const status = normalizeLockerStatus(raw?.status);
+  const size = normalizeLockerSize(raw?.size);
+
+  return {
+    lockerId: String(lockerId),
+    type: LockerType.PUBLIC,
+    operator: (raw?.operator ?? 'seoul_metro') as any,
+    location: {
+      stationId: String(stationId),
+      stationName: raw?.stationName ?? raw?.station_name ?? '',
+      line: raw?.line ?? raw?.line_name ?? '',
+      floor: raw?.floor ?? 1,
+      section: raw?.section ?? raw?.locker_no ?? String(lockerId),
+      address: raw?.address,
+      nearby: raw?.nearby ?? false,
+    },
+    size,
+    pricing: {
+      base: raw?.basePrice ?? raw?.base_price ?? 0,
+      baseDuration: raw?.baseDuration ?? raw?.base_duration ?? 240,
+      extension: raw?.extensionPrice ?? raw?.extension_price ?? 0,
+      maxDuration: raw?.maxDuration ?? raw?.max_duration,
+    },
+    availability: {
+      total: raw?.total ?? 1,
+      occupied: raw?.occupied ?? (status === LockerStatus.OCCUPIED ? 1 : 0),
+      available: raw?.available ?? (status === LockerStatus.AVAILABLE ? 1 : 0),
+    },
+    status,
+    qrCode: raw?.qrCode ?? raw?.qr_code ?? '',
+    accessMethod: raw?.accessMethod ?? 'qr',
+  };
+}
+
+function normalizeKricSize(value?: string): LockerSize {
+  const v = (value || '').toLowerCase();
+  if (v.includes('소') || v.includes('small')) return LockerSize.SMALL;
+  if (v.includes('중') || v.includes('medium')) return LockerSize.MEDIUM;
+  if (v.includes('대') || v.includes('large')) return LockerSize.LARGE;
+  return LockerSize.MEDIUM;
+}
+
+async function fetchKricLockers(stationId?: string): Promise<Locker[]> {
+  if (!KRIC_SERVICE_KEY) return [];
+  if (!stationId) return [];
+
+  try {
+    const stationConfig = await getStationConfig(stationId);
+    const lineCode =
+      stationConfig?.kric?.lineCode ||
+      stationConfig?.lines?.[0]?.lineCode ||
+      '';
+    const stinCd =
+      stationConfig?.kric?.stationCode ||
+      stationId;
+    const railOprIsttCd =
+      stationConfig?.kric?.railOprIsttCd ||
+      KRIC_RAIL_OPR_ISTT_CD;
+
+    if (!lineCode || !stinCd) {
+      return [];
+    }
+
+    const url = new URL(KRIC_LOCKER_API_URL);
+    url.searchParams.set('serviceKey', KRIC_SERVICE_KEY);
+    url.searchParams.set('format', 'json');
+    url.searchParams.set('railOprIsttCd', railOprIsttCd);
+    url.searchParams.set('lnCd', lineCode);
+    url.searchParams.set('stinCd', stinCd);
+
+    const res = await fetch(url.toString());
+    if (!res.ok) return [];
+
+    const data = await res.json();
+    const items =
+      data?.response?.body?.items?.item ||
+      data?.body?.items?.item ||
+      data?.items ||
+      data?.item ||
+      data?.stationLocker ||
+      [];
+
+    const list = Array.isArray(items) ? items : [items];
+    const stationName = stationConfig?.stationName || '';
+
+    return list
+      .filter(Boolean)
+      .map((item: any, index: number) => {
+        const size = normalizeKricSize(item?.szNm);
+        const facilityCount = Number(item?.faclNum ?? 0);
+        const baseFare = Number(item?.utlFare ?? 0);
+
+        return {
+          lockerId: `${stinCd}-${size}-${index}`,
+          type: LockerType.PUBLIC,
+          operator: LockerOperator.SEOUL_METRO,
+          location: {
+            stationId: stinCd,
+            stationName,
+            line: item?.lnCd ? `${item.lnCd}호선` : '',
+            floor: Number(item?.stinFlor ?? 1),
+            section: item?.dtlLoc ?? `보관함-${index + 1}`,
+            address: '',
+            nearby: false,
+          },
+          size,
+          pricing: {
+            base: baseFare,
+            baseDuration: 240,
+            extension: 0,
+          },
+          availability: {
+            total: facilityCount || 1,
+            occupied: 0,
+            available: facilityCount || 1,
+          },
+          status: LockerStatus.AVAILABLE,
+          qrCode: '',
+          accessMethod: 'qr',
+        } as Locker;
+      });
+  } catch (error) {
+    console.error('KRIC locker API fetch failed:', error);
+    return [];
+  }
+}
+
+async function fetchExternalLockers(stationId?: string): Promise<Locker[]> {
+  if (KRIC_SERVICE_KEY) {
+    const kric = await fetchKricLockers(stationId);
+    if (kric.length > 0) return kric;
+  }
+  if (!EXTERNAL_LOCKER_API_URL) return [];
+  try {
+    const url = new URL(EXTERNAL_LOCKER_API_URL);
+    if (stationId) {
+      url.searchParams.set('stationId', stationId);
+    }
+    const res = await fetch(url.toString(), {
+      headers: EXTERNAL_LOCKER_API_KEY
+        ? { Authorization: `Bearer ${EXTERNAL_LOCKER_API_KEY}` }
+        : undefined,
+    });
+    if (!res.ok) {
+      return [];
+    }
+    const data = await res.json();
+    const items = Array.isArray(data) ? data : data?.items ?? [];
+    const mapped = items.map(mapExternalLocker).filter(Boolean) as Locker[];
+    return mapped;
+  } catch (error) {
+    console.error('External locker API fetch failed:', error);
+    return [];
+  }
+}
 
 export class LockerService {
   /**
    * 모든 사물함 조회
    */
   async getAllLockers(): Promise<Locker[]> {
+    const external = await fetchExternalLockers();
     const q = query(collection(db, LOCKERS_COLLECTION));
     const snapshot = await getDocs(q);
 
@@ -43,7 +232,16 @@ export class LockerService {
       } as Locker);
     });
 
-    return lockers;
+    if (external.length === 0) {
+      return lockers.filter((l) => l.isSubway !== false);
+    }
+
+    const merged = new Map<string, Locker>();
+    lockers.forEach((l) => {
+      if (l.isSubway !== false) merged.set(l.lockerId, l);
+    });
+    external.forEach((l) => merged.set(l.lockerId, l));
+    return Array.from(merged.values());
   }
 
   /**
@@ -53,6 +251,8 @@ export class LockerService {
     stationId?: string,
     size?: string
   ): Promise<Locker[]> {
+    const external = await fetchExternalLockers(stationId);
+
     const q = query(
       collection(db, LOCKERS_COLLECTION),
       where('status', '==', LockerStatus.AVAILABLE)
@@ -75,10 +275,29 @@ export class LockerService {
         return;
       }
 
-      lockers.push(locker);
+      if (locker.isSubway !== false) {
+        lockers.push(locker);
+      }
     });
 
-    return lockers;
+    if (external.length === 0) {
+      return lockers;
+    }
+
+    const filteredExternal = external.filter((locker) => {
+      if (stationId && locker.location.stationId !== stationId) {
+        return false;
+      }
+      if (size && locker.size !== size) {
+        return false;
+      }
+      return locker.status === LockerStatus.AVAILABLE;
+    });
+
+    const merged = new Map<string, Locker>();
+    lockers.forEach((l) => merged.set(l.lockerId, l));
+    filteredExternal.forEach((l) => merged.set(l.lockerId, l));
+    return Array.from(merged.values());
   }
 
   /**
@@ -411,6 +630,22 @@ export async function getAvailableLockers(): Promise<Locker[]> {
  */
 export async function getLockersByStation(stationId: string): Promise<Locker[]> {
   return createLockerService().getAvailableLockers(stationId);
+}
+
+/**
+ * 비지하철 사물함 목록 조회
+ */
+export async function getNonSubwayLockers(): Promise<Locker[]> {
+  const q = query(collection(db, NON_SUBWAY_LOCKERS_COLLECTION));
+  const snapshot = await getDocs(q);
+  const lockers: Locker[] = [];
+  snapshot.forEach((docSnapshot) => {
+    lockers.push({
+      lockerId: docSnapshot.id,
+      ...(docSnapshot.data() as any),
+    } as Locker);
+  });
+  return lockers;
 }
 
 /**

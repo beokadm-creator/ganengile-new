@@ -1,0 +1,14 @@
+**/node_modules/**
+**/.git/**
+**/.DS_Store
+**/.expo/**
+**/coverage/**
+**/dist-web/**
+**/.next/**
+**/ios/**
+**/android/**
+**/e2e/**
+**/__tests__/**
+**/tests/**
+**/scripts/**
+**/data/**

@@ -11,7 +11,11 @@ import { Timestamp } from 'firebase/firestore';
 export enum RequestStatus {
   PENDING = 'pending',           // 매칭 대기 중
   MATCHED = 'matched',           // 길러 매칭됨
-  IN_PROGRESS = 'in_progress',   // 배송 중
+  ACCEPTED = 'accepted',         // 길러 수락
+  IN_TRANSIT = 'in_transit',     // 배송 중
+  ARRIVED = 'arrived',           // 도착 완료
+  AT_LOCKER = 'at_locker',       // 사물함 보관 완료
+  DELIVERED = 'delivered',       // 전달 완료 (수령 확인 대기)
   COMPLETED = 'completed',       // 배송 완료
   CANCELLED = 'cancelled',       // 취소됨
 }
@@ -86,6 +90,7 @@ export interface Request {
     sizeFee: number;
     weightFee: number;
     urgencySurcharge: number;
+    publicFare?: number;
     manualAdjustment: number;
     serviceFee: number;
     vat: number;
@@ -97,6 +102,7 @@ export interface Request {
     sizeFee: number;
     weightFee: number;
     urgencySurcharge: number;
+    publicFare?: number;
     manualAdjustment: number;
     serviceFee: number;
     vat: number;
@@ -130,8 +136,12 @@ export interface Request {
   matchedAt?: Timestamp;
 
   // 배송 정보
+  acceptedAt?: Timestamp;
   pickedUpAt?: Timestamp;
+  arrivedAt?: Timestamp;
   deliveredAt?: Timestamp;
+  requesterConfirmedAt?: Timestamp;
+  requesterConfirmedBy?: string;
 
   // 평가 정보
   gillerRating?: number;

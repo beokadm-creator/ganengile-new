@@ -18,7 +18,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect } from '@react-navigation/native';
 import type { Locker, LockerSummary } from '../../types/locker';
 import { LockerStatus } from '../../types/locker';
-import { getAvailableLockers, getLockersByStation, createLockerLocation } from '../../services/locker-service';
+import { getAvailableLockers, getLockersByStation, createLockerLocation, getNonSubwayLockers } from '../../services/locker-service';
 import { Colors, Spacing, Typography, BorderRadius } from '../../theme';
 
 const { width: _SCREEN_WIDTH } = Dimensions.get('window');
@@ -37,13 +37,16 @@ export default function LockerLocator({ selectedStationId, onLockerSelect, onClo
   const selectedStation = selectedStationId;
   const [loading, setLoading] = useState(true);
   const [viewMode, setViewMode] = useState<'list' | 'map'>('list');
+  const [includeNonSubway, setIncludeNonSubway] = useState(false);
 
   const loadLockers = async () => {
     try {
       setLoading(true);
       
-      let lockerList: Locker[];
-      if (selectedStation) {
+      let lockerList: Locker[] = [];
+      if (includeNonSubway) {
+        lockerList = await getNonSubwayLockers();
+      } else if (selectedStation) {
         lockerList = await getLockersByStation(selectedStation);
       } else {
         lockerList = await getAvailableLockers();
@@ -65,7 +68,7 @@ export default function LockerLocator({ selectedStationId, onLockerSelect, onClo
   useFocusEffect(
     useCallback(() => {
       loadLockers();
-    }, [selectedStation])
+    }, [selectedStation, includeNonSubway])
   );
 
   const handleLockerSelect = (locker: any) => {
@@ -123,6 +126,20 @@ export default function LockerLocator({ selectedStationId, onLockerSelect, onClo
 
   return (
     <View style={styles.container}>
+      <View style={styles.filterRow}>
+        <TouchableOpacity
+          style={[styles.filterButton, !includeNonSubway && styles.filterButtonActive]}
+          onPress={() => setIncludeNonSubway(false)}
+        >
+          <Text style={[styles.filterText, !includeNonSubway && styles.filterTextActive]}>지하철</Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={[styles.filterButton, includeNonSubway && styles.filterButtonActive]}
+          onPress={() => setIncludeNonSubway(true)}
+        >
+          <Text style={[styles.filterText, includeNonSubway && styles.filterTextActive]}>비지하철</Text>
+        </TouchableOpacity>
+      </View>
       {/* Header */}
       <View style={styles.header}>
         <View style={styles.headerTop}>
@@ -219,6 +236,32 @@ interface LockerLocation {
 // ==================== Styles ====================
 
 const styles = StyleSheet.create({
+  filterRow: {
+    flexDirection: 'row',
+    gap: Spacing.sm,
+    paddingHorizontal: Spacing.lg,
+    paddingTop: Spacing.md,
+  },
+  filterButton: {
+    borderRadius: BorderRadius.md,
+    borderWidth: 1,
+    borderColor: Colors.gray300,
+    paddingVertical: Spacing.sm,
+    paddingHorizontal: Spacing.md,
+    backgroundColor: Colors.white,
+  },
+  filterButtonActive: {
+    backgroundColor: Colors.primary,
+    borderColor: Colors.primary,
+  },
+  filterText: {
+    color: Colors.gray700,
+    fontSize: Typography.fontSize.sm,
+    fontWeight: Typography.fontWeight.medium,
+  },
+  filterTextActive: {
+    color: Colors.white,
+  },
   centerContainer: {
     alignItems: 'center',
     flex: 1,

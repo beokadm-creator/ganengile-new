@@ -50,6 +50,8 @@ import LockerMapScreen from '../screens/main/LockerMapScreen';
 import DisputeReportScreen from '../screens/main/DisputeReportScreen';
 import GillerLevelUpgradeScreen from '../screens/main/GillerLevelUpgradeScreen';
 import GillerApplyScreen from '../screens/main/GillerApplyScreen';
+import IdentityVerificationScreen from '../screens/main/IdentityVerificationScreen';
+import { PASS_TEST_MODE } from '../config/feature-flags';
 
 const Tab = createBottomTabNavigator<MainTabParamList>();
 const Stack = createStackNavigator();
@@ -100,8 +102,11 @@ function TabBarIcon({ name, focused }: { name: string; focused: boolean }) {
 }
 
 function TabNavigator() {
-  const { currentRole } = useUser();
+  const { currentRole, user } = useUser();
   const insets = useSafeAreaInsets();
+  const canAccessGiller =
+    PASS_TEST_MODE ||
+    (user?.gillerApplicationStatus === 'approved' && user?.isVerified);
 
   return (
     <Tab.Navigator
@@ -143,7 +148,7 @@ function TabNavigator() {
       )}
 
       {/* Giller-specific tab: GillerRequests (배송 매칭) */}
-      {(currentRole === 'giller' || currentRole === 'both') && (
+      {(currentRole === 'giller' || currentRole === 'both') && canAccessGiller && (
         <Tab.Screen
           name="GillerRequests"
           component={GillerRequestsScreen}
@@ -158,7 +163,7 @@ function TabNavigator() {
       />
 
       {/* Route Management: ONLY for Giller (not Gller) */}
-      {currentRole === 'giller' && (
+      {currentRole === 'giller' && canAccessGiller && (
         <Tab.Screen
           name="RouteManagement"
           component={RouteManagementScreen}
@@ -417,6 +422,14 @@ export default function MainNavigator() {
         options={{
           headerShown: true,
           title: '길러 신청',
+        }}
+      />
+      <Stack.Screen
+        name="IdentityVerification"
+        component={IdentityVerificationScreen}
+        options={{
+          headerShown: true,
+          title: '신원 인증',
         }}
       />
     </Stack.Navigator>

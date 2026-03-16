@@ -18,6 +18,7 @@ import {
 import { useUser } from '../../contexts/UserContext';
 import { doc, updateDoc, addDoc, collection, serverTimestamp } from 'firebase/firestore';
 import { db } from '../../services/firebase';
+import { PASS_TEST_MODE } from '../../config/feature-flags';
 
 type Props = {
   navigation: any;
@@ -47,7 +48,7 @@ export default function GillerApplicationOnboarding({ navigation }: Props) {
   const { user, refreshUser } = useUser();
   const [loading, setLoading] = useState(false);
   const [currentStep, setCurrentStep] = useState(1);
-  const [testMode, setTestMode] = useState(true); // 테스트 모드
+  const [testMode] = useState(PASS_TEST_MODE); // 테스트 모드
 
   const [phone, setPhone] = useState('');
   const [routeDescription, setRouteDescription] = useState('');
@@ -185,6 +186,7 @@ export default function GillerApplicationOnboarding({ navigation }: Props) {
           name: passAuthData.name,
           birthday: passAuthData.birthday,
         },
+        verificationStatus: testMode ? 'approved' : 'not_submitted',
         status: 'pending',
         createdAt: serverTimestamp(),
       });

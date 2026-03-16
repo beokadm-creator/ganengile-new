@@ -185,11 +185,18 @@ export async function updateVerificationStatus(
 ): Promise<void> {
   try {
     const profileRef = doc(db, 'users', userId, PROFILE_COLLECTION, userId);
+    const userRef = doc(db, 'users', userId);
 
-    await updateDoc(profileRef, {
-      isVerified,
-      updatedAt: serverTimestamp(),
-    });
+    await Promise.all([
+      updateDoc(profileRef, {
+        isVerified,
+        updatedAt: serverTimestamp(),
+      }),
+      updateDoc(userRef, {
+        isVerified,
+        updatedAt: serverTimestamp(),
+      }),
+    ]);
   } catch (error) {
     console.error('Error updating verification status:', error);
     throw error;

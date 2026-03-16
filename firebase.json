@@ -28,7 +28,17 @@
   "apphosting": [
     {
       "backendId": "ganengile-admin",
-      "rootDir": "admin-web"
+      "rootDir": "admin-web",
+      "ignore": [
+        "**/node_modules/**",
+        "**/.next/**",
+        "**/.expo/**",
+        "**/.git/**",
+        "**/coverage/**",
+        "**/dist/**",
+        "**/dist-web/**",
+        "**/.DS_Store"
+      ]
     }
   ]
 }

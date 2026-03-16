@@ -21,7 +21,15 @@ type MatchingResultRouteParams = {
   };
 };
 
-type RequestStatus = 'pending' | 'matched' | 'in_progress' | 'completed' | 'cancelled';
+type RequestStatus =
+  | 'pending'
+  | 'matched'
+  | 'accepted'
+  | 'in_transit'
+  | 'arrived'
+  | 'delivered'
+  | 'completed'
+  | 'cancelled';
 
 export const MatchingResultScreen: React.FC = () => {
   const navigation = useNavigation();
@@ -32,16 +40,17 @@ export const MatchingResultScreen: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [giller, setGiller] = useState<any>(null);
   const [notificationSent, setNotificationSent] = useState(false);
+  const [notificationError, setNotificationError] = useState<string | null>(null);
 
   // 요청 상태 실시간 감시
   useEffect(() => {
     const unsubscribe = requestService.subscribeToRequest(requestId, async (request) => {
       if (request) {
         setStatus(request.status);
-        if (request.status === 'matched' && (request as any).matchedGillerId) {
-          // matchedGillerId로 길러 정보 별도 조회
-          const gillerInfo = await fetchUserInfo((request as any).matchedGillerId);
-          setGiller({ id: (request as any).matchedGillerId, ...gillerInfo });
+        const matchedGillerId = (request as any).matchedGillerId;
+        if (matchedGillerId) {
+          const gillerInfo = await fetchUserInfo(matchedGillerId);
+          setGiller({ id: matchedGillerId, ...gillerInfo });
         }
         setLoading(false);
       }
@@ -50,10 +59,15 @@ export const MatchingResultScreen: React.FC = () => {
     // 길러들에게 푸시 알림 전송
     const sendNotifications = async () => {
       try {
-        await requestService.notifyGillers(requestId);
+        const result = await requestService.notifyGillers(requestId);
+        if (!result.success) {
+          setNotificationError(result.error || '알림 전송에 실패했습니다.');
+          return;
+        }
         setNotificationSent(true);
       } catch (error) {
         console.error('푸시 알림 전송 실패:', error);
+        setNotificationError('알림 전송에 실패했습니다.');
       }
     };
 
@@ -82,7 +96,7 @@ export const MatchingResultScreen: React.FC = () => {
   };
 
   // 매칭 완료 화면
-  if (status === 'matched' && giller) {
+  if ((status === 'accepted' || status === 'in_transit' || status === 'arrived' || status === 'delivered' || status === 'completed') && giller) {
     return (
       <View style={styles.container}>
         <ScrollView contentContainerStyle={styles.scrollContent}>
@@ -157,8 +171,8 @@ export const MatchingResultScreen: React.FC = () => {
           </Text>
         </View>
 
-        {/* 알림 전송 완료 메시지 */}
-        {notificationSent && (
+        {/* 알림 전송 상태 */}
+        {notificationSent && !notificationError && (
           <View style={styles.successContainer}>
             <Ionicons name="notifications" size={30} color={Colors.success} />
             <Text style={styles.successText}>
@@ -167,6 +181,12 @@ export const MatchingResultScreen: React.FC = () => {
             <Text style={styles.successSubtext}>
               주변 길러들에게 요청 알림을 보냈습니다.
             </Text>
+          </View>
+        )}
+        {notificationError && (
+          <View style={styles.errorContainer}>
+            <Ionicons name="alert-circle" size={30} color={Colors.error} />
+            <Text style={styles.errorText}>{notificationError}</Text>
           </View>
         )}
 
@@ -282,6 +302,22 @@ const styles = StyleSheet.create({
     color: '#666',
     marginLeft: 48,
     marginTop: 4,
+  },
+  errorContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#FFEBEE',
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 20,
+    borderWidth: 1,
+    borderColor: '#EF5350',
+  },
+  errorText: {
+    fontSize: 14,
+    color: '#C62828',
+    marginLeft: 12,
+    flex: 1,
   },
   infoCard: {
     backgroundColor: Colors.white,

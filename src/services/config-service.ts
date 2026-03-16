@@ -99,6 +99,8 @@ function convertStation(data: any, docId?: string): Station {
     isActive: data.isActive,
     region: data.region,
     priority: data.priority,
+    kric: data.kric,
+    fare: data.fare,
     createdAt: convertTimestampToDate(data.createdAt),
     updatedAt: convertTimestampToDate(data.updatedAt),
   };

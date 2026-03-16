@@ -20,6 +20,7 @@ import {
   updateReservationStatus,
   addReservationPhotos,
 } from '../../services/locker-service';
+import { confirmDeliveryByRequester } from '../../services/delivery-service';
 import { verifyQRCode, getQRCodeRemainingTime } from '../../services/qrcode-service';
 import { takePhoto, uploadPhotoWithThumbnail } from '../../services/photo-service';
 import type { MainStackNavigationProp } from '../../types/navigation';
@@ -166,6 +167,18 @@ export default function UnlockLockerScreen() {
       if (reservation && collectPhotoUrl) {
         await addReservationPhotos(reservation.reservationId, undefined, collectPhotoUrl);
         await updateReservationStatus(reservation.reservationId, 'completed');
+      }
+
+      const requesterId = await requireUserId();
+      const confirmResult = await confirmDeliveryByRequester({
+        deliveryId,
+        requesterId,
+      });
+
+      if (!confirmResult.success) {
+        Alert.alert('오류', confirmResult.message);
+        setLoading(false);
+        return;
       }
 
       Alert.alert(

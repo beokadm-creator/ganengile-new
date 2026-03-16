@@ -287,6 +287,8 @@ export default function RealtimeTrackingScreen({ navigation, route }: Props) {
           <Text style={styles.statusText}>
             {trackingData?.status === 'in_transit' ? '배송 중' :
              trackingData?.status === 'arrived' ? '도착 완료' :
+             trackingData?.status === 'at_locker' ? '사물함 보관 완료' :
+             trackingData?.status === 'delivered' ? '수령 확인 대기' :
              trackingData?.status === 'completed' ? '배송 완료' :
              '준비 중'}
           </Text>

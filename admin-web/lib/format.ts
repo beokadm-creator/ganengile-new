@@ -18,12 +18,16 @@ export function statusLabel(status: string): string {
     completed: '완료',
     rejected: '반려',
     processing: '처리중',
+    failed: '실패',
     paid: '납부',
     refunded: '환급',
     deducted: '차감',
+    skipped: '대상 아님',
     resolved: '해결됨',
     approved: '승인',
     in_review: '심사중',
+    under_review: '심사중',
+    not_submitted: '미제출',
   };
   return map[status] ?? status;
 }
@@ -34,12 +38,16 @@ export function statusColor(status: string): string {
     completed: 'bg-green-100 text-green-800',
     rejected: 'bg-red-100 text-red-800',
     processing: 'bg-blue-100 text-blue-800',
+    failed: 'bg-red-100 text-red-800',
     paid: 'bg-green-100 text-green-800',
     refunded: 'bg-gray-100 text-gray-800',
     deducted: 'bg-red-100 text-red-800',
+    skipped: 'bg-gray-100 text-gray-800',
     resolved: 'bg-green-100 text-green-800',
     approved: 'bg-green-100 text-green-800',
     in_review: 'bg-blue-100 text-blue-800',
+    under_review: 'bg-blue-100 text-blue-800',
+    not_submitted: 'bg-gray-100 text-gray-800',
   };
   return map[status] ?? 'bg-gray-100 text-gray-800';
 }

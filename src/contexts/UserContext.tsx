@@ -51,7 +51,7 @@ export function UserProvider({ children }: UserProviderProps) {
               firebaseUser.uid,
               firebaseUser.email || 'unknown@example.com',
               firebaseUser.displayName || '사용자',
-              UserRole.BOTH
+              UserRole.GLER
             );
 
             console.log('✅ User created:', firebaseUser.uid);

@@ -22,6 +22,7 @@ import {
 } from 'firebase/firestore';
 import { db } from './firebase';
 import { getTravelTimeConfig } from './config-service';
+import { processMatchingForRequest } from './matching-service';
 import {
   calculatePhase1DeliveryFee,
   type Phase1PricingParams,
@@ -344,10 +345,16 @@ export async function updateRequestStatus(
     if (status === 'matched' && extras?.matchedGillerId) {
       updateData.matchedGillerId = extras.matchedGillerId;
       updateData.matchedAt = serverTimestamp();
-    } else if (status === 'in_progress') {
+    } else if (status === 'accepted') {
+      updateData.acceptedAt = serverTimestamp();
+    } else if (status === 'in_transit') {
       updateData.pickedUpAt = serverTimestamp();
-    } else if (status === 'completed') {
+    } else if (status === 'arrived') {
+      updateData.arrivedAt = serverTimestamp();
+    } else if (status === 'delivered') {
       updateData.deliveredAt = serverTimestamp();
+    } else if (status === 'completed') {
+      updateData.requesterConfirmedAt = serverTimestamp();
     } else if (status === 'cancelled') {
       updateData.cancelledAt = serverTimestamp();
       updateData.cancellationReason = extras?.cancellationReason;
@@ -809,19 +816,15 @@ export function subscribeToRequest(
  */
 export async function notifyGillers(requestId: string): Promise<{ success: boolean; error?: string }> {
   try {
-    // TODO: 실제 푸시 알림 구현 (Firebase Cloud Messaging)
-    // 현재는 더미 구현
-
     const request = await getRequestById(requestId);
     if (!request) {
       return { success: false, error: '요청을 찾을 수 없습니다.' };
     }
 
-    // 해당 경로와 매칭되는 길러 찾기
-    // TODO: 길러 동선 매칭 로직 구현
-    // const matchedGillers = await findMatchingGillers(request);
-
-    console.log('📱 푸시 알림 전송 (구현 필요):', requestId);
+    const matchCount = await processMatchingForRequest(requestId);
+    if (matchCount === 0) {
+      return { success: false, error: '매칭 가능한 길러가 없습니다.' };
+    }
 
     return { success: true };
   } catch (error: any) {

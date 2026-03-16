@@ -31,14 +31,36 @@ export async function PATCH(req: NextRequest) {
   if (!snap.exists) return NextResponse.json({ error: 'Not found' }, { status: 404 });
 
   const newStatus = action === 'approve' ? 'approved' : action === 'reject' ? 'rejected' : 'in_review';
+
+  const data = snap.data()!;
+  let verificationStatus = data.verificationStatus as string | undefined;
+  if (!verificationStatus && data.userId) {
+    const verificationSnap = await db
+      .collection('users')
+      .doc(data.userId)
+      .collection('verification')
+      .doc(data.userId)
+      .get();
+    verificationStatus = verificationSnap.exists ? verificationSnap.data()?.status : undefined;
+  }
+  if (action === 'approve' && verificationStatus !== 'approved') {
+    return NextResponse.json(
+      { error: '신원 인증이 승인되지 않았습니다.' },
+      { status: 400 }
+    );
+  }
+
   await ref.update({ status: newStatus, adminNote: note ?? '', reviewedAt: new Date() });
 
   // If approved, update user role in users collection
   if (action === 'approve') {
-    const data = snap.data()!;
     if (data.userId) {
-      await db.collection('users').doc(data.userId).update({
-        role: 'giller',
+      const userRef = db.collection('users').doc(data.userId);
+      const userSnap = await userRef.get();
+      const currentRole = userSnap.exists ? userSnap.data()?.role : undefined;
+      const nextRole = currentRole === 'giller' ? 'giller' : 'both';
+      await userRef.update({
+        role: nextRole,
         isGiller: true,
         gillerApplicationStatus: 'approved',
         gillerApprovedAt: new Date(),
@@ -46,7 +68,6 @@ export async function PATCH(req: NextRequest) {
       });
     }
   } else if (action === 'reject') {
-    const data = snap.data()!;
     if (data.userId) {
       await db.collection('users').doc(data.userId).update({
         gillerApplicationStatus: 'rejected',

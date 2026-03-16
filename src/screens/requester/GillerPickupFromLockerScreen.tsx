@@ -25,7 +25,8 @@ import { Typography, Colors, Spacing, BorderRadius } from '../../theme';
 import Button from '../../components/common/Button';
 import Card from '../../components/common/Card';
 import { getReservationByQRCode, openLocker, getLocker } from '../../services/locker-service';
-import { completeDelivery } from '../../services/delivery-service';
+import { confirmDeliveryByRequester, getDeliveryByRequestId } from '../../services/delivery-service';
+import { requireUserId } from '../../services/firebase';
 import type { Locker, LockerReservation } from '../../types/locker';
 
 // ==================== Types ====================
@@ -219,21 +220,19 @@ export default function GillerPickupFromLockerScreen({ route, navigation }: Prop
       // 사진 업로드 (있는 경우)
       const proofPhotoUri = photo || '';
 
-      // Request 정보를 가져와서 verificationCode 추출
-      const { getRequestById } = await import('../../services/request-service');
-      const request = await getRequestById(requestId);
-
-      if (!request) {
-        setError('요청 정보를 찾을 수 없습니다.');
+      const delivery = await getDeliveryByRequestId(requestId);
+      if (!delivery) {
+        setError('배송 정보를 찾을 수 없습니다.');
         setLoading(false);
         return;
       }
 
-      // 배송 완료 처리
-      const result = await completeDelivery({
-        deliveryId: requestId,
-        gillerId: reservation.userId, // 길러 ID
-        verificationCode: request.verificationCode || '000000', // request에서 verificationCode 사용
+      const requesterId = await requireUserId();
+
+      // 수령 확인 처리 (정산/보증금 환급 포함)
+      const result = await confirmDeliveryByRequester({
+        deliveryId: delivery.deliveryId,
+        requesterId,
         photoUri: proofPhotoUri,
         location: {
           latitude: locker?.lat || 37.5665,
