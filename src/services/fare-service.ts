@@ -19,10 +19,18 @@ export interface FareResult {
   raw?: FareResponseItem;
 }
 
+export interface FareQueryOptions {
+  /**
+   * true면 외부 운임 API를 호출하지 않고 config_fares 캐시만 사용
+   */
+  cacheOnly?: boolean;
+}
+
 const FARE_API_URL =
   process.env.EXPO_PUBLIC_SEOUL_FARE_API_URL ||
   'http://openapi.seoul.go.kr:8088';
 const FARE_SERVICE_KEY = process.env.EXPO_PUBLIC_SEOUL_FARE_SERVICE_KEY || '';
+// 운영 안정성을 위해 기본은 캐시 전용(관리자 적재 운임)으로 동작
 const STRICT_CACHE_ONLY = process.env.EXPO_PUBLIC_SEOUL_FARE_CACHE_ONLY !== 'false';
 const CACHE_MAX_AGE_DAYS = 7;
 const DEFAULT_SELECT_FIELDS = [
@@ -84,6 +92,14 @@ function getFareDocId(departureStationCode: string, arrivalStationCode: string):
   return `${departureStationCode}_${arrivalStationCode}`;
 }
 
+function safeNameKey(value: string): string {
+  return encodeURIComponent(value.trim().toLowerCase().replace(/\s+/g, ''));
+}
+
+function getFareNameDocId(departureStationName: string, arrivalStationName: string): string {
+  return `nm_${safeNameKey(departureStationName)}_${safeNameKey(arrivalStationName)}`;
+}
+
 function isCacheFresh(updatedAt: Date | Timestamp | undefined): boolean {
   if (!updatedAt) return false;
   const date = updatedAt instanceof Timestamp ? updatedAt.toDate() : updatedAt;
@@ -136,6 +152,50 @@ async function getCachedFare(
   return null;
 }
 
+async function getCachedFareByName(
+  departureStationName: string,
+  arrivalStationName: string
+): Promise<FareResult | null> {
+  try {
+    let staleCandidate: { fare: number; raw?: FareResponseItem; updatedAtMs: number } | null = null;
+
+    const directRef = doc(db, 'config_fares', getFareNameDocId(departureStationName, arrivalStationName));
+    const directSnap = await getDoc(directRef);
+    if (directSnap.exists()) {
+      const data = directSnap.data() as any;
+      if (isCacheFresh(data.updatedAt) && typeof data.fare === 'number' && data.fare > 0) {
+        return { fare: data.fare, raw: data.raw };
+      }
+      if (typeof data.fare === 'number' && data.fare > 0) {
+        const updatedAtMs = data.updatedAt instanceof Timestamp ? data.updatedAt.toMillis() : 0;
+        staleCandidate = { fare: data.fare, raw: data.raw, updatedAtMs };
+      }
+    }
+
+    const reverseRef = doc(db, 'config_fares', getFareNameDocId(arrivalStationName, departureStationName));
+    const reverseSnap = await getDoc(reverseRef);
+    if (reverseSnap.exists()) {
+      const data = reverseSnap.data() as any;
+      if (isCacheFresh(data.updatedAt) && typeof data.fare === 'number' && data.fare > 0) {
+        return { fare: data.fare, raw: data.raw };
+      }
+      if (typeof data.fare === 'number' && data.fare > 0) {
+        const updatedAtMs = data.updatedAt instanceof Timestamp ? data.updatedAt.toMillis() : 0;
+        if (!staleCandidate || updatedAtMs > staleCandidate.updatedAtMs) {
+          staleCandidate = { fare: data.fare, raw: data.raw, updatedAtMs };
+        }
+      }
+    }
+
+    if (staleCandidate) {
+      return { fare: staleCandidate.fare, raw: staleCandidate.raw };
+    }
+  } catch (error) {
+    console.warn('Fare name-cache read failed:', error);
+  }
+  return null;
+}
+
 async function upsertFareCache(
   departureStationCode: string,
   arrivalStationCode: string,
@@ -157,20 +217,53 @@ async function upsertFareCache(
   }
 }
 
+async function upsertFareCacheByName(
+  departureStationName: string,
+  arrivalStationName: string,
+  fareResult: FareResult
+): Promise<void> {
+  try {
+    if (!fareResult?.fare || fareResult.fare <= 0) return;
+    const ref = doc(db, 'config_fares', getFareNameDocId(departureStationName, arrivalStationName));
+    await setDoc(ref, {
+      departureStationName,
+      arrivalStationName,
+      fare: fareResult.fare,
+      raw: fareResult.raw || null,
+      source: 'realtime_api',
+      updatedAt: serverTimestamp(),
+    }, { merge: true });
+  } catch (error) {
+    console.warn('Fare name-cache write failed:', error);
+  }
+}
+
 export async function getRealtimeFare(
-  departureStationCode: string,
-  arrivalStationCode: string
+  departureStationCode?: string,
+  arrivalStationCode?: string,
+  departureStationName?: string,
+  arrivalStationName?: string,
+  options?: FareQueryOptions
 ): Promise<FareResult | null> {
   if (!FARE_SERVICE_KEY) {
     return null;
   }
-  if (!departureStationCode || !arrivalStationCode) {
+  const hasCodes = Boolean(departureStationCode && arrivalStationCode);
+  const hasNames = Boolean(departureStationName && arrivalStationName);
+  if (!hasCodes && !hasNames) {
     return null;
   }
 
-  const cached = await getCachedFare(departureStationCode, arrivalStationCode);
-  if (cached) return cached;
-  if (STRICT_CACHE_ONLY) return null;
+  if (hasCodes) {
+    const cachedByCode = await getCachedFare(departureStationCode!, arrivalStationCode!);
+    if (cachedByCode) return cachedByCode;
+  }
+  if (hasNames) {
+    const cachedByName = await getCachedFareByName(departureStationName!, arrivalStationName!);
+    if (cachedByName) return cachedByName;
+  }
+  const cacheOnly = options?.cacheOnly ?? STRICT_CACHE_ONLY;
+  if (cacheOnly) return null;
 
   try {
     const base = FARE_API_URL.replace(/\/$/, '');
@@ -180,10 +273,15 @@ export async function getRealtimeFare(
       const params = new URLSearchParams({
         serviceKey: getEncodedServiceKey(FARE_SERVICE_KEY),
         dataType: 'JSON',
-        dptreStnCd: departureStationCode,
-        arvlStnCd: arrivalStationCode,
         selectFields: DEFAULT_SELECT_FIELDS,
       });
+      if (hasCodes) {
+        params.set('dptreStnCd', departureStationCode!);
+        params.set('arvlStnCd', arrivalStationCode!);
+      } else if (hasNames) {
+        params.set('dptreStnNm', departureStationName!);
+        params.set('avrlStnNm', arrivalStationName!);
+      }
       finalUrl = `${base}/getRltmFare?${params.toString()}`;
     } else {
       // 서울시 OpenAPI 포맷: /{KEY}/{TYPE}/{SERVICE}/{START}/{END}/{dptre}/{dptreNm}/{arvl}/{arvlNm}/{selectFields}
@@ -193,7 +291,11 @@ export async function getRealtimeFare(
       const service = 'getRltmFare';
       const empty = encodeURIComponent(' ');
       const selectFields = encodeURIComponent(DEFAULT_SELECT_FIELDS);
-      finalUrl = `${base}/${FARE_SERVICE_KEY}/${type}/${service}/${startIndex}/${endIndex}/${departureStationCode}/${empty}/${arrivalStationCode}/${empty}/${selectFields}`;
+      const depCodeSeg = hasCodes ? encodeURIComponent(departureStationCode!) : empty;
+      const arrCodeSeg = hasCodes ? encodeURIComponent(arrivalStationCode!) : empty;
+      const depNameSeg = hasNames ? encodeURIComponent(departureStationName!) : empty;
+      const arrNameSeg = hasNames ? encodeURIComponent(arrivalStationName!) : empty;
+      finalUrl = `${base}/${FARE_SERVICE_KEY}/${type}/${service}/${startIndex}/${endIndex}/${depCodeSeg}/${depNameSeg}/${arrCodeSeg}/${arrNameSeg}/${selectFields}`;
     }
 
     const res = await fetch(finalUrl);
@@ -207,7 +309,12 @@ export async function getRealtimeFare(
       const list = normalizeItems(data);
       const fareResult = extractFare(list, departureStationCode, arrivalStationCode);
       if (fareResult?.fare) {
-        void upsertFareCache(departureStationCode, arrivalStationCode, fareResult);
+        if (hasCodes) {
+          void upsertFareCache(departureStationCode!, arrivalStationCode!, fareResult);
+        }
+        if (hasNames) {
+          void upsertFareCacheByName(departureStationName!, arrivalStationName!, fareResult);
+        }
       }
       return fareResult;
     } catch {
@@ -216,7 +323,12 @@ export async function getRealtimeFare(
       const fareValue = match ? parseInt(match[1], 10) : undefined;
       if (fareValue) {
         const fareResult = { fare: fareValue, raw: { gnrlCardFare: fareValue } };
-        void upsertFareCache(departureStationCode, arrivalStationCode, fareResult);
+        if (hasCodes) {
+          void upsertFareCache(departureStationCode!, arrivalStationCode!, fareResult);
+        }
+        if (hasNames) {
+          void upsertFareCacheByName(departureStationName!, arrivalStationName!, fareResult);
+        }
         return fareResult;
       }
       return null;

@@ -24,7 +24,8 @@ import {
   Platform,
 } from 'react-native';
 import { useUser } from '../../contexts/UserContext';
-import { doc, updateDoc, addDoc, collection, serverTimestamp } from 'firebase/firestore';
+import { doc, setDoc, addDoc, collection, serverTimestamp } from 'firebase/firestore';
+import { FirebaseError } from 'firebase/app';
 import { db } from '../../services/firebase';
 import type { StackNavigationProp } from '@react-navigation/stack';
 import { useFocusEffect } from '@react-navigation/native';
@@ -32,6 +33,7 @@ import { getUserVerification, getVerificationStatusDisplay } from '../../service
 import type { UserVerification } from '../../types/profile';
 import { PASS_TEST_MODE } from '../../config/feature-flags';
 import AppTopBar from '../../components/common/AppTopBar';
+import BankSelectModal from '../../components/common/BankSelectModal';
 
 type Props = { navigation: StackNavigationProp<any> };
 
@@ -56,6 +58,8 @@ export default function GillerApplyScreen({ navigation }: Props) {
   const [bankName, setBankName] = useState('');
   const [accountNumber, setAccountNumber] = useState('');
   const [accountHolder, setAccountHolder] = useState(user?.name || '');
+  const [bankModalVisible, setBankModalVisible] = useState(false);
+  const [submitHint, setSubmitHint] = useState('');
 
   const loadVerification = useCallback(async () => {
     if (!user?.uid) return;
@@ -106,19 +110,38 @@ export default function GillerApplyScreen({ navigation }: Props) {
   };
 
   const validateStep4 = () => {
-    if (!bankName.trim()) { Alert.alert('필수 입력', '은행명을 입력해주세요.'); return false; }
-    if (!accountNumber.trim()) { Alert.alert('필수 입력', '계좌번호를 입력해주세요.'); return false; }
-    if (accountNumber.replace(/-/g, '').length < 10) { Alert.alert('형식 오류', '올바른 계좌번호를 입력해주세요.'); return false; }
-    if (!accountHolder.trim()) { Alert.alert('필수 입력', '예금주명을 입력해주세요.'); return false; }
+    if (!bankName.trim()) {
+      setSubmitHint('은행을 선택해주세요.');
+      Alert.alert('필수 입력', '은행을 선택해주세요.');
+      return false;
+    }
+    if (!accountNumber.trim()) {
+      setSubmitHint('계좌번호를 입력해주세요.');
+      Alert.alert('필수 입력', '계좌번호를 입력해주세요.');
+      return false;
+    }
+    if (accountNumber.replace(/-/g, '').length < 10) {
+      setSubmitHint('올바른 계좌번호를 입력해주세요.');
+      Alert.alert('형식 오류', '올바른 계좌번호를 입력해주세요.');
+      return false;
+    }
+    if (!accountHolder.trim()) {
+      setSubmitHint('예금주명을 입력해주세요.');
+      Alert.alert('필수 입력', '예금주명을 입력해주세요.');
+      return false;
+    }
     return true;
   };
 
   // ─── Navigation ─────────────────────────────────────
 
-  const goNext = () => {
+  const goNext = async () => {
     if (step === 2 && !validateStep2()) return;
     if (step === 3 && !validateStep3()) return;
-    if (step === 4) { handleSubmit(); return; }
+    if (step === 4) {
+      await handleSubmit();
+      return;
+    }
     setStep((s) => s + 1);
   };
 
@@ -130,10 +153,12 @@ export default function GillerApplyScreen({ navigation }: Props) {
   // ─── Submit ──────────────────────────────────────────
 
   const handleSubmit = async () => {
+    setSubmitHint('');
     if (!validateStep4()) return;
     if (!user?.uid) { Alert.alert('오류', '로그인 정보를 찾을 수 없습니다.'); return; }
 
     setLoading(true);
+    setSubmitHint('신청을 처리하고 있습니다...');
     try {
       // 1. giller_applications 컬렉션에 신청서 저장
       await addDoc(collection(db, 'giller_applications'), {
@@ -153,25 +178,35 @@ export default function GillerApplyScreen({ navigation }: Props) {
       });
 
       // 2. 사용자 문서에 신청 중 상태 + 계좌 정보 저장 (role은 관리자 승인 후 변경)
-      await updateDoc(doc(db, 'users', user.uid), {
+      await setDoc(doc(db, 'users', user.uid), {
         gillerApplicationStatus: 'pending',
-        'gillerInfo.bankAccount': {
-          bankName: bankName.trim(),
-          accountNumber: accountNumber.replace(/-/g, ''),
-          accountHolder: accountHolder.trim(),
+        gillerInfo: {
+          bankAccount: {
+            bankName: bankName.trim(),
+            accountNumber: accountNumber.replace(/-/g, ''),
+            accountHolder: accountHolder.trim(),
+          },
         },
         updatedAt: serverTimestamp(),
-      });
+      }, { merge: true });
 
       await refreshUser();
+      setSubmitHint('신청이 정상 접수되었습니다.');
 
       Alert.alert(
         '신청 완료 🎉',
         '길러 신청이 접수되었습니다.\n\n관리자 심사 후 결과를 앱 알림으로 알려드립니다.\n보통 1~3 영업일 내 처리됩니다.',
-        [{ text: '확인', onPress: () => navigation.goBack() }]
+        [{
+          text: '확인',
+          onPress: () => navigation.navigate('Tabs', { screen: 'Home' } as never),
+        }]
       );
     } catch (error) {
       console.error('길러 신청 오류:', error);
+      const firebaseMessage =
+        error instanceof FirebaseError ? `${error.code}: ${error.message}` : null;
+      const message = firebaseMessage || (error instanceof Error ? error.message : '신청 처리 중 문제가 발생했습니다.');
+      setSubmitHint(`오류: ${message}`);
       Alert.alert('오류', '신청 처리 중 문제가 발생했습니다. 다시 시도해주세요.');
     } finally {
       setLoading(false);
@@ -267,7 +302,7 @@ export default function GillerApplyScreen({ navigation }: Props) {
     <ScrollView style={styles.stepContent} showsVerticalScrollIndicator={false}>
       <Text style={styles.stepTitle}>신원 인증</Text>
       <Text style={styles.stepDescription}>
-        길러 활동을 위해 신원 인증을 제출해주세요.
+        PASS/카카오 인증을 완료한 뒤 다음 단계로 이동해주세요.
       </Text>
 
       {passTestMode && (
@@ -292,13 +327,29 @@ export default function GillerApplyScreen({ navigation }: Props) {
                 : '신원 인증을 제출해주세요.'}
             </Text>
           </View>
-          <TouchableOpacity
-            style={styles.passButton}
-            disabled={verificationLoading}
-            onPress={() => navigation.navigate('IdentityVerification')}
-          >
-            <Text style={styles.passButtonText}>신원 인증 제출하기</Text>
-          </TouchableOpacity>
+          {verification?.status !== 'approved' && (
+            <>
+              <TouchableOpacity
+                style={styles.passButton}
+                disabled={verificationLoading}
+                onPress={() => navigation.navigate('IdentityVerification')}
+              >
+                <Text style={styles.passButtonText}>PASS/카카오 인증 진행하기</Text>
+              </TouchableOpacity>
+              <Text style={styles.step3GuideText}>
+                인증 완료 후 이 화면으로 돌아와 하단 `다음` 버튼을 눌러주세요.
+              </Text>
+            </>
+          )}
+          {verification?.status === 'approved' && (
+            <TouchableOpacity
+              style={styles.step3NextButton}
+              onPress={() => setStep(4)}
+              activeOpacity={0.85}
+            >
+              <Text style={styles.step3NextButtonText}>인증 완료 - 다음 단계로 이동</Text>
+            </TouchableOpacity>
+          )}
         </>
       )}
     </ScrollView>
@@ -322,12 +373,16 @@ export default function GillerApplyScreen({ navigation }: Props) {
 
       <View style={styles.field}>
         <Text style={styles.label}>은행 *</Text>
-        <TextInput
-          style={styles.input}
-          placeholder="예: 카카오뱅크, 국민은행, 신한은행"
-          value={bankName}
-          onChangeText={setBankName}
-        />
+        <TouchableOpacity
+          style={styles.bankSelectButton}
+          onPress={() => setBankModalVisible(true)}
+          activeOpacity={0.8}
+        >
+          <Text style={[styles.bankSelectText, !bankName && styles.bankSelectPlaceholder]}>
+            {bankName || '은행을 선택해주세요'}
+          </Text>
+          <Text style={styles.bankSelectArrow}>▾</Text>
+        </TouchableOpacity>
       </View>
 
       <View style={styles.field}>
@@ -379,7 +434,7 @@ export default function GillerApplyScreen({ navigation }: Props) {
       <View style={styles.footer}>
         <TouchableOpacity
           style={[styles.nextButton, loading && styles.disabled]}
-          onPress={goNext}
+          onPress={() => { void goNext(); }}
           disabled={loading}
           activeOpacity={0.8}
         >
@@ -387,11 +442,22 @@ export default function GillerApplyScreen({ navigation }: Props) {
             <ActivityIndicator color="#fff" />
           ) : (
             <Text style={styles.nextButtonText}>
-              {step === TOTAL_STEPS ? '신청 완료' : '다음'}
+              {step === TOTAL_STEPS ? '신청 완료하기' : '다음'}
             </Text>
           )}
         </TouchableOpacity>
+        {!!submitHint && <Text style={styles.submitHintText}>{submitHint}</Text>}
       </View>
+
+      <BankSelectModal
+        visible={bankModalVisible}
+        onClose={() => setBankModalVisible(false)}
+        onSelect={(selectedBank) => {
+          setBankName(selectedBank);
+          setBankModalVisible(false);
+        }}
+        selectedBank={bankName}
+      />
     </KeyboardAvoidingView>
   );
 }
@@ -435,6 +501,28 @@ const styles = StyleSheet.create({
     fontSize: 15,
     color: '#333',
   },
+  bankSelectButton: {
+    backgroundColor: '#fafafa',
+    borderWidth: 1,
+    borderColor: '#ddd',
+    borderRadius: 10,
+    paddingHorizontal: 14,
+    paddingVertical: 13,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  bankSelectText: {
+    fontSize: 15,
+    color: '#333',
+  },
+  bankSelectPlaceholder: {
+    color: '#9CA3AF',
+  },
+  bankSelectArrow: {
+    fontSize: 16,
+    color: '#6B7280',
+  },
   textarea: { height: 100, textAlignVertical: 'top' },
   helper: { fontSize: 12, color: '#999', marginTop: 6 },
   testBanner: {
@@ -464,6 +552,24 @@ const styles = StyleSheet.create({
     marginTop: 8,
   },
   passButtonText: { fontSize: 15, fontWeight: 'bold', color: '#333' },
+  step3GuideText: {
+    marginTop: 10,
+    fontSize: 12,
+    color: '#6B7280',
+    textAlign: 'center',
+  },
+  step3NextButton: {
+    marginTop: 12,
+    backgroundColor: '#0F766E',
+    borderRadius: 10,
+    padding: 14,
+    alignItems: 'center',
+  },
+  step3NextButtonText: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#fff',
+  },
   footer: {
     padding: 20,
     borderTopWidth: 1,
@@ -478,4 +584,10 @@ const styles = StyleSheet.create({
   },
   disabled: { opacity: 0.5 },
   nextButtonText: { color: '#fff', fontSize: 16, fontWeight: 'bold' },
+  submitHintText: {
+    marginTop: 10,
+    textAlign: 'center',
+    fontSize: 12,
+    color: '#6B7280',
+  },
 });

@@ -496,7 +496,7 @@ export async function getRequestStats(requesterId: string): Promise<{
     const completedRequests = allRequests.filter((r) => r.status === 'completed').length;
     const cancelledRequests = allRequests.filter((r) => r.status === 'cancelled').length;
     const inProgressRequests = allRequests.filter(
-      (r) => r.status === 'matched' || r.status === 'in_progress'
+      (r) => r.status === 'matched' || r.status === 'in_transit'
     ).length;
 
     const totalFee = allRequests.reduce((sum, r) => sum + r.initialNegotiationFee, 0);
@@ -760,6 +760,61 @@ export async function cancelRequest(
     return await cancelRequestInternal(requestId, reasonOrCancelledBy, 'requester');
   } else {
     return await cancelRequestInternal(requestId, userIdOrReason, reasonOrCancelledBy as any || 'requester');
+  }
+}
+
+/**
+ * 매칭 지연 시 이용자가 제안 금액을 빠르게 상향
+ */
+export async function increaseRequestBid(
+  requestId: string,
+  requesterId: string,
+  amount: number = 500
+): Promise<{ success: boolean; newFee?: number; message?: string }> {
+  try {
+    const request = await getRequestById(requestId);
+    if (!request) {
+      return { success: false, message: '요청을 찾을 수 없습니다.' };
+    }
+    if (request.requesterId !== requesterId) {
+      return { success: false, message: '요청자만 금액을 변경할 수 있습니다.' };
+    }
+    if (request.status !== 'pending' && request.status !== 'matched') {
+      return { success: false, message: '현재 상태에서는 금액을 변경할 수 없습니다.' };
+    }
+
+    const currentFee =
+      (request as any)?.fee?.totalFee ||
+      request.initialNegotiationFee ||
+      (request as any)?.feeBreakdown?.totalFee ||
+      3000;
+    const nextFee = Math.min(PRICING_POLICY.MAX_FEE, currentFee + amount);
+
+    const feeSnapshot = (request as any)?.fee || (request as any)?.feeBreakdown || {};
+    const nextFeeSnapshot = {
+      ...feeSnapshot,
+      totalFee: nextFee,
+      breakdown: feeSnapshot.breakdown || {
+        gillerFee: Math.round(nextFee * 0.9),
+        platformFee: nextFee - Math.round(nextFee * 0.9),
+      },
+    };
+
+    await updateDoc(doc(db, 'requests', requestId), {
+      initialNegotiationFee: nextFee,
+      fee: nextFeeSnapshot,
+      feeBreakdown: nextFeeSnapshot,
+      bidUpdatedAt: serverTimestamp(),
+      updatedAt: serverTimestamp(),
+    });
+
+    // 금액 상향 시 매칭 재시도 알림
+    void notifyGillers(requestId);
+
+    return { success: true, newFee: nextFee };
+  } catch (error) {
+    console.error('Error increasing request bid:', error);
+    return { success: false, message: '금액 상향에 실패했습니다.' };
   }
 }
 

@@ -40,6 +40,7 @@ export interface LockerLocation {
   section: string;         // 구역 (예: "A구역", "1번홀")
   nearby?: boolean;         // 역 인근 100m 이내 (민간 사물함)
   address?: string;        // 주소 (민간 사물함)
+  contactPhone?: string;   // 문의 전화번호
 }
 
 /**

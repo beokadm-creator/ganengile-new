@@ -44,6 +44,10 @@ export function subscribeToDeliveryTracking(
     }
 
     const data = docSnapshot.data();
+    if (!data) {
+      console.warn(`Delivery ${requestId} data is empty`);
+      return;
+    }
 
     // 실시간 추적 데이터 변환
     const trackingData: DeliveryTrackingData = {
@@ -137,7 +141,7 @@ export function startLocationUpdates(
     station: string;
     status: 'moving' | 'waiting' | 'arrived';
   }
-): NodeJS.Timeout {
+): number {
   // 즉시 첫 업데이트
   updateGillerLocation(gillerId, requestId, initialLocation);
 
@@ -160,7 +164,7 @@ export function startLocationUpdates(
 /**
  * 위치 업데이트 중지
  */
-export function stopLocationUpdates(intervalId: NodeJS.Timeout): void {
+export function stopLocationUpdates(intervalId: number): void {
   clearInterval(intervalId);
   console.log('⏹️ Location updates stopped');
 }

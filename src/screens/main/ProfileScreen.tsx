@@ -153,11 +153,13 @@ export default function ProfileScreen({ navigation: _navigation }: Props) {
       });
 
       if (userProfile) {
+        const userDocBankAccount = (user as any)?.gillerInfo?.bankAccount;
+        const mergedBankAccount = userProfile.bankAccount || userDocBankAccount;
         setProfile({
           name: userProfile.name,
           phoneNumber: userProfile.phoneNumber || '',
           profilePhotoUrl: userProfile.profilePhotoUrl,
-          bankAccount: userProfile.bankAccount,
+          bankAccount: mergedBankAccount,
         });
       } else {
         console.log('⚠️ userProfile is null, creating default profile');
@@ -165,6 +167,7 @@ export default function ProfileScreen({ navigation: _navigation }: Props) {
           name: user.name || '사용자',
           phoneNumber: user.phoneNumber || '',
           profilePhotoUrl: user.profilePhoto,
+          bankAccount: (user as any)?.gillerInfo?.bankAccount,
         });
       }
 
@@ -467,6 +470,7 @@ export default function ProfileScreen({ navigation: _navigation }: Props) {
     (user.gillerApplicationStatus === 'approved' && user.isVerified);
   const needsVerification = !user.isVerified;
   const canApplyGiller =
+    !canAccessGiller &&
     user.gillerApplicationStatus !== 'pending' &&
     user.gillerApplicationStatus !== 'approved';
 
@@ -898,12 +902,6 @@ export default function ProfileScreen({ navigation: _navigation }: Props) {
       />
     </View>
   );
-}
-
-function maskAccountNumber(accountNumber: string): string {
-  if (accountNumber.length <= 4) return accountNumber;
-  const visible = accountNumber.slice(-4);
-  return '*'.repeat(accountNumber.length - 4) + visible;
 }
 
 const styles = StyleSheet.create({

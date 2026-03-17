@@ -25,7 +25,6 @@ import {
   calculatePhase1DeliveryFee,
   estimateStationCountFromCoords,
   type Phase1PricingParams,
-  type DeliveryFeeBreakdown,
   type PackageSizeType,
 } from '../../services/pricing-service';
 import { getRealtimeFare } from '../../services/fare-service';
@@ -41,7 +40,7 @@ import ModeToggleSwitch from '../../components/onetime/ModeToggleSwitch';
 
 // Utils
 import { retryWithBackoff, retryFirebaseQuery } from '../../utils/retry-with-backoff';
-import { showErrorAlert, isNetworkError } from '../../utils/error-handler';
+import { showErrorAlert } from '../../utils/error-handler';
 import { isNetworkAvailable } from '../../utils/network-detector';
 import {
   saveCreateRequestProgress,
@@ -156,7 +155,7 @@ export default function CreateRequestScreen({ navigation }: Props) {
   const [pickupTime, setPickupTime] = useState('12:00');
   const [deliveryTime, setDeliveryTime] = useState('14:00');
   const [urgency, setUrgency] = useState<UrgencyLevel>('normal');
-  const [manualAdjustment, setManualAdjustment] = useState(0);
+  const [manualAdjustment] = useState(0);
   const [pickupLocationDetail, setPickupLocationDetail] = useState('');
   const [storageLocation, setStorageLocation] = useState('');
   const [specialInstructions, setSpecialInstructions] = useState('');
@@ -448,13 +447,21 @@ export default function CreateRequestScreen({ navigation }: Props) {
         ]);
         const dptreStnCd = pickupConfig?.fare?.stationCode || pickupConfig?.kric?.stationCode;
         const avrlStnCd = deliveryConfig?.fare?.stationCode || deliveryConfig?.kric?.stationCode;
-        if (dptreStnCd && avrlStnCd) {
-          const fareResult = await getRealtimeFare(dptreStnCd, avrlStnCd);
+        if ((dptreStnCd && avrlStnCd) || (pickupStation.stationName && deliveryStation.stationName)) {
+          const fareResult = await getRealtimeFare(
+            dptreStnCd,
+            avrlStnCd,
+            pickupStation.stationName,
+            deliveryStation.stationName,
+            { cacheOnly: true }
+          );
           if (fareResult?.fare) {
             publicFare = fareResult.fare;
             setFareStatus('ok');
           } else {
             setFareStatus('unavailable');
+            setDeliveryFee(null);
+            return;
           }
           const movement = Number(fareResult?.raw?.mvmnDstc ?? NaN);
           if (Number.isFinite(movement) && movement > 0) {
@@ -462,10 +469,14 @@ export default function CreateRequestScreen({ navigation }: Props) {
           }
         } else {
           setFareStatus('unavailable');
+          setDeliveryFee(null);
+          return;
         }
       } catch (error) {
-        console.log('Fare API not available, using 0 fare:', error);
+        console.log('Fare cache not available:', error);
         setFareStatus('unavailable');
+        setDeliveryFee(null);
+        return;
       }
 
       // 마지막 fallback: 운임 API의 이동거리(km)로 역수/시간 추정
@@ -516,42 +527,7 @@ export default function CreateRequestScreen({ navigation }: Props) {
     } catch (error) {
       console.error('Error calculating delivery fee:', error);
       setFareStatus('unavailable');
-
-      // 에러 발생 시 기본값으로 계산
-      const weightRaw = parseFloat(weight);
-      const weightValue = Number.isFinite(weightRaw) ? weightRaw : 0;
-      if (weightValue <= 0) {
-        setDeliveryFee(null);
-        return;
-      }
-      const stationCount = 5;
-      const pricingParams: Phase1PricingParams = {
-        stationCount,
-        weight: weightValue,
-        packageSize: packageSize as PackageSizeType,
-        urgency,
-      };
-
-      const feeResult = calculatePhase1DeliveryFee(pricingParams);
-
-      setDeliveryFee({
-        baseFee: feeResult.baseFee,
-        distanceFee: feeResult.distanceFee,
-        sizeFee: feeResult.sizeFee,
-        weightFee: feeResult.weightFee,
-        publicFare: feeResult.publicFare,
-        serviceFee: feeResult.serviceFee,
-        vat: feeResult.vat,
-        totalFee: feeResult.totalFee,
-        estimatedTime: 30,
-        stationCount,
-        estimationSource: 'default',
-        urgencyFee: feeResult.urgencySurcharge,
-        urgencySurcharge: feeResult.urgencySurcharge,
-        manualAdjustment: 0,
-        gillerFee: feeResult.breakdown.gillerFee,
-        platformFee: feeResult.breakdown.platformFee,
-      });
+      setDeliveryFee(null);
     }
   };
 
@@ -700,8 +676,13 @@ export default function CreateRequestScreen({ navigation }: Props) {
     }
 
     if (!deliveryFee) {
-      Alert.alert('알림', '배송비를 계산할 수 없습니다. 패키지 정보를 확인해주세요.');
+      Alert.alert('알림', '관리자 운임 캐시를 확인할 수 없어 배송비를 계산하지 못했습니다. 잠시 후 다시 시도해주세요.');
       setCurrentStep(2);
+      return;
+    }
+    if (fareStatus !== 'ok' || !deliveryFee.publicFare || deliveryFee.publicFare <= 0) {
+      Alert.alert('알림', '운임 캐시가 확인된 구간만 요청할 수 있습니다. 역 조합을 다시 선택하거나 잠시 후 재시도해주세요.');
+      setCurrentStep(1);
       return;
     }
 
@@ -1059,19 +1040,25 @@ export default function CreateRequestScreen({ navigation }: Props) {
             <Text style={styles.feePreviewTitle}>예상 배송비 (초기 협상금액)</Text>
             <Text style={styles.feePreviewAmount}>{deliveryFee.totalFee.toLocaleString()}원</Text>
             <View style={styles.feeBreakdownPreview}>
+              <Text style={styles.feeBreakdownNote}>요금 구성</Text>
               <Text style={styles.feeBreakdownText}>
                 기본: {deliveryFee.baseFee.toLocaleString()}원
               </Text>
-              {deliveryFee.publicFare && deliveryFee.publicFare > 0 && (
+              {deliveryFee.publicFare > 0 && (
                 <Text style={styles.feeBreakdownText}>
                   운임: {deliveryFee.publicFare.toLocaleString()}원
+                </Text>
+              )}
+              {(!deliveryFee.publicFare || deliveryFee.publicFare <= 0) && (
+                <Text style={styles.feeBreakdownText}>
+                  운임: 0원 (관리자 운임 캐시 미확인)
                 </Text>
               )}
               {fareStatus === 'loading' && (
                 <Text style={styles.feeBreakdownNote}>운임 조회 중...</Text>
               )}
               {fareStatus === 'unavailable' && (
-                <Text style={styles.feeBreakdownNote}>운임 조회 지연으로 현재 운임이 미반영될 수 있습니다.</Text>
+                <Text style={styles.feeBreakdownNote}>운임 캐시 미확인 구간입니다. 요청 전 역 조합을 다시 확인해주세요.</Text>
               )}
               <Text style={styles.feeBreakdownText}>
                 거리: {deliveryFee.distanceFee.toLocaleString()}원 (기준 {deliveryFee.stationCount}개 역)
@@ -1082,9 +1069,9 @@ export default function CreateRequestScreen({ navigation }: Props) {
               <Text style={styles.feeBreakdownText}>
                 {deliveryFee.sizeFee > 0
                   ? `크기: ${deliveryFee.sizeFee.toLocaleString()}원`
-                  : '크기: 추가요금 없음'}
+                  : '크기: 소형 기준 추가요금 0원'}
               </Text>
-              {deliveryFee.urgencySurcharge && deliveryFee.urgencySurcharge > 0 && (
+              {deliveryFee.urgencySurcharge > 0 && (
                 <Text style={styles.feeBreakdownUrgency}>
                   긴급 할증: +{deliveryFee.urgencySurcharge.toLocaleString()}원
                 </Text>
@@ -1099,15 +1086,6 @@ export default function CreateRequestScreen({ navigation }: Props) {
                 합계 = (기본+거리+무게+크기+긴급+운임+수수료) + VAT
               </Text>
             </View>
-            <View style={styles.gillerBreakdownPreview}>
-              <Text style={styles.gillerBreakdownTitle}>정산 내역 (참고)</Text>
-              <Text style={styles.gillerBreakdownText}>
-                길러 수령 ({Math.round((deliveryFee.gillerFee / deliveryFee.totalFee) * 100)}%): {deliveryFee.gillerFee.toLocaleString()}원
-              </Text>
-              <Text style={styles.gillerBreakdownText}>
-                플랫폼 수수료 ({Math.round((deliveryFee.platformFee / deliveryFee.totalFee) * 100)}%): {deliveryFee.platformFee.toLocaleString()}원
-              </Text>
-            </View>
             <Text style={styles.feePreviewNote}>
               * 이 요금은 초기 협상금액이며, 최종 금액은 배송 완료 후 확정됩니다.
             </Text>
@@ -1116,6 +1094,14 @@ export default function CreateRequestScreen({ navigation }: Props) {
             </Text>
           </View>
         </>
+      )}
+      {!deliveryFee && pickupStation && deliveryStation && weight && fareStatus === 'unavailable' && (
+        <View style={styles.warningCard}>
+          <Text style={styles.warningTitle}>운임 캐시 확인 필요</Text>
+          <Text style={styles.warningText}>
+            선택한 역 조합의 관리자 운임 데이터가 아직 준비되지 않았습니다. 다른 역 조합을 선택하거나 잠시 후 다시 시도해주세요.
+          </Text>
+        </View>
       )}
     </View>
   );
@@ -1270,7 +1256,7 @@ export default function CreateRequestScreen({ navigation }: Props) {
                 <Text style={styles.feeItemNote}>운임 조회 중...</Text>
               )}
               {fareStatus === 'unavailable' && (
-                <Text style={styles.feeItemNote}>운임 조회 지연으로 현재 운임이 미반영될 수 있습니다.</Text>
+                <Text style={styles.feeItemNote}>운임 캐시 미확인 구간입니다. 요청 전 역 조합을 다시 확인해주세요.</Text>
               )}
               <Text style={styles.feeItem}>
                 거리: {deliveryFee.distanceFee.toLocaleString()}원 (기준 {deliveryFee.stationCount}개 역)
@@ -1289,15 +1275,6 @@ export default function CreateRequestScreen({ navigation }: Props) {
               <Text style={styles.feeItemNote}>
                 합계 = (기본+거리+무게+크기+긴급+운임+수수료) + VAT
               </Text>
-              <View style={styles.gillerBreakdownSummary}>
-                <Text style={styles.gillerBreakdownTitle}>정산 내역 (참고)</Text>
-                <Text style={styles.gillerBreakdownText}>
-                  길러 수령 ({Math.round((deliveryFee.gillerFee / deliveryFee.totalFee) * 100)}%): {deliveryFee.gillerFee.toLocaleString()}원
-                </Text>
-                <Text style={styles.gillerBreakdownText}>
-                  플랫폼 수수료 ({Math.round((deliveryFee.platformFee / deliveryFee.totalFee) * 100)}%): {deliveryFee.platformFee.toLocaleString()}원
-                </Text>
-              </View>
               <View style={styles.auctionInfo}>
                 <Text style={styles.auctionLabel}>경매 시작가</Text>
                 <Text style={styles.auctionPrice}>{deliveryFee.totalFee.toLocaleString()}원부터</Text>
@@ -1394,9 +1371,9 @@ export default function CreateRequestScreen({ navigation }: Props) {
       </View>
 
       <TouchableOpacity
-        style={[styles.nextButton, styles.submitButton, (!pickupStation || !deliveryStation || !deliveryFee) && styles.disabledButton]}
+        style={[styles.nextButton, styles.submitButton, (!pickupStation || !deliveryStation || !deliveryFee || fareStatus !== 'ok') && styles.disabledButton]}
         onPress={handleSubmit}
-        disabled={loading || !pickupStation || !deliveryStation || !deliveryFee}
+        disabled={loading || !pickupStation || !deliveryStation || !deliveryFee || fareStatus !== 'ok'}
         accessibilityLabel="배송 요청 제출"
         accessibilityHint="배송 요청을 제출합니다"
       >
@@ -1883,27 +1860,24 @@ function createStyles(
       color: colors.textSecondary,
       fontSize: typo.fontSize.xs,
     },
-    gillerBreakdownPreview: {
-      backgroundColor: colors.gray100,
-      borderRadius: radius.sm,
-      marginTop: space.sm,
-      padding: space.sm,
+    warningCard: {
+      backgroundColor: colors.warningLight,
+      borderColor: colors.warning,
+      borderRadius: radius.md,
+      borderWidth: 1,
+      marginTop: space.lg,
+      padding: space.md,
     },
-    gillerBreakdownSummary: {
-      backgroundColor: colors.gray100,
-      borderRadius: radius.sm,
-      marginTop: space.sm,
-      padding: space.sm,
-    },
-    gillerBreakdownTitle: {
-      color: colors.textSecondary,
-      fontSize: typo.fontSize.xs,
-      fontWeight: typo.fontWeight.semiBold,
+    warningTitle: {
+      color: colors.warningDark,
+      fontSize: typo.fontSize.sm,
+      fontWeight: typo.fontWeight.bold,
       marginBottom: space.xs,
     },
-    gillerBreakdownText: {
-      color: colors.textSecondary,
+    warningText: {
+      color: colors.warningDark,
       fontSize: typo.fontSize.xs,
+      lineHeight: 18,
     },
     footer: {
       backgroundColor: colors.white,

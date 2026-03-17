@@ -10,16 +10,16 @@ import {
   getDocs,
   addDoc,
   updateDoc,
+  deleteField,
   query,
   where,
-  orderBy,
   serverTimestamp,
-  Timestamp,
   runTransaction,
 } from 'firebase/firestore';
 import { db } from './firebase';
 import { uploadPickupPhoto, uploadDeliveryPhoto } from './storage-service';
 import { DepositService } from './DepositService';
+import { calculatePhase1DeliveryFee, type PackageSizeType } from './pricing-service';
 import {
   createGillerEarning,
   getGillerEarningForRequest,
@@ -102,21 +102,20 @@ export async function gillerAcceptRequest(
       return { success: false, message: '요청 데이터를 찾을 수 없습니다.' };
     }
 
-    if (request.status !== 'matched' && request.status !== 'pending') {
+    if (request.status === 'accepted') {
+      const existingDelivery = await getDeliveryByRequestId(requestId);
+      if (existingDelivery) {
+        return { success: false, message: '이미 수락된 요청입니다.' };
+      }
+      // 과거 실패 케이스(요청은 accepted인데 delivery 미생성)는 복구 허용
+      console.warn('Recovering accepted request without delivery:', requestId);
+    } else if (request.status !== 'matched' && request.status !== 'pending') {
       return { success: false, message: '수락할 수 없는 요청입니다.' };
     }
 
-    // Update request status
-    await updateDoc(requestRef, {
-      status: 'accepted',
-      matchedGillerId: gillerId,
-      acceptedAt: serverTimestamp(),
-      updatedAt: serverTimestamp(),
-    });
-
     // Extract fee information from various possible fields (for compatibility)
     const rawFee = request.fee || request.feeBreakdown;
-    let confirmedFee = null;
+    let confirmedFee: any = null;
 
     if (rawFee && typeof rawFee === 'object') {
       confirmedFee = {
@@ -141,11 +140,55 @@ export async function gillerAcceptRequest(
       };
     }
 
+    // 실시간 운임 미반영 등으로 금액이 0인 요청은 최소 계산식으로 보정
+    if (!confirmedFee?.totalFee || confirmedFee.totalFee <= 0) {
+      const rawWeight = toPositiveNumber(
+        request?.packageInfo?.weightKg,
+        request?.packageInfo?.weight,
+        request?.weight
+      ) || 1;
+      const stationCount = toPositiveNumber(
+        request?.stationCount,
+        request?.fee?.stationCount,
+        request?.feeBreakdown?.stationCount
+      ) || 5;
+      const packageSize = (request?.packageInfo?.size || 'small') as PackageSizeType;
+      const urgency = request?.urgency || 'normal';
+      const publicFare = toPositiveNumber(
+        request?.fee?.publicFare,
+        request?.feeBreakdown?.publicFare
+      ) || 0;
+
+      const fallbackFee = calculatePhase1DeliveryFee({
+        stationCount,
+        weight: rawWeight,
+        packageSize,
+        urgency,
+        publicFare,
+      });
+
+      confirmedFee = {
+        totalFee: fallbackFee.totalFee,
+        deliveryFee: fallbackFee.baseFee + fallbackFee.distanceFee + fallbackFee.weightFee + fallbackFee.sizeFee,
+        vat: fallbackFee.vat,
+        breakdown: fallbackFee.breakdown,
+        publicFare: fallbackFee.publicFare,
+      };
+    }
+
     // Block if no valid fee information is found
     if (!confirmedFee?.totalFee || confirmedFee.totalFee <= 0) {
       console.error('Invalid fee information found for request:', requestId, request);
       return { success: false, message: '배송 요금 정보가 유효하지 않아 수락할 수 없습니다. 고객센터에 문의해주세요.' };
     }
+
+    const recipientName = request.recipientName || request.receiverName || '수령인';
+    const recipientPhone = request.recipientPhone || request.receiverPhone || '';
+    const recipientVerificationCode =
+      request.recipientVerificationCode ||
+      request.verificationCode ||
+      request.recipientCode ||
+      '000000';
 
     // Create delivery document
     const deliveryData = {
@@ -158,9 +201,9 @@ export async function gillerAcceptRequest(
       packageInfo: request.packageInfo,
       fee: confirmedFee,
       recipientInfo: {
-        name: request.recipientName,
-        phone: request.recipientPhone,
-        verificationCode: request.recipientVerificationCode,
+        name: recipientName,
+        phone: recipientPhone,
+        verificationCode: recipientVerificationCode,
       },
       status: 'accepted' as DeliveryStatus,
       tracking: {
@@ -180,6 +223,21 @@ export async function gillerAcceptRequest(
 
     const deliveryRef = await addDoc(collection(db, 'deliveries'), deliveryData);
 
+    // Update request status + fee snapshot (delivery 생성 성공 후 반영)
+    await updateDoc(requestRef, {
+      status: 'accepted',
+      matchedGillerId: gillerId,
+      fee: {
+        totalFee: confirmedFee.totalFee,
+        deliveryFee: confirmedFee.deliveryFee || 0,
+        vat: confirmedFee.vat || 0,
+        publicFare: confirmedFee.publicFare || 0,
+        breakdown: confirmedFee.breakdown || null,
+      },
+      acceptedAt: serverTimestamp(),
+      updatedAt: serverTimestamp(),
+    });
+
     return {
       success: true,
       message: '배송을 수락했습니다.',
@@ -188,6 +246,57 @@ export async function gillerAcceptRequest(
   } catch (error) {
     console.error('Error accepting request:', error);
     return { success: false, message: '수락에 실패했습니다.' };
+  }
+}
+
+/**
+ * 길러가 수락을 취소하고 요청을 다시 매칭 대기로 되돌림
+ * (픽업 시작 전 단계에서만 허용)
+ */
+export async function gillerCancelAcceptance(
+  requestId: string,
+  gillerId: string
+): Promise<{ success: boolean; message: string }> {
+  try {
+    const requestRef = doc(db, 'requests', requestId);
+    const requestSnap = await getDoc(requestRef);
+
+    if (!requestSnap.exists()) {
+      return { success: false, message: '요청을 찾을 수 없습니다.' };
+    }
+
+    const request = requestSnap.data() as any;
+    if (request.status !== 'accepted') {
+      return { success: false, message: '수락 취소가 가능한 상태가 아닙니다.' };
+    }
+    if (request.matchedGillerId !== gillerId) {
+      return { success: false, message: '본인이 수락한 요청만 취소할 수 있습니다.' };
+    }
+
+    // 관련 delivery를 취소 상태로 변경
+    const deliveriesQ = query(collection(db, 'deliveries'), where('requestId', '==', requestId));
+    const deliveriesSnap = await getDocs(deliveriesQ);
+    for (const deliveryDoc of deliveriesSnap.docs) {
+      const deliveryData = deliveryDoc.data() as any;
+      if (deliveryData.gillerId !== gillerId) continue;
+      await updateDoc(doc(db, 'deliveries', deliveryDoc.id), {
+        status: 'cancelled',
+        cancellationReason: 'giller_cancelled_before_pickup',
+        updatedAt: serverTimestamp(),
+      });
+    }
+
+    await updateDoc(requestRef, {
+      status: 'pending',
+      matchedGillerId: deleteField(),
+      acceptedAt: deleteField(),
+      updatedAt: serverTimestamp(),
+    });
+
+    return { success: true, message: '수락이 취소되었습니다.' };
+  } catch (error) {
+    console.error('Error cancelling acceptance:', error);
+    return { success: false, message: '수락 취소 처리에 실패했습니다.' };
   }
 }
 
@@ -673,7 +782,7 @@ export async function getDeliveryById(deliveryId: string): Promise<DeliveryReque
 /**
  * Get delivery by request ID
  */
-export async function getDeliveryByRequestId(requestId: string): Promise<any | null> {
+export async function getDeliveryByRequestId(requestId: string): Promise<Record<string, any> | null> {
   try {
     const q = query(
       collection(db, 'deliveries'),
@@ -702,27 +811,24 @@ export async function getDeliveryByRequestId(requestId: string): Promise<any | n
  */
 export async function getGillerDeliveries(gillerId: string, status?: DeliveryStatus): Promise<any[]> {
   try {
-    let q = query(
-      collection(db, 'deliveries'),
-      where('gillerId', '==', gillerId)
-    );
-
-    if (status) {
-      q = query(q, where('status', '==', status));
-    }
-
-    q = query(q, orderBy('createdAt', 'desc'));
-
+    const q = query(collection(db, 'deliveries'), where('gillerId', '==', gillerId));
     const snapshot = await getDocs(q);
     const deliveries: any[] = [];
 
     snapshot.forEach((docSnapshot) => {
+      const data = docSnapshot.data() as any;
+      if (status && data?.status !== status) return;
       deliveries.push({
         deliveryId: docSnapshot.id,
-        ...docSnapshot.data(),
+        ...data,
       });
     });
 
+    deliveries.sort((a, b) => {
+      const aMs = a?.createdAt?.toMillis?.() || 0;
+      const bMs = b?.createdAt?.toMillis?.() || 0;
+      return bMs - aMs;
+    });
     return deliveries;
   } catch (error) {
     console.error('Error fetching giller deliveries:', error);
@@ -735,27 +841,24 @@ export async function getGillerDeliveries(gillerId: string, status?: DeliverySta
  */
 export async function getGllerDeliveries(gllerId: string, status?: DeliveryStatus): Promise<any[]> {
   try {
-    let q = query(
-      collection(db, 'deliveries'),
-      where('gllerId', '==', gllerId)
-    );
-
-    if (status) {
-      q = query(q, where('status', '==', status));
-    }
-
-    q = query(q, orderBy('createdAt', 'desc'));
-
+    const q = query(collection(db, 'deliveries'), where('gllerId', '==', gllerId));
     const snapshot = await getDocs(q);
     const deliveries: any[] = [];
 
     snapshot.forEach((docSnapshot) => {
+      const data = docSnapshot.data() as any;
+      if (status && data?.status !== status) return;
       deliveries.push({
         deliveryId: docSnapshot.id,
-        ...docSnapshot.data(),
+        ...data,
       });
     });
 
+    deliveries.sort((a, b) => {
+      const aMs = a?.createdAt?.toMillis?.() || 0;
+      const bMs = b?.createdAt?.toMillis?.() || 0;
+      return bMs - aMs;
+    });
     return deliveries;
   } catch (error) {
     console.error('Error fetching gller deliveries:', error);

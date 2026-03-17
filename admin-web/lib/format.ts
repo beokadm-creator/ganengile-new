@@ -4,11 +4,20 @@ export function formatKRW(amount: number): string {
 
 export function formatDate(date: Date | { seconds: number } | string): string {
   if (!date) return '-';
+  const raw: any = date;
   const d = date instanceof Date
     ? date
     : typeof date === 'string'
     ? new Date(date)
-    : new Date((date as { seconds: number }).seconds * 1000);
+    : typeof raw?.toDate === 'function'
+    ? raw.toDate()
+    : typeof raw?.seconds === 'number'
+    ? new Date(raw.seconds * 1000)
+    : typeof raw?._seconds === 'number'
+    ? new Date(raw._seconds * 1000)
+    : new Date(0);
+
+  if (Number.isNaN(d.getTime())) return '-';
   return d.toLocaleDateString('ko-KR', { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' });
 }
 

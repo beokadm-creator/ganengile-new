@@ -133,11 +133,6 @@ export default function IdentityVerificationScreen({ navigation }: Props) {
       return;
     }
 
-    if (!PASS_TEST_MODE) {
-      Alert.alert('안내', '운영 환경에서는 인증사 콜백으로 자동 반영됩니다.');
-      return;
-    }
-
     try {
       setLoading(true);
       let applied = false;
@@ -154,20 +149,20 @@ export default function IdentityVerificationScreen({ navigation }: Props) {
         applied = true;
       }
 
-      if (!applied) {
-        Alert.alert('안내', '아직 인증 완료 처리가 확인되지 않았습니다. 인증 완료 후 다시 시도해주세요.');
+      await Promise.all([loadVerification(), refreshUser()]);
+      const latest = await getUserVerification(user.uid);
+
+      if (applied || latest?.status === 'approved') {
+        Alert.alert('인증 완료', '본인인증이 완료되었습니다. 길러 신청 페이지로 이동합니다.', [
+          {
+            text: '확인',
+            onPress: () => navigation.navigate('GillerApply'),
+          },
+        ]);
         return;
       }
 
-      await Promise.all([loadVerification(), refreshUser()]);
-
-      Alert.alert('인증 완료', '본인인증이 완료되었습니다. 다음 단계로 길러 신청(관리자 심사)을 진행해주세요.', [
-        {
-          text: '길러 신청으로 이동',
-          onPress: () => navigation.navigate('GillerApply'),
-        },
-        { text: '닫기', style: 'cancel' },
-      ]);
+      Alert.alert('안내', '아직 인증 완료 처리가 확인되지 않았습니다. 인증 완료 후 다시 시도해주세요.');
     } catch (error) {
       console.error('Failed to apply verification result:', error);
       Alert.alert('오류', '인증 결과 반영에 실패했습니다.');
@@ -181,7 +176,7 @@ export default function IdentityVerificationScreen({ navigation }: Props) {
       <View style={styles.headerCard}>
         <Text style={styles.headerTitle}>신원 인증</Text>
         <Text style={styles.headerSubtitle}>
-          신분증 이미지 업로드 대신 PASS 또는 카카오 본인인증(CI)으로 안전하게 인증합니다.
+          PASS인증이나 카카오 본인인증을 진행해주세요
         </Text>
       </View>
 
@@ -198,6 +193,11 @@ export default function IdentityVerificationScreen({ navigation }: Props) {
         )}
         {user.gillerApplicationStatus === 'pending' && (
           <Text style={styles.nextStepText}>현재 상태: 길러 신청 심사 중입니다.</Text>
+        )}
+        {status.status === 'approved' && user.gillerApplicationStatus !== 'pending' && user.gillerApplicationStatus !== 'approved' && (
+          <TouchableOpacity style={styles.moveButton} onPress={() => navigation.navigate('GillerApply')}>
+            <Text style={styles.moveButtonText}>길러 신청 페이지로 이동</Text>
+          </TouchableOpacity>
         )}
       </View>
 
@@ -331,6 +331,19 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: '#1F2937',
     fontWeight: '600',
+  },
+  moveButton: {
+    marginTop: 8,
+    alignSelf: 'flex-start',
+    backgroundColor: '#0F766E',
+    borderRadius: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+  },
+  moveButtonText: {
+    color: '#fff',
+    fontWeight: '700',
+    fontSize: 12,
   },
   section: {
     backgroundColor: '#fff',

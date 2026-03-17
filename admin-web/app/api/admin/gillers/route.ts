@@ -10,13 +10,22 @@ const STATUS_ALIAS: Record<string, string[]> = {
 };
 
 function normalizeStatus(raw: unknown): string {
-  const value = String(raw ?? '').toLowerCase();
+  const value = typeof raw === 'string' ? raw.toLowerCase() : '';
   if (!value) return 'pending';
   if (STATUS_ALIAS.pending.includes(value)) return 'pending';
   if (STATUS_ALIAS.in_review.includes(value)) return 'in_review';
   if (STATUS_ALIAS.approved.includes(value)) return 'approved';
   if (STATUS_ALIAS.rejected.includes(value)) return 'rejected';
   return value;
+}
+
+function toMillis(value: any): number {
+  if (!value) return 0;
+  if (typeof value?.toDate === 'function') return value.toDate().getTime();
+  if (typeof value?.seconds === 'number') return value.seconds * 1000;
+  if (typeof value?._seconds === 'number') return value._seconds * 1000;
+  const parsed = new Date(value).getTime();
+  return Number.isNaN(parsed) ? 0 : parsed;
 }
 
 export async function GET(req: NextRequest) {
@@ -32,7 +41,7 @@ export async function GET(req: NextRequest) {
     const snap = await db.collection('giller_applications').limit(500).get();
 
     const appItems = snap.docs.map((doc) => {
-      const data = doc.data() as any;
+      const data = doc.data();
       return {
         id: doc.id,
         ...data,
@@ -47,9 +56,9 @@ export async function GET(req: NextRequest) {
       .limit(200)
       .get();
 
-    const existingUserIds = new Set(appItems.map((item: any) => String(item.userId || '')));
+    const existingUserIds = new Set(appItems.map((item) => String(item.userId || '')));
     const fallbackItems = pendingUsersSnap.docs
-      .map((doc) => doc.data() as any)
+      .map((doc) => doc.data())
       .filter((user) => !existingUserIds.has(String(user.uid || '')))
       .map((user) => ({
         id: `user-${user.uid}`,
@@ -64,10 +73,10 @@ export async function GET(req: NextRequest) {
       }));
 
     const items = [...appItems, ...fallbackItems]
-      .filter((item: any) => aliases.includes(String(item.status ?? 'pending')))
-      .sort((a: any, b: any) => {
-        const aTime = new Date(a.createdAt?.seconds ? a.createdAt.seconds * 1000 : a.createdAt || 0).getTime();
-        const bTime = new Date(b.createdAt?.seconds ? b.createdAt.seconds * 1000 : b.createdAt || 0).getTime();
+      .filter((item) => aliases.includes(String(item.status ?? 'pending')))
+      .sort((a, b) => {
+        const aTime = toMillis(a.createdAt);
+        const bTime = toMillis(b.createdAt);
         return bTime - aTime;
       });
 
@@ -121,13 +130,34 @@ export async function PATCH(req: NextRequest) {
       const userSnap = await userRef.get();
       const currentRole = userSnap.exists ? userSnap.data()?.role : undefined;
       const nextRole = currentRole === 'giller' ? 'giller' : 'both';
+      const bankAccount =
+        data.bankAccount ||
+        data?.gillerInfo?.bankAccount ||
+        data?.bank_account ||
+        null;
       await userRef.update({
         role: nextRole,
         isGiller: true,
         gillerApplicationStatus: 'approved',
         gillerApprovedAt: new Date(),
+        ...(bankAccount ? { 'gillerInfo.bankAccount': bankAccount } : {}),
         updatedAt: new Date(),
       });
+
+      if (bankAccount) {
+        await db
+          .collection('users')
+          .doc(data.userId)
+          .collection('profile')
+          .doc(data.userId)
+          .set(
+            {
+              bankAccount,
+              updatedAt: new Date(),
+            },
+            { merge: true }
+          );
+      }
     }
   } else if (action === 'reject') {
     if (data.userId) {

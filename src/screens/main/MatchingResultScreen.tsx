@@ -7,12 +7,14 @@ import {
   ScrollView,
   TouchableOpacity,
   Platform,
+  Alert,
 } from 'react-native';
 import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import { Colors } from '../../theme';
 import * as requestService from '../../services/request-service';
 import { fetchUserInfo } from '../../services/matching-service';
+import { requireUserId } from '../../services/firebase';
 
 const IconWrapper = ({
   name,
@@ -61,12 +63,20 @@ export const MatchingResultScreen: React.FC = () => {
   const [notificationError, setNotificationError] = useState<string | null>(null);
   const [noMatchMessage, setNoMatchMessage] = useState<string | null>(null);
   const [showNoMatchMessage, setShowNoMatchMessage] = useState(false);
+  const [currentFee, setCurrentFee] = useState(0);
+  const [increasingBid, setIncreasingBid] = useState(false);
 
   // 요청 상태 실시간 감시
   useEffect(() => {
     const unsubscribe = requestService.subscribeToRequest(requestId, async (request) => {
       if (request) {
         setStatus(request.status);
+        const requestFee =
+          (request as any)?.fee?.totalFee ||
+          (request as any)?.feeBreakdown?.totalFee ||
+          (request as any)?.initialNegotiationFee ||
+          0;
+        setCurrentFee(requestFee);
         const matchedGillerId = (request as any).matchedGillerId;
         if (matchedGillerId) {
           const gillerInfo = await fetchUserInfo(matchedGillerId);
@@ -128,6 +138,27 @@ export const MatchingResultScreen: React.FC = () => {
     navigation.navigate('RequestDetail' as any, {
       requestId,
     });
+  };
+
+  const handleIncreaseBid = async () => {
+    if (increasingBid) return;
+    setIncreasingBid(true);
+    try {
+      const requesterId = requireUserId();
+      const result = await requestService.increaseRequestBid(requestId, requesterId, 500);
+      if (!result.success) {
+        Alert.alert('금액 상향 실패', result.message || '금액 상향에 실패했습니다.');
+        return;
+      }
+      const newFee = result.newFee || currentFee;
+      setCurrentFee(newFee);
+      Alert.alert('금액 상향 완료', `요청 금액이 ${newFee.toLocaleString()}원으로 변경되었습니다.`);
+    } catch (error) {
+      console.error('Failed to increase request bid:', error);
+      Alert.alert('오류', '금액 상향 중 문제가 발생했습니다.');
+    } finally {
+      setIncreasingBid(false);
+    }
   };
 
   // 매칭 완료 화면
@@ -255,6 +286,22 @@ export const MatchingResultScreen: React.FC = () => {
             <Text style={styles.noticeItem}>• 홈으로 가셔도 알림을 받을 수 있습니다.</Text>
           </View>
         </View>
+
+        {status === 'pending' && (
+          <View style={styles.bidAdjustCard}>
+            <Text style={styles.bidAdjustTitle}>매칭이 지연되면 금액을 올려보세요</Text>
+            <Text style={styles.bidAdjustAmount}>현재 제안가: {currentFee.toLocaleString()}원</Text>
+            <TouchableOpacity
+              style={[styles.bidAdjustButton, increasingBid && styles.bidAdjustButtonDisabled]}
+              onPress={handleIncreaseBid}
+              disabled={increasingBid}
+            >
+              <Text style={styles.bidAdjustButtonText}>
+                {increasingBid ? '상향 중...' : '+500원 올리기'}
+              </Text>
+            </TouchableOpacity>
+          </View>
+        )}
 
         {/* 버튼 */}
         <View style={styles.buttonContainer}>
@@ -462,6 +509,39 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#666',
     lineHeight: 20,
+  },
+  bidAdjustCard: {
+    backgroundColor: '#FFF7ED',
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 8,
+    borderWidth: 1,
+    borderColor: '#FDBA74',
+  },
+  bidAdjustTitle: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: '#9A3412',
+    marginBottom: 6,
+  },
+  bidAdjustAmount: {
+    fontSize: 14,
+    color: '#7C2D12',
+    marginBottom: 10,
+  },
+  bidAdjustButton: {
+    backgroundColor: '#EA580C',
+    borderRadius: 10,
+    paddingVertical: 10,
+    alignItems: 'center',
+  },
+  bidAdjustButtonDisabled: {
+    opacity: 0.6,
+  },
+  bidAdjustButtonText: {
+    color: '#fff',
+    fontSize: 14,
+    fontWeight: '700',
   },
   buttonContainer: {
     gap: 12,

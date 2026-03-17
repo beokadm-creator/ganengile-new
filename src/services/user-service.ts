@@ -17,7 +17,6 @@ import {
   where,
   serverTimestamp,
   sum,
-  avg,
 } from 'firebase/firestore';
 import { db } from './firebase';
 import { auth } from './firebase';
@@ -93,6 +92,9 @@ export async function getUserById(userId: string): Promise<User | null> {
       isVerified: data.isVerified,
       gillerApplicationStatus: data.gillerApplicationStatus,
       gillerInfo: data.gillerInfo,
+      pointBalance: data.pointBalance || 0,
+      totalEarnedPoints: data.totalEarnedPoints || 0,
+      totalSpentPoints: data.totalSpentPoints || 0,
       gllerInfo: data.gllerInfo,
       // P1 추가 필드
       stats: data.stats || {
@@ -494,6 +496,11 @@ export async function createUser(
         totalBadges: 0,
         currentTier: 'none',
       },
+
+      // 포인트 시스템 (P1)
+      pointBalance: 0,
+      totalEarnedPoints: 0,
+      totalSpentPoints: 0,
 
       // 타임스탬프
       createdAt: serverTimestamp() as any,

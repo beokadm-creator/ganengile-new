@@ -103,12 +103,21 @@ export default function LockerLocator({ selectedStationId, onLockerSelect, onClo
             <Ionicons name="location" size={14} color={Colors.gray600} />
             <Text style={styles.metaText}>{item.stationName}</Text>
           </View>
+          {item.line ? (
+            <View style={styles.metaTag}>
+              <Ionicons name="subway" size={14} color={Colors.gray600} />
+              <Text style={styles.metaText}>{item.line}</Text>
+            </View>
+          ) : null}
           {item.isAvailable && (
             <View style={styles.availableBadge}>
               <Text style={styles.availableText}>이용 가능</Text>
             </View>
           )}
         </View>
+        <Text style={styles.detailText}>위치: {item.floor ?? 1}층 · {item.section || item.name}</Text>
+        <Text style={styles.detailText}>요금: {(item.pricePer4Hours ?? 0).toLocaleString()}원 / 4시간</Text>
+        {!!item.telNo && <Text style={styles.detailText}>문의: {item.telNo}</Text>}
       </View>
 
       <Ionicons name="chevron-forward" size={20} color={Colors.gray400} />
@@ -207,13 +216,7 @@ export default function LockerLocator({ selectedStationId, onLockerSelect, onClo
         <View style={styles.footerItem}>
           <Ionicons name="information-circle" size={20} color={Colors.primary} />
           <Text style={styles.footerText}>
-            공공 사물함: 2,000원/4시간
-          </Text>
-        </View>
-        <View style={styles.footerItem}>
-          <Ionicons name="storefront" size={20} color={Colors.secondary} />
-          <Text style={styles.footerText}>
-            민간 사물함: 3,000원/6시간
+            사물함 상세 위치(층/구역), 요금, 문의번호를 함께 제공합니다.
           </Text>
         </View>
       </View>
@@ -226,9 +229,12 @@ export default function LockerLocator({ selectedStationId, onLockerSelect, onClo
 interface LockerLocation {
   lockerId: string;
   name: string;
-  lat: number;
-  lng: number;
   stationName: string;
+  line?: string;
+  floor?: number;
+  section?: string;
+  pricePer4Hours?: number;
+  telNo?: string;
   status: 'available' | 'occupied' | 'maintenance' | 'out_of_order';
   isAvailable: boolean;
 }
@@ -383,6 +389,11 @@ const styles = StyleSheet.create({
     color: Colors.success,
     fontSize: Typography.fontSize.xs,
     fontWeight: Typography.fontWeight.semibold,
+  },
+  detailText: {
+    color: Colors.gray700,
+    fontSize: Typography.fontSize.xs,
+    marginTop: 2,
   },
   mapContainer: {
     flex: 1,

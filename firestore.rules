@@ -11,6 +11,11 @@ service cloud.firestore {
       return isAuthenticated() && request.auth.uid == userId;
     }
 
+    function isAdmin() {
+      return isAuthenticated() &&
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
+    }
+
     // ==================== Config Collections (Read-Only, Public) ====================
 
     match /config_stations/{stationId} {
@@ -83,6 +88,24 @@ service cloud.firestore {
       }
     }
 
+    // ==================== Giller Applications ====================
+
+    match /giller_applications/{applicationId} {
+      // 본인 신청 내역 또는 관리자만 조회
+      allow read: if isAuthenticated() &&
+                  (isAdmin() || isOwner(resource.data.userId));
+
+      // 본인 신청만 생성 허용
+      allow create: if isAuthenticated() &&
+                    request.resource.data.userId == request.auth.uid;
+
+      // 관리자가 심사 상태 변경 가능
+      allow update: if isAdmin();
+
+      // 삭제는 관리자만
+      allow delete: if isAdmin();
+    }
+
     // ==================== Routes Collection ====================
 
     match /routes/{routeId} {
@@ -112,9 +135,15 @@ service cloud.firestore {
       allow create: if isAuthenticated();
 
       // 쓰기: 요청자 또는 매칭된 길러
+      // + pending/matched 요청을 길러가 최초 수락(accepted)하는 전환 허용
       allow update: if isAuthenticated() &&
                     (isOwner(resource.data.requesterId) ||
-                     isOwner(resource.data.matchedGillerId));
+                     isOwner(resource.data.matchedGillerId) ||
+                     (
+                       (resource.data.status == 'pending' || resource.data.status == 'matched') &&
+                       request.resource.data.status == 'accepted' &&
+                       request.resource.data.matchedGillerId == request.auth.uid
+                     ));
 
       // 삭제: 요청자만
       allow delete: if isOwner(resource.data.requesterId);
@@ -144,8 +173,12 @@ service cloud.firestore {
                   (isOwner(resource.data.gllerId) ||
                    isOwner(resource.data.gillerId));
 
-      // 쓰기: giller(길러)만
-      allow write: if isOwner(resource.data.gillerId);
+      // 생성: 길러 본인만
+      allow create: if isAuthenticated() &&
+                    request.resource.data.gillerId == request.auth.uid;
+
+      // 수정: 해당 배송 길러 본인만
+      allow update: if isOwner(resource.data.gillerId);
 
       // 삭제: 시스템만
       allow delete: if false;

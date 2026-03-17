@@ -47,7 +47,12 @@ export default function RouteMatchingTab({ navigation }: Props) {
   });
 
   const [isFilterModalVisible, setIsFilterModalVisible] = useState(false);
-  const [acceptingRequestId, setAcceptingRequestId] = useState<string | null>(null);
+
+  const getRequesterInfo = (request: any) => {
+    const requesterId = request.requesterId || request.gllerId || request.userId;
+    const requesterName = request.requesterName || request.gllerName || request.recipientName || '의뢰인';
+    return { requesterId, requesterName };
+  };
 
   // Load data on mount
   useEffect(() => {
@@ -106,6 +111,11 @@ export default function RouteMatchingTab({ navigation }: Props) {
   const handleChat = async (request: RouteFilteredRequest) => {
     try {
       if (!gillerId || !gillerStats) return;
+      const { requesterId, requesterName } = getRequesterInfo(request);
+      if (!requesterId) {
+        Alert.alert('오류', '의뢰인 정보를 찾을 수 없어 채팅을 시작할 수 없습니다.');
+        return;
+      }
       const { createChatService, getChatRoomByRequestId } = await import('../../../services/chat-service');
       const chatService = createChatService();
       
@@ -113,7 +123,7 @@ export default function RouteMatchingTab({ navigation }: Props) {
       if (!chatRoom) {
         chatRoom = await chatService.createChatRoom({
           user1: { userId: gillerId, name: gillerStats.nickname || '길러' },
-          user2: { userId: request.gllerId, name: request.gllerName || '의뢰인' },
+          user2: { userId: requesterId, name: requesterName },
           requestId: request.requestId,
           requestInfo: { 
             from: request.pickupStation.stationName, 
@@ -125,85 +135,13 @@ export default function RouteMatchingTab({ navigation }: Props) {
       
       navigation.navigate('Chat', {
         chatRoomId: chatRoom.chatRoomId,
-        otherUserId: request.gllerId,
-        otherUserName: request.gllerName || '의뢰인',
+        otherUserId: requesterId,
+        otherUserName: requesterName,
         requestInfo: chatRoom.requestInfo,
       });
     } catch (error) {
       console.error('Error opening chat:', error);
       Alert.alert('오류', '채팅방을 열 수 없습니다.');
-    }
-  };
-
-  const handleAccept = async (request: RouteFilteredRequest) => {
-    if (acceptingRequestId) return; // 중복 클릭 방지
-    try {
-      if (!gillerId) return;
-      setAcceptingRequestId(request.requestId);
-
-      const { gillerAcceptRequest } = await import('../../../services/delivery-service');
-      const result = await gillerAcceptRequest(request.requestId, gillerId);
-
-      if (result.success) {
-        // 채팅방 자동 생성 및 시스템 메시지 전송
-        const { createChatService, getChatRoomByRequestId } = await import('../../../services/chat-service');
-        const chatService = createChatService();
-        
-        let chatRoom = await getChatRoomByRequestId(request.requestId);
-        if (!chatRoom) {
-           chatRoom = await chatService.createChatRoom({
-             user1: { userId: gillerId, name: gillerStats?.nickname || '길러' },
-             user2: { userId: request.gllerId, name: request.gllerName || '의뢰인' },
-             requestId: request.requestId,
-             requestInfo: { 
-               from: request.pickupStation.stationName, 
-               to: request.deliveryStation.stationName, 
-               urgency: request.packageInfo?.size || '일반' 
-             }
-           }, 'active');
-        } else {
-           await chatService.activateChatRoom(chatRoom.chatRoomId);
-        }
-        
-        const maskedPhone = request.recipientPhone ? request.recipientPhone.replace(/(\d{3})-?(\d{4})-?(\d{4})/, '$1-****-$3') : '번호 없음';
-        await chatService.sendSystemMessage(
-          chatRoom.chatRoomId, 
-          'match_accepted', 
-          `배송자가 배송을 수락했습니다.\n받는 분 연락처: ${maskedPhone}`
-        );
-
-        Alert.alert('배송 수락 완료!', '의뢰인과 채팅하거나 픽업을 진행하세요.', [
-          {
-            text: '채팅하기',
-            onPress: () => {
-              navigation.navigate('Chat', {
-                chatRoomId: chatRoom.chatRoomId,
-                otherUserId: request.gllerId,
-                otherUserName: request.gllerName || '의뢰인',
-              });
-            },
-          },
-          {
-            text: '배송 시작하기',
-            style: 'default',
-            onPress: () => {
-              navigation.navigate('DeliveryTracking', {
-                requestId: request.requestId,
-              });
-            },
-          },
-        ]);
-        
-        // 목록 다시 불러오기
-        loadRequests();
-      } else {
-        Alert.alert('실패', result.message);
-      }
-    } catch (error) {
-      console.error('Error accepting request:', error);
-      Alert.alert('오류', '수락 처리에 실패했습니다.');
-    } finally {
-      setAcceptingRequestId(null);
     }
   };
 
@@ -284,18 +222,9 @@ export default function RouteMatchingTab({ navigation }: Props) {
 
         {/* Footer: Action */}
         <View style={styles.requestFooter}>
-          <TouchableOpacity
-            style={styles.chatButton}
-            onPress={() => handleChat(item)}
-          >
+          <TouchableOpacity style={styles.chatButtonFull} onPress={() => handleChat(item)}>
             <Text style={styles.chatIcon}>💬</Text>
             <Text style={styles.chatButtonText}>채팅</Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={styles.acceptButton}
-            onPress={() => handleAccept(item)}
-          >
-            <Text style={styles.acceptButtonText}>수락하기</Text>
           </TouchableOpacity>
         </View>
       </View>
@@ -851,15 +780,13 @@ const styles = StyleSheet.create({
     borderTopWidth: 1,
     borderTopColor: '#f0f0f0',
   },
-  chatButton: {
+  chatButtonFull: {
+    flex: 1,
     flexDirection: 'row',
+    justifyContent: 'center',
     alignItems: 'center',
-    paddingVertical: 8,
-    paddingHorizontal: 16,
-    marginRight: 10,
-    backgroundColor: '#f5f5f5',
-    borderColor: '#e0e0e0',
-    borderWidth: 1,
+    paddingVertical: 12,
+    backgroundColor: Colors.primary,
     borderRadius: 8,
   },
   chatIcon: {
@@ -867,20 +794,8 @@ const styles = StyleSheet.create({
     marginRight: 6,
   },
   chatButtonText: {
-    fontSize: 14,
-    color: '#333',
-    fontWeight: 'bold',
-  },
-  acceptButton: {
-    flex: 1,
-    backgroundColor: '#00BCD4',
-    paddingVertical: 12,
-    borderRadius: 8,
-    alignItems: 'center',
-  },
-  acceptButtonText: {
+    fontSize: 15,
     color: '#fff',
-    fontSize: 16,
     fontWeight: 'bold',
   },
 });

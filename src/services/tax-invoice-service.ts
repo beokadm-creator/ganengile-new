@@ -9,11 +9,10 @@ import type {
   TaxInvoice,
   TaxInvoiceStatus,
   TaxInvoiceItems,
-  TaxInvoiceRecipient,
-  SettlementPeriod,
-  PLATFORM_INFO,
-  TAX_RATE
+  TaxInvoiceRecipient
 } from '../types/tax-invoice';
+import { TAX_RATE, PLATFORM_INFO } from '../types/tax-invoice';
+import type { SettlementPeriod } from '../types/b2b-settlement';
 import type { SubscriptionTier } from '../types/business-contract';
 import { SUBSCRIPTION_TIERS } from '../types/business-contract';
 
@@ -69,8 +68,7 @@ export class TaxInvoiceService {
           tax
         },
         recipient: await this.getBusinessInfo(contract.businessId),
-        supplier: PLATFORM_INFO,
-        status: 'issued' as TaxInvoiceStatus
+        supplier: PLATFORM_INFO
       };
 
       const docRef = await addDoc(collection(db, INVOICE_COLLECTION), invoiceData);

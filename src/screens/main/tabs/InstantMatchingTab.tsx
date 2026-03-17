@@ -3,7 +3,7 @@
  * 즉시 매칭 탭 - 현재 위치 기반 5km 반경 내 요청 표시
  */
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -15,7 +15,6 @@ import {
   Alert,
   ScrollView,
   Modal,
-  Switch,
 } from 'react-native';
 import { StackNavigationProp } from '@react-navigation/stack';
 import {
@@ -55,12 +54,18 @@ export default function InstantMatchingTab({ navigation }: Props) {
 
   const [isFilterModalVisible, setIsFilterModalVisible] = useState(false);
 
+  const getRequesterInfo = (request: any) => {
+    const requesterId = request.requesterId || request.gllerId || request.userId;
+    const requesterName = request.requesterName || request.gllerName || request.recipientName || '의뢰인';
+    return { requesterId, requesterName };
+  };
+
   useEffect(() => {
     initializeGiller();
   }, []);
 
   useEffect(() => {
-    if (gillerId && currentLocation) {
+    if (gillerId) {
       loadRequests();
     }
   }, [gillerId, currentLocation]);
@@ -112,14 +117,38 @@ export default function InstantMatchingTab({ navigation }: Props) {
 
   const loadRequests = async () => {
     try {
-      if (!gillerId || !currentLocation) return;
+      if (!gillerId) return;
 
       const allRequests = await getPendingGillerRequests();
-      const matchedRequests = await filterRequestsByLocation(
-        allRequests,
-        currentLocation,
-        30 // 30km 반경으로 대폭 상향
-      );
+
+      if (!currentLocation) {
+        const withoutLocation = allRequests.map((request: any) => ({
+          ...request,
+          metadata: {
+            distanceFromCurrent: Number.MAX_SAFE_INTEGER,
+            nearestStation: request.pickupStation?.stationName || '-',
+            estimatedTimeMinutes: 0,
+          },
+        }));
+        setRequests(withoutLocation);
+        return;
+      }
+
+      const matchedRequests = await filterRequestsByLocation(allRequests, currentLocation, 30);
+
+      // 좌표 누락 등으로 위치 매칭 결과가 비어도 요청 목록은 보여주도록 폴백
+      if (matchedRequests.length === 0 && allRequests.length > 0) {
+        const fallbackRequests = allRequests.map((request: any) => ({
+          ...request,
+          metadata: {
+            distanceFromCurrent: Number.MAX_SAFE_INTEGER,
+            nearestStation: request.pickupStation?.stationName || '-',
+            estimatedTimeMinutes: 0,
+          },
+        }));
+        setRequests(fallbackRequests);
+        return;
+      }
 
       setRequests(matchedRequests);
     } catch (error) {
@@ -159,6 +188,11 @@ export default function InstantMatchingTab({ navigation }: Props) {
   const handleChat = async (request: LocationFilteredRequest) => {
     try {
       if (!gillerId || !gillerStats) return;
+      const { requesterId, requesterName } = getRequesterInfo(request);
+      if (!requesterId) {
+        Alert.alert('오류', '의뢰인 정보를 찾을 수 없어 채팅을 시작할 수 없습니다.');
+        return;
+      }
       const { createChatService, getChatRoomByRequestId } = await import('../../../services/chat-service');
       const chatService = createChatService();
       
@@ -166,7 +200,7 @@ export default function InstantMatchingTab({ navigation }: Props) {
       if (!chatRoom) {
         chatRoom = await chatService.createChatRoom({
           user1: { userId: gillerId, name: gillerStats.nickname || '길러' },
-          user2: { userId: request.gllerId, name: request.gllerName || '의뢰인' },
+          user2: { userId: requesterId, name: requesterName },
           requestId: request.requestId,
           requestInfo: { 
             from: request.pickupStation.stationName, 
@@ -178,8 +212,8 @@ export default function InstantMatchingTab({ navigation }: Props) {
       
       navigation.navigate('Chat', {
         chatRoomId: chatRoom.chatRoomId,
-        otherUserId: request.gllerId,
-        otherUserName: request.gllerName || '의뢰인',
+        otherUserId: requesterId,
+        otherUserName: requesterName,
         requestInfo: chatRoom.requestInfo,
       });
     } catch (error) {
@@ -188,72 +222,15 @@ export default function InstantMatchingTab({ navigation }: Props) {
     }
   };
 
-  const handleAccept = async (request: LocationFilteredRequest) => {
-    try {
-      if (!gillerId) return;
-
-      const { gillerAcceptRequest } = await import('../../../services/delivery-service');
-      const result = await gillerAcceptRequest(request.requestId, gillerId);
-
-      if (result.success) {
-        // 채팅방 자동 생성 및 시스템 메시지 전송
-        const { createChatService, getChatRoomByRequestId } = await import('../../../services/chat-service');
-        const chatService = createChatService();
-        
-        let chatRoom = await getChatRoomByRequestId(request.requestId);
-        if (!chatRoom) {
-           chatRoom = await chatService.createChatRoom({
-             user1: { userId: gillerId, name: gillerStats?.nickname || '길러' },
-             user2: { userId: request.gllerId, name: request.gllerName || '의뢰인' },
-             requestId: request.requestId,
-             requestInfo: { 
-               from: request.pickupStation.stationName, 
-               to: request.deliveryStation.stationName, 
-               urgency: request.packageInfo?.size || '일반' 
-             }
-           }, 'active');
-        } else {
-           await chatService.activateChatRoom(chatRoom.chatRoomId);
-        }
-        
-        const maskedPhone = request.recipientPhone ? request.recipientPhone.replace(/(\d{3})-?(\d{4})-?(\d{4})/, '$1-****-$3') : '번호 없음';
-        await chatService.sendSystemMessage(
-          chatRoom.chatRoomId, 
-          'match_accepted', 
-          `배송자가 배송을 수락했습니다.\n받는 분 연락처: ${maskedPhone}`
-        );
-
-        Alert.alert('성공', '배송 수락 완료! 채팅으로 이동합니다.', [
-          {
-            text: '채팅하기',
-            onPress: () => {
-              navigation.navigate('Chat', {
-                chatRoomId: chatRoom.chatRoomId,
-                otherUserId: request.gllerId,
-                otherUserName: request.gllerName || '의뢰인',
-              });
-            },
-          },
-        ]);
-        
-        // 목록 다시 불러오기
-        loadRequests();
-      } else {
-        Alert.alert('실패', result.message);
-      }
-    } catch (error) {
-      console.error('Error accepting request:', error);
-      Alert.alert('오류', '수락 처리에 실패했습니다.');
-    }
-  };
-
   const getDistanceColor = (distance: number): string => {
+    if (!Number.isFinite(distance) || distance >= Number.MAX_SAFE_INTEGER / 2) return Colors.gray600;
     if (distance < 1000) return Colors.secondary; // 1km 미만: 녹색
     if (distance < 3000) return Colors.accent; // 3km 미만: 노란색
     return Colors.warning; // 3km 이상: 주황색
   };
 
   const formatDistance = (meters: number): string => {
+    if (!Number.isFinite(meters) || meters >= Number.MAX_SAFE_INTEGER / 2) return '거리 미확인';
     if (meters < 1000) {
       return `${meters}m`;
     }
@@ -496,18 +473,9 @@ export default function InstantMatchingTab({ navigation }: Props) {
 
       {/* Footer: Action */}
       <View style={styles.requestFooter}>
-        <TouchableOpacity
-          style={styles.chatButton}
-          onPress={() => handleChat(item)}
-        >
+        <TouchableOpacity style={styles.chatButtonFull} onPress={() => handleChat(item)}>
           <Text style={styles.chatIcon}>💬</Text>
           <Text style={styles.chatButtonText}>채팅</Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={styles.acceptButton}
-          onPress={() => handleAccept(item)}
-        >
-          <Text style={styles.acceptButtonText}>수락하기</Text>
         </TouchableOpacity>
       </View>
     </TouchableOpacity>
@@ -533,7 +501,7 @@ export default function InstantMatchingTab({ navigation }: Props) {
           <Text style={styles.emptyTitle}>반경 내 요청이 없습니다</Text>
           <Text style={styles.emptyDesc}>
             {requests.length === 0
-              ? `현재 위치 5km 반경 내에 배송 요청이 없습니다.\n\n반경을 넓히거나 다른 탭을 확인해보세요.`
+              ? `현재 조건에 맞는 배송 요청이 없습니다.\n\n잠시 후 새로고침하거나 필터를 확인해보세요.`
               : '필터 조건에 맞는 요청이 없습니다.'}
           </Text>
           {filters.maxDistance && filters.maxDistance < 10000 && (
@@ -632,19 +600,6 @@ const styles = StyleSheet.create({
     height: 20, // 높이 축소
     backgroundColor: Colors.gray200,
   },
-  acceptButton: {
-    alignItems: 'center',
-    backgroundColor: Colors.secondary,
-    borderRadius: BorderRadius.md,
-    flex: 1,
-    paddingVertical: 12,
-    ...Shadows.sm,
-  },
-  acceptButtonText: {
-    color: Colors.white,
-    fontSize: 16,
-    fontWeight: 'bold',
-  },
   adjustFilterButton: {
     backgroundColor: Colors.primary,
     borderRadius: BorderRadius.md,
@@ -658,19 +613,17 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: 'bold',
   },
-  chatButton: {
+  chatButtonFull: {
     alignItems: 'center',
-    backgroundColor: Colors.white,
-    borderColor: Colors.primary,
+    backgroundColor: Colors.primary,
     borderRadius: BorderRadius.md,
-    borderWidth: 1,
+    flex: 1,
     flexDirection: 'row',
     justifyContent: 'center',
-    paddingHorizontal: 12,
     paddingVertical: 12,
   },
   chatButtonText: {
-    color: Colors.primary,
+    color: Colors.white,
     fontSize: 14,
     fontWeight: 'bold',
     marginLeft: 6,

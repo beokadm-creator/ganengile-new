@@ -17,8 +17,6 @@ import {
 import { db } from './firebase';
 import {
   Locker,
-  PublicLocker,
-  PrivateLocker,
   LockerReservation,
   LockerType,
   LockerOperator,
@@ -73,6 +71,7 @@ function mapExternalLocker(raw: any): Locker | null {
       floor: raw?.floor ?? 1,
       section: raw?.section ?? raw?.locker_no ?? String(lockerId),
       address: raw?.address,
+      contactPhone: raw?.telNo ?? raw?.phone ?? raw?.contactPhone,
       nearby: raw?.nearby ?? false,
     },
     size,
@@ -162,6 +161,7 @@ async function fetchKricLockers(stationId?: string): Promise<Locker[]> {
             floor: Number(item?.stinFlor ?? 1),
             section: item?.dtlLoc ?? `보관함-${index + 1}`,
             address: '',
+            contactPhone: item?.telNo ?? '',
             nearby: false,
           },
           size,
@@ -472,7 +472,7 @@ export class LockerService {
    */
   async recommendLockers(
     pickupStationId: string,
-    deliveryStationId: string
+    _deliveryStationId: string
   ): Promise<Locker[]> {
     // 픽업역과 배송역 중간에 있는 사물함 추천
     const allLockers = await this.getAllLockers();
@@ -655,6 +655,11 @@ export function createLockerLocation(locker: Locker): {
   lockerId: string;
   name: string;
   stationName: string;
+  line: string;
+  floor: number;
+  section: string;
+  pricePer4Hours: number;
+  telNo?: string;
   status: string;
   isAvailable: boolean;
 } {
@@ -662,6 +667,11 @@ export function createLockerLocation(locker: Locker): {
     lockerId: locker.lockerId,
     name: locker.location?.section ?? locker.lockerId,
     stationName: locker.location?.stationName ?? '',
+    line: locker.location?.line ?? '',
+    floor: Number(locker.location?.floor ?? 1),
+    section: locker.location?.section ?? '',
+    pricePer4Hours: Number(locker.pricing?.base ?? 0),
+    telNo: locker.location?.contactPhone ?? '',
     status: locker.status,
     isAvailable: locker.status === LockerStatus.AVAILABLE,
   };

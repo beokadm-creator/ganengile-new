@@ -37,6 +37,8 @@ interface Locker {
   stationName: string;
   line: string;
   floor: string;
+  section: string;
+  contactPhone: string;
   location: {
     latitude: number;
     longitude: number;
@@ -99,15 +101,17 @@ export default function LockerMapScreen({ navigation }: Props) {
         
         lockerData.push({
           id: docSnapshot.id,
-          stationId: data?.stationId || '',
-          stationName: data?.stationName || '',
-          line: data?.line || '',
-          floor: data?.floor || '',
+          stationId: data?.stationId || data?.location?.stationId || '',
+          stationName: data?.stationName || data?.location?.stationName || '',
+          line: data?.line || data?.location?.line || '',
+          floor: String(data?.floor || data?.location?.floor || 1),
+          section: data?.section || data?.location?.section || '',
+          contactPhone: data?.contactPhone || data?.location?.contactPhone || '',
           location: data?.location || { latitude: 0, longitude: 0 },
           type: data?.type || 'public',
           provider: data?.provider || '서울메트로',
-          pricePerHour: data?.pricePerHour || 2000,
-          maxHours: data?.maxHours || 4,
+          pricePerHour: data?.pricePerHour || Math.round((Number(data?.pricing?.base || 0) / Math.max(1, Number(data?.pricing?.baseDuration || 240))) * 60) || 2000,
+          maxHours: data?.maxHours || Math.max(1, Math.round((Number(data?.pricing?.maxDuration || 240) / 60))) || 4,
           availableFrom: data?.availableFrom || '06:00',
           availableUntil: data?.availableUntil || '23:00',
           status: data?.status || 'available',
@@ -146,7 +150,7 @@ export default function LockerMapScreen({ navigation }: Props) {
 
     Alert.alert(
       '사물함 선택',
-      `${locker.stationName} ${locker.floor}층 ${locker.provider} 사물함을 선택하시겠습니까?\n\n가격: ${locker.pricePerHour.toLocaleString()}원/시간`,
+      `${locker.stationName} ${locker.floor}층 ${locker.provider}\n위치: ${locker.section || '역사 내 안내 위치 확인'}\n${locker.contactPhone ? `문의: ${locker.contactPhone}\n` : ''}\n가격: ${locker.pricePerHour.toLocaleString()}원/시간`,
       [
         { text: '취소', style: 'cancel' },
         {
@@ -275,7 +279,9 @@ export default function LockerMapScreen({ navigation }: Props) {
         {/* 위치 정보 */}
         <View style={styles.locationInfo}>
           <Text style={styles.locationLabel}>📍 {locker.floor}층</Text>
+          <Text style={styles.locationLabel}>🧭 {locker.section || '역사 내 안내 위치 확인'}</Text>
           <Text style={styles.locationLabel}>🏢 {locker.provider}</Text>
+          {!!locker.contactPhone && <Text style={styles.locationLabel}>☎ {locker.contactPhone}</Text>}
         </View>
 
         {/* 가격 정보 */}

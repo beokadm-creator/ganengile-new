@@ -1204,7 +1204,7 @@ export async function getPendingGillerRequests(): Promise<any[]> {
   try {
     const q = query(
       collection(db, 'requests'),
-      where('status', 'in', ['pending', 'matched'])
+      where('status', '==', 'pending')
     );
 
     const snapshot = await getDocs(q);
@@ -1218,6 +1218,11 @@ export async function getPendingGillerRequests(): Promise<any[]> {
 
       // 수신자 이름 (채팅 시 필요)
       const recipientName = data.requesterName || data.senderName || '이용자';
+
+      // 이미 다른 길러가 매칭된 건 제외
+      if (data.matchedGillerId) {
+        return;
+      }
 
       requests.push({
         requestId: doc.id,

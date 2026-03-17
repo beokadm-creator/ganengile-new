@@ -15,8 +15,6 @@ import {
   serverTimestamp,
   getDoc,
   getDocs,
-  setDoc,
-  arrayUnion,
   increment,
 } from 'firebase/firestore';
 import { db } from './firebase';
@@ -47,24 +45,59 @@ export class ChatService {
    * 사용자별 채팅방 목록 실시간 구독
    */
   subscribeToUserChatRooms(listener: ChatRoomListener): () => void {
-    const q = query(
+    const qUser1 = query(
       collection(db, CHAT_ROOMS_COLLECTION),
       where('participants.user1.userId', '==', this.userId),
       orderBy('updatedAt', 'desc')
     );
 
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-      const chatRooms = snapshot.docs.map((doc) => ({
+    const qUser2 = query(
+      collection(db, CHAT_ROOMS_COLLECTION),
+      where('participants.user2.userId', '==', this.userId),
+      orderBy('updatedAt', 'desc')
+    );
+
+    let roomsAsUser1: ChatRoom[] = [];
+    let roomsAsUser2: ChatRoom[] = [];
+
+    const emitMerged = () => {
+      const deduped = new Map<string, ChatRoom>();
+      [...roomsAsUser1, ...roomsAsUser2].forEach((room) => {
+        deduped.set(room.chatRoomId, room);
+      });
+
+      const merged = [...deduped.values()].sort((a, b) => {
+        const aTime = (a.updatedAt as any)?.toDate?.()?.getTime?.() || 0;
+        const bTime = (b.updatedAt as any)?.toDate?.()?.getTime?.() || 0;
+        return bTime - aTime;
+      });
+      listener(merged);
+    };
+
+    const unsubUser1 = onSnapshot(qUser1, (snapshot) => {
+      roomsAsUser1 = snapshot.docs.map((doc) => ({
         chatRoomId: doc.id,
         ...doc.data(),
       })) as ChatRoom[];
-
-      listener(chatRooms);
+      emitMerged();
     }, (error) => {
-      console.error('Error subscribing to chat rooms:', error);
+      console.error('Error subscribing to chat rooms (user1):', error);
     });
 
-    return unsubscribe;
+    const unsubUser2 = onSnapshot(qUser2, (snapshot) => {
+      roomsAsUser2 = snapshot.docs.map((doc) => ({
+        chatRoomId: doc.id,
+        ...doc.data(),
+      })) as ChatRoom[];
+      emitMerged();
+    }, (error) => {
+      console.error('Error subscribing to chat rooms (user2):', error);
+    });
+
+    return () => {
+      unsubUser1();
+      unsubUser2();
+    };
   }
 
   /**

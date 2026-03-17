@@ -3,6 +3,7 @@
  * 이미지 최적화를 위한 유틸리티 함수
  */
 
+import React from 'react';
 import { Image } from 'react-native';
 
 interface ImageOptimizationOptions {
@@ -146,7 +147,7 @@ export const ICON_SIZES = {
  * Lazy loading 이미지 컴포넌트
  */
 export const LazyImage: React.FC<{
-  source: any;
+  source: { uri: string };
   style?: any;
   onLoad?: () => void;
 }> = ({ source, style, onLoad }) => {

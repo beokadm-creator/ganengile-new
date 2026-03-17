@@ -9,7 +9,7 @@ import {
   getUserRoutes,
   validateRoute,
   clearRoutesCache,
-} from '../route-service';
+} from './route-service';
 import {
   doc,
   getDoc,

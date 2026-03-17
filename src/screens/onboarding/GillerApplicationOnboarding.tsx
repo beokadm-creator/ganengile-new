@@ -15,7 +15,8 @@ import {
   ScrollView,
 } from 'react-native';
 import { useUser } from '../../contexts/UserContext';
-import { doc, updateDoc, addDoc, collection, serverTimestamp } from 'firebase/firestore';
+import { doc, setDoc, addDoc, collection, serverTimestamp } from 'firebase/firestore';
+import { FirebaseError } from 'firebase/app';
 import { db } from '../../services/firebase';
 import { PASS_TEST_MODE } from '../../config/feature-flags';
 
@@ -46,8 +47,9 @@ interface PassAuthData {
 export default function GillerApplicationOnboarding({ navigation }: Props) {
   const { user, refreshUser } = useUser();
   const [loading, setLoading] = useState(false);
+  const [submitError, setSubmitError] = useState('');
   const [currentStep, setCurrentStep] = useState(1);
-  const [testMode] = useState(PASS_TEST_MODE); // 테스트 모드
+  const [testMode, setTestMode] = useState(PASS_TEST_MODE); // 테스트 모드
 
   const [phone, setPhone] = useState('');
   const [routeDescription, setRouteDescription] = useState('');
@@ -168,6 +170,7 @@ export default function GillerApplicationOnboarding({ navigation }: Props) {
       return;
     }
 
+    setSubmitError('');
     setLoading(true);
 
     try {
@@ -185,6 +188,7 @@ export default function GillerApplicationOnboarding({ navigation }: Props) {
           name: passAuthData.name,
           birthday: passAuthData.birthday,
         },
+        bankAccount: gillerInfo.bankAccount,
         verificationStatus: testMode ? 'approved' : 'not_submitted',
         status: 'pending',
         createdAt: serverTimestamp(),
@@ -192,14 +196,16 @@ export default function GillerApplicationOnboarding({ navigation }: Props) {
 
       // 2. 사용자 계정에 신청 중 상태 + 계좌 정보 저장 (role은 관리자 승인 후 변경됨)
       const userRef = doc(db, 'users', user.uid);
-      await updateDoc(userRef, {
+      await setDoc(userRef, {
         gillerApplicationStatus: 'pending',
-        'gillerInfo.activeDays': gillerInfo.activeDays,
-        'gillerInfo.activeTime': gillerInfo.activeTime,
-        'gillerInfo.bankAccount': gillerInfo.bankAccount,
+        gillerInfo: {
+          activeDays: gillerInfo.activeDays,
+          activeTime: gillerInfo.activeTime,
+          bankAccount: gillerInfo.bankAccount,
+        },
         hasCompletedOnboarding: true,
         updatedAt: serverTimestamp(),
-      });
+      }, { merge: true });
 
       await refreshUser();
 
@@ -210,6 +216,9 @@ export default function GillerApplicationOnboarding({ navigation }: Props) {
       );
     } catch (error) {
       console.error('❌ Error processing Giller application:', error);
+      const firebaseMessage =
+        error instanceof FirebaseError ? `${error.code}: ${error.message}` : null;
+      setSubmitError(firebaseMessage || '신청 처리에 실패했습니다. 잠시 후 다시 시도해주세요.');
       Alert.alert('오류', '길러 신청 처리에 실패했습니다. 다시 시도해주세요.');
     } finally {
       setLoading(false);
@@ -497,6 +506,7 @@ export default function GillerApplicationOnboarding({ navigation }: Props) {
             </Text>
           )}
         </TouchableOpacity>
+        {!!submitError && <Text style={styles.submitErrorText}>{submitError}</Text>}
       </View>
     </View>
   );
@@ -711,5 +721,11 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontSize: 16,
     fontWeight: 'bold',
+  },
+  submitErrorText: {
+    marginTop: 10,
+    fontSize: 12,
+    color: '#C62828',
+    textAlign: 'center',
   },
 });

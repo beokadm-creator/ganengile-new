@@ -5,7 +5,6 @@
 
 import { collection, doc, getDoc, addDoc, updateDoc, query, where, getDocs } from 'firebase/firestore';
 import { db } from './firebase';
-import { getStationByName } from '../services/config-service';
 import type { TransferPossibility, TransferPricing, TransferMatch, Route } from '../types/transfer';
 import type { Station } from '../types/config';
 

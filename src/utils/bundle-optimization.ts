@@ -62,8 +62,8 @@ export const dynamicImport = () => {
     // 설정 화면 지연 로딩
     SettingsScreen: () => import('../screens/SettingsScreen'),
     // 프로필 화면 지연 로딩
-    ProfileScreen: () => import('../screens/ProfileScreen'),
+    ProfileScreen: () => import('../screens/main/ProfileScreen'),
     // 채팅 화면 지연 로딩
-    ChatScreen: () => import('../screens/ChatScreen')
+    ChatScreen: () => import('../screens/main/ChatScreen')
   };
 };

@@ -12,7 +12,6 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { MaterialIcons } from '@expo/vector-icons';
 import type { MainTabParamList } from '../types/navigation';
 import { useUser } from '../contexts/UserContext';
-import { Colors } from '../components';
 
 // Screens
 import HomeScreen from '../screens/main/HomeScreen';
@@ -35,6 +34,7 @@ import ChatScreen from '../screens/main/ChatScreen';
 import NotificationSettingsScreen from '../screens/main/NotificationSettingsScreen';
 import EarningsScreen from '../screens/main/EarningsScreen';
 import MyRatingScreen from '../screens/main/MyRatingScreen';
+import BadgeCollectionScreen from '../screens/main/BadgeCollectionScreen';
 import CustomerServiceScreen from '../screens/main/CustomerServiceScreen';
 import TermsScreen from '../screens/main/TermsScreen';
 import DepositPaymentScreen from '../screens/main/DepositPaymentScreen';
@@ -355,6 +355,14 @@ export default function MainNavigator() {
         options={{
           headerShown: true,
           title: '내 평가',
+        }}
+      />
+      <Stack.Screen
+        name="BadgeCollection"
+        component={BadgeCollectionScreen}
+        options={{
+          headerShown: true,
+          title: '내 배지',
         }}
       />
       <Stack.Screen
