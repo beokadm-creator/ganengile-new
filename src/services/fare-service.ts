@@ -245,15 +245,13 @@ export async function getRealtimeFare(
   arrivalStationName?: string,
   options?: FareQueryOptions
 ): Promise<FareResult | null> {
-  if (!FARE_SERVICE_KEY) {
-    return null;
-  }
   const hasCodes = Boolean(departureStationCode && arrivalStationCode);
   const hasNames = Boolean(departureStationName && arrivalStationName);
   if (!hasCodes && !hasNames) {
     return null;
   }
 
+  // Cache lookups work regardless of whether the live API key is configured
   if (hasCodes) {
     const cachedByCode = await getCachedFare(departureStationCode!, arrivalStationCode!);
     if (cachedByCode) return cachedByCode;
@@ -264,6 +262,11 @@ export async function getRealtimeFare(
   }
   const cacheOnly = options?.cacheOnly ?? STRICT_CACHE_ONLY;
   if (cacheOnly) return null;
+
+  // Live API requires a service key
+  if (!FARE_SERVICE_KEY) {
+    return null;
+  }
 
   try {
     const base = FARE_API_URL.replace(/\/$/, '');

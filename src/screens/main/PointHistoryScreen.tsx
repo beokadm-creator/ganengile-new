@@ -10,6 +10,7 @@ import {
 } from 'react-native';
 import { StackNavigationProp } from '@react-navigation/stack';
 import { PointService } from '../../services/PointService';
+import { useUser } from '../../contexts/UserContext';
 import { Colors, Typography, Spacing, BorderRadius } from '../../theme';
 
 type NavigationProp = StackNavigationProp<any>;
@@ -22,15 +23,16 @@ interface PointSummary {
 }
 
 export default function PointHistoryScreen({ navigation }: { navigation: NavigationProp }) {
+  const { user } = useUser();
   const [summary, setSummary] = useState<PointSummary | null>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
 
   const loadPointSummary = async () => {
+    if (!user?.uid) return;
     try {
       setLoading(true);
-      const userId = 'current-user-id';
-      const data = await PointService.getSummary(userId);
+      const data = await PointService.getSummary(user.uid);
       setSummary(data);
     } catch (error) {
       console.error('Failed to load point summary:', error);
@@ -47,7 +49,7 @@ export default function PointHistoryScreen({ navigation }: { navigation: Navigat
 
   useEffect(() => {
     loadPointSummary();
-  }, []);
+  }, [user?.uid]);
 
   const formatAmount = (amount: number): string => {
     return `${amount > 0 ? '+' : ''}${amount.toLocaleString()} P`;

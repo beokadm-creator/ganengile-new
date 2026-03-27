@@ -1,6 +1,8 @@
 /**
- * Payment Service
+ * Payment Service (P4) - Consolidated
  * 결제 및 수익 정산 시스템 (세금 처리 포함)
+ * NOTE: This file consolidates legacy modules and acts as the main payment service.
+ * Legacy PaymentService.ts should be deprecated/migrated.
  *
  * 세금 정책:
  * - 사업소득세 3.3% 원천징수 (법적 의무)

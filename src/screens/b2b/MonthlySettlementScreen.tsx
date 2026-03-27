@@ -20,7 +20,7 @@ import { b2bFirestoreService } from '../../services/b2b-firestore-service';
 import { requireUserId } from '../../services/firebase';
 import * as Print from 'expo-print';
 import * as Sharing from 'expo-sharing';
-import type { MainStackNavigationProp } from '../../types/navigation';
+import type { B2BStackNavigationProp } from '../../types/navigation';
 import { Colors, Typography, Spacing, BorderRadius, Shadows } from '../../theme';
 
 interface MonthlySummary {
@@ -43,7 +43,7 @@ interface SettlementItem {
 }
 
 export default function MonthlySettlementScreen() {
-  const navigation = useNavigation<MainStackNavigationProp>();
+  const navigation = useNavigation<B2BStackNavigationProp>();
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [summary, setSummary] = useState<MonthlySummary | null>(null);

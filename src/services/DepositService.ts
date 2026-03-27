@@ -10,7 +10,7 @@ import {
   orderBy,
   Timestamp,
 } from 'firebase/firestore';
-import { db } from '../core/firebase';
+import { db } from './firebase';
 import { PointService } from './PointService';
 import { TossPaymentService } from './TossPaymentService';
 import type { Deposit, DepositStatus, DepositPaymentMethod } from '../types/point';

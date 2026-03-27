@@ -1821,6 +1821,28 @@ export const scheduledFareCacheSync = functions.pubsub
     }
   });
 
+/**
+ * Callable Function: Manual Fare Cache Sync (Admin only)
+ * 관리자가 수동으로 운임 캐시 갱신을 트리거할 수 있습니다.
+ */
+export const triggerFareCacheSync = functions.https.onCall(async (_data, context) => {
+  if (!context.auth) {
+    throw new functions.https.HttpsError('unauthenticated', 'Authentication required.');
+  }
+  const userDoc = await admin.firestore().collection('users').doc(context.auth.uid).get();
+  const role = userDoc.data()?.role;
+  if (role !== 'admin' && role !== 'superadmin') {
+    throw new functions.https.HttpsError('permission-denied', 'Admin role required.');
+  }
+  try {
+    const result = await fareCacheScheduler();
+    return { success: true, result };
+  } catch (error) {
+    console.error('❌ Manual fare cache sync error:', error);
+    throw new functions.https.HttpsError('internal', 'Fare cache sync failed.');
+  }
+});
+
 // ==================== CI Verification APIs (PASS / Kakao) ====================
 
 type CiProvider = 'pass' | 'kakao';

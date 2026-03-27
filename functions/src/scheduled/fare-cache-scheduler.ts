@@ -151,6 +151,14 @@ function getCacheDocId(fromCode: string, toCode: string): string {
   return `${fromCode}_${toCode}`;
 }
 
+function safeNameKey(value: string): string {
+  return encodeURIComponent(value.trim().toLowerCase().replace(/\s+/g, ''));
+}
+
+function getNameCacheDocId(fromName: string, toName: string): string {
+  return `nm_${safeNameKey(fromName)}_${safeNameKey(toName)}`;
+}
+
 function shouldSkipByUpdatedAt(updatedAt: admin.firestore.Timestamp | null | undefined): boolean {
   if (!updatedAt) return false;
   const ageMs = Date.now() - updatedAt.toMillis();
@@ -343,7 +351,7 @@ export const fareCacheScheduler = async (): Promise<SchedulerResult> => {
         continue;
       }
 
-      await db.collection(CACHE_DOC_COLLECTION).doc(fareDocId).set({
+      const codeDocData = {
         departureStationCode: fromCode,
         arrivalStationCode: toCode,
         departureStationId: route.fromStationId,
@@ -352,7 +360,25 @@ export const fareCacheScheduler = async (): Promise<SchedulerResult> => {
         raw: parsed.raw || null,
         source: 'weekly_batch',
         updatedAt: admin.firestore.FieldValue.serverTimestamp(),
-      }, { merge: true });
+      };
+      await db.collection(CACHE_DOC_COLLECTION).doc(fareDocId).set(codeDocData, { merge: true });
+
+      // Also save name-based key so getCachedFareByName() fallback can succeed
+      const fromStation = stationById.get(route.fromStationId);
+      const toStation = stationById.get(route.toStationId);
+      if (fromStation?.stationName && toStation?.stationName) {
+        const nameDocId = getNameCacheDocId(fromStation.stationName, toStation.stationName);
+        await db.collection(CACHE_DOC_COLLECTION).doc(nameDocId).set({
+          departureStationName: fromStation.stationName,
+          arrivalStationName: toStation.stationName,
+          departureStationCode: fromCode,
+          arrivalStationCode: toCode,
+          fare: parsed.fare,
+          raw: parsed.raw || null,
+          source: 'weekly_batch',
+          updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+        }, { merge: true });
+      }
 
       result.updatedRoutes += 1;
     } catch (error) {

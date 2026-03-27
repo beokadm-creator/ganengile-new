@@ -38,7 +38,7 @@ import {
 import { BadgeService } from '../../services/BadgeService';
 import TextInputModal from '../../components/common/TextInputModal';
 import BankAccountModal from '../../components/common/BankAccountModal';
-import { PASS_TEST_MODE } from '../../config/feature-flags';
+import { useGillerAccess } from '../../hooks/useGillerAccess';
 
 type NavigationProp = StackNavigationProp<any>;
 
@@ -66,6 +66,7 @@ type EditModalType = 'name' | 'phone' | 'bankName' | 'accountNumber' | 'accountH
 
 export default function ProfileScreen({ navigation: _navigation }: Props) {
   const { user, currentRole, switchRole, loading, refreshUser, logout } = useUser();
+  const { canAccessGiller, applicationStatus } = useGillerAccess();
   const [stats, setStats] = useState<UserStats | null>(null);
   const [rating, setRating] = useState<{
     averageRating: number;
@@ -229,22 +230,16 @@ export default function ProfileScreen({ navigation: _navigation }: Props) {
   const toggleRole = () => {
     if (user?.role === UserRole.BOTH && currentRole) {
       const newRole = currentRole === UserRole.GLER ? UserRole.GILLER : UserRole.GLER;
-      const canAccessGillerMode =
-        PASS_TEST_MODE ||
-        user.role === UserRole.BOTH ||
-        user.role === UserRole.GILLER ||
-        (user as any)?.isGiller === true ||
-        (user.gillerApplicationStatus === 'approved' && user.isVerified);
 
-      if (newRole === UserRole.GILLER && !canAccessGillerMode) {
+      if (newRole === UserRole.GILLER && !canAccessGiller) {
         Alert.alert(
           '길러 모드 이용 안내',
-          user.gillerApplicationStatus === 'pending'
+          applicationStatus === 'pending'
             ? '길러 신청이 심사 중입니다. 승인 후 길러 모드를 이용할 수 있습니다.'
             : '길러 모드를 이용하려면 승인 절차가 필요합니다. 지금 신청하시겠어요?',
           [
             { text: '취소', style: 'cancel' },
-            user.gillerApplicationStatus !== 'pending'
+            applicationStatus !== 'pending'
               ? {
                   text: '신청하기',
                   onPress: () => (_navigation as any).navigate('GillerApply'),
@@ -462,17 +457,11 @@ export default function ProfileScreen({ navigation: _navigation }: Props) {
   const displayName = profile.name?.trim() || user.name?.trim() || '사용자';
 
   const isGiller = currentRole === UserRole.GILLER || user.role === UserRole.GILLER;
-  const canAccessGiller =
-    PASS_TEST_MODE ||
-    user.role === UserRole.BOTH ||
-    user.role === UserRole.GILLER ||
-    (user as any)?.isGiller === true ||
-    (user.gillerApplicationStatus === 'approved' && user.isVerified);
   const needsVerification = !user.isVerified;
   const canApplyGiller =
     !canAccessGiller &&
-    user.gillerApplicationStatus !== 'pending' &&
-    user.gillerApplicationStatus !== 'approved';
+    applicationStatus !== 'pending' &&
+    applicationStatus !== 'approved';
 
   const commonItems: MenuItem[] = [
     {
@@ -481,6 +470,13 @@ export default function ProfileScreen({ navigation: _navigation }: Props) {
       subtitle: '푸시 알림, 이메일',
       onPress: () => (_navigation as any).navigate('NotificationSettings'),
       color: '#9C27B0',
+    },
+    {
+      icon: '🏢',
+      title: 'B2B 서비스',
+      subtitle: '기업 고객 전용 서비스',
+      onPress: () => (_navigation as any).navigate('B2B', { screen: 'B2BDashboard' }),
+      color: '#2196F3',
     },
     {
       icon: '❓',
@@ -574,11 +570,15 @@ export default function ProfileScreen({ navigation: _navigation }: Props) {
         onPress: () => (_navigation as any).navigate('GillerApply'),
         color: '#FF5722',
       }] : []),
-      ...(user.gillerApplicationStatus === 'pending' ? [{
+      ...(applicationStatus === 'pending' ? [{
         icon: '🔍',
         title: '길러 신청 심사 중',
         subtitle: '관리자가 심사 중입니다. 잠시 기다려주세요.',
-        onPress: () => {},
+        onPress: () => Alert.alert(
+          '🔍 심사 진행 중',
+          '길러 신청이 접수되었습니다.\n관리자 심사는 영업일 기준 1~3일 소요됩니다.\n\n승인 완료 시 알림을 받으실 수 있습니다.',
+          [{ text: '확인' }]
+        ),
         color: '#FF9800',
       }] : []),
       ...commonItems,

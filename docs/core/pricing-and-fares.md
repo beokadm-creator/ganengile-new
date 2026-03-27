@@ -6,10 +6,10 @@
 
 관련 코드:
 
-- `/Users/aaron/ganengile-new/src/services/pricing-service.ts`
-- `/Users/aaron/ganengile-new/src/services/fare-service.ts`
-- `/Users/aaron/ganengile-new/src/screens/main/CreateRequestScreen.tsx`
-- `/Users/aaron/ganengile-new/src/services/payment-service.ts`
+- `src/services/pricing-service.ts`
+- `src/services/fare-service.ts`
+- `src/screens/main/CreateRequestScreen.tsx`
+- `src/services/payment-service.ts`
 
 ## 운임 정책
 
@@ -26,9 +26,9 @@
 
 ## 운영 스크립트
 
-- 역 매핑 보정: `/Users/aaron/ganengile-new/scripts/update-station-mapping-from-seoul-json.ts`
-- 문서 내 역 ID 정규화: `/Users/aaron/ganengile-new/scripts/normalize-station-ids-in-documents.ts`
-- 운임 캐시 시드: `/Users/aaron/ganengile-new/scripts/seed-fares-from-api.ts`
+- 역 매핑 보정: `scripts/update-station-mapping-from-seoul-json.ts`
+- 문서 내 역 ID 정규화: `scripts/normalize-station-ids-in-documents.ts`
+- 운임 캐시 시드: `scripts/seed-fares-from-api.ts`
 
 ## 재발 방지 규칙
 

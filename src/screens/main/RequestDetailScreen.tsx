@@ -18,6 +18,7 @@ import { getRequest, cancelRequest } from '../../services/request-service';
 import { requireUserId } from '../../services/firebase';
 import { getMatchingResults } from '../../services/matching-service';
 import { confirmDeliveryByRequester, getDeliveryByRequestId } from '../../services/delivery-service';
+import { getChatRoomByRequestId } from '../../services/chat-service';
 import type { Request } from '../../types/request';
 import { RequestStatus } from '../../types/request';
 import { toRequestDetailView } from '../../utils/request-adapters';
@@ -171,8 +172,17 @@ export default function RequestDetailScreen({ navigation, route }: Props) {
         requesterId,
       });
       if (result.success) {
-        Alert.alert('완료', result.message);
-        await loadData();
+        Alert.alert('수령 완료', '배송 수령이 확인되었습니다.\n길러를 평가해주세요!', [
+          {
+            text: '평가하기',
+            onPress: () => navigation.navigate('Rating', {
+              deliveryId: delivery.deliveryId,
+              gillerId: delivery.gillerId,
+              gllerId: delivery.gillerId,
+            }),
+          },
+          { text: '나중에', style: 'cancel', onPress: () => loadData() },
+        ]);
       } else {
         Alert.alert('실패', result.message);
       }
@@ -415,6 +425,38 @@ export default function RequestDetailScreen({ navigation, route }: Props) {
           </View>
         )}
 
+        {(detailView.status === RequestStatus.ACCEPTED ||
+          detailView.status === RequestStatus.IN_TRANSIT ||
+          detailView.status === RequestStatus.ARRIVED ||
+          detailView.status === RequestStatus.AT_LOCKER) && (
+          <View style={styles.actions}>
+            <TouchableOpacity
+              style={[styles.actionButton, styles.chatButton]}
+              onPress={async () => {
+                const chatRoom = await getChatRoomByRequestId(requestId);
+                if (chatRoom) {
+                  const userId = requireUserId();
+                  const otherUserId = chatRoom.participants.user1.userId === userId
+                    ? chatRoom.participants.user2.userId
+                    : chatRoom.participants.user1.userId;
+                  const otherUserName = chatRoom.participants.user1.userId === userId
+                    ? chatRoom.participants.user2.name
+                    : chatRoom.participants.user1.name;
+                  navigation.navigate('Chat', {
+                    chatRoomId: chatRoom.chatRoomId,
+                    otherUserId,
+                    otherUserName,
+                  });
+                } else {
+                  Alert.alert('안내', '채팅방을 찾을 수 없습니다.');
+                }
+              }}
+            >
+              <Text style={styles.actionButtonText}>💬 길러와 채팅</Text>
+            </TouchableOpacity>
+          </View>
+        )}
+
         {detailView.status === RequestStatus.DELIVERED && (
           <View style={styles.actions}>
             <TouchableOpacity
@@ -484,6 +526,9 @@ const styles = StyleSheet.create({
   },
   confirmButton: {
     backgroundColor: '#4CAF50',
+  },
+  chatButton: {
+    backgroundColor: '#1976D2',
   },
   cancelledCard: {
     backgroundColor: '#FFEBEE',

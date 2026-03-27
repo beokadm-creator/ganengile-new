@@ -12,6 +12,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { MaterialIcons } from '@expo/vector-icons';
 import type { MainTabParamList } from '../types/navigation';
 import { useUser } from '../contexts/UserContext';
+import { useGillerAccess } from '../hooks/useGillerAccess';
 
 // Screens
 import HomeScreen from '../screens/main/HomeScreen';
@@ -40,6 +41,7 @@ import TermsScreen from '../screens/main/TermsScreen';
 import DepositPaymentScreen from '../screens/main/DepositPaymentScreen';
 import PointHistoryScreen from '../screens/main/PointHistoryScreen';
 import PointWithdrawScreen from '../screens/main/PointWithdrawScreen';
+import LockerSelectionScreen from '../screens/main/LockerSelectionScreen';
 import GillerPickupFromLockerScreen from '../screens/requester/GillerPickupFromLockerScreen';
 import GillerDropoffAtLockerScreen from '../screens/giller/GillerDropoffAtLockerScreen';
 import GillerPickupAtLockerScreen from '../screens/giller/GillerPickupAtLockerScreen';
@@ -48,8 +50,14 @@ import DisputeReportScreen from '../screens/main/DisputeReportScreen';
 import GillerLevelUpgradeScreen from '../screens/main/GillerLevelUpgradeScreen';
 import GillerApplyScreen from '../screens/main/GillerApplyScreen';
 import IdentityVerificationScreen from '../screens/main/IdentityVerificationScreen';
-import { PASS_TEST_MODE } from '../config/feature-flags';
-
+import DisputeResolutionScreen from '../screens/main/DisputeResolutionScreen';
+import LevelBenefitsScreen from '../screens/main/LevelBenefitsScreen';
+import UnlockLockerScreen from '../screens/main/UnlockLockerScreen';
+import QRCodeScannerScreen from '../screens/main/QRCodeScannerScreen';
+import RealtimeTrackingScreen from '../screens/main/RealtimeTrackingScreen';
+import OnetimeModeScreen from '../screens/main/OnetimeModeScreen';
+import CreateAuctionScreen from '../screens/main/CreateAuctionScreen';
+import AuctionListScreen from '../screens/main/AuctionListScreen';
 const Tab = createBottomTabNavigator<MainTabParamList>();
 const Stack = createStackNavigator();
 
@@ -75,14 +83,9 @@ function TabBarIcon({ name, focused }: { name: string; focused: boolean }) {
 }
 
 function TabNavigator() {
-  const { currentRole, user } = useUser();
+  const { currentRole } = useUser();
+  const { canAccessGiller } = useGillerAccess();
   const insets = useSafeAreaInsets();
-  const canAccessGiller =
-    PASS_TEST_MODE ||
-    user?.role === 'both' ||
-    user?.role === 'giller' ||
-    (user as any)?.isGiller === true ||
-    (user?.gillerApplicationStatus === 'approved' && user?.isVerified);
 
   return (
     <Tab.Navigator
@@ -434,6 +437,76 @@ export default function MainNavigator() {
         options={{
           headerShown: true,
           title: '신원 인증',
+        }}
+      />
+      <Stack.Screen
+        name="LockerSelection"
+        component={LockerSelectionScreen as any}
+        options={{
+          headerShown: true,
+          title: '사물함 선택',
+        }}
+      />
+      <Stack.Screen
+        name="DisputeResolution"
+        component={DisputeResolutionScreen as any}
+        options={{
+          headerShown: true,
+          title: '분쟁 해결',
+        }}
+      />
+      <Stack.Screen
+        name="LevelBenefits"
+        component={LevelBenefitsScreen as any}
+        options={{
+          headerShown: true,
+          title: '등급 혜택',
+        }}
+      />
+      <Stack.Screen
+        name="UnlockLocker"
+        component={UnlockLockerScreen as any}
+        options={{
+          headerShown: true,
+          title: '사물함 수령',
+        }}
+      />
+      <Stack.Screen
+        name="QRCodeScanner"
+        component={QRCodeScannerScreen as any}
+        options={{
+          headerShown: false,
+        }}
+      />
+      <Stack.Screen
+        name="RealtimeTracking"
+        component={RealtimeTrackingScreen as any}
+        options={{
+          headerShown: false,
+        }}
+      />
+      <Stack.Screen
+        name="OnetimeMode"
+        component={OnetimeModeScreen as any}
+        options={{
+          headerShown: true,
+          title: '원타임 매칭',
+        }}
+      />
+      <Stack.Screen
+        name="CreateAuction"
+        component={CreateAuctionScreen as any}
+        options={{
+          headerShown: true,
+          title: '경매 생성',
+        }}
+      />
+      <Stack.Screen
+        name="AuctionList"
+        component={AuctionListScreen as any}
+        options={{
+          headerShown: true,
+          title: '경매 목록',
         }}
       />
     </Stack.Navigator>

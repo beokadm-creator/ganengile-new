@@ -51,6 +51,9 @@ Thumbs.db
 *.log
 *.tmp
 
+# Temporary project copies (59K+ files)
+ganengile-new-temp/
+
 # Firebase Service Account (CRITICAL SECURITY)
 firebase-service-account.json
 ganengile-firebase-adminsdk-fbsvc-*.json

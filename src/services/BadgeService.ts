@@ -202,4 +202,15 @@ export class BadgeService {
 
     console.log(`⚠️ Badge revoked: ${badge.name} from user ${userId}`);
   }
+
+  /**
+   * Get badges earned by a giller (if available).
+   * This is a lightweight fetcher to support UI rendering.
+   * Returns an array of Badge-like objects or an empty array if unavailable.
+   */
+  static async getGillerBadges(userId: string): Promise<import('../types/user').Badge[]> {
+    // Minimal implementation: return empty list for now to avoid breaking UI.
+    // A full implementation would read user.badges from Firestore and map to Badge objects.
+    return [] as any;
+  }
 }

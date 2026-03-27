@@ -3,9 +3,11 @@ import { getAdminDb } from '@/lib/firebase-admin';
 import { isAdmin } from '@/lib/auth';
 
 const DOC_PATH = ['admin_settings', 'identity_verification'] as const;
+const PUBLIC_DOC_PATH = ['config_integrations', 'identity'] as const;
 
 function defaultPayload() {
   return {
+    testMode: true, // 기본값: 테스트 모드 ON (라이브 전환 전까지)
     pass: {
       enabled: true,
       startUrl: '',
@@ -61,8 +63,10 @@ export async function PATCH(req: NextRequest) {
   if (!(await isAdmin())) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
   const body = await req.json();
+  const testMode = Boolean(body?.testMode ?? true);
 
   const payload = {
+    testMode,
     pass: {
       enabled: Boolean(body?.pass?.enabled ?? true),
       startUrl: String(body?.pass?.startUrl || '').trim(),
@@ -87,8 +91,14 @@ export async function PATCH(req: NextRequest) {
   };
 
   const db = getAdminDb();
+
+  // 민감 정보 포함 전체 설정 저장 (admin 전용)
   const ref = db.collection(DOC_PATH[0]).doc(DOC_PATH[1]);
   await ref.set(payload, { merge: true });
+
+  // 앱에서 읽을 수 있는 비민감 공개 설정 동기화 (testMode만)
+  const publicRef = db.collection(PUBLIC_DOC_PATH[0]).doc(PUBLIC_DOC_PATH[1]);
+  await publicRef.set({ testMode, updatedAt: new Date() }, { merge: true });
 
   return NextResponse.json({ ok: true, item: payload });
 }

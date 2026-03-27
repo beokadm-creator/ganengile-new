@@ -26,7 +26,7 @@ import {
   startCiVerification,
 } from '../../services/verification-service';
 import type { UserVerification, VerificationProvider } from '../../types/profile';
-import { PASS_TEST_MODE } from '../../config/feature-flags';
+import { getIdentityTestMode } from '../../services/integration-config-service';
 
 type NavigationProp = StackNavigationProp<any>;
 
@@ -63,6 +63,11 @@ export default function IdentityVerificationScreen({ navigation }: Props) {
   const [loading, setLoading] = useState(false);
   const [selectedProvider, setSelectedProvider] = useState<VerificationProvider | null>(null);
   const [sessionId, setSessionId] = useState<string | null>(null);
+  const [isTestMode, setIsTestMode] = useState(true); // 기본값: 테스트 모드 (Firestore 로드 전)
+
+  useEffect(() => {
+    getIdentityTestMode().then(setIsTestMode).catch(() => setIsTestMode(true));
+  }, []);
 
   const status = useMemo(() => getVerificationStatusDisplay(verification), [verification]);
 
@@ -140,7 +145,7 @@ export default function IdentityVerificationScreen({ navigation }: Props) {
       const apiResult = await completeCiVerificationByApi(selectedProvider, sessionId || undefined);
       if (apiResult.ok && apiResult.ciHash) {
         applied = true;
-      } else if (PASS_TEST_MODE) {
+      } else if (isTestMode) {
         const ciHash = await Crypto.digestStringAsync(
           Crypto.CryptoDigestAlgorithm.SHA256,
           `${user.uid}:${selectedProvider}:${Date.now()}`
@@ -246,12 +251,12 @@ export default function IdentityVerificationScreen({ navigation }: Props) {
           <ActivityIndicator color="#fff" />
         ) : (
           <Text style={styles.submitButtonText}>
-            {PASS_TEST_MODE ? '인증 완료 확인 (테스트)' : '인증 완료 확인'}
+            {isTestMode ? '인증 완료 확인 (테스트)' : '인증 완료 확인'}
           </Text>
         )}
       </TouchableOpacity>
 
-      {!PASS_TEST_MODE && (
+      {!isTestMode && (
         <Text style={styles.footerGuide}>
           운영 환경에서는 인증사 콜백에서 자동으로 인증 상태가 반영됩니다.
         </Text>

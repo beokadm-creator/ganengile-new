@@ -6,14 +6,14 @@
 
 ## 주요 페이지
 
-- 대시보드: `/Users/aaron/ganengile-new/admin-web/app/(admin)/dashboard/page.tsx`
-- 배송: `/Users/aaron/ganengile-new/admin-web/app/(admin)/deliveries/page.tsx`
-- 정산: `/Users/aaron/ganengile-new/admin-web/app/(admin)/settlements/page.tsx`
-- 보증금: `/Users/aaron/ganengile-new/admin-web/app/(admin)/deposits/page.tsx`
-- 사물함: `/Users/aaron/ganengile-new/admin-web/app/(admin)/lockers/page.tsx`
-- 분쟁: `/Users/aaron/ganengile-new/admin-web/app/(admin)/disputes/page.tsx`
-- 사용자: `/Users/aaron/ganengile-new/admin-web/app/(admin)/users/page.tsx`
-- 인증/승급: `/Users/aaron/ganengile-new/admin-web/app/(admin)/verifications/page.tsx`
+- 대시보드: `admin-web/app/(admin)/dashboard/page.tsx`
+- 배송: `admin-web/app/(admin)/deliveries/page.tsx`
+- 정산: `admin-web/app/(admin)/settlements/page.tsx`
+- 보증금: `admin-web/app/(admin)/deposits/page.tsx`
+- 사물함: `admin-web/app/(admin)/lockers/page.tsx`
+- 분쟁: `admin-web/app/(admin)/disputes/page.tsx`
+- 사용자: `admin-web/app/(admin)/users/page.tsx`
+- 인증/승급: `admin-web/app/(admin)/verifications/page.tsx`
 
 ## 관리 항목
 
@@ -25,8 +25,8 @@
 
 ## API 경로
 
-- 로그인: `/Users/aaron/ganengile-new/admin-web/app/api/login/route.ts`
-- 로그아웃: `/Users/aaron/ganengile-new/admin-web/app/api/logout/route.ts`
+- 로그인: `admin-web/app/api/login/route.ts`
+- 로그아웃: `admin-web/app/api/logout/route.ts`
 
 ## 재발 방지 규칙
 

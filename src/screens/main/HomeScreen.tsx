@@ -25,7 +25,7 @@ import type { MainStackNavigationProp } from '../../types/navigation';
 import type { User } from '../../types/user';
 import type { Station } from '../../types/config';
 import { UserRole } from '../../types/user';
-import { PASS_TEST_MODE } from '../../config/feature-flags';
+import { useGillerAccess } from '../../hooks/useGillerAccess';
 
 // 웹에서는 아이콘 대신 텍스트 라벨 사용
 const IconLabel = ({ name, label }: { name: string; label: string }) => {
@@ -49,6 +49,7 @@ interface Stats {
 
 export default function HomeScreen({ navigation }: { navigation: MainStackNavigationProp }) {
   const { user, currentRole, switchRole, refreshUser } = useUser();
+  const { canAccessGiller, applicationStatus } = useGillerAccess();
   const [stats, setStats] = useState<Stats | null>(null);
   const [refreshing, setRefreshing] = useState(false);
   const [stationModalVisible, setStationModalVisible] = useState(false);
@@ -111,23 +112,16 @@ export default function HomeScreen({ navigation }: { navigation: MainStackNaviga
     setStationModalVisible(false);
   };
 
-  const canAccessGiller =
-    PASS_TEST_MODE ||
-    user?.role === UserRole.BOTH ||
-    user?.role === UserRole.GILLER ||
-    (user as any)?.isGiller === true ||
-    (user?.gillerApplicationStatus === 'approved' && user?.isVerified);
-
   const handleRoleChange = (newRole: 'gller' | 'giller') => {
     if (newRole === 'giller' && !canAccessGiller) {
       Alert.alert(
         '길러 모드 이용 안내',
-        user?.gillerApplicationStatus === 'pending'
+        applicationStatus === 'pending'
           ? '길러 신청이 심사 중입니다. 승인 후 길러 모드를 이용할 수 있습니다.'
           : '길러 모드를 이용하려면 승인 절차가 필요합니다. 지금 신청하시겠어요?',
         [
           { text: '취소', style: 'cancel' },
-          user?.gillerApplicationStatus !== 'pending'
+          applicationStatus !== 'pending'
             ? {
                 text: '신청하기',
                 onPress: () => navigation.navigate('GillerApply' as any),
@@ -201,14 +195,14 @@ export default function HomeScreen({ navigation }: { navigation: MainStackNaviga
           )}
 
           {/* 신청 상태 안내: 헤더 상단이 아닌 본문 하단으로 이동 */}
-          {user.gillerApplicationStatus === 'pending' && (
+          {applicationStatus === 'pending' && (
             <View style={styles.applicationBanner}>
               <Text style={styles.applicationBannerText}>
                 🔍 길러 신청이 심사 중입니다. 승인 후 길러 기능이 활성화됩니다.
               </Text>
             </View>
           )}
-          {user.gillerApplicationStatus === 'rejected' && (
+          {applicationStatus === 'rejected' && (
             <View style={[styles.applicationBanner, styles.applicationBannerRejected]}>
               <Text style={[styles.applicationBannerText, styles.applicationBannerTextRejected]}>
                 ❌ 길러 신청이 반려되었습니다. 고객센터에 문의해주세요.
@@ -253,7 +247,7 @@ function GllerDashboard({
     at_locker: '사물함 보관',
     delivered: '수령 확인 대기',
   };
-  const needsGillerEntry = user.gillerApplicationStatus !== 'approved' || !user.isVerified;
+  const needsGillerEntry = !canAccessGiller;
 
   return (
     <View style={styles.dashboardContainer}>
@@ -491,6 +485,27 @@ function GillerDashboard({
       {/* Quick Actions */}
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>배송 매칭</Text>
+
+        <TouchableOpacity
+          style={styles.actionCard}
+          onPress={() => navigation.navigate('OnetimeMode')}
+          activeOpacity={0.7}
+        >
+          <View style={[styles.actionIcon, styles.actionIconPurple]}>
+            <IconLabel name="flash-on" label="⚡" />
+          </View>
+          <View style={styles.actionContent}>
+            <Text style={styles.actionTitle}>원타임 매칭</Text>
+            <Text style={styles.actionSubtitle}>
+              즉시 매칭으로 빠르게 배송을 시작하세요
+            </Text>
+          </View>
+          {Platform.OS === 'web' ? (
+            <Text style={styles.actionArrow}>▶</Text>
+          ) : (
+            <MaterialIcons name="chevron-right" size={24} color={Colors.gray400} style={styles.actionArrow} />
+          )}
+        </TouchableOpacity>
 
         <TouchableOpacity
           style={styles.actionCard}

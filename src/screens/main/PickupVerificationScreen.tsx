@@ -44,7 +44,7 @@ interface Props {
 type VerificationMethod = 'qr' | 'code' | null;
 
 export default function PickupVerificationScreen({ navigation, route }: Props) {
-  const { deliveryId } = route.params;
+  const { deliveryId, requestId } = route.params;
   const [method, setMethod] = useState<VerificationMethod>(null);
   const [verificationCode, setVerificationCode] = useState('');
   const [photoUri, setPhotoUri] = useState<string | null>(null);
@@ -191,16 +191,13 @@ export default function PickupVerificationScreen({ navigation, route }: Props) {
         // Navigate after animation
         setTimeout(() => {
           Alert.alert(
-            '성공',
-            result.message,
+            '픽업 완료',
+            '물품을 수령했습니다!\n이제 목적지로 이동해 배송을 완료해주세요.',
             [
               {
-                text: '확인',
+                text: '배송 추적 보기',
                 onPress: () => {
-                  navigation.reset({
-                    index: 0,
-                    routes: [{ name: 'Tabs' }],
-                  });
+                  navigation.replace('DeliveryTracking', { requestId });
                 },
               },
             ]

@@ -4,7 +4,7 @@
  * 개선사항: 네트워크 에러 처리, 재시도 로직, 더 나은 UX
  */
 
-import React, { useState, useEffect, useContext, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useContext, useCallback, useMemo, useRef } from 'react';
 import {
   View,
   Text,
@@ -17,8 +17,10 @@ import {
   RefreshControl,
 } from 'react-native';
 import { StackNavigationProp } from '@react-navigation/stack';
-import { getDeliveryByRequestId } from '../../services/delivery-service';
-import { getRequestById } from '../../services/request-service';
+import { subscribeToDeliveryByRequestId, confirmDeliveryByRequester, getDeliveryByRequestId } from '../../services/delivery-service';
+import { subscribeToRequest, getRequestById } from '../../services/request-service';
+import { getChatRoomByRequestId } from '../../services/chat-service';
+import { requireUserId } from '../../services/firebase';
 import { UserContext } from '../../contexts/UserContext';
 import type { UserContextType } from '../../contexts/UserContext';
 import { toTrackingModel, TrackingModel, TrackingEvent } from '../../utils/request-adapters';
@@ -69,18 +71,51 @@ export default function DeliveryTrackingScreen({ navigation, route }: Props) {
   const [retryCount, setRetryCount] = useState(0);
   const [_currentLocation, setCurrentLocation] = useState<{ latitude: number; longitude: number } | null>(null);
   const [isTracking, setIsTracking] = useState(false);
+  const isTrackingRef = useRef(false);
+  const unsubscribeRequestRef = useRef<(() => void) | null>(null);
+  const [confirming, setConfirming] = useState(false);
 
   // Memoized values
   const progressValue = useMemo(() => progress, [progress]);
 
   useEffect(() => {
-    loadTrackingData();
     setupNetworkListener();
 
-    // Cleanup: stop location tracking when unmount
+    // 실시간 delivery 구독 시작
+    const unsubscribeDelivery = subscribeToDeliveryByRequestId(requestId, (deliveryData) => {
+      if (deliveryData) {
+        const model = toTrackingModel(deliveryData);
+        setTrackingData(model);
+        setTrackingEvents(model.trackingEvents || []);
+        calculateProgress(model.status);
+        setLoading(false);
+
+        if ((model.status === 'in_transit' || model.status === 'arrived') && !isTrackingRef.current && deliveryData.deliveryId) {
+          startDeliveryTracking(deliveryData.deliveryId);
+          isTrackingRef.current = true;
+          setIsTracking(true);
+        }
+      } else {
+        // delivery 미생성 시 (pending/matched) → request 구독
+        unsubscribeRequestRef.current?.();
+        unsubscribeRequestRef.current = subscribeToRequest(requestId, (requestData) => {
+          if (requestData) {
+            const model = toTrackingModel(requestData);
+            setTrackingData(model);
+            setTrackingEvents(model.trackingEvents || []);
+            calculateProgress(model.status);
+          }
+          setLoading(false);
+        });
+      }
+    });
+
     return () => {
-      if (isTracking) {
+      unsubscribeDelivery();
+      unsubscribeRequestRef.current?.();
+      if (isTrackingRef.current) {
         stopDeliveryTracking();
+        isTrackingRef.current = false;
       }
     };
   }, [requestId]);
@@ -351,7 +386,9 @@ export default function DeliveryTrackingScreen({ navigation, route }: Props) {
 
             <View style={styles.routeLine}>
               <View style={styles.dashedLine} />
-              <Text style={styles.routeDuration}>약 25분</Text>
+              {trackingData.estimatedMinutes ? (
+                <Text style={styles.routeDuration}>약 {trackingData.estimatedMinutes}분</Text>
+              ) : null}
             </View>
 
             <View style={styles.stationPoint}>
@@ -361,6 +398,36 @@ export default function DeliveryTrackingScreen({ navigation, route }: Props) {
             </View>
           </View>
         </View>
+
+        {/* Real-time Tracking Button */}
+        {(trackingData.status === 'in_transit' || trackingData.status === 'arrived') && (
+          <TouchableOpacity
+            style={[styles.card, styles.realtimeTrackingButton]}
+            onPress={() => {
+              const delivery = trackingData as any;
+              navigation.navigate('RealtimeTracking', {
+                deliveryId: delivery.deliveryId,
+                requesterId: delivery.requesterId,
+                gillerId: delivery.gillerId,
+                pickupStation: delivery.pickupStation,
+                dropoffStation: delivery.deliveryStation,
+              });
+            }}
+          >
+            <Text style={styles.realtimeTrackingIcon}>📍</Text>
+            <View style={styles.realtimeTrackingContent}>
+              <Text style={styles.realtimeTrackingTitle}>실시간 추적</Text>
+              <Text style={styles.realtimeTrackingDesc}>
+                길러의 실시간 위치를 지도에서 확인하세요
+              </Text>
+            </View>
+            {Platform.OS === 'web' ? (
+              <Text style={styles.realtimeTrackingArrow}>▶</Text>
+            ) : (
+              <MaterialIcons name="chevron-right" size={24} color={Colors.primary} />
+            )}
+          </TouchableOpacity>
+        )}
 
         {/* Tracking Timeline */}
         <View style={styles.card}>
@@ -447,8 +514,29 @@ export default function DeliveryTrackingScreen({ navigation, route }: Props) {
                 <Text style={styles.courierAvatarText}>🚴</Text>
               </View>
               <View style={styles.courierDetails}>
-                <Text style={styles.courierName}>길러</Text>
-                <Text style={styles.courierRating}>⭐ 4.8</Text>
+                <Text style={styles.courierName}>{trackingData.gillerName || '길러'}</Text>
+                {['in_transit', 'arrived', 'delivered', 'completed'].includes(trackingData.status) && (
+                  <TouchableOpacity
+                    onPress={async () => {
+                      const chatRoom = await getChatRoomByRequestId(requestId);
+                      if (chatRoom) {
+                        const userId = requireUserId();
+                        const otherUserId = chatRoom.participants.user1.userId === userId
+                          ? chatRoom.participants.user2.userId
+                          : chatRoom.participants.user1.userId;
+                        const otherUserName = chatRoom.participants.user1.userId === userId
+                          ? chatRoom.participants.user2.name
+                          : chatRoom.participants.user1.name;
+                        navigation.navigate('Chat', { chatRoomId: chatRoom.chatRoomId, otherUserId, otherUserName });
+                      } else {
+                        Alert.alert('안내', '채팅방을 찾을 수 없습니다.');
+                      }
+                    }}
+                    style={styles.chatLinkButton}
+                  >
+                    <Text style={styles.chatLinkText}>💬 채팅하기</Text>
+                  </TouchableOpacity>
+                )}
               </View>
             </View>
           </View>
@@ -460,6 +548,7 @@ export default function DeliveryTrackingScreen({ navigation, route }: Props) {
           <TouchableOpacity
             style={styles.helpButton}
             accessibilityLabel="고객센터 문의"
+            onPress={() => navigation.navigate('CustomerService')}
           >
             <Text style={styles.helpButtonText}>고객센터 문의</Text>
           </TouchableOpacity>
@@ -542,17 +631,91 @@ export default function DeliveryTrackingScreen({ navigation, route }: Props) {
           </View>
         )}
 
-        {/* Gller Info - 읽기 전용 (글러만) */}
-        {currentRole === 'gller' && trackingData && trackingData.status !== 'pending' && trackingData.status !== 'cancelled' && (
+        {/* 요청자(gller) 사물함 수령 (at_locker) */}
+        {currentRole === 'gller' && trackingData?.status === 'at_locker' && (
           <View style={styles.card}>
-            <Text style={styles.cardTitle}>📦 배송 정보</Text>
+            <Text style={styles.cardTitle}>🔓 사물함 수령</Text>
+            <Text style={[styles.infoText, { marginBottom: 12 }]}>
+              사물함에 보관된 물품을 수령하려면 사물함을 열어야 합니다.
+            </Text>
+            <TouchableOpacity
+              style={[styles.actionButton, { backgroundColor: '#00BCD4' }]}
+              onPress={() => {
+                const delivery = trackingData as any;
+                navigation.navigate('UnlockLocker', {
+                  deliveryId: delivery.deliveryId,
+                  lockerId: delivery.lockerId,
+                  reservationId: delivery.reservationId,
+                });
+              }}
+            >
+              <Text style={styles.actionButtonText}>🔓 사물함 열기</Text>
+            </TouchableOpacity>
+          </View>
+        )}
+
+        {/* 요청자(gller) 수령 확인 */}
+        {currentRole === 'gller' && trackingData?.status === 'delivered' && (
+          <View style={styles.card}>
+            <Text style={styles.cardTitle}>📬 수령 확인</Text>
+            <Text style={[styles.infoText, { marginBottom: 12 }]}>
+              물품이 배송되었습니다. 수령 확인 후 길러에게 정산이 완료됩니다.
+            </Text>
+            <TouchableOpacity
+              style={[styles.actionButton, { backgroundColor: '#4CAF50' }]}
+              disabled={confirming}
+              onPress={async () => {
+                if (!trackingData.deliveryId) {
+                  Alert.alert('오류', '배송 정보를 찾을 수 없습니다.');
+                  return;
+                }
+                try {
+                  setConfirming(true);
+                  const requesterId = requireUserId();
+                  const result = await confirmDeliveryByRequester({
+                    deliveryId: trackingData.deliveryId,
+                    requesterId,
+                  });
+                  if (result.success) {
+                    Alert.alert('수령 완료', '배송 수령이 확인되었습니다. 길러를 평가해주세요!', [
+                      {
+                        text: '평가하기',
+                        onPress: () => navigation.navigate('Rating', {
+                          deliveryId: trackingData.deliveryId,
+                          gillerId: trackingData.gillerId,
+                          gllerId: trackingData.gillerId,
+                        }),
+                      },
+                      { text: '나중에', style: 'cancel' },
+                    ]);
+                  } else {
+                    Alert.alert('실패', result.message);
+                  }
+                } catch (e: any) {
+                  Alert.alert('오류', e?.message || '수령 확인에 실패했습니다.');
+                } finally {
+                  setConfirming(false);
+                }
+              }}
+            >
+              {confirming
+                ? <ActivityIndicator color="#fff" />
+                : <Text style={styles.actionButtonText}>✅ 수령 확인</Text>
+              }
+            </TouchableOpacity>
+          </View>
+        )}
+
+        {/* Gller Info - 읽기 전용 (글러만, delivered 제외) */}
+        {currentRole === 'gller' && trackingData && trackingData.status !== 'pending' && trackingData.status !== 'cancelled' && trackingData.status !== 'delivered' && (
+          <View style={styles.card}>
+            <Text style={styles.cardTitle}>📦 배송 현황</Text>
             <Text style={styles.infoText}>
-              {trackingData.status === 'accepted' && '길러가 매칭을 수락했습니다.'}
-              {trackingData.status === 'in_transit' && '길러가 배송 중입니다.'}
-              {trackingData.status === 'arrived' && '길러가 도착했습니다.'}
-              {trackingData.status === 'at_locker' && '사물함에 물품이 보관되었습니다.'}
-              {trackingData.status === 'delivered' && '배송이 완료되어 수령 확인을 기다리고 있습니다.'}
-              {trackingData.status === 'completed' && '배송이 완료되었습니다.'}
+              {trackingData.status === 'accepted' && '길러가 매칭을 수락했습니다. 곧 픽업을 시작합니다.'}
+              {trackingData.status === 'in_transit' && '길러가 지하철로 배송 중입니다.'}
+              {trackingData.status === 'arrived' && '길러가 목적지에 도착했습니다.'}
+              {trackingData.status === 'at_locker' && '사물함에 물품이 보관되었습니다. 수령 코드를 확인해주세요.'}
+              {trackingData.status === 'completed' && '배송이 완료되었습니다. 이용해 주셔서 감사합니다.'}
             </Text>
           </View>
         )}
@@ -594,6 +757,14 @@ const styles = StyleSheet.create({
     color: '#FF5722',
     fontSize: 16,
     fontWeight: 'bold',
+  },
+  chatLinkButton: {
+    marginTop: 4,
+  },
+  chatLinkText: {
+    color: '#1976D2',
+    fontSize: 13,
+    fontWeight: '600',
   },
   backButton: {
     width: 40,
@@ -933,5 +1104,32 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: 'bold',
     letterSpacing: 2,
+  },
+  realtimeTrackingButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#E3F2FD',
+    borderColor: '#00BCD4',
+    borderWidth: 1,
+  },
+  realtimeTrackingIcon: {
+    fontSize: 28,
+    marginRight: 12,
+  },
+  realtimeTrackingContent: {
+    flex: 1,
+  },
+  realtimeTrackingTitle: {
+    color: '#00BCD4',
+    fontSize: 16,
+    fontWeight: 'bold',
+    marginBottom: 2,
+  },
+  realtimeTrackingDesc: {
+    color: '#666',
+    fontSize: 13,
+  },
+  realtimeTrackingArrow: {
+    marginLeft: 8,
   },
 });

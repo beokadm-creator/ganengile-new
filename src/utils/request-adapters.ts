@@ -21,6 +21,9 @@ export interface TrackingModel {
   updatedAt?: Date;
   trackingEvents?: TrackingEvent[];
   deliveryId?: string;
+  gillerId?: string;
+  gillerName?: string;
+  estimatedMinutes?: number;
 }
 
 export interface RequestDetailView {
@@ -178,6 +181,9 @@ export function toTrackingModel(data: any): TrackingModel {
     updatedAt,
     trackingEvents: eventsFromTracking || fallbackEvents,
     deliveryId: data.deliveryId,
+    gillerId: data.gillerId || data.matchedGillerId,
+    gillerName: data.gillerName || data.gillerInfo?.name,
+    estimatedMinutes: data.estimatedMinutes || data.fee?.estimatedTime,
   };
 }
 

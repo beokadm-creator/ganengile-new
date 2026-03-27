@@ -2,12 +2,15 @@
 
 ## 주요 화면 경로
 
-- 길러 신청: `/Users/aaron/ganengile-new/src/screens/main/GillerApplyScreen.tsx`
-- 인증: `/Users/aaron/ganengile-new/src/screens/main/IdentityVerificationScreen.tsx`
-- 배송 매칭: `/Users/aaron/ganengile-new/src/screens/main/GillerRequestsScreen.tsx`
-- 채팅: `/Users/aaron/ganengile-new/src/screens/main/ChatScreen.tsx`
-- 동선 관리: `/Users/aaron/ganengile-new/src/screens/main/RouteManagementScreen.tsx`
-- 수익/정산: `/Users/aaron/ganengile-new/src/screens/main/EarningsScreen.tsx`
+- 길러 신청: `src/screens/main/GillerApplyScreen.tsx`
+- 인증: `src/screens/main/IdentityVerificationScreen.tsx`
+- 배송 매칭: `src/screens/main/GillerRequestsScreen.tsx`
+- 채팅: `src/screens/main/ChatScreen.tsx`
+- 동선 관리: `src/screens/main/RouteManagementScreen.tsx`
+- 수익/정산: `src/screens/main/EarningsScreen.tsx`
+- 등급 혜택: `src/screens/main/LevelBenefitsScreen.tsx`
+- 사물함 보관: `src/screens/giller/GillerDropoffAtLockerScreen.tsx`
+- 사물함 수거: `src/screens/giller/GillerPickupAtLockerScreen.tsx`
 
 ## 정상 흐름
 
@@ -18,8 +21,9 @@
 5. 동선 등록
 6. 배송 매칭 목록 확인
 7. 채팅에서 협의 후 수락
-8. 픽업, 직접전달 또는 사물함 전달
+8. **사물함 보관 또는 직접 전달**
 9. 완료 후 정산 확인
+10. **승급 시 등급 혜택 확인**
 
 ## 매칭 정책
 

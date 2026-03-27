@@ -13,9 +13,9 @@ npm run web:deploy
 
 관련 설정:
 
-- `/Users/aaron/ganengile-new/firebase.json`
-- `/Users/aaron/ganengile-new/app.json`
-- `/Users/aaron/ganengile-new/scripts/postexport-web-assets.mjs`
+- `firebase.json`
+- `app.json`
+- `scripts/postexport-web-assets.mjs`
 
 ## 관리자 웹 배포
 
@@ -23,8 +23,8 @@ npm run web:deploy
 
 관련 경로:
 
-- `/Users/aaron/ganengile-new/admin-web`
-- `/Users/aaron/ganengile-new/firebase.json`
+- `admin-web/`
+- `firebase.json`
 
 ## 핵심 환경변수
 

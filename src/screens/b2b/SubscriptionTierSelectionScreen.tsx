@@ -17,7 +17,7 @@ import { useNavigation } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import { businessContractService } from '../../services/business-contract-service';
 import { requireUserId } from '../../services/firebase';
-import type { MainStackNavigationProp } from '../../types/navigation';
+import type { B2BStackNavigationProp } from '../../types/navigation';
 import { Colors, Typography, Spacing, BorderRadius, Shadows } from '../../theme';
 
 interface SubscriptionTier {
@@ -31,7 +31,7 @@ interface SubscriptionTier {
 }
 
 export default function SubscriptionTierSelectionScreen() {
-  const navigation = useNavigation<MainStackNavigationProp>();
+  const navigation = useNavigation<B2BStackNavigationProp>();
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [selectedTier, setSelectedTier] = useState<string | null>(null);

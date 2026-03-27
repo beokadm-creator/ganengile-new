@@ -10,12 +10,12 @@
 
 ## 코드 기준 경로
 
-- 네비게이션: `/Users/aaron/ganengile-new/src/navigation`
-- 화면: `/Users/aaron/ganengile-new/src/screens`
-- 비즈니스 로직: `/Users/aaron/ganengile-new/src/services`
-- 타입 정의: `/Users/aaron/ganengile-new/src/types`
-- 관리자 웹: `/Users/aaron/ganengile-new/admin-web/app`
-- Cloud Functions: `/Users/aaron/ganengile-new/functions/src`
+- 네비게이션: `src/navigation/`
+- 화면: `src/screens/`
+- 비즈니스 로직: `src/services/`
+- 타입 정의: `src/types/`
+- 관리자 웹: `admin-web/app/`
+- Cloud Functions: `functions/src/`
 
 ## 앱 구조
 
@@ -28,8 +28,8 @@
 
 핵심 스택 등록 파일:
 
-- [MainNavigator.tsx](/Users/aaron/ganengile-new/src/navigation/MainNavigator.tsx)
-- [AppNavigator.tsx](/Users/aaron/ganengile-new/src/navigation/AppNavigator.tsx)
+- [MainNavigator.tsx](../../src/navigation/MainNavigator.tsx)
+- [AppNavigator.tsx](../../src/navigation/AppNavigator.tsx)
 
 ## 관리자 구조
 

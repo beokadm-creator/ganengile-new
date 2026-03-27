@@ -12,9 +12,9 @@
 
 주요 코드 경로:
 
-- `/Users/aaron/ganengile-new/src/contexts/UserContext.tsx`
-- `/Users/aaron/ganengile-new/src/screens/onboarding/RoleSelectionScreen.tsx`
-- `/Users/aaron/ganengile-new/src/screens/main/ProfileScreen.tsx`
+- `src/contexts/UserContext.tsx`
+- `src/screens/onboarding/RoleSelectionScreen.tsx`
+- `src/screens/main/ProfileScreen.tsx`
 
 ## 길러 신청 흐름
 
@@ -22,9 +22,9 @@
 
 주요 화면:
 
-- `/Users/aaron/ganengile-new/src/screens/main/GillerApplyScreen.tsx`
-- `/Users/aaron/ganengile-new/src/screens/main/IdentityVerificationScreen.tsx`
-- `/Users/aaron/ganengile-new/src/screens/onboarding/GillerApplicationOnboarding.tsx`
+- `src/screens/main/GillerApplyScreen.tsx`
+- `src/screens/main/IdentityVerificationScreen.tsx`
+- `src/screens/onboarding/GillerApplicationOnboarding.tsx`
 
 ## 인증 정책
 
@@ -36,8 +36,8 @@
 
 관련 경로:
 
-- `/Users/aaron/ganengile-new/src/config/feature-flags.ts`
-- `/Users/aaron/ganengile-new/src/screens/main/IdentityVerificationScreen.tsx`
+- `src/config/feature-flags.ts`
+- `src/screens/main/IdentityVerificationScreen.tsx`
 
 ## 관리자 반영
 
@@ -45,8 +45,8 @@
 
 관련 경로:
 
-- `/Users/aaron/ganengile-new/admin-web/app/(admin)/verifications/page.tsx`
-- `/Users/aaron/ganengile-new/admin-web/app/api/admin/gillers`
+- `admin-web/app/(admin)/verifications/page.tsx`
+- `admin-web/app/api/admin/gillers/`
 
 ## 재발 방지 규칙
 

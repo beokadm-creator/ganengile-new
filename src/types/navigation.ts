@@ -113,6 +113,29 @@ export type MainStackParamList = {
   PointWithdraw: undefined;
   GillerApply: undefined;
   IdentityVerification: undefined;
+  LockerSelection: {
+    stationId?: string;
+    stationName?: string;
+  };
+  BadgeCollection: undefined;
+  DisputeResolution: {
+    disputeId: string;
+  };
+  LevelBenefits: undefined;
+  UnlockLocker: {
+    deliveryId: string;
+  };
+  QRCodeScanner: undefined;
+  RealtimeTracking: {
+    deliveryId: string;
+    requesterId: string;
+    gillerId: string;
+    pickupStation: { name: string; latitude: number; longitude: number };
+    dropoffStation: { name: string; latitude: number; longitude: number };
+  };
+  OnetimeMode: undefined;
+  CreateAuction: undefined;
+  AuctionList: undefined;
 };
 
 export type MainTabNavigationProp = BottomTabNavigationProp<MainTabParamList>;
@@ -127,12 +150,31 @@ export type MainStackWithTabNavigationProp = MainStackNavigationProp & {
   ): void;
 };
 
+// ==================== B2B Navigator ====================
+
+export type B2BStackParamList = {
+  B2BDashboard: undefined;
+  B2BRequest: undefined;
+  B2BGiller: undefined;
+  B2BMatchingResult: {
+    requestId: string;
+  };
+  B2BOnboarding: undefined;
+  BusinessProfile: undefined;
+  MonthlySettlement: undefined;
+  SubscriptionTierSelection: undefined;
+  TaxInvoiceRequest: undefined;
+};
+
+export type B2BStackNavigationProp = StackNavigationProp<B2BStackParamList>;
+
 // ==================== Root Navigator ====================
 
 export type RootStackParamList = {
   Auth: NavigatorScreenParams<AuthStackParamList>;
   Onboarding: NavigatorScreenParams<OnboardingStackParamList> & { role: UserRole };
   Main: NavigatorScreenParams<MainStackParamList>;
+  B2B: NavigatorScreenParams<B2BStackParamList>;
 };
 
 export type RootNavigationProp = StackNavigationProp<RootStackParamList>;

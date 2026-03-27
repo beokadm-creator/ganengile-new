@@ -19,7 +19,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { b2bFirestoreService } from '../../services/b2b-firestore-service';
 import { taxInvoiceService } from '../../services/tax-invoice-service';
 import { requireUserId } from '../../services/firebase';
-import type { MainStackNavigationProp } from '../../types/navigation';
+import type { B2BStackNavigationProp } from '../../types/navigation';
 import { Colors, Typography, Spacing, BorderRadius, Shadows } from '../../theme';
 
 interface InvoicePeriod {
@@ -37,7 +37,7 @@ interface InvoiceSummary {
 }
 
 export default function TaxInvoiceRequestScreen() {
-  const navigation = useNavigation<MainStackNavigationProp>();
+  const navigation = useNavigation<B2BStackNavigationProp>();
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [period, setPeriod] = useState<InvoicePeriod | null>(null);

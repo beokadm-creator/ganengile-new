@@ -43,6 +43,14 @@ service cloud.firestore {
       allow write: if false;
     }
 
+    // ==================== Integration Config (비민감 설정만 — testMode 등) ====================
+    // API 키는 admin_settings에만 보관. 앱은 여기서 testMode만 읽음.
+
+    match /config_integrations/{docId} {
+      allow read: if isAuthenticated();
+      allow write: if false; // Admin SDK로만 쓰기
+    }
+
     // ==================== Users Collection ====================
 
     match /users/{userId} {

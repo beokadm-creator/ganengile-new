@@ -11,12 +11,12 @@
 
 관련 코드:
 
-- `/Users/aaron/ganengile-new/src/services/locker-service.ts`
-- `/Users/aaron/ganengile-new/src/screens/main/LockerMapScreen.tsx`
-- `/Users/aaron/ganengile-new/src/components/delivery/LockerLocator.tsx`
-- `/Users/aaron/ganengile-new/src/screens/giller/GillerDropoffAtLockerScreen.tsx`
-- `/Users/aaron/ganengile-new/src/screens/giller/GillerPickupAtLockerScreen.tsx`
-- `/Users/aaron/ganengile-new/src/screens/requester/GillerPickupFromLockerScreen.tsx`
+- `src/services/locker-service.ts`
+- `src/screens/main/LockerMapScreen.tsx`
+- `src/components/delivery/LockerLocator.tsx`
+- `src/screens/giller/GillerDropoffAtLockerScreen.tsx`
+- `src/screens/giller/GillerPickupAtLockerScreen.tsx`
+- `src/screens/requester/GillerPickupFromLockerScreen.tsx`
 
 ## 외부 데이터
 

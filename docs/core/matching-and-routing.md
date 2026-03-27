@@ -6,12 +6,12 @@
 
 ## 관련 코드
 
-- 동선 등록/수정: `/Users/aaron/ganengile-new/src/screens/main/AddRouteScreen.tsx`, `/Users/aaron/ganengile-new/src/screens/main/EditRouteScreen.tsx`
-- 동선 목록: `/Users/aaron/ganengile-new/src/screens/main/RouteManagementScreen.tsx`
-- 매칭 서비스: `/Users/aaron/ganengile-new/src/services/matching-service.ts`
-- 요청 서비스: `/Users/aaron/ganengile-new/src/services/request-service.ts`
-- 배송 수락/취소: `/Users/aaron/ganengile-new/src/services/delivery-service.ts`
-- 채팅: `/Users/aaron/ganengile-new/src/screens/main/ChatScreen.tsx`, `/Users/aaron/ganengile-new/src/services/chat-service.ts`
+- 동선 등록/수정: `src/screens/main/AddRouteScreen.tsx`, `src/screens/main/EditRouteScreen.tsx`
+- 동선 목록: `src/screens/main/RouteManagementScreen.tsx`
+- 매칭 서비스: `src/services/matching-service.ts`
+- 요청 서비스: `src/services/request-service.ts`
+- 배송 수락/취소: `src/services/delivery-service.ts`
+- 채팅: `src/screens/main/ChatScreen.tsx`, `src/services/chat-service.ts`
 
 ## 현재 매칭 흐름
 
@@ -28,9 +28,9 @@
 
 관련 화면:
 
-- `/Users/aaron/ganengile-new/src/screens/main/GillerRequestsScreen.tsx`
-- `/Users/aaron/ganengile-new/src/screens/main/tabs/InstantMatchingTab.tsx`
-- `/Users/aaron/ganengile-new/src/screens/main/tabs/RouteMatchingTab.tsx`
+- `src/screens/main/GillerRequestsScreen.tsx`
+- `src/screens/main/tabs/InstantMatchingTab.tsx`
+- `src/screens/main/tabs/RouteMatchingTab.tsx`
 
 ## 재발 방지 규칙
 

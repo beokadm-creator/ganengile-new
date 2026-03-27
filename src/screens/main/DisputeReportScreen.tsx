@@ -160,7 +160,7 @@ export default function DisputeReportScreen({ navigation, route }: Props) {
       const reporterType = user?.role === 'giller' ? 'giller' : 'requester';
 
       // Firestore에 저장 (disputes 컬렉션) — 어드민이 기대하는 필드명 사용
-      await addDoc(collection(db, 'disputes'), {
+      const disputeRef = await addDoc(collection(db, 'disputes'), {
         reporterId: userId,
         reporterType,
         requestId: requestId ?? '',
@@ -174,13 +174,15 @@ export default function DisputeReportScreen({ navigation, route }: Props) {
         createdAt: serverTimestamp(),
       });
 
+      const disputeId = disputeRef.id;
+
       Alert.alert(
         '신고 완료',
         '분쟁 신고가 접수되었습니다.\n\n빠른 시간 내 조사 후 답변드리겠습니다.',
         [
           {
             text: '확인',
-            onPress: () => navigation.goBack(),
+            onPress: () => navigation.navigate('DisputeResolution', { disputeId }),
           },
         ]
       );

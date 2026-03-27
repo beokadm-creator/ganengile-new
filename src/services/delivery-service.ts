@@ -15,6 +15,7 @@ import {
   where,
   serverTimestamp,
   runTransaction,
+  onSnapshot,
 } from 'firebase/firestore';
 import { db } from './firebase';
 import { uploadPickupPhoto, uploadDeliveryPhoto } from './storage-service';
@@ -932,4 +933,33 @@ export async function markAsDroppedAtLocker(
     console.error('Error marking as dropped at locker:', error);
     return { success: false, message: '사물함 인계 처리에 실패했습니다.' };
   }
+}
+
+/**
+ * requestId 기반으로 delivery 문서를 실시간 구독
+ * delivery가 아직 생성되지 않은 경우(pending/matched) null을 콜백으로 전달
+ */
+export function subscribeToDeliveryByRequestId(
+  requestId: string,
+  callback: (delivery: Record<string, any> | null) => void
+): () => void {
+  const q = query(collection(db, 'deliveries'), where('requestId', '==', requestId));
+
+  const unsubscribe = onSnapshot(
+    q,
+    (snapshot) => {
+      if (snapshot.empty) {
+        callback(null);
+      } else {
+        const docSnap = snapshot.docs[0];
+        callback({ deliveryId: docSnap.id, ...docSnap.data() });
+      }
+    },
+    (error) => {
+      console.error('Error subscribing to delivery:', error);
+      callback(null);
+    }
+  );
+
+  return unsubscribe;
 }

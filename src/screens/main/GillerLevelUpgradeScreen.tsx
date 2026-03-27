@@ -24,12 +24,14 @@ import { Ionicons } from '@expo/vector-icons';
 import { createGillerService } from '../../services/giller-service';
 import type { GillerProfile } from '../../types/giller';
 import { GillerType } from '../../types/giller';
+import { useUser } from '../../contexts/UserContext';
 
 type Props = {
   navigation: any;
 };
 
 export default function GillerLevelUpgradeScreen({ navigation }: Props) {
+  const { refreshUser } = useUser();
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [profile, setProfile] = useState<GillerProfile | null>(null);
@@ -104,13 +106,14 @@ export default function GillerLevelUpgradeScreen({ navigation }: Props) {
       // 전문 길러로 승급
       await gillerService.promoteToProfessional();
 
+      await refreshUser();
       Alert.alert(
         '승급 완료',
         '축하합니다!\n전문 길러로 승급되었습니다.\n\n혜택이 즉시 적용됩니다.',
         [
           {
             text: '확인',
-            onPress: () => navigation.goBack(),
+            onPress: () => navigation.navigate('Profile'),
           },
         ]
       );
@@ -365,6 +368,13 @@ export default function GillerLevelUpgradeScreen({ navigation }: Props) {
               </View>
             ))}
           </View>
+          <TouchableOpacity
+            style={styles.benefitsButton}
+            onPress={() => navigation.navigate('LevelBenefits')}
+          >
+            <Text style={styles.benefitsButtonText}>모든 등급 혜택 보기</Text>
+            <Ionicons name="chevron-forward" size={20} color="#0F766E" />
+          </TouchableOpacity>
         </View>
       )}
 
@@ -661,5 +671,22 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     marginTop: 8,
     lineHeight: 22,
+  },
+  benefitsButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#F0FDFA',
+    borderRadius: 8,
+    padding: 12,
+    marginTop: 12,
+    borderWidth: 1,
+    borderColor: '#0F766E',
+  },
+  benefitsButtonText: {
+    color: '#0F766E',
+    fontSize: 14,
+    fontWeight: '600',
+    marginRight: 8,
   },
 });

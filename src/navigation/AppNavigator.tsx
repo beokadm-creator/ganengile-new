@@ -17,6 +17,7 @@ import type { RootStackParamList } from '../types/navigation';
 import AuthNavigator from './AuthNavigator';
 import OnboardingNavigator from './OnboardingNavigator';
 import MainNavigator from './MainNavigator';
+import B2BNavigator from './B2BNavigator';
 import { AppDownloadBanner } from '../components/AppDownloadBanner';
 import { navigationRef } from './navigationRef';
 import { handleNotificationResponse, getInitialNotification } from './notificationHandler';
@@ -81,7 +82,10 @@ function AppNavigatorContent() {
           </Stack.Screen>
         ) : (
           // User signed in and completed onboarding - show Main app
-          <Stack.Screen name="Main" component={MainNavigator} />
+          <>
+            <Stack.Screen name="Main" component={MainNavigator} />
+            <Stack.Screen name="B2B" component={B2BNavigator} />
+          </>
         )}
       </Stack.Navigator>
     </NavigationContainer>

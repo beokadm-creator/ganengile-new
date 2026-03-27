@@ -19,6 +19,7 @@ import {
 } from 'react-native';
 import { CameraView, Camera } from 'expo-camera';
 import * as ImagePicker from 'expo-image-picker';
+import { Linking } from 'react-native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 
 import { Typography, Colors, Spacing, BorderRadius } from '../../theme';
@@ -102,7 +103,7 @@ export default function GillerPickupFromLockerScreen({ route, navigation }: Prop
         'QR코드를 스캔하려면 카메라 권한이 필요합니다.',
         [
           { text: '취소', onPress: () => navigation.goBack() },
-          { text: '설정', onPress: () => { /* 설정으로 이동 */ } },
+          { text: '설정', onPress: () => Linking.openSettings() },
         ]
       );
     }

@@ -297,3 +297,6 @@ export class ProfessionalGillerService {
     return user.gillerProfile?.benefits?.priorityMatching || 'normal';
   }
 }
+
+// Expose a singleton instance for compatibility with existing imports
+export const professionalGillerService = new ProfessionalGillerService();

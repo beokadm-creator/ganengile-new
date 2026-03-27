@@ -2,12 +2,16 @@
 
 ## 주요 화면 경로
 
-- 홈: `/Users/aaron/ganengile-new/src/screens/main/HomeScreen.tsx`
-- 요청 생성: `/Users/aaron/ganengile-new/src/screens/main/CreateRequestScreen.tsx`
-- 요청 완료: `/Users/aaron/ganengile-new/src/screens/main/RequestConfirmationScreen.tsx`
-- 요청 상세: `/Users/aaron/ganengile-new/src/screens/main/RequestDetailScreen.tsx`
-- 배송 추적: `/Users/aaron/ganengile-new/src/screens/main/DeliveryTrackingScreen.tsx`
-- 채팅: `/Users/aaron/ganengile-new/src/screens/main/ChatScreen.tsx`
+- 홈: `src/screens/main/HomeScreen.tsx`
+- 요청 생성: `src/screens/main/CreateRequestScreen.tsx`
+- 요청 완료: `src/screens/main/RequestConfirmationScreen.tsx`
+- 요청 상세: `src/screens/main/RequestDetailScreen.tsx`
+- 배송 추적: `src/screens/main/DeliveryTrackingScreen.tsx`
+- 채팅: `src/screens/main/ChatScreen.tsx`
+- 사물함 선택: `src/screens/main/LockerSelectionScreen.tsx`
+- 사물함 수령: `src/screens/main/UnlockLockerScreen.tsx`
+- 분쟁 해결: `src/screens/main/DisputeResolutionScreen.tsx`
+- 길러 수령 (사물함): `src/screens/requester/GillerPickupFromLockerScreen.tsx`
 
 ## 정상 흐름
 
@@ -17,7 +21,8 @@
 4. 가격 확인
 5. 추가 정보 입력 후 요청 생성
 6. 채팅과 배송 추적에서 진행상태 확인
-7. 직접 수령 또는 사물함 수령 후 승인
+7. 직접 수령 또는 **사물함 수령 후 승인**
+8. **분쟁 발생 시 분쟁 해결 화면에서 진행**
 
 ## 요청 생성 시 필수 조건
 

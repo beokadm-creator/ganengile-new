@@ -12,19 +12,28 @@ import {
 } from 'react-native';
 import { StackNavigationProp } from '@react-navigation/stack';
 import { PointService } from '../../services/PointService';
+import { useUser } from '../../contexts/UserContext';
 import { WITHDRAW_MIN_AMOUNT } from '../../types/point';
 import { Colors, Typography, Spacing, BorderRadius } from '../../theme';
 
 type NavigationProp = StackNavigationProp<any>;
 
 export default function PointWithdrawScreen({ navigation }: { navigation: NavigationProp }) {
+  const { user } = useUser();
   const [loading, setLoading] = useState(false);
   const [amount, setAmount] = useState('');
   const [bankName, setBankName] = useState('');
   const [accountNumber, setAccountNumber] = useState('');
   const [accountHolder, setAccountHolder] = useState('');
   const [errors, setErrors] = useState<Record<string, string>>({});
-  const [balance, _setBalance] = useState(0);
+  const [balance, setBalance] = useState(0);
+
+  React.useEffect(() => {
+    if (!user?.uid) return;
+    PointService.getSummary(user.uid)
+      .then((s) => setBalance(s.balance ?? 0))
+      .catch(() => {});
+  }, [user?.uid]);
 
   const validateForm = (): boolean => {
     const newErrors: Record<string, string> = {};
@@ -64,7 +73,7 @@ export default function PointWithdrawScreen({ navigation }: { navigation: Naviga
       setLoading(true);
 
       await PointService.requestWithdrawal({
-        userId: 'current-user-id',
+        userId: user?.uid ?? '',
         amount: parseFloat(amount),
         bankName: bankName.trim(),
         accountNumber: accountNumber.trim(),

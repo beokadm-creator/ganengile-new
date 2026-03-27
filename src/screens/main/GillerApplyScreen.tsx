@@ -31,7 +31,7 @@ import type { StackNavigationProp } from '@react-navigation/stack';
 import { useFocusEffect } from '@react-navigation/native';
 import { getUserVerification, getVerificationStatusDisplay } from '../../services/verification-service';
 import type { UserVerification } from '../../types/profile';
-import { PASS_TEST_MODE } from '../../config/feature-flags';
+import { getIdentityTestMode } from '../../services/integration-config-service';
 import AppTopBar from '../../components/common/AppTopBar';
 import BankSelectModal from '../../components/common/BankSelectModal';
 
@@ -50,7 +50,7 @@ export default function GillerApplyScreen({ navigation }: Props) {
   const [selfIntroduction, setSelfIntroduction] = useState('');
 
   // Step 3 — 신원 인증
-  const passTestMode = PASS_TEST_MODE;
+  const [passTestMode, setPassTestMode] = useState(true);
   const [verification, setVerification] = useState<UserVerification | null>(null);
   const [verificationLoading, setVerificationLoading] = useState(false);
 
@@ -76,6 +76,7 @@ export default function GillerApplyScreen({ navigation }: Props) {
 
   useEffect(() => {
     loadVerification();
+    getIdentityTestMode().then(setPassTestMode).catch(() => setPassTestMode(true));
   }, [loadVerification]);
 
   useFocusEffect(
@@ -83,6 +84,13 @@ export default function GillerApplyScreen({ navigation }: Props) {
       loadVerification();
     }, [loadVerification])
   );
+
+  // 인증 완료 후 IdentityVerificationScreen에서 돌아오면 자동으로 Step 4로 이동
+  useEffect(() => {
+    if (step === 3 && verification?.status === 'approved') {
+      setStep(4);
+    }
+  }, [step, verification?.status]);
 
   // ─── Validation ─────────────────────────────────────
 

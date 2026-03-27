@@ -21,7 +21,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { b2bFirestoreService } from '../../services/b2b-firestore-service';
 import { businessContractService } from '../../services/business-contract-service';
 import { requireUserId } from '../../services/firebase';
-import type { MainStackNavigationProp } from '../../types/navigation';
+import type { B2BStackNavigationProp } from '../../types/navigation';
 import { Colors, Typography, Spacing, BorderRadius, Shadows } from '../../theme';
 
 interface BusinessProfile {
@@ -41,7 +41,7 @@ interface BusinessProfile {
 }
 
 export default function BusinessProfileScreen() {
-  const navigation = useNavigation<MainStackNavigationProp>();
+  const navigation = useNavigation<B2BStackNavigationProp>();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [editing, setEditing] = useState(false);
@@ -118,7 +118,7 @@ export default function BusinessProfileScreen() {
   };
 
   const handleManageSubscription = () => {
-    navigation.navigate('SubscriptionTierSelection' as never);
+    navigation.navigate('SubscriptionTierSelection');
   };
 
   const handleChangePassword = () => {

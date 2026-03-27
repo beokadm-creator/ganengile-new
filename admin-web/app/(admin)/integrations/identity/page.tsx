@@ -14,11 +14,13 @@ type ProviderConfig = {
 };
 
 type IdentityConfig = {
+  testMode: boolean;
   pass: ProviderConfig;
   kakao: ProviderConfig;
 };
 
 const emptyConfig: IdentityConfig = {
+  testMode: true,
   pass: {
     enabled: true,
     startUrl: '',
@@ -198,6 +200,36 @@ export default function IdentityIntegrationPage() {
         <p className="text-sm text-gray-500 mt-1">
           PASS/카카오 본인인증 API 정보를 설정하면 앱의 인증 시작 플로우에 즉시 반영됩니다.
         </p>
+      </div>
+
+      {/* 테스트 모드 토글 */}
+      <div className="bg-amber-50 border border-amber-200 rounded-xl p-5 mb-2">
+        <div className="flex items-center justify-between">
+          <div>
+            <h2 className="text-base font-semibold text-amber-900">테스트 모드</h2>
+            <p className="text-xs text-amber-700 mt-1">
+              ON: 실제 PASS/카카오 인증 없이 인증 완료 처리 (개발·QA 전용)<br />
+              OFF: 실제 인증 URL을 사용하는 라이브 모드
+            </p>
+          </div>
+          <label className="flex items-center gap-3 cursor-pointer">
+            <span className={`text-sm font-semibold ${config.testMode ? 'text-amber-700' : 'text-gray-400'}`}>
+              {config.testMode ? '테스트 모드' : '라이브'}
+            </span>
+            <div
+              onClick={() => setConfig((prev) => ({ ...prev, testMode: !prev.testMode }))}
+              className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors cursor-pointer ${
+                config.testMode ? 'bg-amber-500' : 'bg-green-500'
+              }`}
+            >
+              <span
+                className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                  config.testMode ? 'translate-x-1' : 'translate-x-6'
+                }`}
+              />
+            </div>
+          </label>
+        </div>
       </div>
 
       <div className="space-y-4">

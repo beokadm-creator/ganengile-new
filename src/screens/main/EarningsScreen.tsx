@@ -169,7 +169,7 @@ export default function EarningsScreen({ navigation }: Props) {
         </View>
 
         {/* Withdraw Button */}
-        <TouchableOpacity style={styles.withdrawButton}>
+        <TouchableOpacity style={styles.withdrawButton} onPress={() => navigation.navigate('PointWithdraw')}>
           <Text style={styles.withdrawButtonText}>출금하기</Text>
           <Text style={styles.withdrawButtonSubtext}>최소 ₩10,000부터 출금 가능</Text>
         </TouchableOpacity>

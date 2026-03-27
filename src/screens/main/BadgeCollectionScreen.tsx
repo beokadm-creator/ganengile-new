@@ -25,6 +25,7 @@ import { StackNavigationProp } from '@react-navigation/stack';
 import { doc, getDoc, getFirestore } from 'firebase/firestore';
 import { INITIAL_BADGES } from '../../data/badges';
 import { BadgeCategory, BadgeTier, User } from '../../types/user';
+import { useUser } from '../../contexts/UserContext';
 import { Colors, Typography, Spacing, BorderRadius } from '../../theme';
 
 type NavigationProp = StackNavigationProp<any>;
@@ -49,6 +50,7 @@ interface BadgeWithStatus {
 }
 
 export default function BadgeCollectionScreen({ navigation }: Props) {
+  const { user } = useUser();
   const [loading, setLoading] = useState(true);
   const [userBadges, setUserBadges] = useState<User['badges'] | null>(null);
   const [badgeEarnedAt, setBadgeEarnedAt] = useState<Record<string, Date>>({});
@@ -61,13 +63,13 @@ export default function BadgeCollectionScreen({ navigation }: Props) {
   // 사용자 배지 데이터 로드
   useEffect(() => {
     loadUserBadges();
-  }, []);
+  }, [user?.uid]);
 
   const loadUserBadges = async () => {
+    if (!user?.uid) { setLoading(false); return; }
     try {
       const db = getFirestore();
-      const userId = 'current_user_id'; // 실제로는 Auth에서 가져옴
-      const userRef = doc(db, 'users', userId);
+      const userRef = doc(db, 'users', user.uid);
       const userDoc = await getDoc(userRef);
 
       if (userDoc.exists()) {

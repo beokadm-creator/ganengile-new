@@ -1,3 +1,21 @@
+/**
+ * ⚠️ 미완성 기능
+ *
+ * 경매 생성 기능은 구현되어 있지만, AuctionList 화면이 없으므로 생성 후 이동이 불가능합니다.
+ *
+ * 현재 상태:
+ * - 경매 생성 기능: 정상 작동
+ * - AuctionList 화면: 미구현
+ * - 생성 후 동작: AuctionList로 이동 시도 → 에러 발생
+ *
+ * 해결 방법:
+ * 1. AuctionListScreen.tsx를 생성하고 MainNavigator에 등록
+ * 2. 또는 아래와 같이 navigation.goBack()으로 임시 대체:
+ *    onPress: () => navigation.goBack(),
+ *
+ * @see TODO: AuctionListScreen 구현 필요
+ */
+
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import {
   View,
@@ -241,7 +259,7 @@ export default function CreateAuctionScreen({ navigation }: Props) {
             {
               text: '확인',
               onPress: () => {
-                navigation.navigate('AuctionList' as never);
+                navigation.navigate('AuctionList');
               },
             },
           ]
@@ -369,7 +387,7 @@ export default function CreateAuctionScreen({ navigation }: Props) {
           {
             text: '확인',
             onPress: () => {
-              navigation.navigate('AuctionList' as never);
+              navigation.navigate('AuctionList');
             },
           },
         ]

@@ -206,10 +206,18 @@ export const MatchingResultScreen: React.FC = () => {
           <View style={styles.buttonContainer}>
             <TouchableOpacity
               style={[styles.button, styles.primaryButton]}
+              onPress={() => navigation.navigate('DeliveryTracking' as any, { requestId })}
+            >
+              <IconWrapper name="location" size={24} color={Colors.white} emoji="📍" />
+              <Text style={styles.buttonText}>배송 추적 보기</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={[styles.button, styles.secondaryButton]}
               onPress={handleGoToChat}
             >
-              <IconWrapper name="chatbubbles" size={24} color={Colors.white} emoji="💬" />
-              <Text style={styles.buttonText}>채팅 시작하기</Text>
+              <IconWrapper name="chatbubbles" size={24} color={Colors.primary} emoji="💬" />
+              <Text style={styles.secondaryButtonText}>채팅 시작하기</Text>
             </TouchableOpacity>
 
             <TouchableOpacity

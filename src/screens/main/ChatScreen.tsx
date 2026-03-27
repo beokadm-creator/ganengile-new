@@ -25,6 +25,7 @@ import { db } from '../../services/firebase';
 import { gillerAcceptRequest } from '../../services/delivery-service';
 import { gillerCancelAcceptance } from '../../services/delivery-service';
 import { UserRole } from '../../types/user';
+import { useGillerAccess } from '../../hooks/useGillerAccess';
 
 type Props = {
   navigation: MainStackNavigationProp;
@@ -40,6 +41,7 @@ type Props = {
 
 export default function ChatScreen({ navigation, route }: Props) {
   const { user } = useUser();
+  const { canGillerActionInChat } = useGillerAccess();
   const { chatRoomId, otherUserId: _otherUserId, otherUserName, requestInfo: routeRequestInfo } = route.params;
 
   const [messages, setMessages] = useState<ChatMessage[]>([]);
@@ -96,20 +98,14 @@ export default function ChatScreen({ navigation, route }: Props) {
       chatRoom?.requestId &&
       (requestStatus === 'pending' || requestStatus === 'matched') &&
       user?.uid !== requestRequesterId &&
-      (user?.role === UserRole.GILLER ||
-        user?.role === UserRole.BOTH ||
-        (user as any)?.isGiller === true ||
-        user?.gillerApplicationStatus === 'approved')
+      canGillerActionInChat
   );
   const canCancelAcceptInChat = Boolean(
     user?.uid &&
       chatRoom?.requestId &&
       requestStatus === 'accepted' &&
       user?.uid !== requestRequesterId &&
-      (user?.role === UserRole.GILLER ||
-        user?.role === UserRole.BOTH ||
-        (user as any)?.isGiller === true ||
-        user?.gillerApplicationStatus === 'approved')
+      canGillerActionInChat
   );
 
   useEffect(() => {
@@ -216,7 +212,20 @@ export default function ChatScreen({ navigation, route }: Props) {
                 `배송자가 배송을 수락했습니다.\n수령인: ${requestRecipientInfo?.name || '수령인'} / 연락처: ${maskedPhone}`
               );
               setRequestStatus('accepted');
-              Alert.alert('수락 완료', '배송 수락이 완료되었습니다.');
+              Alert.alert(
+                '수락 완료',
+                '배송 수락이 완료되었습니다.\n픽업 장소로 이동해 물건을 수령해주세요.',
+                [
+                  {
+                    text: '배송 추적 보기',
+                    onPress: () =>
+                      (navigation as any).navigate('DeliveryTracking', {
+                        requestId: chatRoom.requestId,
+                      }),
+                  },
+                  { text: '채팅 계속', style: 'cancel' },
+                ]
+              );
             } catch (error) {
               console.error('Error accepting request in chat:', error);
               Alert.alert('오류', '채팅에서 수락 처리 중 문제가 발생했습니다.');

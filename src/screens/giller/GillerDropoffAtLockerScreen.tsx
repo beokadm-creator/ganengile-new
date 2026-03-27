@@ -183,11 +183,11 @@ export default function GillerDropoffAtLockerScreen() {
 
       Alert.alert(
         '✅ 인계 완료',
-        '사물함에 물품을 보관했습니다.\n\n이용자에게 알림을 보내세요.',
+        '사물함에 물품을 보관했습니다.\n이용자에게 수령 안내 알림이 자동으로 발송됩니다.',
         [
           {
             text: '확인',
-            onPress: () => navigation.goBack(),
+            onPress: () => navigation.navigate('Tabs', { screen: 'Home' }),
           },
         ]
       );
