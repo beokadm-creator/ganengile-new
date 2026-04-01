@@ -1,64 +1,60 @@
-/**
- * Photo Service
- * 사진 인증 서비스
- */
-
+import { Platform } from 'react-native';
 import {
+  addDoc,
   collection,
   doc,
   getDoc,
-  addDoc,
-  updateDoc,
-  query,
-  where,
-  serverTimestamp,
   getDocs,
+  query,
+  serverTimestamp,
+  updateDoc,
+  where,
 } from 'firebase/firestore';
 import { db } from './firebase';
-import { getStorage, ref as storageRef, uploadBytesResumable, getDownloadURL as getStorageDownloadURL, uploadBytes, ref } from 'firebase/storage';
+import { uploadPhoto as uploadToStorage } from './storage-service';
 import {
-  Photo,
-  PhotoType,
-  PhotoStatus,
   Dispute,
+  Photo,
+  PhotoStatus,
+  PhotoType,
   PhotoVerification,
 } from '../types/photo';
+import * as ImagePicker from 'expo-image-picker';
 
 const PHOTOS_COLLECTION = 'photos';
 const DISPUTES_COLLECTION = 'disputes';
+const DISPUTE_HISTORY_COLLECTION = 'dispute_history';
 const STORAGE_PATH = 'locker_photos';
 
-export class PhotoService {
-  private storage = getStorage();
+type PhotoMetadata = Photo['metadata'] & {
+  fileName?: string;
+  deliveryId?: string;
+};
 
-  /**
-   * 사진 업로드
-   */
+function getDeviceInfo(): string {
+  return `${Platform.OS}`;
+}
+
+export class PhotoService {
   async uploadPhoto(
     userId: string,
     requestId: string,
     type: PhotoType,
     fileUri: string,
-    metadata?: any
+    metadata?: PhotoMetadata
   ): Promise<Photo> {
-    // 파일명 생성
     const fileName = `${userId}_${requestId}_${type}_${Date.now()}.jpg`;
-    const storageRefPath = storageRef(this.storage, `${STORAGE_PATH}/${fileName}`);
+    const downloadURL = await uploadToStorage(`${STORAGE_PATH}/${fileName}`, fileUri);
 
-    // TODO: 실제 파일 업로드 로직 (현재는 mock)
-    // React Native에서는 expo-document-picker 등 사용 필요
-    const downloadURL = `https://storage.example.com/${fileName}`;
-
-    // 사진 메타데이터 저장
     const photoData = {
       type,
       userId,
       requestId,
       url: downloadURL,
-      thumbnailUrl: `${downloadURL}_thumb`, // TODO: 썸네일 생성
+      thumbnailUrl: downloadURL,
       takenAt: new Date(),
       uploadedAt: serverTimestamp(),
-      status: 'pending',
+      status: PhotoStatus.PENDING,
       metadata: {
         ...metadata,
         fileName,
@@ -73,81 +69,72 @@ export class PhotoService {
     } as unknown as Photo;
   }
 
-  /**
-   * 사진 URL로 업로드 (base64 데이터)
-   */
   async uploadPhotoFromBase64(
     userId: string,
     requestId: string,
     type: PhotoType,
     base64Data: string,
-    metadata?: any
+    metadata?: PhotoMetadata
   ): Promise<Photo> {
-    // Base64 데이터를 Blob으로 변환
-    const blob = this.base64ToBlob(base64Data);
     const fileName = `${userId}_${requestId}_${type}_${Date.now()}.jpg`;
+    const blob = await this.base64ToBlobAsync(base64Data);
+    const fileUri = URL.createObjectURL(blob);
 
-    // Firebase Storage에 업로드
-    const storageRefPath = storageRef(this.storage, `${STORAGE_PATH}/${fileName}`);
-    await uploadBytesResumable(storageRefPath, blob);
+    try {
+      const downloadURL = await uploadToStorage(`${STORAGE_PATH}/${fileName}`, fileUri);
 
-    const downloadURL = await getStorageDownloadURL(storageRefPath);
+      const photoData = {
+        type,
+        userId,
+        requestId,
+        url: downloadURL,
+        thumbnailUrl: downloadURL,
+        takenAt: new Date(),
+        uploadedAt: serverTimestamp(),
+        status: PhotoStatus.PENDING,
+        metadata: {
+          ...metadata,
+          fileName,
+          fileSize: blob.size,
+          mimeType: 'image/jpeg',
+        },
+      };
 
-    // 사진 메타데이터 저장
-    const photoData = {
-      type,
-      userId,
-      requestId,
-      url: downloadURL,
-      thumbnailUrl: downloadURL, // TODO: 썸네일 생성
-      takenAt: new Date(),
-      uploadedAt: serverTimestamp(),
-      status: 'pending',
-      metadata: {
-        ...metadata,
-        fileName,
-        fileSize: blob.size,
-        mimeType: 'image/jpeg',
-      },
-    };
+      const docRef = await addDoc(collection(db, PHOTOS_COLLECTION), photoData);
 
-    const docRef = await addDoc(collection(db, PHOTOS_COLLECTION), photoData);
-
-    return {
-      photoId: docRef.id,
-      ...photoData,
-    } as unknown as Photo;
+      return {
+        photoId: docRef.id,
+        ...photoData,
+      } as unknown as Photo;
+    } finally {
+      URL.revokeObjectURL(fileUri);
+    }
   }
 
-  /**
-   * 사진 검증
-   */
   async verifyPhoto(photoId: string): Promise<PhotoVerification> {
     const docRef = doc(db, PHOTOS_COLLECTION, photoId);
     const docSnap = await getDoc(docRef);
 
-    if (!docSnap.exists) {
+    if (!docSnap.exists()) {
       throw new Error('Photo not found');
     }
 
     const photo = {
       photoId: docSnap.id,
       ...docSnap.data(),
-    } as unknown as Photo;
+    } as Photo;
 
-    // TODO: AI 기반 검증 로직 (현재는 mock)
-    // 실제로는 TensorFlow.js 또는 외부 API 사용
+    const isValid = Boolean(photo.url);
     const verification: PhotoVerification = {
       photoId,
-      isValid: true,
-      confidence: 0.95, // 95% confidence
-      issues: [],
+      isValid,
+      confidence: isValid ? 0.72 : 0.1,
+      issues: isValid ? [] : ['업로드된 URL을 확인할 수 없습니다.'],
       verifiedAt: new Date(),
     };
 
-    // 사진 상태 업데이트
     await updateDoc(docRef, {
-      status: 'verified',
+      status: verification.isValid ? PhotoStatus.VERIFIED : PhotoStatus.REJECTED,
       verifiedBy: 'system',
       verifiedAt: serverTimestamp(),
     });
@@ -155,74 +142,70 @@ export class PhotoService {
     return verification;
   }
 
-  /**
-   * 인수 사진 촬영
-   */
   async capturePickupPhoto(
     userId: string,
     requestId: string,
     deliveryId: string,
     base64Data: string
   ): Promise<Photo> {
-    return this.uploadPhotoFromBase64(
-      userId,
-      requestId,
-      PhotoType.PICKUP,
-      base64Data,
-      {
-        deliveryId,
-        deviceInfo: 'Mock Device',
-        appVersion: '1.0.0',
-      }
-    );
+    return this.uploadPhotoFromBase64(userId, requestId, PhotoType.PICKUP, base64Data, {
+      deliveryId,
+      deviceInfo: getDeviceInfo(),
+      appVersion: '1.0.0',
+    });
   }
 
-  /**
-   * 인계 사진 촬영
-   */
   async captureDropoffPhoto(
     userId: string,
     requestId: string,
     deliveryId: string,
     base64Data: string
   ): Promise<Photo> {
-    return this.uploadPhotoFromBase64(
-      userId,
-      requestId,
-      PhotoType.DROPOFF,
-      base64Data,
-      {
-        deliveryId,
-        deviceInfo: 'Mock Device',
-        appVersion: '1.0.0',
-      }
-    );
+    return this.uploadPhotoFromBase64(userId, requestId, PhotoType.DROPOFF, base64Data, {
+      deliveryId,
+      deviceInfo: getDeviceInfo(),
+      appVersion: '1.0.0',
+    });
   }
 
-  /**
-   * 분쟁 신고
-   */
   async reportDispute(
     reporterId: string,
     reporterType: 'requester' | 'giller',
     requestId: string,
-    type: 'damage' | 'loss' | 'quality',
+    type: 'damage' | 'loss' | 'quality' | 'delay' | 'other',
     description: string,
-    photoUrls: string[]
+    photoUrls: string[],
+    options?: {
+      deliveryId?: string;
+      matchId?: string;
+      urgency?: 'normal' | 'urgent' | 'critical';
+      evidenceUrls?: string[];
+    }
   ): Promise<Dispute> {
     const disputeData = {
       reporterId,
       reporterType,
       requestId,
+      deliveryId: options?.deliveryId,
+      matchId: options?.matchId,
       type,
       description,
       photoUrls,
+      evidenceUrls: options?.evidenceUrls ?? [],
+      urgency: options?.urgency ?? 'normal',
       status: 'pending',
       createdAt: serverTimestamp(),
       updatedAt: serverTimestamp(),
     };
 
     const docRef = await addDoc(collection(db, DISPUTES_COLLECTION), disputeData);
+    await addDoc(collection(db, DISPUTE_HISTORY_COLLECTION), {
+      disputeId: docRef.id,
+      action: '분쟁 접수',
+      note: description,
+      actorName: reporterType === 'giller' ? '길러' : '요청자',
+      createdAt: serverTimestamp(),
+    });
 
     return {
       disputeId: docRef.id,
@@ -230,9 +213,6 @@ export class PhotoService {
     } as unknown as Dispute;
   }
 
-  /**
-   * 분쟁 해결
-   */
   async resolveDispute(
     disputeId: string,
     resolution: {
@@ -248,11 +228,15 @@ export class PhotoService {
       resolvedAt: serverTimestamp(),
       updatedAt: serverTimestamp(),
     });
+    await addDoc(collection(db, DISPUTE_HISTORY_COLLECTION), {
+      disputeId,
+      action: '운영 판정 완료',
+      note: resolution.note ?? '운영 검토 결과가 반영되었습니다.',
+      actorName: '운영 시스템',
+      createdAt: serverTimestamp(),
+    });
   }
 
-  /**
-   * 요청에 대한 모든 사진 조회
-   */
   async getPhotosByRequestId(requestId: string): Promise<Photo[]> {
     const q = query(
       collection(db, PHOTOS_COLLECTION),
@@ -262,26 +246,20 @@ export class PhotoService {
     const snapshot = await getDocs(q);
     const photos: Photo[] = [];
 
-    snapshot.forEach((doc) => {
+    snapshot.forEach((photoDoc) => {
       photos.push({
-        photoId: doc.id,
-        ...doc.data(),
-      } as unknown as Photo);
+        photoId: photoDoc.id,
+        ...photoDoc.data(),
+      } as Photo);
     });
 
     return photos;
   }
 
-  /**
-   * Base64를 Blob으로 변환
-   */
-  private base64ToBlob(base64: string): Blob {
-    const bytes = atob(base64.split(',')[1] || base64);
-    const arr = new Uint8Array(bytes.length);
-    for (let i = 0; i < bytes.length; i++) {
-      arr[i] = bytes.charCodeAt(i);
-    }
-    return new Blob([arr], { type: 'image/jpeg' });
+  private async base64ToBlobAsync(base64: string): Promise<Blob> {
+    const dataUri = base64.startsWith('data:') ? base64 : `data:image/jpeg;base64,${base64}`;
+    const response = await fetch(dataUri);
+    return response.blob();
   }
 }
 
@@ -289,29 +267,24 @@ export function createPhotoService(): PhotoService {
   return new PhotoService();
 }
 
-// ==================== Standalone named exports ====================
-
-import * as ImagePicker from 'expo-image-picker';
-import { uploadPhoto as uploadToStorage } from './storage-service';
-
-/**
- * 카메라 앱을 열어 사진을 촬영하고 로컬 URI를 반환
- * Returns null if cancelled
- */
 export async function takePhoto(): Promise<string | null> {
   const permission = await ImagePicker.requestCameraPermissionsAsync();
-  if (!permission.granted) return null;
+  if (!permission.granted) {
+    return null;
+  }
+
   const result = await ImagePicker.launchCameraAsync({
     mediaTypes: ImagePicker.MediaTypeOptions.Images,
     quality: 0.85,
   });
-  if (result.canceled || !result.assets[0]) return null;
+
+  if (result.canceled || !result.assets[0]) {
+    return null;
+  }
+
   return result.assets[0].uri;
 }
 
-/**
- * URI를 Firebase Storage에 업로드하고 { url } 반환
- */
 export async function uploadPhotoWithThumbnail(
   uri: string,
   userId: string,

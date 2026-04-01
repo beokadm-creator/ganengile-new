@@ -57,6 +57,57 @@
         {"fieldPath": "gllerId", "order": "ASCENDING"},
         {"fieldPath": "createdAt", "order": "DESCENDING"}
       ]
+    },
+    {
+      "collectionGroup": "request_drafts",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {"fieldPath": "requesterUserId", "order": "ASCENDING"},
+        {"fieldPath": "status", "order": "ASCENDING"},
+        {"fieldPath": "updatedAt", "order": "DESCENDING"}
+      ]
+    },
+    {
+      "collectionGroup": "pricing_quotes",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {"fieldPath": "requestDraftId", "order": "ASCENDING"},
+        {"fieldPath": "status", "order": "ASCENDING"},
+        {"fieldPath": "updatedAt", "order": "DESCENDING"}
+      ]
+    },
+    {
+      "collectionGroup": "missions",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {"fieldPath": "assignedGillerUserId", "order": "ASCENDING"},
+        {"fieldPath": "status", "order": "ASCENDING"},
+        {"fieldPath": "updatedAt", "order": "DESCENDING"}
+      ]
+    },
+    {
+      "collectionGroup": "missions",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {"fieldPath": "deliveryId", "order": "ASCENDING"},
+        {"fieldPath": "sequence", "order": "ASCENDING"}
+      ]
+    },
+    {
+      "collectionGroup": "delivery_legs",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {"fieldPath": "deliveryId", "order": "ASCENDING"},
+        {"fieldPath": "sequence", "order": "ASCENDING"}
+      ]
+    },
+    {
+      "collectionGroup": "actor_selection_decisions",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {"fieldPath": "requestId", "order": "ASCENDING"},
+        {"fieldPath": "createdAt", "order": "DESCENDING"}
+      ]
     }
   ],
   "fieldOverrides": []

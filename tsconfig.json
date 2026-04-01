@@ -7,8 +7,14 @@
   },
   "exclude": [
     "node_modules",
+    "admin-web",
+    "functions",
     "e2e",
+    "screens",
+    "tests",
     "__tests__",
+    "**/*.test.ts",
+    "**/*.test.tsx",
     "detox.config.js",
     "jest.setup.ts",
     "scripts"

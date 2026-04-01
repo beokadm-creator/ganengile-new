@@ -168,7 +168,7 @@ export const cachedFirestoreQuery = async <T>(
   cacheKey: string,
   options: CacheOptions = {}
 ): Promise<T> => {
-  const cachedData = globalCache.get(cacheKey);
+  const cachedData = globalCache.get<T>(cacheKey);
 
   if (cachedData) {
     console.log(`✅ Firestore cache hit: ${cacheKey}`);
@@ -178,8 +178,7 @@ export const cachedFirestoreQuery = async <T>(
   console.log(`🌐 Firestore cache miss: ${cacheKey}`);
   const result = await queryFn();
 
-  // @ts-ignore - Generic type T can be assigned to cache
-  globalCache.set(cacheKey, result as any, options);
+  globalCache.set<T>(cacheKey, result, options);
   return result;
 };
 

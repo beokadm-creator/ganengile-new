@@ -30,6 +30,11 @@ import {
 } from '../types/payment';
 import { User } from '../types/user';
 import { CommissionService } from './CommissionService';
+import {
+  createProtectedBankAccount,
+  getAccountLast4,
+  maskAccountNumber,
+} from '../../shared/bank-account';
 
 export class SettlementService {
   static async createSettlement(
@@ -42,6 +47,12 @@ export class SettlementService {
       data.totalPayment,
       data.platformFee
     );
+    const protectedBankAccount = createProtectedBankAccount({
+      bankName: data.bankAccount.bankName,
+      accountNumber: data.bankAccount.accountNumber ?? data.bankAccount.accountNumberMasked ?? '',
+      accountHolder: data.bankAccount.accountHolder,
+      bankCode: data.bankAccount.bankCode,
+    });
 
     const settlement: Settlement = {
       settlementId,
@@ -59,9 +70,10 @@ export class SettlementService {
       },
       bankAccount: {
         bankCode: data.bankAccount.bankCode,
-        bankName: data.bankAccount.bankName,
-        accountNumber: data.bankAccount.accountNumber,
-        accountHolder: data.bankAccount.accountHolder,
+        bankName: protectedBankAccount.bankName,
+        accountNumberMasked: protectedBankAccount.accountNumberMasked,
+        accountLast4: protectedBankAccount.accountLast4,
+        accountHolder: protectedBankAccount.accountHolder,
       },
       status: SettlementStatus.PENDING,
       scheduledFor: data.scheduledFor,
@@ -308,8 +320,19 @@ export class SettlementService {
     const accounts = await this.getGillerBankAccounts(gillerId);
     const isDefault = accounts.length === 0;
 
+    const protectedBankAccount = createProtectedBankAccount({
+      bankName: accountData.bankName,
+      accountNumber: accountData.accountNumber ?? '',
+      accountHolder: accountData.accountHolder,
+      bankCode: accountData.bankCode,
+    });
+
     const newAccount: GillerBankAccount = {
-      ...accountData,
+      bankCode: accountData.bankCode,
+      bankName: protectedBankAccount.bankName,
+      accountNumberMasked: protectedBankAccount.accountNumberMasked,
+      accountLast4: protectedBankAccount.accountLast4,
+      accountHolder: protectedBankAccount.accountHolder,
       status: 'active',
       isDefault,
       createdAt: Timestamp.now(),
@@ -370,7 +393,14 @@ export class SettlementService {
 
     let found = false;
     accounts.forEach((acc: GillerBankAccount) => {
-      if (acc.accountNumber === accountNumber) {
+      const matchesRaw = typeof acc.accountNumber === 'string' && acc.accountNumber === accountNumber;
+      const matchesMasked =
+        typeof acc.accountNumberMasked === 'string' &&
+        acc.accountNumberMasked === maskAccountNumber(accountNumber);
+      const matchesLast4 =
+        typeof acc.accountLast4 === 'string' && acc.accountLast4 === getAccountLast4(accountNumber);
+
+      if (matchesRaw || matchesMasked || matchesLast4) {
         acc.isDefault = true;
         found = true;
       } else {

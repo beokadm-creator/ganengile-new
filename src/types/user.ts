@@ -19,6 +19,13 @@ export enum UserRole {
   BOTH = 'both',
 }
 
+export enum AuthProviderType {
+  EMAIL = 'email',
+  GOOGLE = 'google',
+  KAKAO = 'kakao',
+  UNKNOWN = 'unknown',
+}
+
 /**
  * 길러 등급 (P1 신규)
  */
@@ -45,6 +52,10 @@ export interface User {
   email: string;
   name: string;
   phoneNumber?: string;
+  authProvider?: AuthProviderType;
+  authProviderUserId?: string;
+  signupMethod?: 'email' | 'google' | 'kakao' | 'unknown';
+  providerLinkedAt?: Timestamp;
 
   // 역할 (길러/이용자/둘다)
   role: UserRole;
@@ -82,6 +93,24 @@ export interface User {
   pointBalance: number;
   totalEarnedPoints: number;
   totalSpentPoints: number;
+  walletBalances?: {
+    chargeBalance: number;
+    earnedBalance: number;
+    promoBalance?: number;
+    lockedChargeBalance?: number;
+    lockedEarnedBalance?: number;
+    lockedPromoBalance?: number;
+    pendingWithdrawalBalance?: number;
+  };
+  payoutProfile?: {
+    legalName?: string;
+    isIdentityVerified?: boolean;
+    identityVerifiedAt?: Timestamp;
+    isPayoutAccountVerified?: boolean;
+    payoutAccountVerifiedAt?: Timestamp;
+    payoutAccountOwnerMatchesUser?: boolean;
+    payoutBlockedReason?: string;
+  };
 
   // 길러 신청 상태 (pending: 심사중, approved: 승인, rejected: 반려)
   gillerApplicationStatus?: 'pending' | 'approved' | 'rejected';

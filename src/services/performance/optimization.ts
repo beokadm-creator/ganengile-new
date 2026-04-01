@@ -1,204 +1,103 @@
-/**
- * React Performance Optimization Utilities
- * memo, useMemo, useCallback helpers
- */
+import { lazy, memo, useCallback, useMemo, useRef } from 'react';
+import type { ComponentType, LazyExoticComponent } from 'react';
 
-import { useCallback, useMemo, useRef, useEffect } from 'react';
-import { FlatList } from 'react-native';
-
-/**
- * Deep comparison utility for useMemo/useCallback dependencies
- */
-export function shallowEqual(objA: any, objB: any): boolean {
+export function shallowEqual(objA: Record<string, unknown>, objB: Record<string, unknown>): boolean {
   if (objA === objB) return true;
-
-  if (typeof objA !== 'object' || objA === null ||
-      typeof objB !== 'object' || objB === null) {
-    return false;
-  }
 
   const keysA = Object.keys(objA);
   const keysB = Object.keys(objB);
-
   if (keysA.length !== keysB.length) return false;
 
-  for (const key of keysA) {
-    if (!objB.hasOwnProperty(key) || objA[key] !== objB[key]) {
-      return false;
-    }
-  }
-
-  return true;
+  return keysA.every((key) => objA[key] === objB[key]);
 }
 
-/**
- * Stable callback hook that only updates when dependencies change
- * Uses useRef to maintain function reference
- */
-export function useStableCallback<T extends (...args: any[]) => any>(
-  callback: T,
-  deps: any[] = []
-): T {
+export function useStableCallback<T extends (...args: never[]) => unknown>(callback: T): T {
   const callbackRef = useRef(callback);
+  callbackRef.current = callback;
 
-  // Update ref when callback changes
-  useEffect(() => {
-    callbackRef.current = callback;
-  }, [callback, ...deps]);
-
-  // Return memoized callback
-  return useCallback((...args: any[]) => {
-    return callbackRef.current(...args);
-  }, deps);
+  return useCallback(((...args: Parameters<T>) => callbackRef.current(...args)) as T, []);
 }
 
-/**
- * Memoized component factory with display name support
- */
 export function memoized<P extends object>(
-  Component: React.ComponentType<P>,
-  areEqual?: (prevProps: P, nextProps: P) => boolean
-) {
-  const MemoizedComponent = React.memo(Component, areEqual);
-  
-  // Preserve component name for debugging
-  const name = Component.displayName || Component.name || 'MemoizedComponent';
-  MemoizedComponent.displayName = `Memo(${name})`;
-  
-  return MemoizedComponent;
+  component: ComponentType<P>,
+  areEqual?: (prevProps: Readonly<P>, nextProps: Readonly<P>) => boolean,
+): ComponentType<P> {
+  const Memoized = memo(component, areEqual);
+  Memoized.displayName = component.displayName ?? component.name ?? 'MemoizedComponent';
+  return Memoized;
 }
 
-/**
- * Expensive computation hook with cache key
- */
-export function useComputation<T>(
-  key: string,
-  computation: () => T,
-  deps: any[] = []
-): T {
-  const cacheRef = useRef<Map<string, T>>(new Map());
-
-  const result = useMemo(() => {
-    const cache = cacheRef.current;
-    
-    if (cache.has(key)) {
-      return cache.get(key)!;
-    }
-
-    const value = computation();
-    cache.set(key, value);
-
-    // Cleanup old cache entries (keep last 10)
-    if (cache.size > 10) {
-      const firstKey = cache.keys().next().value;
-      cache.delete(firstKey);
-    }
-
-    return value;
-  }, [key, ...deps]);
-
-  return result;
+export function useComputation<T>(key: string, computation: () => T, deps: readonly unknown[] = []): T {
+  return useMemo(computation, [key, ...deps]);
 }
 
-/**
- * Debounce hook for expensive operations
- */
-export function useDebounce<T extends (...args: any[]) => any>(
-  callback: T,
-  delay: number = 300
-): T {
-  const timeoutRef = useRef<NodeJS.Timeout>();
+export function useDebounce<T extends (...args: never[]) => void>(callback: T, delay = 300): T {
+  const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  return useCallback((...args: any[]) => {
+  return useCallback(((...args: Parameters<T>) => {
+    if (timeoutRef.current) {
+      clearTimeout(timeoutRef.current);
+    }
+    timeoutRef.current = setTimeout(() => callback(...args), delay);
+  }) as T, [callback, delay]);
+}
+
+export function useThrottle<T extends (...args: never[]) => void>(callback: T, delay = 100): T {
+  const lastRunRef = useRef(0);
+  const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  return useCallback(((...args: Parameters<T>) => {
+    const now = Date.now();
+    const remaining = delay - (now - lastRunRef.current);
+
+    if (remaining <= 0) {
+      lastRunRef.current = now;
+      callback(...args);
+      return;
+    }
+
     if (timeoutRef.current) {
       clearTimeout(timeoutRef.current);
     }
 
     timeoutRef.current = setTimeout(() => {
+      lastRunRef.current = Date.now();
       callback(...args);
-    }, delay);
-  }, [callback, delay]) as T;
+    }, remaining);
+  }) as T, [callback, delay]);
 }
 
-/**
- * Throttle hook for frequent events (scrolling, resizing)
- */
-export function useThrottle<T extends (...args: any[]) => any>(
-  callback: T,
-  delay: number = 100
-): T {
-  const lastRunRef = useRef<number>(0);
-  const timeoutRef = useRef<NodeJS.Timeout>();
-
-  return useCallback((...args: any[]) => {
-    const now = Date.now();
-    const timeSinceLastRun = now - lastRunRef.current;
-
-    if (timeSinceLastRun >= delay) {
-      callback(...args);
-      lastRunRef.current = now;
-    } else {
-      if (timeoutRef.current) {
-        clearTimeout(timeoutRef.current);
-      }
-
-      timeoutRef.current = setTimeout(() => {
-        callback(...args);
-        lastRunRef.current = Date.now();
-      }, delay - timeSinceLastRun);
-    }
-  }, [callback, delay]) as T;
+export function lazyLoad<T extends ComponentType<any>>(
+  importFn: () => Promise<{ default: T }>,
+): LazyExoticComponent<T> {
+  return lazy(importFn as () => Promise<{ default: ComponentType<any> }>) as LazyExoticComponent<T>;
 }
 
-/**
- * Lazy load component (code splitting)
- */
-export function lazyLoad<T extends React.ComponentType<any>>(
-  importFn: () => Promise<{ default: T }>
-): React.LazyExoticComponent<T> {
-  return React.lazy(importFn);
-}
-
-/**
- * Performance measurement utility
- */
 export class PerformanceMonitor {
-  private marks: Map<string, number> = new Map();
+  private marks = new Map<string, number>();
 
   start(markName: string): void {
-    this.marks.set(markName, performance.now());
+    this.marks.set(markName, Date.now());
   }
 
   end(markName: string): number {
     const startTime = this.marks.get(markName);
-    if (!startTime) {
-      console.warn(`Performance mark "${markName}" not found`);
+    if (typeof startTime !== 'number') {
       return 0;
     }
-
-    const endTime = performance.now();
-    const duration = endTime - startTime;
-
-    console.log(`⏱️ ${markName}: ${duration.toFixed(2)}ms`);
+    const duration = Date.now() - startTime;
     this.marks.delete(markName);
-
     return duration;
   }
 
-  measure<T>(
-    markName: string,
-    fn: () => T
-  ): T {
+  measure<T>(markName: string, fn: () => T): T {
     this.start(markName);
     const result = fn();
     this.end(markName);
     return result;
   }
 
-  async measureAsync<T>(
-    markName: string,
-    fn: () => Promise<T>
-  ): Promise<T> {
+  async measureAsync<T>(markName: string, fn: () => Promise<T>): Promise<T> {
     this.start(markName);
     const result = await fn();
     this.end(markName);

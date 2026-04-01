@@ -1,126 +1,172 @@
-/**
- * Locker Locator Component
- * 사물함 위치 지도 컴포넌트
- */
-
-import React, { useState, useCallback } from 'react';
+﻿import React, { useCallback, useMemo, useState } from 'react';
 import {
-  View,
-  Text,
-  StyleSheet,
-  TouchableOpacity,
   ActivityIndicator,
   Alert,
   FlatList,
-  Dimensions,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect } from '@react-navigation/native';
+import { NaverMapCard } from '../maps/NaverMapCard';
+import { getAllStations } from '../../services/config-service';
+import { locationService, type LocationData } from '../../services/location-service';
+import {
+  createLockerLocation,
+  getAvailableLockers,
+  getLockersByStation,
+  getNonSubwayLockers,
+} from '../../services/locker-service';
+import type { Station } from '../../types/config';
 import type { Locker, LockerSummary } from '../../types/locker';
 import { LockerStatus } from '../../types/locker';
-import { getAvailableLockers, getLockersByStation, createLockerLocation, getNonSubwayLockers } from '../../services/locker-service';
-import { Colors, Spacing, Typography, BorderRadius } from '../../theme';
+import { BorderRadius, Colors, Spacing } from '../../theme';
 
-const { width: _SCREEN_WIDTH } = Dimensions.get('window');
+const FONT_XS = 12;
+const FONT_SM = 14;
+const FONT_MD = 16;
+const FONT_LG = 18;
+const FONT_XL = 22;
 
 interface LockerLocatorProps {
-  /** 선택된 역 ID (선택사항) */
   selectedStationId?: string;
-  /** 사물함 선택 콜백 */
   onLockerSelect: (locker: LockerSummary) => void;
-  /** 닫기 콜백 */
   onClose: () => void;
 }
 
+type LockerMapRow = ReturnType<typeof createLockerLocation> & {
+  distanceMeters: number | null;
+  latitude?: number;
+  longitude?: number;
+};
+
+function formatDistance(distanceMeters: number | null): string {
+  if (distanceMeters == null) {
+    return '거리 확인 중';
+  }
+  if (distanceMeters < 1000) {
+    return `${Math.round(distanceMeters)}m`;
+  }
+  return `${(distanceMeters / 1000).toFixed(1)}km`;
+}
+
+function buildRow(locker: Locker, station: Station | null, currentLocation: LocationData | null): LockerMapRow {
+  const base = createLockerLocation(locker);
+  const distanceMeters =
+    station && currentLocation
+      ? locationService.calculateDistance(
+          currentLocation.latitude,
+          currentLocation.longitude,
+          station.location.latitude,
+          station.location.longitude
+        )
+      : null;
+
+  return {
+    ...base,
+    distanceMeters,
+    latitude: station?.location.latitude,
+    longitude: station?.location.longitude,
+  };
+}
+
 export default function LockerLocator({ selectedStationId, onLockerSelect, onClose }: LockerLocatorProps) {
-  const [lockers, setLockers] = useState<any[]>([]);
-  const selectedStation = selectedStationId;
+  const [lockers, setLockers] = useState<LockerMapRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [viewMode, setViewMode] = useState<'list' | 'map'>('list');
   const [includeNonSubway, setIncludeNonSubway] = useState(false);
 
-  const loadLockers = async () => {
+  const loadLockers = useCallback(async (): Promise<void> => {
     try {
       setLoading(true);
-      
+      const [currentLocation, stations] = await Promise.all([
+        locationService.getCurrentLocation(),
+        getAllStations(),
+      ]);
+
       let lockerList: Locker[] = [];
       if (includeNonSubway) {
         lockerList = await getNonSubwayLockers();
-      } else if (selectedStation) {
-        lockerList = await getLockersByStation(selectedStation);
+      } else if (selectedStationId) {
+        lockerList = await getLockersByStation(selectedStationId);
       } else {
         lockerList = await getAvailableLockers();
       }
 
-      const locations = lockerList
+      const stationMap = new Map(stations.map((station) => [station.stationId, station]));
+      const rows = lockerList
         .filter((locker) => locker.status === LockerStatus.AVAILABLE && (locker.availability?.available ?? 1) > 0)
-        .map(createLockerLocation);
+        .map((locker) => buildRow(locker, stationMap.get(locker.location.stationId) ?? null, currentLocation))
+        .sort(
+          (left, right) =>
+            (left.distanceMeters ?? Number.MAX_SAFE_INTEGER) - (right.distanceMeters ?? Number.MAX_SAFE_INTEGER)
+        );
 
-      setLockers(locations);
+      setLockers(rows);
     } catch (error) {
       console.error('Error loading lockers:', error);
-      Alert.alert('오류', '사물함 목록을 불러오는데 실패했습니다.');
+      Alert.alert('?ㅻ쪟', '?щЪ??紐⑸줉??遺덈윭?ㅼ? 紐삵뻽?듬땲??');
     } finally {
       setLoading(false);
     }
-  };
+  }, [includeNonSubway, selectedStationId]);
 
   useFocusEffect(
     useCallback(() => {
-      loadLockers();
-    }, [selectedStation, includeNonSubway])
+      void loadLockers();
+    }, [loadLockers])
   );
 
-  const handleLockerSelect = (locker: any) => {
+  const featuredMapRows = useMemo(
+    () => lockers.slice(0, 4).filter((item) => item.latitude && item.longitude),
+    [lockers]
+  );
+
+  const mapCenter = featuredMapRows[0]
+    ? {
+        latitude: featuredMapRows[0].latitude!,
+        longitude: featuredMapRows[0].longitude!,
+        label: featuredMapRows[0].stationName ?? featuredMapRows[0].name,
+      }
+    : {
+        latitude: 37.5665,
+        longitude: 126.978,
+        label: 'Seoul',
+      };
+
+  const handleLockerSelect = (locker: LockerMapRow): void => {
     const summary: LockerSummary = {
       lockerId: locker.lockerId,
       stationName: locker.stationName ?? locker.name ?? '',
-      size: locker.size ?? 'medium' as any,
+      size: 'medium' as never,
       status: locker.isAvailable ? LockerStatus.AVAILABLE : LockerStatus.OCCUPIED,
       available: locker.isAvailable ?? true,
     };
     onLockerSelect(summary);
   };
 
-  const renderLockerItem = ({ item }: { item: LockerLocation }) => (
-    <TouchableOpacity
-      style={styles.lockerItem}
-      onPress={() => handleLockerSelect(item)}
-      activeOpacity={0.7}
-    >
+  const renderLockerItem = ({ item }: { item: LockerMapRow }) => (
+    <TouchableOpacity style={styles.lockerItem} onPress={() => handleLockerSelect(item)} activeOpacity={0.7}>
       <View style={styles.lockerIconContainer}>
         <Ionicons
           name={item.isAvailable ? 'cube' : 'cube-outline'}
-          size={32}
+          size={28}
           color={item.isAvailable ? Colors.primary : Colors.gray400}
         />
       </View>
-
       <View style={styles.lockerInfo}>
-        <Text style={styles.lockerName}>{item.name}</Text>
-        <View style={styles.lockerMeta}>
-          <View style={styles.metaTag}>
-            <Ionicons name="location" size={14} color={Colors.gray600} />
-            <Text style={styles.metaText}>{item.stationName}</Text>
-          </View>
-          {item.line ? (
-            <View style={styles.metaTag}>
-              <Ionicons name="subway" size={14} color={Colors.gray600} />
-              <Text style={styles.metaText}>{item.line}</Text>
-            </View>
-          ) : null}
-          {item.isAvailable && (
-            <View style={styles.availableBadge}>
-              <Text style={styles.availableText}>이용 가능</Text>
-            </View>
-          )}
+        <View style={styles.titleRow}>
+          <Text style={styles.lockerName}>{item.stationName || item.name}</Text>
+          <Text style={styles.distanceBadge}>{formatDistance(item.distanceMeters)}</Text>
         </View>
-        <Text style={styles.detailText}>위치: {item.floor ?? 1}층 · {item.section || item.name}</Text>
-        <Text style={styles.detailText}>요금: {(item.pricePer4Hours ?? 0).toLocaleString()}원 / 4시간</Text>
+        <Text style={styles.detailText}>
+          {item.line ?? '노선 정보 없음'} · {item.floor ?? 1}층 · {item.section ?? item.name}
+        </Text>
+        <Text style={styles.detailText}>기본 {(item.pricePer4Hours ?? 0).toLocaleString()}원 / 4시간</Text>
         {!!item.telNo && <Text style={styles.detailText}>문의: {item.telNo}</Text>}
       </View>
-
-      <Ionicons name="chevron-forward" size={20} color={Colors.gray400} />
     </TouchableOpacity>
   );
 
@@ -128,7 +174,7 @@ export default function LockerLocator({ selectedStationId, onLockerSelect, onClo
     return (
       <View style={styles.centerContainer}>
         <ActivityIndicator size="large" color={Colors.primary} />
-        <Text style={styles.loadingText}>사물함 찾는 중...</Text>
+        <Text style={styles.loadingText}>사물함을 찾는 중입니다.</Text>
       </View>
     );
   }
@@ -140,49 +186,43 @@ export default function LockerLocator({ selectedStationId, onLockerSelect, onClo
           style={[styles.filterButton, !includeNonSubway && styles.filterButtonActive]}
           onPress={() => setIncludeNonSubway(false)}
         >
-          <Text style={[styles.filterText, !includeNonSubway && styles.filterTextActive]}>지하철</Text>
+          <Text style={[styles.filterText, !includeNonSubway && styles.filterTextActive]}>지하철 보관함</Text>
         </TouchableOpacity>
         <TouchableOpacity
           style={[styles.filterButton, includeNonSubway && styles.filterButtonActive]}
           onPress={() => setIncludeNonSubway(true)}
         >
-          <Text style={[styles.filterText, includeNonSubway && styles.filterTextActive]}>비지하철</Text>
+          <Text style={[styles.filterText, includeNonSubway && styles.filterTextActive]}>외부 거점</Text>
         </TouchableOpacity>
       </View>
-      {/* Header */}
+
       <View style={styles.header}>
         <View style={styles.headerTop}>
           <TouchableOpacity style={styles.closeButton} onPress={onClose}>
-            <Ionicons name="close" size={28} color={Colors.white} />
+            <Ionicons name="close" size={24} color={Colors.white} />
           </TouchableOpacity>
           <Text style={styles.title}>사물함 선택</Text>
           <View style={styles.closeButton} />
         </View>
 
-        {/* View Mode Toggle */}
         <View style={styles.viewToggle}>
           <TouchableOpacity
             style={[styles.toggleButton, viewMode === 'list' && styles.toggleButtonActive]}
             onPress={() => setViewMode('list')}
           >
-            <Ionicons name="list" size={20} color={viewMode === 'list' ? Colors.white : Colors.gray600} />
-            <Text style={[styles.toggleText, viewMode === 'list' && styles.toggleTextActive]}>
-              목록
-            </Text>
+            <Ionicons name="list" size={18} color={viewMode === 'list' ? Colors.white : Colors.gray600} />
+            <Text style={[styles.toggleText, viewMode === 'list' && styles.toggleTextActive]}>목록</Text>
           </TouchableOpacity>
           <TouchableOpacity
             style={[styles.toggleButton, viewMode === 'map' && styles.toggleButtonActive]}
             onPress={() => setViewMode('map')}
           >
-            <Ionicons name="map" size={20} color={viewMode === 'map' ? Colors.white : Colors.gray600} />
-            <Text style={[styles.toggleText, viewMode === 'map' && styles.toggleTextActive]}>
-              지도
-            </Text>
+            <Ionicons name="map" size={18} color={viewMode === 'map' ? Colors.white : Colors.gray600} />
+            <Text style={[styles.toggleText, viewMode === 'map' && styles.toggleTextActive]}>지도</Text>
           </TouchableOpacity>
         </View>
       </View>
 
-      {/* Content */}
       {viewMode === 'list' ? (
         <FlatList
           data={lockers}
@@ -192,264 +232,128 @@ export default function LockerLocator({ selectedStationId, onLockerSelect, onClo
           ListEmptyComponent={
             <View style={styles.centerContainer}>
               <Ionicons name="cube-outline" size={64} color={Colors.gray300} />
-              <Text style={styles.emptyTitle}>이용 가능한 사물함이 없습니다</Text>
-              <Text style={styles.emptySubtitle}>
-                다른 역이나 시간을 선택해주세요
-              </Text>
+              <Text style={styles.emptyTitle}>선택 가능한 사물함이 없습니다.</Text>
+              <Text style={styles.emptySubtitle}>다른 역이나 다른 시간대로 다시 확인해 주세요.</Text>
             </View>
           }
         />
-       ) : (
+      ) : (
         <View style={styles.mapContainer}>
-          <View style={styles.mapPlaceholder}>
-            <Ionicons name="map-outline" size={64} color={Colors.gray300} />
-            <Text style={styles.mapPlaceholderText}>지도 기능 준비 중</Text>
-            <Text style={styles.mapPlaceholderSubtext}>
-              목록 모드를 이용해주세요
-            </Text>
+          <NaverMapCard
+            center={mapCenter}
+            markers={featuredMapRows.map((item, index) => ({
+              latitude: item.latitude!,
+              longitude: item.longitude!,
+              label: String(index + 1),
+            }))}
+            title="가까운 사물함 지도"
+            subtitle="현재 위치가 있으면 가까운 순서로, 없으면 선택 역 기준으로 보여줍니다."
+          />
+
+          <View style={styles.mapListCard}>
+            <Text style={styles.mapTitle}>빠른 선택</Text>
+            <Text style={styles.mapSubtitle}>지도를 먼저 보고 아래 카드에서 바로 예약할 수 있습니다.</Text>
+            {featuredMapRows.map((item, index) => (
+              <TouchableOpacity key={item.lockerId} style={styles.mapRow} onPress={() => handleLockerSelect(item)}>
+                <View style={styles.mapRowIndex}>
+                  <Text style={styles.mapRowIndexText}>{index + 1}</Text>
+                </View>
+                <View style={styles.mapRowBody}>
+                  <Text style={styles.mapRowTitle}>{item.stationName}</Text>
+                  <Text style={styles.mapRowMeta}>
+                    {item.line ?? '노선 정보 없음'} · {formatDistance(item.distanceMeters)}
+                  </Text>
+                </View>
+              </TouchableOpacity>
+            ))}
           </View>
         </View>
       )}
-
-      {/* Footer Info */}
-      <View style={styles.footer}>
-        <View style={styles.footerItem}>
-          <Ionicons name="information-circle" size={20} color={Colors.primary} />
-          <Text style={styles.footerText}>
-            사물함 상세 위치(층/구역), 요금, 문의번호를 함께 제공합니다.
-          </Text>
-        </View>
-      </View>
     </View>
   );
 }
 
-// ==================== Types ====================
-
-interface LockerLocation {
-  lockerId: string;
-  name: string;
-  stationName: string;
-  line?: string;
-  floor?: number;
-  section?: string;
-  pricePer4Hours?: number;
-  telNo?: string;
-  status: 'available' | 'occupied' | 'maintenance' | 'out_of_order';
-  isAvailable: boolean;
-}
-
-// ==================== Styles ====================
-
 const styles = StyleSheet.create({
-  filterRow: {
-    flexDirection: 'row',
-    gap: Spacing.sm,
-    paddingHorizontal: Spacing.lg,
-    paddingTop: Spacing.md,
-  },
+  container: { flex: 1, backgroundColor: Colors.gray50 },
+  centerContainer: { alignItems: 'center', justifyContent: 'center', padding: Spacing.xl },
+  loadingText: { marginTop: Spacing.md, fontSize: FONT_SM, color: Colors.gray600 },
+  filterRow: { flexDirection: 'row', gap: Spacing.sm, paddingHorizontal: Spacing.lg, paddingTop: Spacing.lg },
   filterButton: {
-    borderRadius: BorderRadius.md,
-    borderWidth: 1,
-    borderColor: Colors.gray300,
+    flex: 1,
+    alignItems: 'center',
+    borderRadius: BorderRadius.full,
+    backgroundColor: Colors.gray200,
     paddingVertical: Spacing.sm,
-    paddingHorizontal: Spacing.md,
-    backgroundColor: Colors.white,
   },
-  filterButtonActive: {
-    backgroundColor: Colors.primary,
-    borderColor: Colors.primary,
-  },
-  filterText: {
-    color: Colors.gray700,
-    fontSize: Typography.fontSize.sm,
-    fontWeight: Typography.fontWeight.medium,
-  },
-  filterTextActive: {
-    color: Colors.white,
-  },
-  centerContainer: {
-    alignItems: 'center',
-    flex: 1,
-    justifyContent: 'center',
-    padding: Spacing.lg,
-  },
-  container: {
-    backgroundColor: Colors.white,
-    flex: 1,
-  },
-  header: {
-    backgroundColor: Colors.primary,
-    paddingTop: 60,
-    paddingBottom: Spacing.lg,
-    paddingHorizontal: Spacing.lg,
-    borderBottomLeftRadius: BorderRadius.lg,
-    borderBottomRightRadius: BorderRadius.lg,
-  },
-  headerTop: {
-    alignItems: 'center',
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginBottom: Spacing.md,
-  },
+  filterButtonActive: { backgroundColor: Colors.primary },
+  filterText: { fontSize: FONT_SM, fontWeight: '700', color: Colors.gray700 },
+  filterTextActive: { color: Colors.white },
+  header: { gap: Spacing.md, padding: Spacing.lg },
+  headerTop: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   closeButton: {
-    width: 28,
-  },
-  title: {
-    color: Colors.white,
-    fontSize: Typography.fontSize.xl,
-    fontWeight: Typography.fontWeight.bold,
-  },
-  viewToggle: {
-    flexDirection: 'row',
-    backgroundColor: Colors.white,
-    borderRadius: BorderRadius.md,
-    padding: Spacing.xs,
-  },
-  toggleButton: {
     alignItems: 'center',
-    backgroundColor: 'transparent',
-    borderRadius: BorderRadius.sm,
-    flexDirection: 'row',
-    flex: 1,
-    gap: Spacing.xs,
-    padding: Spacing.sm,
     justifyContent: 'center',
+    width: 40,
+    height: 40,
+    borderRadius: BorderRadius.full,
+    backgroundColor: Colors.gray900,
   },
-  toggleButtonActive: {
-    backgroundColor: Colors.primary,
-  },
-  toggleText: {
-    color: Colors.gray600,
-    fontSize: Typography.fontSize.sm,
-    fontWeight: Typography.fontWeight.semibold,
-  },
-  toggleTextActive: {
-    color: Colors.white,
-  },
-  listContent: {
-    padding: Spacing.md,
-  },
-  lockerItem: {
-    alignItems: 'center',
-    backgroundColor: Colors.white,
-    borderRadius: BorderRadius.md,
+  title: { fontSize: FONT_XL, fontWeight: '800', color: Colors.gray900 },
+  viewToggle: { flexDirection: 'row', gap: Spacing.sm },
+  toggleButton: {
     flexDirection: 'row',
-    marginBottom: Spacing.sm,
-    padding: Spacing.md,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.1,
-    shadowRadius: 2,
-    elevation: 2,
+    alignItems: 'center',
+    gap: Spacing.xs,
+    paddingHorizontal: Spacing.md,
+    paddingVertical: Spacing.sm,
+    borderRadius: BorderRadius.full,
+    backgroundColor: Colors.gray200,
+  },
+  toggleButtonActive: { backgroundColor: Colors.primary },
+  toggleText: { fontSize: FONT_SM, fontWeight: '700', color: Colors.gray700 },
+  toggleTextActive: { color: Colors.white },
+  listContent: { paddingBottom: 48, paddingHorizontal: Spacing.lg },
+  lockerItem: {
+    flexDirection: 'row',
+    gap: Spacing.md,
+    alignItems: 'center',
+    marginBottom: Spacing.md,
+    borderRadius: BorderRadius.lg,
+    backgroundColor: Colors.white,
+    padding: Spacing.lg,
   },
   lockerIconContainer: {
     alignItems: 'center',
-    backgroundColor: Colors.gray100,
-    borderRadius: 20,
-    height: 48,
     justifyContent: 'center',
-    width: 48,
-  },
-  lockerInfo: {
-    flex: 1,
-    marginLeft: Spacing.md,
-  },
-  lockerName: {
-    color: Colors.textPrimary,
-    fontSize: Typography.fontSize.base,
-    fontWeight: Typography.fontWeight.semibold,
-    marginBottom: Spacing.xs,
-  },
-  lockerMeta: {
-    alignItems: 'center',
-    flexDirection: 'row',
-    gap: Spacing.sm,
-  },
-  metaTag: {
-    alignItems: 'center',
+    width: 52,
+    height: 52,
+    borderRadius: BorderRadius.lg,
     backgroundColor: Colors.gray100,
-    borderRadius: 4,
-    flexDirection: 'row',
-    gap: 4,
-    paddingHorizontal: Spacing.xs,
-    paddingVertical: 2,
   },
-  metaText: {
-    color: Colors.gray600,
-    fontSize: Typography.fontSize.xs,
-  },
-  availableBadge: {
-    backgroundColor: Colors.successLight,
-    borderRadius: 4,
-    paddingHorizontal: Spacing.xs,
-    paddingVertical: 2,
-  },
-  availableText: {
-    color: Colors.success,
-    fontSize: Typography.fontSize.xs,
-    fontWeight: Typography.fontWeight.semibold,
-  },
-  detailText: {
-    color: Colors.gray700,
-    fontSize: Typography.fontSize.xs,
-    marginTop: 2,
-  },
-  mapContainer: {
-    flex: 1,
-  },
-  mapPlaceholder: {
+  lockerInfo: { flex: 1, gap: 4 },
+  titleRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: Spacing.sm },
+  lockerName: { flex: 1, fontSize: FONT_MD, fontWeight: '800', color: Colors.gray900 },
+  distanceBadge: { fontSize: FONT_XS, fontWeight: '700', color: Colors.primary },
+  detailText: { fontSize: FONT_SM, color: Colors.gray600 },
+  emptyTitle: { marginTop: Spacing.md, fontSize: FONT_LG, fontWeight: '800', color: Colors.gray900 },
+  emptySubtitle: { marginTop: Spacing.xs, fontSize: FONT_SM, lineHeight: 20, textAlign: 'center', color: Colors.gray600 },
+  mapContainer: { gap: Spacing.lg, padding: Spacing.lg },
+  mapListCard: { borderRadius: BorderRadius.xl, backgroundColor: Colors.white, padding: Spacing.lg, gap: Spacing.sm },
+  mapTitle: { fontSize: FONT_LG, fontWeight: '800', color: Colors.gray900 },
+  mapSubtitle: { fontSize: FONT_SM, lineHeight: 20, color: Colors.gray600 },
+  mapRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing.md, borderRadius: BorderRadius.lg, backgroundColor: Colors.gray50, padding: Spacing.md },
+  mapRowIndex: {
     alignItems: 'center',
-    flex: 1,
     justifyContent: 'center',
-    padding: Spacing.xl,
+    width: 28,
+    height: 28,
+    borderRadius: BorderRadius.full,
+    backgroundColor: Colors.primary,
   },
-  mapPlaceholderText: {
-    color: Colors.textPrimary,
-    fontSize: Typography.fontSize.lg,
-    fontWeight: Typography.fontWeight.semibold,
-    marginTop: Spacing.md,
-  },
-  mapPlaceholderSubtext: {
-    color: Colors.gray600,
-    fontSize: Typography.fontSize.sm,
-    marginTop: Spacing.xs,
-    textAlign: 'center',
-  },
-  emptyTitle: {
-    color: Colors.textPrimary,
-    fontSize: Typography.fontSize.lg,
-    fontWeight: Typography.fontWeight.bold,
-    marginBottom: Spacing.xs,
-    marginTop: Spacing.md,
-  },
-  emptySubtitle: {
-    color: Colors.gray600,
-    fontSize: Typography.fontSize.sm,
-    marginTop: Spacing.xs,
-    textAlign: 'center',
-  },
-  loadingText: {
-    color: Colors.gray600,
-    fontSize: Typography.fontSize.sm,
-    marginTop: Spacing.md,
-  },
-  footer: {
-    backgroundColor: Colors.gray50,
-    borderTopWidth: 1,
-    borderTopColor: Colors.gray200,
-    paddingHorizontal: Spacing.lg,
-    paddingVertical: Spacing.md,
-  },
-  footerItem: {
-    alignItems: 'center',
-    flexDirection: 'row',
-    gap: Spacing.sm,
-    marginBottom: Spacing.xs,
-  },
-  footerText: {
-    color: Colors.gray700,
-    fontSize: Typography.fontSize.xs,
-    flex: 1,
-  },
+  mapRowIndexText: { fontSize: FONT_XS, fontWeight: '800', color: Colors.white },
+  mapRowBody: { flex: 1, gap: 2 },
+  mapRowTitle: { fontSize: FONT_SM, fontWeight: '700', color: Colors.gray900 },
+  mapRowMeta: { fontSize: FONT_XS, color: Colors.gray600 },
 });
+
+

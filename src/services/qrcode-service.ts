@@ -1,175 +1,172 @@
-/**
- * QR Code Service - QR 코드 스캔 및 생성
- * 
- * 기능:
- * - 카메라로 QR 코드 스캔
- * - QR 코드 생성 (배송 인증용)
- * - QR 코드 데이터 검증
- */
+import { BarcodeScanningResult } from 'expo-camera';
 
-import { CameraView, BarcodeScanningResult } from 'expo-camera';
+export type QRCodeType = 'pickup' | 'delivery' | 'verification' | 'locker_access';
+
+export interface QRCodeMetadata {
+  gillerId?: string;
+  userId?: string;
+  lockerId?: string;
+  reservationId?: string;
+  deliveryId?: string;
+  requestId?: string;
+  step?: 'dropoff' | 'pickup' | 'verification';
+}
 
 export interface QRCodeData {
-  type: 'pickup' | 'delivery' | 'verification';
+  version: 1;
+  type: QRCodeType;
   id: string;
   timestamp: number;
-  metadata?: Record<string, any>;
+  signature: string;
+  metadata?: QRCodeMetadata;
+}
+
+const QR_VALIDITY_MS = 24 * 60 * 60 * 1000;
+const QR_SIGNATURE_SEED = 'ganengile-beta1-qr';
+
+function computeSignature(type: QRCodeType, id: string, timestamp: number, metadata?: QRCodeMetadata): string {
+  const raw = JSON.stringify({
+    seed: QR_SIGNATURE_SEED,
+    type,
+    id,
+    timestamp,
+    metadata: metadata ?? null,
+  });
+
+  let hash = 0;
+  for (let index = 0; index < raw.length; index += 1) {
+    hash = (hash * 31 + raw.charCodeAt(index)) >>> 0;
+  }
+
+  return hash.toString(16).padStart(8, '0');
+}
+
+function buildQRCodeData(type: QRCodeType, id: string, metadata?: QRCodeMetadata): QRCodeData {
+  const timestamp = Date.now();
+  return {
+    version: 1,
+    type,
+    id,
+    timestamp,
+    signature: computeSignature(type, id, timestamp, metadata),
+    metadata,
+  };
+}
+
+function validateParsedQRCode(parsed: QRCodeData, expectedType?: QRCodeType): string | null {
+  if (!parsed.type || !parsed.id || !parsed.timestamp || !parsed.signature) {
+    return 'QR 코드 형식이 올바르지 않습니다.';
+  }
+
+  if (expectedType && parsed.type !== expectedType) {
+    return '예상한 QR 유형과 일치하지 않습니다.';
+  }
+
+  const expectedSignature = computeSignature(parsed.type, parsed.id, parsed.timestamp, parsed.metadata);
+  if (parsed.signature !== expectedSignature) {
+    return 'QR 코드 서명이 일치하지 않습니다.';
+  }
+
+  if (Date.now() - parsed.timestamp > QR_VALIDITY_MS) {
+    return 'QR 코드가 만료되었습니다.';
+  }
+
+  return null;
 }
 
 export class QRCodeService {
-  /**
-   * QR 코드 스캔 핸들러
-   */
   static handleQRCodeScan(result: BarcodeScanningResult): QRCodeData | null {
     try {
-      const data = result.data;
-
-      // QR 코드 데이터 파싱
-      const parsedData = JSON.parse(data) as QRCodeData;
-
-      // 데이터 검증
-      if (!parsedData.type || !parsedData.id || !parsedData.timestamp) {
-        console.error('Invalid QR code format');
-        return null;
-      }
-
-      // 타임스탬프 검증 (24시간 이내만 유효)
-      const now = Date.now();
-      const qrTime = parsedData.timestamp;
-      const timeDiff = now - qrTime;
-      const oneDay = 24 * 60 * 60 * 1000;
-
-      if (timeDiff > oneDay) {
-        console.error('QR code expired');
-        return null;
-      }
-
-      return parsedData;
+      const parsed = JSON.parse(result.data) as QRCodeData;
+      return validateParsedQRCode(parsed) ? null : parsed;
     } catch (error) {
       console.error('Error parsing QR code:', error);
       return null;
     }
   }
 
-  /**
-   * 픽업 인증 QR 코드 생성
-   */
   static generatePickupQRCode(requestId: string, gillerId: string): string {
-    const qrData: QRCodeData = {
-      type: 'pickup',
-      id: requestId,
-      timestamp: Date.now(),
-      metadata: {
+    return JSON.stringify(
+      buildQRCodeData('pickup', requestId, {
         gillerId,
-      },
-    };
-
-    return JSON.stringify(qrData);
+        requestId,
+      })
+    );
   }
 
-  /**
-   * 배송 완료 QR 코드 생성
-   */
   static generateDeliveryQRCode(requestId: string, gillerId: string): string {
-    const qrData: QRCodeData = {
-      type: 'delivery',
-      id: requestId,
-      timestamp: Date.now(),
-      metadata: {
+    return JSON.stringify(
+      buildQRCodeData('delivery', requestId, {
         gillerId,
-      },
-    };
-
-    return JSON.stringify(qrData);
+        requestId,
+      })
+    );
   }
 
-  /**
-   * 인증 QR 코드 생성
-   */
-  static generateVerificationQRCode(userId: string): string {
-    const qrData: QRCodeData = {
-      type: 'verification',
-      id: userId,
-      timestamp: Date.now(),
-    };
-
-    return JSON.stringify(qrData);
+  static generateVerificationQRCode(userId: string, metadata?: QRCodeMetadata): string {
+    return JSON.stringify(
+      buildQRCodeData('verification', userId, {
+        userId,
+        ...metadata,
+      })
+    );
   }
 
-  /**
-   * QR 코드 데이터 검증
-   */
-  static validateQRCodeData(data: QRCodeData, expectedType?: string): boolean {
-    // 필수 필드 확인
-    if (!data.type || !data.id || !data.timestamp) {
-      return false;
-    }
-
-    // 타입 검증
-    if (expectedType && data.type !== expectedType) {
-      return false;
-    }
-
-    // 타임스탬프 검증 (24시간 이내)
-    const now = Date.now();
-    const timeDiff = now - data.timestamp;
-    const oneDay = 24 * 60 * 60 * 1000;
-
-    if (timeDiff > oneDay) {
-      return false;
-    }
-
-    return true;
+  static generateLockerAccessQRCode(params: {
+    lockerId: string;
+    reservationId: string;
+    userId: string;
+    deliveryId?: string;
+    step?: 'dropoff' | 'pickup' | 'verification';
+  }): string {
+    return JSON.stringify(
+      buildQRCodeData('locker_access', params.reservationId, {
+        lockerId: params.lockerId,
+        reservationId: params.reservationId,
+        userId: params.userId,
+        deliveryId: params.deliveryId,
+        step: params.step ?? 'verification',
+      })
+    );
   }
 
-  /**
-   * QR 코드 생성기 (Google Charts API 또는 라이브러리 사용)
-   * TODO: QR 코드 생성 라이브러리 연동 (react-native-qrcode-svg 등)
-   */
+  static validateQRCodeData(data: QRCodeData, expectedType?: QRCodeType): boolean {
+    return validateParsedQRCode(data, expectedType) === null;
+  }
+
   static generateQRCodeImage(data: string): string {
-    // Google Charts API (개발용, 프로덕션에서는 로컬 라이브러리 권장)
     const encodedData = encodeURIComponent(data);
-    return `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodedData}`;
+    return `https://api.qrserver.com/v1/create-qr-code/?size=240x240&data=${encodedData}`;
   }
 }
 
 export default QRCodeService;
 
-// ==================== Standalone named exports ====================
-
-/**
- * QR 코드 문자열 검증
- * Returns { isValid, data, error }
- */
-export function verifyQRCode(qrString: string): {
+export function verifyQRCode(
+  qrString: string,
+  expectedType?: QRCodeType
+): {
   isValid: boolean;
   data?: QRCodeData;
   error?: string;
 } {
   try {
     const parsed = JSON.parse(qrString) as QRCodeData;
-    if (!parsed.type || !parsed.id || !parsed.timestamp) {
-      return { isValid: false, error: '유효하지 않은 QR코드 형식입니다.' };
+    const error = validateParsedQRCode(parsed, expectedType);
+    if (error) {
+      return { isValid: false, error };
     }
-    const oneDay = 24 * 60 * 60 * 1000;
-    if (Date.now() - parsed.timestamp > oneDay) {
-      return { isValid: false, error: 'QR코드가 만료되었습니다.' };
-    }
+
     return { isValid: true, data: parsed };
   } catch {
-    return { isValid: false, error: 'QR코드를 파싱할 수 없습니다.' };
+    return { isValid: false, error: 'QR 코드를 해석할 수 없습니다.' };
   }
 }
 
-/**
- * QR 코드 남은 유효 시간 반환 (분 단위)
- * Returns 0 if expired or invalid
- */
 export function getQRCodeRemainingTime(qrCode: string): number {
   try {
     const parsed = JSON.parse(qrCode) as QRCodeData;
-    const oneDay = 24 * 60 * 60 * 1000;
-    const remaining = oneDay - (Date.now() - parsed.timestamp);
+    const remaining = QR_VALIDITY_MS - (Date.now() - parsed.timestamp);
     return Math.max(0, Math.floor(remaining / 60000));
   } catch {
     return 0;

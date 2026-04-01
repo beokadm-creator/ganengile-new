@@ -4,6 +4,7 @@
  */
 
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { decryptStorageJson, encryptStorageJson } from './secure-local-storage';
 
 const KEYS = {
   // Onboarding
@@ -44,9 +45,9 @@ export async function getOnboardingStep(): Promise<string | null> {
 /**
  * 온보딩 임시 데이터 저장 (중단 후 복구용)
  */
-export async function saveOnboardingTempData(data: any): Promise<void> {
+export async function saveOnboardingTempData(data: Record<string, unknown>): Promise<void> {
   try {
-    await AsyncStorage.setItem(KEYS.ONBOARDING_TEMP_DATA, JSON.stringify(data));
+    await AsyncStorage.setItem(KEYS.ONBOARDING_TEMP_DATA, await encryptStorageJson(data));
     console.log('💾 Onboarding temp data saved:', data);
   } catch (error) {
     console.error('Error saving onboarding temp data:', error);
@@ -56,10 +57,10 @@ export async function saveOnboardingTempData(data: any): Promise<void> {
 /**
  * 온보딩 임시 데이터 가져오기
  */
-export async function getOnboardingTempData(): Promise<any | null> {
+export async function getOnboardingTempData(): Promise<Record<string, unknown> | null> {
   try {
     const data = await AsyncStorage.getItem(KEYS.ONBOARDING_TEMP_DATA);
-    return data ? JSON.parse(data) : null;
+    return data ? await decryptStorageJson<Record<string, unknown>>(data) : null;
   } catch (error) {
     console.error('Error getting onboarding temp data:', error);
     return null;
@@ -91,7 +92,7 @@ export function saveCurrentRole(role: 'gller' | 'giller' | 'both'): Promise<void
     return Promise.resolve();
   } catch (error) {
     console.error('Error saving current role:', error);
-    return Promise.reject(error);
+    return Promise.reject(error instanceof Error ? error : new Error('Failed to save current role'));
   }
 }
 

@@ -5,6 +5,7 @@
 
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Platform } from 'react-native';
+import { decryptStorageJson, encryptStorageJson } from './secure-local-storage';
 
 const DRAFT_PREFIX = '@ganengile_draft_';
 const FORM_PROGRESS_PREFIX = '@ganengile_form_';
@@ -14,41 +15,47 @@ const isWeb = Platform.OS === 'web';
 
 // 웹 전용 스토리지 래퍼
 const webStorage = {
-  getItem: async (key: string): Promise<string | null> => {
+  getItem: (key: string): Promise<string | null> => {
     try {
-      return localStorage.getItem(key);
+      return Promise.resolve(localStorage.getItem(key));
     } catch (error) {
       console.error('Web storage getItem error:', error);
-      return null;
+      return Promise.resolve(null);
     }
   },
-  setItem: async (key: string, value: string): Promise<void> => {
+  setItem: (key: string, value: string): Promise<void> => {
     try {
       localStorage.setItem(key, value);
+      return Promise.resolve();
     } catch (error) {
       console.error('Web storage setItem error:', error);
+      return Promise.resolve();
     }
   },
-  removeItem: async (key: string): Promise<void> => {
+  removeItem: (key: string): Promise<void> => {
     try {
       localStorage.removeItem(key);
+      return Promise.resolve();
     } catch (error) {
       console.error('Web storage removeItem error:', error);
+      return Promise.resolve();
     }
   },
-  getAllKeys: async (): Promise<string[]> => {
+  getAllKeys: (): Promise<string[]> => {
     try {
-      return Object.keys(localStorage);
+      return Promise.resolve(Object.keys(localStorage));
     } catch (error) {
       console.error('Web storage getAllKeys error:', error);
-      return [];
+      return Promise.resolve([]);
     }
   },
-  multiRemove: async (keys: string[]): Promise<void> => {
+  multiRemove: (keys: string[]): Promise<void> => {
     try {
       keys.forEach(key => localStorage.removeItem(key));
+      return Promise.resolve();
     } catch (error) {
       console.error('Web storage multiRemove error:', error);
+      return Promise.resolve();
     }
   }
 };
@@ -71,7 +78,7 @@ export async function saveDraft<T>(key: string, data: T): Promise<void> {
       data,
       timestamp: Date.now(),
     };
-    await storage.setItem(`${DRAFT_PREFIX}${key}`, JSON.stringify(draft));
+    await storage.setItem(`${DRAFT_PREFIX}${key}`, await encryptStorageJson(draft));
   } catch (error) {
     console.error('Error saving draft:', error);
   }
@@ -85,7 +92,7 @@ export async function loadDraft<T>(key: string): Promise<T | null> {
     const json = await storage.getItem(`${DRAFT_PREFIX}${key}`);
     if (!json) return null;
 
-    const draft: DraftData<T> = JSON.parse(json);
+    const draft = await decryptStorageJson<DraftData<T>>(json);
 
     // Check if draft is too old (7 days)
     const maxAge = 7 * 24 * 60 * 60 * 1000; // 7 days
@@ -138,7 +145,7 @@ export async function cleanupOldDrafts(): Promise<number> {
     for (const key of keys) {
       const json = await storage.getItem(`${DRAFT_PREFIX}${key}`);
       if (json) {
-        const draft: DraftData = JSON.parse(json);
+        const draft = await decryptStorageJson<DraftData>(json);
         const maxAge = 7 * 24 * 60 * 60 * 1000;
 
         if (Date.now() - draft.timestamp > maxAge) {
@@ -169,7 +176,7 @@ export async function saveFormProgress(
       data,
       timestamp: Date.now(),
     };
-    await storage.setItem(`${FORM_PROGRESS_PREFIX}${formId}`, JSON.stringify(formData));
+    await storage.setItem(`${FORM_PROGRESS_PREFIX}${formId}`, await encryptStorageJson(formData));
   } catch (error) {
     console.error('Error saving form progress:', error);
   }
@@ -185,7 +192,7 @@ export async function loadFormProgress(
     const json = await storage.getItem(`${FORM_PROGRESS_PREFIX}${formId}`);
     if (!json) return null;
 
-    const formData = JSON.parse(json);
+    const formData = await decryptStorageJson<{ step: number; data: Record<string, any>; timestamp: number }>(json);
 
     // Check if progress is too old (24 hours)
     const maxAge = 24 * 60 * 60 * 1000; // 24 hours

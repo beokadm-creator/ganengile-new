@@ -1,9 +1,5 @@
-/**
- * Matching Timeout Hook
- * 30초 타임아웃 처리 및 자동 재시도
- */
-
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import type { Match } from '../types/matching';
 
 interface UseMatchingTimeoutOptions {
   timeoutSeconds?: number;
@@ -24,6 +20,18 @@ interface UseMatchingTimeoutResult {
   retry: () => void;
 }
 
+interface UseMatchingResultsOptions {
+  onAccept?: (matchId: string) => Promise<void>;
+  onReject?: (matchId: string) => Promise<void>;
+  onTimeout?: (matchId: string) => void;
+}
+
+type TimerHandle = ReturnType<typeof setInterval>;
+
+function getMatchId(match: Match): string {
+  return match.matchId;
+}
+
 export function useMatchingTimeout({
   timeoutSeconds = 30,
   onTimeout,
@@ -36,44 +44,50 @@ export function useMatchingTimeout({
   const [isExpired, setIsExpired] = useState(false);
   const [retryCount, setRetryCount] = useState(0);
 
-  const intervalRef = useRef<number | null>(null);
-  const timeoutRef = useRef<number | null>(null);
+  const intervalRef = useRef<TimerHandle | null>(null);
+  const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const clearTimers = useCallback(() => {
+    if (intervalRef.current) {
+      clearInterval(intervalRef.current);
+      intervalRef.current = null;
+    }
+    if (timeoutRef.current) {
+      clearTimeout(timeoutRef.current);
+      timeoutRef.current = null;
+    }
+  }, []);
 
   const start = useCallback(() => {
+    clearTimers();
     setIsActive(true);
     setIsExpired(false);
     setRemainingSeconds(timeoutSeconds);
 
-    // 1초마다 타이머 감소
     intervalRef.current = setInterval(() => {
       setRemainingSeconds((prev) => {
-        const newRemaining = prev - 1;
-        onTick?.(newRemaining);
+        const nextValue = prev - 1;
+        onTick?.(nextValue);
 
-        if (newRemaining <= 0) {
-          clearInterval(intervalRef.current!);
+        if (nextValue <= 0) {
+          clearTimers();
           setIsActive(false);
           setIsExpired(true);
           onTimeout?.();
           return 0;
         }
 
-        return newRemaining;
+        return nextValue;
       });
     }, 1000);
-  }, [timeoutSeconds, onTick, onTimeout]);
+  }, [clearTimers, onTick, onTimeout, timeoutSeconds]);
 
   const reset = useCallback(() => {
-    if (intervalRef.current) {
-      clearInterval(intervalRef.current);
-    }
-    if (timeoutRef.current) {
-      clearTimeout(timeoutRef.current);
-    }
+    clearTimers();
     setIsActive(false);
     setIsExpired(false);
     setRemainingSeconds(timeoutSeconds);
-  }, [timeoutSeconds]);
+  }, [clearTimers, timeoutSeconds]);
 
   const cancel = useCallback(() => {
     reset();
@@ -86,22 +100,12 @@ export function useMatchingTimeout({
 
     reset();
     setRetryCount((prev) => prev + 1);
-    setTimeout(() => {
+    timeoutRef.current = setTimeout(() => {
       start();
     }, 1000);
-  }, [retryCount, maxRetries, reset, start]);
+  }, [maxRetries, reset, retryCount, start]);
 
-  // 컴포넌트 언마운트 시 정리
-  useEffect(() => {
-    return () => {
-      if (intervalRef.current) {
-        clearInterval(intervalRef.current);
-      }
-      if (timeoutRef.current) {
-        clearTimeout(timeoutRef.current);
-      }
-    };
-  }, []);
+  useEffect(() => () => clearTimers(), [clearTimers]);
 
   return {
     remainingSeconds,
@@ -113,19 +117,6 @@ export function useMatchingTimeout({
     cancel,
     retry,
   };
-}
-
-/**
- * 매칭 결과 관리 Hook
- * 여러 길러 매칭 및 수락/거절 처리
- */
-
-import { Match } from '../types/matching'; // 경로에 맞게 수정 필요
-
-interface UseMatchingResultsOptions {
-  onAccept?: (matchId: string) => Promise<void>;
-  onReject?: (matchId: string) => Promise<void>;
-  onTimeout?: (matchId: string) => void;
 }
 
 export function useMatchingResults({
@@ -144,7 +135,7 @@ export function useMatchingResults({
 
     try {
       await onAccept?.(matchId);
-      setMatches((prev) => prev.filter((m) => m.id !== matchId));
+      setMatches((prev) => prev.filter((match) => getMatchId(match) !== matchId));
     } catch (error) {
       console.error('Failed to accept match:', error);
     } finally {
@@ -163,7 +154,7 @@ export function useMatchingResults({
 
     try {
       await onReject?.(matchId);
-      setMatches((prev) => prev.filter((m) => m.id !== matchId));
+      setMatches((prev) => prev.filter((match) => getMatchId(match) !== matchId));
     } catch (error) {
       console.error('Failed to reject match:', error);
     } finally {
@@ -177,7 +168,7 @@ export function useMatchingResults({
 
   const markAsExpired = (matchId: string) => {
     setExpiredIds((prev) => new Set(prev).add(matchId));
-    setMatches((prev) => prev.filter((m) => m.id !== matchId));
+    setMatches((prev) => prev.filter((match) => getMatchId(match) !== matchId));
     onTimeout?.(matchId);
   };
 

@@ -1,6 +1,6 @@
-/**
+﻿/**
  * Payment and Settlement Type Definitions
- * P4: 결제 및 수수료 정산 시스템
+ * P4: 寃곗젣 諛??섏닔猷??뺤궛 ?쒖뒪??
  */
 
 import { Timestamp } from 'firebase/firestore';
@@ -10,85 +10,85 @@ import { UrgencyLevel } from './matching';
 // ===== Payment Types =====
 
 /**
- * 결제 상태 (PaymentStatus)
+ * 寃곗젣 ?곹깭 (PaymentStatus)
  * Payment status enum
  */
 export enum PaymentStatus {
-  /** 결제 대기 중 */
+  /** 寃곗젣 ?湲?以?*/
   PENDING = 'pending',
-  /** 결제 완료 */
+  /** 寃곗젣 ?꾨즺 */
   COMPLETED = 'completed',
-  /** 결제 실패 */
+  /** 寃곗젣 ?ㅽ뙣 */
   FAILED = 'failed',
-  /** 결제 취소 */
+  /** 寃곗젣 痍⑥냼 */
   CANCELLED = 'cancelled',
-  /** 환불 처리 중 */
+  /** ?섎텋 泥섎━ 以?*/
   REFUNDING = 'refunding',
-  /** 환불 완료 */
+  /** ?섎텋 ?꾨즺 */
   REFUNDED = 'refunded',
 }
 
 /**
- * 결제 수단 (PaymentMethod)
+ * 寃곗젣 ?섎떒 (PaymentMethod)
  * Payment method enum
  */
 export enum PaymentMethod {
-  /** 신용카드 */
+  /** ?좎슜移대뱶 */
   CREDIT_CARD = 'credit_card',
-  /** 간편결제 (카카오페이, 네이버페이 등) */
+  /** 媛꾪렪寃곗젣 (移댁뭅?ㅽ럹?? ?ㅼ씠踰꾪럹???? */
   EASY_PAYMENT = 'easy_payment',
-  /** 포인트 결제 */
+  /** ?ъ씤??寃곗젣 */
   POINT = 'point',
-  /** 혼합 결제 */
+  /** ?쇳빀 寃곗젣 */
   MIXED = 'mixed',
 }
 
 /**
- * 결제 정보 (Payment)
+ * 寃곗젣 ?뺣낫 (Payment)
  * Payment information stored in Firestore
  */
 export interface Payment {
-  /** 결제 ID */
+  /** 寃곗젣 ID */
   paymentId: string;
 
-  /** 연관된 배송/요청 ID */
+  /** ?곌???諛곗넚/?붿껌 ID */
   deliveryId?: string;
   requestId?: string;
   matchId?: string;
 
-  /** 결제자 (이용자) ID */
+  /** 寃곗젣??(?댁슜?? ID */
   gllerId: string;
 
-  /** 결제 금액 (KRW) */
+  /** 寃곗젣 湲덉븸 (KRW) */
   amount: number;
 
-  /** 결제 수수료 (platform commission) */
+  /** 寃곗젣 ?섏닔猷?(platform commission) */
   commission: {
-    baseCommission: number;      // 기본 수수료 (5%)
-    gradeBonus: number;          // 길러 등급 보너스 (0~2등급)
-    urgencySurcharge: number;    // 긴급도 surcharge
-    totalCommission: number;     // 총 수수료
+    baseCommission: number;      // 湲곕낯 ?섏닔猷?(5%)
+    gradeBonus: number;          // 湲몃윭 ?깃툒 蹂대꼫??(0~2?깃툒)
+    urgencySurcharge: number;    // 湲닿툒??surcharge
+    totalCommission: number;     // 珥??섏닔猷?
   };
 
-  /** 결제 수단 */
+  /** 寃곗젣 ?섎떒 */
   paymentMethod: PaymentMethod;
 
-  /** 결제 상태 */
+  /** 寃곗젣 ?곹깭 */
   status: PaymentStatus;
 
-  /** 결제 시도 횟수 */
+  /** 寃곗젣 ?쒕룄 ?잛닔 */
   attemptCount: number;
 
-  /** 결제 실패 사유 (실패 시) */
+  /** 寃곗젣 ?ㅽ뙣 ?ъ쑀 (?ㅽ뙣 ?? */
   failureReason?: string;
 
-  /** 결제 완료 시간 */
+  /** 寃곗젣 ?꾨즺 ?쒓컙 */
   completedAt?: Timestamp;
 
-  /** 결제 취소 시간 */
+  /** 寃곗젣 痍⑥냼 ?쒓컙 */
   cancelledAt?: Timestamp;
 
-  /** 환불 정보 */
+  /** ?섎텋 ?뺣낫 */
   refund?: {
     amount: number;
     reason: string;
@@ -96,22 +96,22 @@ export interface Payment {
     status: 'pending' | 'completed' | 'failed';
   };
 
-  /** 결제 메타데이터 (PG사 응답 등) */
+  /** 寃곗젣 硫뷀??곗씠??(PG???묐떟 ?? */
   metadata?: {
-    pgProvider?: string;         // PG사 (e.g., 'kakaopay', 'tosspayments')
-    pgTransactionId?: string;    // PG사 거래 ID
-    pgResponse?: Record<string, any>;  // PG사 응답 전체
+    pgProvider?: string;         // PG??(e.g., 'kakaopay', 'tosspayments')
+    pgTransactionId?: string;    // PG??嫄곕옒 ID
+    pgResponse?: Record<string, any>;  // PG???묐떟 ?꾩껜
   };
 
-  /** 생성 시간 */
+  /** ?앹꽦 ?쒓컙 */
   createdAt: Timestamp;
 
-  /** 업데이트 시간 */
+  /** ?낅뜲?댄듃 ?쒓컙 */
   updatedAt: Timestamp;
 }
 
 /**
- * 결제 생성 데이터
+ * 寃곗젣 ?앹꽦 ?곗씠??
  * Data for creating a new payment
  */
 export interface CreatePaymentData {
@@ -133,121 +133,125 @@ export interface CreatePaymentData {
 // ===== Settlement Types =====
 
 /**
- * 정산 상태 (SettlementStatus)
+ * ?뺤궛 ?곹깭 (SettlementStatus)
  * Settlement status enum
  */
 export enum SettlementStatus {
-  /** 정산 대기 중 */
+  /** ?뺤궛 ?湲?以?*/
   PENDING = 'pending',
-  /** 정산 처리 중 */
+  /** ?뺤궛 泥섎━ 以?*/
   PROCESSING = 'processing',
-  /** 정산 완료 */
+  /** ?뺤궛 ?꾨즺 */
   COMPLETED = 'completed',
-  /** 정산 실패 */
+  /** ?뺤궛 ?ㅽ뙣 */
   FAILED = 'failed',
-  /** 정산 보류 */
+  /** ?뺤궛 蹂대쪟 */
   ON_HOLD = 'on_hold',
 }
 
 /**
- * 길러 계좌 정보 (GillerBankAccount)
+ * 湲몃윭 怨꾩쥖 ?뺣낫 (GillerBankAccount)
  * Giller's bank account information
  */
 export interface GillerBankAccount {
-  /** 은행 코드 */
+  /** ???肄붾뱶 */
   bankCode: string;
 
-  /** 은행명 */
+  /** ??됰챸 */
   bankName: string;
 
-  /** 계좌번호 */
-  accountNumber: string;
+  /** 怨꾩쥖踰덊샇 */
+  accountNumber?: string;
+  accountNumberMasked?: string;
+  accountLast4?: string;
 
-  /** 예금주명 */
+  /** ?덇툑二쇰챸 */
   accountHolder: string;
 
-  /** 계좌 상태 */
+  /** 怨꾩쥖 ?곹깭 */
   status: 'active' | 'inactive' | 'verified';
 
-  /** 기본 계좌 여부 */
+  /** 湲곕낯 怨꾩쥖 ?щ? */
   isDefault: boolean;
 
-  /** 검증 시간 */
+  /** 寃利??쒓컙 */
   verifiedAt?: Timestamp;
 
-  /** 생성 시간 */
+  /** ?앹꽦 ?쒓컙 */
   createdAt: Timestamp;
 }
 
 /**
- * 정산 정보 (Settlement)
+ * ?뺤궛 ?뺣낫 (Settlement)
  * Settlement information stored in Firestore
  */
 export interface Settlement {
-  /** 정산 ID */
+  /** ?뺤궛 ID */
   settlementId: string;
 
-  /** 연관된 결제 ID */
+  /** ?곌???寃곗젣 ID */
   paymentId: string;
 
-  /** 연관된 배송/매칭 ID */
+  /** ?곌???諛곗넚/留ㅼ묶 ID */
   deliveryId?: string;
   matchId?: string;
 
-  /** 길러 ID */
+  /** 湲몃윭 ID */
   gillerId: string;
 
-  /** 길러명 (비정규화된 데이터) */
+  /** 湲몃윭紐?(鍮꾩젙洹쒗솕???곗씠?? */
   gillerName: string;
 
-  /** 정산 금액 상세 */
+  /** ?뺤궛 湲덉븸 ?곸꽭 */
   amount: {
-    totalPayment: number;         // 총 결제 금액
-    platformFee: number;          // 플랫폼 수수료
-    gillerEarnings: number;       // 길러 수익
-    tax: number;                  // 세금 (3.3%)
-    netAmount: number;            // 실제 지급액 (수익 - 세금)
+    totalPayment: number;         // 珥?寃곗젣 湲덉븸
+    platformFee: number;          // ?뚮옯???섏닔猷?
+    gillerEarnings: number;       // 湲몃윭 ?섏씡
+    tax: number;                  // ?멸툑 (3.3%)
+    netAmount: number;            // ?ㅼ젣 吏湲됱븸 (?섏씡 - ?멸툑)
   };
 
-  /** 길러 계좌 정보 */
+  /** 湲몃윭 怨꾩쥖 ?뺣낫 */
   bankAccount: {
     bankCode: string;
     bankName: string;
-    accountNumber: string;
+    accountNumber?: string;
+    accountNumberMasked?: string;
+    accountLast4?: string;
     accountHolder: string;
   };
 
-  /** 정산 상태 */
+  /** ?뺤궛 ?곹깭 */
   status: SettlementStatus;
 
-  /** 정산 예정일 */
+  /** ?뺤궛 ?덉젙??*/
   scheduledFor: Date;
 
-  /** 정산 완료일 */
+  /** ?뺤궛 ?꾨즺??*/
   completedAt?: Timestamp;
 
-  /** 정산 실패 사유 */
+  /** ?뺤궛 ?ㅽ뙣 ?ъ쑀 */
   failureReason?: string;
 
-  /** 재시도 횟수 */
+  /** ?ъ떆???잛닔 */
   retryCount: number;
 
-  /** 메타데이터 */
+  /** 硫뷀??곗씠??*/
   metadata?: {
-    processedBy?: string;         // 처리자 (system 또는 admin ID)
-    batchId?: string;             // 일괄 정산 배치 ID
+    processedBy?: string;         // 泥섎━??(system ?먮뒗 admin ID)
+    batchId?: string;             // ?쇨큵 ?뺤궛 諛곗튂 ID
     notes?: string;
   };
 
-  /** 생성 시간 */
+  /** ?앹꽦 ?쒓컙 */
   createdAt: Timestamp;
 
-  /** 업데이트 시간 */
+  /** ?낅뜲?댄듃 ?쒓컙 */
   updatedAt: Timestamp;
 }
 
 /**
- * 정산 생성 데이터
+ * ?뺤궛 ?앹꽦 ?곗씠??
  * Data for creating a new settlement
  */
 export interface CreateSettlementData {
@@ -263,35 +267,35 @@ export interface CreateSettlementData {
 }
 
 /**
- * 정산 내역 조회 필터
+ * ?뺤궛 ?댁뿭 議고쉶 ?꾪꽣
  * Settlement history filter options
  */
 export interface SettlementFilterOptions {
-  /** 길러 ID 필터 */
+  /** 湲몃윭 ID ?꾪꽣 */
   gillerId?: string;
 
-  /** 상태 필터 */
+  /** ?곹깭 ?꾪꽣 */
   status?: SettlementStatus[];
 
-  /** 날짜 범위 필터 */
+  /** ?좎쭨 踰붿쐞 ?꾪꽣 */
   dateRange?: {
     start: Date;
     end: Date;
   };
 
-  /** 최소 금액 필터 */
+  /** 理쒖냼 湲덉븸 ?꾪꽣 */
   minAmount?: number;
 
-  /** 최대 금액 필터 */
+  /** 理쒕? 湲덉븸 ?꾪꽣 */
   maxAmount?: number;
 
-  /** 페이지네이션 */
+  /** ?섏씠吏?ㅼ씠??*/
   pagination?: {
     limit: number;
     offset: number;
   };
 
-  /** 정렬 */
+  /** ?뺣젹 */
   sort?: {
     field: 'createdAt' | 'scheduledFor' | 'amount';
     order: 'asc' | 'desc';
@@ -299,87 +303,88 @@ export interface SettlementFilterOptions {
 }
 
 /**
- * 정산 통계 (SettlementStatistics)
+ * ?뺤궛 ?듦퀎 (SettlementStatistics)
  * Settlement statistics for giller
  */
 export interface SettlementStatistics {
-  /** 총 정산 횟수 */
+  /** 珥??뺤궛 ?잛닔 */
   totalSettlements: number;
 
-  /** 총 수익 */
+  /** 珥??섏씡 */
   totalEarnings: number;
 
-  /** 총 세금 */
+  /** 珥??멸툑 */
   totalTax: number;
 
-  /** 총 지급액 */
+  /** 珥?吏湲됱븸 */
   totalNetAmount: number;
 
-  /** 예정 정산금 (정산 대기 중) */
+  /** ?덉젙 ?뺤궛湲?(?뺤궛 ?湲?以? */
   pendingAmount: number;
 
-  /** 완료된 정산금 */
+  /** ?꾨즺???뺤궛湲?*/
   completedAmount: number;
 
-  /** 보류 중인 정산금 */
+  /** 蹂대쪟 以묒씤 ?뺤궛湲?*/
   onHoldAmount: number;
 
-  /** 평균 정산 주기 (일) */
+  /** ?됯퇏 ?뺤궛 二쇨린 (?? */
   averageSettlementDays: number;
 
-  /** 마지막 정산일 */
+  /** 留덉?留??뺤궛??*/
   lastSettlementDate?: Date;
 }
 
 /**
- * 결제 수수료 계산 결과
+ * 寃곗젣 ?섏닔猷?怨꾩궛 寃곌낵
  * Commission calculation result
  */
 export interface CommissionCalculationResult {
-  /** 기본 수수료 (5%) */
+  /** 湲곕낯 ?섏닔猷?(5%) */
   baseCommission: number;
 
-  /** 길러 등급 보너스 (0~2등급) */
+  /** 湲몃윭 ?깃툒 蹂대꼫??(0~2?깃툒) */
   gradeBonus: number;
 
-  /** 긴급도 surcharge */
+  /** 湲닿툒??surcharge */
   urgencySurcharge: number;
 
-  /** 총 수수료 */
+  /** 珥??섏닔猷?*/
   totalCommission: number;
 
-  /** 길러 수익 */
+  /** 湲몃윭 ?섏씡 */
   gillerEarnings: number;
 
-  /** 최소 수수료 적용 여부 */
+  /** 理쒖냼 ?섏닔猷??곸슜 ?щ? */
   appliedMinimum: boolean;
 
-  /** 계산 시간 */
+  /** 怨꾩궛 ?쒓컙 */
   calculatedAt: Date;
 }
 
 /**
- * 수수료 계산 옵션
+ * ?섏닔猷?怨꾩궛 ?듭뀡
  * Commission calculation options
  */
 export interface CommissionCalculationOptions {
-  /** 결제 금액 */
+  /** 寃곗젣 湲덉븸 */
   amount: number;
 
-  /** 길러 등급 */
+  /** 湲몃윭 ?깃툒 */
   gillerGrade: GillerType;
 
-  /** 긴급도 */
+  /** 湲닿툒??*/
   urgencyLevel: UrgencyLevel;
 }
 
 // ===== Firestore Collection Names =====
 
 /**
- * Firestore 컬렉션 이름 상수
+ * Firestore 而щ젆???대쫫 ?곸닔
  * Firestore collection name constants
  */
 export const PAYMENT_COLLECTIONS = {
   PAYMENTS: 'payments',
   SETTLEMENTS: 'settlements',
 } as const;
+

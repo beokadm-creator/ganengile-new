@@ -1,626 +1,262 @@
-/**
- * Locker Selection Screen
- * 사물함 선택 화면 (P2-1)
- *
- * 기능:
- * - 역별 사물함 목록
- * - 사물함 상세 정보 (가격, 시간, 위치)
- * - 예약 가능 시간대 선택
- * - 예약 버튼
- */
-
-import React, { useState, useEffect } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
-  View,
-  Text,
-  StyleSheet,
-  ScrollView,
-  TouchableOpacity,
   ActivityIndicator,
   Alert,
-  Platform,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
 } from 'react-native';
-import { StackNavigationProp } from '@react-navigation/stack';
-import { getFirestore, doc, collection, query, where, getDocs, updateDoc, addDoc, serverTimestamp } from 'firebase/firestore';
+import { RouteProp, useNavigation, useRoute } from '@react-navigation/native';
+import { createLockerReservation, getLockersByStation } from '../../services/locker-service';
 import { requireUserId } from '../../services/firebase';
-import { Colors, Typography, Spacing, BorderRadius } from '../../theme';
+import { QRCodeService } from '../../services/qrcode-service';
+import type { Locker } from '../../types/locker';
+import type { MainStackNavigationProp, MainStackParamList } from '../../types/navigation';
 
-type NavigationProp = StackNavigationProp<any>;
+type LockerSelectionRoute = RouteProp<MainStackParamList, 'LockerSelection'>;
 
-interface Props {
-  navigation: NavigationProp;
-  route?: {
-    params?: {
-      stationId?: string;
-      stationName?: string;
-    };
-  };
-}
+export default function LockerSelectionScreen() {
+  const navigation = useNavigation<MainStackNavigationProp>();
+  const route = useRoute<LockerSelectionRoute>();
+  const { stationId, stationName, lockerId } = route.params ?? {};
 
-interface Locker {
-  id: string;
-  lockerId: string;
-  lockerNumber: string;
-  type: 'public' | 'private';
-  provider: string;
-  location: {
-    floor: string;
-    section: string;
-  };
-  pricing: {
-    pricePerHour: number;
-    maxHours: number;
-  };
-  availability: {
-    status: 'available' | 'occupied' | 'maintenance';
-    availableSlots: TimeSlot[];
-  };
-}
-
-interface TimeSlot {
-  startTime: string; // HH:mm
-  endTime: string; // HH:mm
-  date: string; // YYYY-MM-DD
-}
-
-export default function LockerSelectionScreen({ navigation, route }: Props) {
+  const [lockers, setLockers] = useState<Locker[]>([]);
   const [loading, setLoading] = useState(true);
   const [reserving, setReserving] = useState(false);
-  const [selectedStation, setSelectedStation] = useState<{ id: string; name: string } | null>(null);
-  const [lockers, setLockers] = useState<Locker[]>([]);
-  const [selectedLocker, setSelectedLocker] = useState<Locker | null>(null);
-  const [selectedTimeSlot, setSelectedTimeSlot] = useState<TimeSlot | null>(null);
+  const [selectedLockerId, setSelectedLockerId] = useState<string | null>(lockerId ?? null);
 
-  useEffect(() => {
-    const stationId = route?.params?.stationId;
-    const stationName = route?.params?.stationName;
-
-    if (stationId && stationName) {
-      setSelectedStation({ id: stationId, name: stationName });
-      loadLockers(stationId);
-    } else {
-      setLoading(false);
-    }
-  }, [route]);
-
-  const loadLockers = async (stationId: string) => {
+  const loadLockers = useCallback(async (targetStationId: string): Promise<void> => {
     try {
       setLoading(true);
-
-      const db = getFirestore();
-      const lockersRef = collection(db, 'lockers');
-      const q = query(
-        lockersRef,
-        where('stationId', '==', stationId)
-      );
-
-      const snapshot = await getDocs(q);
-      const lockerData: Locker[] = [];
-
-      snapshot.forEach((docSnapshot) => {
-        const data = docSnapshot.data();
-
-        lockerData.push({
-          id: docSnapshot.id,
-          lockerId: data?.lockerId || '',
-          lockerNumber: data?.lockerNumber || '',
-          type: data?.type || 'public',
-          provider: data?.provider || '서울메트로',
-          location: data?.location || { floor: '', section: '' },
-          pricing: data?.pricing || { pricePerHour: 2000, maxHours: 4 },
-          availability: {
-            status: data?.availability?.status || 'available',
-            availableSlots: data?.availability?.availableSlots || [],
-          },
-        });
-      });
-
-      setLockers(lockerData);
+      const result = await getLockersByStation(targetStationId);
+      setLockers(result);
+      if (!selectedLockerId && result[0]) {
+        setSelectedLockerId(result[0].lockerId);
+      }
     } catch (error) {
-      console.error('Error loading lockers:', error);
-      Alert.alert('오류', '사물함 정보를 불러올 수 없습니다.');
+      console.error('Failed to load station lockers:', error);
+      Alert.alert('사물함 목록을 불러오지 못했어요', '잠시 후 다시 시도해 주세요.');
     } finally {
       setLoading(false);
     }
-  };
+  }, [selectedLockerId]);
 
-  const handleLockerSelect = (locker: Locker) => {
-    setSelectedLocker(locker);
-    setSelectedTimeSlot(null);
-  };
-
-  const handleTimeSlotSelect = (timeSlot: TimeSlot) => {
-    if (selectedLocker && timeSlot.available) {
-      setSelectedTimeSlot(timeSlot);
-    } else {
-      Alert.alert('이용 불가', '이미 예약된 시간대입니다.');
+  useEffect(() => {
+    if (!stationId) {
+      setLoading(false);
+      return;
     }
-  };
+    void loadLockers(stationId);
+  }, [loadLockers, stationId]);
 
-  const handleReserve = () => {
-    if (!selectedLocker || !selectedTimeSlot) {
-      Alert.alert('선택 필요', '사물함과 예약 시간을 선택해주세요.');
+  const selectedLocker = useMemo(
+    () => lockers.find((locker) => locker.lockerId === selectedLockerId) ?? null,
+    [lockers, selectedLockerId]
+  );
+
+  const handleReserve = async (): Promise<void> => {
+    if (!selectedLocker) {
+      Alert.alert('사물함을 선택해 주세요', '예약할 사물함을 먼저 골라야 합니다.');
       return;
     }
 
-    Alert.alert(
-      '사물함 예약',
-      `${selectedStation?.name} ${selectedLocker.location.floor}층 ${selectedLocker.lockerNumber}번 사물함을\n${selectedTimeSlot.startTime} ~ ${selectedTimeSlot.endTime}\n예약하시겠습니까?\n\n가격: ${selectedLocker.pricing.pricePerHour.toLocaleString()}원`,
-      [
-        { text: '취소', style: 'cancel' },
-        {
-          text: '예약',
-          onPress: submitReservation,
-        },
-      ]
-    );
-  };
-
-  const submitReservation = async () => {
-    if (!selectedLocker || !selectedTimeSlot) return;
-
     try {
       setReserving(true);
-
-      const db = getFirestore();
       const userId = requireUserId();
+      const startTime = new Date();
+      const endTime = new Date(startTime.getTime() + 4 * 60 * 60 * 1000);
+      const qrCode = QRCodeService.generateVerificationQRCode(userId);
 
-      // 예약 데이터 생성 (reservations 컬렉션)
-      await addDoc(collection(db, 'reservations'), {
+      await createLockerReservation(
+        selectedLocker.lockerId,
+        'manual-locker-selection',
         userId,
-        lockerId: selectedLocker.id,
-        lockerNumber: selectedLocker.lockerNumber,
-        stationId: selectedStation?.id || '',
-        stationName: selectedStation?.name || '',
-        startTime: selectedTimeSlot.startTime,
-        endTime: selectedTimeSlot.endTime,
-        date: selectedTimeSlot.date,
-        pricing: {
-          pricePerHour: selectedLocker.pricing.pricePerHour,
-          totalHours: 1,
-          totalPrice: selectedLocker.pricing.pricePerHour,
+        'manual_selection',
+        startTime,
+        endTime,
+        qrCode
+      );
+
+      Alert.alert('사물함 예약 완료', '사물함 임시 예약이 생성됐어요. QR 해제 화면에서 바로 테스트할 수 있습니다.', [
+        {
+          text: 'QR 확인',
+          onPress: () => navigation.navigate('QRCodeScanner'),
         },
-        status: 'pending', // pending, confirmed, completed, cancelled
-        createdAt: serverTimestamp(),
-      });
-
-      // 사물함 상태 업데이트
-      const lockerRef = doc(db, 'lockers', selectedLocker.id);
-      const updatedSlots = selectedLocker.availability.availableSlots.filter(
-        (slot) => slot.date !== selectedTimeSlot.date || slot.startTime !== selectedTimeSlot.startTime
-      );
-
-      await updateDoc(lockerRef, {
-        'availability.availableSlots': updatedSlots,
-        'availability.status': 'reserved',
-      });
-
-      Alert.alert(
-        '예약 완료',
-        '사물함 예약이 완료되었습니다.\n\n예약 정보는 마이페이지에서 확인할 수 있습니다.',
-        [
-          {
-            text: '확인',
-            onPress: () => navigation.goBack(),
-          },
-        ]
-      );
+        {
+          text: '닫기',
+          style: 'cancel',
+          onPress: () => navigation.goBack(),
+        },
+      ]);
     } catch (error) {
-      console.error('Error reserving locker:', error);
-      Alert.alert('오류', '사물함 예약을 실패했습니다.');
+      console.error('Failed to create locker reservation:', error);
+      Alert.alert('사물함 예약 실패', '잠시 후 다시 시도해 주세요.');
     } finally {
       setReserving(false);
     }
   };
 
-  const getProviderColor = (provider: string): string => {
-    switch (provider) {
-      case '서울메트로':
-        return '#00BCD4';
-      case 'CU':
-        return '#00A9E0';
-      case 'GS25':
-        return '#FF9800';
-      default:
-        return '#9E9E9E';
-    }
-  };
-
-  const getAvailabilityBadge = (status: string): { color: string; text: string } => {
-    switch (status) {
-      case 'available':
-        return { color: '#4CAF50', text: '예약 가능' };
-      case 'occupied':
-        return { color: '#FF5252', text: '이용 중' };
-      case 'maintenance':
-        return { color: '#FF9800', text: '점검 중' };
-      default:
-        return { color: '#9E9E9E', text: '알 수 없음' };
-    }
-  };
-
-  const renderTimeSlotButton = (timeSlot: TimeSlot, index: number) => {
-    const { color, text } = getAvailabilityBadge(
-      timeSlot.available ? 'available' : 'occupied'
-    );
-    const isSelected = selectedTimeSlot?.date === timeSlot.date && selectedTimeSlot?.startTime === timeSlot.startTime;
-
-    return (
-      <TouchableOpacity
-        key={index}
-        style={[
-          styles.timeSlotButton,
-          !timeSlot.available && styles.timeSlotButtonDisabled,
-          isSelected && styles.timeSlotButtonSelected,
-        ]}
-        onPress={() => handleTimeSlotSelect(timeSlot)}
-        disabled={!timeSlot.available}
-      >
-        <Text style={[styles.timeSlotTime, isSelected && styles.timeSlotTimeSelected]}>
-          {timeSlot.startTime}
-        </Text>
-        <Text style={[styles.timeSlotSeparator, isSelected && styles.timeSlotSeparatorSelected]}>
-          ~
-        </Text>
-        <Text style={[styles.timeSlotTime, isSelected && styles.timeSlotTimeSelected]}>
-          {timeSlot.endTime}
-        </Text>
-        <View style={[styles.timeSlotBadge, { backgroundColor: color }]}>
-          <Text style={styles.timeSlotBadgeText}>{text}</Text>
-        </View>
-      </TouchableOpacity>
-    );
-  };
-
-  const renderLockerCard = (locker: Locker) => {
-    const providerColor = getProviderColor(locker.provider);
-    const isSelected = selectedLocker?.id === locker.id;
-    const { color: statusColor, text: statusText } = getAvailabilityBadge(locker.availability.status);
-
-    return (
-      <TouchableOpacity
-        key={locker.id}
-        style={[
-          styles.lockerCard,
-          isSelected && styles.lockerCardSelected,
-          locker.availability.status !== 'available' && styles.lockerCardDisabled,
-        ]}
-        onPress={() => handleLockerSelect(locker)}
-        disabled={locker.availability.status !== 'available'}
-        activeOpacity={0.7}
-      >
-        {/* 헤더 */}
-        <View style={styles.cardHeader}>
-          <View style={styles.lockerInfo}>
-            <View style={[styles.lockerNumberBadge, { backgroundColor: providerColor }]}>
-              <Text style={styles.lockerNumberText}>{locker.lockerNumber}</Text>
-            </View>
-            <View style={styles.locationInfo}>
-              <Text style={styles.locationText}>📍 {locker.location.floor}층</Text>
-              <Text style={styles.locationText}>🏢 {locker.location.section}</Text>
-            </View>
-          </View>
-          <View style={[styles.statusBadge, { backgroundColor: statusColor }]}>
-            <Text style={styles.statusBadgeText}>{statusText}</Text>
-          </View>
-        </View>
-
-        <View style={[styles.providerBadge, { backgroundColor: providerColor }]}>
-          <Text style={styles.providerBadgeText}>{locker.provider}</Text>
-        </View>
-
-        {/* 가격 정보 */}
-        <View style={styles.pricingInfo}>
-          <Text style={styles.priceText}>
-            {locker.pricing.pricePerHour.toLocaleString()}원 / 시간
-          </Text>
-          <Text style={styles.maxHoursText}>
-            최대 {locker.pricing.maxHours}시간
-          </Text>
-        </View>
-
-        {/* 이용 가능 시간대 */}
-        {locker.availability.availableSlots.length > 0 && (
-          <View style={styles.timeSlotsContainer}>
-            <Text style={styles.timeSlotsTitle}>예약 가능 시간</Text>
-            <View style={styles.timeSlotsGrid}>
-              {locker.availability.availableSlots.map((timeSlot, index) =>
-                renderTimeSlotButton(timeSlot, index)
-              )}
-            </View>
-          </View>
-        )}
-
-        {/* 예약 버튼 */}
-        {locker.availability.status === 'available' && selectedLocker?.id === locker.id && (
-          <TouchableOpacity
-            style={[styles.reserveButton, !selectedTimeSlot && styles.reserveButtonDisabled]}
-            onPress={handleReserve}
-            disabled={!selectedTimeSlot || reserving}
-          >
-            <Text style={styles.reserveButtonText}>
-              {reserving ? '예약 중...' : '예약하기'}
-            </Text>
-          </TouchableOpacity>
-        )}
-      </TouchableOpacity>
-    );
-  };
-
   if (loading) {
     return (
       <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color={Colors.primary} />
-        <Text style={styles.loadingText}>사물함 정보를 불러오는 중...</Text>
+        <ActivityIndicator size="large" color="#2563EB" />
+        <Text style={styles.loadingText}>역 사물함을 불러오고 있어요.</Text>
       </View>
     );
   }
 
   return (
-    <View style={styles.container}>
-      {/* 헤더 */}
+    <ScrollView style={styles.container} contentContainerStyle={styles.content}>
       <View style={styles.header}>
-        <Text style={styles.headerTitle}>사물함 선택</Text>
-        <Text style={styles.headerSubtitle}>
-          {selectedStation ? `${selectedStation.name}` : '역'} 사물함을 선택하세요
+        <Text style={styles.title}>{stationName ?? '사물함 선택'}</Text>
+        <Text style={styles.subtitle}>
+          픽업과 전달에 쓸 사물함을 고릅니다. 현재는 빠른 운영 연결을 위해 기본 4시간 예약 기준으로 처리합니다.
         </Text>
       </View>
 
-      {/* 사물함 목록 */}
-      <ScrollView
-        style={styles.lockerList}
-        contentContainerStyle={styles.lockerListContent}
-        showsVerticalScrollIndicator={false}
-      >
-        {lockers.map((locker) => renderLockerCard(locker))}
-
-        {lockers.length === 0 && (
-          <View style={styles.emptyContainer}>
-            <Text style={styles.emptyIcon}>🔍</Text>
-            <Text style={styles.emptyText}>이용 가능한 사물함이 없습니다</Text>
-            <Text style={styles.emptySubtext}>
-              다른 역을 확인하거나 나중에 다시 시도해주세요
-            </Text>
-          </View>
-        )}
-      </ScrollView>
-
-      {/* 선택 정보 */}
-      {selectedLocker && (
-        <View style={styles.footer}>
-          <Text style={styles.footerText}>
-            💡 예약 시간을 선택하면 예약하기 버튼이 활성화됩니다
-          </Text>
+      {lockers.length === 0 ? (
+        <View style={styles.emptyCard}>
+          <Text style={styles.emptyTitle}>이 역에는 선택 가능한 사물함이 없어요</Text>
+          <Text style={styles.emptyBody}>다른 역을 선택하거나 일반 배송 흐름으로 진행해 주세요.</Text>
         </View>
+      ) : (
+        lockers.map((locker) => {
+          const active = locker.lockerId === selectedLockerId;
+          return (
+            <TouchableOpacity
+              key={locker.lockerId}
+              style={[styles.card, active ? styles.cardActive : undefined]}
+              onPress={() => setSelectedLockerId(locker.lockerId)}
+            >
+              <View style={styles.cardHeader}>
+                <Text style={styles.cardTitle}>{locker.location.section || locker.lockerId}</Text>
+                <Text style={styles.badge}>{locker.status}</Text>
+              </View>
+              <Text style={styles.cardBody}>
+                {locker.location.floor}층 · {locker.location.line || '노선 정보 없음'}
+              </Text>
+              <Text style={styles.cardMeta}>
+                기본 {locker.pricing.base.toLocaleString()}원 / {locker.pricing.baseDuration}분
+              </Text>
+            </TouchableOpacity>
+          );
+        })
       )}
-    </View>
+
+      <TouchableOpacity style={styles.primaryButton} onPress={() => void handleReserve()} disabled={reserving}>
+        {reserving ? (
+          <ActivityIndicator size="small" color="#FFFFFF" />
+        ) : (
+          <Text style={styles.primaryButtonText}>선택한 사물함으로 예약</Text>
+        )}
+      </TouchableOpacity>
+    </ScrollView>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: Colors.background,
+    backgroundColor: '#F8FAFC',
   },
-  header: {
-    paddingHorizontal: Spacing.md,
-    paddingTop: Spacing.lg,
-    paddingBottom: Spacing.sm,
-    backgroundColor: Colors.surface,
-  },
-  headerTitle: {
-    ...Typography.h2,
-    color: Colors.text,
-    marginBottom: Spacing.xs,
-  },
-  headerSubtitle: {
-    ...Typography.body2,
-    color: Colors.textSecondary,
+  content: {
+    padding: 20,
+    gap: 16,
   },
   loadingContainer: {
     flex: 1,
-    justifyContent: 'center',
     alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#F8FAFC',
   },
   loadingText: {
-    ...Typography.body1,
-    color: Colors.textSecondary,
-    marginTop: Spacing.md,
+    marginTop: 12,
+    fontSize: 14,
+    color: '#64748B',
   },
-  lockerList: {
-    flex: 1,
+  header: {
+    gap: 8,
   },
-  lockerListContent: {
-    padding: Spacing.md,
+  title: {
+    fontSize: 28,
+    fontWeight: '800',
+    color: '#0F172A',
   },
-  lockerCard: {
-    backgroundColor: Colors.surface,
-    borderRadius: BorderRadius.lg,
-    padding: Spacing.md,
-    marginBottom: Spacing.md,
-    ...Platform.select({
-      ios: {
-        shadowColor: Colors.black,
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.1,
-        shadowRadius: 4,
-      },
-      android: {
-        elevation: 2,
-      },
-    }),
+  subtitle: {
+    fontSize: 15,
+    lineHeight: 22,
+    color: '#64748B',
   },
-  lockerCardSelected: {
-    borderWidth: 2,
-    borderColor: Colors.primary,
+  emptyCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 24,
+    padding: 20,
+    gap: 8,
   },
-  lockerCardDisabled: {
-    opacity: 0.5,
+  emptyTitle: {
+    fontSize: 18,
+    fontWeight: '800',
+    color: '#0F172A',
+  },
+  emptyBody: {
+    fontSize: 14,
+    lineHeight: 20,
+    color: '#64748B',
+  },
+  card: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 24,
+    padding: 20,
+    gap: 8,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+  },
+  cardActive: {
+    borderColor: '#2563EB',
+    backgroundColor: '#EFF6FF',
   },
   cardHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: Spacing.md,
+    gap: 12,
   },
-  lockerInfo: {
-    flexDirection: 'row',
-    alignItems: 'center',
+  cardTitle: {
     flex: 1,
+    fontSize: 17,
+    fontWeight: '800',
+    color: '#0F172A',
   },
-  lockerNumberBadge: {
-    paddingHorizontal: Spacing.sm,
-    paddingVertical: Spacing.xs,
-    borderRadius: BorderRadius.sm,
-    backgroundColor: Colors.primary,
-  },
-  lockerNumberText: {
-    ...Typography.h3,
-    color: Colors.white,
+  badge: {
+    fontSize: 12,
     fontWeight: '700',
+    color: '#1D4ED8',
+    backgroundColor: '#DBEAFE',
+    borderRadius: 999,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    overflow: 'hidden',
   },
-  locationInfo: {
-    marginLeft: Spacing.sm,
+  cardBody: {
+    fontSize: 14,
+    color: '#334155',
   },
-  locationText: {
-    ...Typography.body2,
-    color: Colors.textSecondary,
-    marginRight: Spacing.sm,
+  cardMeta: {
+    fontSize: 13,
+    color: '#64748B',
   },
-  statusBadge: {
-    paddingHorizontal: Spacing.sm,
-    paddingVertical: Spacing.xs,
-    borderRadius: BorderRadius.sm,
-  },
-  statusBadgeText: {
-    ...Typography.bodySmall,
-    color: Colors.white,
-    fontWeight: '600',
-  },
-  providerBadge: {
-    paddingHorizontal: Spacing.sm,
-    paddingVertical: Spacing.xs,
-    borderRadius: BorderRadius.sm,
-  },
-  providerBadgeText: {
-    ...Typography.bodySmall,
-    color: Colors.white,
-    fontWeight: '600',
-  },
-  pricingInfo: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
+  primaryButton: {
     alignItems: 'center',
-    marginBottom: Spacing.md,
+    justifyContent: 'center',
+    paddingVertical: 16,
+    borderRadius: 18,
+    backgroundColor: '#2563EB',
   },
-  priceText: {
-    ...Typography.h3,
-    color: Colors.primary,
+  primaryButtonText: {
+    fontSize: 15,
     fontWeight: '700',
-  },
-  maxHoursText: {
-    ...Typography.body2,
-    color: Colors.textSecondary,
-  },
-  timeSlotsContainer: {
-    backgroundColor: Colors.background,
-    borderRadius: BorderRadius.md,
-    padding: Spacing.md,
-  },
-  timeSlotsTitle: {
-    ...Typography.h3,
-    color: Colors.text,
-    marginBottom: Spacing.md,
-  },
-  timeSlotsGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-  },
-  timeSlotButton: {
-    backgroundColor: Colors.background,
-    borderRadius: BorderRadius.md,
-    padding: Spacing.sm,
-    marginRight: Spacing.sm,
-    marginBottom: Spacing.sm,
-    borderWidth: 1,
-    borderColor: Colors.border,
-    minWidth: 80,
-  },
-  timeSlotButtonDisabled: {
-    opacity: 0.5,
-    borderColor: Colors.border,
-  },
-  timeSlotButtonSelected: {
-    borderColor: Colors.primary,
-    backgroundColor: Colors.primary + '10',
-  },
-  timeSlotTime: {
-    ...Typography.body1,
-    color: Colors.text,
-    fontWeight: '600',
-  },
-  timeSlotTimeSelected: {
-    color: Colors.primary,
-  },
-  timeSlotSeparator: {
-    ...Typography.body1,
-    color: Colors.textSecondary,
-    marginHorizontal: Spacing.xs,
-  },
-  timeSlotSeparatorSelected: {
-    color: Colors.primary,
-  },
-  timeSlotBadge: {
-    paddingHorizontal: Spacing.sm,
-    paddingVertical: Spacing.xs,
-    borderRadius: BorderRadius.sm,
-  },
-  timeSlotBadgeText: {
-    ...Typography.bodySmall,
-    color: Colors.white,
-    fontWeight: '600',
-  },
-  reserveButton: {
-    backgroundColor: Colors.primary,
-    borderRadius: BorderRadius.md,
-    padding: Spacing.lg,
-    alignItems: 'center',
-    marginTop: Spacing.md,
-  },
-  reserveButtonDisabled: {
-    backgroundColor: Colors.border,
-  },
-  reserveButtonText: {
-    ...Typography.h3,
-    color: Colors.white,
-    fontWeight: '700',
-  },
-  emptyContainer: {
-    paddingVertical: Spacing.xl,
-    alignItems: 'center',
-  },
-  emptyIcon: {
-    fontSize: 48,
-    marginBottom: Spacing.md,
-  },
-  emptyText: {
-    ...Typography.h3,
-    color: Colors.text,
-    marginBottom: Spacing.xs,
-  },
-  emptySubtext: {
-    ...Typography.body2,
-    color: Colors.textSecondary,
-    textAlign: 'center',
-  },
-  footer: {
-    backgroundColor: Colors.surface,
-    paddingHorizontal: Spacing.md,
-    paddingVertical: Spacing.lg,
-  },
-  footerText: {
-    ...Typography.body2,
-    color: Colors.textSecondary,
-    textAlign: 'center',
+    color: '#FFFFFF',
   },
 });

@@ -1,646 +1,328 @@
-/**
- * Unlock Locker Screen
- * 이용자가 사물함에서 물품을 수령하는 화면
- */
-
-import React, { useState, useEffect } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import {
-  View,
-  Text,
-  StyleSheet,
-  TouchableOpacity,
-  Alert,
   ActivityIndicator,
+  Alert,
   ScrollView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { useRoute, useNavigation } from '@react-navigation/native';
+import { RouteProp, useNavigation, useRoute } from '@react-navigation/native';
 import { requireUserId } from '../../services/firebase';
 import {
-  updateReservationStatus,
   addReservationPhotos,
+  getDeliveryReservations,
+  updateReservationStatus,
 } from '../../services/locker-service';
 import { confirmDeliveryByRequester } from '../../services/delivery-service';
-import { verifyQRCode, getQRCodeRemainingTime } from '../../services/qrcode-service';
+import { getQRCodeRemainingTime, verifyQRCode } from '../../services/qrcode-service';
 import { takePhoto, uploadPhotoWithThumbnail } from '../../services/photo-service';
-import type { MainStackNavigationProp } from '../../types/navigation';
 import type { LockerReservation } from '../../types/locker';
-import { Colors, Spacing, Typography, BorderRadius } from '../../theme';
+import type { MainStackNavigationProp, MainStackParamList } from '../../types/navigation';
+import { BorderRadius, Colors, Spacing, Typography } from '../../theme';
 
-interface RouteParams {
-  deliveryId: string;
-}
-
-type Step = 'scan' | 'open' | 'collect' | 'photo' | 'complete';
+type UnlockLockerRoute = RouteProp<MainStackParamList, 'UnlockLocker'>;
+type Step = 'verify' | 'collect' | 'photo' | 'complete';
 
 export default function UnlockLockerScreen() {
-  const route = useRoute();
   const navigation = useNavigation<MainStackNavigationProp>();
-  const { deliveryId } = (route.params as RouteParams) || {};
+  const route = useRoute<UnlockLockerRoute>();
+  const { deliveryId } = route.params;
 
-  const [currentStep, setCurrentStep] = useState<Step>('scan');
-  const [loading, setLoading] = useState(false);
+  const [step, setStep] = useState<Step>('verify');
+  const [loading, setLoading] = useState(true);
+  const [working, setWorking] = useState(false);
   const [reservation, setReservation] = useState<LockerReservation | null>(null);
   const [collectPhotoUrl, setCollectPhotoUrl] = useState<string | null>(null);
-  const [remainingTime, setRemainingTime] = useState(0);
+  const [remainingMinutes, setRemainingMinutes] = useState(0);
 
-  const loadReservation = async () => {
-    if (!deliveryId) {
-      Alert.alert('오류', '배송 ID가 없습니다.');
-      navigation.goBack();
+  const loadReservation = useCallback(async (): Promise<void> => {
+    try {
+      setLoading(true);
+      const reservations = await getDeliveryReservations(deliveryId);
+      const pickupReservation =
+        reservations.find((item) => item.type === 'requester_pickup') ?? reservations[0] ?? null;
+
+      if (!pickupReservation) {
+        Alert.alert('No locker reservation found', 'Try again after the locker handoff is complete.', [
+          { text: 'Close', onPress: () => navigation.goBack() },
+        ]);
+        return;
+      }
+
+      setReservation(pickupReservation);
+      setRemainingMinutes(getQRCodeRemainingTime(pickupReservation.qrCode));
+    } catch (error) {
+      console.error('Failed to load locker reservation:', error);
+      Alert.alert('Failed to load locker info', 'Please try again in a moment.', [
+        { text: 'Close', onPress: () => navigation.goBack() },
+      ]);
+    } finally {
+      setLoading(false);
+    }
+  }, [deliveryId, navigation]);
+
+  useEffect(() => {
+    void loadReservation();
+  }, [loadReservation]);
+
+  const handleVerifyQr = (): void => {
+    if (!reservation) {
+      return;
+    }
+
+    const verification = verifyQRCode(reservation.qrCode);
+    if (!verification.isValid) {
+      Alert.alert('QR verification failed', verification.error ?? 'This QR code is not valid.');
+      return;
+    }
+
+    void updateReservationStatus(reservation.reservationId, 'in_use');
+    setStep('collect');
+  };
+
+  const handleCollect = (): void => {
+    setStep('photo');
+  };
+
+  const handleTakePhoto = async (): Promise<void> => {
+    try {
+      setWorking(true);
+      const photoUri = await takePhoto();
+      if (!photoUri) {
+        return;
+      }
+
+      const userId = requireUserId();
+      const uploaded = await uploadPhotoWithThumbnail(photoUri, userId, 'locker-collect');
+      setCollectPhotoUrl(uploaded.url);
+      setStep('complete');
+    } catch (error) {
+      console.error('Failed to capture pickup photo:', error);
+      Alert.alert('Photo upload failed', 'Please try again.');
+    } finally {
+      setWorking(false);
+    }
+  };
+
+  const handleComplete = async (): Promise<void> => {
+    if (!reservation) {
       return;
     }
 
     try {
-      setLoading(true);
-      // 배송의 수령 예약 조회
-      const { getDeliveryReservations } = await import('../../services/locker-service');
-      const reservations = await getDeliveryReservations(deliveryId);
-      const collectReservation = reservations.find((r) => r.reservationType === 'user_pickup');
+      setWorking(true);
 
-      if (!collectReservation) {
-        Alert.alert(
-          '오류',
-          '사물함 예약을 찾을 수 없습니다.\n\n길러에게 QR코드를 요청하세요.'
-        );
-        navigation.goBack();
-        return;
-      }
-
-      setReservation(collectReservation);
-
-      // 남은 시간 계산
-      const remaining = getQRCodeRemainingTime(collectReservation.qrCode);
-      setRemainingTime(remaining);
-    } catch (error) {
-      console.error('Error loading reservation:', error);
-      Alert.alert('오류', '예약 정보를 불러오는데 실패했습니다.');
-      navigation.goBack();
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    loadReservation();
-  }, [deliveryId]);
-
-  const handleQRCodeScan = (data: string) => {
-    try {
-      const verification = verifyQRCode(data);
-
-      if (!verification.isValid) {
-        Alert.alert('QR코드 오류', verification.error || '유효하지 않은 QR코드입니다.');
-        return;
-      }
-
-      // 예약 ID 확인
-      if (reservation && verification.reservation?.reservationId !== reservation.reservationId) {
-        Alert.alert(
-          'QR코드 불일치',
-          '이 배송의 QR코드가 아닙니다.\n\n올바른 QR코드를 스캔해주세요.'
-        );
-        return;
-      }
-
-      setCurrentStep('open');
-    } catch (error) {
-      console.error('Error verifying QR code:', error);
-      Alert.alert('오류', 'QR코드 검증 중 오류가 발생했습니다.');
-    }
-  };
-
-  const handleOpenLocker = () => {
-    Alert.alert(
-      '사물함 열기',
-      'QR코드를 사물함 스캐너에 대세요.\n\n열리면 다음 단계로 진행합니다.',
-      [
-        { text: '취소', style: 'cancel' },
-        {
-          text: '열림',
-          onPress: () => {
-            // 예약 상태를 'in_use'로 변경
-            updateReservationStatus(reservation!.reservationId, 'in_use');
-            setCurrentStep('collect');
-          },
-        },
-      ]
-    );
-  };
-
-  const handleCollect = () => {
-    Alert.alert(
-      '물품 수령',
-      '사물함에서 물품을 꺼내세요.\n\n상태를 확인하고 문제가 없으면 다음으로 진행하세요.',
-      [
-        { text: '문제 있음', style: 'destructive' },
-        {
-          text: '수령 완료',
-          onPress: () => setCurrentStep('photo'),
-        },
-      ]
-    );
-  };
-
-  const handleTakePhoto = async () => {
-    try {
-      const photoUri = await takePhoto();
-      if (!photoUri) return;
-
-      setLoading(true);
-      const userId = await requireUserId();
-      const result = await uploadPhotoWithThumbnail(photoUri, userId, 'collect');
-      setCollectPhotoUrl(result.url);
-      setCurrentStep('complete');
-    } catch (error) {
-      console.error('Error taking photo:', error);
-      Alert.alert('오류', '사진 촬영에 실패했습니다.');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleComplete = async () => {
-    try {
-      setLoading(true);
-
-      if (reservation && collectPhotoUrl) {
+      if (collectPhotoUrl) {
         await addReservationPhotos(reservation.reservationId, undefined, collectPhotoUrl);
-        await updateReservationStatus(reservation.reservationId, 'completed');
       }
 
-      const requesterId = await requireUserId();
-      const confirmResult = await confirmDeliveryByRequester({
+      await updateReservationStatus(reservation.reservationId, 'completed');
+
+      const requesterId = requireUserId();
+      const result = await confirmDeliveryByRequester({
         deliveryId,
         requesterId,
       });
 
-      if (!confirmResult.success) {
-        Alert.alert('오류', confirmResult.message);
-        setLoading(false);
+      if (!result.success) {
+        Alert.alert('Completion failed', result.message);
         return;
       }
 
-      Alert.alert(
-        '✅ 수령 완료',
-        '사물함에서 물품을 수령했습니다.\n\n배송이 완료되었습니다.',
-        [
-          {
-            text: '확인',
-            onPress: () => {
-              navigation.navigate('Rating' as never, {
-                deliveryId: deliveryId,
-                gillerId: reservation!.userId,
-                gllerId: reservation!.userId,
-              });
-            },
-          },
-        ]
-      );
+      Alert.alert('Locker pickup complete', 'The pickup was confirmed. Continue to the rating step.', [
+        {
+          text: 'Rate delivery',
+          onPress: () =>
+            navigation.navigate('Rating', {
+              deliveryId,
+              gillerId: reservation.userId,
+              gllerId: reservation.userId,
+            }),
+        },
+      ]);
     } catch (error) {
-      console.error('Error completing collection:', error);
-      Alert.alert('오류', '수령 완료 처리에 실패했습니다.');
+      console.error('Failed to complete locker pickup:', error);
+      Alert.alert('Completion failed', 'Please try again.');
     } finally {
-      setLoading(false);
+      setWorking(false);
     }
   };
 
-  const renderStep = () => {
-    switch (currentStep) {
-      case 'scan':
-        return (
-          <View style={styles.stepContainer}>
-            <View style={styles.stepHeader}>
-              <Ionicons name="qr-code" size={48} color={Colors.primary} />
-              <Text style={styles.stepTitle}>QR코드 스캔</Text>
-              <Text style={styles.stepDescription}>
-                길러가 받은 QR코드를 스캔하세요
-              </Text>
-            </View>
-
-            {reservation && (
-              <View style={styles.qrInfo}>
-                <Text style={styles.qrInfoText}>
-                  사물함: {reservation.lockerId}
-                </Text>
-                {remainingTime > 0 && (
-                  <Text style={styles.qrTime}>
-                    남은 시간: {remainingTime}분
-                  </Text>
-                )}
-                {remainingTime === 0 && (
-                  <Text style={styles.qrExpired}>
-                    ⚠️ QR코드 만료됨 (길러에게 재요청)
-                  </Text>
-                )}
-              </View>
-            )}
-
-            <View style={styles.scanButtonContainer}>
-              <TouchableOpacity
-                style={styles.scanButton}
-                onPress={() => {
-                  // 수동 QR코드 입력 (테스트용)
-                  if (reservation) {
-                    handleQRCodeScan(reservation.qrCode);
-                  }
-                }}
-              >
-                <Ionicons name="camera" size={24} color="#fff" />
-                <Text style={styles.scanButtonText}>카메라로 스캔</Text>
-              </TouchableOpacity>
-            </View>
-
-            <TouchableOpacity
-              style={styles.helpButton}
-              onPress={() => {
-                Alert.alert(
-                  'QR코드가 없나요?',
-                  '길러에게 연락하여 QR코드를 다시 요청하세요.\n\n길러가 사물함에 보관한 후 QR코드를 생성합니다.',
-                  [{ text: '확인' }]
-                );
-              }}
-            >
-              <Text style={styles.helpButtonText}>QR코드가 없나요?</Text>
-            </TouchableOpacity>
-          </View>
-        );
-
-      case 'open':
-        return (
-          <View style={styles.stepContainer}>
-            <View style={styles.stepHeader}>
-              <Ionicons name="lock-open" size={48} color={Colors.secondary} />
-              <Text style={styles.stepTitle}>사물함 열기</Text>
-              <Text style={styles.stepDescription}>
-                QR코드를 사물함 스캐너에 대세요
-              </Text>
-            </View>
-
-            <View style={styles.instructionContainer}>
-              <Text style={styles.instructionStep}>1. 사물함 앞으로 이동</Text>
-              <Text style={styles.instructionStep}>2. QR코드를 스캔너에 대세요</Text>
-              <Text style={styles.instructionStep}>3. 열리면 확인을 누르세요</Text>
-            </View>
-
-            <TouchableOpacity
-              style={styles.actionButton}
-              onPress={handleOpenLocker}
-            >
-              <Text style={styles.actionButtonText}>열렸습니다</Text>
-            </TouchableOpacity>
-          </View>
-        );
-
-      case 'collect':
-        return (
-          <View style={styles.stepContainer}>
-            <View style={styles.stepHeader}>
-              <Ionicons name="cube" size={48} color={Colors.success} />
-              <Text style={styles.stepTitle}>물품 수령</Text>
-              <Text style={styles.stepDescription}>
-                사물함에서 물품을 꺼내세요
-              </Text>
-            </View>
-
-            <View style={styles.instructionContainer}>
-              <Text style={styles.instructionStep}>1. 사물함에서 물품을 꺼내세요</Text>
-              <Text style={styles.instructionStep}>2. 내용물을 확인하세요</Text>
-              <Text style={styles.instructionStep}>3. 파손/누락 여부를 확인하세요</Text>
-            </View>
-
-            <View style={styles.warningBox}>
-              <Ionicons name="warning" size={20} color={Colors.accent} />
-              <Text style={styles.warningText}>
-                물품에 파손이나 누락이 있는 경우 '문제 있음'을 눌러주세요
-              </Text>
-            </View>
-
-            <TouchableOpacity
-              style={styles.actionButton}
-              onPress={handleCollect}
-            >
-              <Text style={styles.actionButtonText}>수령 완료</Text>
-            </TouchableOpacity>
-          </View>
-        );
-
-      case 'photo':
-        return (
-          <View style={styles.stepContainer}>
-            <View style={styles.stepHeader}>
-              <Ionicons name="image" size={48} color={Colors.primary} />
-              <Text style={styles.stepTitle}>사진 촬영</Text>
-              <Text style={styles.stepDescription}>
-                수령 증거 사진을 촬영하세요 (선택)
-              </Text>
-            </View>
-
-            <View style={styles.noteBox}>
-              <Text style={styles.noteText}>
-                사진 촬영은 선택사항입니다. 분쟁 발생 시 증거로 사용됩니다.
-              </Text>
-            </View>
-
-            {collectPhotoUrl && (
-              <View style={styles.photoPreview}>
-                <Text style={styles.photoPreviewText}>사진이 촬영되었습니다</Text>
-                <TouchableOpacity
-                  style={styles.retakeButton}
-                  onPress={handleTakePhoto}
-                >
-                  <Text style={styles.retakeButtonText}>다시 촬영</Text>
-                </TouchableOpacity>
-              </View>
-            )}
-
-            <TouchableOpacity
-              style={[styles.actionButton, styles.secondaryButton]}
-              onPress={handleTakePhoto}
-            >
-              <Ionicons name="camera" size={20} color="#fff" />
-              <Text style={styles.actionButtonText}>사진 촬영</Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              style={styles.skipButton}
-              onPress={handleComplete}
-            >
-              <Text style={styles.skipButtonText}>사진 없이 완료</Text>
-            </TouchableOpacity>
-          </View>
-        );
-
-      case 'complete':
-        return (
-          <View style={styles.stepContainer}>
-            <View style={styles.stepHeader}>
-              <Ionicons name="checkmark-circle" size={48} color={Colors.success} />
-              <Text style={styles.stepTitle}>수령 완료</Text>
-              <Text style={styles.stepDescription}>
-                배송이 완료되었습니다
-              </Text>
-            </View>
-
-            <View style={styles.successBox}>
-              <Ionicons name="checkmark-circle" size={32} color={Colors.success} />
-              <Text style={styles.successText}>
-                물품을 안전하게 수령했습니다
-              </Text>
-            </View>
-
-            <TouchableOpacity
-              style={styles.actionButton}
-              onPress={handleComplete}
-              disabled={loading}
-            >
-              <Text style={styles.actionButtonText}>
-                {loading ? '처리 중...' : '평가하러 가기'}
-              </Text>
-            </TouchableOpacity>
-          </View>
-        );
-
-      default:
-        return null;
-    }
-  };
-
-  if (loading && !reservation) {
+  if (loading) {
     return (
-      <View style={styles.centerContainer}>
+      <View style={styles.loadingContainer}>
         <ActivityIndicator size="large" color={Colors.primary} />
-        <Text style={styles.loadingText}>예약 정보 로딩 중...</Text>
+        <Text style={styles.loadingText}>Checking locker reservation…</Text>
       </View>
     );
   }
 
+  if (!reservation) {
+    return null;
+  }
+
   return (
-    <View style={styles.container}>
-      {/* Header */}
+    <ScrollView style={styles.container} contentContainerStyle={styles.content}>
       <View style={styles.header}>
-        <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
-          <Ionicons name="arrow-back" size={24} color={Colors.white} />
-        </TouchableOpacity>
-        <Text style={styles.title}>사물함 수령</Text>
-        <View style={styles.backButton} />
+        <Text style={styles.title}>Unlock Locker</Text>
+        <Text style={styles.subtitle}>Verify the reservation QR, collect the item, add a pickup photo, then finish.</Text>
       </View>
 
-      {/* Content */}
-      <ScrollView style={styles.content}>
-        {renderStep()}
-      </ScrollView>
+      <View style={styles.card}>
+        <Text style={styles.sectionTitle}>Reservation</Text>
+        <Text style={styles.infoText}>Locker: {reservation.lockerId}</Text>
+        <Text style={styles.infoText}>Status: {reservation.status}</Text>
+        <Text style={styles.infoText}>
+          QR remaining: {remainingMinutes > 0 ? `${remainingMinutes} min` : 'expired or unavailable'}
+        </Text>
+      </View>
+
+      <View style={styles.card}>
+        <Text style={styles.sectionTitle}>Current step</Text>
+        <StepRow active={step === 'verify'} done={step !== 'verify'} label="Verify QR" />
+        <StepRow active={step === 'collect'} done={step === 'photo' || step === 'complete'} label="Collect item" />
+        <StepRow active={step === 'photo'} done={step === 'complete'} label="Pickup photo" />
+        <StepRow active={step === 'complete'} done={false} label="Complete" />
+      </View>
+
+      {step === 'verify' ? (
+        <TouchableOpacity style={styles.primaryButton} onPress={handleVerifyQr}>
+          <Text style={styles.primaryButtonText}>Verify reservation QR</Text>
+        </TouchableOpacity>
+      ) : null}
+
+      {step === 'collect' ? (
+        <TouchableOpacity style={styles.primaryButton} onPress={handleCollect}>
+          <Text style={styles.primaryButtonText}>Item collected</Text>
+        </TouchableOpacity>
+      ) : null}
+
+      {step === 'photo' ? (
+        <TouchableOpacity style={styles.primaryButton} onPress={() => void handleTakePhoto()} disabled={working}>
+          {working ? (
+            <ActivityIndicator size="small" color="#FFFFFF" />
+          ) : (
+            <Text style={styles.primaryButtonText}>Capture pickup photo</Text>
+          )}
+        </TouchableOpacity>
+      ) : null}
+
+      {step === 'complete' ? (
+        <TouchableOpacity style={styles.primaryButton} onPress={() => void handleComplete()} disabled={working}>
+          {working ? (
+            <ActivityIndicator size="small" color="#FFFFFF" />
+          ) : (
+            <Text style={styles.primaryButtonText}>Finish pickup</Text>
+          )}
+        </TouchableOpacity>
+      ) : null}
+    </ScrollView>
+  );
+}
+
+function StepRow({ active, done, label }: { active: boolean; done: boolean; label: string }) {
+  return (
+    <View style={styles.stepRow}>
+      <View
+        style={[
+          styles.stepDot,
+          done ? styles.stepDotDone : active ? styles.stepDotActive : styles.stepDotIdle,
+        ]}
+      >
+        {done ? <Ionicons name="checkmark" size={14} color="#FFFFFF" /> : null}
+      </View>
+      <Text style={styles.stepLabel}>{label}</Text>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  centerContainer: {
-    alignItems: 'center',
-    flex: 1,
-    justifyContent: 'center',
-    padding: Spacing.lg,
-  },
   container: {
-    backgroundColor: Colors.gray100,
     flex: 1,
-  },
-  header: {
-    alignItems: 'center',
-    backgroundColor: Colors.primary,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    paddingTop: 60,
-    paddingBottom: Spacing.lg,
-    paddingHorizontal: Spacing.lg,
-  },
-  backButton: {
-    width: 40,
-  },
-  title: {
-    color: Colors.white,
-    fontSize: Typography.fontSize.xl,
-    fontWeight: Typography.fontWeight.bold,
+    backgroundColor: '#F8FAFC',
   },
   content: {
+    padding: 20,
+    gap: 16,
+  },
+  loadingContainer: {
     flex: 1,
-    padding: Spacing.lg,
-  },
-  stepContainer: {
-    backgroundColor: Colors.white,
-    borderRadius: BorderRadius.lg,
-    padding: Spacing.xl,
-  },
-  stepHeader: {
     alignItems: 'center',
-    marginBottom: Spacing.xl,
-  },
-  stepTitle: {
-    color: Colors.textPrimary,
-    fontSize: Typography.fontSize.xl,
-    fontWeight: Typography.fontWeight.bold,
-    marginTop: Spacing.md,
-  },
-  stepDescription: {
-    color: Colors.gray600,
-    fontSize: Typography.fontSize.sm,
-    marginTop: Spacing.sm,
-    textAlign: 'center',
-  },
-  qrInfo: {
-    backgroundColor: Colors.gray100,
-    borderRadius: BorderRadius.md,
-    marginBottom: Spacing.lg,
-    padding: Spacing.md,
-  },
-  qrInfoText: {
-    color: Colors.textPrimary,
-    fontSize: Typography.fontSize.base,
-    textAlign: 'center',
-  },
-  qrTime: {
-    color: Colors.primary,
-    fontSize: Typography.fontSize.sm,
-    fontWeight: Typography.fontWeight.semibold,
-    marginTop: Spacing.xs,
-    textAlign: 'center',
-  },
-  qrExpired: {
-    color: Colors.error,
-    fontSize: Typography.fontSize.sm,
-    fontWeight: Typography.fontWeight.semibold,
-    marginTop: Spacing.xs,
-    textAlign: 'center',
-  },
-  scanButtonContainer: {
-    gap: Spacing.md,
-  },
-  scanButton: {
-    alignItems: 'center',
-    backgroundColor: Colors.primary,
-    borderRadius: BorderRadius.md,
-    flexDirection: 'row',
-    gap: Spacing.sm,
     justifyContent: 'center',
-    padding: Spacing.lg,
-  },
-  scanButtonText: {
-    color: Colors.white,
-    fontSize: Typography.fontSize.base,
-    fontWeight: Typography.fontWeight.semibold,
-  },
-  helpButton: {
-    alignItems: 'center',
-    backgroundColor: 'transparent',
-    padding: Spacing.md,
-  },
-  helpButtonText: {
-    color: Colors.primary,
-    fontSize: Typography.fontSize.sm,
-    textDecorationLine: 'underline',
-  },
-  instructionContainer: {
-    backgroundColor: Colors.gray100,
-    borderRadius: BorderRadius.md,
-    marginBottom: Spacing.lg,
-    padding: Spacing.lg,
-  },
-  instructionStep: {
-    color: Colors.textPrimary,
-    fontSize: Typography.fontSize.base,
-    marginBottom: Spacing.sm,
-  },
-  warningBox: {
-    alignItems: 'center',
-    backgroundColor: Colors.accentLight,
-    borderRadius: BorderRadius.md,
-    flexDirection: 'row',
-    gap: Spacing.sm,
-    marginBottom: Spacing.lg,
-    padding: Spacing.md,
-  },
-  warningText: {
-    color: Colors.accent,
-    fontSize: Typography.fontSize.sm,
-    flex: 1,
-  },
-  actionButton: {
-    alignItems: 'center',
-    backgroundColor: Colors.primary,
-    borderRadius: BorderRadius.md,
-    justifyContent: 'center',
-    padding: Spacing.lg,
-  },
-  secondaryButton: {
-    backgroundColor: Colors.secondary,
-  },
-  actionButtonText: {
-    color: Colors.white,
-    fontSize: Typography.fontSize.base,
-    fontWeight: Typography.fontWeight.semibold,
-  },
-  noteBox: {
-    backgroundColor: Colors.infoLight,
-    borderRadius: BorderRadius.md,
-    marginBottom: Spacing.lg,
-    padding: Spacing.md,
-  },
-  noteText: {
-    color: Colors.info,
-    fontSize: Typography.fontSize.sm,
-  },
-  photoPreview: {
-    alignItems: 'center',
-    backgroundColor: Colors.successLight,
-    borderRadius: BorderRadius.md,
-    marginBottom: Spacing.lg,
-    padding: Spacing.lg,
-  },
-  photoPreviewText: {
-    color: Colors.success,
-    fontSize: Typography.fontSize.base,
-    fontWeight: Typography.fontWeight.semibold,
-  },
-  retakeButton: {
-    backgroundColor: Colors.white,
-    borderRadius: BorderRadius.sm,
-    marginTop: Spacing.sm,
-    paddingHorizontal: Spacing.lg,
-    paddingVertical: Spacing.sm,
-  },
-  retakeButtonText: {
-    color: Colors.primary,
-    fontSize: Typography.fontSize.sm,
-  },
-  skipButton: {
-    alignItems: 'center',
-    backgroundColor: 'transparent',
-    borderRadius: BorderRadius.md,
-    justifyContent: 'center',
-    padding: Spacing.md,
-  },
-  skipButtonText: {
-    color: Colors.gray600,
-    fontSize: Typography.fontSize.sm,
-  },
-  successBox: {
-    alignItems: 'center',
-    backgroundColor: Colors.successLight,
-    borderRadius: BorderRadius.md,
-    flexDirection: 'row',
-    gap: Spacing.sm,
-    marginBottom: Spacing.lg,
-    padding: Spacing.xl,
-  },
-  successText: {
-    color: Colors.success,
-    fontSize: Typography.fontSize.base,
-    fontWeight: Typography.fontWeight.semibold,
-    textAlign: 'center',
+    backgroundColor: '#F8FAFC',
   },
   loadingText: {
-    color: Colors.gray600,
+    marginTop: 12,
+    fontSize: 14,
+    color: '#64748B',
+  },
+  header: {
+    gap: 8,
+  },
+  title: {
+    fontSize: 28,
+    fontWeight: '800',
+    color: '#0F172A',
+  },
+  subtitle: {
+    fontSize: 15,
+    lineHeight: 22,
+    color: '#64748B',
+  },
+  card: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: BorderRadius.xl,
+    padding: Spacing.lg,
+    gap: 12,
+  },
+  sectionTitle: {
+    fontSize: Typography.fontSize.lg,
+    fontWeight: '800',
+    color: '#0F172A',
+  },
+  infoText: {
     fontSize: Typography.fontSize.sm,
-    marginTop: Spacing.md,
+    color: '#334155',
+  },
+  stepRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  stepDot: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  stepDotDone: {
+    backgroundColor: '#16A34A',
+  },
+  stepDotActive: {
+    backgroundColor: '#2563EB',
+  },
+  stepDotIdle: {
+    backgroundColor: '#CBD5E1',
+  },
+  stepLabel: {
+    fontSize: Typography.fontSize.sm,
+    color: '#0F172A',
+    fontWeight: '700',
+  },
+  primaryButton: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 16,
+    borderRadius: 18,
+    backgroundColor: '#2563EB',
+  },
+  primaryButtonText: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: '#FFFFFF',
   },
 });

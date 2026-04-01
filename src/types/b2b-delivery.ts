@@ -1,292 +1,296 @@
-/**
- * B2B 배송 타입 정의
+﻿/**
+ * B2B 諛곗넚 ????뺤쓽
  * 
- * B2B 배송 요청 및 진행 상태를 관리합니다.
- * 기획 문서: PLANNING_B2B_BUSINESS.md
+ * B2B 諛곗넚 ?붿껌 諛?吏꾪뻾 ?곹깭瑜?愿由ы빀?덈떎.
+ * 湲고쉷 臾몄꽌: PLANNING_B2B_BUSINESS.md
  */
 
 /**
- * 위치 정보 (공통)
+ * ?꾩튂 ?뺣낫 (怨듯넻)
  */
 export interface Location {
-  /** 역 이름 */
+  /** ???대쫫 */
   station: string;
-  /** 주소 */
+  /** 二쇱냼 */
   address: string;
-  /** 연락처 */
-  contact: string;
+  /** ?곕씫泥?*/
+  contact?: string;
+  latitude?: number;
+  longitude?: number;
 }
 
 /**
- * 배송 요금 정보
+ * 諛곗넚 ?붽툑 ?뺣낫
  */
 export interface DeliveryPricing {
-  /** 기본 배송비 */
+  /** 湲곕낯 諛곗넚鍮?*/
   baseFee: number;
-  /** 중량 추가비 (kg당) */
+  /** 以묐웾 異붽?鍮?(kg?? */
   weightSurcharge: number;
-  /** 총 배송비 */
+  /** 珥?諛곗넚鍮?*/
   totalFee: number;
-  /** 길러 수익 */
+  /** 湲몃윭 ?섏씡 */
   gillerEarning: number;
 }
 
 /**
- * B2B 배송 타입
+ * B2B 諛곗넚 ???
  */
 export type B2BDeliveryType = "on-demand" | "scheduled";
 
 /**
- * B2B 배송 상태
+ * B2B 諛곗넚 ?곹깭
  */
 export type B2BDeliveryStatus = 
-  | "pending"       // 대기 중 (길러 매칭 전)
-  | "matched"       // 매칭 완료
-  | "picked_up"     // 픽업 완료
-  | "in_transit"    // 이동 중
-  | "delivered"     // 배송 완료
-  | "cancelled";    // 취소됨
+  | "pending"       // ?湲?以?(湲몃윭 留ㅼ묶 ??
+  | "matched"       // 留ㅼ묶 ?꾨즺
+  | "picked_up"     // ?쎌뾽 ?꾨즺
+  | "in_transit"    // ?대룞 以?
+  | "delivered"     // 諛곗넚 ?꾨즺
+  | "cancelled";    // 痍⑥냼??
 
 /**
- * B2B 배송 인터페이스
+ * B2B 諛곗넚 ?명꽣?섏씠??
  */
 export interface B2BDelivery {
-  /** 배송 ID */
+  /** 諛곗넚 ID */
   id: string;
-  /** 계약 ID */
+  /** 怨꾩빟 ID */
   contractId: string;
-  /** B2B 고객사 ID */
+  /** B2B 怨좉컼??ID */
   businessId: string;
-  /** 길러 ID (매칭 후) */
+  /** 湲몃윭 ID (留ㅼ묶 ?? */
   gillerId?: string;
   
-  // 배송 정보
-  /** 픽업 위치 */
+  // 諛곗넚 ?뺣낫
+  /** ?쎌뾽 ?꾩튂 */
   pickupLocation: Location;
-  /** 드롭오프 위치 */
+  /** ?쒕∼?ㅽ봽 ?꾩튂 */
   dropoffLocation: Location;
-  /** 예정 시간 */
+  /** ?덉젙 ?쒓컙 */
   scheduledTime: Date;
-  /** 무게 (kg) */
+  /** 臾닿쾶 (kg) */
   weight: number;
-  /** 특이사항 */
+  /** ?뱀씠?ы빆 */
   notes?: string;
   
-  // 매칭
-  /** 배송 타입 */
+  // 留ㅼ묶
+  /** 諛곗넚 ???*/
   type: B2BDeliveryType;
-  /** 매칭 시간 */
+  /** 留ㅼ묶 ?쒓컙 */
   matchedAt?: Date;
-  /** 수락 시간 */
+  /** ?섎씫 ?쒓컙 */
   acceptedAt?: Date;
   
-  // 진행 상태
-  /** 배송 상태 */
+  // 吏꾪뻾 ?곹깭
+  /** 諛곗넚 ?곹깭 */
   status: B2BDeliveryStatus;
   
-  // 완료 정보
-  /** 픽업 사진 URL */
+  // ?꾨즺 ?뺣낫
+  /** ?쎌뾽 ?ъ쭊 URL */
   pickupPhoto?: string;
-  /** 배송 사진 URL */
+  /** 諛곗넚 ?ъ쭊 URL */
   deliveryPhoto?: string;
-  /** 완료 시간 */
+  /** ?꾨즺 ?쒓컙 */
   completedAt?: Date;
   
-  // 요금
-  /** 배송 요금 */
+  // ?붽툑
+  /** 諛곗넚 ?붽툑 */
   pricing: DeliveryPricing;
   
-  /** 생성 일시 */
+  /** ?앹꽦 ?쇱떆 */
   createdAt: Date;
-  /** 업데이트 일시 */
+  /** ?낅뜲?댄듃 ?쇱떆 */
   updatedAt: Date;
 }
 
 /**
- * B2B 배송 생성 데이터
+ * B2B 諛곗넚 ?앹꽦 ?곗씠??
  */
 export interface CreateB2BDeliveryData {
   /** 계약 ID */
   contractId: string;
-  /** 픽업 위치 */
+  businessId: string;
+  /** ?쎌뾽 ?꾩튂 */
   pickupLocation: Location;
-  /** 드롭오프 위치 */
+  /** ?쒕∼?ㅽ봽 ?꾩튂 */
   dropoffLocation: Location;
-  /** 예정 시간 */
+  /** ?덉젙 ?쒓컙 */
   scheduledTime: Date;
-  /** 무게 (kg) */
+  /** 臾닿쾶 (kg) */
   weight: number;
-  /** 특이사항 */
+  /** ?뱀씠?ы빆 */
   notes?: string;
 }
 
 /**
- * 중량 추가비 계산 상수
+ * 以묐웾 異붽?鍮?怨꾩궛 ?곸닔
  */
-export const WEIGHT_SURCHARGE_RATE = 200; // 200원/kg
+export const WEIGHT_SURCHARGE_RATE = 200; // 200??kg
 
 /**
- * 기본 배송비 상수
+ * 湲곕낯 諛곗넚鍮??곸닔
  */
 export const BASE_DELIVERY_FEES = {
-  small: 5000,   // 5km 미만
+  small: 5000,   // 5km 誘몃쭔
   medium: 7000,  // 5-10km
-  large: 9000     // 10km 초과
+  large: 9000     // 10km 珥덇낵
 } as const;
 
 /**
- * B2B 계약 타입
+ * B2B 怨꾩빟 ???
  */
 export interface B2BContract {
-  /** 계약 ID */
+  /** 怨꾩빟 ID */
   contractId: string;
-  /** B2B 고객사 ID */
+  /** B2B 怨좉컼??ID */
   businessId: string;
-  /** 고객사명 */
+  /** 怨좉컼?щ챸 */
   businessName: string;
-  /** 업종 */
+  /** ?낆쥌 */
   businessType: string;
-  /** 등급 (basic, standard, premium) */
+  /** ?깃툒 (basic, standard, premium) */
   tier: string;
-  /** 계약 시작일 */
+  /** 怨꾩빟 ?쒖옉??*/
   startDate: Date;
-  /** 계약 종료일 */
+  /** 怨꾩빟 醫낅즺??*/
   endDate: Date;
-  /** 월 이용료 */
+  /** ???댁슜猷?*/
   monthlyFee: number;
-  /** 월 배송 한도 */
+  /** ??諛곗넚 ?쒕룄 */
   deliveryLimit: number;
-  /** 건당 배송비 */
+  /** 嫄대떦 諛곗넚鍮?*/
   pricePerDelivery: number;
-  /** 상태 (active, suspended, cancelled) */
+  /** ?곹깭 (active, suspended, cancelled) */
   status?: string;
-  /** 생성 일시 */
+  /** ?앹꽦 ?쇱떆 */
   createdAt?: Date;
-  /** 업데이트 일시 */
+  /** ?낅뜲?댄듃 ?쇱떆 */
   updatedAt?: Date;
 }
 
 /**
- * B2B 계약 생성 데이터
+ * B2B 怨꾩빟 ?앹꽦 ?곗씠??
  */
 export interface CreateB2BContractData {
-  /** B2B 고객사 ID */
+  /** B2B 怨좉컼??ID */
   businessId: string;
-  /** 고객사명 */
+  /** 怨좉컼?щ챸 */
   businessName: string;
-  /** 업종 */
+  /** ?낆쥌 */
   businessType?: string;
-  /** 등급 (basic, standard, premium) */
+  /** ?깃툒 (basic, standard, premium) */
   tier?: string;
-  /** 계약 시작일 */
+  /** 怨꾩빟 ?쒖옉??*/
   startDate: Date;
-  /** 계약 종료일 */
+  /** 怨꾩빟 醫낅즺??*/
   endDate: Date;
-  /** 월 이용료 */
+  /** ???댁슜猷?*/
   monthlyFee: number;
-  /** 월 배송 한도 */
+  /** ??諛곗넚 ?쒕룄 */
   deliveryLimit: number;
-  /** 건당 배송비 */
+  /** 嫄대떦 諛곗넚鍮?*/
   pricePerDelivery: number;
 }
 
 /**
- * B2B 요청 타입
+ * B2B ?붿껌 ???
  */
 export interface B2BRequest {
-  /** 요청 ID */
+  /** ?붿껌 ID */
   requestId: string;
-  /** B2B 고객사 ID */
+  /** B2B 怨좉컼??ID */
   businessId: string;
-  /** 계약 ID */
+  /** 怨꾩빟 ID */
   contractId: string;
-  /** 픽업 역 정보 */
+  /** ?쎌뾽 ???뺣낫 */
   pickupStation: {
     stationId: string;
     stationName: string;
   };
-  /** 배송 역 정보 */
+  /** 諛곗넚 ???뺣낫 */
   deliveryStation: {
     stationId: string;
     stationName: string;
   };
-  /** 패키지 정보 */
+  /** ?⑦궎吏 ?뺣낫 */
   packageInfo: {
     size: string;
     weight: string;
     description: string;
   };
-  /** 긴급도 */
+  /** 湲닿툒??*/
   urgency: string;
-  /** 예정 시간 */
+  /** ?덉젙 ?쒓컙 */
   scheduledTime: Date;
-  /** 배정된 길러 ID */
+  /** 諛곗젙??湲몃윭 ID */
   assignedGillerId?: string;
-  /** 상태 (pending, assigned, in_progress, completed, cancelled) */
+  /** ?곹깭 (pending, assigned, in_progress, completed, cancelled) */
   status?: string;
-  /** 생성 일시 */
+  /** ?앹꽦 ?쇱떆 */
   createdAt?: Date;
-  /** 업데이트 일시 */
+  /** ?낅뜲?댄듃 ?쇱떆 */
   updatedAt?: Date;
 }
 
 /**
- * B2B 요청 생성 데이터
+ * B2B ?붿껌 ?앹꽦 ?곗씠??
  */
 export interface CreateB2BRequestData {
-  /** B2B 고객사 ID */
+  /** B2B 怨좉컼??ID */
   businessId: string;
-  /** 계약 ID */
+  /** 怨꾩빟 ID */
   contractId: string;
-  /** 픽업 역 정보 */
+  /** ?쎌뾽 ???뺣낫 */
   pickupStation: {
     stationId: string;
     stationName: string;
   };
-  /** 배송 역 정보 */
+  /** 諛곗넚 ???뺣낫 */
   deliveryStation: {
     stationId: string;
     stationName: string;
   };
-  /** 패키지 정보 */
+  /** ?⑦궎吏 ?뺣낫 */
   packageInfo: {
     size: string;
     weight: string;
     description: string;
   };
-  /** 긴급도 */
+  /** 湲닿툒??*/
   urgency?: string;
-  /** 예정 시간 */
+  /** ?덉젙 ?쒓컙 */
   scheduledTime: Date;
 }
 
 /**
- * 세금 계산서 타입
+ * ?멸툑 怨꾩궛?????
  */
 export interface TaxInvoice {
-  /** 계산서 ID */
+  /** 怨꾩궛??ID */
   invoiceId: string;
-  /** B2B 고객사 ID */
+  /** B2B 怨좉컼??ID */
   businessId: string;
-  /** 계약 ID */
+  /** 怨꾩빟 ID */
   contractId: string;
-  /** 대상 월 */
+  /** ?????*/
   month: string;
-  /** 기간 */
+  /** 湲곌컙 */
   period: {
     start: Date;
     end: Date;
   };
-  /** 총 금액 */
+  /** 珥?湲덉븸 */
   totalAmount: number;
-  /** 배송 건수 */
+  /** 諛곗넚 嫄댁닔 */
   deliveryCount: number;
-  /** 기본료 */
+  /** 湲곕낯猷?*/
   baseFee: number;
-  /** 배송비 */
+  /** 諛곗넚鍮?*/
   deliveryFees: number;
-  /** 부가세 (10%) */
+  /** 遺媛??(10%) */
   tax: number;
-  /** 생성 일시 */
+  /** ?앹꽦 ?쇱떆 */
   createdAt?: Date;
 }
+

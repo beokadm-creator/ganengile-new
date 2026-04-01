@@ -101,7 +101,7 @@ export class NotificationService {
     const docRef = doc(db, NOTIFICATION_SETTINGS_COLLECTION, this.userId);
     const docSnap = await getDoc(docRef);
 
-    if (docSnap.exists) {
+    if (docSnap.exists()) {
       await updateDoc(docRef, { fcmToken: token, updatedAt: serverTimestamp() });
     } else {
       await setDoc(docRef, {
@@ -138,18 +138,23 @@ export class NotificationService {
     const docRef = doc(db, NOTIFICATION_SETTINGS_COLLECTION, this.userId);
     const docSnap = await getDoc(docRef);
 
-    if (!docSnap.exists) {
+    if (!docSnap.exists()) {
+      return null;
+    }
+
+    const data = docSnap.data();
+    if (!data) {
       return null;
     }
 
     return {
-      userId: docSnap.data()?.userId,
-      enabled: docSnap.data()?.enabled ?? true,
-      settings: docSnap.data()?.settings ?? this.getDefaultNotificationSettings(),
-      fcmToken: docSnap.data()?.fcmToken,
-      quietHours: docSnap.data()?.quietHours,
-      createdAt: docSnap.data()?.createdAt,
-      updatedAt: docSnap.data()?.updatedAt,
+      userId: data.userId,
+      enabled: data.enabled ?? true,
+      settings: data.settings ?? this.getDefaultNotificationSettings(),
+      fcmToken: data.fcmToken,
+      quietHours: data.quietHours,
+      createdAt: data.createdAt,
+      updatedAt: data.updatedAt,
     } as NotificationSettings;
   }
 
@@ -160,8 +165,11 @@ export class NotificationService {
     const docRef = doc(db, NOTIFICATION_SETTINGS_COLLECTION, this.userId);
 
     const unsubscribe = onSnapshot(docRef, (docSnap) => {
-      if (docSnap.exists) {
+      if (docSnap.exists()) {
         const data = docSnap.data();
+        if (!data) {
+          return;
+        }
         listener({
           userId: data.userId,
           enabled: data.enabled ?? true,

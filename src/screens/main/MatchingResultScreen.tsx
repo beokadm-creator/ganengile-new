@@ -1,600 +1,207 @@
-import React, { useEffect, useState } from 'react';
+﻿import React, { useEffect, useState } from 'react';
 import {
-  View,
-  Text,
-  StyleSheet,
   ActivityIndicator,
-  ScrollView,
-  TouchableOpacity,
-  Platform,
   Alert,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
 } from 'react-native';
-import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
-import { Ionicons } from '@expo/vector-icons';
+import { useNavigation, useRoute, type RouteProp } from '@react-navigation/native';
 import { Colors } from '../../theme';
-import * as requestService from '../../services/request-service';
 import { fetchUserInfo } from '../../services/matching-service';
 import { requireUserId } from '../../services/firebase';
+import { increaseRequestBid, notifyGillers, subscribeToRequest } from '../../services/request-service';
+import { RequestStatus, type Request } from '../../types/request';
+import type { MainStackNavigationProp, MainStackParamList } from '../../types/navigation';
 
-const IconWrapper = ({
-  name,
-  size,
-  color,
-  emoji,
-}: {
-  name: string;
-  size: number;
-  color: string;
-  emoji: string;
-}) => {
-  if (Platform.OS === 'web') {
-    return <Text style={{ fontSize: size, color }}>{emoji}</Text>;
+type GillerSnapshot = Awaited<ReturnType<typeof fetchUserInfo>> & { id: string };
+
+function readStringField(value: unknown, key: string): string | undefined {
+  if (!value || typeof value !== 'object' || !(key in value)) {
+    return undefined;
   }
-  return <Ionicons name={name as any} size={size} color={color} />;
-};
+  const field = (value as Record<string, unknown>)[key];
+  return typeof field === 'string' ? field : undefined;
+}
 
-type MatchingResultRouteParams = {
-  MatchingResult: {
-    requestId: string;
-    pickupStationName?: string;
-    deliveryStationName?: string;
-  };
-};
+function readNumberField(value: unknown, key: string): number | undefined {
+  if (!value || typeof value !== 'object' || !(key in value)) {
+    return undefined;
+  }
+  const field = (value as Record<string, unknown>)[key];
+  return typeof field === 'number' ? field : undefined;
+}
 
-type RequestStatus =
-  | 'pending'
-  | 'matched'
-  | 'accepted'
-  | 'in_transit'
-  | 'arrived'
-  | 'delivered'
-  | 'completed'
-  | 'cancelled';
+function isMatchedState(status: RequestStatus): boolean {
+  return [
+    RequestStatus.ACCEPTED,
+    RequestStatus.IN_TRANSIT,
+    RequestStatus.ARRIVED,
+    RequestStatus.DELIVERED,
+    RequestStatus.COMPLETED,
+    RequestStatus.AT_LOCKER,
+  ].includes(status);
+}
 
-export const MatchingResultScreen: React.FC = () => {
-  const navigation = useNavigation();
-  const route = useRoute<RouteProp<MatchingResultRouteParams, 'MatchingResult'>>();
+function getRequestRouteLabel(request: Request | null, pickupStationName?: string, deliveryStationName?: string): string {
+  const from = pickupStationName ?? request?.pickupStation.stationName ?? '출발역';
+  const to = deliveryStationName ?? request?.deliveryStation.stationName ?? '도착역';
+  return `${from} -> ${to}`;
+}
+
+export function MatchingResultScreen() {
+  const navigation = useNavigation<MainStackNavigationProp>();
+  const route = useRoute<RouteProp<MainStackParamList, 'MatchingResult'>>();
   const { requestId, pickupStationName, deliveryStationName } = route.params;
 
-  const [status, setStatus] = useState<RequestStatus>('pending');
-  const [_loading, setLoading] = useState(true);
-  const [giller, setGiller] = useState<any>(null);
-  const [notificationSent, setNotificationSent] = useState(false);
-  const [notificationError, setNotificationError] = useState<string | null>(null);
-  const [noMatchMessage, setNoMatchMessage] = useState<string | null>(null);
-  const [showNoMatchMessage, setShowNoMatchMessage] = useState(false);
-  const [currentFee, setCurrentFee] = useState(0);
+  const [request, setRequest] = useState<Request | null>(null);
+  const [giller, setGiller] = useState<GillerSnapshot | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [notificationMessage, setNotificationMessage] = useState<string | null>(null);
   const [increasingBid, setIncreasingBid] = useState(false);
 
-  // 요청 상태 실시간 감시
   useEffect(() => {
-    const unsubscribe = requestService.subscribeToRequest(requestId, async (request) => {
-      if (request) {
-        setStatus(request.status);
-        const requestFee =
-          (request as any)?.fee?.totalFee ||
-          (request as any)?.feeBreakdown?.totalFee ||
-          (request as any)?.initialNegotiationFee ||
-          0;
-        setCurrentFee(requestFee);
-        const matchedGillerId = (request as any).matchedGillerId;
-        if (matchedGillerId) {
-          const gillerInfo = await fetchUserInfo(matchedGillerId);
-          setGiller({ id: matchedGillerId, ...gillerInfo });
-        }
-        setLoading(false);
-      }
-    });
+    const unsubscribe = subscribeToRequest(requestId, (nextRequest) => {
+      setRequest(nextRequest);
+      setLoading(false);
 
-    // 길러들에게 푸시 알림 전송
-    const sendNotifications = async () => {
-      try {
-        const result = await requestService.notifyGillers(requestId);
-        if (!result.success) {
-          if (result.error?.includes('매칭 가능한 길러가 없습니다')) {
-            setNoMatchMessage('현재 즉시 매칭 가능한 길러가 아직 없습니다. 요청은 유지되며 순차적으로 재탐색됩니다.');
-          } else {
-            setNotificationError(result.error || '알림 전송에 실패했습니다.');
-          }
-          return;
-        }
-        setNotificationSent(true);
-      } catch (error) {
-        console.error('푸시 알림 전송 실패:', error);
-        setNotificationError('알림 전송에 실패했습니다.');
-      }
-    };
-
-    sendNotifications();
-
-    return () => {
-      if (unsubscribe) unsubscribe();
-    };
-  }, [requestId]);
-
-  useEffect(() => {
-    if (!noMatchMessage || status !== 'pending') {
-      setShowNoMatchMessage(false);
-      return;
-    }
-    const timer = setTimeout(() => {
-      setShowNoMatchMessage(true);
-    }, 20000);
-    return () => clearTimeout(timer);
-  }, [noMatchMessage, status]);
-
-  const handleGoToChat = () => {
-    navigation.navigate('Chat' as any, {
-      gillerId: giller.id,
-      requestId: requestId,
-    });
-  };
-
-  const handleGoHome = () => {
-    navigation.navigate('Tabs', { screen: 'Home' } as any);
-  };
-
-  const handleViewRequestDetail = () => {
-    navigation.navigate('RequestDetail' as any, {
-      requestId,
-    });
-  };
-
-  const handleIncreaseBid = async () => {
-    if (increasingBid) return;
-    setIncreasingBid(true);
-    try {
-      const requesterId = requireUserId();
-      const result = await requestService.increaseRequestBid(requestId, requesterId, 500);
-      if (!result.success) {
-        Alert.alert('금액 상향 실패', result.message || '금액 상향에 실패했습니다.');
+      if (!nextRequest?.matchedGillerId) {
+        setGiller(null);
         return;
       }
-      const newFee = result.newFee || currentFee;
-      setCurrentFee(newFee);
-      Alert.alert('금액 상향 완료', `요청 금액이 ${newFee.toLocaleString()}원으로 변경되었습니다.`);
+
+      const matchedGillerId = nextRequest.matchedGillerId;
+      void fetchUserInfo(matchedGillerId)
+        .then((snapshot) => setGiller({ id: matchedGillerId, ...snapshot }))
+        .catch((error) => {
+          console.error('Failed to load matched giller', error);
+          setGiller(null);
+        });
+    });
+
+    void (async () => {
+      try {
+        const result = await notifyGillers(requestId);
+        const errorMessage = readStringField(result, 'message');
+        const nextMessage = result.success
+          ? '길러 후보에게 알림을 보냈습니다.'
+          : typeof errorMessage === 'string'
+            ? errorMessage
+            : null;
+        setNotificationMessage(nextMessage);
+      } catch (error) {
+        console.error('Failed to notify gillers', error);
+      }
+    })();
+
+    return unsubscribe;
+  }, [requestId]);
+
+  const currentFee = request?.fee?.totalFee ?? request?.feeBreakdown?.totalFee ?? request?.initialNegotiationFee ?? 0;
+  const routeLabel = getRequestRouteLabel(request, pickupStationName, deliveryStationName);
+
+  async function handleIncreaseBid() {
+    if (!request) return;
+
+    try {
+      setIncreasingBid(true);
+      const result = await increaseRequestBid(request.requestId, requireUserId(), 1000);
+      const errorMessage = readStringField(result, 'error');
+      const newFee = readNumberField(result, 'newFee');
+      if (!result.success) {
+        Alert.alert('금액 조정 실패', errorMessage ?? '지금은 금액을 조정할 수 없습니다.');
+        return;
+      }
+
+      Alert.alert('긴급 재매칭을 다시 시작합니다', `현재 제안 금액을 ${(newFee ?? currentFee).toLocaleString()}원으로 조정했습니다.`);
     } catch (error) {
-      console.error('Failed to increase request bid:', error);
-      Alert.alert('오류', '금액 상향 중 문제가 발생했습니다.');
+      console.error('Failed to increase bid', error);
+      Alert.alert('금액 조정 실패', '잠시 후 다시 시도해 주세요.');
     } finally {
       setIncreasingBid(false);
     }
-  };
+  }
 
-  // 매칭 완료 화면
-  if ((status === 'accepted' || status === 'in_transit' || status === 'arrived' || status === 'delivered' || status === 'completed') && giller) {
+  if (loading) {
     return (
-      <View style={styles.container}>
-        <ScrollView contentContainerStyle={styles.scrollContent}>
-          {/* 성공 아이콘 */}
-          <View style={styles.iconContainer}>
-            <IconWrapper name="checkmark-circle" size={100} color={Colors.success} emoji="✅" />
-          </View>
-
-          <Text style={styles.title}>길러 매칭 완료!</Text>
-          <Text style={styles.message}>
-            {giller.name || '길러'}님과 매칭되었습니다.
-          </Text>
-
-          {/* 길러 정보 카드 */}
-          <View style={styles.infoCard}>
-            <View style={styles.gillerInfo}>
-              <View style={styles.avatar}>
-                <IconWrapper name="person" size={40} color={Colors.primary} emoji="👤" />
-              </View>
-              <View style={styles.gillerDetails}>
-                <Text style={styles.gillerName}>{giller.name || '길러'}</Text>
-                <Text style={styles.gillerRating}>
-                  ⭐ {giller.rating?.toFixed(1) || '0.0'} ({giller.completedDeliveries || 0}건 완료)
-                </Text>
-              </View>
-            </View>
-          </View>
-
-          {/* 안내 메시지 */}
-          <View style={styles.noticeContainer}>
-            <Text style={styles.noticeTitle}>💬 채팅으로 조율하세요</Text>
-            <Text style={styles.noticeText}>
-              길러님과 채팅으로 상세 시간과 장소를 조율해주세요.
-            </Text>
-            <Text style={styles.noticeText}>
-              정확한 픽업 시간과 장소를 미리 정하시면 배송이 원활합니다.
-            </Text>
-          </View>
-
-          {/* 버튼 */}
-          <View style={styles.buttonContainer}>
-            <TouchableOpacity
-              style={[styles.button, styles.primaryButton]}
-              onPress={() => navigation.navigate('DeliveryTracking' as any, { requestId })}
-            >
-              <IconWrapper name="location" size={24} color={Colors.white} emoji="📍" />
-              <Text style={styles.buttonText}>배송 추적 보기</Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              style={[styles.button, styles.secondaryButton]}
-              onPress={handleGoToChat}
-            >
-              <IconWrapper name="chatbubbles" size={24} color={Colors.primary} emoji="💬" />
-              <Text style={styles.secondaryButtonText}>채팅 시작하기</Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              style={[styles.button, styles.secondaryButton]}
-              onPress={handleViewRequestDetail}
-            >
-              <Text style={styles.secondaryButtonText}>요청 상세 보기</Text>
-            </TouchableOpacity>
-          </View>
-        </ScrollView>
+      <View style={styles.centerState}>
+        <ActivityIndicator size="large" color={Colors.primary} />
+        <Text style={styles.centerText}>매칭 진행 상황을 불러오는 중입니다.</Text>
       </View>
     );
   }
 
-  // 매칭 대기 화면
   return (
-    <View style={styles.container}>
-      <ScrollView contentContainerStyle={styles.scrollContent}>
-        {/* 로딩 인디케이터 */}
-        <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color={Colors.primary} />
-          <Text style={styles.loadingTitle}>길러를 찾고 있습니다...</Text>
-          <Text style={styles.loadingMessage}>
-            해당 경로를 운행하는 길러에게 알림을 보냈습니다.
-          </Text>
+    <ScrollView style={styles.container} contentContainerStyle={styles.content}>
+      <View style={styles.hero}>
+        <Text style={styles.kicker}>가는길에</Text>
+        <Text style={styles.title}>{isMatchedState(request?.status ?? RequestStatus.PENDING) ? '연결이 진행되고 있습니다.' : '길러를 찾는 중입니다.'}</Text>
+        <Text style={styles.subtitle}>{notificationMessage ?? '응답을 기다리는 중입니다.'}</Text>
+      </View>
+
+      <View style={styles.card}>
+        <Text style={styles.cardTitle}>요청 경로</Text>
+        <InfoRow label="구간" value={routeLabel} />
+        <InfoRow label="현재 제안 금액" value={`${currentFee.toLocaleString()}원`} />
+        <InfoRow label="현재 상태" value={request?.status ?? 'pending'} />
+      </View>
+
+      {giller ? (
+        <View style={styles.card}>
+          <Text style={styles.cardTitle}>현재 연결 후보</Text>
+          <InfoRow label="이름" value={giller.name ?? '길러'} />
+          <InfoRow label="평점" value={typeof giller.rating === 'number' ? giller.rating.toFixed(1) : '-'} />
         </View>
+      ) : null}
 
-        {/* 알림 전송 상태 */}
-        {notificationSent && !notificationError && (
-          <View style={styles.successContainer}>
-            <IconWrapper name="notifications" size={30} color={Colors.success} emoji="🔔" />
-            <Text style={styles.successText}>
-              알림 전송 완료!
-            </Text>
-            <Text style={styles.successSubtext}>
-              주변 길러들에게 요청 알림을 보냈습니다.
-            </Text>
-          </View>
-        )}
-        {notificationError && (
-          <View style={styles.errorContainer}>
-            <IconWrapper name="alert-circle" size={30} color={Colors.error} emoji="⚠️" />
-            <Text style={styles.errorText}>{notificationError}</Text>
-          </View>
-        )}
-        {showNoMatchMessage && noMatchMessage && (
-          <View style={styles.pendingContainer}>
-            <Text style={styles.pendingIcon}>🔎</Text>
-            <View style={styles.pendingTextWrap}>
-              <Text style={styles.pendingTitle}>아직 매칭 대기 중입니다</Text>
-              <Text style={styles.pendingText}>{noMatchMessage}</Text>
-            </View>
-          </View>
-        )}
+      <View style={styles.actionGroup}>
+        <TouchableOpacity style={styles.primaryButton} onPress={() => void handleIncreaseBid()} disabled={increasingBid}>
+          <Text style={styles.primaryButtonText}>{increasingBid ? '조정 중...' : 'AI 추천 금액 올리기'}</Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={styles.secondaryButton}
+          onPress={() => navigation.navigate('CreateRequest', { mode: 'reservation', sourceRequestId: requestId })}
+        >
+          <Text style={styles.secondaryButtonText}>예약으로 전환하기</Text>
+        </TouchableOpacity>
+        <TouchableOpacity style={styles.ghostButton} onPress={() => navigation.navigate('RequestDetail', { requestId })}>
+          <Text style={styles.ghostButtonText}>요청 상세 보기</Text>
+        </TouchableOpacity>
+      </View>
+    </ScrollView>
+  );
+}
 
-        {/* 경로 정보 */}
-        {(pickupStationName || deliveryStationName) && (
-          <View style={styles.infoCard}>
-            <View style={styles.infoRow}>
-              <IconWrapper name="map-outline" size={20} color={Colors.primary} emoji="📍" />
-              <Text style={styles.infoText}>
-                {pickupStationName} → {deliveryStationName}
-              </Text>
-            </View>
-          </View>
-        )}
-
-        {/* 안내사항 */}
-        <View style={styles.noticeContainer}>
-          <Text style={styles.noticeTitle}>⏰ 대기 중</Text>
-          <View style={styles.noticeList}>
-            <Text style={styles.noticeItem}>• 길러가 요청을 확인하면 매칭됩니다.</Text>
-            <Text style={styles.noticeItem}>• 매칭되면 알림으로 알려드립니다.</Text>
-            <Text style={styles.noticeItem}>• 홈으로 가셔도 알림을 받을 수 있습니다.</Text>
-          </View>
-        </View>
-
-        {status === 'pending' && (
-          <View style={styles.bidAdjustCard}>
-            <Text style={styles.bidAdjustTitle}>매칭이 지연되면 금액을 올려보세요</Text>
-            <Text style={styles.bidAdjustAmount}>현재 제안가: {currentFee.toLocaleString()}원</Text>
-            <TouchableOpacity
-              style={[styles.bidAdjustButton, increasingBid && styles.bidAdjustButtonDisabled]}
-              onPress={handleIncreaseBid}
-              disabled={increasingBid}
-            >
-              <Text style={styles.bidAdjustButtonText}>
-                {increasingBid ? '상향 중...' : '+500원 올리기'}
-              </Text>
-            </TouchableOpacity>
-          </View>
-        )}
-
-        {/* 버튼 */}
-        <View style={styles.buttonContainer}>
-          <TouchableOpacity
-            style={[styles.button, styles.secondaryButton]}
-            onPress={handleGoHome}
-          >
-            <Text style={styles.secondaryButtonText}>홈으로 가기</Text>
-            <Text style={styles.buttonSubtext}>
-              알림을 받으면 매칭 완료 화면이 나타납니다
-            </Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={[styles.button, styles.tertiaryButton]}
-            onPress={handleViewRequestDetail}
-          >
-            <Text style={styles.tertiaryButtonText}>요청 상세 보기</Text>
-          </TouchableOpacity>
-        </View>
-      </ScrollView>
+function InfoRow({ label, value }: { label: string; value: string }) {
+  return (
+    <View style={styles.infoRow}>
+      <Text style={styles.infoLabel}>{label}</Text>
+      <Text style={styles.infoValue}>{value}</Text>
     </View>
   );
-};
+}
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#F5F5F5',
-  },
-  scrollContent: {
-    padding: 20,
-    paddingBottom: 40,
-  },
-  iconContainer: {
-    alignItems: 'center',
-    marginTop: 40,
-    marginBottom: 20,
-  },
-  title: {
-    fontSize: 28,
-    fontWeight: 'bold',
-    color: Colors.textPrimary,
-    textAlign: 'center',
-    marginBottom: 8,
-  },
-  message: {
-    fontSize: 16,
-    color: Colors.textSecondary,
-    textAlign: 'center',
-    marginBottom: 30,
-  },
-  loadingContainer: {
-    alignItems: 'center',
-    marginTop: 40,
-    marginBottom: 20,
-  },
-  loadingTitle: {
-    fontSize: 22,
-    fontWeight: 'bold',
-    color: Colors.textPrimary,
-    marginTop: 20,
-    marginBottom: 8,
-  },
-  loadingMessage: {
-    fontSize: 14,
-    color: Colors.textSecondary,
-    textAlign: 'center',
-  },
-  successContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#E8F5E9',
-    borderRadius: 12,
-    padding: 16,
-    marginBottom: 20,
-    borderWidth: 1,
-    borderColor: '#4CAF50',
-  },
-  successText: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    color: '#2E7D32',
-    marginLeft: 12,
-    flex: 1,
-  },
-  successSubtext: {
-    fontSize: 12,
-    color: '#666',
-    marginLeft: 48,
-    marginTop: 4,
-  },
-  errorContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#FFEBEE',
-    borderRadius: 12,
-    padding: 16,
-    marginBottom: 20,
-    borderWidth: 1,
-    borderColor: '#EF5350',
-  },
-  errorText: {
-    fontSize: 14,
-    color: '#C62828',
-    marginLeft: 12,
-    flex: 1,
-  },
-  pendingContainer: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    backgroundColor: '#FFFDE7',
-    borderRadius: 12,
-    padding: 16,
-    marginBottom: 20,
-    borderWidth: 1,
-    borderColor: '#FBC02D',
-  },
-  pendingIcon: {
-    fontSize: 24,
-    marginRight: 10,
-  },
-  pendingTextWrap: {
-    flex: 1,
-  },
-  pendingTitle: {
-    fontSize: 15,
-    fontWeight: '700',
-    color: '#8D6E00',
-    marginBottom: 4,
-  },
-  pendingText: {
-    fontSize: 13,
-    color: '#6D4C41',
-    lineHeight: 19,
-  },
-  infoCard: {
-    backgroundColor: Colors.white,
-    borderRadius: 12,
-    padding: 16,
-    marginBottom: 16,
-    borderWidth: 1,
-    borderColor: Colors.gray200,
-  },
-  infoRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-  },
-  infoText: {
-    fontSize: 16,
-    color: Colors.textPrimary,
-    fontWeight: '500',
-  },
-  gillerInfo: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 16,
-  },
-  avatar: {
-    width: 60,
-    height: 60,
-    borderRadius: 30,
-    backgroundColor: '#E3F2FD',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  gillerDetails: {
-    flex: 1,
-  },
-  gillerName: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: Colors.textPrimary,
-    marginBottom: 4,
-  },
-  gillerRating: {
-    fontSize: 14,
-    color: Colors.textSecondary,
-  },
-  noticeContainer: {
-    backgroundColor: '#FFF3E0',
-    borderRadius: 12,
-    padding: 16,
-    marginBottom: 16,
-    borderWidth: 1,
-    borderColor: '#FF9800',
-  },
-  noticeTitle: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    color: '#E65100',
-    marginBottom: 12,
-  },
-  noticeText: {
-    fontSize: 14,
-    color: '#666',
-    lineHeight: 20,
-    marginBottom: 8,
-  },
-  noticeList: {
-    gap: 8,
-  },
-  noticeItem: {
-    fontSize: 14,
-    color: '#666',
-    lineHeight: 20,
-  },
-  bidAdjustCard: {
-    backgroundColor: '#FFF7ED',
-    borderRadius: 12,
-    padding: 16,
-    marginBottom: 8,
-    borderWidth: 1,
-    borderColor: '#FDBA74',
-  },
-  bidAdjustTitle: {
-    fontSize: 15,
-    fontWeight: '700',
-    color: '#9A3412',
-    marginBottom: 6,
-  },
-  bidAdjustAmount: {
-    fontSize: 14,
-    color: '#7C2D12',
-    marginBottom: 10,
-  },
-  bidAdjustButton: {
-    backgroundColor: '#EA580C',
-    borderRadius: 10,
-    paddingVertical: 10,
-    alignItems: 'center',
-  },
-  bidAdjustButtonDisabled: {
-    opacity: 0.6,
-  },
-  bidAdjustButtonText: {
-    color: '#fff',
-    fontSize: 14,
-    fontWeight: '700',
-  },
-  buttonContainer: {
-    gap: 12,
-    marginTop: 20,
-  },
-  button: {
-    borderRadius: 12,
-    padding: 16,
-    alignItems: 'center',
-    flexDirection: 'row',
-    justifyContent: 'center',
-    gap: 8,
-  },
-  primaryButton: {
-    backgroundColor: Colors.primary,
-  },
-  buttonText: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: Colors.white,
-  },
-  secondaryButton: {
-    backgroundColor: Colors.white,
-    borderWidth: 2,
-    borderColor: Colors.gray300,
-  },
-  secondaryButtonText: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: Colors.textPrimary,
-    marginBottom: 4,
-  },
-  tertiaryButton: {
-    backgroundColor: 'transparent',
-    borderWidth: 1,
-    borderColor: Colors.primary,
-  },
-  tertiaryButtonText: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: Colors.primary,
-  },
-  buttonSubtext: {
-    fontSize: 12,
-    color: Colors.textSecondary,
-    marginTop: 4,
-  },
+  container: { flex: 1, backgroundColor: '#F8FAFC' },
+  content: { padding: 20, gap: 16 },
+  centerState: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: '#F8FAFC' },
+  centerText: { marginTop: 12, color: '#475569' },
+  hero: { backgroundColor: '#FFFFFF', borderRadius: 20, padding: 20, gap: 6 },
+  kicker: { color: '#0F766E', fontSize: 12, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 1 },
+  title: { color: '#0F172A', fontSize: 24, fontWeight: '800' },
+  subtitle: { color: '#475569' },
+  card: { backgroundColor: '#FFFFFF', borderRadius: 20, padding: 20, gap: 10 },
+  cardTitle: { color: '#0F172A', fontSize: 18, fontWeight: '800' },
+  infoRow: { flexDirection: 'row', justifyContent: 'space-between', gap: 12 },
+  infoLabel: { color: '#64748B' },
+  infoValue: { color: '#0F172A', fontWeight: '700' },
+  actionGroup: { gap: 10 },
+  primaryButton: { minHeight: 52, borderRadius: 16, backgroundColor: '#115E59', alignItems: 'center', justifyContent: 'center' },
+  primaryButtonText: { color: '#FFFFFF', fontWeight: '800' },
+  secondaryButton: { minHeight: 52, borderRadius: 16, backgroundColor: '#FFFFFF', alignItems: 'center', justifyContent: 'center' },
+  secondaryButtonText: { color: '#0F172A', fontWeight: '700' },
+  ghostButton: { minHeight: 52, borderRadius: 16, alignItems: 'center', justifyContent: 'center' },
+  ghostButtonText: { color: '#475569', fontWeight: '700' },
 });

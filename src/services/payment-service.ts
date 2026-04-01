@@ -5,8 +5,8 @@
  * Legacy PaymentService.ts should be deprecated/migrated.
  *
  * 세금 정책:
- * - 사업소득세 3.3% 원천징수 (법적 의무)
- * - 지방소득세 0.33% 포함
+ * - 사업소득 원천징수 3.3% 기준 적용
+ * - 지방소득세 0.3% 포함
  * - 금액 페널티도 현물성 수익으로 간주
  * - 연간 3,000,000원 초과 시 종합소득세 신고 필요
  */
@@ -29,6 +29,11 @@ import {
 } from 'firebase/firestore';
 import { db } from './firebase';
 import { calculateBadgeBonus } from './matching-service';
+import {
+  SETTLEMENT_POLICY,
+  calculateWithholdingBreakdown,
+  calculateWithholdingTax,
+} from '../constants/settlementPolicy';
 
 // ==================== Constants ====================
 
@@ -36,9 +41,10 @@ import { calculateBadgeBonus } from './matching-service';
  * 세금율 상수
  */
 export const TAX_RATES = {
-  BUSINESS_INCOME_TAX: 0.033, // 사업소득세 3.3% (지방소득세 포함)
-  LOCAL_INCOME_TAX: 0.0033,   // 지방소득세 0.33% (3.3% 내 포함)
-  PLATFORM_FEE: 0.1,          // 플랫폼 수수료 10% (pricing-service와 일치)
+  BUSINESS_INCOME_TAX: SETTLEMENT_POLICY.combinedWithholdingRate, // 사업소득 원천징수 3.3% (지방소득세 포함)
+  BUSINESS_INCOME_TAX_NATIONAL: SETTLEMENT_POLICY.businessIncomeTaxRate, // 사업소득세 3.0%
+  LOCAL_INCOME_TAX: SETTLEMENT_POLICY.localIncomeTaxRate,   // 지방소득세 0.3%
+  PLATFORM_FEE: SETTLEMENT_POLICY.platformFeeRate,          // 플랫폼 수수료 10%
 } as const;
 
 /**
@@ -194,7 +200,7 @@ export async function createRequestPayment(
  *
  * 계산 로직:
  * 1. 수수료 10% 차감
- * 2. 세후 금액에서 3.3% 원천징수
+ * 2. 수수료 차감 후 금액에서 3.3% 원천징수
  * 3. 최종 수익 = 수수료 차감 - 세금
  *
  * @param userId User ID (giller)
@@ -233,9 +239,11 @@ export async function createGillerEarning(
     let netAmount = afterFee;
 
     if (isTaxable) {
-      tax = Math.round(afterFee * TAX_RATES.BUSINESS_INCOME_TAX);
+      tax = calculateWithholdingTax(afterFee);
       netAmount = afterFee - tax;
     }
+
+    const withholdingBreakdown = calculateWithholdingBreakdown(afterFee);
 
     const paymentData = {
       userId,
@@ -252,7 +260,11 @@ export async function createGillerEarning(
         platformFeeAlreadyDeducted,
         platformFeeSnapshot,
         taxRate: isTaxable ? TAX_RATES.BUSINESS_INCOME_TAX : 0,
+        taxRateBusinessIncome: isTaxable ? TAX_RATES.BUSINESS_INCOME_TAX_NATIONAL : 0,
+        taxRateLocalIncome: isTaxable ? TAX_RATES.LOCAL_INCOME_TAX : 0,
         taxWithheld: tax,
+        taxWithheldBusinessIncome: isTaxable ? withholdingBreakdown.businessIncomeTax : 0,
+        taxWithheldLocalIncome: isTaxable ? withholdingBreakdown.localIncomeTax : 0,
         isTaxable,
         baseAmount, // 기본 요금
         bonusAmount, // 배지 보너스
@@ -279,6 +291,10 @@ export async function createGillerEarning(
       console.log(`   - 수수료(10%): ${platformFee.toLocaleString()}원`);
     }
     console.log(`   - 세금(3.3%): ${tax.toLocaleString()}원`);
+    if (isTaxable) {
+      console.log(`   - 사업소득세(3.0%): ${withholdingBreakdown.businessIncomeTax.toLocaleString()}원`);
+      console.log(`   - 지방소득세(0.3%): ${withholdingBreakdown.localIncomeTax.toLocaleString()}원`);
+    }
     console.log(`   - 세후 수익: ${netAmount.toLocaleString()}원`);
 
     // Update user's total earnings (세후 기준)
@@ -820,11 +836,14 @@ export async function getPayment(paymentId: string): Promise<Payment | null> {
     const docRef = doc(db, 'payments', paymentId);
     const docSnapshot = await getDoc(docRef);
 
-    if (!docSnapshot.exists) {
+    if (!docSnapshot.exists()) {
       return null;
     }
 
     const data = docSnapshot.data();
+    if (!data) {
+      return null;
+    }
     return {
       paymentId: docSnapshot.id,
       userId: data.userId,

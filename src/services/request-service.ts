@@ -20,6 +20,7 @@ import {
   onSnapshot,
 } from 'firebase/firestore';
 import { db } from './firebase';
+import { bootstrapRequestCreationEngine } from './beta1-engine-service';
 import { getTravelTimeConfig } from './config-service';
 import { processMatchingForRequest } from './matching-service';
 import {
@@ -90,6 +91,7 @@ export async function createRequest(
       validateRequestData(requestDataOrUserId);
 
       const requestsRef = collection(db, 'requests');
+      const beta1Bootstrap = await bootstrapRequestCreationEngine(requestDataOrUserId);
 
       const newRequest: Omit<Request, 'requestId'> = {
         requesterId: requestDataOrUserId.requesterId,
@@ -106,6 +108,8 @@ export async function createRequest(
           : Timestamp.fromDate(requestDataOrUserId.deadline),
         urgency: requestDataOrUserId.urgency || 'medium',
         status: 'pending' as RequestStatus,
+        requestDraftId: beta1Bootstrap.requestDraft.requestDraftId,
+        pricingQuoteId: beta1Bootstrap.selectedPricingQuote?.pricingQuoteId,
         createdAt: serverTimestamp() as any,
         updatedAt: serverTimestamp() as any,
       };
@@ -759,7 +763,8 @@ export async function cancelRequest(
     if (request.requesterId !== userIdOrReason) return null;
     return await cancelRequestInternal(requestId, reasonOrCancelledBy, 'requester');
   } else {
-    return await cancelRequestInternal(requestId, userIdOrReason, reasonOrCancelledBy as any || 'requester');
+    const resolvedCancelledBy: 'requester' | 'giller' | 'system' = cancelledBy ?? 'requester';
+    return await cancelRequestInternal(requestId, userIdOrReason, resolvedCancelledBy);
   }
 }
 

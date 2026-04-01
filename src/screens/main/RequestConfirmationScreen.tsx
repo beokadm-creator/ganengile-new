@@ -1,137 +1,78 @@
-/**
- * Request Confirmation Screen
- * 배송 기본 정보 입력 완료 후 안내 화면
- */
-
-import React, { useState } from 'react';
-import {
-  View,
-  Text,
-  StyleSheet,
-  TouchableOpacity,
-  ScrollView,
-} from 'react-native';
-import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
+﻿import React from 'react';
+import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
-import { Colors } from '../../theme';
-
-const IconWrapper = ({ name, size, color }: { name: string; size: number; color: string }) => {
-  return <MaterialIcons name={name as any} size={size} color={color} />;
-};
-
-type RequestConfirmationRouteParams = {
-  RequestConfirmation: {
-    requestId: string;
-    pickupStationName?: string;
-    deliveryStationName?: string;
-    deliveryFee?: {
-      totalFee: number;
-      estimatedTime: number;
-    };
-  };
-};
+import { useNavigation, useRoute, type RouteProp } from '@react-navigation/native';
+import { BorderRadius, Colors, Shadows, Spacing, Typography } from '../../theme';
+import type { MainStackNavigationProp, MainStackParamList } from '../../types/navigation';
 
 export default function RequestConfirmationScreen() {
-  const navigation = useNavigation();
-  const route = useRoute<RouteProp<RequestConfirmationRouteParams, 'RequestConfirmation'>>();
+  const navigation = useNavigation<MainStackNavigationProp>();
+  const route = useRoute<RouteProp<MainStackParamList, 'RequestConfirmation'>>();
   const { requestId, pickupStationName, deliveryStationName, deliveryFee } = route.params;
 
-  const [_loading, _setLoading] = useState(false);
-
-  const handleStartMatching = () => {
-    navigation.navigate('MatchingResult' as any, {
-      requestId,
-      pickupStationName,
-      deliveryStationName
-    });
-  };
-
-  const _handleViewRequest = () => {
-    navigation.navigate('RequestDetail' as any, {
-      requestId,
-    });
-  };
-
-  const handleGoHome = () => {
-    navigation.navigate('Tabs', { screen: 'Home' } as any);
-  };
+  const routeLabel =
+    pickupStationName && deliveryStationName
+      ? `${pickupStationName} -> ${deliveryStationName}`
+      : '출발역과 도착역은 다음 화면에서 다시 확인할 수 있습니다.';
 
   return (
     <View style={styles.container}>
-      <ScrollView contentContainerStyle={styles.scrollContent}>
-        {/* 성공 아이콘 */}
-        <View style={styles.iconContainer}>
-          <IconWrapper name="check-circle" size={80} color={Colors.success} />
+      <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+        <View style={styles.heroCard}>
+          <View style={styles.heroIcon}>
+            <MaterialIcons name="check-circle" size={56} color="#027A48" />
+          </View>
+          <Text style={styles.heroTitle}>요청이 접수됐습니다.</Text>
+          <Text style={styles.heroBody}>매칭을 시작합니다.</Text>
         </View>
 
-        {/* 메시지 */}
-        <Text style={styles.title}>배송 기본 정보 입력 완료</Text>
-        <Text style={styles.message}>
-          아래 버튼을 누르면 길러 매칭이 시작됩니다.
-        </Text>
-
-        {/* 경로 정보 */}
-        {(pickupStationName || deliveryStationName) && (
-          <View style={styles.infoCard}>
-            <View style={styles.infoRow}>
-              <IconWrapper name="location-on" size={20} color={Colors.primary} />
-              <Text style={styles.infoText}>
-                {pickupStationName} → {deliveryStationName}
-              </Text>
-            </View>
-          </View>
-        )}
-
-        {/* 배송비 정보 */}
-        {deliveryFee && (
-          <View style={styles.infoCard}>
-            <View style={styles.infoRow}>
-              <IconWrapper name="payments" size={20} color={Colors.primary} />
-              <View>
-                <Text style={styles.feeAmount}>
-                  {deliveryFee.totalFee.toLocaleString()}원
-                </Text>
-                <Text style={styles.feeNote}>
-                  예상 소요 시간: {deliveryFee.estimatedTime}분
-                </Text>
-              </View>
-            </View>
-          </View>
-        )}
-
-        {/* 주의사항 */}
-        <View style={styles.noticeContainer}>
-          <Text style={styles.noticeTitle}>이용 안내</Text>
-          <View style={styles.noticeList}>
-            <Text style={styles.noticeItem}>• 길러 매칭은 상황에 따라 시간이 더 소요될 수 있습니다.</Text>
-            <Text style={styles.noticeItem}>• 매칭이 완료되면 길러에게 연락이 갑니다.</Text>
-            <Text style={styles.noticeItem}>• 길러가 배송을 수락하면 배송이 시작됩니다.</Text>
-            <Text style={styles.noticeItemImportant}>• 부재하거나 위법한 물건은 배송할 수 없습니다.</Text>
+        <View style={styles.card}>
+          <Text style={styles.cardTitle}>진행 순서</Text>
+          <View style={styles.stepList}>
+            <StepRow label="1. 분석" body="요청 확인" />
+            <StepRow label="2. 가격" body="제안 확인" />
+            <StepRow label="3. 매칭" body="응답 대기" />
           </View>
         </View>
 
-        {/* 요청 ID */}
-        <View style={styles.requestIdCard}>
-          <Text style={styles.requestIdLabel}>요청 ID</Text>
-          <Text style={styles.requestId}>{requestId}</Text>
+        <View style={styles.card}>
+          <Text style={styles.cardTitle}>요청 요약</Text>
+          <InfoRow label="경로" value={routeLabel} />
+          <InfoRow label="요청 ID" value={requestId} mono />
+          {deliveryFee ? (
+            <>
+              <InfoRow label="제안 금액" value={`${deliveryFee.totalFee.toLocaleString()}원`} />
+              <InfoRow label="예상 시간" value={`${deliveryFee.estimatedTime}분`} />
+            </>
+          ) : null}
         </View>
 
-        {/* 버튼 그룹 */}
-        <View style={styles.buttonContainer}>
+        <View style={styles.buttonGroup}>
           <TouchableOpacity
             style={[styles.button, styles.primaryButton]}
-            onPress={handleStartMatching}
+            onPress={() =>
+              navigation.navigate('MatchingResult', {
+                requestId,
+                pickupStationName,
+                deliveryStationName,
+              })
+            }
           >
-            <Text style={styles.primaryButtonText}>길러 매칭 시작</Text>
-            <Text style={styles.buttonSubtext}>버튼을 눌러 매칭을 시작하세요</Text>
+            <Text style={styles.primaryButtonText}>매칭 진행 보기</Text>
           </TouchableOpacity>
 
           <TouchableOpacity
             style={[styles.button, styles.secondaryButton]}
-            onPress={handleGoHome}
+            onPress={() => navigation.navigate('RequestDetail', { requestId })}
           >
-            <Text style={styles.secondaryButtonText}>홈으로 가기</Text>
-            <Text style={styles.buttonSubtext}>요청 상태는 홈에서 확인</Text>
+            <Text style={styles.secondaryButtonText}>요청 상세 보기</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={[styles.button, styles.ghostButton]}
+            onPress={() => navigation.navigate('Tabs', { screen: 'Home' })}
+          >
+            <Text style={styles.ghostButtonText}>홈으로 이동</Text>
           </TouchableOpacity>
         </View>
       </ScrollView>
@@ -139,138 +80,157 @@ export default function RequestConfirmationScreen() {
   );
 }
 
+function StepRow({ label, body }: { label: string; body: string }) {
+  return (
+    <View style={styles.stepRow}>
+      <Text style={styles.stepLabel}>{label}</Text>
+      <Text style={styles.stepBody}>{body}</Text>
+    </View>
+  );
+}
+
+function InfoRow({ label, value, mono = false }: { label: string; value: string; mono?: boolean }) {
+  return (
+    <View style={styles.infoRow}>
+      <Text style={styles.infoLabel}>{label}</Text>
+      <Text style={[styles.infoValue, mono && styles.mono]}>{value}</Text>
+    </View>
+  );
+}
+
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F5F5F5',
+    backgroundColor: Colors.background,
   },
-  scrollContent: {
-    padding: 20,
-    paddingBottom: 40,
+  content: {
+    padding: Spacing.lg,
+    gap: Spacing.md,
   },
-  iconContainer: {
+  heroCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: BorderRadius.xl,
+    padding: Spacing.xl,
     alignItems: 'center',
-    marginTop: 40,
-    marginBottom: 20,
+    ...Shadows.sm,
   },
-  title: {
-    fontSize: 28,
-    fontWeight: 'bold',
-    color: Colors.textPrimary,
-    textAlign: 'center',
+  heroIcon: {
+    width: 88,
+    height: 88,
+    borderRadius: 44,
+    backgroundColor: '#ECFDF3',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: Spacing.md,
+  },
+  heroTitle: {
+    fontSize: 24,
+    fontWeight: '800',
+    color: '#0F172A',
     marginBottom: 8,
-  },
-  message: {
-    fontSize: 16,
-    color: Colors.textSecondary,
     textAlign: 'center',
-    marginBottom: 30,
   },
-  infoCard: {
-    backgroundColor: Colors.white,
-    borderRadius: 12,
-    padding: 16,
-    marginBottom: 16,
-    borderWidth: 1,
-    borderColor: Colors.gray200,
+  heroBody: {
+    color: '#475569',
+    textAlign: 'center',
+    ...Typography.body,
+  },
+  card: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: BorderRadius.xl,
+    padding: Spacing.lg,
+    gap: Spacing.sm,
+    ...Shadows.sm,
+  },
+  cardTitle: {
+    fontSize: 18,
+    fontWeight: '800',
+    color: '#0F172A',
+  },
+  stepList: {
+    gap: Spacing.md,
+  },
+  stepRow: {
+    gap: 4,
+  },
+  stepLabel: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#115E59',
+  },
+  stepBody: {
+    color: '#475569',
+    ...Typography.bodySmall,
   },
   infoRow: {
     flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
+    justifyContent: 'space-between',
+    gap: Spacing.md,
   },
-  infoText: {
-    fontSize: 16,
-    color: Colors.textPrimary,
-    fontWeight: '500',
+  infoLabel: {
+    color: '#64748B',
+    ...Typography.bodySmall,
   },
-  feeAmount: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    color: Colors.primary,
+  infoValue: {
+    flex: 1,
+    textAlign: 'right',
+    color: '#0F172A',
+    ...Typography.bodySmall,
   },
-  feeNote: {
-    fontSize: 14,
-    color: Colors.textSecondary,
-    marginTop: 4,
+  mono: {
+    fontFamily: 'monospace',
   },
-  noticeContainer: {
-    backgroundColor: '#FFF3E0',
-    borderRadius: 12,
-    padding: 16,
-    marginBottom: 16,
-    borderWidth: 1,
-    borderColor: '#FF9800',
+  noticeCard: {
+    backgroundColor: '#F8FAFC',
+    borderRadius: BorderRadius.xl,
+    padding: Spacing.lg,
+    gap: 6,
   },
   noticeTitle: {
     fontSize: 16,
-    fontWeight: 'bold',
-    color: '#E65100',
-    marginBottom: 12,
+    fontWeight: '700',
+    color: '#0F172A',
   },
-  noticeList: {
-    gap: 8,
+  noticeBody: {
+    color: '#475569',
+    ...Typography.bodySmall,
   },
-  noticeItem: {
-    fontSize: 14,
-    color: '#666',
-    lineHeight: 20,
-  },
-  noticeItemImportant: {
-    fontSize: 14,
-    color: '#D84315',
-    fontWeight: '500',
-    lineHeight: 20,
-  },
-  requestIdCard: {
-    backgroundColor: '#F5F5F5',
-    borderRadius: 8,
-    padding: 12,
-    marginBottom: 20,
-    alignItems: 'center',
-  },
-  requestIdLabel: {
-    fontSize: 12,
-    color: Colors.textSecondary,
-    marginBottom: 4,
-  },
-  requestId: {
-    fontSize: 14,
-    color: Colors.textPrimary,
-    fontWeight: '600',
-    fontFamily: 'monospace',
-  },
-  buttonContainer: {
-    gap: 12,
+  buttonGroup: {
+    gap: Spacing.sm,
   },
   button: {
-    borderRadius: 12,
-    padding: 16,
+    borderRadius: BorderRadius.xl,
+    paddingHorizontal: Spacing.lg,
+    paddingVertical: Spacing.md,
     alignItems: 'center',
-    minWidth: '100%',
+    justifyContent: 'center',
   },
   primaryButton: {
-    backgroundColor: Colors.primary,
-  },
-  primaryButtonText: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: Colors.white,
-    marginBottom: 4,
+    backgroundColor: '#115E59',
   },
   secondaryButton: {
-    backgroundColor: Colors.white,
-    borderWidth: 2,
-    borderColor: Colors.gray300,
+    backgroundColor: '#FFFFFF',
+    ...Shadows.sm,
+  },
+  ghostButton: {
+    backgroundColor: 'transparent',
+  },
+  primaryButtonText: {
+    color: '#FFFFFF',
+    fontSize: 16,
+    fontWeight: '800',
+  },
+  primaryButtonSubtext: {
+    marginTop: 4,
+    color: '#CCFBF1',
+    fontSize: 12,
   },
   secondaryButtonText: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: Colors.textPrimary,
-    marginBottom: 4,
+    color: '#0F172A',
+    ...Typography.bodyBold,
   },
-  buttonSubtext: {
-    fontSize: 12,
-    color: Colors.textSecondary,
+  ghostButtonText: {
+    color: '#475569',
+    ...Typography.bodyBold,
   },
 });

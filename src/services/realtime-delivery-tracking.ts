@@ -38,7 +38,7 @@ export function subscribeToDeliveryTracking(
 
   // Firestore 실시간 리스너
   const unsubscribe = onSnapshot(deliveryDoc, (docSnapshot) => {
-    if (!docSnapshot.exists) {
+    if (!docSnapshot.exists()) {
       console.warn(`Delivery ${requestId} not found`);
       return;
     }
@@ -141,9 +141,9 @@ export function startLocationUpdates(
     station: string;
     status: 'moving' | 'waiting' | 'arrived';
   }
-): number {
+): ReturnType<typeof setInterval> {
   // 즉시 첫 업데이트
-  updateGillerLocation(gillerId, requestId, initialLocation);
+  void updateGillerLocation(gillerId, requestId, initialLocation);
 
   // 10초마다 업데이트
   const intervalId = setInterval(async () => {
@@ -164,7 +164,7 @@ export function startLocationUpdates(
 /**
  * 위치 업데이트 중지
  */
-export function stopLocationUpdates(intervalId: number): void {
+export function stopLocationUpdates(intervalId: ReturnType<typeof setInterval>): void {
   clearInterval(intervalId);
   console.log('⏹️ Location updates stopped');
 }

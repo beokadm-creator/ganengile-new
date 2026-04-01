@@ -1,7 +1,6 @@
 /**
- * Tabs Index
- * 탭 컴포넌트들의 인덱스 파일
+ * Tabs barrel intentionally left empty.
+ * Legacy matching tabs were removed during the beta1 cleanup.
  */
 
-export { default as RouteMatchingTab } from './RouteMatchingTab';
-export { default as InstantMatchingTab } from './InstantMatchingTab';
+export {};

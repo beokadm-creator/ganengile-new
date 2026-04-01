@@ -12,8 +12,8 @@ export interface TrackingEvent {
 
 export interface TrackingModel {
   status: string;
-  pickupStation: { stationName: string; line: string };
-  deliveryStation: { stationName: string; line: string };
+  pickupStation: { stationName: string; line: string; lat?: number; lng?: number };
+  deliveryStation: { stationName: string; line: string; lat?: number; lng?: number };
   packageInfo: { size: string; weight: string | number; weightKg?: number; description?: string };
   recipientName?: string;
   recipientVerificationCode?: string;
@@ -39,22 +39,77 @@ export interface RequestDetailView {
   cancelledAt?: Date;
 }
 
+interface FeeShape {
+  totalFee?: unknown;
+  total?: {
+    fee?: unknown;
+  };
+  estimatedTime?: unknown;
+}
+
+interface TrackingEventInput {
+  type?: string;
+  description?: string;
+  timestamp?: Date | Timestamp | null;
+}
+
+interface TrackingInput {
+  status?: string;
+  pickupStation?: {
+    stationName?: string;
+    line?: string;
+    lat?: number;
+    lng?: number;
+  };
+  deliveryStation?: {
+    stationName?: string;
+    line?: string;
+    lat?: number;
+    lng?: number;
+  };
+  packageInfo?: {
+    size?: string;
+    weight?: string | number;
+    weightKg?: number;
+    description?: string;
+  };
+  recipientInfo?: {
+    name?: string;
+    verificationCode?: string;
+  };
+  recipientName?: string;
+  recipientVerificationCode?: string;
+  createdAt?: Date | Timestamp | null;
+  updatedAt?: Date | Timestamp | null;
+  tracking?: {
+    events?: TrackingEventInput[];
+  };
+  deliveryId?: string;
+  gillerId?: string;
+  matchedGillerId?: string;
+  gillerName?: string;
+  gillerInfo?: {
+    name?: string;
+  };
+  estimatedMinutes?: number;
+  fee?: FeeShape;
+}
+
 export function toRequestDetailView(request: Request): RequestDetailView {
-  const rawFee = (request as any).fee;
-  const feeTotal = resolveFeeTotal(rawFee, request.initialNegotiationFee || 0);
+  const feeTotal = resolveFeeTotal(request.fee, request.initialNegotiationFee || 0);
 
   return {
     status: request.status,
     pickupStation: {
-      stationName: request.pickupStation?.stationName || '-',
-      line: request.pickupStation?.line || '',
+      stationName: request.pickupStation?.stationName ?? '-',
+      line: request.pickupStation?.line ?? '',
     },
     deliveryStation: {
-      stationName: request.deliveryStation?.stationName || '-',
-      line: request.deliveryStation?.line || '',
+      stationName: request.deliveryStation?.stationName ?? '-',
+      line: request.deliveryStation?.line ?? '',
     },
     packageInfo: {
-      size: request.packageInfo?.size || '-',
+      size: request.packageInfo?.size ?? '-',
       weight: request.packageInfo?.weight ?? '-',
       weightKg: request.packageInfo?.weightKg,
       description: request.packageInfo?.description,
@@ -68,15 +123,15 @@ export function toRequestDetailView(request: Request): RequestDetailView {
   };
 }
 
-function resolveFeeTotal(rawFee: unknown, fallback: number): number {
+function resolveFeeTotal(rawFee: FeeShape | undefined, fallback: number): number {
   const direct = extractNumber(rawFee);
   if (typeof direct === 'number') return direct;
 
   if (rawFee && typeof rawFee === 'object') {
-    const totalFee = extractNumber((rawFee as any).totalFee);
+    const totalFee = extractNumber(rawFee.totalFee);
     if (typeof totalFee === 'number') return totalFee;
 
-    const nestedTotalFee = extractNumber((rawFee as any).total?.fee);
+    const nestedTotalFee = extractNumber(rawFee.total?.fee);
     if (typeof nestedTotalFee === 'number') return nestedTotalFee;
   }
 
@@ -92,68 +147,71 @@ function extractNumber(value: unknown): number | undefined {
   return undefined;
 }
 
-export function toTrackingModel(data: any): TrackingModel {
+export function toTrackingModel(data: TrackingInput): TrackingModel {
   const createdAt = toDateOrUndefined(data.createdAt);
   const updatedAt = toDateOrUndefined(data.updatedAt);
-  const status = data.status as string;
+  const status = data.status ?? 'pending';
 
   const eventsFromTracking = Array.isArray(data.tracking?.events)
-    ? data.tracking.events.map((event: any) => ({
-        type: event.type,
-        title: eventTitle(event.type),
-        description: event.description || eventTitle(event.type),
-        timestamp: toDateOrUndefined(event.timestamp),
-        completed: true,
-      }))
+    ? data.tracking.events.map((event) => {
+        const type = event.type ?? 'status_changed';
+        return {
+          type,
+          title: eventTitle(type),
+          description: event.description ?? eventTitle(type),
+          timestamp: toDateOrUndefined(event.timestamp),
+          completed: true,
+        };
+      })
     : null;
 
   const fallbackEvents: TrackingEvent[] = [
     {
       type: 'created',
       title: '요청 생성',
-      description: '배송 요청이 생성되었습니다',
+      description: '배송 요청이 생성되었습니다.',
       timestamp: createdAt,
       completed: true,
     },
     {
       type: 'matched',
       title: '매칭 완료',
-      description: '길러가 매칭되었습니다',
+      description: '길러가 매칭되었습니다.',
       timestamp: updatedAt,
       completed: ['matched', 'accepted', 'in_transit', 'arrived', 'completed'].includes(status),
     },
     {
       type: 'accepted',
       title: '수락 완료',
-      description: '길러가 배송을 수락했습니다',
+      description: '길러가 배송을 수락했습니다.',
       timestamp: updatedAt,
       completed: ['accepted', 'in_transit', 'arrived', 'completed'].includes(status),
     },
     {
       type: 'picked_up',
       title: '픽업 완료',
-      description: '물품을 수령했습니다',
+      description: '물품을 수령했습니다.',
       timestamp: updatedAt,
       completed: ['in_transit', 'arrived', 'completed'].includes(status),
     },
     {
       type: 'in_transit',
       title: '배송 중',
-      description: '지하철을 타고 이동 중입니다',
+      description: '지정된 경로를 따라 이동 중입니다.',
       timestamp: updatedAt,
       completed: ['in_transit', 'arrived', 'completed'].includes(status),
     },
     {
       type: 'arrived',
       title: '도착 완료',
-      description: '목적지에 도착했습니다',
+      description: '목적지에 도착했습니다.',
       timestamp: updatedAt,
       completed: ['arrived', 'completed'].includes(status),
     },
     {
       type: 'completed',
       title: '배송 완료',
-      description: '배송이 완료되었습니다',
+      description: '배송이 완료되었습니다.',
       timestamp: updatedAt,
       completed: status === 'completed',
     },
@@ -162,28 +220,32 @@ export function toTrackingModel(data: any): TrackingModel {
   return {
     status,
     pickupStation: {
-      stationName: data.pickupStation?.stationName || '-',
-      line: data.pickupStation?.line || '',
+      stationName: data.pickupStation?.stationName ?? '-',
+      line: data.pickupStation?.line ?? '',
+      lat: typeof data.pickupStation?.lat === 'number' ? data.pickupStation.lat : undefined,
+      lng: typeof data.pickupStation?.lng === 'number' ? data.pickupStation.lng : undefined,
     },
     deliveryStation: {
-      stationName: data.deliveryStation?.stationName || '-',
-      line: data.deliveryStation?.line || '',
+      stationName: data.deliveryStation?.stationName ?? '-',
+      line: data.deliveryStation?.line ?? '',
+      lat: typeof data.deliveryStation?.lat === 'number' ? data.deliveryStation.lat : undefined,
+      lng: typeof data.deliveryStation?.lng === 'number' ? data.deliveryStation.lng : undefined,
     },
     packageInfo: {
-      size: data.packageInfo?.size || '-',
+      size: data.packageInfo?.size ?? '-',
       weight: data.packageInfo?.weight ?? '-',
       weightKg: data.packageInfo?.weightKg,
       description: data.packageInfo?.description,
     },
-    recipientName: data.recipientInfo?.name || data.recipientName,
-    recipientVerificationCode: data.recipientInfo?.verificationCode || data.recipientVerificationCode,
+    recipientName: data.recipientInfo?.name ?? data.recipientName,
+    recipientVerificationCode: data.recipientInfo?.verificationCode ?? data.recipientVerificationCode,
     createdAt,
     updatedAt,
-    trackingEvents: eventsFromTracking || fallbackEvents,
+    trackingEvents: eventsFromTracking ?? fallbackEvents,
     deliveryId: data.deliveryId,
-    gillerId: data.gillerId || data.matchedGillerId,
-    gillerName: data.gillerName || data.gillerInfo?.name,
-    estimatedMinutes: data.estimatedMinutes || data.fee?.estimatedTime,
+    gillerId: data.gillerId ?? data.matchedGillerId,
+    gillerName: data.gillerName ?? data.gillerInfo?.name,
+    estimatedMinutes: data.estimatedMinutes ?? extractNumber(data.fee?.estimatedTime),
   };
 }
 

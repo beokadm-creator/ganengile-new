@@ -1,940 +1,597 @@
-/**
- * Home Screen - Role-Based Dashboard
- * 역할별 맞춤 대시보드 (이용자/길러/BOTH)
- */
-
-import React, { useState, useCallback, useEffect } from 'react';
-import {
-  View,
-  Text,
-  StyleSheet,
-  ScrollView,
-  TouchableOpacity,
-  RefreshControl,
-  Platform,
-  Alert,
-} from 'react-native';
+﻿import React, { useEffect, useState } from 'react';
+import { RefreshControl, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
-import { Colors, Spacing, Typography, BorderRadius, Shadows } from '../../theme';
 import { useUser } from '../../contexts/UserContext';
-import { getUserStats, getRequestsByRequester } from '../../services/user-service';
-import { getGillerDeliveries } from '../../services/delivery-service';
-import StationSelectModal from '../../components/StationSelectModal';
-import { RoleSlider } from '../../components/common';
+import {
+  getBeta1HomeSnapshot,
+  type Beta1HomeSnapshot,
+} from '../../services/beta1-orchestration-service';
+import { BorderRadius, Shadows, Spacing, Typography } from '../../theme';
 import type { MainStackNavigationProp } from '../../types/navigation';
-import type { User } from '../../types/user';
-import type { Station } from '../../types/config';
 import { UserRole } from '../../types/user';
-import { useGillerAccess } from '../../hooks/useGillerAccess';
-
-// 웹에서는 아이콘 대신 텍스트 라벨 사용
-const IconLabel = ({ name, label }: { name: string; label: string }) => {
-  if (Platform.OS === 'web') {
-    return <Text style={styles.iconLabel}>{label}</Text>;
-  }
-  let iconName = name;
-  if (name === 'list') iconName = 'view-list';
-  if (name === 'route') iconName = 'alt-route';
-  return <MaterialIcons name={iconName as any} size={24} color="currentColor" />;
-};
-
-interface Stats {
-  totalRequests: number;
-  totalDeliveries: number;
-  totalEarnings: number;
-  averageRating: number;
-  completionRate: number;
-  activeRequestsCount: number;
-}
 
 export default function HomeScreen({ navigation }: { navigation: MainStackNavigationProp }) {
-  const { user, currentRole, switchRole, refreshUser } = useUser();
-  const { canAccessGiller, applicationStatus } = useGillerAccess();
-  const [stats, setStats] = useState<Stats | null>(null);
+  const { user, currentRole, switchRole } = useUser();
+  const [snapshot, setSnapshot] = useState<Beta1HomeSnapshot | null>(null);
   const [refreshing, setRefreshing] = useState(false);
-  const [stationModalVisible, setStationModalVisible] = useState(false);
-  const [_selectedStation, _setSelectedStation] = useState<Station | null>(null);
-  const [activeRequest, setActiveRequest] = useState<any>(null);
 
-  // Load stats
-  const loadStats = useCallback(async () => {
-    if (!user) return;
+  const role = currentRole === UserRole.GILLER ? 'giller' : 'requester';
 
-    try {
-      const userStats = await getUserStats(user.uid);
-      setStats(userStats);
+  useEffect(() => {
+    let mounted = true;
 
-      // Get active requests count
-      const requests = await getRequestsByRequester(user.uid);
-      const activeStatuses = ['pending', 'matched', 'accepted', 'in_transit', 'arrived', 'at_locker', 'delivered'];
-      const activeRequests = requests.filter(req => activeStatuses.includes(req.status as any));
-      const activeCount = activeRequests.length;
-      setStats(prev => prev ? { ...prev, activeRequestsCount: activeCount } : null);
-      setActiveRequest(activeRequests[0] || null);
-    } catch (error: any) {
-      console.error('Error loading stats:', error);
-    } finally {
-      setRefreshing(false);
-    }
-  }, [user]);
+    void (async () => {
+      if (!user?.uid) {
+        return;
+      }
 
-  React.useEffect(() => {
-    loadStats();
-  }, [loadStats]);
+      const nextSnapshot = await getBeta1HomeSnapshot(user.uid, role);
+      if (mounted) {
+        setSnapshot(nextSnapshot);
+      }
+    })();
 
-  const onRefresh = async () => {
-    setRefreshing(true);
-    await Promise.all([refreshUser(), loadStats()]);
-  };
+    return () => {
+      mounted = false;
+    };
+  }, [role, user]);
 
-  // Toggle role for BOTH users
-  const _toggleRole = () => {
-    if (user?.role === UserRole.BOTH && currentRole) {
-      const newRole = currentRole === UserRole.GLER ? UserRole.GILLER : UserRole.GLER;
-      switchRole(newRole);
-    }
-  };
-
-  // Handle station selection
-  const handleSelectStation = (station: any) => {
-    _setSelectedStation(station);
-    // Navigate to AddRoute with selected station
-    navigation.navigate('AddRoute', {
-      selectedStation: station,
-    });
-  };
-
-  const openStationModal = () => {
-    setStationModalVisible(true);
-  };
-
-  const closeStationModal = () => {
-    setStationModalVisible(false);
-  };
-
-  const handleRoleChange = (newRole: 'gller' | 'giller') => {
-    if (newRole === 'giller' && !canAccessGiller) {
-      Alert.alert(
-        '길러 모드 이용 안내',
-        applicationStatus === 'pending'
-          ? '길러 신청이 심사 중입니다. 승인 후 길러 모드를 이용할 수 있습니다.'
-          : '길러 모드를 이용하려면 승인 절차가 필요합니다. 지금 신청하시겠어요?',
-        [
-          { text: '취소', style: 'cancel' },
-          applicationStatus !== 'pending'
-            ? {
-                text: '신청하기',
-                onPress: () => navigation.navigate('GillerApply' as any),
-              }
-            : { text: '확인' },
-        ]
-      );
+  const refresh = async () => {
+    if (!user?.uid) {
       return;
     }
-    switchRole(newRole === 'gller' ? UserRole.GLER : UserRole.GILLER);
+
+    setRefreshing(true);
+    const nextSnapshot = await getBeta1HomeSnapshot(user.uid, role);
+    setSnapshot(nextSnapshot);
+    setRefreshing(false);
   };
+
+  if (!user) {
+    return (
+      <View style={styles.emptyState}>
+        <Text style={styles.emptyTitle}>사용자 정보를 불러오지 못했습니다.</Text>
+      </View>
+    );
+  }
 
   return (
     <ScrollView
       style={styles.container}
-      contentContainerStyle={styles.scrollContent}
-      scrollEnabled
-      nestedScrollEnabled
-      keyboardShouldPersistTaps="handled"
+      contentContainerStyle={styles.content}
       showsVerticalScrollIndicator={false}
-      refreshControl={
-        <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
-      }
+      refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => void refresh()} />}
     >
-      {!user ? (
-        <View style={styles.centerContainer}>
-          <Text style={styles.errorText}>사용자 정보를 찾을 수 없습니다.</Text>
-        </View>
-      ) : (
-        <>
-          {/* Header */}
-          <View style={styles.header}>
-            <View style={styles.headerGreeting}>
-              <Text style={styles.title}>
-                안녕하세요,{`\n`}{user.name.split(' ')[0]}님!
-              </Text>
-              {Platform.OS === 'web' ? (
-                <Text style={styles.waveText}>👋</Text>
-              ) : (
-                <MaterialIcons name="waving-hand" size={28} color="#FFD54F" style={styles.waveIcon} />
-              )}
-            </View>
-            <Text style={styles.subtitle}>
-              {currentRole === UserRole.GLER ? '오늘도 편리한 배송을' : '오늘도 좋은 수익을'}
+      <View style={styles.hero}>
+        <View style={styles.heroTop}>
+          <View style={styles.heroCopy}>
+            <Text style={styles.heroKicker}>가는길에</Text>
+            <Text style={styles.heroTitle}>{snapshot?.headline ?? '결정만 하면 되는 배송'}</Text>
+            <Text style={styles.heroSubtitle}>
+              {snapshot?.subheadline ?? '지금 필요한 흐름만 바로 확인하세요.'}
             </Text>
-
-            {/* Role Slider for BOTH users */}
-            {user.role === UserRole.BOTH && (
-              <RoleSlider
-                currentRole={currentRole === UserRole.GLER ? 'gller' : 'giller'}
-                onRoleChange={handleRoleChange}
-              />
-            )}
           </View>
 
-          {/* Role-specific content */}
-          {!currentRole || currentRole === UserRole.GLER || (!canAccessGiller && currentRole === UserRole.GILLER) ? (
-            <GllerDashboard
-              user={user}
-              stats={stats}
-              activeRequest={activeRequest}
-              navigation={navigation}
+          {user.role === UserRole.BOTH ? (
+            <TouchableOpacity
+              style={styles.roleChip}
+              onPress={() => switchRole(role === 'requester' ? UserRole.GILLER : UserRole.GLER)}
+            >
+              <MaterialIcons name="swap-horiz" size={18} color="#0F172A" />
+              <Text style={styles.roleChipText}>{role === 'requester' ? '길러 모드' : '요청자 모드'}</Text>
+            </TouchableOpacity>
+          ) : null}
+        </View>
+
+        <View style={styles.metricRow}>
+          <MetricCard label="진행 요청" value={`${snapshot?.activeRequestCount ?? 0}`} />
+          <MetricCard label="진행 미션" value={`${snapshot?.activeMissionCount ?? 0}`} />
+          <MetricCard label="정산 예정" value={`${(snapshot?.pendingRewardTotal ?? 0).toLocaleString()}원`} />
+        </View>
+
+        <View style={styles.strategyPanel}>
+          <Text style={styles.strategyKicker}>{role === 'requester' ? '지금 필요한 선택' : '지금 확인할 미션'}</Text>
+          <Text style={styles.strategyTitle}>
+            {role === 'requester'
+              ? '급하면 바로, 아니면 예약으로.'
+              : '받을 미션만 빠르게 확인하세요.'}
+          </Text>
+        </View>
+      </View>
+
+      <View style={styles.section}>
+        <Text style={styles.sectionTitle}>빠른 실행</Text>
+        <View style={styles.actionGrid}>
+          <ActionCard
+            icon="add-box"
+            title="배송 요청 만들기"
+            subtitle="바로 요청"
+            onPress={() => navigation.navigate('CreateRequest')}
+          />
+          <ActionCard
+            icon="chat"
+            title="채팅 보기"
+            subtitle="대화 확인"
+            onPress={() => navigation.navigate('ChatList')}
+          />
+          <ActionCard
+            icon="account-balance-wallet"
+            title="지갑 보기"
+            subtitle="잔액 확인"
+            onPress={() => navigation.navigate('PointHistory')}
+          />
+          {role === 'giller' ? (
+            <ActionCard
+              icon="alt-route"
+              title="미션 보드 열기"
+              subtitle="미션 확인"
+              onPress={() => navigation.navigate('Tabs', { screen: 'GillerRequests' })}
             />
           ) : (
-            <GillerDashboard
-              user={user}
-              stats={stats}
-              navigation={navigation}
-              openStationModal={openStationModal}
+            <ActionCard
+              icon="schedule-send"
+              title="예약 요청 만들기"
+              subtitle="예약 접수"
+              onPress={() => navigation.navigate('CreateRequest', { mode: 'reservation' })}
             />
           )}
+        </View>
+      </View>
 
-          {/* 신청 상태 안내: 헤더 상단이 아닌 본문 하단으로 이동 */}
-          {applicationStatus === 'pending' && (
-            <View style={styles.applicationBanner}>
-              <Text style={styles.applicationBannerText}>
-                🔍 길러 신청이 심사 중입니다. 승인 후 길러 기능이 활성화됩니다.
-              </Text>
+      <View style={styles.section}>
+        <Text style={styles.sectionTitle}>추천</Text>
+        <View style={styles.panel}>
+          {(snapshot?.recommendations ?? []).map((item) => (
+            <View key={item} style={styles.recommendationRow}>
+              <MaterialIcons name="auto-awesome" size={18} color="#0F766E" />
+              <Text style={styles.recommendationText}>{item}</Text>
             </View>
-          )}
-          {applicationStatus === 'rejected' && (
-            <View style={[styles.applicationBanner, styles.applicationBannerRejected]}>
-              <Text style={[styles.applicationBannerText, styles.applicationBannerTextRejected]}>
-                ❌ 길러 신청이 반려되었습니다. 고객센터에 문의해주세요.
-              </Text>
-            </View>
-          )}
+          ))}
+        </View>
+      </View>
 
-          {/* Station Select Modal */}
-          <StationSelectModal
-            visible={stationModalVisible}
-            onClose={closeStationModal}
-            onSelectStation={handleSelectStation}
-            title="출발역 선택"
-            mode="start"
-          />
-        </>
-      )}
+      <View style={styles.section}>
+        <Text style={styles.sectionTitle}>요청</Text>
+        {(snapshot?.requestCards ?? []).length ? (
+          snapshot?.requestCards.map((card) => (
+            <TouchableOpacity
+              key={card.id}
+              style={styles.boardCard}
+              onPress={() => navigation.navigate('RequestDetail', { requestId: card.id })}
+            >
+              <View style={styles.boardHeader}>
+                <Text style={styles.boardTitle}>{card.title}</Text>
+                <View style={styles.boardHeaderRight}>
+                  <ModeBadge label={card.modeLabel} />
+                  <StatusPill label={card.status} tone="request" />
+                </View>
+              </View>
+              <Text style={styles.boardBody}>{card.detail}</Text>
+              <Text style={styles.boardMeta}>{card.etaLabel}</Text>
+
+              <View style={styles.strategyCard}>
+                <Text style={styles.strategyCardTitle}>{card.strategyTitle}</Text>
+                <Text style={styles.strategyCardBody}>{card.strategyBody}</Text>
+              </View>
+            </TouchableOpacity>
+          ))
+        ) : (
+          <EmptyCard title="진행 중인 요청이 없습니다" subtitle="필요한 배송이 생기면 새 요청부터 시작하세요." />
+        )}
+      </View>
+
+      <View style={styles.section}>
+        <Text style={styles.sectionTitle}>미션</Text>
+        {(snapshot?.missionCards ?? []).length ? (
+          snapshot?.missionCards.map((card) => (
+            <TouchableOpacity
+              key={card.id}
+              style={styles.boardCard}
+              onPress={() => navigation.navigate('Tabs', { screen: 'GillerRequests' })}
+            >
+              <View style={styles.boardHeader}>
+                <Text style={styles.boardTitle}>{card.title}</Text>
+                <StatusPill label={card.status} tone="mission" />
+              </View>
+              <Text style={styles.boardMeta}>{card.windowLabel}</Text>
+              <Text style={styles.rewardText}>{card.rewardLabel}</Text>
+
+              <View style={styles.strategyCard}>
+                <Text style={styles.strategyCardTitle}>{card.strategyTitle}</Text>
+                <Text style={styles.strategyCardBody}>{card.strategyBody}</Text>
+              </View>
+            </TouchableOpacity>
+          ))
+        ) : (
+          <EmptyCard title="지금 받을 수 있는 미션이 없습니다" subtitle="조건에 맞는 미션이 생기면 여기에서 바로 확인할 수 있습니다." />
+        )}
+      </View>
+
+      <View style={styles.walletCard}>
+        <Text style={styles.sectionTitle}>지갑</Text>
+        <WalletRow label="충전금" value={snapshot?.wallet.chargeBalance ?? 0} />
+        <WalletRow label="정산금" value={snapshot?.wallet.earnedBalance ?? 0} />
+        <WalletRow label="프로모션" value={snapshot?.wallet.promoBalance ?? 0} />
+        <WalletRow label="출금 대기" value={snapshot?.wallet.pendingWithdrawalBalance ?? 0} />
+        <View style={styles.walletDivider} />
+        <WalletRow label="출금 가능" value={snapshot?.wallet.withdrawableBalance ?? 0} strong />
+      </View>
     </ScrollView>
   );
 }
 
-/**
- * Gller Dashboard (이용자)
- */
-function GllerDashboard({
-  user,
-  stats,
-  activeRequest,
-  navigation,
-}: {
-  user: User;
-  stats: Stats | null;
-  activeRequest: any;
-  navigation: MainStackNavigationProp;
-}) {
-  const requesterStatusLabel: Record<string, string> = {
-    pending: '매칭 대기',
-    matched: '길러 매칭됨',
-    accepted: '길러 수락',
-    in_transit: '배송 중',
-    arrived: '도착 완료',
-    at_locker: '사물함 보관',
-    delivered: '수령 확인 대기',
-  };
-  const needsGillerEntry = !canAccessGiller;
-
+function MetricCard({ label, value }: { label: string; value: string }) {
   return (
-    <View style={styles.dashboardContainer}>
-      {activeRequest && (
-        <TouchableOpacity
-          style={styles.activeDeliveryCard}
-          onPress={() => navigation.navigate('RequestDetail', { requestId: activeRequest.requestId })}
-          activeOpacity={0.8}
-        >
-          <View style={styles.activeDeliveryHeader}>
-            <Text style={styles.activeDeliveryBadge}>진행 중</Text>
-            <Text style={styles.activeDeliveryStatus}>
-              {requesterStatusLabel[activeRequest.status] || activeRequest.status}
-            </Text>
-          </View>
-          <View style={styles.activeDeliveryRoute}>
-            <Text style={styles.activeDeliveryStation}>
-              {activeRequest.pickupStation?.stationName || '픽업 역'}
-            </Text>
-            <Text style={styles.activeDeliveryArrow}> → </Text>
-            <Text style={styles.activeDeliveryStation}>
-              {activeRequest.deliveryStation?.stationName || '배송 역'}
-            </Text>
-          </View>
-          <Text style={styles.activeDeliveryAction}>👆 탭하여 진행 상황 확인</Text>
-        </TouchableOpacity>
-      )}
-
-      {/* Quick Stats */}
-      <View style={styles.statsRow}>
-        {/* 진행 중인 배송 */}
-        <TouchableOpacity
-          style={styles.statCard}
-          onPress={() => navigation.navigate('Tabs', { screen: 'Requests' })}
-          activeOpacity={0.7}
-        >
-          <Text style={styles.statNumber}>{stats?.activeRequestsCount || 0}</Text>
-          <Text style={styles.statLabel}>진행 중</Text>
-          <View style={[styles.statIconContainer, { backgroundColor: Colors.accentLight }]}>
-            <IconLabel name="local-shipping" label="🚚" />
-          </View>
-        </TouchableOpacity>
-
-        {/* 총 배송 */}
-        <TouchableOpacity
-          style={styles.statCard}
-          onPress={() => navigation.navigate('Tabs', { screen: 'Requests' })}
-          activeOpacity={0.7}
-        >
-          <Text style={styles.statNumber}>{stats?.totalRequests || 0}</Text>
-          <Text style={styles.statLabel}>총 배송</Text>
-          <View style={styles.statIconContainer}>
-            <IconLabel name="inventory" label="📦" />
-          </View>
-        </TouchableOpacity>
-      </View>
-
-      {/* Quick Actions */}
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>빠른 시작</Text>
-
-        <TouchableOpacity
-          style={styles.actionCard}
-          onPress={() => navigation.navigate('CreateRequest')}
-          activeOpacity={0.7}
-        >
-          <View style={[styles.actionIcon, styles.actionIconGreen]}>
-            <IconLabel name="inventory-2" label="📦" />
-          </View>
-          <View style={styles.actionContent}>
-            <Text style={styles.actionTitle}>배송 요청하기</Text>
-            <Text style={styles.actionSubtitle}>
-              출퇴근길에 짐을 보내보세요
-            </Text>
-          </View>
-          {Platform.OS === 'web' ? (
-            <Text style={styles.actionArrow}>▶</Text>
-          ) : (
-            <MaterialIcons name="chevron-right" size={24} color={Colors.gray400} style={styles.actionArrow} />
-          )}
-        </TouchableOpacity>
-
-        <TouchableOpacity
-          style={styles.actionCard}
-          onPress={() => navigation.navigate('Tabs', { screen: 'Requests' })}
-          activeOpacity={0.7}
-        >
-          <View style={[styles.actionIcon, styles.actionIconBlue]}>
-            <IconLabel name="list" label="📋" />
-          </View>
-          <View style={styles.actionContent}>
-            <Text style={styles.actionTitle}>요청 내역</Text>
-            <Text style={styles.actionSubtitle}>
-              배송 요청 내역을 확인하세요
-            </Text>
-          </View>
-          {Platform.OS === 'web' ? (
-            <Text style={styles.actionArrow}>▶</Text>
-          ) : (
-            <MaterialIcons name="chevron-right" size={24} color={Colors.gray400} style={styles.actionArrow} />
-          )}
-        </TouchableOpacity>
-      </View>
-
-      {needsGillerEntry && (
-        <TouchableOpacity
-          style={styles.gillerPromoBanner}
-          activeOpacity={0.85}
-          onPress={() => navigation.navigate('IdentityVerification')}
-        >
-          <Text style={styles.gillerPromoTitle}>🚴 길러를 신청하고 배송해보세요</Text>
-          <Text style={styles.gillerPromoDesc}>
-            신원 인증을 완료하면 길러 신청과 심사 절차를 진행할 수 있어요.
-          </Text>
-          <Text style={styles.gillerPromoAction}>신원 인증 시작하기 →</Text>
-        </TouchableOpacity>
-      )}
+    <View style={styles.metricCard}>
+      <Text style={styles.metricLabel}>{label}</Text>
+      <Text style={styles.metricValue}>{value}</Text>
     </View>
   );
 }
 
-/**
- * Giller Dashboard (길러)
- */
-function GillerDashboard({
-  user,
-  stats,
-  navigation,
-  openStationModal,
+function ActionCard({
+  icon,
+  title,
+  subtitle,
+  onPress,
 }: {
-  user: User;
-  stats: Stats | null;
-  navigation: MainStackNavigationProp;
-  openStationModal: () => void;
+  icon: keyof typeof MaterialIcons.glyphMap;
+  title: string;
+  subtitle: string;
+  onPress: () => void;
 }) {
-  const [activeDelivery, setActiveDelivery] = useState<any>(null);
-
-  useEffect(() => {
-    const loadActiveDelivery = async () => {
-      try {
-        const accepted = await getGillerDeliveries(user.uid, 'accepted' as any);
-        if (accepted.length > 0) {
-          setActiveDelivery(accepted[0]);
-          return;
-        }
-        const inTransit = await getGillerDeliveries(user.uid, 'in_transit' as any);
-        if (inTransit.length > 0) {
-          setActiveDelivery(inTransit[0]);
-        }
-      } catch {
-        // 조용히 실패
-      }
-    };
-    loadActiveDelivery();
-  }, [user.uid]);
-
-  const statusLabel: Record<string, string> = {
-    accepted: '수락됨 - 픽업 대기',
-    in_transit: '배송 중',
-    arrived: '목적지 도착',
-  };
-
   return (
-    <View style={styles.dashboardContainer}>
-      {/* 진행 중인 배송 카드 */}
-      {activeDelivery && (
-        <TouchableOpacity
-          style={styles.activeDeliveryCard}
-          onPress={() => navigation.navigate('DeliveryTracking', { requestId: activeDelivery.requestId })}
-          activeOpacity={0.8}
-        >
-          <View style={styles.activeDeliveryHeader}>
-            <Text style={styles.activeDeliveryBadge}>진행 중</Text>
-            <Text style={styles.activeDeliveryStatus}>
-              {statusLabel[activeDelivery.status] || activeDelivery.status}
-            </Text>
-          </View>
-          <View style={styles.activeDeliveryRoute}>
-            <Text style={styles.activeDeliveryStation}>
-              {activeDelivery.pickupStation?.stationName || '픽업 역'}
-            </Text>
-            <Text style={styles.activeDeliveryArrow}> → </Text>
-            <Text style={styles.activeDeliveryStation}>
-              {activeDelivery.deliveryStation?.stationName || '배송 역'}
-            </Text>
-          </View>
-          <Text style={styles.activeDeliveryAction}>
-            {activeDelivery.status === 'accepted' ? '👆 탭하여 픽업 인증 시작' : '👆 탭하여 배송 완료 처리'}
-          </Text>
-        </TouchableOpacity>
-      )}
-
-      {/* Quick Stats */}
-      <View style={styles.statsRow}>
-        <TouchableOpacity
-          style={styles.statCard}
-          onPress={() => navigation.navigate('Tabs', { screen: 'GillerRequests' })}
-          activeOpacity={0.7}
-        >
-          <Text style={styles.statNumber}>{stats?.totalDeliveries || 0}</Text>
-          <Text style={styles.statLabel}>완료 배송</Text>
-          <View style={[styles.statIconContainer, { backgroundColor: Colors.secondaryLight }]}>
-            <IconLabel name="local-shipping" label="🚚" />
-          </View>
-        </TouchableOpacity>
-
-        <TouchableOpacity
-          style={styles.statCard}
-          activeOpacity={0.7}
-        >
-          <Text style={styles.statNumber} adjustsFontSizeToFit numberOfLines={1}>
-            {((stats?.totalEarnings || 0) / 10000).toFixed(1)}만
-          </Text>
-          <Text style={styles.statLabel}>총 수익</Text>
-          <View style={[styles.statIconContainer, { backgroundColor: Colors.accentLight }]}>
-            <IconLabel name="payments" label="💰" />
-          </View>
-        </TouchableOpacity>
-
-        <TouchableOpacity
-          style={styles.statCard}
-          activeOpacity={0.7}
-        >
-          <Text style={styles.statNumber}>{stats?.averageRating || 0}</Text>
-          <View style={styles.ratingContainer}>
-            <Text style={styles.statLabel}>평점</Text>
-            <IconLabel name="star" label="⭐" />
-          </View>
-          <View style={[styles.statIconContainer, { backgroundColor: '#FFF9C4' }]}>
-            <IconLabel name="star-rate" label="⭐" />
-          </View>
-        </TouchableOpacity>
+    <TouchableOpacity style={styles.actionCard} onPress={onPress} activeOpacity={0.88}>
+      <View style={styles.actionIconWrap}>
+        <MaterialIcons name={icon} size={22} color="#115E59" />
       </View>
+      <Text style={styles.actionTitle}>{title}</Text>
+      <Text style={styles.actionSubtitle}>{subtitle}</Text>
+    </TouchableOpacity>
+  );
+}
 
-      {/* Quick Actions */}
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>배송 매칭</Text>
+function ModeBadge({ label }: { label: string }) {
+  return (
+    <View style={styles.modeBadge}>
+      <Text style={styles.modeBadgeText}>{label}</Text>
+    </View>
+  );
+}
 
-        <TouchableOpacity
-          style={styles.actionCard}
-          onPress={() => navigation.navigate('OnetimeMode')}
-          activeOpacity={0.7}
-        >
-          <View style={[styles.actionIcon, styles.actionIconPurple]}>
-            <IconLabel name="flash-on" label="⚡" />
-          </View>
-          <View style={styles.actionContent}>
-            <Text style={styles.actionTitle}>원타임 매칭</Text>
-            <Text style={styles.actionSubtitle}>
-              즉시 매칭으로 빠르게 배송을 시작하세요
-            </Text>
-          </View>
-          {Platform.OS === 'web' ? (
-            <Text style={styles.actionArrow}>▶</Text>
-          ) : (
-            <MaterialIcons name="chevron-right" size={24} color={Colors.gray400} style={styles.actionArrow} />
-          )}
-        </TouchableOpacity>
+function StatusPill({ label, tone }: { label: string; tone: 'request' | 'mission' }) {
+  return (
+    <View style={[styles.statusPill, tone === 'request' ? styles.requestPill : styles.missionPill]}>
+      <Text
+        style={[
+          styles.statusPillText,
+          tone === 'request' ? styles.requestPillText : styles.missionPillText,
+        ]}
+      >
+        {label}
+      </Text>
+    </View>
+  );
+}
 
-        <TouchableOpacity
-          style={styles.actionCard}
-          onPress={() => navigation.navigate('Tabs', { screen: 'GillerRequests' })}
-          activeOpacity={0.7}
-        >
-          <View style={[styles.actionIcon, styles.actionIconGreen]}>
-            <IconLabel name="pedal-bike" label="🚲" />
-          </View>
-          <View style={styles.actionContent}>
-            <Text style={styles.actionTitle}>가능한 배송</Text>
-            <Text style={styles.actionSubtitle}>
-              내 동선과 매칭된 요청을 확인하세요
-            </Text>
-          </View>
-          {Platform.OS === 'web' ? (
-            <Text style={styles.actionArrow}>▶</Text>
-          ) : (
-            <MaterialIcons name="chevron-right" size={24} color={Colors.gray400} style={styles.actionArrow} />
-          )}
-        </TouchableOpacity>
+function EmptyCard({ title, subtitle }: { title: string; subtitle: string }) {
+  return (
+    <View style={styles.emptyCard}>
+      <Text style={styles.emptyCardTitle}>{title}</Text>
+      <Text style={styles.emptyCardSubtitle}>{subtitle}</Text>
+    </View>
+  );
+}
 
-        <TouchableOpacity
-          style={styles.actionCard}
-          onPress={openStationModal}
-          activeOpacity={0.7}
-        >
-          <View style={[styles.actionIcon, styles.actionIconOrange]}>
-            <IconLabel name="subway" label="🚇" />
-          </View>
-          <View style={styles.actionContent}>
-            <Text style={styles.actionTitle}>빠른 동선 추가</Text>
-            <Text style={styles.actionSubtitle}>
-              역을 선택하여 동선을 빠르게 등록하세요
-            </Text>
-          </View>
-          {Platform.OS === 'web' ? (
-            <Text style={styles.actionArrow}>▶</Text>
-          ) : (
-            <MaterialIcons name="chevron-right" size={24} color={Colors.gray400} style={styles.actionArrow} />
-          )}
-        </TouchableOpacity>
-
-        <TouchableOpacity
-          style={styles.actionCard}
-          onPress={() => navigation.navigate('AddRoute', {})}
-          activeOpacity={0.7}
-        >
-          <View style={[styles.actionIcon, styles.actionIconBlue]}>
-            <IconLabel name="route" label="🛤️" />
-          </View>
-          <View style={styles.actionContent}>
-            <Text style={styles.actionTitle}>동선 관리</Text>
-            <Text style={styles.actionSubtitle}>
-              루틴/단일 동선을 등록하고 관리하세요
-            </Text>
-          </View>
-          {Platform.OS === 'web' ? (
-            <Text style={styles.actionArrow}>▶</Text>
-          ) : (
-            <MaterialIcons name="chevron-right" size={24} color={Colors.gray400} style={styles.actionArrow} />
-          )}
-        </TouchableOpacity>
-
-        {activeDelivery && (
-          <TouchableOpacity
-            style={styles.actionCard}
-            onPress={() => navigation.navigate('DeliveryTracking', { requestId: activeDelivery.requestId })}
-            activeOpacity={0.7}
-          >
-            <View style={[styles.actionIcon, styles.actionIconPurple]}>
-              <IconLabel name="location-on" label="📍" />
-            </View>
-            <View style={styles.actionContent}>
-              <Text style={styles.actionTitle}>배송 진행하기</Text>
-              <Text style={styles.actionSubtitle}>
-                {statusLabel[activeDelivery.status] || '진행 중인 배송이 있습니다'}
-              </Text>
-            </View>
-            {Platform.OS === 'web' ? (
-              <Text style={styles.actionArrow}>▶</Text>
-            ) : (
-              <MaterialIcons name="chevron-right" size={24} color={Colors.gray400} style={styles.actionArrow} />
-            )}
-          </TouchableOpacity>
-        )}
-      </View>
-
-      {/* Performance */}
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>내 성과</Text>
-        <View style={styles.performanceCard}>
-          <View style={styles.performanceRow}>
-            <Text style={styles.performanceLabel}>완료율</Text>
-            <Text style={styles.performanceValue}>
-              {stats?.completionRate.toFixed(0) || 0}%
-            </Text>
-          </View>
-          <View style={styles.performanceRow}>
-            <Text style={styles.performanceLabel}>총 배송</Text>
-            <Text style={styles.performanceValue}>
-              {stats?.totalDeliveries || 0}건
-            </Text>
-          </View>
-          <View style={[styles.performanceRow, styles.performanceRowLast]}>
-            <Text style={styles.performanceLabel}>평균 평점</Text>
-            <View style={styles.ratingContainer}>
-              <Text style={styles.performanceValue}>
-                {stats?.averageRating || 0}
-              </Text>
-              <IconLabel name="star" label="⭐" />
-            </View>
-          </View>
-        </View>
-      </View>
+function WalletRow({ label, value, strong }: { label: string; value: number; strong?: boolean }) {
+  return (
+    <View style={styles.walletRow}>
+      <Text style={[styles.walletLabel, strong && styles.walletLabelStrong]}>{label}</Text>
+      <Text style={[styles.walletValue, strong && styles.walletValueStrong]}>{value.toLocaleString()}원</Text>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  applicationBanner: {
-    backgroundColor: '#FFF3CD',
-    borderLeftWidth: 4,
-    borderLeftColor: '#FF9800',
-    paddingHorizontal: Spacing.md,
-    paddingVertical: Spacing.sm,
-    marginHorizontal: Spacing.md,
-    marginTop: Spacing.sm,
-    borderRadius: BorderRadius.sm,
-  },
-  applicationBannerRejected: {
-    backgroundColor: '#FFEBEE',
-    borderLeftColor: '#F44336',
-  },
-  applicationBannerText: {
-    fontSize: 13,
-    color: '#E65100',
-    lineHeight: 18,
-  },
-  applicationBannerTextRejected: {
-    color: '#B71C1C',
-  },
-  header: {
-    backgroundColor: Colors.primary,
-    borderBottomLeftRadius: 32,
-    borderBottomRightRadius: 32,
-    padding: Spacing.xxl,
-    paddingTop: 65,
-    paddingBottom: Spacing['4xl'],
-    ...Shadows.lg,
-  },
-  headerGreeting: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: Spacing.xs,
-  },
-  title: {
-    color: Colors.white,
-    fontSize: Typography.fontSize['3xl'],
-    fontWeight: Typography.fontWeight.bold,
-    letterSpacing: -0.5,
-  },
-  waveIcon: {
-    marginLeft: Spacing.sm,
-  },
-  waveText: {
-    fontSize: 24,
-    marginLeft: Spacing.sm,
-  },
-  iconLabel: {
-    fontSize: 16,
-  },
-  activeDeliveryCard: {
-    backgroundColor: '#0B7B73',
-    borderRadius: 16,
-    padding: 16,
-    marginBottom: 16,
-    borderWidth: 2,
-    borderColor: '#57D7C8',
-    shadowColor: '#0B7B73',
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.24,
-    shadowRadius: 14,
-    elevation: 8,
-  },
-  activeDeliveryHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 8,
-    gap: 8,
-  },
-  activeDeliveryBadge: {
-    backgroundColor: 'rgba(255,255,255,0.3)',
-    color: Colors.white,
-    fontSize: 11,
-    fontWeight: 'bold',
-    paddingHorizontal: 8,
-    paddingVertical: 2,
-    borderRadius: 8,
-  },
-  activeDeliveryStatus: {
-    color: Colors.white,
-    fontSize: 14,
-    fontWeight: '600',
-  },
-  activeDeliveryRoute: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 8,
-  },
-  activeDeliveryStation: {
-    color: Colors.white,
-    fontSize: 16,
-    fontWeight: 'bold',
-  },
-  activeDeliveryArrow: {
-    color: 'rgba(255,255,255,0.7)',
-    fontSize: 16,
-  },
-  activeDeliveryAction: {
-    color: 'rgba(255,255,255,0.85)',
-    fontSize: 12,
-  },
-  subtitle: {
-    color: Colors.white,
-    fontSize: Typography.fontSize.lg,
-    marginTop: Spacing.xs,
-    opacity: 0.95,
-    fontWeight: Typography.fontWeight.medium,
-  },
-  dashboardContainer: {
-    padding: Spacing.lg,
-    marginTop: -Spacing.lg,
-  },
-  statsRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginBottom: Spacing.xl,
-    gap: Spacing.sm,
-  },
-  statCard: {
-    alignItems: 'center',
-    backgroundColor: Colors.white,
-    borderRadius: BorderRadius.xl,
+  container: {
     flex: 1,
+    backgroundColor: '#F4F7F5',
+  },
+  content: {
+    gap: Spacing.xl,
     padding: Spacing.lg,
-    paddingTop: Spacing.lg,
-    paddingBottom: Spacing.md,
-    ...Shadows.md,
-    borderWidth: 1,
-    borderColor: Colors.gray100,
+    paddingBottom: Spacing['5xl'],
   },
-  statNumber: {
-    color: Colors.primary,
-    fontSize: 28,
-    fontWeight: Typography.fontWeight.bold,
-    letterSpacing: -1,
-    marginBottom: Spacing.xs,
-  },
-  statLabel: {
-    color: Colors.textSecondary,
-    fontSize: Typography.fontSize.xs,
-    fontWeight: Typography.fontWeight.medium,
-  },
-  statIconContainer: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    backgroundColor: Colors.primaryLight,
+  emptyState: {
+    flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    marginTop: Spacing.xs,
+    backgroundColor: '#F4F7F5',
+  },
+  emptyTitle: {
+    color: '#111827',
+    fontSize: Typography.fontSize.base,
+    fontWeight: '700',
+  },
+  hero: {
+    backgroundColor: '#D7F2EC',
+    borderRadius: BorderRadius.xl,
+    padding: Spacing.xl,
+    ...Shadows.md,
+  },
+  heroTop: {
+    flexDirection: 'row',
+    gap: Spacing.md,
+    justifyContent: 'space-between',
+    marginBottom: Spacing.lg,
+  },
+  heroCopy: {
+    flex: 1,
+  },
+  heroKicker: {
+    color: '#0F766E',
+    fontSize: 12,
+    fontWeight: '700',
+    letterSpacing: 1.2,
+    marginBottom: Spacing.xs,
+    textTransform: 'uppercase',
+  },
+  heroTitle: {
+    color: '#0F172A',
+    fontSize: Typography.fontSize['3xl'],
+    fontWeight: '800',
+    marginBottom: Spacing.xs,
+  },
+  heroSubtitle: {
+    color: '#334155',
+    fontSize: Typography.fontSize.base,
+    lineHeight: 22,
+    maxWidth: 280,
+  },
+  roleChip: {
+    alignItems: 'center',
+    alignSelf: 'flex-start',
+    backgroundColor: '#FFFFFF',
+    borderRadius: 999,
+    flexDirection: 'row',
+    gap: 6,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+  },
+  roleChipText: {
+    color: '#0F172A',
+    fontSize: 13,
+    fontWeight: '700',
+  },
+  metricRow: {
+    flexDirection: 'row',
+    gap: Spacing.sm,
+    marginBottom: Spacing.md,
+  },
+  metricCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: BorderRadius.lg,
+    flex: 1,
+    padding: Spacing.md,
+  },
+  metricLabel: {
+    color: '#64748B',
+    fontSize: 12,
+    marginBottom: 6,
+  },
+  metricValue: {
+    color: '#0F172A',
+    fontSize: 22,
+    fontWeight: '800',
+  },
+  strategyPanel: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: BorderRadius.xl,
+    padding: Spacing.lg,
+    gap: 6,
+  },
+  strategyKicker: {
+    color: '#0F766E',
+    fontSize: 12,
+    fontWeight: '700',
+    textTransform: 'uppercase',
+  },
+  strategyTitle: {
+    color: '#0F172A',
+    fontSize: Typography.fontSize.lg,
+    fontWeight: '800',
+    lineHeight: 24,
+  },
+  strategyBody: {
+    color: '#475569',
+    fontSize: Typography.fontSize.sm,
+    lineHeight: 21,
   },
   section: {
-    marginBottom: Spacing.xxl,
+    gap: Spacing.md,
   },
   sectionTitle: {
-    color: Colors.textPrimary,
+    color: '#0F172A',
     fontSize: Typography.fontSize.xl,
-    fontWeight: Typography.fontWeight.bold,
-    marginBottom: Spacing.lg,
-    letterSpacing: -0.3,
+    fontWeight: '800',
+  },
+  actionGrid: {
+    gap: Spacing.md,
   },
   actionCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: Colors.white,
+    backgroundColor: '#FFFFFF',
     borderRadius: BorderRadius.xl,
-    marginBottom: Spacing.md,
     padding: Spacing.lg,
-    ...Shadows.md,
-    borderWidth: 1,
-    borderColor: Colors.gray100,
+    ...Shadows.sm,
   },
-  actionIcon: {
-    width: 52,
-    height: 52,
-    borderRadius: 26,
+  actionIconWrap: {
     alignItems: 'center',
+    backgroundColor: '#DCFCE7',
+    borderRadius: 14,
+    height: 42,
     justifyContent: 'center',
-    marginRight: Spacing.lg,
-  },
-  actionIconGreen: {
-    backgroundColor: Colors.secondaryLight,
-  },
-  actionIconBlue: {
-    backgroundColor: Colors.primaryLight,
-  },
-  actionIconOrange: {
-    backgroundColor: Colors.accentLight,
-  },
-  actionIconPurple: {
-    backgroundColor: '#E1BEE7',
-  },
-  actionContent: {
-    flex: 1,
+    marginBottom: Spacing.md,
+    width: 42,
   },
   actionTitle: {
-    color: Colors.textPrimary,
+    color: '#0F172A',
     fontSize: Typography.fontSize.lg,
-    fontWeight: Typography.fontWeight.semibold,
-    marginBottom: 2,
-    letterSpacing: -0.2,
+    fontWeight: '700',
+    marginBottom: 4,
   },
   actionSubtitle: {
-    color: Colors.textSecondary,
+    color: '#475569',
     fontSize: Typography.fontSize.sm,
-    lineHeight: 18,
+    lineHeight: 20,
   },
-  actionArrow: {
-    marginLeft: Spacing.sm,
-  },
-  infoCard: {
-    backgroundColor: Colors.white,
+  panel: {
+    backgroundColor: '#FFFFFF',
     borderRadius: BorderRadius.xl,
+    gap: Spacing.sm,
     padding: Spacing.lg,
-    ...Shadows.md,
-    borderWidth: 1,
-    borderColor: Colors.gray100,
   },
-  infoTitle: {
-    color: Colors.textPrimary,
+  recommendationRow: {
+    alignItems: 'flex-start',
+    flexDirection: 'row',
+    gap: Spacing.sm,
+  },
+  recommendationText: {
+    color: '#334155',
+    flex: 1,
+    fontSize: Typography.fontSize.sm,
+    lineHeight: 20,
+  },
+  boardCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: BorderRadius.xl,
+    gap: 8,
+    padding: Spacing.lg,
+  },
+  boardHeader: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    gap: Spacing.sm,
+    justifyContent: 'space-between',
+  },
+  boardHeaderRight: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  boardTitle: {
+    color: '#0F172A',
+    flex: 1,
+    fontSize: Typography.fontSize.base,
+    fontWeight: '700',
+  },
+  modeBadge: {
+    backgroundColor: '#E0E7FF',
+    borderRadius: 999,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+  },
+  modeBadgeText: {
+    color: '#4338CA',
+    fontSize: 11,
+    fontWeight: '800',
+  },
+  statusPill: {
+    borderRadius: 999,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+  },
+  requestPill: {
+    backgroundColor: '#ECFDF3',
+  },
+  missionPill: {
+    backgroundColor: '#EFF6FF',
+  },
+  statusPillText: {
+    fontSize: 11,
+    fontWeight: '800',
+  },
+  requestPillText: {
+    color: '#15803D',
+  },
+  missionPillText: {
+    color: '#2563EB',
+  },
+  boardBody: {
+    color: '#334155',
+    fontSize: Typography.fontSize.sm,
+    lineHeight: 20,
+  },
+  boardMeta: {
+    color: '#64748B',
+    fontSize: Typography.fontSize.sm,
+  },
+  rewardText: {
+    color: '#0F766E',
     fontSize: Typography.fontSize.lg,
-    fontWeight: Typography.fontWeight.semibold,
-    marginBottom: Spacing.xs,
+    fontWeight: '800',
   },
-  infoSubtitle: {
-    color: Colors.textSecondary,
+  strategyCard: {
+    backgroundColor: '#F8FAFC',
+    borderRadius: BorderRadius.lg,
+    padding: Spacing.md,
+    gap: 4,
+  },
+  strategyCardTitle: {
+    color: '#0F172A',
     fontSize: Typography.fontSize.sm,
-    lineHeight: 18,
+    fontWeight: '800',
   },
-  performanceCard: {
-    backgroundColor: Colors.white,
+  strategyCardBody: {
+    color: '#475569',
+    fontSize: Typography.fontSize.sm,
+    lineHeight: 20,
+  },
+  emptyCard: {
+    backgroundColor: '#FFFFFF',
     borderRadius: BorderRadius.xl,
-    padding: Spacing.lg,
-    ...Shadows.md,
-    borderWidth: 1,
-    borderColor: Colors.gray100,
+    padding: Spacing.xl,
+    gap: 6,
   },
-  performanceRow: {
+  emptyCardTitle: {
+    color: '#111827',
+    fontSize: Typography.fontSize.base,
+    fontWeight: '700',
+  },
+  emptyCardSubtitle: {
+    color: '#64748B',
+    fontSize: Typography.fontSize.sm,
+    lineHeight: 20,
+  },
+  walletCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: BorderRadius.xl,
+    gap: Spacing.sm,
+    padding: Spacing.xl,
+  },
+  walletRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingVertical: Spacing.sm,
-    borderBottomWidth: 1,
-    borderBottomColor: Colors.gray100,
   },
-  performanceRowLast: {
-    borderBottomWidth: 0,
-  },
-  gillerPromoBanner: {
-    backgroundColor: '#E8F5E9',
-    borderWidth: 1,
-    borderColor: '#A5D6A7',
-    borderRadius: BorderRadius.lg,
-    padding: Spacing.lg,
-    marginTop: Spacing.md,
-  },
-  gillerPromoTitle: {
-    fontSize: Typography.fontSize.base,
-    fontWeight: Typography.fontWeight.bold,
-    color: '#2E7D32',
-    marginBottom: Spacing.xs,
-  },
-  gillerPromoDesc: {
+  walletLabel: {
+    color: '#64748B',
     fontSize: Typography.fontSize.sm,
-    color: '#33691E',
-    lineHeight: 20,
   },
-  gillerPromoAction: {
-    marginTop: Spacing.sm,
-    fontSize: Typography.fontSize.sm,
-    fontWeight: Typography.fontWeight.semibold,
-    color: '#1B5E20',
+  walletLabelStrong: {
+    color: '#0F172A',
+    fontWeight: '700',
   },
-  performanceLabel: {
-    color: Colors.textSecondary,
-    fontSize: Typography.fontSize.sm,
-    fontWeight: Typography.fontWeight.medium,
-  },
-  performanceValue: {
-    color: Colors.textPrimary,
+  walletValue: {
+    color: '#111827',
     fontSize: Typography.fontSize.base,
-    fontWeight: Typography.fontWeight.bold,
+    fontWeight: '700',
   },
-  ratingContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
+  walletValueStrong: {
+    color: '#0F766E',
   },
-  ratingStar: {
-    marginLeft: Spacing.xs,
-  },
-  container: {
-    backgroundColor: Colors.gray50,
-    flex: 1,
-  },
-  centerContainer: {
-    alignItems: 'center',
-    flex: 1,
-    justifyContent: 'center',
-    padding: Spacing.xl,
-  },
-  errorText: {
-    color: Colors.error,
-    fontSize: Typography.fontSize.base,
-    textAlign: 'center',
-  },
-  scrollContent: {
-    flexGrow: 1,
-    paddingBottom: Spacing['5xl'],
+  walletDivider: {
+    height: 1,
+    backgroundColor: '#E5E7EB',
+    marginVertical: 4,
   },
 });

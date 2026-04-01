@@ -1,26 +1,21 @@
-/**
- * Tax Invoice Request Screen
- * B2B 기업용 세금계산서 발행 화면
- */
-
-import React, { useState, useEffect } from 'react';
+﻿import React, { useEffect, useState } from 'react';
 import {
-  View,
-  Text,
-  StyleSheet,
-  ScrollView,
-  TouchableOpacity,
   ActivityIndicator,
   Alert,
+  ScrollView,
+  StyleSheet,
+  Text,
   TextInput,
+  TouchableOpacity,
+  View,
 } from 'react-native';
-import { useNavigation } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
+import { useNavigation } from '@react-navigation/native';
 import { b2bFirestoreService } from '../../services/b2b-firestore-service';
-import { taxInvoiceService } from '../../services/tax-invoice-service';
 import { requireUserId } from '../../services/firebase';
+import { taxInvoiceService } from '../../services/tax-invoice-service';
 import type { B2BStackNavigationProp } from '../../types/navigation';
-import { Colors, Typography, Spacing, BorderRadius, Shadows } from '../../theme';
+import { BorderRadius, Colors, Shadows, Spacing, Typography } from '../../theme';
 
 interface InvoicePeriod {
   year: number;
@@ -30,10 +25,33 @@ interface InvoicePeriod {
 }
 
 interface InvoiceSummary {
-  totalAmount: number;
+  supplyAmount: number;
   taxAmount: number;
-  totalAmountWithTax: number;
+  totalAmount: number;
   deliveryCount: number;
+}
+
+type BusinessInfo = {
+  businessNumber?: string;
+  companyName?: string;
+  ceoName?: string;
+  address?: string;
+  contact?: string;
+};
+
+function getErrorMessage(error: unknown): string {
+  return error instanceof Error ? error.message : '알 수 없는 오류가 발생했습니다.';
+}
+
+function formatBusinessNumber(text: string): string {
+  const cleaned = text.replace(/\D/g, '');
+  if (cleaned.length <= 3) return cleaned;
+  if (cleaned.length <= 5) return `${cleaned.slice(0, 3)}-${cleaned.slice(3)}`;
+  return `${cleaned.slice(0, 3)}-${cleaned.slice(3, 5)}-${cleaned.slice(5, 10)}`;
+}
+
+function formatCurrency(amount: number): string {
+  return `${amount.toLocaleString('ko-KR')}원`;
 }
 
 export default function TaxInvoiceRequestScreen() {
@@ -49,120 +67,86 @@ export default function TaxInvoiceRequestScreen() {
   const [contact, setContact] = useState('');
 
   useEffect(() => {
-    loadInvoiceData();
+    void loadInvoiceData();
   }, []);
 
-  const loadInvoiceData = async () => {
+  async function loadInvoiceData(): Promise<void> {
     try {
-      const userId = await requireUserId();
+      const userId = requireUserId();
       const { year, month } = b2bFirestoreService.getCurrentYearMonth();
-
-      // 기간 설정
       const startDate = new Date(year, month - 1, 1);
       const endDate = new Date(year, month, 0, 23, 59, 59);
-
       setPeriod({ year, month, startDate, endDate });
 
-      // 기업 정보 조회
-      const businessInfo = await b2bFirestoreService.getBusinessInfo(userId);
+      const businessInfo = (await b2bFirestoreService.getBusinessInfo(userId)) as BusinessInfo | null;
       if (businessInfo) {
-        setBusinessNumber(businessInfo.businessNumber || '');
-        setCompanyName(businessInfo.companyName || '');
-        setCeoName(businessInfo.ceoName || '');
-        setAddress(businessInfo.address || '');
-        setContact(businessInfo.contact || '');
+        setBusinessNumber(businessInfo.businessNumber ?? '');
+        setCompanyName(businessInfo.companyName ?? '');
+        setCeoName(businessInfo.ceoName ?? '');
+        setAddress(businessInfo.address ?? '');
+        setContact(businessInfo.contact ?? '');
       }
 
-      // 청구 금액 계산
       const summaryData = await b2bFirestoreService.getMonthlyStats(userId, year, month);
       if (summaryData) {
-        const taxAmount = Math.round(summaryData.totalAmount * 0.1); // 부가세 10%
+        const supplyAmount = summaryData.totalAmount;
+        const taxAmount = Math.round(supplyAmount * 0.1);
         setSummary({
-          totalAmount: summaryData.totalAmount,
+          supplyAmount,
           taxAmount,
-          totalAmountWithTax: summaryData.totalAmount + taxAmount,
+          totalAmount: supplyAmount + taxAmount,
           deliveryCount: summaryData.totalDeliveries,
         });
       }
     } catch (error) {
-      console.error('Error loading invoice data:', error);
-      Alert.alert('오류', '세금계산서 정보를 불러오지 못했습니다.');
+      Alert.alert('불러오기 실패', '세금계산서 정보를 준비하지 못했습니다.');
+      console.error('Failed to load tax invoice request data', error);
     } finally {
       setLoading(false);
     }
-  };
+  }
 
-  const handleSubmit = async () => {
-    // 필수 필드 검증
-    if (!businessNumber || !companyName || !ceoName || !address || !contact) {
-      Alert.alert('입력 오류', '모든 필수 정보를 입력해주세요.');
+  async function handleSubmit(): Promise<void> {
+    if (!businessNumber || !companyName || !ceoName || !address || !contact || !period || !summary) {
+      Alert.alert('입력 확인', '필수 정보를 모두 입력해 주세요.');
       return;
     }
 
-    // 사업자등록번호 형식 검증 (XXX-XX-XXXX)
     const businessNumberRegex = /^\d{3}-\d{2}-\d{5}$/;
     if (!businessNumberRegex.test(businessNumber)) {
-      Alert.alert(
-        '입력 오류',
-        '사업자등록번호 형식이 올바르지 않습니다.\n예: 123-45-67890'
-      );
+      Alert.alert('사업자번호 확인', '형식은 123-45-67890 입니다.');
       return;
     }
 
     setSubmitting(true);
     try {
-      const userId = await requireUserId();
-      const invoiceData = {
+      const userId = requireUserId();
+      const invoiceId = await taxInvoiceService.issueTaxInvoice(userId, {
         businessNumber,
         companyName,
         ceoName,
         address,
         contact,
         period: {
-          startDate: period?.startDate,
-          endDate: period?.endDate,
+          startDate: period.startDate,
+          endDate: period.endDate,
         },
-        amount: summary?.totalAmount || 0,
-        tax: summary?.taxAmount || 0,
-        totalAmount: summary?.totalAmountWithTax || 0,
-      };
-
-      await taxInvoiceService.issueTaxInvoice(userId, invoiceData);
+        amount: summary.supplyAmount,
+        tax: summary.taxAmount,
+        totalAmount: summary.totalAmount,
+      });
 
       Alert.alert(
-        '발행 완료',
-        '세금계산서가 발행되었습니다.\n홈택스로 전송되었습니다.',
-        [
-          {
-            text: '확인',
-            onPress: () => {
-              navigation.goBack();
-            },
-          },
-        ]
+        '발행 요청 완료',
+        `세금계산서 초안을 생성했습니다.\n문서 ID: ${invoiceId}\n운영 검토 후 발송 상태가 업데이트됩니다.`,
+        [{ text: '확인', onPress: () => navigation.goBack() }],
       );
-    } catch (error: any) {
-      Alert.alert('발행 실패', error.message || '세금계산서 발행에 실패했습니다.');
+    } catch (error) {
+      Alert.alert('발행 실패', getErrorMessage(error));
     } finally {
       setSubmitting(false);
     }
-  };
-
-  const handleBack = () => {
-    navigation.goBack();
-  };
-
-  const formatCurrency = (amount: number): string => {
-    return amount.toLocaleString('ko-KR') + '원';
-  };
-
-  const formatBusinessNumber = (text: string): string => {
-    // 자동으로 하이픈 추가
-    const cleaned = text.replace(/\D/g, '');
-    if (cleaned.length <= 3) return cleaned;
-    if (cleaned.length <= 5) return `${cleaned.slice(0, 3)}-${cleaned.slice(3)}`;
-    return `${cleaned.slice(0, 3)}-${cleaned.slice(3, 5)}-${cleaned.slice(5, 10)}`;
-  };
+  }
 
   if (loading) {
     return (
@@ -174,39 +158,30 @@ export default function TaxInvoiceRequestScreen() {
 
   return (
     <View style={styles.container}>
-      {/* 헤더 */}
       <View style={styles.header}>
-        <TouchableOpacity style={styles.backButton} onPress={handleBack}>
+        <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
           <Ionicons name="arrow-back" size={24} color={Colors.text.primary} />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>세금계산서 발행</Text>
       </View>
 
-      <ScrollView
-        style={styles.content}
-        showsVerticalScrollIndicator={false}
-      >
-        {/* 기간 정보 */}
-        {period && (
+      <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
+        {period ? (
           <View style={styles.periodCard}>
-            <Text style={styles.periodTitle}>발행 기간</Text>
-            <Text style={styles.periodText}>
-              {period.year}년 {period.month}월
-            </Text>
-            <Text style={styles.periodDate}>
-              {period.startDate.toLocaleDateString('ko-KR')} ~{' '}
-              {period.endDate.toLocaleDateString('ko-KR')}
+            <Text style={styles.periodTitle}>발행 대상 기간</Text>
+            <Text style={styles.periodMonth}>{period.year}년 {period.month}월</Text>
+            <Text style={styles.periodRange}>
+              {period.startDate.toLocaleDateString('ko-KR')} ~ {period.endDate.toLocaleDateString('ko-KR')}
             </Text>
           </View>
-        )}
+        ) : null}
 
-        {/* 청구 금액 요약 */}
-        {summary && (
+        {summary ? (
           <View style={styles.summaryCard}>
-            <Text style={styles.summaryTitle}>청구 금액</Text>
+            <Text style={styles.cardTitle}>청구 금액 요약</Text>
             <View style={styles.summaryRow}>
               <Text style={styles.summaryLabel}>공급가액</Text>
-              <Text style={styles.summaryValue}>{formatCurrency(summary.totalAmount)}</Text>
+              <Text style={styles.summaryValue}>{formatCurrency(summary.supplyAmount)}</Text>
             </View>
             <View style={styles.summaryRow}>
               <Text style={styles.summaryLabel}>부가세</Text>
@@ -214,26 +189,18 @@ export default function TaxInvoiceRequestScreen() {
             </View>
             <View style={styles.divider} />
             <View style={styles.summaryRow}>
-              <Text style={[styles.summaryLabel, styles.totalLabel]}>합계</Text>
-              <Text style={[styles.summaryValue, styles.totalValue]}>
-                {formatCurrency(summary.totalAmountWithTax)}
-              </Text>
+              <Text style={styles.totalLabel}>합계</Text>
+              <Text style={styles.totalValue}>{formatCurrency(summary.totalAmount)}</Text>
             </View>
-            <Text style={styles.deliveryCount}>
-              총 {summary.deliveryCount}건의 배송
-            </Text>
+            <Text style={styles.deliveryCount}>이번 달 완료 배송 {summary.deliveryCount}건 기준</Text>
           </View>
-        )}
+        ) : null}
 
-        {/* 기업 정보 입력 */}
         <View style={styles.formCard}>
-          <Text style={styles.formTitle}>기업 정보</Text>
+          <Text style={styles.cardTitle}>공급받는자 정보</Text>
 
-          {/* 사업자등록번호 */}
           <View style={styles.inputGroup}>
-            <Text style={styles.inputLabel}>
-              사업자등록번호 <Text style={styles.required}>*</Text>
-            </Text>
+            <Text style={styles.inputLabel}>사업자등록번호</Text>
             <TextInput
               style={styles.input}
               value={businessNumber}
@@ -241,106 +208,78 @@ export default function TaxInvoiceRequestScreen() {
               placeholder="123-45-67890"
               placeholderTextColor={Colors.text.tertiary}
               maxLength={12}
-              autoCapitalize="none"
             />
           </View>
 
-          {/* 상호명 */}
           <View style={styles.inputGroup}>
-            <Text style={styles.inputLabel}>
-              상호명 <Text style={styles.required}>*</Text>
-            </Text>
+            <Text style={styles.inputLabel}>상호명</Text>
             <TextInput
               style={styles.input}
               value={companyName}
               onChangeText={setCompanyName}
-              placeholder="회사명을 입력하세요"
+              placeholder="회사명을 입력해 주세요"
               placeholderTextColor={Colors.text.tertiary}
             />
           </View>
 
-          {/* 대표자명 */}
           <View style={styles.inputGroup}>
-            <Text style={styles.inputLabel}>
-              대표자명 <Text style={styles.required}>*</Text>
-            </Text>
+            <Text style={styles.inputLabel}>대표자명</Text>
             <TextInput
               style={styles.input}
               value={ceoName}
               onChangeText={setCeoName}
-              placeholder="대표자 성명을 입력하세요"
+              placeholder="대표자명을 입력해 주세요"
               placeholderTextColor={Colors.text.tertiary}
             />
           </View>
 
-          {/* 사업장 주소 */}
           <View style={styles.inputGroup}>
-            <Text style={styles.inputLabel}>
-              사업장 주소 <Text style={styles.required}>*</Text>
-            </Text>
+            <Text style={styles.inputLabel}>사업장 주소</Text>
             <TextInput
               style={[styles.input, styles.textArea]}
               value={address}
               onChangeText={setAddress}
-              placeholder="사업장 주소를 입력하세요"
+              placeholder="세금계산서에 표시할 주소를 입력해 주세요"
               placeholderTextColor={Colors.text.tertiary}
               multiline
-              numberOfLines={3}
             />
           </View>
 
-          {/* 담당자 연락처 */}
           <View style={styles.inputGroup}>
-            <Text style={styles.inputLabel}>
-              담당자 연락처 <Text style={styles.required}>*</Text>
-            </Text>
+            <Text style={styles.inputLabel}>담당자 연락처</Text>
             <TextInput
               style={styles.input}
               value={contact}
               onChangeText={setContact}
-              placeholder="010-XXXX-XXXX"
+              placeholder="010-1234-5678"
               placeholderTextColor={Colors.text.tertiary}
               keyboardType="phone-pad"
             />
           </View>
         </View>
 
-        {/* 안내 사항 */}
         <View style={styles.noticeCard}>
           <View style={styles.noticeHeader}>
             <Ionicons name="information-circle-outline" size={20} color={Colors.primary} />
-            <Text style={styles.noticeTitle}>유의사항</Text>
+            <Text style={styles.noticeTitle}>운영 검토 안내</Text>
           </View>
-          <Text style={styles.noticeText}>
-            • 세금계산서는 매월 10일 영업일 내에 발행됩니다.
-          </Text>
-          <Text style={styles.noticeText}>
-            • 발행된 세금계산서는 홈택스로 자동 전송됩니다.
-          </Text>
-          <Text style={styles.noticeText}>
-            • 수정이 필요한 경우 고객센터로 문의해주세요.
-          </Text>
+          <Text style={styles.noticeText}>발행 요청 후 문서는 운영 검토 대기 상태로 저장됩니다.</Text>
+          <Text style={styles.noticeText}>이메일 발송과 입금 확인은 실서비스 연동 전까지 운영 검토로 진행됩니다.</Text>
+          <Text style={styles.noticeText}>사업자 정보가 변경되면 다시 요청해 최신 정보로 문서를 발행해 주세요.</Text>
         </View>
 
-        {/* 하단 여백 */}
-        <View style={{ height: Spacing.xl }} />
+        <View style={styles.bottomSpacer} />
       </ScrollView>
 
-      {/* 하단 버튼 */}
       <View style={styles.footer}>
         <TouchableOpacity
-          style={[
-            styles.submitButton,
-            submitting && styles.disabledButton,
-          ]}
-          onPress={handleSubmit}
+          style={[styles.submitButton, submitting && styles.submitButtonDisabled]}
           disabled={submitting}
+          onPress={() => {
+            void handleSubmit();
+          }}
         >
-          {submitting ? (
-            <ActivityIndicator color="#fff" />
-          ) : (
-            <Text style={styles.submitButtonText}>세금계산서 발행</Text>
-          )}
+          {submitting ? <ActivityIndicator color="#fff" /> : <Text style={styles.submitButtonText}>발행 요청하기</Text>}
         </TouchableOpacity>
       </View>
     </View>
@@ -350,12 +289,13 @@ export default function TaxInvoiceRequestScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: Colors.background.primary,
+    backgroundColor: Colors.background,
   },
   loadingContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
+    backgroundColor: Colors.background,
   },
   header: {
     flexDirection: 'row',
@@ -388,23 +328,24 @@ const styles = StyleSheet.create({
     color: Colors.text.secondary,
     marginBottom: Spacing.xs,
   },
-  periodText: {
+  periodMonth: {
     ...Typography.h2,
     color: Colors.primary,
     marginBottom: Spacing.xs,
   },
-  periodDate: {
+  periodRange: {
     ...Typography.body2,
     color: Colors.text.secondary,
   },
   summaryCard: {
-    margin: Spacing.md,
+    marginHorizontal: Spacing.md,
+    marginBottom: Spacing.md,
     padding: Spacing.lg,
     backgroundColor: '#fff',
     borderRadius: BorderRadius.lg,
     ...Shadows.sm,
   },
-  summaryTitle: {
+  cardTitle: {
     ...Typography.h3,
     color: Colors.text.primary,
     marginBottom: Spacing.md,
@@ -422,7 +363,12 @@ const styles = StyleSheet.create({
   summaryValue: {
     ...Typography.body1,
     color: Colors.text.primary,
-    fontWeight: 'bold',
+    fontWeight: '600',
+  },
+  divider: {
+    height: 1,
+    backgroundColor: Colors.border,
+    marginVertical: Spacing.sm,
   },
   totalLabel: {
     ...Typography.h3,
@@ -432,28 +378,18 @@ const styles = StyleSheet.create({
     ...Typography.h2,
     color: Colors.primary,
   },
-  divider: {
-    height: 1,
-    backgroundColor: Colors.border,
-    marginVertical: Spacing.sm,
-  },
   deliveryCount: {
     ...Typography.bodySmall,
     color: Colors.text.tertiary,
-    textAlign: 'center',
     marginTop: Spacing.sm,
   },
   formCard: {
-    margin: Spacing.md,
+    marginHorizontal: Spacing.md,
+    marginBottom: Spacing.md,
     padding: Spacing.lg,
     backgroundColor: '#fff',
     borderRadius: BorderRadius.lg,
     ...Shadows.sm,
-  },
-  formTitle: {
-    ...Typography.h3,
-    color: Colors.text.primary,
-    marginBottom: Spacing.lg,
   },
   inputGroup: {
     marginBottom: Spacing.lg,
@@ -463,9 +399,6 @@ const styles = StyleSheet.create({
     color: Colors.text.primary,
     marginBottom: Spacing.sm,
   },
-  required: {
-    color: Colors.error,
-  },
   input: {
     ...Typography.body1,
     color: Colors.text.primary,
@@ -474,14 +407,14 @@ const styles = StyleSheet.create({
     borderRadius: BorderRadius.md,
     paddingHorizontal: Spacing.md,
     paddingVertical: Spacing.sm,
-    backgroundColor: Colors.background.primary,
+    backgroundColor: Colors.background,
   },
   textArea: {
-    height: 80,
+    minHeight: 88,
     textAlignVertical: 'top',
   },
   noticeCard: {
-    margin: Spacing.md,
+    marginHorizontal: Spacing.md,
     padding: Spacing.lg,
     backgroundColor: Colors.warning + '10',
     borderRadius: BorderRadius.lg,
@@ -496,13 +429,16 @@ const styles = StyleSheet.create({
   noticeTitle: {
     ...Typography.body1,
     color: Colors.warning,
-    fontWeight: 'bold',
+    fontWeight: '700',
     marginLeft: Spacing.xs,
   },
   noticeText: {
     ...Typography.body2,
     color: Colors.text.secondary,
     lineHeight: 20,
+  },
+  bottomSpacer: {
+    height: Spacing.xl,
   },
   footer: {
     padding: Spacing.md,
@@ -511,17 +447,17 @@ const styles = StyleSheet.create({
     backgroundColor: '#fff',
   },
   submitButton: {
-    paddingVertical: Spacing.lg,
-    borderRadius: BorderRadius.md,
     backgroundColor: Colors.primary,
+    borderRadius: BorderRadius.md,
     alignItems: 'center',
+    paddingVertical: Spacing.lg,
   },
-  disabledButton: {
-    backgroundColor: Colors.background.secondary,
+  submitButtonDisabled: {
+    backgroundColor: Colors.gray100,
   },
   submitButtonText: {
     ...Typography.body1,
     color: '#fff',
-    fontWeight: 'bold',
+    fontWeight: '700',
   },
 });

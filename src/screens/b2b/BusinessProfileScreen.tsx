@@ -1,30 +1,24 @@
-/**
- * Business Profile Screen
- * B2B 기업용 프로필 관리 화면
- */
-// @ts-nocheck - Temporarily suppress TypeScript errors for rapid development
-
-import React, { useState, useEffect } from 'react';
+﻿import React, { useEffect, useState } from 'react';
 import {
-  View,
-  Text,
-  StyleSheet,
-  ScrollView,
-  TouchableOpacity,
   ActivityIndicator,
   Alert,
+  ScrollView,
+  StyleSheet,
+  Text,
   TextInput,
-  Image,
+  TouchableOpacity,
+  View,
 } from 'react-native';
-import { useNavigation } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
+import { useNavigation } from '@react-navigation/native';
+import { doc, updateDoc } from 'firebase/firestore';
 import { b2bFirestoreService } from '../../services/b2b-firestore-service';
-import { businessContractService } from '../../services/business-contract-service';
-import { requireUserId } from '../../services/firebase';
+import { db, requireUserId } from '../../services/firebase';
 import type { B2BStackNavigationProp } from '../../types/navigation';
-import { Colors, Typography, Spacing, BorderRadius, Shadows } from '../../theme';
 
-interface BusinessProfile {
+type SubscriptionStatus = 'active' | 'suspended' | 'cancelled';
+
+type BusinessProfile = {
   businessId: string;
   companyName: string;
   businessNumber: string;
@@ -34,10 +28,89 @@ interface BusinessProfile {
   email: string;
   businessType: string;
   subscriptionTier: string;
-  subscriptionStatus: 'active' | 'suspended' | 'cancelled';
+  subscriptionStatus: SubscriptionStatus;
   monthlyLimit: number;
   usedDeliveries: number;
-  createdAt: Date;
+};
+
+type EditableProfile = Pick<BusinessProfile, 'companyName' | 'ceoName' | 'address' | 'contact'>;
+
+function toSubscriptionStatus(value: unknown): SubscriptionStatus {
+  return value === 'active' || value === 'suspended' || value === 'cancelled' ? value : 'active';
+}
+
+function mapBusinessProfile(userId: string, raw: Record<string, unknown>): BusinessProfile {
+  return {
+    businessId: typeof raw.businessId === 'string' ? raw.businessId : userId,
+    companyName: typeof raw.companyName === 'string' ? raw.companyName : '',
+    businessNumber: typeof raw.businessNumber === 'string' ? raw.businessNumber : '',
+    ceoName: typeof raw.ceoName === 'string' ? raw.ceoName : '',
+    address: typeof raw.address === 'string' ? raw.address : '',
+    contact: typeof raw.contact === 'string' ? raw.contact : '',
+    email: typeof raw.email === 'string' ? raw.email : '',
+    businessType: typeof raw.businessType === 'string' ? raw.businessType : '기업 회원',
+    subscriptionTier: typeof raw.subscriptionTier === 'string' ? raw.subscriptionTier : 'basic',
+    subscriptionStatus: toSubscriptionStatus(raw.subscriptionStatus),
+    monthlyLimit: typeof raw.monthlyLimit === 'number' ? raw.monthlyLimit : 0,
+    usedDeliveries: typeof raw.usedDeliveries === 'number' ? raw.usedDeliveries : 0,
+  };
+}
+
+function formatBusinessNumber(value: string): string {
+  const digits = value.replace(/\D/g, '');
+  if (digits.length !== 10) {
+    return value;
+  }
+
+  return `${digits.slice(0, 3)}-${digits.slice(3, 5)}-${digits.slice(5)}`;
+}
+
+function getTierLabel(tier: string): string {
+  switch (tier) {
+    case 'premium':
+      return '프리미엄';
+    case 'standard':
+      return '스탠다드';
+    default:
+      return '베이직';
+  }
+}
+
+function getTierColor(tier: string): string {
+  switch (tier) {
+    case 'premium':
+      return '#7C3AED';
+    case 'standard':
+      return '#2563EB';
+    default:
+      return '#64748B';
+  }
+}
+
+function getStatusLabel(status: SubscriptionStatus): string {
+  switch (status) {
+    case 'active':
+      return '이용 중';
+    case 'suspended':
+      return '일시 중지';
+    case 'cancelled':
+      return '해지';
+    default:
+      return '확인 필요';
+  }
+}
+
+function getStatusColor(status: SubscriptionStatus): string {
+  switch (status) {
+    case 'active':
+      return '#16A34A';
+    case 'suspended':
+      return '#D97706';
+    case 'cancelled':
+      return '#DC2626';
+    default:
+      return '#64748B';
+  }
 }
 
 export default function BusinessProfileScreen() {
@@ -46,641 +119,490 @@ export default function BusinessProfileScreen() {
   const [saving, setSaving] = useState(false);
   const [editing, setEditing] = useState(false);
   const [profile, setProfile] = useState<BusinessProfile | null>(null);
-  const [companyName, setCompanyName] = useState('');
-  const [ceoName, setCeoName] = useState('');
-  const [address, setAddress] = useState('');
-  const [contact, setContact] = useState('');
+  const [form, setForm] = useState<EditableProfile>({ companyName: '', ceoName: '', address: '', contact: '' });
 
   useEffect(() => {
-    loadProfile();
+    void loadProfile();
   }, []);
 
-  const loadProfile = async () => {
+  async function loadProfile(): Promise<void> {
     try {
-      const userId = await requireUserId();
+      setLoading(true);
+      const userId = requireUserId();
       const businessData = await b2bFirestoreService.getBusinessInfo(userId);
 
-      if (businessData) {
-        setProfile(businessData);
-        setCompanyName(businessData.companyName || '');
-        setCeoName(businessData.ceoName || '');
-        setAddress(businessData.address || '');
-        setContact(businessData.contact || '');
+      if (!businessData || typeof businessData !== 'object') {
+        setProfile(null);
+        return;
       }
+
+      const mappedProfile = mapBusinessProfile(userId, businessData as Record<string, unknown>);
+      setProfile(mappedProfile);
+      setForm({
+        companyName: mappedProfile.companyName,
+        ceoName: mappedProfile.ceoName,
+        address: mappedProfile.address,
+        contact: mappedProfile.contact,
+      });
     } catch (error) {
-      console.error('Error loading profile:', error);
-      Alert.alert('오류', '기업 정보를 불러오지 못했습니다.');
+      console.error('Failed to load business profile', error);
+      Alert.alert('불러오기 실패', '기업 정보를 불러오지 못했습니다.');
     } finally {
       setLoading(false);
     }
-  };
+  }
 
-  const handleEdit = () => {
-    setEditing(true);
-  };
+  function handleFieldChange(field: keyof EditableProfile, value: string): void {
+    setForm((current) => ({ ...current, [field]: value }));
+  }
 
-  const handleCancel = () => {
-    setEditing(false);
-    // 원래 데이터로 복원
+  function handleCancel(): void {
     if (profile) {
-      setCompanyName(profile.companyName || '');
-      setCeoName(profile.ceoName || '');
-      setAddress(profile.address || '');
-      setContact(profile.contact || '');
+      setForm({
+        companyName: profile.companyName,
+        ceoName: profile.ceoName,
+        address: profile.address,
+        contact: profile.contact,
+      });
     }
-  };
+    setEditing(false);
+  }
 
-  const handleSave = async () => {
-    // 필수 필드 검증
-    if (!companyName || !ceoName || !address || !contact) {
-      Alert.alert('입력 오류', '모든 필수 정보를 입력해주세요.');
+  async function handleSave(): Promise<void> {
+    if (!form.companyName.trim() || !form.ceoName.trim() || !form.address.trim() || !form.contact.trim()) {
+      Alert.alert('입력 확인', '회사명, 대표자명, 주소, 연락처를 모두 입력해 주세요.');
       return;
     }
 
-    setSaving(true);
     try {
-      const userId = await requireUserId();
-      await b2bFirestoreService.updateBusinessInfo(userId, {
-        companyName,
-        ceoName,
-        address,
-        contact,
+      setSaving(true);
+      const userId = requireUserId();
+      await updateDoc(doc(db, 'users', userId), {
+        companyName: form.companyName.trim(),
+        ceoName: form.ceoName.trim(),
+        address: form.address.trim(),
+        contact: form.contact.trim(),
+        updatedAt: new Date(),
       });
 
-      Alert.alert('완료', '기업 정보가 업데이트되었습니다.');
+      Alert.alert('저장 완료', '기업 프로필을 업데이트했습니다.');
       setEditing(false);
-      loadProfile();
-    } catch (error: any) {
-      Alert.alert('실패', error.message || '기업 정보 업데이트에 실패했습니다.');
+      await loadProfile();
+    } catch (error) {
+      console.error('Failed to update business profile', error);
+      Alert.alert('저장 실패', '기업 프로필을 저장하지 못했습니다.');
     } finally {
       setSaving(false);
     }
-  };
-
-  const handleManageSubscription = () => {
-    navigation.navigate('SubscriptionTierSelection');
-  };
-
-  const handleChangePassword = () => {
-    Alert.alert('알림', '비밀번호 변경은 웹에서 진행해주세요.');
-  };
-
-  const handleLogout = () => {
-    Alert.alert(
-      '로그아웃',
-      '로그아웃 하시겠습니까?',
-      [
-        { text: '취소', style: 'cancel' },
-        {
-          text: '로그아웃',
-          style: 'destructive',
-          onPress: () => {
-            navigation.reset({
-              index: 0,
-              routes: [{ name: 'Login' }],
-            });
-          },
-        },
-      ]
-    );
-  };
-
-  const formatBusinessNumber = (number: string): string => {
-    // XXX-XX-XXXX 형식으로 변환
-    if (number.length === 10) {
-      return `${number.slice(0, 3)}-${number.slice(3, 5)}-${number.slice(5)}`;
-    }
-    return number;
-  };
-
-  const getTierColor = (tier: string): string => {
-    switch (tier) {
-      case 'premium':
-        return Colors.premium;
-      case 'standard':
-        return Colors.primary;
-      default:
-        return Colors.text.secondary;
-    }
-  };
-
-  const getTierName = (tier: string): string => {
-    switch (tier) {
-      case 'premium':
-        return '프리미엄';
-      case 'standard':
-        return '스탠다드';
-      default:
-        return '베이직';
-    }
-  };
-
-  const getStatusColor = (status: string): string => {
-    switch (status) {
-      case 'active':
-        return Colors.success;
-      case 'suspended':
-        return Colors.warning;
-      default:
-        return Colors.error;
-    }
-  };
-
-  const getStatusText = (status: string): string => {
-    switch (status) {
-      case 'active':
-        return '활성';
-      case 'suspended':
-        return '일시정지';
-      default:
-        return '해지';
-    }
-  };
+  }
 
   if (loading) {
     return (
       <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color={Colors.primary} />
+        <ActivityIndicator size="large" color="#2563EB" />
       </View>
     );
   }
 
   if (!profile) {
     return (
-      <View style={styles.errorContainer}>
-        <Ionicons name="alert-circle-outline" size={64} color={Colors.error} />
-        <Text style={styles.errorText}>기업 정보를 찾을 수 없습니다.</Text>
+      <View style={styles.emptyContainer}>
+        <Ionicons name="business-outline" size={56} color="#94A3B8" />
+        <Text style={styles.emptyTitle}>기업 정보를 찾지 못했습니다.</Text>
+        <Text style={styles.emptyDescription}>B2B 계약 또는 사업자 정보가 아직 연결되지 않았습니다. 운영팀과 연결 상태를 확인해 주세요.</Text>
       </View>
     );
   }
 
-  const usagePercentage = profile.monthlyLimit > 0
-    ? (profile.usedDeliveries / profile.monthlyLimit) * 100
-    : 0;
+  const usageRatio = profile.monthlyLimit > 0 ? profile.usedDeliveries / profile.monthlyLimit : 0;
+  const usagePercent = Math.min(usageRatio * 100, 100);
 
   return (
-    <View style={styles.container}>
-      {/* 헤더 */}
-      <View style={styles.header}>
-        <Text style={styles.headerTitle}>기업 프로필</Text>
-        {!editing && (
-          <TouchableOpacity style={styles.editButton} onPress={handleEdit}>
-            <Ionicons name="create-outline" size={24} color={Colors.primary} />
-          </TouchableOpacity>
-        )}
-      </View>
-
-      <ScrollView
-        style={styles.content}
-        showsVerticalScrollIndicator={false}
-      >
-        {/* 기업 기본 정보 카드 */}
-        <View style={styles.profileCard}>
-          <View style={styles.profileHeader}>
-            <View style={styles.profileIcon}>
-              <Ionicons name="business" size={48} color={Colors.primary} />
-            </View>
-            <View style={styles.profileInfo}>
-              <Text style={styles.companyName}>{profile.companyName}</Text>
-              <Text style={styles.businessType}>{profile.businessType}</Text>
-            </View>
+    <ScrollView style={styles.container} contentContainerStyle={styles.content}>
+      <View style={styles.heroCard}>
+        <View style={styles.heroHeader}>
+          <View style={styles.heroIcon}>
+            <Ionicons name="business" size={28} color="#2563EB" />
           </View>
-
-          {/* 사업자등록번호 */}
-          <View style={styles.infoRow}>
-            <Text style={styles.infoLabel}>사업자등록번호</Text>
-            <Text style={styles.infoValue}>
-              {formatBusinessNumber(profile.businessNumber)}
-            </Text>
+          <View style={styles.heroText}>
+            <Text style={styles.heroTitle}>{profile.companyName || '기업 프로필'}</Text>
+            <Text style={styles.heroSubtitle}>{profile.businessType}</Text>
           </View>
-
-          {/* 대표자명 */}
-          <View style={styles.infoRow}>
-            <Text style={styles.infoLabel}>대표자</Text>
-            {editing ? (
-              <TextInput
-                style={styles.input}
-                value={ceoName}
-                onChangeText={setCeoName}
-                placeholder="대표자명"
-              />
-            ) : (
-              <Text style={styles.infoValue}>{profile.ceoName}</Text>
-            )}
-          </View>
-
-          {/* 주소 */}
-          <View style={styles.infoRow}>
-            <Text style={styles.infoLabel}>주소</Text>
-            {editing ? (
-              <TextInput
-                style={[styles.input, styles.inputMultiline]}
-                value={address}
-                onChangeText={setAddress}
-                placeholder="사업장 주소"
-                multiline
-              />
-            ) : (
-              <Text style={[styles.infoValue, styles.infoValueMultiline]}>
-                {profile.address}
-              </Text>
-            )}
-          </View>
-
-          {/* 연락처 */}
-          <View style={styles.infoRow}>
-            <Text style={styles.infoLabel}>연락처</Text>
-            {editing ? (
-              <TextInput
-                style={styles.input}
-                value={contact}
-                onChangeText={setContact}
-                placeholder="담당자 연락처"
-                keyboardType="phone-pad"
-              />
-            ) : (
-              <Text style={styles.infoValue}>{profile.contact}</Text>
-            )}
-          </View>
-
-          {/* 이메일 */}
-          <View style={styles.infoRow}>
-            <Text style={styles.infoLabel}>이메일</Text>
-            <Text style={styles.infoValue}>{profile.email}</Text>
-          </View>
-
-          {/* 편집 모드 버튼 */}
-          {editing && (
-            <View style={styles.editButtons}>
-              <TouchableOpacity
-                style={[styles.editButtonAction, styles.cancelButton]}
-                onPress={handleCancel}
-              >
-                <Text style={styles.cancelButtonText}>취소</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[styles.editButtonAction, styles.saveButton]}
-                onPress={handleSave}
-                disabled={saving}
-              >
-                {saving ? (
-                  <ActivityIndicator color="#fff" />
-                ) : (
-                  <Text style={styles.saveButtonText}>저장</Text>
-                )}
-              </TouchableOpacity>
-            </View>
+          {!editing && (
+            <TouchableOpacity style={styles.editPill} onPress={() => setEditing(true)}>
+              <Ionicons name="create-outline" size={16} color="#2563EB" />
+              <Text style={styles.editPillText}>수정</Text>
+            </TouchableOpacity>
           )}
         </View>
 
-        {/* 구독 정보 카드 */}
-        <View style={styles.subscriptionCard}>
-          <View style={styles.cardHeader}>
-            <Text style={styles.cardTitle}>구독 정보</Text>
-            <TouchableOpacity
-              style={styles.manageButton}
-              onPress={handleManageSubscription}
-            >
-              <Text style={styles.manageButtonText}>관리</Text>
-            </TouchableOpacity>
+        <View style={styles.badgeRow}>
+          <View style={[styles.badge, { backgroundColor: `${getTierColor(profile.subscriptionTier)}18` }]}>
+            <Text style={[styles.badgeText, { color: getTierColor(profile.subscriptionTier) }]}>{getTierLabel(profile.subscriptionTier)}</Text>
           </View>
-
-          {/* 티어 */}
-          <View style={styles.tierRow}>
-            <View
-              style={[
-                styles.tierBadge,
-                { backgroundColor: getTierColor(profile.subscriptionTier) + '20' },
-              ]}
-            >
-              <Text
-                style={[
-                  styles.tierText,
-                  { color: getTierColor(profile.subscriptionTier) },
-                ]}
-              >
-                {getTierName(profile.subscriptionTier)}
-              </Text>
-            </View>
-            <View
-              style={[
-                styles.statusBadge,
-                { backgroundColor: getStatusColor(profile.subscriptionStatus) + '20' },
-              ]}
-            >
-              <Text
-                style={[
-                  styles.statusText,
-                  { color: getStatusColor(profile.subscriptionStatus) },
-                ]}
-              >
-                {getStatusText(profile.subscriptionStatus)}
-              </Text>
-            </View>
-          </View>
-
-          {/* 월간 사용량 */}
-          <View style={styles.usageContainer}>
-            <View style={styles.usageHeader}>
-              <Text style={styles.usageLabel}>월간 사용량</Text>
-              <Text style={styles.usageValue}>
-                {profile.usedDeliveries} / {profile.monthlyLimit}건
-              </Text>
-            </View>
-            <View style={styles.progressBar}>
-              <View
-                style={[
-                  styles.progressFill,
-                  {
-                    width: `${Math.min(usagePercentage, 100)}%`,
-                    backgroundColor:
-                      usagePercentage > 90
-                        ? Colors.error
-                        : usagePercentage > 70
-                        ? Colors.warning
-                        : Colors.primary,
-                  },
-                ]}
-              />
-            </View>
-            <Text style={styles.usageNote}>
-              {usagePercentage > 90
-                ? '한계 임박! 추가 결제가 필요합니다.'
-                : usagePercentage > 70
-                ? '사용량이 70%를 넘었습니다.'
-                : '정상적인 사용량입니다.'}
-            </Text>
+          <View style={[styles.badge, { backgroundColor: `${getStatusColor(profile.subscriptionStatus)}18` }]}>
+            <Text style={[styles.badgeText, { color: getStatusColor(profile.subscriptionStatus) }]}>{getStatusLabel(profile.subscriptionStatus)}</Text>
           </View>
         </View>
+      </View>
 
-        {/* 계정 관리 */}
-        <View style={styles.accountCard}>
-          <Text style={styles.cardTitle}>계정 관리</Text>
+      <View style={styles.card}>
+        <Text style={styles.sectionTitle}>기본 정보</Text>
+        <InfoRow label="사업자등록번호" value={formatBusinessNumber(profile.businessNumber)} />
+        <EditableRow label="대표자" editing={editing} value={form.ceoName} displayValue={profile.ceoName} placeholder="대표자명을 입력해 주세요" onChangeText={(value) => handleFieldChange('ceoName', value)} />
+        <EditableRow label="회사명" editing={editing} value={form.companyName} displayValue={profile.companyName} placeholder="회사명을 입력해 주세요" onChangeText={(value) => handleFieldChange('companyName', value)} />
+        <EditableRow label="주소" editing={editing} value={form.address} displayValue={profile.address} placeholder="사업장 주소를 입력해 주세요" multiline onChangeText={(value) => handleFieldChange('address', value)} />
+        <EditableRow label="연락처" editing={editing} value={form.contact} displayValue={profile.contact} placeholder="담당자 연락처를 입력해 주세요" keyboardType="phone-pad" onChangeText={(value) => handleFieldChange('contact', value)} />
+        <InfoRow label="이메일" value={profile.email || '등록되지 않음'} />
+      </View>
 
-          <TouchableOpacity style={styles.menuItem} onPress={handleChangePassword}>
-            <Ionicons name="lock-closed-outline" size={24} color={Colors.text.secondary} />
-            <Text style={styles.menuText}>비밀번호 변경</Text>
-            <Ionicons name="chevron-forward" size={20} color={Colors.text.tertiary} />
+      <View style={styles.card}>
+        <Text style={styles.sectionTitle}>구독 사용량</Text>
+        <View style={styles.progressHeader}>
+          <Text style={styles.progressLabel}>월 배송 사용량</Text>
+          <Text style={styles.progressValue}>{profile.usedDeliveries} / {profile.monthlyLimit || '무제한'}</Text>
+        </View>
+        <View style={styles.progressTrack}>
+          <View style={[styles.progressFill, { width: `${usagePercent}%` }]} />
+        </View>
+        <Text style={styles.progressHint}>현재 플랜은 {getTierLabel(profile.subscriptionTier)}이며, 사용량이 늘어나면 상위 플랜 전환을 검토할 수 있습니다.</Text>
+        <TouchableOpacity style={styles.secondaryButton} onPress={() => navigation.navigate('SubscriptionTierSelection')}>
+          <Ionicons name="sparkles-outline" size={18} color="#2563EB" />
+          <Text style={styles.secondaryButtonText}>구독 플랜 보기</Text>
+        </TouchableOpacity>
+      </View>
+
+      <View style={styles.card}>
+        <Text style={styles.sectionTitle}>운영 연결</Text>
+        <ActionRow icon="receipt-outline" title="세금계산서 발행" description="이번 달 공급가액과 부가세 기준으로 발행 요청을 보냅니다." onPress={() => navigation.navigate('TaxInvoiceRequest')} />
+        <ActionRow icon="wallet-outline" title="월 정산 확인" description="지급 대기, 지급 완료, 운영 검토 메모를 한 화면에서 확인합니다." onPress={() => navigation.navigate('MonthlySettlement')} />
+      </View>
+
+      {editing ? (
+        <View style={styles.footerActions}>
+          <TouchableOpacity style={styles.cancelButton} onPress={handleCancel}>
+            <Text style={styles.cancelButtonText}>취소</Text>
           </TouchableOpacity>
-
-          <TouchableOpacity style={styles.menuItem} onPress={handleLogout}>
-            <Ionicons name="log-out-outline" size={24} color={Colors.error} />
-            <Text style={[styles.menuText, { color: Colors.error }]}>로그아웃</Text>
+          <TouchableOpacity style={styles.saveButton} onPress={() => void handleSave()} disabled={saving}>
+            {saving ? <ActivityIndicator color="#fff" /> : <Text style={styles.saveButtonText}>저장</Text>}
           </TouchableOpacity>
         </View>
+      ) : null}
+    </ScrollView>
+  );
+}
 
-        {/* 버전 정보 */}
-        <View style={styles.versionContainer}>
-          <Text style={styles.versionText}>버전 1.0.0</Text>
-          <Text style={styles.versionText}>© 2026 가는길에</Text>
-        </View>
-
-        <View style={{ height: Spacing.xl }} />
-      </ScrollView>
+function InfoRow({ label, value }: { label: string; value: string }) {
+  return (
+    <View style={styles.row}>
+      <Text style={styles.label}>{label}</Text>
+      <Text style={styles.value}>{value}</Text>
     </View>
+  );
+}
+
+function EditableRow({
+  label,
+  value,
+  displayValue,
+  editing,
+  placeholder,
+  onChangeText,
+  multiline,
+  keyboardType,
+}: {
+  label: string;
+  value: string;
+  displayValue: string;
+  editing: boolean;
+  placeholder: string;
+  onChangeText: (value: string) => void;
+  multiline?: boolean;
+  keyboardType?: 'default' | 'phone-pad';
+}) {
+  return (
+    <View style={styles.row}>
+      <Text style={styles.label}>{label}</Text>
+      {editing ? (
+        <TextInput
+          style={[styles.input, multiline ? styles.multilineInput : null]}
+          value={value}
+          onChangeText={onChangeText}
+          placeholder={placeholder}
+          multiline={multiline}
+          keyboardType={keyboardType ?? 'default'}
+        />
+      ) : (
+        <Text style={styles.value}>{displayValue || '미등록'}</Text>
+      )}
+    </View>
+  );
+}
+
+function ActionRow({ icon, title, description, onPress }: { icon: keyof typeof Ionicons.glyphMap; title: string; description: string; onPress: () => void }) {
+  return (
+    <TouchableOpacity style={styles.actionRow} onPress={onPress}>
+      <View style={styles.actionIcon}>
+        <Ionicons name={icon} size={20} color="#2563EB" />
+      </View>
+      <View style={styles.actionText}>
+        <Text style={styles.actionTitle}>{title}</Text>
+        <Text style={styles.actionDescription}>{description}</Text>
+      </View>
+      <Ionicons name="chevron-forward" size={18} color="#94A3B8" />
+    </TouchableOpacity>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: Colors.background.primary,
+    backgroundColor: '#F8FAFC',
+  },
+  content: {
+    padding: 20,
+    gap: 16,
   },
   loadingContainer: {
     flex: 1,
+    alignItems: 'center',
     justifyContent: 'center',
-    alignItems: 'center',
+    backgroundColor: '#F8FAFC',
   },
-  errorContainer: {
+  emptyContainer: {
     flex: 1,
+    alignItems: 'center',
     justifyContent: 'center',
-    alignItems: 'center',
-    padding: Spacing.xl,
+    padding: 24,
+    backgroundColor: '#F8FAFC',
   },
-  errorText: {
-    ...Typography.body1,
-    color: Colors.text.secondary,
-    marginTop: Spacing.md,
+  emptyTitle: {
+    marginTop: 12,
+    fontSize: 20,
+    fontWeight: '700',
+    color: '#0F172A',
   },
-  header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingHorizontal: Spacing.md,
-    paddingVertical: Spacing.lg,
-    borderBottomWidth: 1,
-    borderBottomColor: Colors.border,
-    backgroundColor: '#fff',
+  emptyDescription: {
+    marginTop: 8,
+    fontSize: 14,
+    lineHeight: 20,
+    textAlign: 'center',
+    color: '#64748B',
   },
-  headerTitle: {
-    ...Typography.h3,
-    color: Colors.text.primary,
+  heroCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 24,
+    padding: 20,
+    shadowColor: '#0F172A',
+    shadowOpacity: 0.08,
+    shadowRadius: 12,
+    shadowOffset: { width: 0, height: 6 },
+    elevation: 4,
   },
-  editButton: {
-    padding: Spacing.sm,
-  },
-  content: {
-    flex: 1,
-  },
-  profileCard: {
-    margin: Spacing.md,
-    padding: Spacing.lg,
-    backgroundColor: '#fff',
-    borderRadius: BorderRadius.lg,
-    ...Shadows.sm,
-  },
-  profileHeader: {
+  heroHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: Spacing.lg,
   },
-  profileIcon: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
-    backgroundColor: Colors.primary + '10',
-    justifyContent: 'center',
+  heroIcon: {
+    width: 56,
+    height: 56,
+    borderRadius: 18,
+    backgroundColor: '#DBEAFE',
     alignItems: 'center',
-    marginRight: Spacing.md,
+    justifyContent: 'center',
   },
-  profileInfo: {
+  heroText: {
     flex: 1,
+    marginLeft: 14,
   },
-  companyName: {
-    ...Typography.h2,
-    color: Colors.text.primary,
-    marginBottom: Spacing.xs,
+  heroTitle: {
+    fontSize: 22,
+    fontWeight: '800',
+    color: '#0F172A',
   },
-  businessType: {
-    ...Typography.body2,
-    color: Colors.text.secondary,
+  heroSubtitle: {
+    marginTop: 4,
+    fontSize: 14,
+    color: '#64748B',
   },
-  infoRow: {
-    marginBottom: Spacing.md,
+  editPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 999,
+    backgroundColor: '#EFF6FF',
   },
-  infoLabel: {
-    ...Typography.body2,
-    color: Colors.text.secondary,
-    marginBottom: Spacing.xs,
+  editPillText: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#2563EB',
   },
-  infoValue: {
-    ...Typography.body1,
-    color: Colors.text.primary,
+  badgeRow: {
+    flexDirection: 'row',
+    gap: 8,
+    marginTop: 16,
   },
-  infoValueMultiline: {
+  badge: {
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 999,
+  },
+  badgeText: {
+    fontSize: 12,
+    fontWeight: '700',
+  },
+  card: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 24,
+    padding: 20,
+    shadowColor: '#0F172A',
+    shadowOpacity: 0.05,
+    shadowRadius: 10,
+    shadowOffset: { width: 0, height: 4 },
+    elevation: 3,
+  },
+  sectionTitle: {
+    fontSize: 18,
+    fontWeight: '800',
+    color: '#0F172A',
+    marginBottom: 16,
+  },
+  row: {
+    marginBottom: 16,
+  },
+  label: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#64748B',
+    marginBottom: 8,
+  },
+  value: {
+    fontSize: 15,
     lineHeight: 22,
+    color: '#0F172A',
   },
   input: {
-    ...Typography.body1,
-    color: Colors.text.primary,
     borderWidth: 1,
-    borderColor: Colors.border,
-    borderRadius: BorderRadius.md,
-    paddingHorizontal: Spacing.md,
-    paddingVertical: Spacing.sm,
+    borderColor: '#CBD5E1',
+    borderRadius: 14,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    fontSize: 15,
+    color: '#0F172A',
+    backgroundColor: '#FFFFFF',
   },
-  inputMultiline: {
-    height: 80,
+  multilineInput: {
+    minHeight: 88,
     textAlignVertical: 'top',
   },
-  editButtons: {
-    flexDirection: 'row',
-    marginTop: Spacing.md,
-    gap: Spacing.md,
-  },
-  editButtonAction: {
-    flex: 1,
-    paddingVertical: Spacing.md,
-    borderRadius: BorderRadius.md,
-    alignItems: 'center',
-  },
-  cancelButton: {
-    backgroundColor: Colors.background.secondary,
-  },
-  cancelButtonText: {
-    ...Typography.body1,
-    color: Colors.text.primary,
-  },
-  saveButton: {
-    backgroundColor: Colors.primary,
-  },
-  saveButtonText: {
-    ...Typography.body1,
-    color: '#fff',
-    fontWeight: 'bold',
-  },
-  subscriptionCard: {
-    margin: Spacing.md,
-    padding: Spacing.lg,
-    backgroundColor: '#fff',
-    borderRadius: BorderRadius.lg,
-    ...Shadows.sm,
-  },
-  cardHeader: {
+  progressHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: Spacing.md,
   },
-  cardTitle: {
-    ...Typography.h3,
-    color: Colors.text.primary,
+  progressLabel: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#0F172A',
   },
-  manageButton: {
-    paddingHorizontal: Spacing.md,
-    paddingVertical: Spacing.sm,
-    borderRadius: BorderRadius.sm,
-    backgroundColor: Colors.primary + '10',
+  progressValue: {
+    fontSize: 14,
+    color: '#475569',
   },
-  manageButtonText: {
-    ...Typography.body2,
-    color: Colors.primary,
-    fontWeight: 'bold',
-  },
-  tierRow: {
-    flexDirection: 'row',
-    gap: Spacing.sm,
-    marginBottom: Spacing.lg,
-  },
-  tierBadge: {
-    paddingHorizontal: Spacing.md,
-    paddingVertical: Spacing.sm,
-    borderRadius: BorderRadius.sm,
-  },
-  tierText: {
-    ...Typography.body2,
-    fontWeight: 'bold',
-  },
-  statusBadge: {
-    paddingHorizontal: Spacing.md,
-    paddingVertical: Spacing.sm,
-    borderRadius: BorderRadius.sm,
-  },
-  statusText: {
-    ...Typography.body2,
-    fontWeight: 'bold',
-  },
-  usageContainer: {
-    borderTopWidth: 1,
-    borderTopColor: Colors.border,
-    paddingTop: Spacing.md,
-  },
-  usageHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginBottom: Spacing.sm,
-  },
-  usageLabel: {
-    ...Typography.body2,
-    color: Colors.text.secondary,
-  },
-  usageValue: {
-    ...Typography.body2,
-    color: Colors.text.primary,
-    fontWeight: 'bold',
-  },
-  progressBar: {
-    height: 8,
-    backgroundColor: Colors.background.secondary,
-    borderRadius: 4,
+  progressTrack: {
+    marginTop: 12,
+    height: 10,
+    borderRadius: 999,
+    backgroundColor: '#E2E8F0',
     overflow: 'hidden',
-    marginBottom: Spacing.sm,
   },
   progressFill: {
     height: '100%',
-    borderRadius: 4,
+    borderRadius: 999,
+    backgroundColor: '#2563EB',
   },
-  usageNote: {
-    ...Typography.bodySmall,
-    color: Colors.text.tertiary,
+  progressHint: {
+    marginTop: 12,
+    fontSize: 13,
+    lineHeight: 20,
+    color: '#64748B',
   },
-  accountCard: {
-    margin: Spacing.md,
-    padding: Spacing.lg,
-    backgroundColor: '#fff',
-    borderRadius: BorderRadius.lg,
-    ...Shadows.sm,
-  },
-  menuItem: {
+  secondaryButton: {
+    marginTop: 16,
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: Spacing.md,
-    borderBottomWidth: 1,
-    borderBottomColor: Colors.border,
+    justifyContent: 'center',
+    gap: 8,
+    paddingVertical: 14,
+    borderRadius: 16,
+    backgroundColor: '#EFF6FF',
   },
-  menuText: {
-    ...Typography.body1,
-    color: Colors.text.primary,
-    marginLeft: Spacing.md,
+  secondaryButtonText: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: '#2563EB',
+  },
+  actionRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 14,
+    borderTopWidth: 1,
+    borderTopColor: '#E2E8F0',
+  },
+  actionIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: 14,
+    backgroundColor: '#EFF6FF',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 12,
+  },
+  actionText: {
     flex: 1,
   },
-  versionContainer: {
-    alignItems: 'center',
-    paddingVertical: Spacing.xl,
+  actionTitle: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: '#0F172A',
   },
-  versionText: {
-    ...Typography.bodySmall,
-    color: Colors.text.tertiary,
-    marginTop: Spacing.xs,
+  actionDescription: {
+    marginTop: 4,
+    fontSize: 13,
+    lineHeight: 18,
+    color: '#64748B',
+  },
+  footerActions: {
+    flexDirection: 'row',
+    gap: 12,
+    marginBottom: 8,
+  },
+  cancelButton: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 15,
+    borderRadius: 16,
+    backgroundColor: '#E2E8F0',
+  },
+  cancelButtonText: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: '#334155',
+  },
+  saveButton: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 15,
+    borderRadius: 16,
+    backgroundColor: '#2563EB',
+  },
+  saveButtonText: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: '#FFFFFF',
   },
 });

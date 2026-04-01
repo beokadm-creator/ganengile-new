@@ -1,218 +1,116 @@
-/**
- * Monthly Settlement Screen
- * B2B 기업용 월간 정산 화면
- */
-
-import React, { useState, useEffect } from 'react';
+﻿import React, { useEffect, useState } from 'react';
 import {
-  View,
-  Text,
-  StyleSheet,
-  ScrollView,
-  TouchableOpacity,
   ActivityIndicator,
   Alert,
   RefreshControl,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
-import { b2bFirestoreService } from '../../services/b2b-firestore-service';
-import { requireUserId } from '../../services/firebase';
 import * as Print from 'expo-print';
 import * as Sharing from 'expo-sharing';
+import { requireUserId } from '../../services/firebase';
+import { B2BSettlementService } from '../../services/b2b-settlement-service';
+import type { B2BSettlement } from '../../types/b2b-settlement';
 import type { B2BStackNavigationProp } from '../../types/navigation';
-import { Colors, Typography, Spacing, BorderRadius, Shadows } from '../../theme';
+import { BorderRadius, Colors, Shadows, Spacing, Typography } from '../../theme';
 
-interface MonthlySummary {
-  year: number;
-  month: number;
-  totalDeliveries: number;
+interface SettlementSummary {
+  totalSettlements: number;
   totalAmount: number;
   paidAmount: number;
-  unpaidAmount: number;
-  dueDate: Date;
-  status: 'pending' | 'paid' | 'overdue';
+  pendingAmount: number;
 }
 
-interface SettlementItem {
-  settlementId: string;
-  deliveryId: string;
-  date: Date;
-  amount: number;
-  status: 'pending' | 'paid';
+function formatCurrency(amount: number): string {
+  return `${amount.toLocaleString('ko-KR')}원`;
+}
+
+function getStatusTone(status: B2BSettlement['status']): string {
+  switch (status) {
+    case 'paid':
+      return Colors.success;
+    case 'failed':
+      return Colors.error;
+    default:
+      return Colors.warning;
+  }
 }
 
 export default function MonthlySettlementScreen() {
   const navigation = useNavigation<B2BStackNavigationProp>();
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  const [summary, setSummary] = useState<MonthlySummary | null>(null);
-  const [settlements, setSettlements] = useState<SettlementItem[]>([]);
-  const [selectedPeriod, setSelectedPeriod] = useState<{ year: number; month: number } | null>(null);
+  const [settlements, setSettlements] = useState<B2BSettlement[]>([]);
+  const [summary, setSummary] = useState<SettlementSummary | null>(null);
 
   useEffect(() => {
-    loadSettlementData();
+    void loadSettlementData();
   }, []);
 
-  const loadSettlementData = async () => {
+  async function loadSettlementData(): Promise<void> {
     try {
-      const userId = await requireUserId();
-      const { year, month } = b2bFirestoreService.getCurrentYearMonth();
-      setSelectedPeriod({ year, month });
+      const userId = requireUserId();
+      const data = await B2BSettlementService.getGillerSettlements(userId);
+      const sorted = [...data].sort((a, b) => b.period.start.getTime() - a.period.start.getTime());
+      const paidAmount = sorted
+        .filter((settlement) => settlement.status === 'paid')
+        .reduce((sum, settlement) => sum + settlement.totalSettlement, 0);
+      const pendingAmount = sorted
+        .filter((settlement) => settlement.status === 'pending_payment')
+        .reduce((sum, settlement) => sum + settlement.totalSettlement, 0);
 
-      // 월간 요약 조회
-      const summaryData = await b2bFirestoreService.getMonthlySummary(userId, year, month);
-      if (summaryData) {
-        setSummary(summaryData);
-      }
-
-      // 정산 내역 조회
-      const settlementsData = await b2bFirestoreService.getSettlements(userId, 50);
-      setSettlements(settlementsData);
+      setSettlements(sorted);
+      setSummary({
+        totalSettlements: sorted.length,
+        totalAmount: paidAmount + pendingAmount,
+        paidAmount,
+        pendingAmount,
+      });
     } catch (error) {
-      console.error('Error loading settlement data:', error);
-      Alert.alert('오류', '정산 정보를 불러오지 못했습니다.');
+      console.error('Failed to load monthly settlements', error);
+      Alert.alert('불러오기 실패', '정산 현황을 불러오지 못했습니다.');
     } finally {
       setLoading(false);
     }
-  };
+  }
 
-  const handleRefresh = async () => {
+  async function handleRefresh(): Promise<void> {
     setRefreshing(true);
     await loadSettlementData();
     setRefreshing(false);
-  };
+  }
 
-  const handleDownloadPDF = async () => {
+  async function handleExport(settlementId: string): Promise<void> {
     try {
-      if (!summary) {
-        Alert.alert('알림', '다운로드할 데이터가 없습니다.');
+      const report = await B2BSettlementService.generateSettlementReport(settlementId);
+      if (!report.success || !report.reportText) {
+        Alert.alert('내보내기 실패', report.error ?? '정산 리포트를 만들지 못했습니다.');
         return;
       }
 
-      // HTML 템플릿 생성
       const html = `
-        <!DOCTYPE html>
         <html>
-        <head>
-          <meta charset="utf-8">
-          <title>월간 정산서</title>
-          <style>
-            body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; padding: 20px; }
-            h1 { color: #00BCD4; }
-            table { width: 100%; border-collapse: collapse; margin-top: 20px; }
-            th, td { border: 1px solid #ddd; padding: 10px; text-align: left; }
-            th { background-color: #f5f5f5; }
-            .summary { background-color: #f9f9f9; padding: 15px; border-radius: 8px; margin: 20px 0; }
-            .total { font-size: 24px; font-weight: bold; color: #00BCD4; }
-          </style>
-        </head>
-        <body>
-          <h1>월간 정산서</h1>
-          <p>기간: ${selectedPeriod?.year}년 ${selectedPeriod?.month}월</p>
-          
-          <div class="summary">
-            <h2>요약</h2>
-            <p>총 배송 건수: ${summary?.totalDeliveries || 0}건</p>
-            <p>총 금액: ${summary?.totalAmount.toLocaleString()}원</p>
-            <p>결제 완료: ${summary?.paidAmount.toLocaleString()}원</p>
-            <p>미결제: ${summary?.unpaidAmount.toLocaleString()}원</p>
-            <p>결제 예정일: ${summary?.dueDate.toLocaleDateString('ko-KR')}</p>
-          </div>
-
-          <h2>상세 내역</h2>
-          <table>
-            <thead>
-              <tr>
-                <th>배송 ID</th>
-                <th>날짜</th>
-                <th>금액</th>
-                <th>상태</th>
-              </tr>
-            </thead>
-            <tbody>
-              ${settlements.map(s => `
-                <tr>
-                  <td>${s.deliveryId}</td>
-                  <td>${new Date(s.date).toLocaleDateString('ko-KR')}</td>
-                  <td>${s.amount.toLocaleString()}원</td>
-                  <td>${s.status === 'paid' ? '결제 완료' : '미결제'}</td>
-                </tr>
-              `).join('')}
-            </tbody>
-          </table>
-        </body>
+          <head><meta charset="utf-8" /></head>
+          <body style="font-family: Apple SD Gothic Neo, sans-serif; padding: 24px; white-space: pre-wrap;">${report.reportText}</body>
         </html>
       `;
-
-      // PDF 생성
-      const { uri } = await Print.printToFileAsync({ html });
-      
-      // 공유
+      const file = await Print.printToFileAsync({ html });
       if (await Sharing.isAvailableAsync()) {
-        await Sharing.shareAsync(uri, {
+        await Sharing.shareAsync(file.uri, {
           mimeType: 'application/pdf',
-          dialogTitle: '월간 정산서',
+          dialogTitle: '정산 리포트 공유',
         });
-      } else {
-        Alert.alert('알림', 'PDF 저장이 지원되지 않는 기기입니다.');
       }
     } catch (error) {
-      console.error('Error downloading PDF:', error);
-      Alert.alert('오류', 'PDF 다운로드에 실패했습니다.');
+      console.error('Failed to export settlement report', error);
+      Alert.alert('내보내기 실패', '정산 리포트를 내보내지 못했습니다.');
     }
-  };
-
-  const handlePayNow = () => {
-    if (!summary || summary.status === 'paid') {
-      return;
-    }
-
-    Alert.alert(
-      '결제',
-      `미결제 금액: ${summary.unpaidAmount.toLocaleString()}원\n결제하시겠습니까?`,
-      [
-        { text: '취소', style: 'cancel' },
-        {
-          text: '결제',
-          onPress: () => {
-            Alert.alert('완료', '결제가 완료되었습니다.');
-            loadSettlementData();
-          },
-        },
-      ]
-    );
-  };
-
-  const handleBack = () => {
-    navigation.goBack();
-  };
-
-  const formatCurrency = (amount: number): string => {
-    return amount.toLocaleString('ko-KR') + '원';
-  };
-
-  const getStatusColor = (status: string): string => {
-    switch (status) {
-      case 'paid':
-        return Colors.success;
-      case 'overdue':
-        return Colors.error;
-      default:
-        return Colors.warning;
-    }
-  };
-
-  const getStatusText = (status: string): string => {
-    switch (status) {
-      case 'paid':
-        return '결제 완료';
-      case 'overdue':
-        return '연체';
-      default:
-        return '미결제';
-    }
-  };
+  }
 
   if (loading) {
     return (
@@ -224,130 +122,86 @@ export default function MonthlySettlementScreen() {
 
   return (
     <View style={styles.container}>
-      {/* 헤더 */}
       <View style={styles.header}>
-        <TouchableOpacity style={styles.backButton} onPress={handleBack}>
+        <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
           <Ionicons name="arrow-back" size={24} color={Colors.text.primary} />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>월간 정산</Text>
+        <Text style={styles.headerTitle}>월 정산</Text>
       </View>
 
       <ScrollView
         style={styles.content}
-        refreshControl={
-          <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />
-        }
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => void handleRefresh()} />}
         showsVerticalScrollIndicator={false}
       >
-        {/* 기간 선택 */}
-        <View style={styles.periodContainer}>
-          <Text style={styles.periodText}>
-            {selectedPeriod?.year}년 {selectedPeriod?.month}월
-          </Text>
-          <TouchableOpacity style={styles.changePeriodButton}>
-            <Ionicons name="calendar-outline" size={20} color={Colors.primary} />
-            <Text style={styles.changePeriodText}>기간 변경</Text>
-          </TouchableOpacity>
-        </View>
-
-        {/* 요약 카드 */}
-        {summary && (
+        {summary ? (
           <View style={styles.summaryCard}>
+            <Text style={styles.cardTitle}>정산 요약</Text>
             <View style={styles.summaryRow}>
-              <Text style={styles.summaryLabel}>총 배송 건수</Text>
-              <Text style={styles.summaryValue}>{summary.totalDeliveries}건</Text>
+              <Text style={styles.summaryLabel}>정산 건수</Text>
+              <Text style={styles.summaryValue}>{summary.totalSettlements}건</Text>
             </View>
             <View style={styles.summaryRow}>
-              <Text style={styles.summaryLabel}>총 금액</Text>
+              <Text style={styles.summaryLabel}>총 정산액</Text>
               <Text style={styles.summaryValue}>{formatCurrency(summary.totalAmount)}</Text>
             </View>
-            <View style={styles.divider} />
             <View style={styles.summaryRow}>
-              <Text style={styles.summaryLabel}>결제 완료</Text>
-              <Text style={[styles.summaryValue, { color: Colors.success }]}>
-                {formatCurrency(summary.paidAmount)}
-              </Text>
+              <Text style={styles.summaryLabel}>지급 완료</Text>
+              <Text style={styles.summaryValue}>{formatCurrency(summary.paidAmount)}</Text>
             </View>
             <View style={styles.summaryRow}>
-              <Text style={styles.summaryLabel}>미결제</Text>
-              <Text style={[styles.summaryValue, { color: Colors.warning }]}>
-                {formatCurrency(summary.unpaidAmount)}
-              </Text>
-            </View>
-            <View style={styles.divider} />
-            <View style={styles.summaryRow}>
-              <Text style={styles.summaryLabel}>결제 예정일</Text>
-              <Text style={styles.summaryValue}>
-                {summary.dueDate.toLocaleDateString('ko-KR')}
-              </Text>
-            </View>
-            <View style={styles.summaryRow}>
-              <Text style={styles.summaryLabel}>상태</Text>
-              <Text style={[styles.summaryValue, { color: getStatusColor(summary.status) }]}>
-                {getStatusText(summary.status)}
-              </Text>
+              <Text style={styles.summaryLabel}>운영 검토 대기</Text>
+              <Text style={styles.summaryValue}>{formatCurrency(summary.pendingAmount)}</Text>
             </View>
           </View>
-        )}
+        ) : null}
 
-        {/* 액션 버튼 */}
-        <View style={styles.actionButtons}>
-          <TouchableOpacity
-            style={styles.actionButton}
-            onPress={handleDownloadPDF}
-          >
-            <Ionicons name="download-outline" size={20} color={Colors.primary} />
-            <Text style={styles.actionButtonText}>PDF 다운로드</Text>
-          </TouchableOpacity>
-          {summary && summary.status !== 'paid' && (
-            <TouchableOpacity
-              style={[styles.actionButton, styles.payButton]}
-              onPress={handlePayNow}
-            >
-              <Ionicons name="card-outline" size={20} color="#fff" />
-              <Text style={[styles.actionButtonText, { color: '#fff' }]}>
-                즉시 결제
-              </Text>
-            </TouchableOpacity>
-          )}
+        <View style={styles.noticeCard}>
+          <Text style={styles.noticeTitle}>운영 검토 기준</Text>
+          <Text style={styles.noticeText}>실지급 자동 이체 대신 운영 수동 검토 후 지급 상태가 갱신됩니다.</Text>
+          <Text style={styles.noticeText}>계좌 인증, 세금 처리, 지급 사유 확인이 끝난 뒤 지급 완료로 전환됩니다.</Text>
         </View>
 
-        {/* 상세 내역 */}
-        <View style={styles.detailsContainer}>
-          <Text style={styles.detailsTitle}>상세 내역</Text>
-          {settlements.length === 0 ? (
-            <View style={styles.emptyContainer}>
-              <Ionicons name="document-outline" size={48} color={Colors.text.tertiary} />
-              <Text style={styles.emptyText}>정산 내역이 없습니다</Text>
-            </View>
-          ) : (
-            settlements.map((item) => (
-              <View key={item.settlementId} style={styles.settlementItem}>
-                <View style={styles.settlementInfo}>
-                  <Text style={styles.settlementId}>{item.deliveryId}</Text>
-                  <Text style={styles.settlementDate}>
-                    {new Date(item.date).toLocaleDateString('ko-KR')}
+        {settlements.length === 0 ? (
+          <View style={styles.emptyCard}>
+            <Ionicons name="document-text-outline" size={28} color={Colors.text.tertiary} />
+            <Text style={styles.emptyTitle}>아직 생성된 정산이 없습니다.</Text>
+            <Text style={styles.emptyText}>월 정산이 생성되면 이 화면에서 운영 검토 상태와 리포트를 확인할 수 있습니다.</Text>
+          </View>
+        ) : (
+          settlements.map((settlement) => (
+            <View key={settlement.id} style={styles.settlementCard}>
+              <View style={styles.settlementHeader}>
+                <View>
+                  <Text style={styles.settlementPeriod}>
+                    {settlement.period.start.toLocaleDateString('ko-KR')} ~ {settlement.period.end.toLocaleDateString('ko-KR')}
+                  </Text>
+                  <Text style={styles.settlementMeta}>배송 {settlement.b2bDeliveries}건 · 보너스 {formatCurrency(settlement.monthlyBonus)}</Text>
+                </View>
+                <View style={[styles.statusBadge, { backgroundColor: `${getStatusTone(settlement.status)}20` }]}>
+                  <Text style={[styles.statusText, { color: getStatusTone(settlement.status) }]}>
+                    {B2BSettlementService.getSettlementStatusLabel(settlement.status)}
                   </Text>
                 </View>
-                <View style={styles.settlementAmount}>
-                  <Text style={styles.amount}>{formatCurrency(item.amount)}</Text>
-                  <View
-                    style={[
-                      styles.statusBadge,
-                      { backgroundColor: getStatusColor(item.status) + '20' },
-                    ]}
-                  >
-                    <Text
-                      style={[styles.statusText, { color: getStatusColor(item.status) }]}
-                    >
-                      {item.status === 'paid' ? '완료' : '대기'}
-                    </Text>
-                  </View>
-                </View>
               </View>
-            ))
-          )}
-        </View>
+
+              <Text style={styles.settlementAmount}>{formatCurrency(settlement.totalSettlement)}</Text>
+              <Text style={styles.reviewNote}>{settlement.reviewNote ?? '운영 검토 메모가 아직 없습니다.'}</Text>
+
+              <View style={styles.settlementFooter}>
+                <Text style={styles.transferHint}>
+                  {settlement.transferInfo?.bank ? `${settlement.transferInfo.bank} / ${settlement.transferInfo.accountNumber}` : '계좌 정보 확인 필요'}
+                </Text>
+                <TouchableOpacity style={styles.exportButton} onPress={() => void handleExport(settlement.id)}>
+                  <Ionicons name="download-outline" size={16} color={Colors.primary} />
+                  <Text style={styles.exportText}>리포트</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          ))
+        )}
+
+        <View style={styles.bottomSpacer} />
       </ScrollView>
     </View>
   );
@@ -356,12 +210,13 @@ export default function MonthlySettlementScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: Colors.background.primary,
+    backgroundColor: '#F8FAFC',
   },
   loadingContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
+    backgroundColor: '#F8FAFC',
   },
   header: {
     flexDirection: 'row',
@@ -382,32 +237,6 @@ const styles = StyleSheet.create({
   content: {
     flex: 1,
   },
-  periodContainer: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    padding: Spacing.lg,
-    backgroundColor: '#fff',
-    borderBottomWidth: 1,
-    borderBottomColor: Colors.border,
-  },
-  periodText: {
-    ...Typography.h3,
-    color: Colors.text.primary,
-  },
-  changePeriodButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: Spacing.md,
-    paddingVertical: Spacing.sm,
-    borderRadius: BorderRadius.sm,
-    backgroundColor: Colors.background.secondary,
-  },
-  changePeriodText: {
-    ...Typography.body2,
-    color: Colors.primary,
-    marginLeft: Spacing.xs,
-  },
   summaryCard: {
     margin: Spacing.md,
     padding: Spacing.lg,
@@ -415,10 +244,14 @@ const styles = StyleSheet.create({
     borderRadius: BorderRadius.lg,
     ...Shadows.sm,
   },
+  cardTitle: {
+    ...Typography.h3,
+    color: Colors.text.primary,
+    marginBottom: Spacing.md,
+  },
   summaryRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'center',
     marginBottom: Spacing.sm,
   },
   summaryLabel: {
@@ -428,94 +261,114 @@ const styles = StyleSheet.create({
   summaryValue: {
     ...Typography.body1,
     color: Colors.text.primary,
-    fontWeight: 'bold',
+    fontWeight: '700',
   },
-  divider: {
-    height: 1,
-    backgroundColor: Colors.border,
-    marginVertical: Spacing.sm,
-  },
-  actionButtons: {
-    flexDirection: 'row',
-    paddingHorizontal: Spacing.md,
-    gap: Spacing.md,
-  },
-  actionButton: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: Spacing.md,
-    borderRadius: BorderRadius.md,
-    backgroundColor: Colors.background.secondary,
+  noticeCard: {
+    marginHorizontal: Spacing.md,
+    marginBottom: Spacing.md,
+    padding: Spacing.lg,
+    backgroundColor: Colors.warning + '10',
+    borderRadius: BorderRadius.lg,
     borderWidth: 1,
-    borderColor: Colors.primary,
+    borderColor: Colors.warning + '30',
   },
-  payButton: {
-    backgroundColor: Colors.primary,
+  noticeTitle: {
+    ...Typography.body1,
+    color: Colors.warning,
+    fontWeight: '700',
+    marginBottom: Spacing.sm,
   },
-  actionButtonText: {
+  noticeText: {
     ...Typography.body2,
-    color: Colors.primary,
-    marginLeft: Spacing.xs,
-    fontWeight: 'bold',
+    color: Colors.text.secondary,
+    lineHeight: 20,
   },
-  detailsContainer: {
-    margin: Spacing.md,
+  emptyCard: {
+    marginHorizontal: Spacing.md,
+    padding: Spacing.xl,
+    borderRadius: BorderRadius.lg,
+    backgroundColor: '#fff',
+    alignItems: 'center',
+    ...Shadows.sm,
   },
-  detailsTitle: {
+  emptyTitle: {
     ...Typography.h3,
     color: Colors.text.primary,
-    marginBottom: Spacing.md,
-  },
-  emptyContainer: {
-    alignItems: 'center',
-    padding: Spacing.xl,
+    marginTop: Spacing.md,
+    marginBottom: Spacing.xs,
   },
   emptyText: {
     ...Typography.body2,
-    color: Colors.text.tertiary,
-    marginTop: Spacing.sm,
+    color: Colors.text.secondary,
+    textAlign: 'center',
   },
-  settlementItem: {
+  settlementCard: {
+    marginHorizontal: Spacing.md,
+    marginBottom: Spacing.md,
+    padding: Spacing.lg,
+    backgroundColor: '#fff',
+    borderRadius: BorderRadius.lg,
+    ...Shadows.sm,
+  },
+  settlementHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'center',
-    padding: Spacing.md,
-    marginBottom: Spacing.sm,
-    backgroundColor: '#fff',
-    borderRadius: BorderRadius.md,
-    ...Shadows.xs,
+    alignItems: 'flex-start',
+    gap: Spacing.sm,
   },
-  settlementInfo: {
-    flex: 1,
-  },
-  settlementId: {
+  settlementPeriod: {
     ...Typography.body1,
     color: Colors.text.primary,
-    fontWeight: 'bold',
+    fontWeight: '700',
   },
-  settlementDate: {
-    ...Typography.body2,
-    color: Colors.text.secondary,
+  settlementMeta: {
+    ...Typography.bodySmall,
+    color: Colors.text.tertiary,
     marginTop: Spacing.xs,
-  },
-  settlementAmount: {
-    alignItems: 'flex-end',
-  },
-  amount: {
-    ...Typography.body1,
-    color: Colors.text.primary,
-    fontWeight: 'bold',
   },
   statusBadge: {
     paddingHorizontal: Spacing.sm,
-    paddingVertical: Spacing.xs,
-    borderRadius: BorderRadius.sm,
-    marginTop: Spacing.xs,
+    paddingVertical: 6,
+    borderRadius: BorderRadius.full,
   },
   statusText: {
+    ...Typography.caption,
+    fontWeight: '700',
+  },
+  settlementAmount: {
+    ...Typography.h2,
+    color: Colors.primary,
+    marginTop: Spacing.md,
+  },
+  reviewNote: {
+    ...Typography.body2,
+    color: Colors.text.secondary,
+    marginTop: Spacing.sm,
+    lineHeight: 20,
+  },
+  settlementFooter: {
+    marginTop: Spacing.md,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  transferHint: {
     ...Typography.bodySmall,
-    fontWeight: 'bold',
+    color: Colors.text.tertiary,
+    flex: 1,
+    marginRight: Spacing.sm,
+  },
+  exportButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  exportText: {
+    ...Typography.body2,
+    color: Colors.primary,
+    fontWeight: '700',
+  },
+  bottomSpacer: {
+    height: Spacing.xl,
   },
 });

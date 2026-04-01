@@ -1,9 +1,11 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import type { ReactNode } from 'react';
 
 type ProviderConfig = {
   enabled: boolean;
+  label: string;
   startUrl: string;
   callbackUrl: string;
   clientId: string;
@@ -14,15 +16,22 @@ type ProviderConfig = {
 };
 
 type IdentityConfig = {
+  enabled: boolean;
   testMode: boolean;
+  allowTestBypass: boolean;
+  requiredForGillerUpgrade: boolean;
   pass: ProviderConfig;
   kakao: ProviderConfig;
 };
 
 const emptyConfig: IdentityConfig = {
+  enabled: true,
   testMode: true,
+  allowTestBypass: true,
+  requiredForGillerUpgrade: true,
   pass: {
     enabled: true,
+    label: 'PASS',
     startUrl: '',
     callbackUrl: '',
     clientId: '',
@@ -33,6 +42,7 @@ const emptyConfig: IdentityConfig = {
   },
   kakao: {
     enabled: true,
+    label: 'Kakao',
     startUrl: '',
     callbackUrl: '',
     clientId: '',
@@ -56,9 +66,9 @@ export default function IdentityIntegrationPage() {
     setLoading(true);
     try {
       const res = await fetch('/api/admin/integrations/identity');
-      const json = await res.json();
-      if (res.ok && json?.item) {
-        setConfig(json.item);
+      const json = (await res.json()) as { item?: IdentityConfig };
+      if (res.ok && json.item) {
+        setConfig({ ...emptyConfig, ...json.item });
       }
     } finally {
       setLoading(false);
@@ -73,12 +83,12 @@ export default function IdentityIntegrationPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(config),
       });
-      const json = await res.json();
+      const json = (await res.json()) as { error?: string };
       if (!res.ok) {
-        alert(json?.error || '저장에 실패했습니다.');
+        window.alert(json.error ?? '저장에 실패했습니다.');
         return;
       }
-      alert('저장 완료: CI 인증 설정이 반영되었습니다.');
+      window.alert('저장 완료: CI/PASS 인증 설정이 반영되었습니다.');
     } finally {
       setSaving(false);
     }
@@ -94,164 +104,193 @@ export default function IdentityIntegrationPage() {
     }));
   }
 
-  const renderProvider = (provider: 'pass' | 'kakao', title: string) => {
+  function providerReady(provider: ProviderConfig) {
+    return provider.enabled && Boolean(provider.startUrl && (provider.clientId || provider.apiKey));
+  }
+
+  function renderProvider(provider: 'pass' | 'kakao', title: string, hint: string) {
     const current = config[provider];
+    const ready = providerReady(current);
     return (
-      <div className="bg-white rounded-xl border border-gray-200 p-5 space-y-3">
-        <div className="flex items-center justify-between">
-          <h2 className="text-base font-semibold">{title}</h2>
-          <label className="text-sm flex items-center gap-2">
-            <input
-              type="checkbox"
-              checked={current.enabled}
-              onChange={(e) => updateProvider(provider, { enabled: e.target.checked })}
-            />
-            사용
-          </label>
-        </div>
-
-        <div>
-          <p className="text-xs text-gray-500 mb-1">인증 시작 URL</p>
-          <input
-            className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
-            value={current.startUrl}
-            onChange={(e) => updateProvider(provider, { startUrl: e.target.value })}
-            placeholder="https://..."
-          />
-        </div>
-
-        <div>
-          <p className="text-xs text-gray-500 mb-1">콜백 URL (선택)</p>
-          <input
-            className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
-            value={current.callbackUrl}
-            onChange={(e) => updateProvider(provider, { callbackUrl: e.target.value })}
-            placeholder="비우면 기본 cloud function 콜백 사용"
-          />
-        </div>
-
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+      <section className="rounded-2xl border border-slate-200 bg-white p-5">
+        <div className="flex items-center justify-between gap-4">
           <div>
-            <p className="text-xs text-gray-500 mb-1">Client ID (선택)</p>
+            <h2 className="text-base font-semibold text-slate-900">{title}</h2>
+            <p className="mt-1 text-xs text-slate-500">{hint}</p>
+          </div>
+          <div className="flex items-center gap-3">
+            <span className={`rounded-full px-3 py-1 text-xs font-semibold ${ready ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800'}`}>
+              {ready ? 'live ready' : 'test only'}
+            </span>
+            <label className="flex items-center gap-2 text-sm text-slate-700">
+              <input
+                type="checkbox"
+                checked={current.enabled}
+                onChange={(event) => updateProvider(provider, { enabled: event.target.checked })}
+              />
+              사용
+            </label>
+          </div>
+        </div>
+
+        <div className="mt-4 grid gap-4 md:grid-cols-2">
+          <Field label="표시 이름">
             <input
-              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
+              className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm"
+              value={current.label}
+              onChange={(event) => updateProvider(provider, { label: event.target.value })}
+            />
+          </Field>
+          <Field label="시작 URL">
+            <input
+              className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm"
+              value={current.startUrl}
+              onChange={(event) => updateProvider(provider, { startUrl: event.target.value })}
+              placeholder="https://..."
+            />
+          </Field>
+          <Field label="콜백 URL">
+            <input
+              className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm"
+              value={current.callbackUrl}
+              onChange={(event) => updateProvider(provider, { callbackUrl: event.target.value })}
+              placeholder="비우면 Cloud Functions 콜백을 사용합니다."
+            />
+          </Field>
+          <Field label="Client ID">
+            <input
+              className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm"
               value={current.clientId}
-              onChange={(e) => updateProvider(provider, { clientId: e.target.value })}
-              placeholder="client id"
+              onChange={(event) => updateProvider(provider, { clientId: event.target.value })}
             />
-          </div>
-          <div>
-            <p className="text-xs text-gray-500 mb-1">API Key (선택)</p>
+          </Field>
+          <Field label="API Key">
             <input
-              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
+              className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm"
+              type="password"
               value={current.apiKey}
-              onChange={(e) => updateProvider(provider, { apiKey: e.target.value })}
-              placeholder="api key"
+              onChange={(event) => updateProvider(provider, { apiKey: event.target.value })}
             />
-          </div>
-        </div>
-
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-          <div>
-            <p className="text-xs text-gray-500 mb-1">Webhook Secret (권장)</p>
+          </Field>
+          <Field label="Webhook Secret">
             <input
-              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
+              className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm"
               type="password"
               value={current.webhookSecret}
-              onChange={(e) => updateProvider(provider, { webhookSecret: e.target.value })}
-              placeholder="콜백 서명 검증용 secret"
+              onChange={(event) => updateProvider(provider, { webhookSecret: event.target.value })}
             />
-          </div>
-          <div>
-            <p className="text-xs text-gray-500 mb-1">Signature Param</p>
+          </Field>
+          <Field label="Signature Param">
             <input
-              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
+              className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm"
               value={current.signatureParam}
-              onChange={(e) => updateProvider(provider, { signatureParam: e.target.value })}
-              placeholder="signature"
+              onChange={(event) => updateProvider(provider, { signatureParam: event.target.value })}
             />
-          </div>
+          </Field>
+          <Field label="Signature Header">
+            <input
+              className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm"
+              value={current.signatureHeader}
+              onChange={(event) => updateProvider(provider, { signatureHeader: event.target.value })}
+            />
+          </Field>
         </div>
-
-        <div>
-          <p className="text-xs text-gray-500 mb-1">Signature Header</p>
-          <input
-            className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
-            value={current.signatureHeader}
-            onChange={(e) => updateProvider(provider, { signatureHeader: e.target.value })}
-            placeholder="x-signature"
-          />
-          <p className="text-[11px] text-gray-500 mt-1">
-            서명 규칙: `HMAC_SHA256(sessionId|provider|result|ci, webhookSecret)` (hex)
-          </p>
-        </div>
-      </div>
+      </section>
     );
-  };
+  }
 
   if (loading) {
-    return <div className="p-6 text-gray-500">로딩 중...</div>;
+    return <div className="p-6 text-slate-500">불러오는 중...</div>;
   }
 
   return (
-    <div className="p-6 max-w-4xl">
-      <div className="mb-5">
-        <h1 className="text-2xl font-bold">🔐 CI 인증 연동 설정</h1>
-        <p className="text-sm text-gray-500 mt-1">
-          PASS/카카오 본인인증 API 정보를 설정하면 앱의 인증 시작 플로우에 즉시 반영됩니다.
+    <div className="max-w-5xl p-6">
+      <div className="mb-6">
+        <h1 className="text-2xl font-bold text-slate-900">CI / PASS 인증 설정</h1>
+        <p className="mt-2 text-sm text-slate-500">
+          회원가입 이후 길러 승급으로 이어지는 실명 인증 경로를 설정합니다. 지금은 테스트 모드로 우회할 수 있게 두고, 나중에는 키만 넣으면 실제 인증으로 전환할 수 있게 준비합니다.
         </p>
       </div>
 
-      {/* 테스트 모드 토글 */}
-      <div className="bg-amber-50 border border-amber-200 rounded-xl p-5 mb-2">
-        <div className="flex items-center justify-between">
-          <div>
-            <h2 className="text-base font-semibold text-amber-900">테스트 모드</h2>
-            <p className="text-xs text-amber-700 mt-1">
-              ON: 실제 PASS/카카오 인증 없이 인증 완료 처리 (개발·QA 전용)<br />
-              OFF: 실제 인증 URL을 사용하는 라이브 모드
-            </p>
-          </div>
-          <label className="flex items-center gap-3 cursor-pointer">
-            <span className={`text-sm font-semibold ${config.testMode ? 'text-amber-700' : 'text-gray-400'}`}>
-              {config.testMode ? '테스트 모드' : '라이브'}
-            </span>
-            <div
-              onClick={() => setConfig((prev) => ({ ...prev, testMode: !prev.testMode }))}
-              className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors cursor-pointer ${
-                config.testMode ? 'bg-amber-500' : 'bg-green-500'
-              }`}
-            >
-              <span
-                className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
-                  config.testMode ? 'translate-x-1' : 'translate-x-6'
-                }`}
-              />
-            </div>
+      <section className="rounded-2xl border border-amber-200 bg-amber-50 p-5">
+        <div className="grid gap-4 md:grid-cols-2">
+          <label className="flex items-center gap-2 text-sm text-amber-900">
+            <input
+              type="checkbox"
+              checked={config.enabled}
+              onChange={(event) => setConfig((prev) => ({ ...prev, enabled: event.target.checked }))}
+            />
+            승급용 CI 인증 흐름 사용
+          </label>
+          <label className="flex items-center gap-2 text-sm text-amber-900">
+            <input
+              type="checkbox"
+              checked={config.requiredForGillerUpgrade}
+              onChange={(event) =>
+                setConfig((prev) => ({ ...prev, requiredForGillerUpgrade: event.target.checked }))
+              }
+            />
+            길러 승급 전에 CI 인증 필수
+          </label>
+          <label className="flex items-center gap-2 text-sm text-amber-900">
+            <input
+              type="checkbox"
+              checked={config.testMode}
+              onChange={(event) => setConfig((prev) => ({ ...prev, testMode: event.target.checked }))}
+            />
+            테스트 모드 유지
+          </label>
+          <label className="flex items-center gap-2 text-sm text-amber-900">
+            <input
+              type="checkbox"
+              checked={config.allowTestBypass}
+              onChange={(event) =>
+                setConfig((prev) => ({ ...prev, allowTestBypass: event.target.checked }))
+              }
+            />
+            테스트 우회 허용
           </label>
         </div>
+        <p className="mt-3 text-xs text-amber-800">
+          테스트 모드에서는 실제 PASS/Kakao 호출이 없어도 앱에서 인증 완료를 진행할 수 있습니다. 라이브 전환 전에는 최소 한 개 공급자에 시작 URL과 키를 넣어 두는 것이 좋습니다.
+        </p>
+      </section>
+
+      <div className="mt-4 space-y-4">
+        {renderProvider('pass', 'PASS', '국내 일반 사용자 인증 흐름을 기본으로 준비합니다.')}
+        {renderProvider('kakao', 'Kakao', 'PASS가 막히는 경우를 대비한 보조 실명 인증 경로입니다.')}
       </div>
 
-      <div className="space-y-4">
-        {renderProvider('pass', 'PASS')}
-        {renderProvider('kakao', '카카오')}
-      </div>
-
-      <div className="mt-5 flex gap-2">
+      <div className="mt-6 flex gap-2">
         <button
-          onClick={save}
+          type="button"
+          onClick={() => {
+            void save();
+          }}
           disabled={saving}
-          className="px-4 py-2 rounded-lg bg-indigo-600 text-white text-sm font-semibold hover:bg-indigo-700 disabled:opacity-50"
+          className="rounded-lg bg-slate-900 px-4 py-2 text-sm font-semibold text-white disabled:opacity-50"
         >
           {saving ? '저장 중...' : '설정 저장'}
         </button>
         <button
-          onClick={() => void load()}
-          className="px-4 py-2 rounded-lg border border-gray-300 text-sm font-medium hover:bg-gray-50"
+          type="button"
+          onClick={() => {
+            void load();
+          }}
+          className="rounded-lg border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700"
         >
-          새로고침
+          다시 불러오기
         </button>
       </div>
     </div>
+  );
+}
+
+function Field(props: { label: string; children: ReactNode }) {
+  return (
+    <label className="block">
+      <p className="mb-1 text-xs font-medium text-slate-500">{props.label}</p>
+      {props.children}
+    </label>
   );
 }

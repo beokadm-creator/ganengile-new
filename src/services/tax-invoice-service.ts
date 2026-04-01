@@ -1,319 +1,302 @@
-/**
- * 세금계산서 서비스
- * 
- * B2B 고객사에게 세금계산서 발행 및 관리
- */
-import { collection, doc, getDoc, setDoc, updateDoc, query, where, getDocs, addDoc, serverTimestamp } from 'firebase/firestore';
+﻿import {
+  addDoc,
+  collection,
+  doc,
+  getDoc,
+  getDocs,
+  query,
+  serverTimestamp,
+  updateDoc,
+  where,
+  type DocumentData,
+  type Timestamp,
+} from 'firebase/firestore';
 import { db } from '../config/firebase';
-import type { 
+import type {
   TaxInvoice,
-  TaxInvoiceStatus,
   TaxInvoiceItems,
-  TaxInvoiceRecipient
+  TaxInvoiceRecipient,
+  TaxInvoiceStatus,
 } from '../types/tax-invoice';
-import { TAX_RATE, PLATFORM_INFO } from '../types/tax-invoice';
+import { PLATFORM_INFO, TAX_RATE } from '../types/tax-invoice';
 import type { SettlementPeriod } from '../types/b2b-settlement';
-import type { SubscriptionTier } from '../types/business-contract';
-import { SUBSCRIPTION_TIERS } from '../types/business-contract';
 
 const INVOICE_COLLECTION = 'tax_invoices';
-const CONTRACT_COLLECTION = 'business_contracts';
-const DELIVERY_COLLECTION = 'b2b_deliveries';
 
-/**
- * 세금계산서 서비스
- */
+type IssueTaxInvoiceInput = {
+  businessNumber: string;
+  companyName: string;
+  ceoName: string;
+  address: string;
+  contact: string;
+  email?: string;
+  period: {
+    startDate?: Date;
+    endDate?: Date;
+  };
+  amount: number;
+  tax: number;
+  totalAmount: number;
+};
+
+type FirestoreTaxInvoiceDoc = DocumentData & {
+  invoiceId?: string;
+  contractId?: string;
+  businessId?: string;
+  issueDate?: Date | Timestamp | null;
+  period?: {
+    start?: Date | Timestamp | null;
+    end?: Date | Timestamp | null;
+  };
+  items?: Partial<TaxInvoiceItems>;
+  recipient?: Partial<TaxInvoiceRecipient>;
+  supplier?: Partial<typeof PLATFORM_INFO>;
+  status?: TaxInvoiceStatus;
+  pdfUrl?: string;
+  documentText?: string;
+  sentAt?: Date | Timestamp | null;
+  updatedAt?: Date | Timestamp | null;
+  manualReviewRequired?: boolean;
+};
+
+export type TaxInvoiceDocument = TaxInvoice & {
+  documentText?: string;
+  sentAt?: Date;
+  updatedAt?: Date;
+  manualReviewRequired?: boolean;
+};
+
+function toDate(value: Date | Timestamp | null | undefined, fallback: Date): Date {
+  if (value instanceof Date) {
+    return value;
+  }
+
+  if (value && typeof value === 'object' && 'toDate' in value && typeof value.toDate === 'function') {
+    return value.toDate();
+  }
+
+  return fallback;
+}
+
+function buildRecipient(data: IssueTaxInvoiceInput): TaxInvoiceRecipient {
+  return {
+    companyName: data.companyName,
+    businessNumber: data.businessNumber,
+    ceo: data.ceoName,
+    address: data.address,
+    contact: data.contact,
+    email: data.email ?? 'billing@customer.local',
+  };
+}
+
+function buildItems(data: IssueTaxInvoiceInput): TaxInvoiceItems {
+  const amount = data.amount;
+  const tax = data.tax > 0 ? data.tax : Math.round(amount * TAX_RATE);
+
+  return {
+    subscriptionFee: amount,
+    deliveryCount: 0,
+    deliveryFee: 0,
+    totalAmount: amount,
+    tax,
+  };
+}
+
+function buildDocumentText(invoice: TaxInvoiceDocument): string {
+  return [
+    '가는길에 B2B 세금계산서',
+    `계산서 ID: ${invoice.invoiceId}`,
+    `발행일: ${invoice.issueDate.toLocaleDateString('ko-KR')}`,
+    `정산 기간: ${invoice.period.start.toLocaleDateString('ko-KR')} ~ ${invoice.period.end.toLocaleDateString('ko-KR')}`,
+    `공급받는자: ${invoice.recipient.companyName}`,
+    `사업자등록번호: ${invoice.recipient.businessNumber}`,
+    `대표자: ${invoice.recipient.ceo}`,
+    `주소: ${invoice.recipient.address}`,
+    `연락처: ${invoice.recipient.contact}`,
+    `공급가액: ${invoice.items.totalAmount.toLocaleString('ko-KR')}원`,
+    `부가세: ${invoice.items.tax.toLocaleString('ko-KR')}원`,
+    `합계: ${(invoice.items.totalAmount + invoice.items.tax).toLocaleString('ko-KR')}원`,
+    '현재 단계: 운영 검토용 문서 생성 완료',
+  ].join('\n');
+}
+
+function mapInvoiceDocument(invoiceId: string, raw: FirestoreTaxInvoiceDoc): TaxInvoiceDocument {
+  const now = new Date();
+  const issueDate = toDate(raw.issueDate, now);
+  const period: SettlementPeriod = {
+    start: toDate(raw.period?.start, now),
+    end: toDate(raw.period?.end, now),
+  };
+
+  return {
+    invoiceId,
+    contractId: typeof raw.contractId === 'string' ? raw.contractId : `manual-${raw.businessId ?? 'unknown'}`,
+    businessId: typeof raw.businessId === 'string' ? raw.businessId : '',
+    issueDate,
+    period,
+    items: {
+      subscriptionFee: typeof raw.items?.subscriptionFee === 'number' ? raw.items.subscriptionFee : 0,
+      deliveryCount: typeof raw.items?.deliveryCount === 'number' ? raw.items.deliveryCount : 0,
+      deliveryFee: typeof raw.items?.deliveryFee === 'number' ? raw.items.deliveryFee : 0,
+      totalAmount: typeof raw.items?.totalAmount === 'number' ? raw.items.totalAmount : 0,
+      tax: typeof raw.items?.tax === 'number' ? raw.items.tax : 0,
+    },
+    recipient: {
+      companyName: raw.recipient?.companyName ?? '',
+      businessNumber: raw.recipient?.businessNumber ?? '',
+      ceo: raw.recipient?.ceo ?? '',
+      address: raw.recipient?.address ?? '',
+      contact: raw.recipient?.contact ?? '',
+      email: raw.recipient?.email ?? 'billing@customer.local',
+    },
+    supplier: {
+      companyName: raw.supplier?.companyName ?? PLATFORM_INFO.companyName,
+      businessNumber: raw.supplier?.businessNumber ?? PLATFORM_INFO.businessNumber,
+      ceo: raw.supplier?.ceo ?? PLATFORM_INFO.ceo,
+      address: raw.supplier?.address ?? PLATFORM_INFO.address,
+      contact: raw.supplier?.contact ?? PLATFORM_INFO.contact,
+      email: raw.supplier?.email ?? PLATFORM_INFO.email,
+    },
+    status: raw.status ?? 'issued',
+    pdfUrl: raw.pdfUrl ?? '',
+    documentText: raw.documentText,
+    sentAt: raw.sentAt ? toDate(raw.sentAt, issueDate) : undefined,
+    updatedAt: raw.updatedAt ? toDate(raw.updatedAt, issueDate) : undefined,
+    manualReviewRequired: raw.manualReviewRequired ?? true,
+  };
+}
+
 export class TaxInvoiceService {
-  /**
-   * 월간 세금계산서 생성 (매월 1일 실행)
-   */
-  static async generateMonthlyInvoices(): Promise<void> {
-    const now = new Date();
-    const lastMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
-    const thisMonth = new Date(now.getFullYear(), now.getMonth(), 1);
-
-    // 1. 활성화된 계약 조회
-    const contracts = await this.getActiveContracts();
-
-    for (const contractDoc of contracts) {
-      const contract = contractDoc.data();
-      if (contract.status !== 'active') continue;
-
-      const contractId = contractDoc.id;
-
-      // 2. 배송 건수 집계
-      const deliveryCount = await this.countDeliveries(contractId, lastMonth, thisMonth);
-
-      // 3. 요금 계산
-      const tier = SUBSCRIPTION_TIERS[contract.tier];
-      const subscriptionFee = tier.pricing.monthly;
-      const deliveryFee = deliveryCount * tier.pricing.perDelivery;
-      const subtotal = subscriptionFee + deliveryFee;
-      const tax = Math.round(subtotal * TAX_RATE);
-      const totalAmount = subtotal + tax;
-
-      // 4. 세금계산서 생성
-      const invoiceData: Omit<TaxInvoice, 'invoiceId' | 'issueDate' | 'status' | 'pdfUrl'> = {
-        contractId,
-        businessId: contract.businessId,
-        period: {
-          start: lastMonth,
-          end: thisMonth
-        },
-        items: {
-          subscriptionFee,
-          deliveryCount,
-          deliveryFee,
-          totalAmount: subtotal,
-          tax
-        },
-        recipient: await this.getBusinessInfo(contract.businessId),
-        supplier: PLATFORM_INFO
-      };
-
-      const docRef = await addDoc(collection(db, INVOICE_COLLECTION), invoiceData);
-      const invoiceId = docRef.id;
-
-      // 5. 발행일, 상태 업데이트
-      await updateDoc(docRef, {
-        invoiceId,
-        issueDate: now,
-        status: 'issued'
-      });
-
-      // 6. PDF 생성 (TODO: PDF 라이브러리 사용)
-      await this.generateInvoicePDF(invoiceId);
-
-      // 7. 이메일 발송 (TODO: SendGrid/Mailgun 사용)
-      await this.sendInvoiceEmail(
-        contract.businessId,
-        invoiceId,
-        totalAmount
-      );
-    }
-  }
-
-  /**
-   * 활성화된 계약 조회
-   */
-  private static async getActiveContracts(): Promise<any[]> {
-    const q = query(
-      collection(db, CONTRACT_COLLECTION),
-      where('status', '==', 'active')
-    );
-    const querySnapshot = await getDocs(q);
-    return querySnapshot.docs.map(doc => ({
-      id: doc.id,
-      ...doc.data()
-    }));
-  }
-
-  /**
-   * 배송 건수 집계
-   */
-  private static async countDeliveries(
-    contractId: string,
-    startDate: Date,
-    endDate: Date
-  ): Promise<number> {
-    const q = query(
-      collection(db, DELIVERY_COLLECTION),
-      where('contractId', '==', contractId),
-      where('completedAt', '>=', startDate),
-      where('completedAt', '<', endDate)
-    );
-    const querySnapshot = await getDocs(q);
-    return querySnapshot.size;
-  }
-
-  /**
-   * B2B 고객사 정보 조회
-   */
-  private static async getBusinessInfo(businessId: string): Promise<TaxInvoiceRecipient> {
-    // TODO: users 컬렉션에서 B2B 고객사 정보 조회
-    // 임시: 더미 데이터
-    return {
-      companyName: '샘플 기업',
-      businessNumber: '123-45-67890',
-      ceo: '김샘플',
-      address: '서울시 강남구...',
-      contact: '02-1234-5678',
-      email: 'sample@company.com'
+  async issueTaxInvoice(businessId: string, data: IssueTaxInvoiceInput): Promise<string> {
+    const period: SettlementPeriod = {
+      start: data.period.startDate ?? new Date(),
+      end: data.period.endDate ?? new Date(),
     };
+
+    const baseDocument = {
+      contractId: `manual-${businessId}`,
+      businessId,
+      issueDate: new Date(),
+      period,
+      items: buildItems(data),
+      recipient: buildRecipient(data),
+      supplier: PLATFORM_INFO,
+      status: 'issued' as TaxInvoiceStatus,
+      pdfUrl: '',
+      manualReviewRequired: true,
+      createdAt: serverTimestamp(),
+      updatedAt: serverTimestamp(),
+    };
+
+    const docRef = await addDoc(collection(db, INVOICE_COLLECTION), baseDocument);
+    const invoiceId = docRef.id;
+    const finalDocument = mapInvoiceDocument(invoiceId, {
+      invoiceId,
+      contractId: baseDocument.contractId,
+      businessId: baseDocument.businessId,
+      issueDate: baseDocument.issueDate,
+      period: {
+        start: period.start,
+        end: period.end,
+      },
+      items: baseDocument.items,
+      recipient: baseDocument.recipient,
+      supplier: baseDocument.supplier,
+      status: baseDocument.status,
+      pdfUrl: baseDocument.pdfUrl,
+      manualReviewRequired: baseDocument.manualReviewRequired,
+      documentText: '',
+      updatedAt: new Date(),
+    });
+
+    await updateDoc(docRef, {
+      invoiceId,
+      documentText: buildDocumentText(finalDocument),
+      updatedAt: serverTimestamp(),
+    });
+
+    return invoiceId;
   }
 
-  /**
-   * 세금계산서 PDF 생성
-   */
-  private static async generateInvoicePDF(invoiceId: string): Promise<string> {
-    // TODO: PDF 라이브러리 (pdfkit, jsPDF 등) 사용
-    // 임시: 더미 URL
-    const pdfUrl = `https://storage.googleapis.com/invoices/${invoiceId}.pdf`;
-    
-    // PDF URL 저장
-    const invoiceRef = doc(db, INVOICE_COLLECTION, invoiceId);
-    await updateDoc(invoiceRef, { pdfUrl });
-    
-    return pdfUrl;
-  }
-
-  /**
-   * 세금계산서 이메일 발송
-   */
-  private static async sendInvoiceEmail(
-    businessId: string,
-    invoiceId: string,
-    amount: number
-  ): Promise<void> {
-    // TODO: SendGrid/Mailgun 사용하여 이메일 발송
-    console.log(`세금계산서 발송: ${businessId}, ${invoiceId}, ${amount}원`);
-  }
-
-  /**
-   * 세금계산서 조회
-   */
-  static async getInvoice(invoiceId: string): Promise<TaxInvoice | null> {
+  async getInvoice(invoiceId: string): Promise<TaxInvoiceDocument | null> {
     const invoiceDoc = await getDoc(doc(db, INVOICE_COLLECTION, invoiceId));
-    if (!invoiceDoc.exists) {
+    if (!invoiceDoc.exists()) {
       return null;
     }
-    return {
-      invoiceId,
-      ...invoiceDoc.data()
-    } as TaxInvoice;
+
+    return mapInvoiceDocument(invoiceId, invoiceDoc.data() as FirestoreTaxInvoiceDoc);
   }
 
-  /**
-   * B2B 고객사 세금계산서 목록
-   */
-  static async getBusinessInvoices(
-    businessId: string,
-    status?: TaxInvoiceStatus
-  ): Promise<TaxInvoice[]> {
-    let q = query(
-      collection(db, INVOICE_COLLECTION),
-      where('businessId', '==', businessId)
-    );
+  async getBusinessInvoices(businessId: string, status?: TaxInvoiceStatus): Promise<TaxInvoiceDocument[]> {
+    let invoiceQuery = query(collection(db, INVOICE_COLLECTION), where('businessId', '==', businessId));
 
     if (status) {
-      q = query(q, where('status', '==', status));
+      invoiceQuery = query(invoiceQuery, where('status', '==', status));
     }
 
-    const querySnapshot = await getDocs(q);
-    return querySnapshot.docs.map(doc => ({
-      invoiceId: doc.id,
-      ...doc.data()
-    } as TaxInvoice));
+    const querySnapshot = await getDocs(invoiceQuery);
+    return querySnapshot.docs.map((invoiceDoc) => mapInvoiceDocument(invoiceDoc.id, invoiceDoc.data() as FirestoreTaxInvoiceDoc));
   }
 
-  /**
-   * 세금계산서 상태 업데이트
-   */
-  static async updateInvoiceStatus(
-    invoiceId: string,
-    status: TaxInvoiceStatus
-  ): Promise<void> {
-    const invoiceRef = doc(db, INVOICE_COLLECTION, invoiceId);
-    await updateDoc(invoiceRef, { 
+  async updateInvoiceStatus(invoiceId: string, status: TaxInvoiceStatus): Promise<void> {
+    await updateDoc(doc(db, INVOICE_COLLECTION, invoiceId), {
       status,
-      updatedAt: new Date()
+      updatedAt: serverTimestamp(),
+      ...(status === 'sent' ? { sentAt: serverTimestamp() } : {}),
     });
   }
 
-  /**
-   * 결제 완료 처리
-   */
-  static async markAsPaid(invoiceId: string): Promise<void> {
+  async markAsPaid(invoiceId: string): Promise<void> {
     await this.updateInvoiceStatus(invoiceId, 'paid');
-    
-    // TODO: 결제 기록 저장
-    console.log(`세금계산서 결제 완료: ${invoiceId}`);
   }
 
-  /**
-   * 연체 처리 (매월 10일 자동 실행)
-   */
-  static async markOverdueInvoices(): Promise<void> {
-    const q = query(
-      collection(db, INVOICE_COLLECTION),
-      where('status', '==', 'issued')
-    );
+  async markOverdueInvoices(): Promise<void> {
+    const invoiceQuery = query(collection(db, INVOICE_COLLECTION), where('status', '==', 'issued'));
+    const querySnapshot = await getDocs(invoiceQuery);
+    const now = Date.now();
 
-    const querySnapshot = await getDocs(q);
-    const now = new Date();
-
-    for (const doc of querySnapshot.docs) {
-      const invoice = doc.data() as TaxInvoice;
-      const issueDate = new Date(invoice.issueDate);
-      const daysSinceIssue = Math.floor((now.getTime() - issueDate.getTime()) / (1000 * 60 * 60 * 24));
-
-      // 발행일로부터 7일 경과 시 연체 처리
+    for (const invoiceDoc of querySnapshot.docs) {
+      const invoice = invoiceDoc.data() as FirestoreTaxInvoiceDoc;
+      const issueDate = toDate(invoice.issueDate, new Date(now));
+      const daysSinceIssue = Math.floor((now - issueDate.getTime()) / (1000 * 60 * 60 * 24));
       if (daysSinceIssue >= 7) {
-        await this.updateInvoiceStatus(doc.id, 'overdue');
+        await this.updateInvoiceStatus(invoiceDoc.id, 'overdue');
       }
     }
   }
 
-  /**
-   * 상세 내역 계산
-   */
-  static calculateInvoiceItems(params: {
-    subscriptionFee: number;
-    deliveryCount: number;
-    perDeliveryFee: number;
-  }): TaxInvoiceItems {
-    const { subscriptionFee, deliveryCount, perDeliveryFee } = params;
-    const deliveryFee = deliveryCount * perDeliveryFee;
-    const subtotal = subscriptionFee + deliveryFee;
+  calculateInvoiceItems(params: { subscriptionFee: number; deliveryCount: number; perDeliveryFee: number }): TaxInvoiceItems {
+    const deliveryFee = params.deliveryCount * params.perDeliveryFee;
+    const subtotal = params.subscriptionFee + deliveryFee;
     const tax = Math.round(subtotal * TAX_RATE);
-    const totalAmount = subtotal + tax;
 
     return {
-      subscriptionFee,
-      deliveryCount,
+      subscriptionFee: params.subscriptionFee,
+      deliveryCount: params.deliveryCount,
       deliveryFee,
       totalAmount: subtotal,
-      tax
+      tax,
     };
   }
 
-  /**
-   * 미결제 내역 조회 (관리자 전용)
-   */
-  static async getUnpaidInvoices(): Promise<TaxInvoice[]> {
-    const q = query(
-      collection(db, INVOICE_COLLECTION),
-      where('status', 'in', ['issued', 'overdue'])
-    );
-    const querySnapshot = await getDocs(q);
-    return querySnapshot.docs.map(doc => ({
-      invoiceId: doc.id,
-      ...doc.data()
-    } as TaxInvoice));
+  async getUnpaidInvoices(): Promise<TaxInvoiceDocument[]> {
+    const invoiceQuery = query(collection(db, INVOICE_COLLECTION), where('status', 'in', ['issued', 'overdue']));
+    const querySnapshot = await getDocs(invoiceQuery);
+    return querySnapshot.docs.map((invoiceDoc) => mapInvoiceDocument(invoiceDoc.id, invoiceDoc.data() as FirestoreTaxInvoiceDoc));
   }
 
-  /**
-   * 세금계산서 재발송
-   */
-  static async resendInvoice(invoiceId: string): Promise<void> {
-    const invoice = await this.getInvoice(invoiceId);
-    if (!invoice) return;
-
-    await this.sendInvoiceEmail(
-      invoice.businessId,
-      invoiceId,
-      invoice.items.totalAmount
-    );
+  async resendInvoice(invoiceId: string): Promise<void> {
+    await this.updateInvoiceStatus(invoiceId, 'sent');
   }
 
-  /**
-   * 환불 계산 (환불 정책에 따름)
-   */
-  static async calculateRefund(invoiceId: string): Promise<number> {
+  async calculateRefund(invoiceId: string): Promise<number> {
     const invoice = await this.getInvoice(invoiceId);
-    if (!invoice) return 0;
+    if (!invoice) {
+      return 0;
+    }
 
-    // TODO: 환불 정책 구현
-    return invoice.items.totalAmount;
+    return invoice.items.totalAmount + invoice.items.tax;
   }
 }
+
+export const taxInvoiceService = new TaxInvoiceService();

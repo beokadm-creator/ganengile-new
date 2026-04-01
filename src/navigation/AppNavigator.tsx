@@ -1,26 +1,19 @@
-/**
- * App Navigator
- * Root navigator that switches between Auth, Onboarding, and Main based on Firebase Auth state
- */
-
 import React, { useEffect, useRef } from 'react';
 import { NavigationContainer } from '@react-navigation/native';
 import { createStackNavigator } from '@react-navigation/stack';
-import { ActivityIndicator, View, StyleSheet, Platform } from 'react-native';
+import { ActivityIndicator, Platform, StyleSheet, View } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import * as Notifications from 'expo-notifications';
-
 import { UserProvider, useUser } from '../contexts/UserContext';
 import { AuthProvider } from '../contexts/AuthContext';
 import type { RootStackParamList } from '../types/navigation';
-
 import AuthNavigator from './AuthNavigator';
-import OnboardingNavigator from './OnboardingNavigator';
+import BasicInfoOnboarding from '../screens/onboarding/BasicInfoOnboarding';
 import MainNavigator from './MainNavigator';
 import B2BNavigator from './B2BNavigator';
 import { AppDownloadBanner } from '../components/AppDownloadBanner';
 import { navigationRef } from './navigationRef';
-import { handleNotificationResponse, getInitialNotification } from './notificationHandler';
+import { getInitialNotification, handleNotificationResponse } from './notificationHandler';
 
 const Stack = createStackNavigator<RootStackParamList>();
 
@@ -29,9 +22,10 @@ function AppNavigatorContent() {
   const notificationResponseListener = useRef<Notifications.Subscription | undefined>(undefined);
   const notificationReceivedListener = useRef<Notifications.Subscription | undefined>(undefined);
 
-  // Set up notification listeners on mount - run once on app startup
   useEffect(() => {
-    if (Platform.OS === 'web') return;
+    if (Platform.OS === 'web') {
+      return;
+    }
 
     notificationResponseListener.current = Notifications.addNotificationResponseReceivedListener(
       (response) => {
@@ -39,19 +33,16 @@ function AppNavigatorContent() {
       }
     );
 
-    getInitialNotification();
+    void getInitialNotification();
+
+    const responseSubscription = notificationResponseListener.current;
+    const receivedSubscription = notificationReceivedListener.current;
 
     return () => {
-      notificationResponseListener.current?.remove();
-      notificationReceivedListener.current?.remove();
+      responseSubscription?.remove();
+      receivedSubscription?.remove();
     };
-  }, []);  
-
-  console.log('AppNavigator 렌더링:', {
-    userExists: !!user,
-    hasCompletedOnboarding: user?.hasCompletedOnboarding,
-    role: user?.role,
-  });
+  }, []);
 
   if (loading) {
     return (
@@ -63,25 +54,13 @@ function AppNavigatorContent() {
 
   return (
     <NavigationContainer ref={navigationRef}>
-      {Platform.OS === 'web' && user?.hasCompletedOnboarding && (
-        <AppDownloadBanner />
-      )}
-      <Stack.Navigator
-        screenOptions={{
-          headerShown: false,
-        }}
-      >
+      {Platform.OS === 'web' && user?.hasCompletedOnboarding ? <AppDownloadBanner /> : null}
+      <Stack.Navigator screenOptions={{ headerShown: false }}>
         {!user ? (
-          // No user - show Auth flow
           <Stack.Screen name="Auth" component={AuthNavigator} />
         ) : !user.hasCompletedOnboarding ? (
-          // User signed in but hasn't completed onboarding
-          // 모든 신규 사용자는 기본 정보 입력부터 시작
-          <Stack.Screen name="Onboarding">
-            {() => <OnboardingNavigator />}
-          </Stack.Screen>
+          <Stack.Screen name="Onboarding" component={BasicInfoOnboarding} />
         ) : (
-          // User signed in and completed onboarding - show Main app
           <>
             <Stack.Screen name="Main" component={MainNavigator} />
             <Stack.Screen name="B2B" component={B2BNavigator} />

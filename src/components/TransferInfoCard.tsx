@@ -1,36 +1,19 @@
-/**
- * Transfer Info Card Component
- * 환승 정보 카드 (P0-5)
- *
- * 기능:
- * - 환승역 표시
- * - 환승 횟수 표시
- * - 환승 보너스 요금 표시
- * - 지하철 요금 표시
- */
-
-// @ts-expect-error - Suppress complex style type errors with Colors object
 import React from 'react';
-import {
-  View,
-  Text,
-  StyleSheet,
-  Platform,
-} from 'react-native';
-import { Colors, Typography, Spacing, BorderRadius } from '../theme';
+import { Platform, StyleSheet, Text, View, type StyleProp, type ViewStyle } from 'react-native';
+import { BorderRadius, Colors, Spacing, Typography } from '../theme';
 
 export interface TransferInfo {
   hasTransfer: boolean;
   transferStation?: string;
   transferCount?: number;
-  transferBonus?: number; // 원
-  subwayFare?: number; // 원
-  additionalTime?: number; // 분
+  transferBonus?: number;
+  subwayFare?: number;
+  additionalTime?: number;
 }
 
 interface Props {
   transferInfo: TransferInfo;
-  style?: any;
+  style?: StyleProp<ViewStyle>;
 }
 
 export default function TransferInfoCard({ transferInfo, style }: Props) {
@@ -40,66 +23,55 @@ export default function TransferInfoCard({ transferInfo, style }: Props) {
 
   return (
     <View style={[styles.container, style]}>
-      {/* 헤더 */}
       <View style={styles.header}>
-        <Text style={styles.headerIcon}>🔄</Text>
+        <Text style={styles.headerIcon}>환승</Text>
         <Text style={styles.headerTitle}>환승 정보</Text>
       </View>
 
-      {/* 환승 정보 */}
       <View style={styles.infoContainer}>
-        {/* 환승역 */}
-        {transferInfo.transferStation && (
+        {transferInfo.transferStation ? (
           <View style={styles.infoRow}>
             <Text style={styles.infoLabel}>환승역</Text>
             <Text style={styles.infoValue}>{transferInfo.transferStation}</Text>
           </View>
-        )}
+        ) : null}
 
-        {/* 환승 횟수 */}
-        {transferInfo.transferCount !== undefined && (
+        {typeof transferInfo.transferCount === 'number' ? (
           <View style={styles.infoRow}>
             <Text style={styles.infoLabel}>환승 횟수</Text>
             <Text style={styles.infoValue}>{transferInfo.transferCount}회</Text>
           </View>
-        )}
+        ) : null}
 
-        {/* 추가 소요 시간 */}
-        {transferInfo.additionalTime !== undefined && (
+        {typeof transferInfo.additionalTime === 'number' ? (
           <View style={styles.infoRow}>
             <Text style={styles.infoLabel}>추가 시간</Text>
             <Text style={styles.infoValue}>+{transferInfo.additionalTime}분</Text>
           </View>
-        )}
+        ) : null}
       </View>
 
-      {/* 요금 정보 */}
       <View style={styles.feeContainer}>
-        {/* 환승 보너스 */}
-        {transferInfo.transferBonus && (
+        {typeof transferInfo.transferBonus === 'number' ? (
           <View style={styles.feeItem}>
             <Text style={styles.feeLabel}>환승 보너스</Text>
             <Text style={[styles.feeValue, styles.feeValuePositive]}>
               +{transferInfo.transferBonus.toLocaleString()}원
             </Text>
           </View>
-        )}
+        ) : null}
 
-        {/* 지하철 요금 */}
-        {transferInfo.subwayFare && (
+        {typeof transferInfo.subwayFare === 'number' ? (
           <View style={styles.feeItem}>
             <Text style={styles.feeLabel}>지하철 요금</Text>
             <Text style={[styles.feeValue, styles.feeValueNegative]}>
               -{transferInfo.subwayFare.toLocaleString()}원
             </Text>
           </View>
-        )}
+        ) : null}
       </View>
 
-      {/* 안내 문구 */}
-      <Text style={styles.notice}>
-        환승 경로로 배송합니다. 추가 시간 내에 도착합니다.
-      </Text>
+      <Text style={styles.notice}>환승 구간이 포함되어 있어 이동 시간이 조금 더 걸릴 수 있습니다.</Text>
     </View>
   );
 }
@@ -114,7 +86,7 @@ const styles = StyleSheet.create({
       ios: {
         shadowColor: Colors.black,
         shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.1,
+        shadowOpacity: 0.08,
         shadowRadius: 4,
       },
       android: {
@@ -126,17 +98,18 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     marginBottom: Spacing.sm,
+    gap: Spacing.xs,
   },
   headerIcon: {
-    fontSize: 20,
-    marginRight: Spacing.xs,
+    ...Typography.bodyBold,
+    color: Colors.primary,
   },
   headerTitle: {
     ...Typography.h3,
-    color: Colors.text,
+    color: Colors.text.primary,
   },
   infoContainer: {
-    backgroundColor: Colors.background,
+    backgroundColor: Colors.gray50,
     borderRadius: BorderRadius.md,
     padding: Spacing.md,
     marginBottom: Spacing.sm,
@@ -148,18 +121,18 @@ const styles = StyleSheet.create({
     marginBottom: Spacing.xs,
   },
   infoLabel: {
-    ...Typography.body2,
-    color: Colors.textSecondary,
+    ...Typography.bodySmall,
+    color: Colors.text.secondary,
   },
   infoValue: {
-    ...Typography.body1,
-    color: Colors.text,
+    ...Typography.body,
+    color: Colors.text.primary,
     fontWeight: '600',
   },
   feeContainer: {
     flexDirection: 'row',
     justifyContent: 'space-around',
-    backgroundColor: Colors.background,
+    backgroundColor: Colors.gray50,
     borderRadius: BorderRadius.md,
     padding: Spacing.md,
     marginBottom: Spacing.sm,
@@ -169,22 +142,22 @@ const styles = StyleSheet.create({
   },
   feeLabel: {
     ...Typography.bodySmall,
-    color: Colors.textSecondary,
+    color: Colors.text.secondary,
     marginBottom: Spacing.xs,
   },
   feeValue: {
-    ...Typography.body1,
+    ...Typography.body,
     fontWeight: '700',
   },
   feeValuePositive: {
-    color: '#4CAF50', // Green
+    color: Colors.success,
   },
   feeValueNegative: {
-    color: '#FF5252', // Red
+    color: Colors.error,
   },
   notice: {
     ...Typography.bodySmall,
-    color: Colors.textSecondary,
+    color: Colors.text.secondary,
     textAlign: 'center',
   },
 });

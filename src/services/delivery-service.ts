@@ -18,8 +18,12 @@ import {
   onSnapshot,
 } from 'firebase/firestore';
 import { db } from './firebase';
+import { bootstrapAcceptedDeliveryPlan } from './beta1-engine-service';
+import { bundleMissionsForDelivery, persistActorSelectionDecision } from './beta1-orchestration-service';
+import { planMissionExecutionWithAI } from './beta1-ai-service';
 import { uploadPickupPhoto, uploadDeliveryPhoto } from './storage-service';
 import { DepositService } from './DepositService';
+import { createPenaltyService } from './penalty-service';
 import { calculatePhase1DeliveryFee, type PackageSizeType } from './pricing-service';
 import {
   createGillerEarning,
@@ -28,6 +32,7 @@ import {
   hasGillerEarningForRequest,
 } from './payment-service';
 import type { DeliveryStatus, DeliveryRequest } from '../types/delivery';
+import { ActorSelectionActorType } from '../types/beta1';
 
 function toPositiveNumber(...values: unknown[]): number | null {
   for (const value of values) {
@@ -36,6 +41,55 @@ function toPositiveNumber(...values: unknown[]): number | null {
     }
   }
   return null;
+}
+
+type CancellationActor = 'requester' | 'giller' | 'system';
+
+type DeliveryCancellationResult = {
+  success: boolean;
+  message: string;
+  penaltyApplied?: boolean;
+  depositStatus?: 'unchanged' | 'refunded' | 'deducted' | 'failed' | 'not_found';
+  requestStatus?: 'pending' | 'cancelled';
+};
+
+function toActorSelectionType(value: unknown): ActorSelectionActorType {
+  switch (value) {
+    case ActorSelectionActorType.GILLER:
+    case 'giller':
+      return ActorSelectionActorType.GILLER;
+    case ActorSelectionActorType.EXTERNAL_PARTNER:
+    case 'external_partner':
+      return ActorSelectionActorType.EXTERNAL_PARTNER;
+    case ActorSelectionActorType.LOCKER:
+    case 'locker':
+      return ActorSelectionActorType.LOCKER;
+    case ActorSelectionActorType.REQUESTER:
+    case 'requester':
+      return ActorSelectionActorType.REQUESTER;
+    default:
+      return ActorSelectionActorType.GILLER;
+  }
+}
+
+function toActorSelectionTypes(values: unknown[] | undefined): ActorSelectionActorType[] {
+  if (!Array.isArray(values) || values.length === 0) {
+    return [
+      ActorSelectionActorType.LOCKER,
+      ActorSelectionActorType.EXTERNAL_PARTNER,
+      ActorSelectionActorType.REQUESTER,
+    ];
+  }
+
+  return values.map((value) => toActorSelectionType(value));
+}
+
+function isPrePickupStatus(status: unknown): boolean {
+  return status === 'accepted';
+}
+
+function isPostPickupStatus(status: unknown): boolean {
+  return status === 'in_transit' || status === 'arrived' || status === 'at_locker';
 }
 
 /**
@@ -223,11 +277,50 @@ export async function gillerAcceptRequest(
     };
 
     const deliveryRef = await addDoc(collection(db, 'deliveries'), deliveryData);
+    await bootstrapAcceptedDeliveryPlan({
+      deliveryId: deliveryRef.id,
+      requestId,
+      requesterUserId: request.requesterId || request.gllerId,
+      assignedGillerUserId: gillerId,
+      pickupStation: request.pickupStation,
+      deliveryStation: request.deliveryStation,
+      deadline: request.deadline?.toDate?.() || request.deadline,
+      currentReward: confirmedFee?.breakdown?.gillerFee || confirmedFee?.totalFee,
+    });
+    const missionPlan = await planMissionExecutionWithAI({
+      requestId,
+      deliveryId: deliveryRef.id,
+      assignedGillerUserId: gillerId,
+      pickupStation: request.pickupStation,
+      deliveryStation: request.deliveryStation,
+      requestContext: {
+        itemDescription: request.packageInfo?.description,
+        itemValue: request.itemValue,
+        urgency: request.urgency,
+        requestMode: request.requestMode,
+        preferredPickupTime: request.preferredTime?.departureTime,
+        preferredArrivalTime: request.preferredTime?.arrivalTime,
+      },
+    }).catch(() => null);
+    await persistActorSelectionDecision({
+      requestId,
+      deliveryId: deliveryRef.id,
+      interventionLevel: missionPlan?.actorSelection.interventionLevel ?? 'guarded_execute',
+      selectedActorType: toActorSelectionType(missionPlan?.actorSelection.selectedActorType),
+      selectionReason: '길러가 직접 수락한 미션이므로 사람 actor를 우선 확정합니다.',
+      selectedPartnerId: missionPlan?.actorSelection.selectedPartnerId,
+      fallbackActorTypes: toActorSelectionTypes(missionPlan?.actorSelection.fallbackActorTypes),
+      fallbackPartnerIds: missionPlan?.actorSelection.fallbackPartnerIds ?? ['partner-a', 'partner-b'],
+      manualReviewRequired: missionPlan?.actorSelection.manualReviewRequired ?? false,
+      riskFlags: missionPlan?.actorSelection.riskFlags ?? [],
+    });
+    await bundleMissionsForDelivery(deliveryRef.id).catch(() => []);
 
     // Update request status + fee snapshot (delivery 생성 성공 후 반영)
     await updateDoc(requestRef, {
       status: 'accepted',
       matchedGillerId: gillerId,
+      primaryDeliveryId: deliveryRef.id,
       fee: {
         totalFee: confirmedFee.totalFee,
         deliveryFee: confirmedFee.deliveryFee || 0,
@@ -266,7 +359,7 @@ export async function gillerCancelAcceptance(
       return { success: false, message: '요청을 찾을 수 없습니다.' };
     }
 
-    const request = requestSnap.data() as any;
+    const request = requestSnap.data() as Record<string, unknown>;
     if (request.status !== 'accepted') {
       return { success: false, message: '수락 취소가 가능한 상태가 아닙니다.' };
     }
@@ -274,15 +367,22 @@ export async function gillerCancelAcceptance(
       return { success: false, message: '본인이 수락한 요청만 취소할 수 있습니다.' };
     }
 
+    const penaltyService = createPenaltyService(gillerId);
+    await penaltyService.applyCancellationPenalty(false, requestId).catch((error) => {
+      console.warn('Failed to apply pre-pickup cancellation penalty:', error);
+    });
+
     // 관련 delivery를 취소 상태로 변경
     const deliveriesQ = query(collection(db, 'deliveries'), where('requestId', '==', requestId));
     const deliveriesSnap = await getDocs(deliveriesQ);
     for (const deliveryDoc of deliveriesSnap.docs) {
-      const deliveryData = deliveryDoc.data() as any;
+      const deliveryData = deliveryDoc.data() as Record<string, unknown>;
       if (deliveryData.gillerId !== gillerId) continue;
       await updateDoc(doc(db, 'deliveries', deliveryDoc.id), {
         status: 'cancelled',
         cancellationReason: 'giller_cancelled_before_pickup',
+        cancelledBy: 'giller',
+        cancelledAt: serverTimestamp(),
         updatedAt: serverTimestamp(),
       });
     }
@@ -290,14 +390,193 @@ export async function gillerCancelAcceptance(
     await updateDoc(requestRef, {
       status: 'pending',
       matchedGillerId: deleteField(),
+      primaryDeliveryId: deleteField(),
       acceptedAt: deleteField(),
+      cancellationReason: 'giller_cancelled_before_pickup',
+      cancelledBy: 'giller',
+      cancelledAt: serverTimestamp(),
       updatedAt: serverTimestamp(),
     });
 
-    return { success: true, message: '수락이 취소되었습니다.' };
+    return { success: true, message: '수락이 취소되었고 패널티가 반영된 뒤 다시 매칭 대기 상태로 전환되었습니다.' };
   } catch (error) {
     console.error('Error cancelling acceptance:', error);
     return { success: false, message: '수락 취소 처리에 실패했습니다.' };
+  }
+}
+
+export async function cancelDeliveryFlow(args: {
+  requestId: string;
+  actorId: string;
+  actorType: CancellationActor;
+  reason: string;
+}): Promise<DeliveryCancellationResult> {
+  try {
+    const requestRef = doc(db, 'requests', args.requestId);
+    const requestSnap = await getDoc(requestRef);
+    if (!requestSnap.exists()) {
+      return { success: false, message: '요청 정보를 찾을 수 없습니다.' };
+    }
+
+    const delivery = await getDeliveryByRequestId(args.requestId);
+
+    if (!delivery) {
+      await updateDoc(requestRef, {
+        status: 'cancelled',
+        cancellationReason: args.reason,
+        cancelledBy: args.actorType,
+        cancelledAt: serverTimestamp(),
+        updatedAt: serverTimestamp(),
+      });
+
+      return {
+        success: true,
+        message: '배송 생성 전 요청이 취소되었습니다.',
+        requestStatus: 'cancelled',
+        depositStatus: 'not_found',
+      };
+    }
+
+    const deliveryRef = doc(db, 'deliveries', delivery.deliveryId);
+    const deliveryStatus = delivery.status;
+    const deposit = await DepositService.getDepositByRequestId(args.requestId);
+
+    if (args.actorType === 'requester') {
+      if (!isPrePickupStatus(deliveryStatus)) {
+        return {
+          success: false,
+          message: '배송이 이미 진행 중이면 취소 대신 채팅 또는 분쟁 접수로 조정해야 합니다.',
+          depositStatus: deposit ? 'unchanged' : 'not_found',
+        };
+      }
+
+      let depositStatus: DeliveryCancellationResult['depositStatus'] = deposit ? 'unchanged' : 'not_found';
+      if (deposit?.depositId) {
+        const refundResult = await DepositService.refundDeposit(deposit.depositId);
+        depositStatus = refundResult.success ? 'refunded' : 'failed';
+      }
+
+      await updateDoc(deliveryRef, {
+        status: 'cancelled',
+        cancellationReason: args.reason,
+        cancelledBy: args.actorType,
+        cancelledAt: serverTimestamp(),
+        updatedAt: serverTimestamp(),
+      });
+
+      await updateDoc(requestRef, {
+        status: 'cancelled',
+        cancellationReason: args.reason,
+        cancelledBy: args.actorType,
+        cancelledAt: serverTimestamp(),
+        updatedAt: serverTimestamp(),
+      });
+
+      return {
+        success: true,
+        message: '수락된 배송이 취소되었고 보증금 환불도 함께 처리되었습니다.',
+        requestStatus: 'cancelled',
+        depositStatus,
+      };
+    }
+
+    if (args.actorType === 'giller') {
+      const penaltyService = createPenaltyService(args.actorId);
+
+      if (isPrePickupStatus(deliveryStatus)) {
+        await penaltyService.applyCancellationPenalty(false, args.requestId).catch((error) => {
+          console.error('Failed to apply pre-pickup cancellation penalty:', error);
+        });
+
+        await updateDoc(deliveryRef, {
+          status: 'cancelled',
+          cancellationReason: args.reason,
+          cancelledBy: args.actorType,
+          cancelledAt: serverTimestamp(),
+          updatedAt: serverTimestamp(),
+        });
+
+        await updateDoc(requestRef, {
+          status: 'pending',
+          matchedGillerId: deleteField(),
+          acceptedAt: deleteField(),
+          primaryDeliveryId: deleteField(),
+          cancellationReason: args.reason,
+          cancelledBy: args.actorType,
+          updatedAt: serverTimestamp(),
+        });
+
+        return {
+          success: true,
+          message: '길러 수락이 취소되어 요청이 다시 매칭 대기로 돌아갔습니다.',
+          requestStatus: 'pending',
+          depositStatus: deposit ? 'unchanged' : 'not_found',
+          penaltyApplied: true,
+        };
+      }
+
+      if (isPostPickupStatus(deliveryStatus)) {
+        await penaltyService.applyCancellationPenalty(true, args.requestId).catch((error) => {
+          console.error('Failed to apply post-pickup cancellation penalty:', error);
+        });
+
+        let depositStatus: DeliveryCancellationResult['depositStatus'] = deposit ? 'unchanged' : 'not_found';
+        if (deposit?.depositId) {
+          const deductionResult = await DepositService.deductCompensation(deposit.depositId);
+          depositStatus = deductionResult.success ? 'deducted' : 'failed';
+        }
+
+        await updateDoc(deliveryRef, {
+          status: 'cancelled',
+          cancellationReason: args.reason,
+          cancelledBy: args.actorType,
+          cancelledAt: serverTimestamp(),
+          updatedAt: serverTimestamp(),
+        });
+
+        await updateDoc(requestRef, {
+          status: 'cancelled',
+          cancellationReason: args.reason,
+          cancelledBy: args.actorType,
+          cancelledAt: serverTimestamp(),
+          updatedAt: serverTimestamp(),
+        });
+
+        return {
+          success: true,
+          message: '진행 중 취소가 반영되었고 패널티와 보증금 차감이 함께 처리되었습니다.',
+          requestStatus: 'cancelled',
+          depositStatus,
+          penaltyApplied: true,
+        };
+      }
+    }
+
+    await updateDoc(deliveryRef, {
+      status: 'cancelled',
+      cancellationReason: args.reason,
+      cancelledBy: args.actorType,
+      cancelledAt: serverTimestamp(),
+      updatedAt: serverTimestamp(),
+    });
+
+    await updateDoc(requestRef, {
+      status: 'cancelled',
+      cancellationReason: args.reason,
+      cancelledBy: args.actorType,
+      cancelledAt: serverTimestamp(),
+      updatedAt: serverTimestamp(),
+    });
+
+    return {
+      success: true,
+      message: '취소가 반영되었습니다.',
+      requestStatus: 'cancelled',
+      depositStatus: deposit ? 'unchanged' : 'not_found',
+    };
+  } catch (error) {
+    console.error('Error cancelling delivery flow:', error);
+    return { success: false, message: '취소 처리 중 오류가 발생했습니다.' };
   }
 }
 

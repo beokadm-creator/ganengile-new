@@ -1,29 +1,86 @@
-/**
- * Auction List Screen
- * 경매 목록 화면 (사용자의 경매 목록)
- */
-
-import React, { useState, useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
-  View,
-  Text,
-  StyleSheet,
-  FlatList,
-  TouchableOpacity,
-  RefreshControl,
   ActivityIndicator,
+  FlatList,
+  RefreshControl,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
 } from 'react-native';
-import { StackNavigationProp } from '@react-navigation/stack';
+import type { StackNavigationProp } from '@react-navigation/stack';
 import { getAuctionsByGller, toAuctionListItem } from '../../services/auction-service';
 import { requireUserId } from '../../services/firebase';
-import { Colors, Typography, Spacing, BorderRadius } from '../../theme';
-import { AuctionStatus } from '../../types/auction';
-import type { AuctionListItem } from '../../types/auction';
+import { AuctionStatus, type AuctionListItem } from '../../types/auction';
+import type { MainStackParamList } from '../../types/navigation';
+import { BorderRadius, Colors, Spacing, Typography } from '../../theme';
 
-type NavigationProp = StackNavigationProp<any>;
+type NavigationProp = StackNavigationProp<MainStackParamList, 'AuctionList'>;
 
 interface Props {
   navigation: NavigationProp;
+}
+
+function getStatusColor(status: AuctionStatus): string {
+  switch (status) {
+    case AuctionStatus.PENDING:
+      return '#FFA726';
+    case AuctionStatus.ACTIVE:
+      return '#42A5F5';
+    case AuctionStatus.CLOSED:
+      return '#4CAF50';
+    case AuctionStatus.CANCELLED:
+      return '#EF5350';
+    case AuctionStatus.EXPIRED:
+      return '#9E9E9E';
+    default:
+      return '#9E9E9E';
+  }
+}
+
+function getStatusText(status: AuctionStatus): string {
+  switch (status) {
+    case AuctionStatus.PENDING:
+      return '대기 중';
+    case AuctionStatus.ACTIVE:
+      return '진행 중';
+    case AuctionStatus.CLOSED:
+      return '마감';
+    case AuctionStatus.CANCELLED:
+      return '취소';
+    case AuctionStatus.EXPIRED:
+      return '만료';
+    default:
+      return status;
+  }
+}
+
+function formatRemainingTime(seconds: number): string {
+  if (seconds <= 0) {
+    return '마감';
+  }
+
+  const hours = Math.floor(seconds / 3600);
+  const minutes = Math.floor((seconds % 3600) / 60);
+  if (hours > 0) {
+    return `${hours}시간 ${minutes}분`;
+  }
+  return `${minutes}분`;
+}
+
+function getPackageSizeText(size: string): string {
+  switch (size) {
+    case 'small':
+      return '소형';
+    case 'medium':
+      return '중형';
+    case 'large':
+      return '대형';
+    case 'xl':
+      return '특대형';
+    default:
+      return size;
+  }
 }
 
 export default function AuctionListScreen({ navigation }: Props) {
@@ -32,150 +89,74 @@ export default function AuctionListScreen({ navigation }: Props) {
   const [refreshing, setRefreshing] = useState(false);
 
   useEffect(() => {
-    loadAuctions();
+    void loadAuctions();
   }, []);
 
-  const loadAuctions = async () => {
+  async function loadAuctions(): Promise<void> {
     try {
       const userId = requireUserId();
       const data = await getAuctionsByGller(userId);
-      const listItems = data.map(auction => toAuctionListItem(auction));
-      setAuctions(listItems);
+      setAuctions(data.map((auction) => toAuctionListItem(auction)));
     } catch (error) {
-      console.error('Error loading auctions:', error);
+      console.error('Failed to load auctions', error);
     } finally {
       setLoading(false);
     }
-  };
+  }
 
-  const onRefresh = async () => {
+  async function onRefresh(): Promise<void> {
     setRefreshing(true);
     await loadAuctions();
     setRefreshing(false);
-  };
+  }
 
-  const getStatusColor = (status: AuctionStatus): string => {
-    switch (status) {
-      case AuctionStatus.PENDING:
-        return '#FFA726';
-      case AuctionStatus.ACTIVE:
-        return '#42A5F5';
-      case AuctionStatus.CLOSED:
-        return '#4CAF50';
-      case AuctionStatus.CANCELLED:
-        return '#EF5350';
-      case AuctionStatus.EXPIRED:
-        return '#9E9E9E';
-      default:
-        return '#9E9E9E';
-    }
-  };
-
-  const getStatusText = (status: AuctionStatus): string => {
-    switch (status) {
-      case AuctionStatus.PENDING:
-        return '대기 중';
-      case AuctionStatus.ACTIVE:
-        return '진행 중';
-      case AuctionStatus.CLOSED:
-        return '마감';
-      case AuctionStatus.CANCELLED:
-        return '취소';
-      case AuctionStatus.EXPIRED:
-        return '만료';
-      default:
-        return status;
-    }
-  };
-
-  const formatRemainingTime = (seconds: number): string => {
-    if (seconds <= 0) return '마감';
-    const hours = Math.floor(seconds / 3600);
-    const minutes = Math.floor((seconds % 3600) / 60);
-    if (hours > 0) {
-      return `${hours}시간 ${minutes}분`;
-    }
-    return `${minutes}분`;
-  };
-
-  const getPackageSizeText = (size: string): string => {
-    switch (size) {
-      case 'small':
-        return '소형';
-      case 'medium':
-        return '중형';
-      case 'large':
-        return '대형';
-      case 'xl':
-        return '특대';
-      default:
-        return size;
-    }
-  };
-
-  const renderAuction = ({ item }: { item: AuctionListItem }) => (
-    <View style={styles.auctionCard}>
-      <View style={styles.cardContent}>
-        <View style={styles.auctionHeader}>
-          <View style={styles.routeInfo}>
-            <Text style={styles.stationName}>{item.pickupStationName}</Text>
-            <Text style={styles.arrow}>→</Text>
-            <Text style={styles.stationName}>{item.deliveryStationName}</Text>
-          </View>
-          <View style={[styles.statusBadge, { backgroundColor: getStatusColor(item.status) }]}>
-            <Text style={styles.statusText}>{getStatusText(item.status)}</Text>
-          </View>
-        </View>
-
-        <View style={styles.auctionBody}>
-          <View style={styles.infoRow}>
-            <Text style={styles.infoLabel}>💵 현재가</Text>
-            <Text style={styles.infoValue}>{item.currentHighestBid.toLocaleString()}원</Text>
-          </View>
-
-          <View style={styles.infoRow}>
-            <Text style={styles.infoLabel}>📦 크기</Text>
-            <Text style={styles.infoValue}>{getPackageSizeText(item.packageSize)}</Text>
-          </View>
-
-          <View style={styles.infoRow}>
-            <Text style={styles.infoLabel}>👥 입찰 수</Text>
-            <Text style={styles.infoValue}>{item.totalBids}개</Text>
-          </View>
-
-          {item.status === AuctionStatus.ACTIVE && (
-            <View style={styles.infoRow}>
-              <Text style={styles.infoLabel}>⏰ 남은 시간</Text>
-              <Text style={styles.infoValue}>{formatRemainingTime(item.remainingSeconds)}</Text>
+  function renderAuction({ item }: { item: AuctionListItem }) {
+    return (
+      <View style={styles.auctionCard}>
+        <View style={styles.cardContent}>
+          <View style={styles.auctionHeader}>
+            <View style={styles.routeInfo}>
+              <Text style={styles.stationName}>{item.pickupStationName}</Text>
+              <Text style={styles.arrow}>→</Text>
+              <Text style={styles.stationName}>{item.deliveryStationName}</Text>
             </View>
-          )}
+            <View style={[styles.statusBadge, { backgroundColor: getStatusColor(item.status) }]}>
+              <Text style={styles.statusText}>{getStatusText(item.status)}</Text>
+            </View>
+          </View>
 
-          <View style={styles.infoRow}>
-            <Text style={styles.infoLabel}>📅 생성일</Text>
-            <Text style={styles.infoValue}>
-              {item.createdAt ? new Date(item.createdAt.toDate()).toLocaleDateString() : '알 수 없음'}
-            </Text>
+          <View style={styles.auctionBody}>
+            <InfoRow label="현재 최고가" value={`${item.currentHighestBid.toLocaleString('ko-KR')}원`} />
+            <InfoRow label="물품 크기" value={getPackageSizeText(item.packageSize)} />
+            <InfoRow label="입찰 수" value={`${item.totalBids}건`} />
+            {item.status === AuctionStatus.ACTIVE ? (
+              <InfoRow label="남은 시간" value={formatRemainingTime(item.remainingSeconds)} />
+            ) : null}
+            <InfoRow
+              label="생성일"
+              value={item.createdAt ? new Date(item.createdAt.toDate()).toLocaleDateString('ko-KR') : '정보 없음'}
+            />
           </View>
         </View>
       </View>
-    </View>
-  );
+    );
+  }
 
-  const renderEmptyState = () => (
-    <View style={styles.emptyState}>
-      <Text style={styles.emptyIcon}>🔨</Text>
-      <Text style={styles.emptyTitle}>경매가 없습니다</Text>
-      <Text style={styles.emptyDesc}>
-        첫 번째 경매를 만들어보세요!
-      </Text>
-    </View>
-  );
+  function renderEmptyState() {
+    return (
+      <View style={styles.emptyState}>
+        <Text style={styles.emptyIcon}>경매</Text>
+        <Text style={styles.emptyTitle}>아직 등록한 경매가 없습니다</Text>
+        <Text style={styles.emptyDesc}>가는길에 동선에 맞춰 첫 경매를 열어보세요.</Text>
+      </View>
+    );
+  }
 
   if (loading) {
     return (
       <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color={Colors.primary} />
-        <Text style={styles.loadingText}>로딩 중...</Text>
+        <ActivityIndicator color={Colors.primary} size="large" />
+        <Text style={styles.loadingText}>경매 목록을 불러오는 중입니다.</Text>
       </View>
     );
   }
@@ -188,49 +169,53 @@ export default function AuctionListScreen({ navigation }: Props) {
       </View>
 
       <FlatList
+        contentContainerStyle={auctions.length === 0 ? styles.emptyList : styles.list}
         data={auctions}
         keyExtractor={(item) => item.auctionId}
-        renderItem={renderAuction}
-        contentContainerStyle={auctions.length === 0 ? styles.emptyList : styles.list}
         ListEmptyComponent={renderEmptyState}
-        refreshControl={
-          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
-        }
+        refreshControl={<RefreshControl onRefresh={() => void onRefresh()} refreshing={refreshing} />}
+        renderItem={renderAuction}
       />
 
-      <TouchableOpacity
-        style={styles.createButton}
-        onPress={() => navigation.navigate('CreateAuction')}
-      >
+      <TouchableOpacity onPress={() => navigation.navigate('CreateAuction')} style={styles.createButton}>
         <Text style={styles.createButtonText}>새 경매 만들기</Text>
       </TouchableOpacity>
     </View>
   );
 }
 
+function InfoRow({ label, value }: { label: string; value: string }) {
+  return (
+    <View style={styles.infoRow}>
+      <Text style={styles.infoLabel}>{label}</Text>
+      <Text style={styles.infoValue}>{value}</Text>
+    </View>
+  );
+}
+
 const styles = StyleSheet.create({
   container: {
-    backgroundColor: '#f5f5f5',
+    backgroundColor: Colors.gray100,
     flex: 1,
   },
   header: {
     backgroundColor: Colors.primary,
-    padding: Spacing.large,
-    paddingBottom: Spacing.medium,
+    paddingBottom: Spacing.md,
+    paddingHorizontal: Spacing.lg,
     paddingTop: 60,
   },
   title: {
-    ...Typography.headerLarge,
+    ...Typography.h1,
     color: Colors.white,
   },
   subtitle: {
-    ...Typography.bodyRegular,
+    ...Typography.body1,
     color: Colors.white,
     marginTop: 4,
     opacity: 0.9,
   },
   list: {
-    padding: Spacing.medium,
+    padding: Spacing.md,
     paddingBottom: 80,
   },
   emptyList: {
@@ -239,42 +224,42 @@ const styles = StyleSheet.create({
   auctionCard: {
     backgroundColor: Colors.white,
     borderColor: Colors.border,
-    borderRadius: BorderRadius.medium,
+    borderRadius: BorderRadius.md,
     borderWidth: 1,
-    marginBottom: Spacing.small,
+    marginBottom: Spacing.sm,
     overflow: 'hidden',
   },
   cardContent: {
-    padding: Spacing.medium,
+    padding: Spacing.md,
   },
   auctionHeader: {
     alignItems: 'center',
     flexDirection: 'row',
     justifyContent: 'space-between',
-    marginBottom: Spacing.small,
+    marginBottom: Spacing.sm,
   },
   routeInfo: {
     alignItems: 'center',
-    flexDirection: 'row',
     flex: 1,
+    flexDirection: 'row',
   },
   stationName: {
-    ...Typography.bodySemibold,
-    color: Colors.textPrimary,
+    ...Typography.bodyBold,
+    color: Colors.text.primary,
   },
   arrow: {
-    color: Colors.textSecondary,
-    fontSize: 16,
+    color: Colors.text.secondary,
     marginHorizontal: 8,
   },
   statusBadge: {
-    borderRadius: 12,
+    borderRadius: BorderRadius.full,
     paddingHorizontal: 12,
     paddingVertical: 4,
   },
   statusText: {
-    ...Typography.captionSemibold,
+    ...Typography.caption,
     color: Colors.white,
+    fontWeight: '700',
   },
   auctionBody: {
     gap: 8,
@@ -285,59 +270,57 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
   },
   infoLabel: {
-    ...Typography.bodyRegular,
-    color: Colors.textSecondary,
+    ...Typography.body1,
+    color: Colors.text.secondary,
   },
   infoValue: {
-    ...Typography.bodySemibold,
-    color: Colors.textPrimary,
+    ...Typography.bodyBold,
+    color: Colors.text.primary,
   },
   emptyState: {
     alignItems: 'center',
     flex: 1,
     justifyContent: 'center',
-    padding: Spacing.xlarge,
+    padding: Spacing.xxl,
   },
   emptyIcon: {
-    fontSize: 64,
+    color: Colors.text.secondary,
+    fontSize: 28,
+    fontWeight: '700',
     marginBottom: 16,
   },
   emptyTitle: {
-    ...Typography.headerMedium,
-    color: Colors.textPrimary,
+    ...Typography.h3,
+    color: Colors.text.primary,
     marginBottom: 8,
   },
   emptyDesc: {
-    ...Typography.bodyRegular,
-    color: Colors.textSecondary,
+    ...Typography.body1,
+    color: Colors.text.secondary,
     textAlign: 'center',
   },
   loadingContainer: {
     alignItems: 'center',
+    backgroundColor: Colors.gray100,
     flex: 1,
     justifyContent: 'center',
   },
   loadingText: {
-    ...Typography.bodyRegular,
-    color: Colors.textSecondary,
+    ...Typography.body1,
+    color: Colors.text.secondary,
     marginTop: 12,
   },
   createButton: {
     backgroundColor: Colors.primary,
-    borderRadius: BorderRadius.medium,
+    borderRadius: BorderRadius.md,
     bottom: 16,
     left: 16,
-    paddingVertical: Spacing.medium,
+    paddingVertical: Spacing.lg,
     position: 'absolute',
     right: 16,
-    shadowColor: Colors.black,
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.25,
-    shadowRadius: 4,
-    elevation: 4,
   },
   createButtonText: {
-    ...Typography.bodySemibold,
+    ...Typography.bodyBold,
     color: Colors.white,
     textAlign: 'center',
   },

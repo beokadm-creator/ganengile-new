@@ -9,11 +9,15 @@ import type { MainStackParamList } from '../types/navigation';
 
 export const navigationRef = React.createRef<NavigationContainerRef<MainStackParamList>>();
 
-export function navigateFromNotification(
-  screen: keyof MainStackParamList,
-  params?: any
+export function navigateFromNotification<RouteName extends keyof MainStackParamList>(
+  screen: RouteName,
+  params?: MainStackParamList[RouteName]
 ) {
-  if (navigationRef.current?.isReady()) {
-    navigationRef.current?.navigate(screen, params);
+  const current = navigationRef.current as
+    | (NavigationContainerRef<MainStackParamList> & { navigate: (...args: unknown[]) => void })
+    | null;
+
+  if (current?.isReady()) {
+    current.navigate(screen, params);
   }
 }

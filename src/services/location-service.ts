@@ -1,13 +1,3 @@
-/**
- * Location Service - GPS 위치 추적
- * 
- * 기능:
- * - 현재 위치 가져오기
- * - 위치 권한 요청
- * - 지속적 위치 추적 (실시간 배송 추적용)
- * - 역 근처 위치 확인
- */
-
 import * as Location from 'expo-location';
 
 export interface LocationData {
@@ -29,28 +19,16 @@ export interface StationLocation {
 export class LocationService {
   private locationSubscription: Location.LocationSubscription | null = null;
 
-  /**
-   * 위치 권한 요청
-   */
   async requestLocationPermission(): Promise<boolean> {
     try {
-      const { status } = await Location.requestForegroundPermissionsAsync();
-      
-      if (status !== 'granted') {
-        console.error('Location permission denied');
-        return false;
-      }
-
-      return true;
+      const permission = await Location.requestForegroundPermissionsAsync();
+      return permission.granted;
     } catch (error) {
       console.error('Error requesting location permission:', error);
       return false;
     }
   }
 
-  /**
-   * 현재 위치 가져오기 (일회성)
-   */
   async getCurrentLocation(): Promise<LocationData | null> {
     try {
       const hasPermission = await this.requestLocationPermission();
@@ -65,10 +43,10 @@ export class LocationService {
       return {
         latitude: location.coords.latitude,
         longitude: location.coords.longitude,
-        accuracy: location.coords.accuracy || 0,
-        altitude: location.coords.altitude || null,
-        speed: location.coords.speed || null,
-        heading: location.coords.heading || null,
+        accuracy: location.coords.accuracy ?? 0,
+        altitude: location.coords.altitude ?? null,
+        speed: location.coords.speed ?? null,
+        heading: location.coords.heading ?? null,
       };
     } catch (error) {
       console.error('Error getting current location:', error);
@@ -76,9 +54,6 @@ export class LocationService {
     }
   }
 
-  /**
-   * 지속적 위치 추적 시작 (실시간 배송 추적용)
-   */
   async startLocationTracking(
     callback: (location: LocationData) => void
   ): Promise<boolean> {
@@ -91,17 +66,17 @@ export class LocationService {
       this.locationSubscription = await Location.watchPositionAsync(
         {
           accuracy: Location.Accuracy.Balanced,
-          distanceInterval: 10, // 10m마다 업데이트
-          timeInterval: 5000, // 또는 5초마다 업데이트
+          distanceInterval: 10,
+          timeInterval: 5000,
         },
         (location) => {
           callback({
             latitude: location.coords.latitude,
             longitude: location.coords.longitude,
-            accuracy: location.coords.accuracy || 0,
-            altitude: location.coords.altitude || null,
-            speed: location.coords.speed || null,
-            heading: location.coords.heading || null,
+            accuracy: location.coords.accuracy ?? 0,
+            altitude: location.coords.altitude ?? null,
+            speed: location.coords.speed ?? null,
+            heading: location.coords.heading ?? null,
           });
         }
       );
@@ -113,9 +88,6 @@ export class LocationService {
     }
   }
 
-  /**
-   * 지속적 위치 추적 중지
-   */
   stopLocationTracking(): void {
     if (this.locationSubscription) {
       this.locationSubscription.remove();
@@ -123,32 +95,26 @@ export class LocationService {
     }
   }
 
-  /**
-   * 두 위치 간의 거리 계산 (Haversine formula, 미터 단위)
-   */
   calculateDistance(
     lat1: number,
     lon1: number,
     lat2: number,
     lon2: number
   ): number {
-    const R = 6371e3; // Earth's radius in meters
-    const φ1 = (lat1 * Math.PI) / 180;
-    const φ2 = (lat2 * Math.PI) / 180;
-    const Δφ = ((lat2 - lat1) * Math.PI) / 180;
-    const Δλ = ((lon2 - lon1) * Math.PI) / 180;
+    const earthRadius = 6371e3;
+    const phi1 = (lat1 * Math.PI) / 180;
+    const phi2 = (lat2 * Math.PI) / 180;
+    const deltaPhi = ((lat2 - lat1) * Math.PI) / 180;
+    const deltaLambda = ((lon2 - lon1) * Math.PI) / 180;
 
     const a =
-      Math.sin(Δφ / 2) * Math.sin(Δφ / 2) +
-      Math.cos(φ1) * Math.cos(φ2) * Math.sin(Δλ / 2) * Math.sin(Δλ / 2);
+      Math.sin(deltaPhi / 2) * Math.sin(deltaPhi / 2) +
+      Math.cos(phi1) * Math.cos(phi2) * Math.sin(deltaLambda / 2) * Math.sin(deltaLambda / 2);
     const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 
-    return R * c;
+    return earthRadius * c;
   }
 
-  /**
-   * 특정 역 근처에 있는지 확인 (반경 200m)
-   */
   isNearStation(
     currentLocation: LocationData,
     station: StationLocation,
@@ -164,9 +130,6 @@ export class LocationService {
     return distance <= radius;
   }
 
-  /**
-   * 가장 가까운 역 찾기
-   */
   findNearestStation(
     currentLocation: LocationData,
     stations: StationLocation[]
@@ -179,35 +142,28 @@ export class LocationService {
     let minDistance = this.calculateDistance(
       currentLocation.latitude,
       currentLocation.longitude,
-      stations[0].latitude,
-      stations[0].longitude
+      nearestStation.latitude,
+      nearestStation.longitude
     );
 
-    for (let i = 1; i < stations.length; i++) {
+    for (const station of stations.slice(1)) {
       const distance = this.calculateDistance(
         currentLocation.latitude,
         currentLocation.longitude,
-        stations[i].latitude,
-        stations[i].longitude
+        station.latitude,
+        station.longitude
       );
 
       if (distance < minDistance) {
         minDistance = distance;
-        nearestStation = stations[i];
+        nearestStation = station;
       }
     }
 
     return nearestStation;
   }
 
-  /**
-   * 주소로 변역 (역 geocoding)
-   * TODO: Google Maps Geocoding API 또는 Daum API 연동
-   */
-  async reverseGeocode(
-    latitude: number,
-    longitude: number
-  ): Promise<string> {
+  async reverseGeocode(latitude: number, longitude: number): Promise<string> {
     try {
       const geocoded = await Location.reverseGeocodeAsync({
         latitude,
@@ -215,17 +171,26 @@ export class LocationService {
       });
 
       if (geocoded.length > 0) {
-        const { street, city, region } = geocoded[0];
-        return `${street || ''} ${city || ''} ${region || ''}`.trim();
+        const first = geocoded[0];
+        const segments = [
+          first.region,
+          first.city,
+          first.district,
+          first.street,
+          first.name,
+        ].filter(Boolean);
+
+        if (segments.length > 0) {
+          return segments.join(' ');
+        }
       }
 
-      return '위치를 찾을 수 없습니다';
+      return `${latitude.toFixed(5)}, ${longitude.toFixed(5)}`;
     } catch (error) {
       console.error('Error reverse geocoding:', error);
-      return '주소 변환 실패';
+      return `${latitude.toFixed(5)}, ${longitude.toFixed(5)}`;
     }
   }
 }
 
-// Singleton instance
 export const locationService = new LocationService();

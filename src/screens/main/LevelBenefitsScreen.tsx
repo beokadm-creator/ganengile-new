@@ -1,30 +1,5 @@
-/**
- * Level Benefits Screen
- * 등급별 혜택 안내 화면 (P1-2)
- *
- * 기능:
- * - 일반/전문가/마스터 등급별 혜택 비교
- * - 요금 보너스 (0%, 15%, 25%)
- * - 동선 개수 (5, 10, 15개)
- * - 일일 배송 가능 수 (10, 20, 30건)
- */
-
 import React, { useState } from 'react';
-import {
-  View,
-  Text,
-  StyleSheet,
-  ScrollView,
-  TouchableOpacity,
-} from 'react-native';
-import { StackNavigationProp } from '@react-navigation/stack';
-import { Colors, Typography, Spacing, BorderRadius } from '../../theme';
-
-type NavigationProp = StackNavigationProp<any>;
-
-interface Props {
-  navigation: NavigationProp;
-}
+import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
 type GillerLevel = 'normal' | 'professional' | 'master';
 
@@ -52,7 +27,7 @@ const LEVEL_BENEFITS: LevelBenefit[] = [
     level: 'normal',
     levelName: '일반 길러',
     levelIcon: '🚶',
-    levelColor: '#9E9E9E',
+    levelColor: '#64748B',
     benefits: {
       routeCount: 5,
       dailyDeliveries: 10,
@@ -69,14 +44,14 @@ const LEVEL_BENEFITS: LevelBenefit[] = [
   {
     level: 'professional',
     levelName: '전문가 길러',
-    levelIcon: '⭐',
-    levelColor: '#FFD700',
+    levelIcon: '🥇',
+    levelColor: '#EAB308',
     benefits: {
       routeCount: 10,
       dailyDeliveries: 20,
       feeBonus: 15,
       priority: '우선',
-      extraBenefits: ['전문가 배지 획득 가능', '프로필 프레임'],
+      extraBenefits: ['전문가 배지 노출', '프로필 프레임', '우선 상담 큐'],
     },
     requirements: {
       completedDeliveries: 50,
@@ -88,18 +63,13 @@ const LEVEL_BENEFITS: LevelBenefit[] = [
     level: 'master',
     levelName: '마스터 길러',
     levelIcon: '👑',
-    levelColor: '#4CAF50',
+    levelColor: '#10B981',
     benefits: {
       routeCount: 15,
       dailyDeliveries: 30,
       feeBonus: 25,
       priority: '최우선',
-      extraBenefits: [
-        '마스터 배지 획득 가능',
-        '골드 프레임',
-        '멘토링 권한',
-        '이벤트 우선 초대',
-      ],
+      extraBenefits: ['마스터 배지 노출', '골드 프레임', '멘토링 권한', '이벤트 우선 초대'],
     },
     requirements: {
       completedDeliveries: 100,
@@ -109,15 +79,15 @@ const LEVEL_BENEFITS: LevelBenefit[] = [
   },
 ];
 
-export default function LevelBenefitsScreen({ navigation: _navigation }: Props) {
-  const [selectedLevel, setSelectedLevel] = useState<GillerLevel | null>(null);
-  const [showRequirements, setShowRequirements] = useState(false);
+export default function LevelBenefitsScreen() {
+  const [selectedLevel, setSelectedLevel] = useState<GillerLevel | null>('professional');
+  const [showComparison, setShowComparison] = useState(false);
 
   const formatPercentage = (value: number): string => {
     return value > 0 ? `+${value}%` : '없음';
   };
 
-  const renderLevelCard = (benefit: LevelBenefit, index: number) => {
+  const renderLevelCard = (benefit: LevelBenefit) => {
     const isSelected = selectedLevel === benefit.level;
 
     return (
@@ -125,435 +95,253 @@ export default function LevelBenefitsScreen({ navigation: _navigation }: Props) 
         key={benefit.level}
         style={[
           styles.levelCard,
-          isSelected && styles.levelCardSelected,
+          isSelected ? styles.levelCardSelected : undefined,
           { borderColor: benefit.levelColor },
         ]}
         onPress={() => setSelectedLevel(benefit.level)}
-        activeOpacity={0.7}
+        activeOpacity={0.8}
       >
-        {/* 등급 헤더 */}
-        <View style={[styles.levelHeader, { backgroundColor: benefit.levelColor + '20' }]}>
+        <View style={[styles.levelHeader, { backgroundColor: `${benefit.levelColor}18` }]}>
           <View style={styles.levelHeaderLeft}>
             <Text style={styles.levelIcon}>{benefit.levelIcon}</Text>
             <View>
-              <Text style={[styles.levelName, { color: benefit.levelColor }]}>
-                {benefit.levelName}
-              </Text>
+              <Text style={[styles.levelName, { color: benefit.levelColor }]}>{benefit.levelName}</Text>
               <Text style={styles.levelSubtitle}>
                 {benefit.level === 'normal'
                   ? '입문 단계'
                   : benefit.level === 'professional'
-                  ? '숙련된 길러'
-                  : '최고 전문가'}
+                    ? '숙련된 길러'
+                    : '최상위 전문 길러'}
               </Text>
             </View>
           </View>
-          <View style={styles.levelHeaderRight}>
-            <Text style={[styles.levelBadge, { backgroundColor: benefit.levelColor }]}>
-              {benefit.level.toUpperCase()}
-            </Text>
+          <View style={[styles.levelBadge, { backgroundColor: benefit.levelColor }]}>
+            <Text style={styles.levelBadgeText}>{benefit.level.toUpperCase()}</Text>
           </View>
         </View>
 
-        {/* 혜택 목록 */}
         <View style={styles.benefitsList}>
-          {/* 동선 개수 */}
-          <View style={styles.benefitItem}>
-            <View style={styles.benefitIconContainer}>
-              <Text style={styles.benefitIcon}>🗺️</Text>
-            </View>
-            <View style={styles.benefitContent}>
-              <Text style={styles.benefitLabel}>등록 가능 동선</Text>
-              <Text style={styles.benefitValue}>{benefit.benefits.routeCount}개</Text>
-            </View>
-          </View>
-
-          {/* 일일 배송 가능 수 */}
-          <View style={styles.benefitItem}>
-            <View style={styles.benefitIconContainer}>
-              <Text style={styles.benefitIcon}>📦</Text>
-            </View>
-            <View style={styles.benefitContent}>
-              <Text style={styles.benefitLabel}>일일 배송 가능</Text>
-              <Text style={styles.benefitValue}>{benefit.benefits.dailyDeliveries}건</Text>
-            </View>
-          </View>
-
-          {/* 요금 보너스 */}
-          <View style={styles.benefitItem}>
-            <View style={styles.benefitIconContainer}>
-              <Text style={styles.benefitIcon}>💰</Text>
-            </View>
-            <View style={styles.benefitContent}>
-              <Text style={styles.benefitLabel}>요금 보너스</Text>
-              <Text
-                style={[
-                  styles.benefitValue,
-                  { color: benefit.benefits.feeBonus > 0 ? '#4CAF50' : Colors.textSecondary },
-                ]}
-              >
-                {formatPercentage(benefit.benefits.feeBonus)}
-              </Text>
-            </View>
-          </View>
-
-          {/* 매칭 우선순위 */}
-          <View style={styles.benefitItem}>
-            <View style={styles.benefitIconContainer}>
-              <Text style={styles.benefitIcon}>🎯</Text>
-            </View>
-            <View style={styles.benefitContent}>
-              <Text style={styles.benefitLabel}>매칭 우선순위</Text>
-              <Text style={styles.benefitValue}>{benefit.benefits.priority}</Text>
-            </View>
-          </View>
+          <BenefitRow label="등록 가능한 동선" value={`${benefit.benefits.routeCount}개`} icon="🗺️" />
+          <BenefitRow label="일일 배송 가능 수" value={`${benefit.benefits.dailyDeliveries}건`} icon="📦" />
+          <BenefitRow
+            label="요금 보너스"
+            value={formatPercentage(benefit.benefits.feeBonus)}
+            icon="💰"
+            emphasis={benefit.benefits.feeBonus > 0}
+          />
+          <BenefitRow label="매칭 우선순위" value={benefit.benefits.priority} icon="🚦" />
         </View>
 
-        {/* 추가 혜택 */}
-        {benefit.benefits.extraBenefits.length > 0 && (
+        {benefit.benefits.extraBenefits.length > 0 ? (
           <View style={styles.extraBenefits}>
-            <Text style={styles.extraBenefitsTitle}>특별 혜택</Text>
-            {benefit.benefits.extraBenefits.map((extra, idx) => (
-              <View key={idx} style={styles.extraBenefitItem}>
-                <Text style={styles.extraBenefitIcon}>✨</Text>
+            <Text style={styles.extraBenefitsTitle}>추가 혜택</Text>
+            {benefit.benefits.extraBenefits.map((extra) => (
+              <View key={extra} style={styles.extraBenefitItem}>
+                <Text style={styles.extraBenefitIcon}>•</Text>
                 <Text style={styles.extraBenefitText}>{extra}</Text>
               </View>
             ))}
           </View>
-        )}
+        ) : null}
 
-        {/* 확장 버튼 */}
-        {isSelected && (
-          <>
-            <View style={styles.divider} />
-
-            {/* 승급 기준 */}
-            {benefit.level !== 'normal' && (
-              <View style={styles.requirements}>
-                <Text style={styles.requirementsTitle}>승급 기준</Text>
-                <View style={styles.requirementItem}>
-                  <Text style={styles.requirementIcon}>📦</Text>
-                  <Text style={styles.requirementText}>
-                    완료 건수 {benefit.requirements.completedDeliveries}건 이상
-                  </Text>
-                </View>
-                <View style={styles.requirementItem}>
-                  <Text style={styles.requirementIcon}>⭐</Text>
-                  <Text style={styles.requirementText}>
-                    평점 {benefit.requirements.rating.toFixed(1)} 이상
-                  </Text>
-                </View>
-                <View style={styles.requirementItem}>
-                  <Text style={styles.requirementIcon}>📅</Text>
-                  <Text style={styles.requirementText}>
-                    가입 {benefit.requirements.memberDays}일 이상
-                  </Text>
-                </View>
-              </View>
-            )}
-          </>
-        )}
+        {isSelected && benefit.level !== 'normal' ? (
+          <View style={styles.requirements}>
+            <Text style={styles.requirementsTitle}>승급 기준</Text>
+            <Text style={styles.requirementText}>완료 배송 {benefit.requirements.completedDeliveries}건 이상</Text>
+            <Text style={styles.requirementText}>평점 {benefit.requirements.rating.toFixed(1)} 이상</Text>
+            <Text style={styles.requirementText}>가입 {benefit.requirements.memberDays}일 이상</Text>
+          </View>
+        ) : null}
       </TouchableOpacity>
     );
   };
 
   return (
     <View style={styles.container}>
-      {/* 헤더 */}
       <View style={styles.header}>
-        <Text style={styles.headerTitle}>등급별 혜택</Text>
+        <Text style={styles.headerTitle}>레벨별 혜택</Text>
         <Text style={styles.headerSubtitle}>
-          활동에 따라 혜택이 달라집니다
+          길러 활동 수준에 따라 동선 수, 배송 수, 보너스가 달라집니다.
         </Text>
       </View>
 
-      {/* 비교 테이블 버튼 */}
-      <TouchableOpacity
-        style={styles.compareButton}
-        onPress={() => setShowRequirements(!showRequirements)}
-      >
+      <TouchableOpacity style={styles.compareButton} onPress={() => setShowComparison((prev) => !prev)}>
         <Text style={styles.compareButtonText}>
-          {showRequirements ? '숨기기' : '전체 비교표 보기'}
+          {showComparison ? '비교표 접기' : '전체 비교표 보기'}
         </Text>
       </TouchableOpacity>
 
-      {/* 전체 비교표 */}
-      {showRequirements && (
+      {showComparison ? (
         <View style={styles.comparisonTable}>
           <View style={styles.comparisonHeader}>
-            <Text style={styles.comparisonHeaderCell}>혜택</Text>
+            <Text style={styles.comparisonHeaderCell}>구분</Text>
             <Text style={styles.comparisonHeaderCell}>일반</Text>
             <Text style={styles.comparisonHeaderCell}>전문가</Text>
             <Text style={styles.comparisonHeaderCell}>마스터</Text>
           </View>
-
-          <View style={styles.comparisonRow}>
-            <Text style={styles.comparisonLabelCell}>동선</Text>
-            <Text style={styles.comparisonDataCell}>5개</Text>
-            <Text style={styles.comparisonDataCell}>10개</Text>
-            <Text style={styles.comparisonDataCell}>15개</Text>
-          </View>
-
-          <View style={styles.comparisonRow}>
-            <Text style={styles.comparisonLabelCell}>일일</Text>
-            <Text style={styles.comparisonDataCell}>10건</Text>
-            <Text style={styles.comparisonDataCell}>20건</Text>
-            <Text style={styles.comparisonDataCell}>30건</Text>
-          </View>
-
-          <View style={styles.comparisonRow}>
-            <Text style={styles.comparisonLabelCell}>보너스</Text>
-            <Text style={styles.comparisonDataCell}>0%</Text>
-            <Text style={styles.comparisonDataCell}>15%</Text>
-            <Text style={styles.comparisonDataCell}>25%</Text>
-          </View>
-
-          <View style={styles.comparisonRow}>
-            <Text style={styles.comparisonLabelCell}>우선순위</Text>
-            <Text style={styles.comparisonDataCell}>일반</Text>
-            <Text style={styles.comparisonDataCell}>우선</Text>
-            <Text style={styles.comparisonDataCell}>최우선</Text>
-          </View>
+          <ComparisonRow label="동선" normal="5개" professional="10개" master="15개" />
+          <ComparisonRow label="일일 배송" normal="10건" professional="20건" master="30건" />
+          <ComparisonRow label="보너스" normal="0%" professional="15%" master="25%" />
+          <ComparisonRow label="우선순위" normal="일반" professional="우선" master="최우선" />
         </View>
-      )}
+      ) : null}
 
-      {/* 등급 카드 목록 */}
-      <ScrollView
-        style={styles.levelList}
-        showsVerticalScrollIndicator={false}
-      >
-        {LEVEL_BENEFITS.map((benefit, index) => renderLevelCard(benefit, index))}
+      <ScrollView style={styles.levelList} showsVerticalScrollIndicator={false}>
+        {LEVEL_BENEFITS.map(renderLevelCard)}
       </ScrollView>
 
-      {/* 승급 안내 */}
-      <View style={styles.upgradeNotice}>
-        <Text style={styles.upgradeNoticeIcon}>💡</Text>
-        <Text style={styles.upgradeNoticeText}>
-          승급 기준을 충족하면 자동으로 승급 신청이 가능합니다.
-          {'\n'}
-          길러 승급 신청 화면에서 확인해보세요!
+      <View style={styles.noticeCard}>
+        <Text style={styles.noticeIcon}>💡</Text>
+        <Text style={styles.noticeText}>
+          승급 기준을 충족하면 길러 승급 신청 화면에서 바로 다음 단계를 진행할 수 있어요.
         </Text>
       </View>
     </View>
   );
 }
 
+function BenefitRow({
+  label,
+  value,
+  icon,
+  emphasis = false,
+}: {
+  label: string;
+  value: string;
+  icon: string;
+  emphasis?: boolean;
+}) {
+  return (
+    <View style={styles.benefitRow}>
+      <View style={styles.benefitIconContainer}>
+        <Text style={styles.benefitIcon}>{icon}</Text>
+      </View>
+      <View style={styles.benefitContent}>
+        <Text style={styles.benefitLabel}>{label}</Text>
+        <Text style={[styles.benefitValue, emphasis ? styles.bonusText : undefined]}>{value}</Text>
+      </View>
+    </View>
+  );
+}
+
+function ComparisonRow({
+  label,
+  normal,
+  professional,
+  master,
+}: {
+  label: string;
+  normal: string;
+  professional: string;
+  master: string;
+}) {
+  return (
+    <View style={styles.comparisonRow}>
+      <Text style={styles.comparisonLabelCell}>{label}</Text>
+      <Text style={styles.comparisonDataCell}>{normal}</Text>
+      <Text style={styles.comparisonDataCell}>{professional}</Text>
+      <Text style={styles.comparisonDataCell}>{master}</Text>
+    </View>
+  );
+}
+
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: Colors.background,
-  },
-  header: {
-    paddingHorizontal: Spacing.md,
-    paddingTop: Spacing.lg,
-    paddingBottom: Spacing.sm,
-    backgroundColor: Colors.surface,
-  },
-  headerTitle: {
-    ...Typography.h2,
-    color: Colors.text,
-    marginBottom: Spacing.xs,
-  },
-  headerSubtitle: {
-    ...Typography.body2,
-    color: Colors.textSecondary,
-  },
+  container: { flex: 1, backgroundColor: '#F8FAFC' },
+  header: { paddingHorizontal: 20, paddingTop: 24, paddingBottom: 12, gap: 6 },
+  headerTitle: { fontSize: 28, fontWeight: '800', color: '#0F172A' },
+  headerSubtitle: { fontSize: 15, lineHeight: 22, color: '#64748B' },
   compareButton: {
-    backgroundColor: Colors.surface,
-    marginHorizontal: Spacing.md,
-    marginTop: Spacing.md,
-    marginBottom: Spacing.sm,
-    padding: Spacing.md,
-    borderRadius: BorderRadius.md,
+    marginHorizontal: 20,
+    marginTop: 8,
+    marginBottom: 12,
+    padding: 14,
+    borderRadius: 16,
     alignItems: 'center',
     borderWidth: 1,
-    borderColor: Colors.primary,
+    borderColor: '#2563EB',
+    backgroundColor: '#FFFFFF',
   },
-  compareButtonText: {
-    ...Typography.body1,
-    color: Colors.primary,
-    fontWeight: '600',
-  },
+  compareButtonText: { fontSize: 15, fontWeight: '700', color: '#2563EB' },
   comparisonTable: {
-    backgroundColor: Colors.surface,
-    marginHorizontal: Spacing.md,
-    marginBottom: Spacing.sm,
-    borderRadius: BorderRadius.lg,
+    backgroundColor: '#FFFFFF',
+    marginHorizontal: 20,
+    marginBottom: 12,
+    borderRadius: 20,
     overflow: 'hidden',
   },
-  comparisonHeader: {
-    flexDirection: 'row',
-    backgroundColor: Colors.primary + '20',
-    paddingVertical: Spacing.sm,
-  },
-  comparisonHeaderCell: {
-    flex: 1,
-    ...Typography.body2,
-    color: Colors.primary,
-    fontWeight: '700',
-    textAlign: 'center',
-  },
-  comparisonRow: {
-    flexDirection: 'row',
-    paddingVertical: Spacing.sm,
-    borderBottomWidth: 1,
-    borderBottomColor: Colors.border,
-  },
-  comparisonLabelCell: {
-    flex: 1,
-    ...Typography.body2,
-    color: Colors.text,
-    textAlign: 'center',
-  },
-  comparisonDataCell: {
-    flex: 1,
-    ...Typography.body2,
-    color: Colors.text,
-    fontWeight: '600',
-    textAlign: 'center',
-  },
-  levelList: {
-    flex: 1,
-    paddingHorizontal: Spacing.md,
-  },
+  comparisonHeader: { flexDirection: 'row', backgroundColor: '#DBEAFE', paddingVertical: 10 },
+  comparisonHeaderCell: { flex: 1, fontSize: 13, fontWeight: '700', color: '#1D4ED8', textAlign: 'center' },
+  comparisonRow: { flexDirection: 'row', paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: '#E2E8F0' },
+  comparisonLabelCell: { flex: 1, fontSize: 13, color: '#0F172A', textAlign: 'center' },
+  comparisonDataCell: { flex: 1, fontSize: 13, fontWeight: '700', color: '#0F172A', textAlign: 'center' },
+  levelList: { flex: 1, paddingHorizontal: 20 },
   levelCard: {
-    backgroundColor: Colors.surface,
-    borderRadius: BorderRadius.lg,
-    marginBottom: Spacing.md,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 24,
+    marginBottom: 16,
     borderWidth: 2,
     overflow: 'hidden',
   },
-  levelCardSelected: {
-    borderWidth: 3,
-  },
+  levelCardSelected: { borderWidth: 3 },
   levelHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    padding: Spacing.lg,
+    padding: 20,
   },
-  levelHeaderLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    flex: 1,
-  },
-  levelIcon: {
-    fontSize: 36,
-    marginRight: Spacing.md,
-  },
-  levelName: {
-    ...Typography.h3,
-    fontWeight: '700',
-  },
-  levelSubtitle: {
-    ...Typography.bodySmall,
-    color: Colors.textSecondary,
-  },
-  levelHeaderRight: {},
-  levelBadge: {
-    paddingHorizontal: Spacing.lg,
-    paddingVertical: Spacing.xs,
-    borderRadius: BorderRadius.lg,
-  },
-  benefitsList: {
-    padding: Spacing.lg,
-  },
-  benefitItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: Spacing.md,
-  },
+  levelHeaderLeft: { flexDirection: 'row', alignItems: 'center', flex: 1 },
+  levelIcon: { fontSize: 36, marginRight: 12 },
+  levelName: { fontSize: 20, fontWeight: '800' },
+  levelSubtitle: { fontSize: 13, color: '#64748B' },
+  levelBadge: { paddingHorizontal: 14, paddingVertical: 6, borderRadius: 999 },
+  levelBadgeText: { fontSize: 11, fontWeight: '800', color: '#FFFFFF' },
+  benefitsList: { paddingHorizontal: 20, paddingBottom: 20, gap: 12 },
+  benefitRow: { flexDirection: 'row', alignItems: 'center' },
   benefitIconContainer: {
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: Colors.background,
+    backgroundColor: '#F1F5F9',
     justifyContent: 'center',
     alignItems: 'center',
-    marginRight: Spacing.md,
+    marginRight: 12,
   },
-  benefitIcon: {
-    fontSize: 20,
-  },
-  benefitContent: {
-    flex: 1,
-  },
-  benefitLabel: {
-    ...Typography.body2,
-    color: Colors.textSecondary,
-    marginBottom: Spacing.xs,
-  },
-  benefitValue: {
-    ...Typography.h3,
-    color: Colors.text,
-    fontWeight: '700',
-  },
+  benefitIcon: { fontSize: 18 },
+  benefitContent: { flex: 1 },
+  benefitLabel: { fontSize: 13, color: '#64748B', marginBottom: 4 },
+  benefitValue: { fontSize: 18, fontWeight: '800', color: '#0F172A' },
+  bonusText: { color: '#16A34A' },
   extraBenefits: {
-    marginTop: Spacing.sm,
-    paddingTop: Spacing.sm,
+    marginHorizontal: 20,
+    marginBottom: 20,
+    paddingTop: 16,
     borderTopWidth: 1,
-    borderTopColor: Colors.border,
+    borderTopColor: '#E2E8F0',
+    gap: 8,
   },
-  extraBenefitsTitle: {
-    ...Typography.body1,
-    color: Colors.text,
-    fontWeight: '600',
-    marginBottom: Spacing.sm,
-  },
-  extraBenefitItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: Spacing.xs,
-  },
-  extraBenefitIcon: {
-    fontSize: 16,
-    marginRight: Spacing.xs,
-  },
-  extraBenefitText: {
-    ...Typography.body2,
-    color: Colors.text,
-  },
-  divider: {
-    height: 1,
-    backgroundColor: Colors.border,
-    marginHorizontal: Spacing.lg,
-  },
+  extraBenefitsTitle: { fontSize: 15, fontWeight: '700', color: '#0F172A' },
+  extraBenefitItem: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  extraBenefitIcon: { fontSize: 16, color: '#2563EB' },
+  extraBenefitText: { fontSize: 14, color: '#334155' },
   requirements: {
-    padding: Spacing.lg,
+    marginHorizontal: 20,
+    marginBottom: 20,
+    paddingTop: 16,
+    borderTopWidth: 1,
+    borderTopColor: '#E2E8F0',
+    gap: 8,
   },
-  requirementsTitle: {
-    ...Typography.h3,
-    color: Colors.text,
-    marginBottom: Spacing.md,
-  },
-  requirementItem: {
+  requirementsTitle: { fontSize: 15, fontWeight: '700', color: '#0F172A' },
+  requirementText: { fontSize: 14, color: '#334155' },
+  noticeCard: {
     flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: Spacing.sm,
-  },
-  requirementIcon: {
-    fontSize: 16,
-    marginRight: Spacing.sm,
-  },
-  requirementText: {
-    ...Typography.body1,
-    color: Colors.text,
-  },
-  upgradeNotice: {
-    backgroundColor: Colors.primary + '10',
-    margin: Spacing.md,
-    padding: Spacing.md,
-    borderRadius: BorderRadius.md,
-    flexDirection: 'row',
+    gap: 10,
+    backgroundColor: '#DBEAFE',
+    margin: 20,
+    padding: 16,
+    borderRadius: 18,
     alignItems: 'flex-start',
   },
-  upgradeNoticeIcon: {
-    fontSize: 20,
-    marginRight: Spacing.sm,
-  },
-  upgradeNoticeText: {
-    ...Typography.body2,
-    color: Colors.text,
-    flex: 1,
-  },
+  noticeIcon: { fontSize: 20 },
+  noticeText: { flex: 1, fontSize: 14, lineHeight: 20, color: '#1E3A8A' },
 });

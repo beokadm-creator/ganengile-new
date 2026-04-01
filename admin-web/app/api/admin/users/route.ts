@@ -1,44 +1,143 @@
 import { NextRequest, NextResponse } from 'next/server';
+import type {
+  DocumentData,
+  Firestore,
+  Query,
+  QueryDocumentSnapshot,
+} from 'firebase-admin/firestore';
 import { getAdminDb } from '@/lib/firebase-admin';
 import { isAdmin } from '@/lib/auth';
 
-export async function GET(req: NextRequest) {
-  if (!(await isAdmin())) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+type UserDoc = DocumentData & {
+  name?: string;
+  displayName?: string;
+  email?: string;
+  phoneNumber?: string;
+  role?: string;
+  isActive?: boolean;
+  isVerified?: boolean;
+  pointBalance?: number;
+  gillerApplicationStatus?: string;
+  createdAt?: unknown;
+  gillerInfo?: {
+    identityVerificationStatus?: string;
+    bankAccount?: {
+      bankCode?: string;
+      accountNumberMasked?: string;
+      accountNumber?: string;
+      verificationStatus?: string;
+    };
+  };
+};
 
-  const db = getAdminDb();
+function getIdentityStatus(data: UserDoc): string {
+  if (typeof data.gillerInfo?.identityVerificationStatus === 'string') {
+    return data.gillerInfo.identityVerificationStatus;
+  }
+
+  return data.isVerified ? 'approved' : 'not_submitted';
+}
+
+function getBankStatus(data: UserDoc): string {
+  return typeof data.gillerInfo?.bankAccount?.verificationStatus === 'string'
+    ? data.gillerInfo.bankAccount.verificationStatus
+    : 'not_submitted';
+}
+
+function getOnboardingStage(data: UserDoc) {
+  const applicationStatus =
+    typeof data.gillerApplicationStatus === 'string' ? data.gillerApplicationStatus : 'none';
+  const identityStatus = getIdentityStatus(data);
+  const bankStatus = getBankStatus(data);
+  const isIdentityApproved =
+    identityStatus === 'approved' || identityStatus === 'approved_test_bypass';
+  const isBankApproved =
+    bankStatus === 'approved' || bankStatus === 'approved_test_bypass' || bankStatus === 'verified';
+
+  if (applicationStatus === 'approved') return '길러 활성';
+  if (applicationStatus === 'pending') return '길러 심사 대기';
+  if (isIdentityApproved && isBankApproved) return '승급 준비 완료';
+  if (isIdentityApproved) return '계좌 인증 대기';
+  return '본인 확인 대기';
+}
+
+function toUserItem(doc: QueryDocumentSnapshot<UserDoc>) {
+  const data = doc.data();
+  const bankAccount = data.gillerInfo?.bankAccount;
+  const identityStatus = getIdentityStatus(data);
+  const bankStatus = getBankStatus(data);
+
+  return {
+    id: doc.id,
+    name:
+      typeof data.name === 'string'
+        ? data.name
+        : typeof data.displayName === 'string'
+          ? data.displayName
+          : '(이름 없음)',
+    email: typeof data.email === 'string' ? data.email : '',
+    phoneNumber: typeof data.phoneNumber === 'string' ? data.phoneNumber : '',
+    role: typeof data.role === 'string' ? data.role : '',
+    isActive: Boolean(data.isActive ?? true),
+    isVerified: Boolean(data.isVerified ?? false),
+    pointBalance: typeof data.pointBalance === 'number' ? data.pointBalance : 0,
+    gillerApplicationStatus:
+      typeof data.gillerApplicationStatus === 'string' ? data.gillerApplicationStatus : null,
+    identityVerificationStatus: identityStatus,
+    bankVerificationStatus: bankStatus,
+    bankCode: typeof bankAccount?.bankCode === 'string' ? bankAccount.bankCode : '',
+    accountNumberMasked:
+      typeof bankAccount?.accountNumberMasked === 'string'
+        ? bankAccount.accountNumberMasked
+        : typeof bankAccount?.accountNumber === 'string'
+          ? bankAccount.accountNumber.replace(/.(?=.{4})/g, '*')
+          : '',
+    onboardingStage: getOnboardingStage(data),
+    createdAt: data.createdAt ?? null,
+  };
+}
+
+export async function GET(req: NextRequest) {
+  if (!(await isAdmin())) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  }
+
+  const db: Firestore = getAdminDb();
   const { searchParams } = new URL(req.url);
   const search = searchParams.get('search') ?? '';
   const role = searchParams.get('role') ?? '';
 
-  let query: FirebaseFirestore.Query = db.collection('users').orderBy('createdAt', 'desc').limit(100);
+  let query: Query<UserDoc> = db
+    .collection('users')
+    .withConverter<UserDoc>({
+      toFirestore: (data) => data,
+      fromFirestore: (snapshot) => snapshot.data() as UserDoc,
+    })
+    .orderBy('createdAt', 'desc')
+    .limit(100);
 
   if (role) {
-    query = db.collection('users').where('role', '==', role).orderBy('createdAt', 'desc').limit(100);
+    query = db
+      .collection('users')
+      .withConverter<UserDoc>({
+        toFirestore: (data) => data,
+        fromFirestore: (snapshot) => snapshot.data() as UserDoc,
+      })
+      .where('role', '==', role)
+      .orderBy('createdAt', 'desc')
+      .limit(100);
   }
 
   const snap = await query.get();
-
-  let items = snap.docs.map((doc) => {
-    const d = doc.data();
-    return {
-      id: doc.id,
-      name: d.name ?? d.displayName ?? '(이름없음)',
-      email: d.email ?? '',
-      role: d.role ?? '',
-      isActive: d.isActive ?? true,
-      pointBalance: d.pointBalance ?? 0,
-      gillerApplicationStatus: d.gillerApplicationStatus ?? null,
-      createdAt: d.createdAt,
-    };
-  });
+  let items = snap.docs.map(toUserItem);
 
   if (search) {
     const q = search.toLowerCase();
-    items = items.filter(
-      (u) =>
-        u.name.toLowerCase().includes(q) ||
-        u.email.toLowerCase().includes(q) ||
-        u.id.includes(q)
+    items = items.filter((item) =>
+      item.name.toLowerCase().includes(q) ||
+      item.email.toLowerCase().includes(q) ||
+      item.phoneNumber.toLowerCase().includes(q) ||
+      item.id.toLowerCase().includes(q)
     );
   }
 
@@ -46,13 +145,29 @@ export async function GET(req: NextRequest) {
 }
 
 export async function PATCH(req: NextRequest) {
-  if (!(await isAdmin())) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  if (!(await isAdmin())) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  }
 
-  const { userId, isActive } = await req.json();
-  if (!userId || isActive === undefined) return NextResponse.json({ error: 'Missing fields' }, { status: 400 });
+  const body: unknown = await req.json();
+  const userId =
+    typeof body === 'object' && body !== null && typeof (body as { userId?: unknown }).userId === 'string'
+      ? (body as { userId: string }).userId
+      : null;
+  const isActive =
+    typeof body === 'object' && body !== null && typeof (body as { isActive?: unknown }).isActive === 'boolean'
+      ? (body as { isActive: boolean }).isActive
+      : null;
 
-  const db = getAdminDb();
-  await db.collection('users').doc(userId).update({ isActive, updatedAt: new Date() });
+  if (!userId || isActive === null) {
+    return NextResponse.json({ error: 'Missing fields' }, { status: 400 });
+  }
+
+  const db: Firestore = getAdminDb();
+  await db.collection('users').doc(userId).update({
+    isActive,
+    updatedAt: new Date(),
+  });
 
   return NextResponse.json({ ok: true });
 }

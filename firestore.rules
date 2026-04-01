@@ -16,6 +16,40 @@ service cloud.firestore {
         get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
     }
 
+    function getRequestDoc(requestId) {
+      return get(/databases/$(database)/documents/requests/$(requestId));
+    }
+
+    function getDeliveryDoc(deliveryId) {
+      return get(/databases/$(database)/documents/deliveries/$(deliveryId));
+    }
+
+    function isRequestParticipantById(requestId) {
+      return isAuthenticated() && (
+        isAdmin() ||
+        isOwner(getRequestDoc(requestId).data.requesterId) ||
+        isOwner(getRequestDoc(requestId).data.requesterUserId) ||
+        isOwner(getRequestDoc(requestId).data.matchedGillerId)
+      );
+    }
+
+    function isDeliveryParticipantById(deliveryId) {
+      return isAuthenticated() && (
+        isAdmin() ||
+        isOwner(getDeliveryDoc(deliveryId).data.gillerId) ||
+        isOwner(getDeliveryDoc(deliveryId).data.gllerId) ||
+        isOwner(getDeliveryDoc(deliveryId).data.requesterId) ||
+        isOwner(getDeliveryDoc(deliveryId).data.requesterUserId)
+      );
+    }
+
+    function isChatRoomParticipant(roomId) {
+      return isAuthenticated() && (
+        get(/databases/$(database)/documents/chatRooms/$(roomId)).data.participants.user1.userId == request.auth.uid ||
+        get(/databases/$(database)/documents/chatRooms/$(roomId)).data.participants.user2.userId == request.auth.uid
+      );
+    }
+
     // ==================== Config Collections (Read-Only, Public) ====================
 
     match /config_stations/{stationId} {
@@ -114,6 +148,50 @@ service cloud.firestore {
       allow delete: if isAdmin();
     }
 
+    // ==================== Wallet / Payment Collections ====================
+
+    match /point_transactions/{transactionId} {
+      allow read: if isAuthenticated() &&
+        (isAdmin() || isOwner(resource.data.userId));
+
+      allow create: if isAuthenticated() &&
+        isOwner(request.resource.data.userId);
+
+      allow update, delete: if isAdmin();
+    }
+
+    match /withdraw_requests/{withdrawRequestId} {
+      allow read: if isAuthenticated() &&
+        (isAdmin() || isOwner(resource.data.userId));
+
+      allow create: if isAuthenticated() &&
+        isOwner(request.resource.data.userId);
+
+      allow update, delete: if isAdmin();
+    }
+
+    match /payments/{paymentId} {
+      allow read: if isAuthenticated() &&
+        (isAdmin() ||
+         isOwner(resource.data.userId) ||
+         isOwner(resource.data.gillerId) ||
+         isOwner(resource.data.gllerId));
+
+      allow create: if isAuthenticated() &&
+        (isOwner(request.resource.data.userId) ||
+         isOwner(request.resource.data.gillerId) ||
+         isOwner(request.resource.data.gllerId));
+
+      allow update, delete: if isAdmin();
+    }
+
+    match /settlements/{settlementId} {
+      allow read: if isAuthenticated() &&
+        (isAdmin() || isOwner(resource.data.gillerId) || isOwner(resource.data.userId));
+
+      allow create, update, delete: if isAdmin();
+    }
+
     // ==================== Routes Collection ====================
 
     match /routes/{routeId} {
@@ -128,6 +206,127 @@ service cloud.firestore {
 
       // 삭제: 본인만
       allow delete: if isOwner(resource.data.userId);
+    }
+
+    // ==================== Beta1 Collections ====================
+
+    match /request_drafts/{requestDraftId} {
+      allow read: if isAuthenticated() &&
+        (isAdmin() || isOwner(resource.data.requesterUserId));
+
+      allow create: if isAuthenticated() &&
+        isOwner(request.resource.data.requesterUserId);
+
+      allow update, delete: if isAuthenticated() &&
+        (isAdmin() || isOwner(resource.data.requesterUserId));
+    }
+
+    match /ai_analyses/{aiAnalysisId} {
+      allow read: if isAuthenticated() &&
+        (isAdmin() || isOwner(resource.data.requesterUserId));
+
+      allow create: if isAuthenticated() &&
+        isOwner(request.resource.data.requesterUserId);
+
+      allow update: if isAuthenticated() &&
+        (isAdmin() || isOwner(resource.data.requesterUserId));
+
+      allow delete: if false;
+    }
+
+    match /pricing_quotes/{pricingQuoteId} {
+      allow read: if isAuthenticated() &&
+        (isAdmin() || isOwner(resource.data.requesterUserId));
+
+      allow create: if isAuthenticated() &&
+        isOwner(request.resource.data.requesterUserId);
+
+      allow update: if isAuthenticated() &&
+        (isAdmin() || isOwner(resource.data.requesterUserId));
+
+      allow delete: if false;
+    }
+
+    match /delivery_legs/{deliveryLegId} {
+      allow read: if isAuthenticated() &&
+        (isAdmin() ||
+         isRequestParticipantById(resource.data.requestId) ||
+         isDeliveryParticipantById(resource.data.deliveryId));
+
+      allow create: if isAuthenticated() &&
+        (isAdmin() ||
+         isRequestParticipantById(request.resource.data.requestId) ||
+         isDeliveryParticipantById(request.resource.data.deliveryId));
+
+      allow update: if isAuthenticated() &&
+        (isAdmin() ||
+         isRequestParticipantById(resource.data.requestId) ||
+         isDeliveryParticipantById(resource.data.deliveryId));
+
+      allow delete: if false;
+    }
+
+    match /handover_events/{handoverEventId} {
+      allow read: if isAuthenticated() &&
+        (isAdmin() ||
+         isRequestParticipantById(resource.data.requestId) ||
+         isDeliveryParticipantById(resource.data.deliveryId));
+
+      allow create, update: if isAuthenticated() &&
+        (isAdmin() ||
+         isRequestParticipantById(request.resource.data.requestId) ||
+         isDeliveryParticipantById(request.resource.data.deliveryId));
+
+      allow delete: if false;
+    }
+
+    match /missions/{missionId} {
+      allow read: if isAuthenticated() &&
+        (isAdmin() ||
+         isRequestParticipantById(resource.data.requestId) ||
+         isDeliveryParticipantById(resource.data.deliveryId) ||
+         isOwner(resource.data.assignedGillerUserId));
+
+      allow create: if isAuthenticated() &&
+        (isAdmin() ||
+         isRequestParticipantById(request.resource.data.requestId) ||
+         isDeliveryParticipantById(request.resource.data.deliveryId));
+
+      allow update: if isAuthenticated() &&
+        (isAdmin() ||
+         isRequestParticipantById(resource.data.requestId) ||
+         isDeliveryParticipantById(resource.data.deliveryId) ||
+         isOwner(resource.data.assignedGillerUserId));
+
+      allow delete: if false;
+    }
+
+    match /mission_bundles/{missionBundleId} {
+      allow read: if isAuthenticated() &&
+        (isAdmin() ||
+         isRequestParticipantById(resource.data.requestId) ||
+         isDeliveryParticipantById(resource.data.deliveryId));
+
+      allow create, update: if isAuthenticated() &&
+        (isAdmin() ||
+         isRequestParticipantById(request.resource.data.requestId) ||
+         isDeliveryParticipantById(request.resource.data.deliveryId));
+
+      allow delete: if false;
+    }
+
+    match /actor_selection_decisions/{decisionId} {
+      allow read: if isAuthenticated() &&
+        (isAdmin() ||
+         isRequestParticipantById(resource.data.requestId) ||
+         (resource.data.deliveryId != null && isDeliveryParticipantById(resource.data.deliveryId)));
+
+      allow create, update: if isAuthenticated() &&
+        (isAdmin() ||
+         isRequestParticipantById(request.resource.data.requestId) ||
+         (request.resource.data.deliveryId != null && isDeliveryParticipantById(request.resource.data.deliveryId)));
+
+      allow delete: if false;
     }
 
     // ==================== Requests Collection ====================
@@ -241,16 +440,6 @@ service cloud.firestore {
 
     // ==================== ChatRooms Collection ====================
 
-    match /chatRooms/{roomId} {
-      allow read: if isAuthenticated();
-      allow write: if isAuthenticated();
-    }
-
-    match /chatRooms/{roomId}/messages/{messageId} {
-      allow read: if isAuthenticated();
-      allow write: if isAuthenticated();
-    }
-
     // ==================== B2B Collections ====================
 
     match /b2b_requests/{requestId} {
@@ -348,34 +537,24 @@ service cloud.firestore {
 
     match /chatRooms/{chatRoomId} {
       // 읽기: 참여자만
-      allow read: if isAuthenticated() &&
-        (resource.data.participants.user1.userId == request.auth.uid ||
-         resource.data.participants.user2.userId == request.auth.uid);
+      allow read: if isChatRoomParticipant(chatRoomId);
 
       // 생성: 인증된 사용자
       allow create: if isAuthenticated();
 
       // 업데이트: 참여자만
-      allow update: if isAuthenticated() &&
-        (resource.data.participants.user1.userId == request.auth.uid ||
-         resource.data.participants.user2.userId == request.auth.uid);
+      allow update: if isChatRoomParticipant(chatRoomId);
 
       // 삭제: 참여자만
-      allow delete: if isAuthenticated() &&
-        (resource.data.participants.user1.userId == request.auth.uid ||
-         resource.data.participants.user2.userId == request.auth.uid);
+      allow delete: if isChatRoomParticipant(chatRoomId);
 
       // 메시지 하위 컬렉션
       match /messages/{messageId} {
         // 읽기: 채팅방 참여자만
-        allow read: if isAuthenticated() &&
-          (get(/databases/$(database)/documents/chatRooms/$(chatRoomId)).data.participants.user1.userId == request.auth.uid ||
-           get(/databases/$(database)/documents/chatRooms/$(chatRoomId)).data.participants.user2.userId == request.auth.uid);
+        allow read: if isChatRoomParticipant(chatRoomId);
 
         // 생성: 참여자만
-        allow create: if isAuthenticated() &&
-          (get(/databases/$(database)/documents/chatRooms/$(chatRoomId)).data.participants.user1.userId == request.auth.uid ||
-           get(/databases/$(database)/documents/chatRooms/$(chatRoomId)).data.participants.user2.userId == request.auth.uid);
+        allow create: if isChatRoomParticipant(chatRoomId);
 
         // 업데이트/삭제: 불가
         allow update, delete: if false;

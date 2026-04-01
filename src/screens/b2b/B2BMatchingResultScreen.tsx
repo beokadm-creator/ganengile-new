@@ -1,366 +1,282 @@
-/**
- * B2B Matching Result Screen
- * B2B 기업용 길러 매칭 결과 화면
- */
-// @ts-nocheck - Temporarily suppress TypeScript errors for rapid development
-
-import React, { useState, useEffect } from 'react';
+import { Ionicons } from '@expo/vector-icons';
+import { useNavigation, useRoute, type RouteProp } from '@react-navigation/native';
+import React, { useEffect, useMemo, useState } from 'react';
 import {
-  View,
-  Text,
-  StyleSheet,
-  ScrollView,
-  TouchableOpacity,
   ActivityIndicator,
   Alert,
-  Image,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
 } from 'react-native';
-import { useRoute, useNavigation } from '@react-navigation/native';
-import { Ionicons } from '@expo/vector-icons';
-import { requireUserId } from '../../services/firebase';
-import { matchingService } from '../../services/matching-service';
-import { professionalGillerService } from '../../services/ProfessionalGillerService';
-import { gradeService } from '../../services/grade-service';
-import { BadgeService } from '../../services/BadgeService';
-import type { MainStackNavigationProp } from '../../types/navigation';
-import type { GillerProfile } from '../../types/giller';
-import { Colors, Typography, Spacing, BorderRadius, Shadows } from '../../theme';
 
-interface RouteParams {
-  requestId: string;
-}
+import { BadgeService } from '../../services/BadgeService';
+import { acceptRequest, getMatchingResults } from '../../services/matching-service';
+import { calculateGrade, getGradeInfo } from '../../services/grade-service';
+import { BorderRadius, Colors, Shadows, Spacing, Typography } from '../../theme';
+import type { B2BStackNavigationProp, B2BStackParamList } from '../../types/navigation';
+import type { Badge } from '../../types/user';
 
 type MatchingStatus = 'searching' | 'found' | 'timeout' | 'failed';
+type MatchCandidate = Awaited<ReturnType<typeof getMatchingResults>>[number];
+type ScreenRoute = RouteProp<B2BStackParamList, 'B2BMatchingResult'>;
+
+const MATCH_TIMEOUT_MS = 30_000;
+
+function formatElapsed(seconds: number): string {
+  const minutes = Math.floor(seconds / 60);
+  const remainder = seconds % 60;
+  return `${minutes}:${String(remainder).padStart(2, '0')}`;
+}
+
+function SummaryCard({ label, value }: { label: string; value: string }) {
+  return (
+    <View style={styles.summaryCard}>
+      <Text style={styles.summaryLabel}>{label}</Text>
+      <Text style={styles.summaryValue}>{value}</Text>
+    </View>
+  );
+}
 
 export default function B2BMatchingResultScreen() {
-  const route = useRoute();
-  const navigation = useNavigation<MainStackNavigationProp>();
-  const { requestId } = (route.params as RouteParams) || {};
+  const navigation = useNavigation<B2BStackNavigationProp>();
+  const route = useRoute<ScreenRoute>();
+  const requestId = route.params?.requestId;
 
   const [status, setStatus] = useState<MatchingStatus>('searching');
   const [loading, setLoading] = useState(false);
-  const [giller, setGiller] = useState<GillerProfile | null>(null);
-  const [grade, setGrade] = useState<any>(null);
-  const [badges, setBadges] = useState<any[]>([]);
   const [elapsedTime, setElapsedTime] = useState(0);
+  const [selectedMatch, setSelectedMatch] = useState<MatchCandidate | null>(null);
+  const [badges, setBadges] = useState<Badge[]>([]);
+
+  const gradeInfo = useMemo(() => {
+    const completedDeliveries = selectedMatch?.completedDeliveries ?? 0;
+    return getGradeInfo(calculateGrade(completedDeliveries));
+  }, [selectedMatch]);
 
   useEffect(() => {
     if (!requestId) {
-      Alert.alert('오류', '요청 ID가 없습니다.');
+      Alert.alert('Error', 'Request id is missing.');
       navigation.goBack();
       return;
     }
 
-    startMatching();
+    let cancelled = false;
     const timer = setInterval(() => {
-      setElapsedTime((prev) => prev + 1);
+      setElapsedTime((previous) => previous + 1);
     }, 1000);
 
-    return () => clearInterval(timer);
-  }, [requestId]);
+    const timeout = setTimeout(() => {
+      if (!cancelled) {
+        setStatus((current) => (current === 'searching' ? 'timeout' : current));
+      }
+    }, MATCH_TIMEOUT_MS);
 
-  const startMatching = async () => {
-    try {
-      // B2B 요청에 대한 매칭 시작
-      const matchResult = await matchingService.findB2BMatchers(requestId);
+    const loadMatches = async () => {
+      try {
+        const matches = await getMatchingResults(requestId);
+        if (cancelled) {
+          return;
+        }
 
-      if (matchResult && matchResult.length > 0) {
-        // 첫 번째 매칭 결과 선택
-        const firstMatch = matchResult[0];
-        const gillerProfile = await matchingService.getGillerProfile(firstMatch.gillerId);
+        const firstMatch = matches[0];
+        if (!firstMatch) {
+          setStatus('timeout');
+          return;
+        }
 
-        if (gillerProfile) {
-          setGiller(gillerProfile);
+        setSelectedMatch(firstMatch);
+        const fetchedBadges = await BadgeService.getGillerBadges(firstMatch.gillerId);
 
-          // 길러 등급 정보 조회
-          const gillerGrade = await gradeService.getGillerGrade(firstMatch.gillerId);
-          setGrade(gillerGrade);
-
-          // 길러 배지 조회
-          const gillerBadges = await BadgeService.getGillerBadges(firstMatch.gillerId);
-          setBadges(gillerBadges);
-
+        if (!cancelled) {
+          setBadges(fetchedBadges);
           setStatus('found');
         }
-      } else {
-        // 30초 후 타임아웃
-        setTimeout(() => {
-          if (status === 'searching') {
-            setStatus('timeout');
-          }
-        }, 30000);
+      } catch (error) {
+        console.error('B2B matching error:', error);
+        if (!cancelled) {
+          setStatus('failed');
+        }
       }
-    } catch (error) {
-      console.error('Matching error:', error);
-      setStatus('failed');
-    }
-  };
+    };
+
+    void loadMatches();
+
+    return () => {
+      cancelled = true;
+      clearInterval(timer);
+      clearTimeout(timeout);
+    };
+  }, [navigation, requestId]);
 
   const handleAccept = async () => {
-    if (!giller) return;
+    if (!requestId || !selectedMatch) {
+      return;
+    }
 
     setLoading(true);
     try {
-      const userId = await requireUserId();
-      await matchingService.acceptB2BRequest(requestId, giller.gillerId, userId);
+      const result = await acceptRequest(requestId, selectedMatch.gillerId);
+      if (!result.success) {
+        throw new Error(result.message);
+      }
 
-      Alert.alert(
-        '매칭 완료',
-        '길러가 배정되었습니다. 배송을 시작합니다.',
-        [
-          {
-            text: '확인',
-            onPress: () => {
-              navigation.reset({
-                index: 0,
-                routes: [{ name: 'B2BDashboard' }],
-              });
-            },
+      Alert.alert('Assigned', 'The selected giller has been assigned.', [
+        {
+          text: 'OK',
+          onPress: () => {
+            navigation.reset({
+              index: 0,
+              routes: [{ name: 'B2BDashboard' }],
+            });
           },
-        ]
-      );
-    } catch (error: any) {
-      Alert.alert('매칭 실패', error.message || '매칭 수락에 실패했습니다.');
+        },
+      ]);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Failed to assign giller.';
+      Alert.alert('Assignment failed', message);
     } finally {
       setLoading(false);
     }
   };
 
-  const handleReject = () => {
-    Alert.alert(
-      '매칭 거절',
-      '다른 길러를 찾고 있습니다.',
-      [
-        {
-          text: '확인',
-          onPress: () => {
-            setElapsedTime(0);
-            startMatching();
-          },
-        },
-      ]
-    );
-  };
-
   const handleRetry = () => {
     setElapsedTime(0);
+    setSelectedMatch(null);
+    setBadges([]);
     setStatus('searching');
-    startMatching();
   };
 
-  const handleBack = () => {
-    navigation.goBack();
+  const handleReject = () => {
+    Alert.alert('Try another candidate', 'Search again for a different giller candidate.', [
+      { text: 'Cancel', style: 'cancel' },
+      { text: 'Retry', onPress: handleRetry },
+    ]);
   };
 
-  const formatTime = (seconds: number): string => {
-    const mins = Math.floor(seconds / 60);
-    const secs = seconds % 60;
-    return `${mins}:${secs.toString().padStart(2, '0')}`;
-  };
-
-  const getGradeColor = (gradeName: string): string => {
-    switch (gradeName) {
-      case '마스터 길러':
-        return Colors.premium;
-      case '전문 길러':
-        return Colors.primary;
-      default:
-        return Colors.text.secondary;
-    }
-  };
-
-  const getGradeIcon = (gradeName: string): string => {
-    switch (gradeName) {
-      case '마스터 길러':
-        return 'diamond';
-      case '전문 길러':
-        return 'star';
-      default:
-        return 'person';
-    }
-  };
-
-  const renderSearchingState = () => (
+  const renderSearching = () => (
     <View style={styles.centerContainer}>
-      <View style={styles.searchingContainer}>
-        <ActivityIndicator size="large" color={Colors.primary} />
-        <Text style={styles.searchingTitle}>길러를 찾고 있습니다</Text>
-        <Text style={styles.searchingTime}>{formatTime(elapsedTime)}</Text>
-        <Text style={styles.searchingSubtitle}>
-          평균 매칭 시간: 약 20초
-        </Text>
-      </View>
-      <TouchableOpacity style={styles.cancelButton} onPress={handleBack}>
-        <Text style={styles.cancelButtonText}>취소</Text>
+      <ActivityIndicator size="large" color={Colors.primary} />
+      <Text style={styles.title}>Searching for a giller</Text>
+      <Text style={styles.timer}>{formatElapsed(elapsedTime)}</Text>
+      <Text style={styles.subtitle}>We are checking route fit, ETA, and reliability.</Text>
+      <TouchableOpacity style={styles.secondaryButton} onPress={() => navigation.goBack()}>
+        <Text style={styles.secondaryButtonText}>Back</Text>
       </TouchableOpacity>
     </View>
   );
 
-  const renderFoundState = () => (
-    <ScrollView style={styles.foundContainer}>
+  const renderFound = () => (
+    <ScrollView style={styles.container} contentContainerStyle={styles.content}>
       <View style={styles.header}>
-        <Text style={styles.headerTitle}>길러를 찾았습니다!</Text>
-        <Text style={styles.headerSubtitle}>
-          {formatTime(elapsedTime)} 소요되었습니다.
-        </Text>
+        <Text style={styles.title}>Candidate found</Text>
+        <Text style={styles.subtitle}>Best available match after {formatElapsed(elapsedTime)}.</Text>
       </View>
 
-      <View style={styles.gillerCard}>
-        {/* 길러 프로필 사진 */}
-        <View style={styles.profileSection}>
-          <Image
-            source={
-              giller?.profilePhoto
-                ? { uri: giller.profilePhoto }
-                : require('../../assets/images/default-avatar.png')
-            }
-            style={styles.profilePhoto}
-          />
-          <View style={styles.profileInfo}>
-            <View style={styles.nameRow}>
-              <Text style={styles.gillerName}>{giller?.name || '길러'}</Text>
-              {grade && (
-                <View
-                  style={[
-                    styles.gradeBadge,
-                    { backgroundColor: getGradeColor(grade.name) },
-                  ]}
-                >
-                  <Ionicons
-                    name={getGradeIcon(grade.name) as any}
-                    size={14}
-                    color="#fff"
-                  />
-                  <Text style={styles.gradeText}>{grade.name}</Text>
-                </View>
-              )}
-            </View>
-
-            {/* 배지 표시 (최대 3개) */}
-            {badges.length > 0 && (
-              <View style={styles.badgesContainer}>
-                {badges.slice(0, 3).map((badge, index) => (
-                  <View key={index} style={styles.miniBadge}>
-                    <Text style={styles.miniBadgeText}>{badge.emoji}</Text>
-                  </View>
-                ))}
-                {badges.length > 3 && (
-                  <Text style={styles.moreBadgesText}>+{badges.length - 3}</Text>
-                )}
-              </View>
-            )}
-
-            <Text style={styles.gillerStats}>
-              완료 {giller?.completedDeliveries || 0}건 • 평점{' '}
-              {giller?.averageRating?.toFixed(1) || '0.0'}
-            </Text>
-          </View>
+      <View style={styles.card}>
+        <View style={styles.avatarWrap}>
+          <Ionicons name="person-circle-outline" size={72} color={Colors.primary} />
         </View>
 
-        {/* 등급별 혜택 */}
-        {grade && (
-          <View style={styles.benefitsSection}>
-            <Text style={styles.benefitsTitle}>등급 혜택</Text>
-            <View style={styles.benefitItem}>
-              <Ionicons name="checkmark-circle" size={18} color={Colors.success} />
-              <Text style={styles.benefitText}>
-                수수료 {grade.feeBonus ? `${grade.feeBonus * 100}% 할인` : '기본'}
-              </Text>
+        <Text style={styles.name}>{selectedMatch?.gillerName ?? 'Giller'}</Text>
+
+        <View style={styles.gradeChip}>
+          <Ionicons name="shield-checkmark" size={14} color="#fff" />
+          <Text style={styles.gradeChipText}>{gradeInfo.name}</Text>
+        </View>
+
+        <Text style={styles.statsText}>
+          Rating {(selectedMatch?.rating ?? 0).toFixed(1)} · Completed {(selectedMatch?.completedDeliveries ?? 0).toLocaleString()}
+        </Text>
+
+        <View style={styles.summaryGrid}>
+          <SummaryCard label="ETA" value={`${selectedMatch?.travelTime ?? 0} min`} />
+          <SummaryCard label="Transfers" value={`${selectedMatch?.transferCount ?? 0}`} />
+          <SummaryCard label="Congestion" value={selectedMatch?.congestion ?? '-'} />
+          <SummaryCard label="Est. fee" value={`${(selectedMatch?.estimatedFee ?? 0).toLocaleString()} KRW`} />
+        </View>
+
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Why this candidate</Text>
+          {(selectedMatch?.reasons ?? []).map((reason) => (
+            <View key={reason} style={styles.row}>
+              <Ionicons name="checkmark-circle" size={16} color={Colors.success} />
+              <Text style={styles.rowText}>{reason}</Text>
             </View>
-            <View style={styles.benefitItem}>
-              <Ionicons name="checkmark-circle" size={18} color={Colors.success} />
-              <Text style={styles.benefitText}>
-                우선 매칭 대상
-              </Text>
+          ))}
+        </View>
+
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Grade benefits</Text>
+          {gradeInfo.benefits.map((benefit) => (
+            <View key={benefit} style={styles.row}>
+              <Ionicons name="sparkles" size={16} color={Colors.primary} />
+              <Text style={styles.rowText}>{benefit}</Text>
+            </View>
+          ))}
+        </View>
+
+        {badges.length > 0 ? (
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>Badges</Text>
+            <View style={styles.badgesWrap}>
+              {badges.slice(0, 4).map((badge) => (
+                <View key={badge.id} style={styles.badgeChip}>
+                  <Text style={styles.badgeText}>{badge.name}</Text>
+                </View>
+              ))}
             </View>
           </View>
-        )}
+        ) : null}
       </View>
 
-      {/* 버튼 영역 */}
-      <View style={styles.buttonContainer}>
-        <TouchableOpacity
-          style={[styles.button, styles.rejectButton]}
-          onPress={handleReject}
-        >
-          <Text style={styles.rejectButtonText}>거절</Text>
+      <View style={styles.actionsRow}>
+        <TouchableOpacity style={styles.secondaryButton} onPress={handleReject}>
+          <Text style={styles.secondaryButtonText}>Find another</Text>
         </TouchableOpacity>
-        <TouchableOpacity
-          style={[styles.button, styles.acceptButton]}
-          onPress={handleAccept}
-          disabled={loading}
-        >
-          {loading ? (
-            <ActivityIndicator color="#fff" />
-          ) : (
-            <Text style={styles.acceptButtonText}>수락</Text>
-          )}
+        <TouchableOpacity style={styles.primaryButton} onPress={() => void handleAccept()} disabled={loading}>
+          {loading ? <ActivityIndicator color="#fff" /> : <Text style={styles.primaryButtonText}>Assign</Text>}
         </TouchableOpacity>
       </View>
     </ScrollView>
   );
 
-  const renderTimeoutState = () => (
+  const renderFallback = (icon: keyof typeof Ionicons.glyphMap, title: string, subtitle: string) => (
     <View style={styles.centerContainer}>
-      <View style={styles.errorContainer}>
-        <Ionicons name="time-outline" size={64} color={Colors.warning} />
-        <Text style={styles.errorTitle}>매칭 시간 초과</Text>
-        <Text style={styles.errorSubtitle}>
-          현재 이용 가능한 길러가 없습니다.
-        </Text>
-        <Text style={styles.errorNote}>
-          잠시 후 다시 시도해 주세요.
-        </Text>
-      </View>
-      <View style={styles.timeoutButtonContainer}>
-        <TouchableOpacity
-          style={[styles.button, styles.secondaryButton]}
-          onPress={handleBack}
-        >
-          <Text style={styles.secondaryButtonText}>돌아가기</Text>
+      <Ionicons name={icon} size={64} color={title === 'Match failed' ? Colors.error : Colors.warning} />
+      <Text style={styles.title}>{title}</Text>
+      <Text style={styles.subtitle}>{subtitle}</Text>
+      <View style={styles.actionsRow}>
+        <TouchableOpacity style={styles.secondaryButton} onPress={() => navigation.goBack()}>
+          <Text style={styles.secondaryButtonText}>Back</Text>
         </TouchableOpacity>
-        <TouchableOpacity
-          style={[styles.button, styles.primaryButton]}
-          onPress={handleRetry}
-        >
-          <Text style={styles.primaryButtonText}>다시 시도</Text>
+        <TouchableOpacity style={styles.primaryButton} onPress={handleRetry}>
+          <Text style={styles.primaryButtonText}>Retry</Text>
         </TouchableOpacity>
       </View>
     </View>
   );
 
-  const renderFailedState = () => (
-    <View style={styles.centerContainer}>
-      <View style={styles.errorContainer}>
-        <Ionicons name="alert-circle-outline" size={64} color={Colors.error} />
-        <Text style={styles.errorTitle}>매칭 실패</Text>
-        <Text style={styles.errorSubtitle}>
-          오류가 발생했습니다.
-        </Text>
+  if (status === 'searching') {
+    return <View style={styles.container}>{renderSearching()}</View>;
+  }
+
+  if (status === 'found') {
+    return renderFound();
+  }
+
+  if (status === 'timeout') {
+    return (
+      <View style={styles.container}>
+        {renderFallback('time-outline', 'Match timeout', 'No available giller was found in the current window.')}
       </View>
-      <View style={styles.timeoutButtonContainer}>
-        <TouchableOpacity
-          style={[styles.button, styles.secondaryButton]}
-          onPress={handleBack}
-        >
-          <Text style={styles.secondaryButtonText}>돌아가기</Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={[styles.button, styles.primaryButton]}
-          onPress={handleRetry}
-        >
-          <Text style={styles.primaryButtonText}>다시 시도</Text>
-        </TouchableOpacity>
-      </View>
-    </View>
-  );
+    );
+  }
 
   return (
     <View style={styles.container}>
-      {status === 'searching' && renderSearchingState()}
-      {status === 'found' && renderFoundState()}
-      {status === 'timeout' && renderTimeoutState()}
-      {status === 'failed' && renderFailedState()}
+      {renderFallback('alert-circle-outline', 'Match failed', 'Please try again after checking the request data.')}
     </View>
   );
 }
@@ -368,204 +284,136 @@ export default function B2BMatchingResultScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: Colors.background.primary,
+    backgroundColor: Colors.background,
+  },
+  content: {
+    padding: Spacing.lg,
+    gap: Spacing.lg,
   },
   centerContainer: {
     flex: 1,
+    alignItems: 'center',
     justifyContent: 'center',
-    alignItems: 'center',
-    padding: Spacing.lg,
-  },
-  searchingContainer: {
-    alignItems: 'center',
-    marginBottom: Spacing.xl,
-  },
-  searchingTitle: {
-    ...Typography.h2,
-    color: Colors.text.primary,
-    marginTop: Spacing.lg,
-  },
-  searchingTime: {
-    ...Typography.h1,
-    color: Colors.primary,
-    marginTop: Spacing.md,
-  },
-  searchingSubtitle: {
-    ...Typography.body2,
-    color: Colors.text.secondary,
-    marginTop: Spacing.sm,
-  },
-  cancelButton: {
-    paddingHorizontal: Spacing.xl,
-    paddingVertical: Spacing.md,
-    borderRadius: BorderRadius.md,
-    backgroundColor: Colors.background.secondary,
-  },
-  cancelButtonText: {
-    ...Typography.body1,
-    color: Colors.text.primary,
-  },
-  foundContainer: {
-    flex: 1,
-  },
-  header: {
     padding: Spacing.xl,
-    alignItems: 'center',
-  },
-  headerTitle: {
-    ...Typography.h2,
-    color: Colors.text.primary,
-    marginBottom: Spacing.sm,
-  },
-  headerSubtitle: {
-    ...Typography.body2,
-    color: Colors.text.secondary,
-  },
-  gillerCard: {
-    margin: Spacing.md,
-    padding: Spacing.lg,
-    backgroundColor: '#fff',
-    borderRadius: BorderRadius.lg,
-    ...Shadows.md,
-  },
-  profileSection: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    marginBottom: Spacing.lg,
-  },
-  profilePhoto: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
-    marginRight: Spacing.md,
-  },
-  profileInfo: {
-    flex: 1,
-  },
-  nameRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: Spacing.sm,
-  },
-  gillerName: {
-    ...Typography.h3,
-    color: Colors.text.primary,
-    marginRight: Spacing.sm,
-  },
-  gradeBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: Spacing.sm,
-    paddingVertical: Spacing.xs,
-    borderRadius: BorderRadius.sm,
-  },
-  gradeText: {
-    ...Typography.bodySmall,
-    color: '#fff',
-    marginLeft: Spacing.xs,
-  },
-  badgesContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: Spacing.xs,
-  },
-  miniBadge: {
-    width: 24,
-    height: 24,
-    borderRadius: 12,
-    backgroundColor: Colors.background.secondary,
-    marginRight: Spacing.xs,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  miniBadgeText: {
-    fontSize: 12,
-  },
-  moreBadgesText: {
-    ...Typography.bodySmall,
-    color: Colors.text.secondary,
-  },
-  gillerStats: {
-    ...Typography.body2,
-    color: Colors.text.secondary,
-  },
-  benefitsSection: {
-    borderTopWidth: 1,
-    borderTopColor: Colors.border,
-    paddingTop: Spacing.md,
-  },
-  benefitsTitle: {
-    ...Typography.body1,
-    fontWeight: 'bold',
-    color: Colors.text.primary,
-    marginBottom: Spacing.sm,
-  },
-  benefitItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: Spacing.xs,
-  },
-  benefitText: {
-    ...Typography.body2,
-    color: Colors.text.primary,
-    marginLeft: Spacing.sm,
-  },
-  buttonContainer: {
-    flexDirection: 'row',
-    padding: Spacing.md,
     gap: Spacing.md,
   },
-  button: {
-    flex: 1,
-    paddingVertical: Spacing.md,
-    borderRadius: BorderRadius.md,
-    alignItems: 'center',
-    justifyContent: 'center',
+  header: {
+    gap: Spacing.xs,
   },
-  rejectButton: {
-    backgroundColor: Colors.background.secondary,
-  },
-  rejectButtonText: {
-    ...Typography.body1,
-    color: Colors.text.primary,
-  },
-  acceptButton: {
-    backgroundColor: Colors.primary,
-  },
-  acceptButtonText: {
-    ...Typography.body1,
-    color: '#fff',
-    fontWeight: 'bold',
-  },
-  errorContainer: {
-    alignItems: 'center',
-    marginBottom: Spacing.xl,
-  },
-  errorTitle: {
+  title: {
     ...Typography.h2,
     color: Colors.text.primary,
-    marginTop: Spacing.lg,
+    textAlign: 'center',
   },
-  errorSubtitle: {
-    ...Typography.body1,
-    color: Colors.text.secondary,
-    marginTop: Spacing.sm,
-  },
-  errorNote: {
+  subtitle: {
     ...Typography.body2,
-    color: Colors.text.tertiary,
-    marginTop: Spacing.sm,
+    color: Colors.text.secondary,
+    textAlign: 'center',
   },
-  timeoutButtonContainer: {
+  timer: {
+    ...Typography.h1,
+    color: Colors.primary,
+  },
+  card: {
+    backgroundColor: '#fff',
+    borderRadius: BorderRadius.lg,
+    padding: Spacing.lg,
+    gap: Spacing.lg,
+    ...Shadows.md,
+  },
+  avatarWrap: {
+    alignItems: 'center',
+  },
+  name: {
+    ...Typography.h3,
+    color: Colors.text.primary,
+    textAlign: 'center',
+  },
+  gradeChip: {
+    alignSelf: 'center',
     flexDirection: 'row',
-    width: '100%',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: Spacing.sm,
+    paddingVertical: 6,
+    borderRadius: BorderRadius.full,
+    backgroundColor: Colors.primary,
+  },
+  gradeChipText: {
+    ...Typography.bodySmall,
+    color: '#fff',
+  },
+  statsText: {
+    ...Typography.body2,
+    color: Colors.text.secondary,
+    textAlign: 'center',
+  },
+  summaryGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: Spacing.sm,
+  },
+  summaryCard: {
+    width: '48%',
+    backgroundColor: Colors.gray100,
+    borderRadius: BorderRadius.md,
+    padding: Spacing.md,
+    gap: 4,
+  },
+  summaryLabel: {
+    ...Typography.bodySmall,
+    color: Colors.text.secondary,
+  },
+  summaryValue: {
+    ...Typography.body1,
+    color: Colors.text.primary,
+    fontWeight: '700',
+  },
+  section: {
+    gap: Spacing.sm,
+  },
+  sectionTitle: {
+    ...Typography.body1,
+    color: Colors.text.primary,
+    fontWeight: '700',
+  },
+  row: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.sm,
+  },
+  rowText: {
+    ...Typography.body2,
+    color: Colors.text.primary,
+    flex: 1,
+  },
+  badgesWrap: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: Spacing.sm,
+  },
+  badgeChip: {
+    paddingHorizontal: Spacing.sm,
+    paddingVertical: 8,
+    borderRadius: BorderRadius.full,
+    backgroundColor: Colors.gray100,
+  },
+  badgeText: {
+    ...Typography.bodySmall,
+    color: Colors.text.primary,
+  },
+  actionsRow: {
+    flexDirection: 'row',
     gap: Spacing.md,
   },
   secondaryButton: {
     flex: 1,
-    paddingVertical: Spacing.md,
+    alignItems: 'center',
+    justifyContent: 'center',
     borderRadius: BorderRadius.md,
-    backgroundColor: Colors.background.secondary,
+    backgroundColor: Colors.gray100,
+    paddingVertical: Spacing.md,
+    paddingHorizontal: Spacing.lg,
   },
   secondaryButtonText: {
     ...Typography.body1,
@@ -573,13 +421,16 @@ const styles = StyleSheet.create({
   },
   primaryButton: {
     flex: 1,
-    paddingVertical: Spacing.md,
+    alignItems: 'center',
+    justifyContent: 'center',
     borderRadius: BorderRadius.md,
     backgroundColor: Colors.primary,
+    paddingVertical: Spacing.md,
+    paddingHorizontal: Spacing.lg,
   },
   primaryButtonText: {
     ...Typography.body1,
     color: '#fff',
-    fontWeight: 'bold',
+    fontWeight: '700',
   },
 });

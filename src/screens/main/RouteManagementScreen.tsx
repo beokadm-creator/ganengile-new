@@ -1,9 +1,4 @@
-/**
- * Route Management Screen (동선 관리)
- * 등록된 동선을 관리하는 화면
- */
-
-import React, { useState, useCallback, useEffect } from 'react';
+﻿import React, { useCallback, useState } from 'react';
 import {
   View,
   Text,
@@ -12,400 +7,180 @@ import {
   ActivityIndicator,
   Alert,
   Platform,
+  ScrollView,
 } from 'react-native';
-import { useNavigation, useFocusEffect, useRoute } from '@react-navigation/native';
+import { StackActions, useFocusEffect, useNavigation } from '@react-navigation/native';
 import { requireUserId } from '../../services/firebase';
-import { getUserRoutes, deleteRoute } from '../../services/route-service';
+import { deleteRoute, getUserRoutes } from '../../services/route-service';
 import { DAY_LABELS } from '../../components/common/DaySelector';
 import type { Route } from '../../types/route';
+import type { MainStackNavigationProp } from '../../types/navigation';
 import { Colors, Spacing, BorderRadius, Typography } from '../../theme';
 
 const MAX_ROUTES = 5;
 
 export default function RouteManagementScreen() {
-  const navigation = useNavigation();
-  const route = useRoute<any>();
+  const navigation = useNavigation<MainStackNavigationProp>();
   const [routes, setRoutes] = useState<Route[]>([]);
   const [loading, setLoading] = useState(true);
-  const [, setRefreshing] = useState(false);
 
-  useEffect(() => {
-    const addedRouteId = route?.params?.justAddedRouteId;
-    if (!addedRouteId) return;
-    Alert.alert('등록 확인', '동선이 정상적으로 등록되었습니다. 목록에서 바로 확인할 수 있습니다.');
-    (navigation as any).setParams?.({ justAddedRouteId: undefined });
-  }, [route?.params?.justAddedRouteId]);
-
-  const loadRoutes = async () => {
+  const loadRoutes = useCallback(async () => {
     try {
       setLoading(true);
-      const userId = await requireUserId();
+      const userId = requireUserId();
       const userRoutes = await getUserRoutes(userId);
-      
-      // 활성화된 동선만 표시, 최신순 정렬
       const activeRoutes = userRoutes
-        .filter((route) => route.isActive)
+        .filter((item) => item.isActive)
         .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
-      
+
       setRoutes(activeRoutes);
-    } catch (error: any) {
-      console.error('Error loading routes:', error);
-      Alert.alert('오류', '동선 목록을 불러오는데 실패했습니다.');
+    } catch (error) {
+      console.error('경로 목록 조회 실패:', error);
+      Alert.alert('경로 목록을 불러오지 못했습니다', '잠시 후 다시 시도해 주세요.');
     } finally {
       setLoading(false);
-      setRefreshing(false);
     }
-  };
+  }, []);
 
   useFocusEffect(
     useCallback(() => {
-      loadRoutes();
-    }, [])
+      void loadRoutes();
+    }, [loadRoutes]),
   );
 
-  const _onRefresh = () => {
-    setRefreshing(true);
-    loadRoutes();
-  };
-
-  const handleDelete = async (routeId: string, routeName: string) => {
+  const handleDelete = (routeId: string, routeName: string) => {
     const executeDelete = async () => {
       try {
-        const userId = await requireUserId();
+        const userId = requireUserId();
         const deleted = await deleteRoute(routeId, userId);
 
         if (!deleted) {
-          Alert.alert('삭제 실패', '권한이 없거나 이미 삭제된 동선입니다.');
+          Alert.alert('경로를 삭제할 수 없습니다', '이미 삭제되었거나 권한이 없습니다.');
           return;
         }
 
-        Alert.alert('성공', '동선이 삭제되었습니다.');
+        Alert.alert('경로를 삭제했습니다');
         await loadRoutes();
-      } catch (error: any) {
-        console.error('Error deleting route:', error);
-        Alert.alert('오류', '동선 삭제에 실패했습니다.');
+      } catch (error) {
+        console.error('경로 삭제 실패:', error);
+        Alert.alert('경로 삭제에 실패했습니다', '잠시 후 다시 시도해 주세요.');
       }
     };
 
     if (Platform.OS === 'web') {
-      const confirmed = window.confirm(`${routeName} 동선을 삭제하시겠습니까?`);
+      const confirmed = window.confirm(`${routeName} 경로를 삭제할까요?`);
       if (confirmed) {
         void executeDelete();
       }
       return;
     }
 
-    Alert.alert('동선 삭제', `${routeName} 동선을 삭제하시겠습니까?`, [
+    Alert.alert('경로 삭제', `${routeName} 경로를 삭제할까요?`, [
       { text: '취소', style: 'cancel' },
-      {
-        text: '삭제',
-        style: 'destructive',
-        onPress: () => {
-          void executeDelete();
-        },
-      },
+      { text: '삭제', style: 'destructive', onPress: () => void executeDelete() },
     ]);
-  };
-
-  const handleEdit = (route: Route) => {
-    (navigation as any).navigate('EditRoute', { routeId: route.routeId });
-  };
-
-  const renderRouteCard = (route: Route) => {
-    const daysText = route.daysOfWeek.map((d) => DAY_LABELS[d]).join(', ');
-    const routeName = `${route.startStation.stationName} → ${route.endStation.stationName}`;
-
-    return (
-      <View key={route.routeId} style={styles.routeCard}>
-        {/* 경로 이름 */}
-        <View style={styles.routeHeader}>
-          <View style={styles.routeIconContainer}>
-            <Text style={styles.routeIcon}>🚇</Text>
-          </View>
-          <View style={styles.routeInfo}>
-            <Text style={styles.routeName}>{routeName}</Text>
-            <View style={styles.routeMeta}>
-              <View style={styles.timeTag}>
-                <Text style={styles.timeIcon}>⏰</Text>
-                <Text style={styles.timeText}>{route.departureTime}</Text>
-              </View>
-              <View style={styles.daysBadge}>
-                <Text style={styles.daysText}>{daysText}</Text>
-              </View>
-            </View>
-          </View>
-        </View>
-
-        {/* 역 정보 */}
-        <View style={styles.stationsContainer}>
-          <View style={styles.stationInfo}>
-            <View style={styles.stationDot} />
-            <Text style={styles.stationName}>{route.startStation.stationName}</Text>
-          </View>
-
-          <View style={styles.connector}>
-            <View style={styles.connectorLine} />
-            <Text style={styles.connectorIcon}>↓</Text>
-          </View>
-
-          <View style={styles.stationInfo}>
-            <View style={[styles.stationDot, { backgroundColor: Colors.secondary }]} />
-            <Text style={styles.stationName}>{route.endStation.stationName}</Text>
-          </View>
-        </View>
-
-        {/* 액션 버튼들 */}
-        <View style={styles.actionButtons}>
-          <TouchableOpacity
-            style={[styles.actionButton, styles.editActionButton]}
-            onPress={() => handleEdit(route)}
-          >
-            <Text style={styles.actionIcon}>✏️</Text>
-            <Text style={styles.editActionButtonText}>수정</Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={[styles.actionButton, styles.deleteActionButton]}
-            onPress={() => handleDelete(route.routeId, routeName)}
-          >
-            <Text style={styles.actionIcon}>🗑️</Text>
-            <Text style={styles.deleteActionButtonText}>삭제</Text>
-          </TouchableOpacity>
-        </View>
-      </View>
-    );
   };
 
   if (loading) {
     return (
       <View style={styles.centerContainer}>
         <ActivityIndicator size="large" color={Colors.primary} />
-        <Text style={styles.loadingText}>동선 목록 불러오는 중...</Text>
+        <Text style={styles.loadingText}>등록한 경로를 불러오는 중입니다.</Text>
       </View>
     );
   }
 
   return (
     <View style={styles.container}>
-      {/* Header */}
       <View style={styles.header}>
-        <Text style={styles.title}>동선 관리</Text>
+        <Text style={styles.title}>경로 관리</Text>
         <Text style={styles.subtitle}>
-          {routes.length} / {MAX_ROUTES}개 등록됨
+          {routes.length} / {MAX_ROUTES}개의 경로를 사용 중입니다.
         </Text>
       </View>
 
-      {/* 동선 목록 */}
       {routes.length === 0 ? (
         <View style={styles.centerContainer}>
-          <Text style={styles.emptyIcon}>🚇</Text>
-          <Text style={styles.emptyTitle}>등록된 동선이 없습니다</Text>
+          <Text style={styles.emptyIcon}>경로 없음</Text>
+          <Text style={styles.emptyTitle}>등록된 경로가 아직 없습니다</Text>
           <Text style={styles.emptySubtitle}>
-            출퇴근 경로를 등록하고 매칭받으세요
+            자주 이동하는 출퇴근 동선을 등록하면 미션 추천과 배정 판단이 더 빨라집니다.
           </Text>
-          <TouchableOpacity
-            style={styles.addButton}
-            onPress={() => {
-              console.log('동선 등록하기 버튼 클릭됨');
-              navigation.navigate('AddRoute' as never);
-            }}
-          >
-            <Text style={styles.addButtonIcon}>➕</Text>
-            <Text style={styles.addButtonText}>동선 등록하기</Text>
+          <TouchableOpacity style={styles.addButton} onPress={() => navigation.dispatch(StackActions.push('AddRoute'))}>
+            <Text style={styles.addButtonText}>寃쎈줈 ?깅줉?섍린</Text>
           </TouchableOpacity>
         </View>
       ) : (
-        <View style={styles.listContainer}>
-          {routes.map((route) => renderRouteCard(route))}
-          
-          {/* 최대 5개 안내 */}
-          {routes.length >= MAX_ROUTES && (
+        <ScrollView contentContainerStyle={styles.listContainer}>
+          {routes.map((item) => {
+            const routeName = `${item.startStation.stationName} ??${item.endStation.stationName}`;
+            return (
+              <View key={item.routeId} style={styles.routeCard}>
+                <View style={styles.routeHeader}>
+                  <Text style={styles.routeName}>{routeName}</Text>
+                  <Text style={styles.routeTime}>{item.departureTime} 異쒕컻</Text>
+                </View>
+
+                <Text style={styles.routeDays}>{item.daysOfWeek.map((day) => DAY_LABELS[day]).join(', ')}</Text>
+
+                <View style={styles.actionButtons}>
+                  <TouchableOpacity
+                    style={[styles.actionButton, styles.editActionButton]}
+                    onPress={() => navigation.dispatch(StackActions.push('EditRoute', { routeId: item.routeId }))}
+                  >
+                    <Text style={styles.editActionButtonText}>?섏젙</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={[styles.actionButton, styles.deleteActionButton]}
+                    onPress={() => handleDelete(item.routeId, routeName)}
+                  >
+                    <Text style={styles.deleteActionButtonText}>??젣</Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+            );
+          })}
+
+          {routes.length >= MAX_ROUTES ? (
             <View style={styles.limitBanner}>
-              <Text style={styles.limitIcon}>ℹ️</Text>
-              <Text style={styles.limitText}>
-                최대 {MAX_ROUTES}개의 동선만 등록할 수 있습니다
-              </Text>
+              <Text style={styles.limitText}>理쒕? 5媛쒖쓽 寃쎈줈源뚯? ?깅줉?????덉뒿?덈떎.</Text>
             </View>
-          )}
-        </View>
+          ) : null}
+        </ScrollView>
       )}
 
-      {/* 동선 추가 버튼 (FAB) */}
-      {routes.length < MAX_ROUTES && (
-        <TouchableOpacity
-          style={styles.fab}
-          onPress={() => {
-            console.log('FAB 버튼 클릭됨');
-            navigation.navigate('AddRoute' as never);
-          }}
-        >
-          <Text style={styles.fabIcon}>➕</Text>
+      {routes.length < MAX_ROUTES ? (
+        <TouchableOpacity style={styles.fab} onPress={() => navigation.dispatch(StackActions.push('AddRoute'))}>
+          <Text style={styles.fabLabel}>+</Text>
         </TouchableOpacity>
-      )}
+      ) : null}
     </View>
   );
 }
 
 const styles = StyleSheet.create({
+  container: {
+    backgroundColor: Colors.gray50,
+    flex: 1,
+  },
   centerContainer: {
     alignItems: 'center',
     flex: 1,
     justifyContent: 'center',
     padding: Spacing.lg,
   },
-  container: {
-    backgroundColor: Colors.gray50,
-    flex: 1,
-  },
-  connector: {
-    alignItems: 'center',
-    marginVertical: Spacing.xs,
-  },
-  connectorLine: {
-    backgroundColor: Colors.gray300,
-    height: 20,
-    width: 2,
-  },
-  daysBadge: {
-    backgroundColor: Colors.secondaryLight,
-    borderRadius: BorderRadius.sm,
-    paddingHorizontal: Spacing.sm,
-    paddingVertical: Spacing.xs,
-  },
-  daysText: {
-    color: Colors.secondary,
-    fontSize: Typography.fontSize.xs,
-    fontWeight: Typography.fontWeight.semibold as any,
-  },
-  emptySubtitle: {
-    color: Colors.gray500,
-    fontSize: Typography.fontSize.base,
-    marginTop: Spacing.sm,
-    textAlign: 'center',
-  },
-  emptyTitle: {
-    color: Colors.gray700,
-    fontSize: Typography.fontSize.lg,
-    fontWeight: Typography.fontWeight.bold as any,
-    marginBottom: Spacing.xs,
-  },
-  fab: {
-    alignItems: 'center',
-    backgroundColor: Colors.primary,
-    borderRadius: 28,
-    bottom: 24,
-    elevation: 8,
-    height: 56,
-    justifyContent: 'center',
-    position: 'absolute',
-    right: 24,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    width: 56,
-  },
-  addButton: {
-    alignItems: 'center',
-    backgroundColor: Colors.primary,
-    borderRadius: BorderRadius.sm,
-    flexDirection: 'row',
-    gap: Spacing.sm,
-    marginTop: Spacing.md,
-    paddingHorizontal: Spacing.lg,
-    paddingVertical: Spacing.md,
-  },
-  addButtonText: {
-    color: Colors.white,
-    fontSize: Typography.fontSize.base,
-    fontWeight: Typography.fontWeight.semibold as any,
-  },
   header: {
     backgroundColor: Colors.primary,
     borderBottomLeftRadius: BorderRadius.lg,
     borderBottomRightRadius: BorderRadius.lg,
+    paddingBottom: Spacing.lg,
     paddingHorizontal: Spacing.lg,
     paddingTop: 60,
-    paddingBottom: Spacing.lg,
   },
-  limitBanner: {
-    alignItems: 'center',
-    backgroundColor: Colors.accentLight,
-    borderRadius: BorderRadius.sm,
-    flexDirection: 'row',
-    gap: Spacing.sm,
-    marginHorizontal: Spacing.md,
-    marginTop: Spacing.md,
-    padding: Spacing.md,
-  },
-  limitText: {
-    color: Colors.accent,
-    fontSize: Typography.fontSize.sm,
-    flex: 1,
-  },
-  listContainer: {
-    padding: Spacing.md,
-  },
-  loadingText: {
-    color: Colors.gray600,
-    fontSize: Typography.fontSize.base,
-    marginTop: Spacing.md,
-  },
-  routeCard: {
-    backgroundColor: Colors.white,
-    borderRadius: BorderRadius.md,
-    elevation: 2,
-    marginBottom: Spacing.md,
-    padding: Spacing.md,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-  },
-  routeHeader: {
-    flexDirection: 'row',
-    gap: Spacing.md,
-    marginBottom: Spacing.md,
-  },
-  routeIconContainer: {
-    alignItems: 'center',
-    backgroundColor: Colors.primaryLight,
-    borderRadius: 20,
-    height: 40,
-    justifyContent: 'center',
-    width: 40,
-  },
-  routeInfo: {
-    flex: 1,
-  },
-  routeMeta: {
-    alignItems: 'center',
-    flexDirection: 'row',
-    gap: Spacing.sm,
-    marginTop: Spacing.xs,
-  },
-  routeName: {
-    color: Colors.textPrimary,
-    fontSize: Typography.fontSize.lg,
-    fontWeight: Typography.fontWeight.bold as any,
-  },
-  stationDot: {
-    backgroundColor: Colors.primary,
-    borderRadius: 6,
-    height: 12,
-    width: 12,
-  },
-  stationInfo: {
-    alignItems: 'center',
-    flexDirection: 'row',
-    gap: Spacing.sm,
-    paddingVertical: Spacing.xs,
-  },
-  stationName: {
-    color: Colors.textPrimary,
-    fontSize: Typography.fontSize.sm,
-  },
-  stationsContainer: {
-    paddingLeft: 52,
+  title: {
+    color: Colors.white,
+    fontSize: Typography.fontSize['2xl'],
+    fontWeight: Typography.fontWeight.bold,
   },
   subtitle: {
     color: Colors.white,
@@ -413,90 +188,134 @@ const styles = StyleSheet.create({
     marginTop: Spacing.xs,
     opacity: 0.9,
   },
-  timeTag: {
-    alignItems: 'center',
-    backgroundColor: Colors.gray100,
-    borderRadius: 4,
-    flexDirection: 'row',
-    gap: 4,
-    paddingHorizontal: Spacing.xs,
-    paddingVertical: 2,
-  },
-  timeText: {
+  loadingText: {
     color: Colors.gray600,
-    fontSize: Typography.fontSize.xs,
+    fontSize: Typography.fontSize.base,
+    marginTop: Spacing.md,
   },
-  title: {
+  emptyIcon: {
+    color: Colors.primary,
+    fontSize: Typography.fontSize.lg,
+    fontWeight: Typography.fontWeight.bold,
+    marginBottom: Spacing.md,
+  },
+  emptyTitle: {
+    color: Colors.gray700,
+    fontSize: Typography.fontSize.lg,
+    fontWeight: Typography.fontWeight.bold,
+    marginBottom: Spacing.xs,
+  },
+  emptySubtitle: {
+    color: Colors.gray500,
+    fontSize: Typography.fontSize.base,
+    marginTop: Spacing.sm,
+    textAlign: 'center',
+  },
+  addButton: {
+    alignItems: 'center',
+    backgroundColor: Colors.primary,
+    borderRadius: BorderRadius.sm,
+    marginTop: Spacing.lg,
+    paddingHorizontal: Spacing.lg,
+    paddingVertical: Spacing.md,
+  },
+  addButtonText: {
     color: Colors.white,
-    fontSize: Typography.fontSize['2xl'],
-    fontWeight: Typography.fontWeight.bold as any,
+    fontSize: Typography.fontSize.base,
+    fontWeight: Typography.fontWeight.semibold,
+  },
+  listContainer: {
+    padding: Spacing.md,
+  },
+  routeCard: {
+    backgroundColor: Colors.white,
+    borderRadius: BorderRadius.md,
+    marginBottom: Spacing.md,
+    padding: Spacing.md,
+  },
+  routeHeader: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: Spacing.sm,
+  },
+  routeName: {
+    color: Colors.textPrimary,
+    flex: 1,
+    fontSize: Typography.fontSize.lg,
+    fontWeight: Typography.fontWeight.bold,
+  },
+  routeTime: {
+    color: Colors.primary,
+    fontSize: Typography.fontSize.sm,
+    fontWeight: Typography.fontWeight.semibold,
+  },
+  routeDays: {
+    color: Colors.textSecondary,
+    fontSize: Typography.fontSize.sm,
   },
   actionButtons: {
+    borderTopColor: Colors.gray200,
+    borderTopWidth: 1,
     flexDirection: 'row',
     gap: Spacing.sm,
     marginTop: Spacing.md,
     paddingTop: Spacing.md,
-    borderTopWidth: 1,
-    borderTopColor: Colors.gray200,
   },
   actionButton: {
-    flex: 1,
-    flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
-    gap: Spacing.xs,
-    paddingVertical: Spacing.sm,
     borderRadius: BorderRadius.sm,
+    flex: 1,
+    justifyContent: 'center',
+    paddingVertical: Spacing.sm,
   },
   editActionButton: {
     backgroundColor: Colors.primaryLight,
-    borderWidth: 1,
     borderColor: Colors.primary,
+    borderWidth: 1,
   },
   editActionButtonText: {
     color: Colors.primary,
     fontSize: Typography.fontSize.sm,
-    fontWeight: Typography.fontWeight.semibold as any,
+    fontWeight: Typography.fontWeight.semibold,
   },
   deleteActionButton: {
     backgroundColor: '#ffebee',
-    borderWidth: 1,
     borderColor: '#f44336',
+    borderWidth: 1,
   },
   deleteActionButtonText: {
     color: '#f44336',
     fontSize: Typography.fontSize.sm,
-    fontWeight: Typography.fontWeight.semibold as any,
+    fontWeight: Typography.fontWeight.semibold,
   },
-  actionIcon: {
-    fontSize: 16,
+  limitBanner: {
+    backgroundColor: Colors.accentLight,
+    borderRadius: BorderRadius.sm,
+    marginTop: Spacing.sm,
+    padding: Spacing.md,
   },
-  emptyIcon: {
-    fontSize: 64,
-    marginBottom: Spacing.lg,
+  limitText: {
+    color: Colors.accent,
+    fontSize: Typography.fontSize.sm,
+    textAlign: 'center',
   },
-  addButtonIcon: {
-    fontSize: 20,
-    color: '#fff',
+  fab: {
+    alignItems: 'center',
+    backgroundColor: Colors.primary,
+    borderRadius: 28,
+    bottom: 24,
+    height: 56,
+    justifyContent: 'center',
+    position: 'absolute',
+    right: 24,
+    width: 56,
   },
-  limitIcon: {
-    fontSize: 20,
-    marginRight: Spacing.sm,
-  },
-  fabIcon: {
+  fabLabel: {
+    color: Colors.white,
     fontSize: 28,
-    color: '#fff',
     fontWeight: '300',
   },
-  routeIcon: {
-    fontSize: 24,
-  },
-  timeIcon: {
-    fontSize: 14,
-    marginRight: 4,
-  },
-  connectorIcon: {
-    fontSize: 16,
-    color: Colors.gray400,
-  },
 });
+
+

@@ -4,6 +4,7 @@
  */
 
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { decryptStorageJson, encryptStorageJson } from './secure-local-storage';
 
 export interface FormData {
   [key: string]: any;
@@ -17,7 +18,7 @@ const PREFIX = 'form_draft_';
 export async function saveFormDraft(formId: string, data: FormData): Promise<void> {
   try {
     const key = `${PREFIX}${formId}`;
-    await AsyncStorage.setItem(key, JSON.stringify({
+    await AsyncStorage.setItem(key, await encryptStorageJson({
       data,
       timestamp: Date.now(),
     }));
@@ -39,7 +40,7 @@ export async function loadFormDraft(formId: string): Promise<FormData | null> {
       return null;
     }
 
-    const parsed = JSON.parse(value);
+    const parsed = await decryptStorageJson<{ data: FormData; timestamp: number }>(value);
 
     // Check if draft is too old (24 hours)
     const maxAge = 24 * 60 * 60 * 1000; // 24 hours
@@ -82,7 +83,7 @@ export async function getAllFormDrafts(): Promise<Array<{ formId: string; data: 
         const value = await AsyncStorage.getItem(key);
         if (!value) return null;
 
-        const parsed = JSON.parse(value);
+        const parsed = await decryptStorageJson<{ data: FormData; timestamp: number }>(value);
         return {
           formId: key.replace(PREFIX, ''),
           data: parsed.data,

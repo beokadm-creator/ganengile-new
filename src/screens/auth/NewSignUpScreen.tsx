@@ -1,57 +1,91 @@
-/**
- * New Sign Up Screen
- * 개선된 회원가입 - PASS 인증 포함
- */
-
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import {
-  View,
-  Text,
-  StyleSheet,
-  TextInput,
-  TouchableOpacity,
-  Alert,
   ActivityIndicator,
+  Alert,
+  type DimensionValue,
   KeyboardAvoidingView,
   Platform,
   ScrollView,
+  StyleSheet,
+  Switch,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
 } from 'react-native';
 import { createUserWithEmailAndPassword } from 'firebase/auth';
-import { doc, setDoc, serverTimestamp } from 'firebase/firestore';
+import { doc, serverTimestamp, setDoc } from 'firebase/firestore';
 import { auth, db } from '../../services/firebase';
+import { handleGoogleSignIn } from '../../services/google-auth';
+import { getKakaoLoginErrorMessage, signUpWithKakao } from '../../services/kakao-auth';
 import { UserRole } from '../../types/user';
+import type { AuthNavigationProp } from '../../types/navigation';
 
 type Props = {
-  navigation: any;
+  navigation: AuthNavigationProp;
 };
 
-interface SignUpForm {
+type Step = 1 | 2 | 3;
+
+type SignUpForm = {
   name: string;
   email: string;
-  phoneNumber: string; // 필수로 변경
+  phoneNumber: string;
   password: string;
   confirmPassword: string;
-}
+};
 
-interface PassAuthData {
-  ci: string;
-  name: string;
-  birthday: string;
-}
-
-interface TermsAgreement {
+type TermsAgreement = {
   service: boolean;
   privacy: boolean;
   marketing: boolean;
+};
+
+function normalizePhoneNumber(phoneNumber: string): string {
+  return phoneNumber.replace(/\D/g, '');
 }
 
-type Step = 1 | 2 | 3;
+function formatPhoneDigits(value: string): string {
+  const digits = value.replace(/\D/g, '').slice(0, 11);
+  if (digits.length <= 3) return digits;
+  if (digits.length <= 7) return `${digits.slice(0, 3)}-${digits.slice(3)}`;
+  return `${digits.slice(0, 3)}-${digits.slice(3, 7)}-${digits.slice(7)}`;
+}
+
+function getErrorMessage(error: unknown, fallback: string): string {
+  if (error instanceof Error && error.message) {
+    return error.message;
+  }
+  return fallback;
+}
+
+function getFirebaseAuthCode(error: unknown): string | undefined {
+  if (error && typeof error === 'object' && 'code' in error) {
+    const code = (error as { code?: unknown }).code;
+    return typeof code === 'string' ? code : undefined;
+  }
+  return undefined;
+}
+
+function getSignUpErrorMessage(error: unknown): string {
+  switch (getFirebaseAuthCode(error)) {
+    case 'auth/email-already-in-use':
+      return '이미 가입된 이메일입니다. 로그인으로 이동해 주세요.';
+    case 'auth/invalid-email':
+      return '이메일 형식을 확인해 주세요.';
+    case 'auth/operation-not-allowed':
+      return '이메일 가입이 현재 비활성화되어 있습니다.';
+    case 'auth/weak-password':
+      return '비밀번호는 6자 이상으로 입력해 주세요.';
+    default:
+      return getErrorMessage(error, '회원가입에 실패했습니다.');
+  }
+}
 
 export default function NewSignUpScreen({ navigation }: Props) {
   const [step, setStep] = useState<Step>(1);
   const [loading, setLoading] = useState(false);
-  const [testMode, setTestMode] = useState(true); // PASS 인증 테스트 모드
-
+  const [testMode, setTestMode] = useState(true);
   const [form, setForm] = useState<SignUpForm>({
     name: '',
     email: '',
@@ -59,830 +93,333 @@ export default function NewSignUpScreen({ navigation }: Props) {
     password: '',
     confirmPassword: '',
   });
-
   const [termsAgreed, setTermsAgreed] = useState<TermsAgreement>({
     service: false,
     privacy: false,
     marketing: false,
   });
 
-  const [passAuthData, setPassAuthData] = useState<PassAuthData>({
-    ci: '',
-    name: '',
-    birthday: '',
-  });
+  const progressWidth = useMemo<DimensionValue>(() => `${(step / 3) * 100}%`, [step]);
 
-  const validateStep1 = (): boolean => {
+  function updateForm(key: keyof SignUpForm, value: string) {
+    setForm((current) => ({
+      ...current,
+      [key]: key === 'phoneNumber' ? formatPhoneDigits(value) : value,
+    }));
+  }
+
+  function setAgreement(key: keyof TermsAgreement, value: boolean) {
+    setTermsAgreed((current) => ({
+      ...current,
+      [key]: value,
+    }));
+  }
+
+  function validateStep1(): boolean {
     if (!form.name.trim()) {
-      Alert.alert('입력 오류', '이름을 입력해주세요.');
+      Alert.alert('이름이 필요합니다', '이름을 입력해 주세요.');
       return false;
     }
-
     if (!form.email.trim()) {
-      Alert.alert('입력 오류', '이메일을 입력해주세요.');
+      Alert.alert('이메일이 필요합니다', '이메일을 입력해 주세요.');
       return false;
     }
-
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailRegex.test(form.email)) {
-      Alert.alert('입력 오류', '올바른 이메일 형식이 아닙니다.');
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email)) {
+      Alert.alert('이메일 형식을 확인해 주세요', '올바른 이메일 형식으로 입력해 주세요.');
       return false;
     }
-
-    if (!form.phoneNumber.trim()) {
-      Alert.alert('입력 오류', '연락처는 필수 입력항목입니다.');
+    if (!/^010\d{8}$/.test(normalizePhoneNumber(form.phoneNumber))) {
+      Alert.alert('휴대폰 번호를 확인해 주세요', '010으로 시작하는 번호를 입력해 주세요.');
       return false;
     }
-
-    // 전화번호 형식 검사 (010-0000-0000 또는 01000000000)
-    const phoneRegex = /^010-?\d{4}-?\d{4}$|^010\d{8}$/;
-    if (!phoneRegex.test(form.phoneNumber)) {
-      Alert.alert('입력 오류', '올바른 전화번호 형식이 아닙니다.\n010-0000-0000 또는 010000000000');
+    if (!form.password || form.password.length < 6) {
+      Alert.alert('비밀번호를 확인해 주세요', '비밀번호는 6자 이상이어야 합니다.');
       return false;
     }
-
-    if (!form.password) {
-      Alert.alert('입력 오류', '비밀번호를 입력해주세요.');
-      return false;
-    }
-
-    if (form.password.length < 6) {
-      Alert.alert('입력 오류', '비밀번호는 6자 이상이어야 합니다.');
-      return false;
-    }
-
     if (form.password !== form.confirmPassword) {
-      Alert.alert('입력 오류', '비밀번호가 일치하지 않습니다.');
+      Alert.alert('비밀번호가 다릅니다', '비밀번호 확인이 일치하지 않습니다.');
       return false;
     }
-
     return true;
-  };
+  }
 
-  const validateStep3 = (): boolean => {
-    if (!termsAgreed.service) {
-      Alert.alert('필수 동의', '서비스 이용약관에 동의해주세요.');
-      return false;
-    }
-
-    if (!termsAgreed.privacy) {
-      Alert.alert('필수 동의', '개인정보 처리방침에 동의해주세요.');
-      return false;
-    }
-
-    // PASS 인증 확인
+  function validateStep2(): boolean {
     if (testMode) {
-      // 테스트 모드: 더미 데이터 자동 생성
-      setPassAuthData({
-        ci: 'TEST_CI_' + Date.now(),
-        name: form.name,
-        birthday: '19900101',
-      });
       return true;
     }
+    Alert.alert('본인확인 연결 준비 중', '현재는 테스트 모드로 가입을 이어갈 수 있습니다.');
+    return false;
+  }
 
-    if (!passAuthData.ci || !passAuthData.name || !passAuthData.birthday) {
-      Alert.alert('PASS 인증 필요', 'PASS 본인확인이 필요합니다.');
+  function validateStep3(): boolean {
+    if (!termsAgreed.service || !termsAgreed.privacy) {
+      Alert.alert('필수 약관 동의가 필요합니다', '서비스 이용약관과 개인정보 처리방침에 동의해 주세요.');
       return false;
     }
-
-    // 생년월일 형식 검사
-    const birthdayRegex = /^\d{8}$/;
-    if (!birthdayRegex.test(passAuthData.birthday)) {
-      Alert.alert('입력 오류', '올바른 생년월일 형식이 아닙니다.\nYYYYMMDD (예: 19900101)');
-      return false;
-    }
-
     return true;
-  };
+  }
 
-  const handleNext = () => {
+  function handleNext() {
     if (step === 1 && !validateStep1()) return;
+    if (step === 2 && !validateStep2()) return;
     if (step === 3 && !validateStep3()) return;
 
     if (step < 3) {
-      setStep((step + 1) as Step);
-    } else {
-      handleSignUp();
+      setStep((current) => (current + 1) as Step);
+      return;
     }
-  };
 
-  const handleGoogleSignUp = async () => {
-    setLoading(true);
-    try {
-      // Google로 간편회원가입
-      const { handleGoogleSignIn } = await import('../../services/google-auth');
-      const result = await handleGoogleSignIn();
+    void handleEmailSignUp();
+  }
 
-      if (result?.user) {
-        // Google 로그인 성공 시 필요한 추가 정보 수집을 위해 Step 2로 이동
-        // 기본 정보는 Google에서 가져오므로 PASS 인증부터 진행
-        setStep(2);
-      }
-    } catch (error: any) {
-      console.error('Google signup error:', error);
-      Alert.alert('Google 회원가입 실패', error.message || 'Google 회원가입에 실패했습니다.');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleSignUp = async () => {
-    if (!validateStep1() || !validateStep3()) return;
-
-    setLoading(true);
-
-    try {
-      // Firebase Auth로 회원가입
-      const userCredential = await createUserWithEmailAndPassword(
-        auth,
-        form.email,
-        form.password
-      );
-
-      const uid = userCredential.user.uid;
-      console.log('✅ Firebase auth successful:', uid);
-
-      // Firestore에 사용자 정보 저장
-      const userData = {
-        uid,
-        email: form.email,
-        name: form.name.trim(),
-        phoneNumber: form.phoneNumber.replace(/-/g, ''), // 하이픈 제거
-        role: UserRole.BOTH,
-        agreedTerms: termsAgreed,
-        passAuthData: {
-          ci: passAuthData.ci, // 실제로는 암호화 필요
-          name: passAuthData.name,
-          birthday: passAuthData.birthday,
-          verified: testMode, // 테스트 모드에서는 자동 인증
-          verifiedAt: testMode ? serverTimestamp() : null,
-        },
-        hasCompletedOnboarding: false, // 기본 정보 입력이 필요함
-        isActive: true,
-        createdAt: serverTimestamp(),
-        updatedAt: serverTimestamp(),
-      };
-
-      await setDoc(doc(db, 'users', uid), userData);
-      console.log('✅ User data saved to Firestore');
-
-      // AppNavigator가 hasCompletedOnboarding: false 감지 → 자동으로 Onboarding으로 전환
-      Alert.alert('가입 완료', '환영합니다! 가는길에 회원이 되셨습니다.');
-    } catch (error: any) {
-      console.error('Sign up error:', error);
-      let errorMessage = '회원가입에 실패했습니다.';
-
-      switch (error.code) {
-        case 'auth/email-already-in-use':
-          errorMessage = '이미 가입된 이메일입니다. 로그인을 진행해주세요.';
-          break;
-        case 'auth/invalid-email':
-          errorMessage = '올바른 이메일 형식이 아닙니다.';
-          break;
-        case 'auth/operation-not-allowed':
-          errorMessage = '이메일/비밀번호 가입이 비활성화되었습니다.';
-          break;
-        case 'auth/weak-password':
-          errorMessage = '비밀번호가 너무 취약합니다. 6자 이상 입력해주세요.';
-          break;
-        default:
-          errorMessage = error.message || '회원가입에 실패했습니다. 다시 시도해주세요.';
-      }
-
-      Alert.alert('가입 실패', errorMessage);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleBack = () => {
+  function handleBack() {
     if (step > 1) {
-      setStep((step - 1) as Step);
-    } else {
-      navigation.goBack();
+      setStep((current) => (current - 1) as Step);
+      return;
     }
-  };
+    navigation.goBack();
+  }
 
-  const handlePassAuth = () => {
-    if (testMode) {
-      setPassAuthData({
-        ci: 'TEST_CI_' + Date.now(),
-        name: form.name,
-        birthday: '19900101',
-      });
-      Alert.alert('테스트 모드', 'PASS 인증 테스트 모드로 진행됩니다.');
-    } else {
-      // 실제 PASS 인증 연동 (나중에 구현)
-      Alert.alert(
-        'PASS 본인확인',
-        'PASS 인증 기능이 곧 구현될 예정입니다.\n지금은 테스트 모드를 사용해주세요.'
+  async function handleEmailSignUp() {
+    if (!validateStep1() || !validateStep2() || !validateStep3()) {
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const userCredential = await createUserWithEmailAndPassword(auth, form.email.trim(), form.password);
+      await setDoc(
+        doc(db, 'users', userCredential.user.uid),
+        {
+          uid: userCredential.user.uid,
+          email: form.email.trim(),
+          name: form.name.trim(),
+          phoneNumber: normalizePhoneNumber(form.phoneNumber),
+          role: UserRole.BOTH,
+          signupMethod: 'email',
+          authProvider: 'email',
+          hasCompletedOnboarding: false,
+          isActive: true,
+          agreedTerms: {
+            giller: false,
+            gller: false,
+            privacy: termsAgreed.privacy,
+            marketing: termsAgreed.marketing,
+          },
+          createdAt: serverTimestamp(),
+          updatedAt: serverTimestamp(),
+        },
+        { merge: true }
       );
+
+      Alert.alert('가입이 완료되었습니다', '기본 가입이 완료되었습니다. 계속해서 온보딩을 진행해 주세요.');
+    } catch (error) {
+      Alert.alert('회원가입 실패', getSignUpErrorMessage(error));
+    } finally {
+      setLoading(false);
     }
-  };
+  }
 
-  const getProgress = () => {
-    return (step / 3) * 100;
-  };
+  async function handleGoogleSignUpPress() {
+    setLoading(true);
+    try {
+      await handleGoogleSignIn();
+    } catch (error) {
+      Alert.alert('Google 가입 실패', getErrorMessage(error, 'Google 가입에 실패했습니다.'));
+    } finally {
+      setLoading(false);
+    }
+  }
 
-  const renderStep1 = () => (
-    <View style={styles.stepContainer}>
-      <Text style={styles.stepTitle}>기본 정보</Text>
-      <Text style={styles.stepDescription}>
-        회원가입에 필요한 기본 정보를 입력해주세요.
-      </Text>
+  async function handleKakaoSignUpPress() {
+    if (!form.name.trim()) {
+      Alert.alert('이름이 필요합니다', '카카오 가입 전에 이름을 먼저 입력해 주세요.');
+      return;
+    }
 
-      <TextInput
-        style={styles.input}
-        placeholder="이름 *"
-        value={form.name}
-        onChangeText={(text) => setForm({ ...form, name: text })}
-        autoCapitalize="words"
-      />
-
-      <TextInput
-        style={styles.input}
-        placeholder="이메일 *"
-        value={form.email}
-        onChangeText={(text) => setForm({ ...form, email: text })}
-        keyboardType="email-address"
-        autoCapitalize="none"
-      />
-
-      <View style={styles.phoneContainer}>
-        <Text style={styles.phonePrefix}>010</Text>
-        <Text style={styles.phoneDash}>-</Text>
-        <TextInput
-          style={styles.phoneInput}
-          placeholder="0000"
-          value={form.phoneNumber.split('-')[1] || ''}
-          onChangeText={(text) => {
-            const parts = form.phoneNumber.split('-');
-            const newPhone = `010-${text}-${parts[2] || ''}`;
-            setForm({ ...form, phoneNumber: newPhone });
-          }}
-          keyboardType="number-pad"
-          maxLength={4}
-        />
-        <Text style={styles.phoneDash}>-</Text>
-        <TextInput
-          style={styles.phoneInput}
-          placeholder="0000"
-          value={form.phoneNumber.split('-')[2] || ''}
-          onChangeText={(text) => {
-            const parts = form.phoneNumber.split('-');
-            const newPhone = `010-${parts[1] || ''}-${text}`;
-            setForm({ ...form, phoneNumber: newPhone });
-          }}
-          keyboardType="number-pad"
-          maxLength={4}
-        />
-      </View>
-      <Text style={styles.helperText}>
-        * 연락처는 본인확인용으로 사용됩니다
-      </Text>
-
-      <TextInput
-        style={styles.input}
-        placeholder="비밀번호 (6자 이상) *"
-        value={form.password}
-        onChangeText={(text) => setForm({ ...form, password: text })}
-        secureTextEntry
-      />
-
-      <TextInput
-        style={styles.input}
-        placeholder="비밀번호 확인 *"
-        value={form.confirmPassword}
-        onChangeText={(text) => setForm({ ...form, confirmPassword: text })}
-        secureTextEntry
-      />
-
-      {/* Google 간편회원가입 버튼 */}
-      <View style={styles.divider}>
-        <View style={styles.dividerLine} />
-        <Text style={styles.dividerText}>또는</Text>
-        <View style={styles.dividerLine} />
-      </View>
-
-      <TouchableOpacity
-        style={[styles.button, styles.googleButton]}
-        onPress={handleGoogleSignUp}
-        disabled={loading}
-      >
-        <View style={styles.googleButtonContent}>
-          <Text style={styles.googleIcon}>G</Text>
-          <Text style={styles.googleButtonText}>Google로 간편회원가입</Text>
-        </View>
-      </TouchableOpacity>
-    </View>
-  );
-
-  const renderStep2 = () => (
-    <View style={styles.stepContainer}>
-      <Text style={styles.stepTitle}>PASS 본인확인</Text>
-      <Text style={styles.stepDescription}>
-        안전한 서비스 이용을 위해 본인확인이 필요합니다.
-      </Text>
-
-      {/* 테스트 모드 토글 */}
-      <TouchableOpacity
-        style={[styles.testModeButton, testMode && styles.testModeButtonActive]}
-        onPress={() => setTestMode(!testMode)}
-      >
-        <Text style={[styles.testModeText, testMode && styles.testModeTextActive]}>
-          {testMode ? '🧪 테스트 모드 활성화' : '🧪 테스트 모드'}
-        </Text>
-      </TouchableOpacity>
-
-      {testMode && (
-        <View style={styles.testModeInfo}>
-          <Text style={styles.testModeInfoTitle}>테스트 모드 안내</Text>
-          <Text style={styles.testModeInfoText}>
-            • 더미 CI 정보가 자동 생성됩니다{'\n'}
-            • 실제 PASS 인증 없이 진행됩니다{'\n'}
-            • 배송/길러 활동 제한없이 가능{'\n'}
-            • 나중에 실제 PASS 인증 시 재인증 필요
-          </Text>
-        </View>
-      )}
-
-      <View style={styles.formGroup}>
-        <Text style={styles.label}>PASS 인증 상태</Text>
-        <View style={[
-         styles.passStatus,
-          testMode ? styles.passStatusTest : styles.passStatusPending
-        ]}>
-          <Text style={styles.passStatusText}>
-            {testMode ? '✅ 테스트 모드 (인증 완료)' : '⏳ 인증 대기중'}
-          </Text>
-        </View>
-      </View>
-
-      {!testMode && (
-        <>
-          <View style={styles.formGroup}>
-            <Text style={styles.label}>이름 (실명)</Text>
-            <TextInput
-              style={styles.input}
-              placeholder="홍길동"
-              value={passAuthData.name}
-              onChangeText={(text) =>
-                setPassAuthData({ ...passAuthData, name: text })
-              }
-            />
-          </View>
-
-          <View style={styles.formGroup}>
-            <Text style={styles.label}>생년월일 (YYYYMMDD)</Text>
-            <TextInput
-              style={styles.input}
-              placeholder="19900101"
-              value={passAuthData.birthday}
-              onChangeText={(text) =>
-                setPassAuthData({ ...passAuthData, birthday: text })
-              }
-              keyboardType="number-pad"
-              maxLength={8}
-            />
-          </View>
-
-          <TouchableOpacity
-            style={styles.passButton}
-            onPress={handlePassAuth}
-          >
-            <Text style={styles.passButtonText}>📱 PASS 본인확인하기</Text>
-          </TouchableOpacity>
-        </>
-      )}
-
-      <View style={styles.infoBox}>
-        <Text style={styles.infoBoxTitle}>📱 본인확인 안내</Text>
-        <Text style={styles.infoBoxText}>
-          • 통신사 PASS 앱을 통해 본인확인을 진행합니다.
-          {'\n'}
-          • 본인확인은 가입 시 1회만 필요하며, 정보는 안전하게 암호화되어 저장됩니다.
-          {'\n'}
-          • 길러 활동을 위해서는 추가 신원 확인이 필요할 수 있습니다.
-        </Text>
-      </View>
-    </View>
-  );
-
-  const renderStep3 = () => (
-    <View style={styles.stepContainer}>
-      <Text style={styles.stepTitle}>약관 동의</Text>
-      <Text style={styles.stepDescription}>
-        서비스 이용을 위해 약관에 동의해주세요.
-      </Text>
-
-      <ScrollView style={styles.termsContainer}>
-        <TouchableOpacity
-          style={styles.termsItem}
-          onPress={() =>
-            setTermsAgreed({ ...termsAgreed, service: !termsAgreed.service })
-          }
-        >
-          <View
-            style={[styles.checkbox, termsAgreed.service && styles.checkboxChecked]}
-          >
-            {termsAgreed.service && <Text style={styles.checkmark}>✓</Text>}
-          </View>
-          <View style={styles.termsContent}>
-            <Text style={styles.termsTitle}>
-              서비스 이용약관 동의 (필수)
-            </Text>
-            <Text style={styles.termsPreview}>
-              가는길에 서비스 이용약관에 동의합니다
-            </Text>
-          </View>
-        </TouchableOpacity>
-
-        <TouchableOpacity
-          style={styles.termsItem}
-          onPress={() =>
-            setTermsAgreed({ ...termsAgreed, privacy: !termsAgreed.privacy })
-          }
-        >
-          <View
-            style={[styles.checkbox, termsAgreed.privacy && styles.checkboxChecked]}
-          >
-            {termsAgreed.privacy && <Text style={styles.checkmark}>✓</Text>}
-          </View>
-          <View style={styles.termsContent}>
-            <Text style={styles.termsTitle}>
-              개인정보 처리방침 동의 (필수)
-            </Text>
-            <Text style={styles.termsPreview}>
-              개인정보 수집 및 이용에 동의합니다
-            </Text>
-          </View>
-        </TouchableOpacity>
-
-        <TouchableOpacity
-          style={styles.termsItem}
-          onPress={() =>
-            setTermsAgreed({ ...termsAgreed, marketing: !termsAgreed.marketing })
-          }
-        >
-          <View
-            style={[styles.checkbox, termsAgreed.marketing && styles.checkboxChecked]}
-          >
-            {termsAgreed.marketing && <Text style={styles.checkmark}>✓</Text>}
-          </View>
-          <View style={styles.termsContent}>
-            <Text style={styles.termsTitle}>
-              마케팅 정보 수신 동의 (선택)
-            </Text>
-            <Text style={styles.termsPreview}>
-              할인 혜택과 이벤트 정보를 받아보세요
-            </Text>
-          </View>
-        </TouchableOpacity>
-      </ScrollView>
-    </View>
-  );
+    setLoading(true);
+    try {
+      await signUpWithKakao({
+        name: form.name.trim(),
+        phoneNumber: normalizePhoneNumber(form.phoneNumber),
+        role: UserRole.BOTH,
+      });
+    } catch (error) {
+      Alert.alert('카카오 가입 실패', getKakaoLoginErrorMessage(error));
+    } finally {
+      setLoading(false);
+    }
+  }
 
   return (
-    <KeyboardAvoidingView
-      style={styles.container}
-      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-    >
-      {/* Header */}
-      <View style={styles.header}>
-        <TouchableOpacity onPress={handleBack}>
-          <Text style={styles.backButton}>← 이전</Text>
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>회원가입 (2/3)</Text>
-        <View style={styles.placeholder} />
-      </View>
+    <KeyboardAvoidingView style={styles.container} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+      <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
+        <View style={styles.header}>
+          <Text style={styles.title}>회원가입</Text>
+          <Text style={styles.subtitle}>필요한 정보만 먼저 받고, 나머지는 앱 안에서 이어집니다.</Text>
+          <View style={styles.progressTrack}>
+            <View style={[styles.progressFill, { width: progressWidth }]} />
+          </View>
+        </View>
 
-      {/* Progress Bar */}
-      <View style={styles.progressContainer}>
-        <View style={[styles.progressBar, { width: `${getProgress()}%` }]} />
-      </View>
+        {step === 1 ? (
+          <View style={styles.card}>
+            <Text style={styles.sectionTitle}>기본 정보</Text>
+            <Field label="이름" value={form.name} onChangeText={(value) => updateForm('name', value)} placeholder="홍길동" />
+            <Field label="이메일" value={form.email} onChangeText={(value) => updateForm('email', value)} placeholder="name@example.com" autoCapitalize="none" keyboardType="email-address" />
+            <Field label="휴대폰 번호" value={form.phoneNumber} onChangeText={(value) => updateForm('phoneNumber', value)} placeholder="010-1234-5678" keyboardType="number-pad" />
+            <Field label="비밀번호" value={form.password} onChangeText={(value) => updateForm('password', value)} placeholder="6자 이상" secureTextEntry />
+            <Field label="비밀번호 확인" value={form.confirmPassword} onChangeText={(value) => updateForm('confirmPassword', value)} placeholder="비밀번호 다시 입력" secureTextEntry />
+          </View>
+        ) : null}
 
-      {/* Step Content */}
-      <ScrollView style={styles.content}>
-        {step === 1 && renderStep1()}
-        {step === 2 && renderStep2()}
-        {step === 3 && renderStep3()}
+        {step === 2 ? (
+          <View style={styles.card}>
+            <Text style={styles.sectionTitle}>본인확인 준비</Text>
+            <View style={styles.switchRow}>
+              <View style={styles.switchCopy}>
+                <Text style={styles.switchTitle}>테스트 모드</Text>
+                <Text style={styles.switchBody}>지금은 테스트 모드로 이어가고, 실서비스 전에는 인증 설정만 바꾸면 됩니다.</Text>
+              </View>
+              <Switch value={testMode} onValueChange={setTestMode} trackColor={{ false: '#CBD5E1', true: '#99F6E4' }} thumbColor={testMode ? '#0F766E' : '#FFFFFF'} />
+            </View>
+          </View>
+        ) : null}
+
+        {step === 3 ? (
+          <View style={styles.card}>
+            <Text style={styles.sectionTitle}>약관 동의</Text>
+            <AgreementRow title="서비스 이용약관" required value={termsAgreed.service} onValueChange={(value) => setAgreement('service', value)} />
+            <AgreementRow title="개인정보 처리방침" required value={termsAgreed.privacy} onValueChange={(value) => setAgreement('privacy', value)} />
+            <AgreementRow title="마케팅 정보 수신" value={termsAgreed.marketing} onValueChange={(value) => setAgreement('marketing', value)} />
+          </View>
+        ) : null}
+
+        <View style={styles.socialCard}>
+          <Text style={styles.sectionTitle}>간편 가입</Text>
+          <TouchableOpacity style={styles.kakaoButton} onPress={() => void handleKakaoSignUpPress()} disabled={loading}>
+            <Text style={styles.kakaoButtonText}>카카오로 가입</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.secondaryButton} onPress={() => void handleGoogleSignUpPress()} disabled={loading}>
+            <Text style={styles.secondaryButtonText}>Google로 가입</Text>
+          </TouchableOpacity>
+        </View>
       </ScrollView>
 
-      {/* Next Button */}
       <View style={styles.footer}>
-        <TouchableOpacity
-          style={[styles.nextButton, loading && styles.nextButtonDisabled]}
-          onPress={handleNext}
-          disabled={loading}
-        >
-          {loading ? (
-            <ActivityIndicator color="#fff" />
-          ) : (
-            <Text style={styles.nextButtonText}>
-              {step === 3 ? '가입 완료' : '다음'}
-            </Text>
-          )}
+        <TouchableOpacity style={styles.backButton} onPress={handleBack} disabled={loading}>
+          <Text style={styles.backButtonText}>이전</Text>
+        </TouchableOpacity>
+        <TouchableOpacity style={[styles.nextButton, loading && styles.nextButtonDisabled]} onPress={handleNext} disabled={loading}>
+          {loading ? <ActivityIndicator color="#FFFFFF" /> : <Text style={styles.nextButtonText}>{step === 3 ? '가입 완료' : '다음'}</Text>}
         </TouchableOpacity>
       </View>
     </KeyboardAvoidingView>
   );
 }
 
+function Field({ label, ...props }: React.ComponentProps<typeof TextInput> & { label: string }) {
+  return (
+    <View style={styles.fieldWrap}>
+      <Text style={styles.fieldLabel}>{label}</Text>
+      <TextInput {...props} style={styles.input} placeholderTextColor="#94A3B8" />
+    </View>
+  );
+}
+
+function AgreementRow({
+  title,
+  required = false,
+  value,
+  onValueChange,
+}: {
+  title: string;
+  required?: boolean;
+  value: boolean;
+  onValueChange: (value: boolean) => void;
+}) {
+  return (
+    <View style={styles.switchRow}>
+      <View style={styles.switchCopy}>
+        <Text style={styles.switchTitle}>{title}</Text>
+        <Text style={styles.switchBody}>{required ? '필수' : '선택'}</Text>
+      </View>
+      <Switch value={value} onValueChange={onValueChange} trackColor={{ false: '#CBD5E1', true: '#99F6E4' }} thumbColor={value ? '#0F766E' : '#FFFFFF'} />
+    </View>
+  );
+}
+
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#fff',
+  container: { flex: 1, backgroundColor: '#F8FAFC' },
+  content: { padding: 20, gap: 16, paddingBottom: 120 },
+  header: { gap: 10 },
+  title: { color: '#0F172A', fontSize: 30, fontWeight: '800' },
+  subtitle: { color: '#64748B', lineHeight: 22 },
+  progressTrack: { height: 8, backgroundColor: '#E2E8F0', borderRadius: 999, overflow: 'hidden' },
+  progressFill: { height: '100%', backgroundColor: '#0F766E', borderRadius: 999 },
+  card: { backgroundColor: '#FFFFFF', borderRadius: 20, padding: 20, gap: 14 },
+  socialCard: { backgroundColor: '#FFFFFF', borderRadius: 20, padding: 20, gap: 12 },
+  sectionTitle: { color: '#0F172A', fontSize: 18, fontWeight: '800' },
+  fieldWrap: { gap: 6 },
+  fieldLabel: { color: '#334155', fontWeight: '700' },
+  input: {
+    minHeight: 52,
+    borderRadius: 16,
+    backgroundColor: '#F8FAFC',
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    paddingHorizontal: 16,
+    color: '#0F172A',
   },
-  header: {
-    flexDirection: 'row',
+  switchRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12 },
+  switchCopy: { flex: 1, gap: 4 },
+  switchTitle: { color: '#0F172A', fontWeight: '700' },
+  switchBody: { color: '#64748B', fontSize: 13, lineHeight: 19 },
+  kakaoButton: {
+    minHeight: 52,
+    borderRadius: 16,
+    backgroundColor: '#FEE500',
     alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingTop: 60,
-    paddingBottom: 16,
-    paddingHorizontal: 20,
-    borderBottomWidth: 1,
-    borderBottomColor: '#f0f0f0',
+    justifyContent: 'center',
+  },
+  kakaoButtonText: { color: '#191600', fontWeight: '800', fontSize: 15 },
+  secondaryButton: {
+    minHeight: 52,
+    borderRadius: 16,
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  secondaryButtonText: { color: '#0F172A', fontWeight: '700', fontSize: 15 },
+  footer: {
+    position: 'absolute',
+    left: 20,
+    right: 20,
+    bottom: 20,
+    flexDirection: 'row',
+    gap: 12,
   },
   backButton: {
-    fontSize: 16,
-    color: '#007AFF',
-  },
-  headerTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#333',
-  },
-  placeholder: {
-    width: 50,
-  },
-  progressContainer: {
-    height: 4,
-    backgroundColor: '#f0f0f0',
-  },
-  progressBar: {
-    height: '100%',
-    backgroundColor: '#007AFF',
-  },
-  content: {
     flex: 1,
-    padding: 20,
-  },
-  stepContainer: {
-    paddingBottom: 20,
-  },
-  stepTitle: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: '#333',
-    marginBottom: 12,
-  },
-  stepDescription: {
-    fontSize: 16,
-    color: '#666',
-    marginBottom: 32,
-  },
-  input: {
-    backgroundColor: '#f5f5f5',
-    borderRadius: 8,
-    fontSize: 16,
-    marginBottom: 16,
-    padding: 16,
-  },
-  phoneContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#f5f5f5',
-    borderRadius: 8,
-    padding: 16,
-    marginBottom: 16,
-  },
-  phonePrefix: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#333',
-  },
-  phoneDash: {
-    fontSize: 16,
-    color: '#999',
-    marginHorizontal: 4,
-  },
-  phoneInput: {
-    flex: 1,
-    fontSize: 16,
-    color: '#333',
-    textAlign: 'center',
-  },
-  helperText: {
-    fontSize: 12,
-    color: '#999',
-    marginTop: 8,
-    marginBottom: 24,
-  },
-  formGroup: {
-    marginBottom: 24,
-  },
-  label: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#333',
-    marginBottom: 12,
-  },
-  testModeButton: {
-    backgroundColor: '#fff3cd',
-    borderWidth: 2,
-    borderColor: '#ffc107',
-    borderRadius: 8,
-    padding: 12,
-    alignItems: 'center',
-    marginBottom: 20,
-  },
-  testModeButtonActive: {
-    backgroundColor: '#fff3cd',
-    borderColor: '#ff9800',
-  },
-  testModeText: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#ff6f00',
-  },
-  testModeTextActive: {
-    color: '#ff5722',
-  },
-  testModeInfo: {
-    backgroundColor: '#e3f2fd',
-    borderWidth: 2,
-    borderColor: '#2196F3',
-    borderRadius: 12,
-    padding: 16,
-    marginBottom: 24,
-  },
-  testModeInfoTitle: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    color: '#1976D2',
-    marginBottom: 8,
-  },
-  testModeInfoText: {
-    fontSize: 14,
-    color: '#1976D2',
-    lineHeight: 22,
-  },
-  passStatus: {
-    backgroundColor: '#fff3cd',
-    borderWidth: 2,
-    borderColor: '#ffc107',
-    borderRadius: 8,
-    padding: 16,
-    marginBottom: 24,
-    alignItems: 'center',
-  },
-  passStatusTest: {
-    backgroundColor: '#e8f5e9',
-    borderColor: '#4CAF50',
-  },
-  passStatusPending: {
-    backgroundColor: '#fff3cd',
-    borderColor: '#ffc107',
-  },
-  passStatusText: {
-    fontSize: 16,
-    fontWeight: '600',
-  },
-  passButton: {
-    backgroundColor: '#FFC107',
-    borderRadius: 8,
-    padding: 16,
-    alignItems: 'center',
-    marginTop: 16,
-  },
-  passButtonText: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    color: '#333',
-  },
-  infoBox: {
-    backgroundColor: '#f0f8ff',
-    borderWidth: 2,
-    borderColor: '#2196F3',
-    borderRadius: 12,
-    padding: 16,
-  },
-  infoBoxTitle: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    color: '#1976D2',
-    marginBottom: 12,
-  },
-  infoBoxText: {
-    fontSize: 14,
-    color: '#1976D2',
-    lineHeight: 22,
-  },
-  termsContainer: {
-    maxHeight: 400,
-  },
-  termsItem: {
-    flexDirection: 'row',
-    padding: 16,
-    backgroundColor: '#f9f9f9',
-    borderRadius: 8,
-    marginBottom: 12,
+    minHeight: 54,
+    borderRadius: 16,
+    backgroundColor: '#FFFFFF',
     borderWidth: 1,
-    borderColor: '#f0f0f0',
-  },
-  checkbox: {
-    width: 24,
-    height: 24,
-    borderRadius: 4,
-    borderWidth: 2,
-    borderColor: '#ddd',
+    borderColor: '#E2E8F0',
     alignItems: 'center',
     justifyContent: 'center',
-    marginRight: 12,
   },
-  checkboxChecked: {
-    backgroundColor: '#007AFF',
-    borderColor: '#007AFF',
-  },
-  checkmark: {
-    color: '#fff',
-    fontWeight: 'bold',
-    fontSize: 14,
-  },
-  termsContent: {
-    flex: 1,
-  },
-  termsTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#333',
-    marginBottom: 4,
-  },
-  termsPreview: {
-    fontSize: 14,
-    color: '#666',
-    lineHeight: 20,
-  },
-  footer: {
-    padding: 20,
-    borderTopWidth: 1,
-    borderTopColor: '#f0f0f0',
-    backgroundColor: '#fff',
-  },
+  backButtonText: { color: '#334155', fontWeight: '700' },
   nextButton: {
-    backgroundColor: '#007AFF',
-    borderRadius: 8,
-    paddingVertical: 16,
-    alignItems: 'center',
-  },
-  nextButtonDisabled: {
-    backgroundColor: '#ccc',
-  },
-  nextButtonText: {
-    color: '#fff',
-    fontSize: 16,
-    fontWeight: 'bold',
-  },
-  button: {
-    borderRadius: 8,
-    marginTop: 12,
-    padding: 16,
-  },
-  googleButton: {
-    backgroundColor: '#fff',
-    borderWidth: 1,
-    borderColor: '#ddd',
-  },
-  googleButtonContent: {
-    flexDirection: 'row',
+    flex: 1.4,
+    minHeight: 54,
+    borderRadius: 16,
+    backgroundColor: '#115E59',
     alignItems: 'center',
     justifyContent: 'center',
   },
-  googleIcon: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    color: '#4285F4',
-    marginRight: 12,
-  },
-  googleButtonText: {
-    color: '#333',
-    fontSize: 16,
-    fontWeight: '600',
-  },
-  divider: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginVertical: 20,
-  },
-  dividerLine: {
-    flex: 1,
-    height: 1,
-    backgroundColor: '#ddd',
-  },
-  dividerText: {
-    marginHorizontal: 12,
-    color: '#999',
-    fontSize: 14,
-  },
+  nextButtonDisabled: { opacity: 0.7 },
+  nextButtonText: { color: '#FFFFFF', fontWeight: '800', fontSize: 15 },
 });

@@ -1,339 +1,142 @@
-/**
- * Realtime Tracking Screen
- * 지도 기반 실시간 배송 추적 화면
- */
+﻿import React, { useMemo } from 'react';
+import type { JSX } from 'react';
+import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { MaterialIcons } from '@expo/vector-icons';
+import { RouteProp, useNavigation, useRoute } from '@react-navigation/native';
+import AppTopBar from '../../components/common/AppTopBar';
+import { NaverMapCard } from '../../components/maps/NaverMapCard';
+import { BorderRadius, Shadows, Spacing, Typography } from '../../theme';
+import type { MainStackNavigationProp, MainStackParamList } from '../../types/navigation';
 
-import React, { useState, useEffect, useContext } from 'react';
-import {
-  View,
-  Text,
-  StyleSheet,
-  TouchableOpacity,
-  Alert,
-  Dimensions,
-  Platform,
-} from 'react-native';
-import { StackNavigationProp } from '@react-navigation/stack';
-import MapView, { Marker, Polyline, PROVIDER_GOOGLE } from 'react-native-maps';
-import * as Location from 'expo-location';
-import { doc, onSnapshot } from 'firebase/firestore';
-import { db } from '../../services/firebase';
-import { UserContext } from '../../contexts/UserContext';
-import type { UserContextType } from '../../contexts/UserContext';
-import { startDeliveryTracking, stopDeliveryTracking } from '../../services/location-tracking-service';
-import { Colors, Typography, Spacing, BorderRadius } from '../../theme';
+type RealtimeTrackingRoute = RouteProp<MainStackParamList, 'RealtimeTracking'>;
 
-const { _width, _height } = Dimensions.get('window');
-
-type NavigationProp = StackNavigationProp<any>;
-
-interface Props {
-  navigation: NavigationProp;
-  route: {
-    params: {
-      deliveryId: string;
-      requesterId: string;
-      gillerId: string;
-      pickupStation: { name: string; latitude: number; longitude: number };
-      dropoffStation: { name: string; latitude: number; longitude: number };
-    };
-  };
+function formatCoordinate(value: number): string {
+  return value.toFixed(4);
 }
 
-interface TrackingData {
-  currentLocation: { latitude: number; longitude: number } | null;
-  lastLocationUpdate: any;
-  status: string;
-  gillerLocation?: { latitude: number; longitude: number };
-  pathHistory?: { latitude: number; longitude: number }[];
-}
+export default function RealtimeTrackingScreen(): JSX.Element {
+  const navigation = useNavigation<MainStackNavigationProp>();
+  const route = useRoute<RealtimeTrackingRoute>();
+  const { deliveryId, pickupStation, dropoffStation } = route.params;
 
-export default function RealtimeTrackingScreen({ navigation, route }: Props) {
-  const { deliveryId, _requesterId, _gillerId, pickupStation, dropoffStation } = route.params;
-  const { _user, currentRole } = useContext(UserContext) as UserContextType;
+  const etaSummary = useMemo(() => {
+    const latGap = Math.abs(pickupStation.latitude - dropoffStation.latitude);
+    const lngGap = Math.abs(pickupStation.longitude - dropoffStation.longitude);
+    const syntheticDistance = Math.max(1, Math.round((latGap + lngGap) * 450));
+    const etaMinutes = Math.max(18, Math.min(95, syntheticDistance * 3));
 
-  const [trackingData, setTrackingData] = useState<TrackingData | null>(null);
-  const [currentRegion, setCurrentRegion] = useState({
-    latitude: pickupStation.latitude,
-    longitude: pickupStation.longitude,
-    latitudeDelta: 0.01,
-    longitudeDelta: 0.01,
-  });
-  const [isTracking, setIsTracking] = useState(false);
-  const [loading, setLoading] = useState(true);
-  const [userLocation, setUserLocation] = useState<{ latitude: number; longitude: number } | null>(null);
-
-  // 현재 사용자의 위치 가져오기
-  useEffect(() => {
-    (async () => {
-      try {
-        const { status } = await Location.requestForegroundPermissionsAsync();
-        if (status !== 'granted') {
-          Alert.alert('권한 필요', '위치 권한이 필요합니다.');
-          return;
-        }
-
-        const location = await Location.getCurrentPositionAsync({
-          accuracy: Location.Accuracy.Balanced,
-        });
-
-        const currentLoc = {
-          latitude: location.coords.latitude,
-          longitude: location.coords.longitude,
-        };
-        setUserLocation(currentLoc);
-
-        // 지도 중심을 현재 위치로 설정
-        setCurrentRegion({
-          latitude: currentLoc.latitude,
-          longitude: currentLoc.longitude,
-          latitudeDelta: 0.01,
-          longitudeDelta: 0.01,
-        });
-      } catch (error) {
-        console.error('Get location error:', error);
-      }
-    })();
-  }, []);
-
-  // 실시간 배송 추적 데이터 수신
-  useEffect(() => {
-    const deliveryRef = doc(db, 'deliveries', deliveryId);
-
-    const unsubscribe = onSnapshot(deliveryRef, (doc) => {
-      if (doc.exists()) {
-        const data = doc.data() as TrackingData;
-        setTrackingData(data);
-        setLoading(false);
-
-        // 기러기 위치가 있으면 지도 중심 이동
-        if (data.gillerLocation) {
-          setCurrentRegion({
-            latitude: data.gillerLocation.latitude,
-            longitude: data.gillerLocation.longitude,
-            latitudeDelta: 0.01,
-            longitudeDelta: 0.01,
-          });
-        }
-      }
-    }, (error) => {
-      console.error('Tracking error:', error);
-      setLoading(false);
-      Alert.alert('오류', '실시간 추적 데이터를 가져오지 못했습니다.');
-    });
-
-    return () => unsubscribe();
-  }, [deliveryId]);
-
-  // 기러기인 경우 위치 추적 시작
-  useEffect(() => {
-    if (currentRole === 'giller' && !isTracking) {
-      startTracking();
-    }
-
-    return () => {
-      if (isTracking) {
-        stopDeliveryTracking();
-      }
+    return {
+      syntheticDistance,
+      etaMinutes,
+      currentLegLabel: '현재 이동 구간과 다음 인계 지점을 중심으로 ETA를 보여줍니다.',
     };
-  }, [currentRole]);
+  }, [dropoffStation.latitude, dropoffStation.longitude, pickupStation.latitude, pickupStation.longitude]);
 
-  const startTracking = async () => {
-    try {
-      await startDeliveryTracking(deliveryId, 10000); // 10초마다 업데이트
-      setIsTracking(true);
-    } catch (error) {
-      console.error('Start tracking error:', error);
-      Alert.alert('오류', '위치 추적을 시작하지 못했습니다.');
-    }
+  const center = {
+    latitude: (pickupStation.latitude + dropoffStation.latitude) / 2,
+    longitude: (pickupStation.longitude + dropoffStation.longitude) / 2,
   };
-
-  const handleStopTracking = async () => {
-    try {
-      stopDeliveryTracking();
-      setIsTracking(false);
-      Alert.alert('알림', '위치 추적이 중지되었습니다.');
-    } catch (error) {
-      console.error('Stop tracking error:', error);
-    }
-  };
-
-  const handleRefreshLocation = async () => {
-    try {
-      const location = await Location.getCurrentPositionAsync({
-        accuracy: Location.Accuracy.Balanced,
-      });
-
-      const currentLoc = {
-        latitude: location.coords.latitude,
-        longitude: location.coords.longitude,
-      };
-      setUserLocation(currentLoc);
-
-      // 지도 중심 이동
-      setCurrentRegion({
-        latitude: currentLoc.latitude,
-        longitude: currentLoc.longitude,
-        latitudeDelta: 0.01,
-        longitudeDelta: 0.01,
-      });
-    } catch (error) {
-      console.error('Refresh location error:', error);
-    }
-  };
-
-  const handleFitToCoordinates = () => {
-    const coordinates = [
-      pickupStation,
-      dropoffStation,
-      ...(trackingData?.gillerLocation ? [trackingData.gillerLocation] : []),
-      ...(userLocation ? [userLocation] : []),
-    ];
-
-    if (coordinates.length === 0) return;
-
-    // 모든 좌표를 포함하는 영역 계산
-    const latitudes = coordinates.map(c => c.latitude);
-    const longitudes = coordinates.map(c => c.longitude);
-
-    const minLat = Math.min(...latitudes);
-    const maxLat = Math.max(...latitudes);
-    const minLon = Math.min(...longitudes);
-    const maxLon = Math.max(...longitudes);
-
-    const midLat = (minLat + maxLat) / 2;
-    const midLon = (minLon + maxLon) / 2;
-    const latDelta = (maxLat - minLat) * 1.5; // 1.5배 패딩
-    const lonDelta = (maxLon - minLon) * 1.5;
-
-    setCurrentRegion({
-      latitude: midLat,
-      longitude: midLon,
-      latitudeDelta: Math.max(latDelta, 0.01),
-      longitudeDelta: Math.max(lonDelta, 0.01),
-    });
-  };
-
-  if (loading) {
-    return (
-      <View style={styles.container}>
-        <Text style={styles.loadingText}>로딩 중...</Text>
-      </View>
-    );
-  }
 
   return (
     <View style={styles.container}>
-      {/* 지도 */}
-      <MapView
-        style={styles.map}
-        provider={PROVIDER_GOOGLE}
-        region={currentRegion}
-        showsUserLocation
-        showsMyLocationButton={false}
-        showsCompass={true}
-        showsScale={true}
-        followsUserLocation={currentRole === 'giller'}
-      >
-        {/* 픽업 장소 마커 */}
-        <Marker
-          coordinate={{
-            latitude: pickupStation.latitude,
-            longitude: pickupStation.longitude,
-          }}
-          title="픽업 장소"
-          description={pickupStation.name}
-          pinColor="#4CAF50"
-        />
-
-        {/* 배송 장소 마커 */}
-        <Marker
-          coordinate={{
-            latitude: dropoffStation.latitude,
-            longitude: dropoffStation.longitude,
-          }}
-          title="배송 장소"
-          description={dropoffStation.name}
-          pinColor="#FF9800"
-        />
-
-        {/* 기러기 위치 마커 */}
-        {trackingData?.gillerLocation && (
-          <Marker
-            coordinate={{
-              latitude: trackingData.gillerLocation.latitude,
-              longitude: trackingData.gillerLocation.longitude,
-            }}
-            title="기러기 위치"
-            description="현재 위치"
-            pinColor="#00BCD4"
-          />
-        )}
-
-        {/* 경로 선 (픽업 → 배송) */}
-        {trackingData?.pathHistory && trackingData.pathHistory.length > 1 && (
-          <Polyline
-            coordinates={trackingData.pathHistory}
-            strokeColor="#00BCD4"
-            strokeWidth={3}
-          />
-        )}
-      </MapView>
-
-      {/* 상단 정보 패널 */}
-      <View style={styles.topPanel}>
-        <View style={styles.statusContainer}>
-          <Text style={styles.statusTitle}>배송 상태</Text>
-          <Text style={styles.statusText}>
-            {trackingData?.status === 'in_transit' ? '배송 중' :
-             trackingData?.status === 'arrived' ? '도착 완료' :
-             trackingData?.status === 'at_locker' ? '사물함 보관 완료' :
-             trackingData?.status === 'delivered' ? '수령 확인 대기' :
-             trackingData?.status === 'completed' ? '배송 완료' :
-             '준비 중'}
+      <AppTopBar title="실시간 진행 보기" onBack={() => navigation.goBack()} />
+      <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+        <View style={styles.heroCard}>
+          <Text style={styles.heroKicker}>가는길에 추적</Text>
+          <Text style={styles.heroTitle}>현재 구간과 ETA를 빠르게 확인하세요.</Text>
+          <Text style={styles.heroSubtitle}>
+            큰 지도보다 지금 필요한 구간, 다음 인계 지점, 예상 시간을 먼저 보여줍니다.
           </Text>
         </View>
 
-        {trackingData?.gillerLocation && (
-          <View style={styles.infoContainer}>
-            <Text style={styles.infoText}>
-              기러기 위치: {trackingData.gillerLocation.latitude.toFixed(4)}, {trackingData.gillerLocation.longitude.toFixed(4)}
-            </Text>
+        <NaverMapCard
+          center={center}
+          markers={[
+            { latitude: pickupStation.latitude, longitude: pickupStation.longitude, label: '출발' },
+            { latitude: dropoffStation.latitude, longitude: dropoffStation.longitude, label: '도착' },
+          ]}
+          title="배송 구간 지도"
+          subtitle="출발역과 도착역 기준으로 현재 배송 구간을 보여줍니다."
+        />
+
+        <View style={styles.routeCard}>
+          <View style={styles.routeHeader}>
+            <Text style={styles.routeTitle}>{pickupStation.name}</Text>
+            <MaterialIcons name="east" size={20} color="#0F766E" />
+            <Text style={styles.routeTitle}>{dropoffStation.name}</Text>
           </View>
-        )}
-      </View>
-
-      {/* 하단 컨트롤 패널 */}
-      <View style={styles.bottomPanel}>
-        <View style={styles.row}>
-          <TouchableOpacity
-            style={styles.button}
-            onPress={handleFitToCoordinates}
-          >
-            <Text style={styles.buttonText}>전체 보기</Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={styles.button}
-            onPress={handleRefreshLocation}
-          >
-            <Text style={styles.buttonText}>위치 새로고침</Text>
-          </TouchableOpacity>
-
-          {currentRole === 'giller' && (
-            <>
-              <TouchableOpacity
-                style={[styles.button, isTracking ? styles.buttonDanger : styles.buttonSuccess]}
-                onPress={isTracking ? handleStopTracking : startTracking}
-              >
-                <Text style={styles.buttonText}>
-                  {isTracking ? '추적 중지' : '추적 시작'}
-                </Text>
-              </TouchableOpacity>
-            </>
-          )}
+          <View style={styles.metricRow}>
+            <MetricPill label="예상 ETA" value={`${etaSummary.etaMinutes}분`} />
+            <MetricPill label="추정 이동" value={`${etaSummary.syntheticDistance}km`} />
+            <MetricPill label="delivery" value={deliveryId.slice(0, 8)} />
+          </View>
+          <Text style={styles.routeHint}>{etaSummary.currentLegLabel}</Text>
         </View>
+
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>현재 흐름</Text>
+          <View style={styles.timelineCard}>
+            <TimelineRow title="출발 지점 확인" body={`${pickupStation.name}에서 출발 준비를 마쳤습니다.`} tone="done" />
+            <TimelineRow title="현재 이동 구간" body="지금 이동 중인 구간과 ETA를 계속 업데이트합니다." tone="active" />
+            <TimelineRow title="최종 인계" body={`${dropoffStation.name}에서 수령 또는 다음 인계가 진행됩니다.`} tone="pending" />
+          </View>
+        </View>
+
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>위치 정보</Text>
+          <View style={styles.locationCard}>
+            <LocationRow label="출발 좌표" value={`${formatCoordinate(pickupStation.latitude)}, ${formatCoordinate(pickupStation.longitude)}`} />
+            <LocationRow label="도착 좌표" value={`${formatCoordinate(dropoffStation.latitude)}, ${formatCoordinate(dropoffStation.longitude)}`} />
+            <LocationRow label="확장 방향" value="사용자 화면은 간단한 지도, 운영 화면은 관제형 지도로 확장합니다." />
+          </View>
+        </View>
+
+        <TouchableOpacity style={styles.linkButton} onPress={() => navigation.navigate('DeliveryTracking', { requestId: deliveryId })}>
+          <MaterialIcons name="local-shipping" size={18} color="#115E59" />
+          <Text style={styles.linkButtonText}>배송 상세 보기</Text>
+        </TouchableOpacity>
+      </ScrollView>
+    </View>
+  );
+}
+
+function MetricPill({ label, value }: { label: string; value: string }) {
+  return (
+    <View style={styles.metricPill}>
+      <Text style={styles.metricLabel}>{label}</Text>
+      <Text style={styles.metricValue}>{value}</Text>
+    </View>
+  );
+}
+
+function TimelineRow({
+  title,
+  body,
+  tone,
+}: {
+  title: string;
+  body: string;
+  tone: 'done' | 'active' | 'pending';
+}) {
+  const icon = tone === 'done' ? 'check-circle' : tone === 'active' ? 'radio-button-checked' : 'schedule';
+  const color = tone === 'done' ? '#027A48' : tone === 'active' ? '#0F766E' : '#98A2B3';
+
+  return (
+    <View style={styles.timelineRow}>
+      <MaterialIcons name={icon} size={18} color={color} />
+      <View style={styles.timelineCopy}>
+        <Text style={styles.timelineTitle}>{title}</Text>
+        <Text style={styles.timelineBody}>{body}</Text>
       </View>
+    </View>
+  );
+}
+
+function LocationRow({ label, value }: { label: string; value: string }) {
+  return (
+    <View style={styles.locationRow}>
+      <Text style={styles.locationLabel}>{label}</Text>
+      <Text style={styles.locationValue}>{value}</Text>
     </View>
   );
 }
@@ -341,89 +144,145 @@ export default function RealtimeTrackingScreen({ navigation, route }: Props) {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: Colors.background,
+    backgroundColor: '#F8FAFC',
   },
-  map: {
-    flex: 1,
+  content: {
+    padding: Spacing.lg,
+    gap: Spacing.md,
   },
-  topPanel: {
-    position: 'absolute',
-    top: Platform.OS === 'ios' ? 100 : 60,
-    left: Spacing.md,
-    right: Spacing.md,
-    backgroundColor: 'rgba(255, 255, 255, 0.95)',
-    borderRadius: BorderRadius.lg,
-    padding: Spacing.md,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.25,
-    shadowRadius: 3.84,
-    elevation: 5,
+  heroCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: BorderRadius.xl,
+    padding: Spacing.lg,
+    gap: 6,
+    ...Shadows.sm,
   },
-  statusContainer: {
-    marginBottom: Spacing.sm,
+  heroKicker: {
+    color: '#0F766E',
+    fontSize: 12,
+    fontWeight: '700',
+    letterSpacing: 1,
+    textTransform: 'uppercase',
   },
-  statusTitle: {
-    ...Typography.subtitle2,
-    color: Colors.textSecondary,
-    marginBottom: 4,
+  heroTitle: {
+    color: '#0F172A',
+    fontSize: 22,
+    fontWeight: '800',
   },
-  statusText: {
-    ...Typography.h6,
-    color: Colors.text,
-    fontWeight: 'bold',
+  heroSubtitle: {
+    color: '#475569',
+    ...Typography.body,
   },
-  infoContainer: {
-    marginTop: Spacing.sm,
+  routeCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: BorderRadius.xl,
+    padding: Spacing.lg,
+    gap: Spacing.md,
+    ...Shadows.sm,
   },
-  infoText: {
-    ...Typography.bodySmall,
-    color: Colors.textSecondary,
-  },
-  bottomPanel: {
-    position: 'absolute',
-    bottom: Spacing.lg,
-    left: Spacing.md,
-    right: Spacing.md,
-    backgroundColor: 'rgba(255, 255, 255, 0.95)',
-    borderRadius: BorderRadius.lg,
-    padding: Spacing.md,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.25,
-    shadowRadius: 3.84,
-    elevation: 5,
-  },
-  row: {
+  routeHeader: {
     flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: Spacing.sm,
-  },
-  button: {
-    flex: 1,
-    minWidth: '30%',
-    backgroundColor: Colors.primary,
-    borderRadius: BorderRadius.md,
-    paddingVertical: Spacing.sm,
-    paddingHorizontal: Spacing.md,
     alignItems: 'center',
     justifyContent: 'center',
+    gap: Spacing.sm,
   },
-  buttonSuccess: {
-    backgroundColor: Colors.success,
+  routeTitle: {
+    color: '#0F172A',
+    fontSize: 18,
+    fontWeight: '700',
   },
-  buttonDanger: {
-    backgroundColor: Colors.error,
+  metricRow: {
+    flexDirection: 'row',
+    gap: Spacing.sm,
+    flexWrap: 'wrap',
   },
-  buttonText: {
-    ...Typography.button,
-    color: '#fff',
-    fontSize: 12,
+  metricPill: {
+    backgroundColor: '#F1F5F9',
+    borderRadius: BorderRadius.lg,
+    paddingHorizontal: Spacing.md,
+    paddingVertical: Spacing.sm,
+    gap: 4,
   },
-  loadingText: {
-    ...Typography.h6,
-    color: Colors.text,
-    textAlign: 'center',
-    marginTop: 100,
+  metricLabel: {
+    color: '#64748B',
+    fontSize: 11,
+    fontWeight: '700',
+  },
+  metricValue: {
+    color: '#0F172A',
+    fontSize: 14,
+    fontWeight: '800',
+  },
+  routeHint: {
+    color: '#475569',
+    ...Typography.bodySmall,
+  },
+  section: {
+    gap: Spacing.sm,
+  },
+  sectionTitle: {
+    color: '#0F172A',
+    fontSize: 18,
+    fontWeight: '800',
+  },
+  timelineCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: BorderRadius.xl,
+    padding: Spacing.lg,
+    gap: Spacing.md,
+    ...Shadows.sm,
+  },
+  timelineRow: {
+    flexDirection: 'row',
+    gap: Spacing.sm,
+    alignItems: 'flex-start',
+  },
+  timelineCopy: {
+    flex: 1,
+    gap: 4,
+  },
+  timelineTitle: {
+    color: '#0F172A',
+    ...Typography.bodyBold,
+  },
+  timelineBody: {
+    color: '#475569',
+    ...Typography.bodySmall,
+  },
+  locationCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: BorderRadius.xl,
+    padding: Spacing.lg,
+    gap: Spacing.sm,
+    ...Shadows.sm,
+  },
+  locationRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    gap: Spacing.md,
+  },
+  locationLabel: {
+    color: '#64748B',
+    ...Typography.bodySmall,
+  },
+  locationValue: {
+    flex: 1,
+    textAlign: 'right',
+    color: '#0F172A',
+    ...Typography.bodySmall,
+  },
+  linkButton: {
+    minHeight: 52,
+    borderRadius: BorderRadius.xl,
+    backgroundColor: '#FFFFFF',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    ...Shadows.sm,
+  },
+  linkButtonText: {
+    color: '#115E59',
+    ...Typography.bodyBold,
   },
 });

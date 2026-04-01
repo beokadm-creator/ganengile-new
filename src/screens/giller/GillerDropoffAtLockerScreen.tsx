@@ -1,90 +1,73 @@
-/**
- * Giller Dropoff At Locker Screen
- * 길러가 사물함에 물품을 보관하는 화면
- */
-
 import React, { useState } from 'react';
 import {
-  View,
-  Text,
-  StyleSheet,
-  TouchableOpacity,
-  Alert,
   ActivityIndicator,
+  Alert,
   ScrollView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
 } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
-import { useRoute, useNavigation } from '@react-navigation/native';
+import { RouteProp, useNavigation, useRoute } from '@react-navigation/native';
 import { requireUserId } from '../../services/firebase';
 import {
-  getLocker,
-  createLockerReservation,
-  updateReservationStatus,
   addReservationPhotos,
+  createLockerReservation,
+  getLocker,
+  updateReservationStatus,
 } from '../../services/locker-service';
-import QRCodeService from '../../services/qrcode-service';
+import { markAsDroppedAtLocker } from '../../services/delivery-service';
 import { takePhoto, uploadPhotoWithThumbnail } from '../../services/photo-service';
-import type { MainStackNavigationProp } from '../../types/navigation';
+import QRCodeService from '../../services/qrcode-service';
 import type { LockerSummary } from '../../types/locker';
-import { Colors, Spacing, Typography, BorderRadius } from '../../theme';
+import type { MainStackNavigationProp, MainStackParamList } from '../../types/navigation';
+import { BorderRadius, Spacing, Typography } from '../../theme';
 import LockerLocator from '../../components/delivery/LockerLocator';
 
-interface RouteParams {
-  deliveryId: string;
-}
-
-type Step = 'select_locker' | 'confirm' | 'deposit' | 'photo' | 'complete';
+type DropoffRoute = RouteProp<MainStackParamList, 'GillerDropoffAtLocker'>;
+type Step = 'select' | 'reserve' | 'photo' | 'complete';
 
 export default function GillerDropoffAtLockerScreen() {
-  const route = useRoute();
   const navigation = useNavigation<MainStackNavigationProp>();
-  const { deliveryId } = (route.params as RouteParams) || {};
+  const route = useRoute<DropoffRoute>();
+  const { deliveryId } = route.params;
 
-  const [currentStep, setCurrentStep] = useState<Step>('select_locker');
-  const [loading, setLoading] = useState(false);
+  const [step, setStep] = useState<Step>('select');
+  const [working, setWorking] = useState(false);
   const [selectedLocker, setSelectedLocker] = useState<LockerSummary | null>(null);
-  const [dropoffPhotoUrl, setDropoffPhotoUrl] = useState<string | null>(null);
   const [reservationId, setReservationId] = useState<string | null>(null);
+  const [dropoffPhotoUrl, setDropoffPhotoUrl] = useState<string | null>(null);
 
-  const handleLockerSelect = async (locker: LockerSummary) => {
+  const handleLockerSelect = async (locker: LockerSummary): Promise<void> => {
     try {
-      setLoading(true);
+      setWorking(true);
       const lockerDetail = await getLocker(locker.lockerId);
-      
-      if (!lockerDetail) {
-        Alert.alert('오류', '사물함 정보를 찾을 수 없습니다.');
-        return;
-      }
-
-      if (lockerDetail.availability.available <= 0) {
-        Alert.alert('사용 불가', '이 사물함은 사용 가능한 공간이 없습니다.');
+      if (!lockerDetail || lockerDetail.availability.available <= 0) {
+        Alert.alert('사물함 선택 불가', '지금은 이 사물함을 사용할 수 없어요.');
         return;
       }
 
       setSelectedLocker(locker);
-      setCurrentStep('confirm');
+      setStep('reserve');
     } catch (error) {
-      console.error('Error loading locker:', error);
-      Alert.alert('오류', '사물함 정보를 불러오는데 실패했습니다.');
+      console.error('Failed to select locker:', error);
+      Alert.alert('사물함 확인 실패', '잠시 후 다시 시도해 주세요.');
     } finally {
-      setLoading(false);
+      setWorking(false);
     }
   };
 
-  const handleConfirm = async () => {
-    if (!selectedLocker || !deliveryId) return;
+  const handleReserve = async (): Promise<void> => {
+    if (!selectedLocker) {
+      return;
+    }
 
     try {
-      setLoading(true);
-      const userId = await requireUserId();
-
-      // QR코드 생성 (사물함 인계용)
+      setWorking(true);
+      const userId = requireUserId();
       const qrCode = QRCodeService.generatePickupQRCode(deliveryId, userId);
-
-      // 예약 생성
-      const now = new Date();
-      const startTime = new Date(now.getTime() + 5 * 60 * 1000); // 5분 후
-      const endTime = new Date(startTime.getTime() + 4 * 60 * 60 * 1000); // 4시간 후
+      const startTime = new Date();
+      const endTime = new Date(startTime.getTime() + 4 * 60 * 60 * 1000);
 
       const reservation = await createLockerReservation(
         selectedLocker.lockerId,
@@ -96,442 +79,128 @@ export default function GillerDropoffAtLockerScreen() {
         qrCode
       );
 
-      // 예약 ID 저장
       setReservationId(reservation.reservationId);
-
-      Alert.alert(
-        '✅ 사물함 예약 완료',
-        `${selectedLocker.stationName}\n\nQR코드가 생성되었습니다.\n\n이용자에게 QR코드를 전송하세요.`,
-        [
-          { text: '취소', style: 'cancel' },
-          {
-            text: '확인',
-            onPress: () => setCurrentStep('deposit'),
-          },
-        ]
-      );
+      setStep('photo');
     } catch (error) {
-      console.error('Error creating reservation:', error);
-      Alert.alert('오류', '사물함 예약에 실패했습니다.');
+      console.error('Failed to reserve locker:', error);
+      Alert.alert('사물함 예약 실패', '잠시 후 다시 시도해 주세요.');
     } finally {
-      setLoading(false);
+      setWorking(false);
     }
   };
 
-  const handleDeposit = () => {
-    Alert.alert(
-      '사물함 보관',
-      '1. 물품을 사물함에 넣으세요\n2. 문을 잠그세요\n3. 확인을 누르세요',
-      [
-        { text: '취소', style: 'cancel' },
-        {
-          text: '보관 완료',
-          onPress: () => setCurrentStep('photo'),
-        },
-      ]
-    );
-  };
-
-  const handleTakePhoto = async () => {
+  const handleTakePhoto = async (): Promise<void> => {
     try {
+      setWorking(true);
       const photoUri = await takePhoto();
-      if (!photoUri) return;
+      if (!photoUri) {
+        return;
+      }
 
-      setLoading(true);
-      const userId = await requireUserId();
-      const result = await uploadPhotoWithThumbnail(photoUri, userId, 'dropoff');
-      setDropoffPhotoUrl(result.url);
-      setCurrentStep('complete');
+      const userId = requireUserId();
+      const uploaded = await uploadPhotoWithThumbnail(photoUri, userId, 'locker-dropoff');
+      setDropoffPhotoUrl(uploaded.url);
+      setStep('complete');
     } catch (error) {
-      console.error('Error taking photo:', error);
-      Alert.alert('오류', '사진 촬영에 실패했습니다.');
+      console.error('Failed to take dropoff photo:', error);
+      Alert.alert('보관 사진 촬영 실패', '잠시 후 다시 시도해 주세요.');
     } finally {
-      setLoading(false);
+      setWorking(false);
     }
   };
 
-  const handleComplete = async () => {
-    if (!reservationId || !deliveryId || !selectedLocker) {
-      Alert.alert('오류', '필요한 정보가 누락되었습니다. 다시 시도해주세요.');
+  const handleComplete = async (): Promise<void> => {
+    if (!selectedLocker || !reservationId) {
       return;
     }
 
     try {
-      setLoading(true);
-      const userId = await requireUserId();
+      setWorking(true);
+      const userId = requireUserId();
 
-      // 1. 예약에 사진 저장
       if (dropoffPhotoUrl) {
-        await addReservationPhotos(reservationId, '', dropoffPhotoUrl);
+        await addReservationPhotos(reservationId, undefined, dropoffPhotoUrl);
       }
 
-      // 2. 예약 상태 업데이트 (completed)
       await updateReservationStatus(reservationId, 'completed');
-
-      // 3. 배송 상태 업데이트 (at_locker)
-      const { markAsDroppedAtLocker } = require('../../services/delivery-service');
-      const result = await markAsDroppedAtLocker(
-        deliveryId,
-        userId,
-        selectedLocker.lockerId,
-        reservationId
-      );
+      const result = await markAsDroppedAtLocker(deliveryId, userId, selectedLocker.lockerId, reservationId);
 
       if (!result.success) {
-        throw new Error(result.message);
+        Alert.alert('보관 완료 실패', result.message);
+        return;
       }
 
-      Alert.alert(
-        '✅ 인계 완료',
-        '사물함에 물품을 보관했습니다.\n이용자에게 수령 안내 알림이 자동으로 발송됩니다.',
-        [
-          {
-            text: '확인',
-            onPress: () => navigation.navigate('Tabs', { screen: 'Home' }),
-          },
-        ]
-      );
-    } catch (error: any) {
-      console.error('Error completing dropoff:', error);
-      Alert.alert(
-        '오류',
-        error.message || '인계 완료 처리에 실패했습니다.'
-      );
+      Alert.alert('사물함 보관 완료', '보관이 기록됐고 다음 인계 단계로 이어집니다.', [
+        { text: '홈으로 이동', onPress: () => navigation.navigate('Tabs', { screen: 'Home' }) },
+      ]);
+    } catch (error) {
+      console.error('Failed to complete locker dropoff:', error);
+      Alert.alert('보관 완료 실패', '잠시 후 다시 시도해 주세요.');
     } finally {
-      setLoading(false);
+      setWorking(false);
     }
   };
 
-  const renderStep = () => {
-    switch (currentStep) {
-      case 'select_locker':
-        return (
-          <LockerLocator
-            onLockerSelect={handleLockerSelect}
-            onClose={() => navigation.goBack()}
-          />
-        );
-
-      case 'confirm':
-        return (
-          <View style={styles.stepContainer}>
-            <View style={styles.stepHeader}>
-              <Ionicons name="checkmark-circle" size={48} color={Colors.success} />
-              <Text style={styles.stepTitle}>사물함 확인</Text>
-              <Text style={styles.stepDescription}>
-                선택한 사물함을 확인하세요
-              </Text>
-            </View>
-
-            {selectedLocker && (
-              <View style={styles.lockerInfo}>
-                <View style={styles.lockerInfoRow}>
-                  <Text style={styles.lockerInfoLabel}>사물함:</Text>
-                  <Text style={styles.lockerInfoValue}>{selectedLocker.stationName}</Text>
-                </View>
-                <View style={styles.lockerInfoRow}>
-                  <Text style={styles.lockerInfoLabel}>유형:</Text>
-                  <Text style={styles.lockerInfoValue}>
-                    {selectedLocker.status === 'available' ? '사용 가능' : '점유 중'}
-                  </Text>
-                </View>
-                <View style={styles.lockerInfoRow}>
-                  <Text style={styles.lockerInfoLabel}>상태:</Text>
-                  <Text style={styles.lockerInfoValue}>
-                    {selectedLocker.status === 'available' ? '사용 가능' : '사용 중'}
-                  </Text>
-                </View>
-              </View>
-            )}
-
-            <TouchableOpacity
-              style={styles.actionButton}
-              onPress={handleConfirm}
-              disabled={loading}
-            >
-              <Text style={styles.actionButtonText}>
-                {loading ? '처리 중...' : 'QR코드 생성'}
-              </Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              style={styles.backButton}
-              onPress={() => setCurrentStep('select_locker')}
-            >
-              <Text style={styles.backButtonText}>다른 사물함 선택</Text>
-            </TouchableOpacity>
-          </View>
-        );
-
-      case 'deposit':
-        return (
-          <View style={styles.stepContainer}>
-            <View style={styles.stepHeader}>
-              <Ionicons name="cube" size={48} color={Colors.accent} />
-              <Text style={styles.stepTitle}>사물함 보관</Text>
-              <Text style={styles.stepDescription}>
-                물품을 사물함에 넣으세요
-              </Text>
-            </View>
-
-            <View style={styles.instructionContainer}>
-              <Text style={styles.instructionStep}>1. 사물함을 여세요</Text>
-              <Text style={styles.instructionStep}>2. 물품을 넣으세요</Text>
-              <Text style={styles.instructionStep}>3. 문을 잠그세요</Text>
-              <Text style={styles.instructionStep}>4. 보관 완료를 누르세요</Text>
-            </View>
-
-            <TouchableOpacity
-              style={styles.actionButton}
-              onPress={handleDeposit}
-            >
-              <Text style={styles.actionButtonText}>보관 완료</Text>
-            </TouchableOpacity>
-          </View>
-        );
-
-      case 'photo':
-        return (
-          <View style={styles.stepContainer}>
-            <View style={styles.stepHeader}>
-              <Ionicons name="image" size={48} color={Colors.primary} />
-              <Text style={styles.stepTitle}>사진 촬영</Text>
-              <Text style={styles.stepDescription}>
-                인계 증거 사진을 촬영하세요
-              </Text>
-            </View>
-
-            {dropoffPhotoUrl && (
-              <View style={styles.photoPreview}>
-                <Text style={styles.photoPreviewText}>사진이 촬영되었습니다</Text>
-                <TouchableOpacity
-                  style={styles.retakeButton}
-                  onPress={handleTakePhoto}
-                >
-                  <Text style={styles.retakeButtonText}>다시 촬영</Text>
-                </TouchableOpacity>
-              </View>
-            )}
-
-            <TouchableOpacity
-              style={styles.actionButton}
-              onPress={handleComplete}
-              disabled={!dropoffPhotoUrl || loading}
-            >
-              <Text style={styles.actionButtonText}>
-                {loading ? '처리 중...' : '완료'}
-              </Text>
-            </TouchableOpacity>
-          </View>
-        );
-
-      case 'complete':
-        return (
-          <View style={styles.stepContainer}>
-            <View style={styles.stepHeader}>
-              <Ionicons name="checkmark-circle" size={48} color={Colors.success} />
-              <Text style={styles.stepTitle}>인계 완료</Text>
-              <Text style={styles.stepDescription}>
-                사물함에 보관했습니다
-              </Text>
-            </View>
-
-            {dropoffPhotoUrl && (
-              <View style={styles.summaryContainer}>
-                <Text style={styles.summaryText}>✅ 사진 촬영 완료</Text>
-                <Text style={styles.summaryText}>✅ 사물함 보관 완료</Text>
-                <Text style={styles.summaryText}>✅ 예약 완료</Text>
-              </View>
-            )}
-
-            <TouchableOpacity
-              style={styles.actionButton}
-              onPress={() => navigation.goBack()}
-            >
-              <Text style={styles.actionButtonText}>확인</Text>
-            </TouchableOpacity>
-          </View>
-        );
-
-      default:
-        return null;
-    }
-  };
-
-  if (loading && currentStep === 'select_locker') {
+  if (step === 'select') {
     return (
-      <View style={styles.centerContainer}>
-        <ActivityIndicator size="large" color={Colors.secondary} />
-        <Text style={styles.loadingText}>로딩 중...</Text>
-      </View>
+      <LockerLocator
+        onLockerSelect={(locker) => {
+          void handleLockerSelect(locker);
+        }}
+        onClose={() => navigation.goBack()}
+      />
     );
   }
 
   return (
-    <View style={styles.container}>
-      {/* Header */}
+    <ScrollView style={styles.container} contentContainerStyle={styles.content}>
       <View style={styles.header}>
-        <TouchableOpacity
-          style={styles.backButton}
-          onPress={() => navigation.goBack()}
-        >
-          <Ionicons name="arrow-back" size={24} color={Colors.white} />
-        </TouchableOpacity>
-        <Text style={styles.title}>사물함 인계</Text>
-        <View style={styles.backButton} />
+        <Text style={styles.title}>사물함 보관</Text>
+        <Text style={styles.subtitle}>선택한 사물함 예약, 보관 사진, 배송 상태 업데이트 순서로 진행합니다.</Text>
       </View>
 
-      {/* Content */}
-      <ScrollView style={styles.content}>
-        {renderStep()}
-      </ScrollView>
-    </View>
+      <View style={styles.card}>
+        <Text style={styles.sectionTitle}>선택 정보</Text>
+        <Text style={styles.bodyText}>사물함: {selectedLocker?.stationName ?? '-'}</Text>
+        <Text style={styles.bodyText}>상태: {selectedLocker?.status ?? '-'}</Text>
+      </View>
+
+      {step === 'reserve' ? (
+        <TouchableOpacity style={styles.primaryButton} onPress={() => { void handleReserve(); }} disabled={working}>
+          {working ? <ActivityIndicator size="small" color="#FFFFFF" /> : <Text style={styles.primaryButtonText}>사물함 예약 생성</Text>}
+        </TouchableOpacity>
+      ) : null}
+
+      {step === 'photo' ? (
+        <TouchableOpacity style={styles.primaryButton} onPress={() => void handleTakePhoto()} disabled={working}>
+          {working ? <ActivityIndicator size="small" color="#FFFFFF" /> : <Text style={styles.primaryButtonText}>보관 사진 촬영</Text>}
+        </TouchableOpacity>
+      ) : null}
+
+      {step === 'complete' ? (
+        <TouchableOpacity style={styles.primaryButton} onPress={() => void handleComplete()} disabled={working}>
+          {working ? <ActivityIndicator size="small" color="#FFFFFF" /> : <Text style={styles.primaryButtonText}>보관 완료 처리</Text>}
+        </TouchableOpacity>
+      ) : null}
+    </ScrollView>
   );
 }
 
 const styles = StyleSheet.create({
-  centerContainer: {
+  container: { flex: 1, backgroundColor: '#F8FAFC' },
+  content: { padding: 20, gap: 16 },
+  header: { gap: 8 },
+  title: { fontSize: 28, fontWeight: '800', color: '#0F172A' },
+  subtitle: { fontSize: 15, lineHeight: 22, color: '#64748B' },
+  card: { backgroundColor: '#FFFFFF', borderRadius: BorderRadius.xl, padding: Spacing.lg, gap: 8 },
+  sectionTitle: { fontSize: Typography.fontSize.lg, fontWeight: '800', color: '#0F172A' },
+  bodyText: { fontSize: Typography.fontSize.sm, color: '#334155' },
+  primaryButton: {
     alignItems: 'center',
-    flex: 1,
     justifyContent: 'center',
-    padding: Spacing.lg,
+    paddingVertical: 16,
+    borderRadius: 18,
+    backgroundColor: '#2563EB',
   },
-  container: {
-    backgroundColor: Colors.gray100,
-    flex: 1,
-  },
-  header: {
-    alignItems: 'center',
-    backgroundColor: Colors.secondary,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    paddingTop: 60,
-    paddingBottom: Spacing.lg,
-    paddingHorizontal: Spacing.lg,
-  },
-  backButton: {
-    width: 40,
-  },
-  title: {
-    color: Colors.white,
-    fontSize: Typography.fontSize.xl,
-    fontWeight: Typography.fontWeight.bold,
-  },
-  content: {
-    flex: 1,
-  },
-  stepContainer: {
-    backgroundColor: Colors.white,
-    borderRadius: BorderRadius.lg,
-    padding: Spacing.xl,
-  },
-  stepHeader: {
-    alignItems: 'center',
-    marginBottom: Spacing.xl,
-  },
-  stepTitle: {
-    color: Colors.textPrimary,
-    fontSize: Typography.fontSize.xl,
-    fontWeight: Typography.fontWeight.bold,
-    marginTop: Spacing.md,
-  },
-  stepDescription: {
-    color: Colors.gray600,
-    fontSize: Typography.fontSize.sm,
-    marginTop: Spacing.sm,
-    textAlign: 'center',
-  },
-  lockerInfo: {
-    backgroundColor: Colors.gray100,
-    borderRadius: BorderRadius.md,
-    marginBottom: Spacing.lg,
-    padding: Spacing.lg,
-  },
-  lockerInfoRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginBottom: Spacing.sm,
-  },
-  lockerInfoLabel: {
-    color: Colors.gray600,
-    fontSize: Typography.fontSize.sm,
-  },
-  lockerInfoValue: {
-    color: Colors.textPrimary,
-    fontSize: Typography.fontSize.sm,
-    fontWeight: Typography.fontWeight.semibold,
-  },
-  instructionContainer: {
-    backgroundColor: Colors.gray100,
-    borderRadius: BorderRadius.md,
-    marginBottom: Spacing.lg,
-    padding: Spacing.lg,
-  },
-  instructionStep: {
-    color: Colors.textPrimary,
-    fontSize: Typography.fontSize.base,
-    marginBottom: Spacing.sm,
-  },
-  actionButton: {
-    alignItems: 'center',
-    backgroundColor: Colors.primary,
-    borderRadius: BorderRadius.md,
-    justifyContent: 'center',
-    padding: Spacing.lg,
-  },
-  actionButtonText: {
-    color: Colors.white,
-    fontSize: Typography.fontSize.base,
-    fontWeight: Typography.fontWeight.semibold,
-  },
-  backButtonSecondary: {
-    alignItems: 'center',
-    backgroundColor: 'transparent',
-    borderRadius: BorderRadius.md,
-    justifyContent: 'center',
-    padding: Spacing.md,
-  },
-  backButtonText: {
-    color: Colors.primary,
-    fontSize: Typography.fontSize.sm,
-  },
-  photoPreview: {
-    alignItems: 'center',
-    backgroundColor: Colors.successLight,
-    borderRadius: BorderRadius.md,
-    marginBottom: Spacing.lg,
-    padding: Spacing.lg,
-  },
-  photoPreviewText: {
-    color: Colors.success,
-    fontSize: Typography.fontSize.base,
-    fontWeight: Typography.fontWeight.semibold,
-  },
-  retakeButton: {
-    backgroundColor: Colors.white,
-    borderRadius: BorderRadius.sm,
-    marginTop: Spacing.sm,
-    paddingHorizontal: Spacing.lg,
-    paddingVertical: Spacing.sm,
-  },
-  retakeButtonText: {
-    color: Colors.primary,
-    fontSize: Typography.fontSize.sm,
-  },
-  loadingText: {
-    color: Colors.gray600,
-    fontSize: Typography.fontSize.sm,
-    marginTop: Spacing.md,
-  },
-  summaryContainer: {
-    backgroundColor: Colors.successLight,
-    borderRadius: BorderRadius.md,
-    marginBottom: Spacing.lg,
-    padding: Spacing.lg,
-  },
-  summaryText: {
-    color: Colors.success,
-    fontSize: Typography.fontSize.base,
-    marginBottom: Spacing.sm,
-  },
+  primaryButtonText: { fontSize: 15, fontWeight: '700', color: '#FFFFFF' },
 });

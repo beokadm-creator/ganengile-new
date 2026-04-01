@@ -1,1135 +1,209 @@
-/**
- * Delivery Tracking Screen
- * 실시간 배송 추적 화면
- * 개선사항: 네트워크 에러 처리, 재시도 로직, 더 나은 UX
- */
-
-import React, { useState, useEffect, useContext, useCallback, useMemo, useRef } from 'react';
-import {
-  View,
-  Text,
-  StyleSheet,
-  ScrollView,
-  ActivityIndicator,
-  TouchableOpacity,
-  Dimensions,
-  Alert,
-  RefreshControl,
-} from 'react-native';
-import { StackNavigationProp } from '@react-navigation/stack';
-import { subscribeToDeliveryByRequestId, confirmDeliveryByRequester, getDeliveryByRequestId } from '../../services/delivery-service';
-import { subscribeToRequest, getRequestById } from '../../services/request-service';
+﻿import React, { useEffect, useMemo, useState } from 'react';
+import type { JSX } from 'react';
+import { ActivityIndicator, RefreshControl, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { MaterialIcons } from '@expo/vector-icons';
+import { RouteProp, useNavigation, useRoute } from '@react-navigation/native';
+import { NaverMapCard } from '../../components/maps/NaverMapCard';
 import { getChatRoomByRequestId } from '../../services/chat-service';
+import { confirmDeliveryByRequester, getDeliveryByRequestId, subscribeToDeliveryByRequestId } from '../../services/delivery-service';
 import { requireUserId } from '../../services/firebase';
-import { UserContext } from '../../contexts/UserContext';
-import type { UserContextType } from '../../contexts/UserContext';
-import { toTrackingModel, TrackingModel, TrackingEvent } from '../../utils/request-adapters';
-import { formatTimeKR } from '../../utils/date';
-import { startDeliveryTracking, stopDeliveryTracking } from '../../services/location-tracking-service';
+import { getRequestById, subscribeToRequest } from '../../services/request-service';
+import { BorderRadius, Shadows, Spacing, Typography } from '../../theme';
+import type { MainStackNavigationProp, MainStackParamList } from '../../types/navigation';
 import { formatWeightDisplay } from '../../utils/package-weight';
-import AppTopBar from '../../components/common/AppTopBar';
+import { toTrackingModel, type TrackingEvent, type TrackingModel } from '../../utils/request-adapters';
 
-// Utils
-import { retryWithBackoff, retryFirebaseQuery } from '../../utils/retry-with-backoff';
-import { showErrorAlert, isNetworkError } from '../../utils/error-handler';
-import { isNetworkAvailable, addNetworkListener } from '../../utils/network-detector';
+type DeliveryLookup = { deliveryId: string; gillerId?: string };
+type DeliveryTrackingRoute = RouteProp<MainStackParamList, 'DeliveryTracking'>;
 
-const { width: _width } = Dimensions.get('window');
-
-type NavigationProp = StackNavigationProp<any>;
-
-interface Props {
-  navigation: NavigationProp;
-  route: {
-    params: {
-      requestId: string;
-    };
-  };
+function formatDateLabel(value: Date | string | undefined): string {
+  if (!value) return '-';
+  const resolved = value instanceof Date ? value : new Date(value);
+  if (Number.isNaN(resolved.getTime())) return '-';
+  return resolved.toLocaleString('ko-KR', { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' });
 }
 
-export default function DeliveryTrackingScreen({ navigation, route }: Props) {
-  const { requestId } = route.params || {};
-
-  // requestId 없으면 홈으로 복귀
-  useEffect(() => {
-    if (!requestId) {
-      navigation.goBack();
-    }
-  }, [requestId]);
-
-  if (!requestId) {
-    return null;
-  }
-  const { user: _user, currentRole } = useContext(UserContext) as UserContextType;
-
+export default function DeliveryTrackingScreen(): JSX.Element {
+  const navigation = useNavigation<MainStackNavigationProp>();
+  const route = useRoute<DeliveryTrackingRoute>();
+  const requestId = route.params.requestId ?? route.params.matchId ?? '';
   const [trackingData, setTrackingData] = useState<TrackingModel | null>(null);
-  const [trackingEvents, setTrackingEvents] = useState<TrackingEvent[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  const [isOnline, setIsOnline] = useState(true);
-  const [progress, setProgress] = useState(0);
-  const [retryCount, setRetryCount] = useState(0);
-  const [_currentLocation, setCurrentLocation] = useState<{ latitude: number; longitude: number } | null>(null);
-  const [isTracking, setIsTracking] = useState(false);
-  const isTrackingRef = useRef(false);
-  const unsubscribeRequestRef = useRef<(() => void) | null>(null);
   const [confirming, setConfirming] = useState(false);
 
-  // Memoized values
-  const progressValue = useMemo(() => progress, [progress]);
-
   useEffect(() => {
-    setupNetworkListener();
-
-    // 실시간 delivery 구독 시작
-    const unsubscribeDelivery = subscribeToDeliveryByRequestId(requestId, (deliveryData) => {
-      if (deliveryData) {
-        const model = toTrackingModel(deliveryData);
-        setTrackingData(model);
-        setTrackingEvents(model.trackingEvents || []);
-        calculateProgress(model.status);
+    let fallbackUnsubscribe: (() => void) | null = null;
+    const unsubscribeDelivery = subscribeToDeliveryByRequestId(requestId, (delivery) => {
+      if (delivery) {
+        setTrackingData(toTrackingModel(delivery));
         setLoading(false);
-
-        if ((model.status === 'in_transit' || model.status === 'arrived') && !isTrackingRef.current && deliveryData.deliveryId) {
-          startDeliveryTracking(deliveryData.deliveryId);
-          isTrackingRef.current = true;
-          setIsTracking(true);
-        }
-      } else {
-        // delivery 미생성 시 (pending/matched) → request 구독
-        unsubscribeRequestRef.current?.();
-        unsubscribeRequestRef.current = subscribeToRequest(requestId, (requestData) => {
-          if (requestData) {
-            const model = toTrackingModel(requestData);
-            setTrackingData(model);
-            setTrackingEvents(model.trackingEvents || []);
-            calculateProgress(model.status);
-          }
-          setLoading(false);
-        });
+        return;
       }
+      fallbackUnsubscribe?.();
+      fallbackUnsubscribe = subscribeToRequest(requestId, (request) => {
+        if (request) setTrackingData(toTrackingModel(request));
+        setLoading(false);
+      });
     });
-
     return () => {
       unsubscribeDelivery();
-      unsubscribeRequestRef.current?.();
-      if (isTrackingRef.current) {
-        stopDeliveryTracking();
-        isTrackingRef.current = false;
-      }
+      fallbackUnsubscribe?.();
     };
   }, [requestId]);
 
-  const setupNetworkListener = () => {
-    const unsubscribe = addNetworkListener((state) => {
-      setIsOnline(state.isOnline);
-
-      // Auto-refresh when coming back online
-      if (state.isOnline && !loading) {
-        loadTrackingData();
-      }
-    });
-
-    return unsubscribe;
-  };
-
-  const loadTrackingData = async () => {
-    // Check network first
-    const networkAvailable = await isNetworkAvailable();
-    if (!networkAvailable) {
-      setIsOnline(false);
-      setLoading(false);
-      return;
-    }
-
-    setIsOnline(true);
-    setRetryCount(0);
-
+  async function loadTracking() {
     try {
-      // Try to get delivery first with retry
-      const deliveryData = await retryWithBackoff(
-        () => getDeliveryByRequestId(requestId),
-        {
-          maxAttempts: 3,
-          timeoutMs: 15000,
-          onRetry: (attempt) => {
-            setRetryCount(attempt);
-            console.log(`Retry attempt ${attempt} for delivery data...`);
-          },
-        }
-      );
-
-      if (deliveryData) {
-        const model = toTrackingModel(deliveryData);
-        setTrackingData(model);
-        setTrackingEvents(model.trackingEvents || []);
-        calculateProgress(model.status);
-
-        // Start real-time tracking for in_transit status
-        if (model.status === 'in_transit' || model.status === 'arrived') {
-          if (!isTracking && deliveryData.id) {
-            startDeliveryTracking(deliveryData.id);
-            setIsTracking(true);
-          }
-
-          // Update current location
-          if (deliveryData.tracking?.currentLocation) {
-            setCurrentLocation(deliveryData.tracking.currentLocation);
-          }
-        }
-      } else {
-        // Fallback to request data
-        const requestData = await retryFirebaseQuery(() => getRequestById(requestId));
-        if (requestData) {
-          const model = toTrackingModel(requestData);
-          setTrackingData(model);
-          setTrackingEvents(model.trackingEvents || []);
-          calculateProgress(model.status);
-        }
+      const delivery = (await getDeliveryByRequestId(requestId)) as DeliveryLookup | Record<string, unknown> | null;
+      if (delivery) {
+        setTrackingData(toTrackingModel(delivery));
+        return;
       }
+      const request = await getRequestById(requestId);
+      if (request) setTrackingData(toTrackingModel(request));
     } catch (error) {
-      console.error('Error loading tracking data:', error);
-
-      // Show user-friendly error
-      if (isNetworkError(error)) {
-        Alert.alert(
-          '네트워크 오류',
-          '배송 정보를 불러오지 못했습니다. 네트워크 연결을 확인해주세요.',
-          [
-            { text: '확인', style: 'cancel' },
-            { text: '다시 시도', onPress: loadTrackingData },
-          ]
-        );
-      } else {
-        showErrorAlert(error, '배송 정보 로딩 오류', loadTrackingData);
-      }
+      console.error('Failed to load tracking', error);
     } finally {
       setLoading(false);
+      setRefreshing(false);
     }
-  };
-
-  const onRefresh = useCallback(async () => {
-    setRefreshing(true);
-    await loadTrackingData();
-    setRefreshing(false);
-  }, [requestId]);
-
-  const calculateProgress = useCallback((status: string) => {
-    const progressMap: Record<string, number> = {
-      pending: 10,
-      matched: 25,
-      accepted: 40,
-      in_transit: 60,
-      arrived: 80,
-      at_locker: 85,
-      delivered: 90,
-      completed: 100,
-      cancelled: 0,
-      quote_requested: 5,
-      quote_received: 15,
-      scheduled: 20,
-    };
-
-    setProgress(progressMap[status] || 0);
-  }, []);
-
-  const getStatusColor = useCallback((status: string): string => {
-    switch (status) {
-      case 'pending':
-        return '#FFA726';
-      case 'matched':
-        return '#42A5F5';
-      case 'accepted':
-        return '#26C6DA';
-      case 'in_transit':
-        return '#AB47BC';
-      case 'arrived':
-        return '#66BB6A';
-      case 'at_locker':
-        return '#7CB342';
-      case 'delivered':
-        return '#8BC34A';
-      case 'completed':
-        return '#4CAF50';
-      case 'cancelled':
-        return '#EF5350';
-      default:
-        return '#9E9E9E';
-    }
-  }, []);
-
-  const getStatusText = useCallback((status: string): string => {
-    switch (status) {
-      case 'pending':
-        return '매칭 대기 중';
-      case 'matched':
-        return '매칭 완료';
-      case 'accepted':
-        return '수락 완료';
-      case 'in_transit':
-        return '배송 중';
-      case 'arrived':
-        return '도착 완료';
-      case 'at_locker':
-        return '사물함 보관 완료';
-      case 'delivered':
-        return '수령 확인 대기';
-      case 'completed':
-        return '배송 완료';
-      case 'cancelled':
-        return '취소됨';
-      default:
-        return status;
-    }
-  }, []);
-
-  const formatTime = useCallback((date: Date): string => formatTimeKR(date), []);
-
-  // Loading state
-  if (loading) {
-    return (
-      <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color="#00BCD4" />
-        <Text style={styles.loadingText}>
-          {retryCount > 0 ? `재시도 중... (${retryCount})` : '로딩 중...'}
-        </Text>
-      </View>
-    );
   }
 
-  // Offline state
-  if (!isOnline) {
-    return (
-      <View style={styles.container}>
-        <AppTopBar title="배송 추적" onBack={() => navigation.goBack()} />
+  const progress = useMemo(() => calculateProgress(trackingData?.status ?? 'pending'), [trackingData?.status]);
+  const pickupLatitude = trackingData?.pickupStation.lat ?? 37.5665;
+  const pickupLongitude = trackingData?.pickupStation.lng ?? 126.978;
+  const deliveryLatitude = trackingData?.deliveryStation.lat ?? 37.57;
+  const deliveryLongitude = trackingData?.deliveryStation.lng ?? 126.99;
+  const mapCenter = { latitude: (pickupLatitude + deliveryLatitude) / 2, longitude: (pickupLongitude + deliveryLongitude) / 2 };
 
-        <View style={styles.offlineContainer}>
-          <Text style={styles.offlineIcon}>📡</Text>
-          <Text style={styles.offlineTitle}>오프라인</Text>
-          <Text style={styles.offlineText}>
-            인터넷 연결을 확인해주세요.
-          </Text>
-          <TouchableOpacity style={styles.retryButton} onPress={loadTrackingData}>
-            <Text style={styles.retryButtonText}>다시 시도</Text>
-          </TouchableOpacity>
-        </View>
-      </View>
-    );
+  async function openChat() {
+    try {
+      const room = await getChatRoomByRequestId(requestId);
+      if (!room) return;
+      const viewerId = requireUserId();
+      const other = room.participants.user1.userId === viewerId ? room.participants.user2 : room.participants.user1;
+      navigation.navigate('Chat', { chatRoomId: room.chatRoomId, otherUserId: other.userId, otherUserName: other.name });
+    } catch (error) {
+      console.error('Failed to open chat', error);
+    }
   }
 
-  // No data state
-  if (!trackingData) {
-    return (
-      <View style={styles.container}>
-        <AppTopBar title="배송 추적" onBack={() => navigation.goBack()} />
+  async function handleConfirmDelivery() {
+    try {
+      setConfirming(true);
+      const delivery = (await getDeliveryByRequestId(requestId)) as DeliveryLookup | null;
+      if (!delivery?.deliveryId) return;
+      const result = await confirmDeliveryByRequester({ deliveryId: delivery.deliveryId, requesterId: requireUserId() });
+      if (result.success) await loadTracking();
+    } catch (error) {
+      console.error('Failed to confirm delivery', error);
+    } finally {
+      setConfirming(false);
+    }
+  }
 
-        <View style={styles.errorContainer}>
-          <Text style={styles.errorIcon}>❌</Text>
-          <Text style={styles.errorTitle}>정보를 찾을 수 없음</Text>
-          <Text style={styles.errorText}>
-            배송 정보를 불러올 수 없습니다.
-          </Text>
-          <TouchableOpacity style={styles.retryButton} onPress={loadTrackingData}>
-            <Text style={styles.retryButtonText}>다시 시도</Text>
-          </TouchableOpacity>
-        </View>
-      </View>
-    );
+  if (loading || !trackingData) {
+    return <View style={styles.centerState}><ActivityIndicator size="large" color="#0F766E" /><Text style={styles.centerText}>배송 추적 정보를 불러오는 중입니다.</Text></View>;
   }
 
   return (
-    <View style={styles.container}>
-      {/* Header */}
-      <AppTopBar
-        title="배송 추적"
-        onBack={() => navigation.goBack()}
-        rightSlot={(
-          <TouchableOpacity onPress={onRefresh} style={styles.refreshButton} accessibilityLabel="새로고침">
-            <ActivityIndicator size="small" color={refreshing ? '#00BCD4' : '#999'} animating={refreshing} />
-          </TouchableOpacity>
-        )}
-      />
+    <ScrollView style={styles.container} contentContainerStyle={styles.content} showsVerticalScrollIndicator={false} refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => void loadTracking()} />}>
+      <View style={styles.hero}>
+        <Text style={styles.heroKicker}>가는길에 배송 추적</Text>
+        <Text style={styles.heroTitle}>{getStatusLabel(trackingData.status)}</Text>
+        <Text style={styles.heroSubtitle}>현재 leg 기준 진행률과 다음 액션을 함께 보여줍니다.</Text>
+        <View style={styles.progressRail}><View style={[styles.progressFill, { width: `${progress}%` }]} /></View>
+        <Text style={styles.progressText}>{progress}% 진행</Text>
+      </View>
 
-      <ScrollView
-        style={styles.content}
-        refreshControl={
-          <RefreshControl
-            refreshing={refreshing}
-            onRefresh={onRefresh}
-            tintColor="#00BCD4"
-            colors={['#00BCD4']}
-          />
-        }
-      >
-        {/* Status Banner */}
-        <View style={[styles.statusBanner, { backgroundColor: getStatusColor(trackingData.status) }]}>
-          <Text style={styles.statusBannerText}>{getStatusText(trackingData.status)}</Text>
-        </View>
+      <NaverMapCard center={mapCenter} markers={[{ latitude: pickupLatitude, longitude: pickupLongitude, label: '출발' }, { latitude: deliveryLatitude, longitude: deliveryLongitude, label: '도착' }]} title="배송 구간 지도" subtitle="출발역과 도착역 기준으로 현재 배송 구간을 보여줍니다." />
 
-        {/* Progress Bar */}
-        <View style={styles.progressSection}>
-          <View style={styles.progressBarContainer}>
-            <View style={[styles.progressBar, { width: `${progressValue}%` }]} />
-          </View>
-          <Text style={styles.progressText}>{progressValue}%</Text>
-        </View>
+      <View style={styles.panel}>
+        <Text style={styles.panelTitle}>경로 요약</Text>
+        <InfoRow label="출발" value={`${trackingData.pickupStation.stationName} / ${trackingData.pickupStation.line}`} />
+        <InfoRow label="도착" value={`${trackingData.deliveryStation.stationName} / ${trackingData.deliveryStation.line}`} />
+        <InfoRow label="예상 ETA" value={trackingData.estimatedMinutes ? `약 ${trackingData.estimatedMinutes}분` : '조정 중'} />
+      </View>
 
-        {/* Route Summary */}
-        <View style={styles.card}>
-          <Text style={styles.cardTitle}>🚇 배송 경로</Text>
-          <View style={styles.routeContainer}>
-            <View style={styles.stationPoint}>
-              <View style={styles.stationDot} />
-              <Text style={styles.stationName}>{trackingData.pickupStation.stationName}</Text>
-              <Text style={styles.stationLine}>{trackingData.pickupStation.line}</Text>
-            </View>
+      <View style={styles.panel}>
+        <Text style={styles.panelTitle}>물품과 인계</Text>
+        <InfoRow label="물품" value={trackingData.packageInfo.description ?? '설명 없음'} />
+        <InfoRow label="무게" value={formatWeightDisplay(trackingData.packageInfo.weight, trackingData.packageInfo.weightKg)} />
+        <InfoRow label="수령인" value={trackingData.recipientName ?? '미션 단계에 따라 제한 공개'} />
+      </View>
 
-            <View style={styles.routeLine}>
-              <View style={styles.dashedLine} />
-              {trackingData.estimatedMinutes ? (
-                <Text style={styles.routeDuration}>약 {trackingData.estimatedMinutes}분</Text>
-              ) : null}
-            </View>
+      <View style={styles.panel}>
+        <Text style={styles.panelTitle}>진행 타임라인</Text>
+        {(trackingData.trackingEvents ?? []).map((event) => <TimelineRow key={`${event.type}-${event.title}`} event={event} />)}
+      </View>
 
-            <View style={styles.stationPoint}>
-              <View style={[styles.stationDot, styles.stationDotEnd]} />
-              <Text style={styles.stationName}>{trackingData.deliveryStation.stationName}</Text>
-              <Text style={styles.stationLine}>{trackingData.deliveryStation.line}</Text>
-            </View>
-          </View>
-        </View>
-
-        {/* Real-time Tracking Button */}
-        {(trackingData.status === 'in_transit' || trackingData.status === 'arrived') && (
-          <TouchableOpacity
-            style={[styles.card, styles.realtimeTrackingButton]}
-            onPress={() => {
-              const delivery = trackingData as any;
-              navigation.navigate('RealtimeTracking', {
-                deliveryId: delivery.deliveryId,
-                requesterId: delivery.requesterId,
-                gillerId: delivery.gillerId,
-                pickupStation: delivery.pickupStation,
-                dropoffStation: delivery.deliveryStation,
-              });
-            }}
-          >
-            <Text style={styles.realtimeTrackingIcon}>📍</Text>
-            <View style={styles.realtimeTrackingContent}>
-              <Text style={styles.realtimeTrackingTitle}>실시간 추적</Text>
-              <Text style={styles.realtimeTrackingDesc}>
-                길러의 실시간 위치를 지도에서 확인하세요
-              </Text>
-            </View>
-            {Platform.OS === 'web' ? (
-              <Text style={styles.realtimeTrackingArrow}>▶</Text>
-            ) : (
-              <MaterialIcons name="chevron-right" size={24} color={Colors.primary} />
-            )}
-          </TouchableOpacity>
-        )}
-
-        {/* Tracking Timeline */}
-        <View style={styles.card}>
-          <Text style={styles.cardTitle}>📍 추적 정보</Text>
-          <View style={styles.timeline}>
-            {trackingEvents.map((event, index) => (
-              <View key={event.type} style={styles.timelineItem}>
-                {/* Timeline Line */}
-                {index < trackingEvents.length - 1 && (
-                  <View style={[
-                    styles.timelineLine,
-                    event.completed && styles.timelineLineCompleted
-                  ]} />
-                )}
-
-                {/* Timeline Dot */}
-                <View style={[
-                  styles.timelineDot,
-                  event.completed && styles.timelineDotCompleted
-                ]}
-                  accessibilityLabel={event.title}
-                  accessibilityState={{ selected: event.completed }}
-                >
-                  {event.completed && (
-                    <Text style={styles.timelineDotIcon}>✓</Text>
-                  )}
-                </View>
-
-                {/* Timeline Content */}
-                <View style={styles.timelineContent}>
-                  <Text style={[
-                    styles.timelineTitle,
-                    event.completed && styles.timelineTitleCompleted
-                  ]}>
-                    {event.title}
-                  </Text>
-                  <Text style={[
-                    styles.timelineDescription,
-                    event.completed && styles.timelineDescriptionCompleted
-                  ]}>
-                    {event.description}
-                  </Text>
-                  {event.completed && event.timestamp && (
-                    <Text style={styles.timelineTime}>
-                      {formatTime(event.timestamp)}
-                    </Text>
-                  )}
-                </View>
-              </View>
-            ))}
-          </View>
-        </View>
-
-        {/* Delivery Info */}
-        <View style={styles.card}>
-          <Text style={styles.cardTitle}>📦 배송 정보</Text>
-          <View style={styles.infoRow}>
-            <Text style={styles.infoLabel}>패키지</Text>
-            <Text style={styles.infoValue}>
-              {trackingData.packageInfo.size === 'small' ? '소형' :
-               trackingData.packageInfo.size === 'medium' ? '중형' :
-               trackingData.packageInfo.size === 'large' ? '대형' : trackingData.packageInfo.size}
-              ({formatWeightDisplay(trackingData.packageInfo.weight, trackingData.packageInfo.weightKg)})
-            </Text>
-          </View>
-          <View style={styles.infoRow}>
-            <Text style={styles.infoLabel}>수신자</Text>
-            <Text style={styles.infoValue}>{trackingData.recipientName || '-'}</Text>
-          </View>
-          {trackingData.recipientVerificationCode && (
-            <View style={styles.infoRow}>
-              <Text style={styles.infoLabel}>인증코드</Text>
-              <Text style={styles.verificationCode}>{trackingData.recipientVerificationCode}</Text>
-            </View>
-          )}
-        </View>
-
-        {/* Courier Info (if matched) */}
-        {trackingData.status !== 'pending' && trackingData.status !== 'cancelled' && (
-          <View style={styles.card}>
-            <Text style={styles.cardTitle}>👤 길러 정보</Text>
-            <View style={styles.courierInfo}>
-              <View style={styles.courierAvatar}>
-                <Text style={styles.courierAvatarText}>🚴</Text>
-              </View>
-              <View style={styles.courierDetails}>
-                <Text style={styles.courierName}>{trackingData.gillerName || '길러'}</Text>
-                {['in_transit', 'arrived', 'delivered', 'completed'].includes(trackingData.status) && (
-                  <TouchableOpacity
-                    onPress={async () => {
-                      const chatRoom = await getChatRoomByRequestId(requestId);
-                      if (chatRoom) {
-                        const userId = requireUserId();
-                        const otherUserId = chatRoom.participants.user1.userId === userId
-                          ? chatRoom.participants.user2.userId
-                          : chatRoom.participants.user1.userId;
-                        const otherUserName = chatRoom.participants.user1.userId === userId
-                          ? chatRoom.participants.user2.name
-                          : chatRoom.participants.user1.name;
-                        navigation.navigate('Chat', { chatRoomId: chatRoom.chatRoomId, otherUserId, otherUserName });
-                      } else {
-                        Alert.alert('안내', '채팅방을 찾을 수 없습니다.');
-                      }
-                    }}
-                    style={styles.chatLinkButton}
-                  >
-                    <Text style={styles.chatLinkText}>💬 채팅하기</Text>
-                  </TouchableOpacity>
-                )}
-              </View>
-            </View>
-          </View>
-        )}
-
-        {/* Help Section */}
-        <View style={styles.card}>
-          <Text style={styles.cardTitle}>❓ 도움이 필요하신가요?</Text>
-          <TouchableOpacity
-            style={styles.helpButton}
-            accessibilityLabel="고객센터 문의"
-            onPress={() => navigation.navigate('CustomerService')}
-          >
-            <Text style={styles.helpButtonText}>고객센터 문의</Text>
-          </TouchableOpacity>
-        </View>
-
-        {/* Giller Actions - for active deliveries (길러만) */}
-        {trackingData &&
-         (currentRole === 'giller' || currentRole === 'both') &&
-         (trackingData.status === 'accepted' || trackingData.status === 'in_transit') && (
-          <View style={styles.card}>
-            <Text style={styles.cardTitle}>📱 길러 액션</Text>
-            {trackingData.status === 'accepted' && (
-              <TouchableOpacity
-                style={styles.actionButton}
-                onPress={() => {
-                  const delivery = trackingData as any;
-                  if (delivery.deliveryId) {
-                    navigation.navigate('PickupVerification', {
-                      deliveryId: delivery.deliveryId,
-                      requestId,
-                    });
-                  }
-                }}
-                accessibilityLabel="픽업 인증하기"
-              >
-                <Text style={styles.actionButtonText}>픽업 인증하기</Text>
-              </TouchableOpacity>
-            )}
-            {trackingData.status === 'in_transit' && (
-              <>
-                <TouchableOpacity
-                  style={styles.actionButton}
-                  onPress={() => {
-                    const delivery = trackingData as any;
-                    if (delivery.deliveryId) {
-                      navigation.navigate('DeliveryCompletion', {
-                        deliveryId: delivery.deliveryId,
-                      });
-                    }
-                  }}
-                  accessibilityLabel="배송 완료하기"
-                >
-                  <Text style={styles.actionButtonText}>배송 완료하기</Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={[styles.actionButton, styles.actionButtonSecondary]}
-                  onPress={() => {
-                    const delivery = trackingData as any;
-                    if (delivery.deliveryId) {
-                      navigation.navigate('GillerDropoffAtLocker', {
-                        deliveryId: delivery.deliveryId,
-                      });
-                    }
-                  }}
-                  accessibilityLabel="사물함에 보관하기"
-                >
-                  <Text style={styles.actionButtonSecondaryText}>🔒 사물함에 보관하기</Text>
-                </TouchableOpacity>
-              </>
-            )}
-          </View>
-        )}
-
-        {/* 분쟁 신고 (이용자/길러 공통) */}
-        {trackingData &&
-         (trackingData.status === 'in_transit' || trackingData.status === 'delivered' || trackingData.status === 'completed') && (
-          <View style={styles.card}>
-            <TouchableOpacity
-              style={[styles.actionButton, styles.actionButtonDanger]}
-              onPress={() => {
-                const delivery = trackingData as any;
-                navigation.navigate('DisputeReport', {
-                  deliveryId: delivery.deliveryId,
-                });
-              }}
-              accessibilityLabel="분쟁 신고"
-            >
-              <Text style={styles.actionButtonDangerText}>⚠️ 분쟁 신고</Text>
-            </TouchableOpacity>
-          </View>
-        )}
-
-        {/* 요청자(gller) 사물함 수령 (at_locker) */}
-        {currentRole === 'gller' && trackingData?.status === 'at_locker' && (
-          <View style={styles.card}>
-            <Text style={styles.cardTitle}>🔓 사물함 수령</Text>
-            <Text style={[styles.infoText, { marginBottom: 12 }]}>
-              사물함에 보관된 물품을 수령하려면 사물함을 열어야 합니다.
-            </Text>
-            <TouchableOpacity
-              style={[styles.actionButton, { backgroundColor: '#00BCD4' }]}
-              onPress={() => {
-                const delivery = trackingData as any;
-                navigation.navigate('UnlockLocker', {
-                  deliveryId: delivery.deliveryId,
-                  lockerId: delivery.lockerId,
-                  reservationId: delivery.reservationId,
-                });
-              }}
-            >
-              <Text style={styles.actionButtonText}>🔓 사물함 열기</Text>
-            </TouchableOpacity>
-          </View>
-        )}
-
-        {/* 요청자(gller) 수령 확인 */}
-        {currentRole === 'gller' && trackingData?.status === 'delivered' && (
-          <View style={styles.card}>
-            <Text style={styles.cardTitle}>📬 수령 확인</Text>
-            <Text style={[styles.infoText, { marginBottom: 12 }]}>
-              물품이 배송되었습니다. 수령 확인 후 길러에게 정산이 완료됩니다.
-            </Text>
-            <TouchableOpacity
-              style={[styles.actionButton, { backgroundColor: '#4CAF50' }]}
-              disabled={confirming}
-              onPress={async () => {
-                if (!trackingData.deliveryId) {
-                  Alert.alert('오류', '배송 정보를 찾을 수 없습니다.');
-                  return;
-                }
-                try {
-                  setConfirming(true);
-                  const requesterId = requireUserId();
-                  const result = await confirmDeliveryByRequester({
-                    deliveryId: trackingData.deliveryId,
-                    requesterId,
-                  });
-                  if (result.success) {
-                    Alert.alert('수령 완료', '배송 수령이 확인되었습니다. 길러를 평가해주세요!', [
-                      {
-                        text: '평가하기',
-                        onPress: () => navigation.navigate('Rating', {
-                          deliveryId: trackingData.deliveryId,
-                          gillerId: trackingData.gillerId,
-                          gllerId: trackingData.gillerId,
-                        }),
-                      },
-                      { text: '나중에', style: 'cancel' },
-                    ]);
-                  } else {
-                    Alert.alert('실패', result.message);
-                  }
-                } catch (e: any) {
-                  Alert.alert('오류', e?.message || '수령 확인에 실패했습니다.');
-                } finally {
-                  setConfirming(false);
-                }
-              }}
-            >
-              {confirming
-                ? <ActivityIndicator color="#fff" />
-                : <Text style={styles.actionButtonText}>✅ 수령 확인</Text>
-              }
-            </TouchableOpacity>
-          </View>
-        )}
-
-        {/* Gller Info - 읽기 전용 (글러만, delivered 제외) */}
-        {currentRole === 'gller' && trackingData && trackingData.status !== 'pending' && trackingData.status !== 'cancelled' && trackingData.status !== 'delivered' && (
-          <View style={styles.card}>
-            <Text style={styles.cardTitle}>📦 배송 현황</Text>
-            <Text style={styles.infoText}>
-              {trackingData.status === 'accepted' && '길러가 매칭을 수락했습니다. 곧 픽업을 시작합니다.'}
-              {trackingData.status === 'in_transit' && '길러가 지하철로 배송 중입니다.'}
-              {trackingData.status === 'arrived' && '길러가 목적지에 도착했습니다.'}
-              {trackingData.status === 'at_locker' && '사물함에 물품이 보관되었습니다. 수령 코드를 확인해주세요.'}
-              {trackingData.status === 'completed' && '배송이 완료되었습니다. 이용해 주셔서 감사합니다.'}
-            </Text>
-          </View>
-        )}
-      </ScrollView>
-    </View>
+      <View style={styles.actionSection}>
+        <TouchableOpacity style={styles.primaryAction} onPress={() => void openChat()}><MaterialIcons name="chat-bubble-outline" size={18} color="#FFFFFF" /><Text style={styles.primaryActionText}>채팅 열기</Text></TouchableOpacity>
+        {(trackingData.status === 'in_transit' || trackingData.status === 'arrived') && <TouchableOpacity style={styles.secondaryAction} onPress={() => navigation.navigate('RealtimeTracking', { deliveryId: trackingData.deliveryId ?? '', requesterId: '', gillerId: trackingData.gillerId ?? '', pickupStation: { name: trackingData.pickupStation.stationName, latitude: pickupLatitude, longitude: pickupLongitude }, dropoffStation: { name: trackingData.deliveryStation.stationName, latitude: deliveryLatitude, longitude: deliveryLongitude } })}><MaterialIcons name="map" size={18} color="#115E59" /><Text style={styles.secondaryActionText}>실시간 위치 보기</Text></TouchableOpacity>}
+        {(trackingData.status === 'delivered' || trackingData.status === 'at_locker') && <TouchableOpacity style={[styles.secondaryAction, confirming && styles.disabledAction]} onPress={() => void handleConfirmDelivery()} disabled={confirming}><MaterialIcons name="check-circle-outline" size={18} color="#115E59" /><Text style={styles.secondaryActionText}>{confirming ? '확인 중...' : '수령 확인'}</Text></TouchableOpacity>}
+      </View>
+    </ScrollView>
   );
 }
 
+function InfoRow({ label, value }: { label: string; value: string }) {
+  return <View style={styles.infoRow}><Text style={styles.infoLabel}>{label}</Text><Text style={styles.infoValue}>{value}</Text></View>;
+}
+
+function TimelineRow({ event }: { event: TrackingEvent }) {
+  return <View style={styles.timelineRow}><View style={styles.timelineDot} /><View style={styles.timelineCopy}><Text style={styles.timelineTitle}>{event.title}</Text><Text style={styles.timelineMeta}>{formatDateLabel(event.timestamp)}</Text></View></View>;
+}
+
+function getStatusLabel(status: string): string {
+  switch (status) {
+    case 'accepted': return '길러가 연결되었습니다.';
+    case 'in_transit': return '배송이 이동 중입니다.';
+    case 'arrived': return '도착 직전입니다.';
+    case 'delivered': return '인계가 완료되었습니다.';
+    case 'completed': return '배송이 완료되었습니다.';
+    case 'at_locker': return '사물함 보관 중입니다.';
+    default: return '배송 준비 중입니다.';
+  }
+}
+
+function calculateProgress(status: string): number {
+  switch (status) {
+    case 'accepted': return 25;
+    case 'in_transit': return 55;
+    case 'arrived': return 75;
+    case 'delivered': return 90;
+    case 'completed': return 100;
+    case 'at_locker': return 85;
+    default: return 10;
+  }
+}
+
 const styles = StyleSheet.create({
-  actionButton: {
-    alignItems: 'center',
-    backgroundColor: '#4CAF50',
-    borderRadius: 8,
-    paddingVertical: 14,
-  },
-  actionButtonText: {
-    color: '#fff',
-    fontSize: 16,
-    fontWeight: 'bold',
-  },
-  actionButtonSecondary: {
-    backgroundColor: '#fff',
-    borderColor: '#4CAF50',
-    borderWidth: 1,
-    marginTop: 8,
-  },
-  actionButtonSecondaryText: {
-    color: '#4CAF50',
-    fontSize: 16,
-    fontWeight: 'bold',
-  },
-  actionButtonDanger: {
-    backgroundColor: '#FFF3E0',
-    borderColor: '#FF5722',
-    borderWidth: 1,
-    marginTop: 8,
-  },
-  actionButtonDangerText: {
-    color: '#FF5722',
-    fontSize: 16,
-    fontWeight: 'bold',
-  },
-  chatLinkButton: {
-    marginTop: 4,
-  },
-  chatLinkText: {
-    color: '#1976D2',
-    fontSize: 13,
-    fontWeight: '600',
-  },
-  backButton: {
-    width: 40,
-  },
-  backButtonText: {
-    color: '#333',
-    fontSize: 24,
-  },
-  card: {
-    backgroundColor: '#fff',
-    borderColor: '#e0e0e0',
-    borderRadius: 12,
-    borderWidth: 1,
-    marginBottom: 12,
-    padding: 16,
-  },
-  cardTitle: {
-    color: '#333',
-    fontSize: 18,
-    fontWeight: 'bold',
-    marginBottom: 12,
-  },
-  container: {
-    backgroundColor: '#f5f5f5',
-    flex: 1,
-  },
-  content: {
-    flex: 1,
-    padding: 16,
-  },
-  courierAvatar: {
-    alignItems: 'center',
-    backgroundColor: '#E3F2FD',
-    borderRadius: 25,
-    height: 50,
-    justifyContent: 'center',
-    marginRight: 12,
-    width: 50,
-  },
-  courierAvatarText: {
-    fontSize: 24,
-  },
-  courierDetails: {
-    flex: 1,
-  },
-  courierInfo: {
-    alignItems: 'center',
-    flexDirection: 'row',
-  },
-  courierName: {
-    color: '#333',
-    fontSize: 16,
-    fontWeight: 'bold',
-    marginBottom: 4,
-  },
-  courierRating: {
-    color: '#FFA726',
-    fontSize: 14,
-  },
-  dashedLine: {
-    borderColor: '#e0e0e0',
-    borderStyle: 'dashed',
-    borderWidth: 1,
-    height: 2,
-    marginBottom: 8,
-    width: '100%',
-  },
-  header: {
-    alignItems: 'center',
-    backgroundColor: '#fff',
-    borderBottomColor: '#e0e0e0',
-    borderBottomWidth: 1,
-    flexDirection: 'row',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-  },
-  headerSpacer: {
-    width: 40,
-  },
-  headerTitle: {
-    color: '#333',
-    flex: 1,
-    fontSize: 18,
-    fontWeight: 'bold',
-    textAlign: 'center',
-  },
-  refreshButton: {
-    width: 40,
-    alignItems: 'center',
-  },
-  helpButton: {
-    alignItems: 'center',
-    backgroundColor: '#00BCD4',
-    borderRadius: 8,
-    paddingVertical: 12,
-  },
-  helpButtonText: {
-    color: '#fff',
-    fontSize: 16,
-    fontWeight: 'bold',
-  },
-  infoLabel: {
-    color: '#666',
-    fontSize: 14,
-  },
-  infoRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginBottom: 8,
-  },
-  infoText: {
-    color: '#666',
-    fontSize: 14,
-    lineHeight: 20,
-  },
-  infoValue: {
-    color: '#333',
-    fontSize: 14,
-    fontWeight: '600',
-  },
-  loadingContainer: {
-    alignItems: 'center',
-    flex: 1,
-    justifyContent: 'center',
-  },
-  loadingText: {
-    color: '#666',
-    fontSize: 16,
-    marginTop: 12,
-  },
-  offlineContainer: {
-    alignItems: 'center',
-    flex: 1,
-    justifyContent: 'center',
-    padding: 32,
-  },
-  offlineIcon: {
-    fontSize: 60,
-    marginBottom: 16,
-  },
-  offlineText: {
-    color: '#666',
-    fontSize: 14,
-    marginBottom: 24,
-    textAlign: 'center',
-  },
-  offlineTitle: {
-    color: '#333',
-    fontSize: 20,
-    fontWeight: 'bold',
-    marginBottom: 8,
-  },
-  errorContainer: {
-    alignItems: 'center',
-    flex: 1,
-    justifyContent: 'center',
-    padding: 32,
-  },
-  errorIcon: {
-    fontSize: 60,
-    marginBottom: 16,
-  },
-  errorText: {
-    color: '#666',
-    fontSize: 14,
-    marginBottom: 24,
-    textAlign: 'center',
-  },
-  errorTitle: {
-    color: '#333',
-    fontSize: 20,
-    fontWeight: 'bold',
-    marginBottom: 8,
-  },
-  retryButton: {
-    alignItems: 'center',
-    backgroundColor: '#00BCD4',
-    borderRadius: 8,
-    paddingHorizontal: 32,
-    paddingVertical: 12,
-  },
-  retryButtonText: {
-    color: '#fff',
-    fontSize: 16,
-    fontWeight: 'bold',
-  },
-  progressBar: {
-    backgroundColor: '#00BCD4',
-    height: '100%',
-  },
-  progressBarContainer: {
-    backgroundColor: '#e0e0e0',
-    borderRadius: 4,
-    height: 8,
-    overflow: 'hidden',
-    width: '100%',
-  },
-  progressSection: {
-    alignItems: 'center',
-    backgroundColor: '#fff',
-    borderRadius: 12,
-    marginBottom: 12,
-    padding: 16,
-  },
-  progressText: {
-    color: '#00BCD4',
-    fontSize: 14,
-    fontWeight: 'bold',
-    marginTop: 8,
-  },
-  routeContainer: {
-    alignItems: 'center',
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-  },
-  routeDuration: {
-    color: '#999',
-    fontSize: 12,
-  },
-  routeLine: {
-    alignItems: 'center',
-    flex: 1,
-    marginHorizontal: 8,
-  },
-  stationDot: {
-    backgroundColor: '#00BCD4',
-    borderColor: '#fff',
-    borderRadius: 8,
-    borderWidth: 3,
-    elevation: 2,
-    height: 16,
-    marginBottom: 8,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.2,
-    shadowRadius: 2,
-    width: 16,
-  },
-  stationDotEnd: {
-    backgroundColor: '#4CAF50',
-  },
-  stationLine: {
-    color: '#00BCD4',
-    fontSize: 12,
-  },
-  stationName: {
-    color: '#333',
-    fontSize: 14,
-    fontWeight: 'bold',
-    marginBottom: 4,
-  },
-  stationPoint: {
-    alignItems: 'center',
-  },
-  statusBanner: {
-    alignItems: 'center',
-    borderRadius: 12,
-    marginBottom: 16,
-    padding: 16,
-  },
-  statusBannerText: {
-    color: '#fff',
-    fontSize: 18,
-    fontWeight: 'bold',
-  },
-  timeline: {
-    paddingLeft: 8,
-  },
-  timelineContent: {
-    flex: 1,
-    paddingTop: 2,
-  },
-  timelineDescription: {
-    color: '#999',
-    fontSize: 14,
-    marginBottom: 4,
-  },
-  timelineDescriptionCompleted: {
-    color: '#666',
-  },
-  timelineDot: {
-    alignItems: 'center',
-    backgroundColor: '#e0e0e0',
-    borderColor: '#fff',
-    borderRadius: 12,
-    borderWidth: 3,
-    elevation: 2,
-    height: 24,
-    justifyContent: 'center',
-    marginRight: 12,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.2,
-    shadowRadius: 2,
-    width: 24,
-    zIndex: 1,
-  },
-  timelineDotCompleted: {
-    backgroundColor: '#00BCD4',
-  },
-  timelineDotIcon: {
-    color: '#fff',
-    fontSize: 12,
-    fontWeight: 'bold',
-  },
-  timelineItem: {
-    flexDirection: 'row',
-    marginBottom: 24,
-    position: 'relative',
-  },
-  timelineLine: {
-    backgroundColor: '#e0e0e0',
-    height: '100%',
-    left: 11,
-    position: 'absolute',
-    top: 24,
-    width: 2,
-  },
-  timelineLineCompleted: {
-    backgroundColor: '#00BCD4',
-  },
-  timelineTime: {
-    color: '#00BCD4',
-    fontSize: 12,
-  },
-  timelineTitle: {
-    color: '#999',
-    fontSize: 16,
-    fontWeight: '600',
-    marginBottom: 4,
-  },
-  timelineTitleCompleted: {
-    color: '#333',
-  },
-  verificationCode: {
-    color: '#00BCD4',
-    fontSize: 16,
-    fontWeight: 'bold',
-    letterSpacing: 2,
-  },
-  realtimeTrackingButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#E3F2FD',
-    borderColor: '#00BCD4',
-    borderWidth: 1,
-  },
-  realtimeTrackingIcon: {
-    fontSize: 28,
-    marginRight: 12,
-  },
-  realtimeTrackingContent: {
-    flex: 1,
-  },
-  realtimeTrackingTitle: {
-    color: '#00BCD4',
-    fontSize: 16,
-    fontWeight: 'bold',
-    marginBottom: 2,
-  },
-  realtimeTrackingDesc: {
-    color: '#666',
-    fontSize: 13,
-  },
-  realtimeTrackingArrow: {
-    marginLeft: 8,
-  },
+  container: { flex: 1, backgroundColor: '#F8FAFC' },
+  content: { padding: Spacing.lg, gap: Spacing.md },
+  centerState: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: '#F8FAFC' },
+  centerText: { marginTop: Spacing.md, color: '#475569', ...Typography.body },
+  hero: { backgroundColor: '#FFFFFF', borderRadius: BorderRadius.xl, padding: Spacing.lg, gap: 8, ...Shadows.sm },
+  heroKicker: { fontSize: 12, fontWeight: '700', color: '#0F766E', textTransform: 'uppercase', letterSpacing: 1 },
+  heroTitle: { fontSize: 24, fontWeight: '800', color: '#0F172A' },
+  heroSubtitle: { color: '#475569', ...Typography.body },
+  progressRail: { height: 8, borderRadius: 999, backgroundColor: '#E2E8F0', overflow: 'hidden' },
+  progressFill: { height: '100%', backgroundColor: '#14B8A6' },
+  progressText: { color: '#0F766E', fontWeight: '700' },
+  panel: { backgroundColor: '#FFFFFF', borderRadius: BorderRadius.xl, padding: Spacing.lg, gap: 10, ...Shadows.sm },
+  panelTitle: { color: '#0F172A', fontSize: 18, fontWeight: '800' },
+  infoRow: { flexDirection: 'row', justifyContent: 'space-between', gap: 12 },
+  infoLabel: { color: '#64748B', ...Typography.bodySmall },
+  infoValue: { color: '#0F172A', ...Typography.bodyBold },
+  timelineRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 10 },
+  timelineDot: { width: 10, height: 10, borderRadius: 5, backgroundColor: '#14B8A6', marginTop: 4 },
+  timelineCopy: { flex: 1, gap: 2 },
+  timelineTitle: { color: '#0F172A', ...Typography.bodyBold },
+  timelineMeta: { color: '#64748B', ...Typography.caption },
+  actionSection: { gap: 10 },
+  primaryAction: { minHeight: 52, borderRadius: BorderRadius.xl, backgroundColor: '#115E59', alignItems: 'center', justifyContent: 'center', flexDirection: 'row', gap: 8 },
+  primaryActionText: { color: '#FFFFFF', fontSize: 16, fontWeight: '800' },
+  secondaryAction: { minHeight: 52, borderRadius: BorderRadius.xl, backgroundColor: '#FFFFFF', alignItems: 'center', justifyContent: 'center', flexDirection: 'row', gap: 8, ...Shadows.sm },
+  secondaryActionText: { color: '#115E59', ...Typography.bodyBold },
+  disabledAction: { opacity: 0.6 },
 });

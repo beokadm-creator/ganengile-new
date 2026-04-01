@@ -72,10 +72,14 @@ export async function getCurrentLocation(): Promise<LocationData> {
     return {
       latitude: location.coords.latitude,
       longitude: location.coords.longitude,
-      accuracy: location.coords.accuracy,
-      altitude: location.coords.altitude || undefined,
-      heading: location.coords.heading || undefined,
-      speed: location.coords.speed || undefined,
+      accuracy: location.coords.accuracy ?? undefined,
+      altitude: location.coords.altitude ?? undefined,
+      heading: typeof location.coords.heading === 'number' && location.coords.heading >= 0
+        ? location.coords.heading
+        : undefined,
+      speed: typeof location.coords.speed === 'number' && location.coords.speed >= 0
+        ? location.coords.speed
+        : undefined,
     };
   } catch (error: any) {
     console.error('Get current location error:', error);
@@ -143,10 +147,14 @@ export class LocationTrackingService {
       const locationData: LocationData = {
         latitude: location.coords.latitude,
         longitude: location.coords.longitude,
-        accuracy: location.coords.accuracy,
-        altitude: location.coords.altitude || undefined,
-        heading: location.coords.heading || undefined,
-        speed: location.coords.speed || undefined,
+        accuracy: location.coords.accuracy ?? undefined,
+        altitude: location.coords.altitude ?? undefined,
+        heading: typeof location.coords.heading === 'number' && location.coords.heading >= 0
+          ? location.coords.heading
+          : undefined,
+        speed: typeof location.coords.speed === 'number' && location.coords.speed >= 0
+          ? location.coords.speed
+          : undefined,
       };
 
       // Firestore에 위치 업데이트

@@ -1,17 +1,20 @@
-/**
- * 타입 인덱스
- *
- * 모든 타입을 내보내는 인덱스 파일입니다.
- */
-
-// B2B 관련 타입
-export * from './business-contract';
-export * from './b2b-delivery';
+﻿export * from './business-contract';
+export {
+  BASE_DELIVERY_FEES,
+  WEIGHT_SURCHARGE_RATE,
+  type B2BContract,
+  type B2BDelivery,
+  type B2BDeliveryStatus,
+  type B2BDeliveryType,
+  type CreateB2BContractData,
+  type CreateB2BDeliveryData,
+  type CreateB2BRequestData,
+  type DeliveryPricing,
+  type Location as B2BDeliveryLocation,
+} from './b2b-delivery';
 export * from './tax-invoice';
 export * from './b2b-giller-tier';
 export * from './b2b-settlement';
-
 export * from './point';
-
-// 길러 배송 매칭 시스템 개선 타입
-export * from './matching-extended';
+export * from './beta1';
+export * from './beta1-wallet';

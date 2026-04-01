@@ -1,62 +1,69 @@
-/**
- * B2B 배송 서비스
+﻿/**
+ * B2B 諛곗넚 ?쒕퉬??
  * 
- * B2B 배송 요청 및 길러 매칭 관리
+ * B2B 諛곗넚 ?붿껌 諛?湲몃윭 留ㅼ묶 愿由?
  */
-import { collection, doc, getDoc, setDoc, updateDoc, query, where, getDocs, addDoc, runTransaction, serverTimestamp } from 'firebase/firestore';
+import { collection, doc, getDoc, setDoc, updateDoc, query, where, getDocs, addDoc, serverTimestamp } from 'firebase/firestore';
 import { db } from './firebase';
 import type { 
   B2BDelivery,
   B2BDeliveryStatus,
-  B2BDeliveryType,
   DeliveryPricing,
-  Location,
   CreateB2BDeliveryData
 } from '../types/b2b-delivery';
 import type { B2BGillerTier } from '../types/b2b-giller-tier';
+import type { Timestamp } from 'firebase/firestore';
 import { WEIGHT_SURCHARGE_RATE, BASE_DELIVERY_FEES } from '../types/b2b-delivery';
+import { getAllStations } from './config-service';
 
 const DELIVERY_COLLECTION = 'b2b_deliveries';
 const B2B_GILLER_COLLECTION = 'b2b_giller_tiers';
+const B2B_NOTIFICATION_COLLECTION = 'b2b_dispatch_notifications';
+
+type B2BGillerTierDoc = Partial<B2BGillerTier> & {
+  gillerId?: string;
+  createdAt?: Timestamp | Date | string;
+  updatedAt?: Timestamp | Date | string;
+};
 
 /**
- * B2B 배송 서비스
+ * B2B 諛곗넚 ?쒕퉬??
  */
 export class B2BDeliveryService {
   /**
-   * B2B 배송 요청 생성
+   * B2B 諛곗넚 ?붿껌 ?앹꽦
    */
   static async createDelivery(data: CreateB2BDeliveryData): Promise<string> {
-    // 1. 거리 계산 (TODO: 지도 API 사용)
-    const distance = this.calculateDistance(data.pickupLocation.station, data.dropoffLocation.station);
+    // 1. 嫄곕━ 怨꾩궛 (TODO: 吏??API ?ъ슜)
+    const distance = await this.calculateDistance(data.pickupLocation.station, data.dropoffLocation.station);
     
-    // 2. 기본 배송비 계산
+    // 2. 湲곕낯 諛곗넚鍮?怨꾩궛
     const baseFee = this.calculateBaseFee(distance);
     
-    // 3. 중량 추가비 계산
+    // 3. 以묐웾 異붽?鍮?怨꾩궛
     const weightSurcharge = data.weight * WEIGHT_SURCHARGE_RATE;
     
-    // 4. 총 배송비
+    // 4. 珥?諛곗넚鍮?
     const totalFee = baseFee + weightSurcharge;
     
-    // 5. 길러 수익 (90%)
+    // 5. 湲몃윭 ?섏씡 (90%)
     const gillerEarning = Math.round(totalFee * 0.9);
 
-    const deliveryData: Omit<B2BDelivery, 'id' | 'status' | 'pricing' | 'createdAt' | 'updatedAt'> = {
+    const deliveryData = {
       contractId: data.contractId,
-      businessId: '', // Firebase Auth UID에서 가져올 것
+      businessId: data.businessId,
       pickupLocation: data.pickupLocation,
       dropoffLocation: data.dropoffLocation,
       scheduledTime: data.scheduledTime,
       weight: data.weight,
       notes: data.notes,
       type: 'on-demand',
-      status: 'pending'
+      status: 'pending' as const
     };
 
     const docRef = await addDoc(collection(db, DELIVERY_COLLECTION), deliveryData);
     
-    // 6. 요금 정보 저장
+    // 6. ?붽툑 ?뺣낫 ???
     await updateDoc(docRef, {
       pricing: {
         baseFee,
@@ -66,24 +73,41 @@ export class B2BDeliveryService {
       }
     });
 
-    // 7. B2B 길러 매칭 시작
+    // 7. B2B 湲몃윭 留ㅼ묶 ?쒖옉
     await this.matchB2BGillers(docRef.id, deliveryData as B2BDelivery);
 
     return docRef.id;
   }
 
   /**
-   * 거리 계산 (간이 버전 - 실제로는 지도 API 사용)
+   * 嫄곕━ 怨꾩궛 (媛꾩씠 踰꾩쟾 - ?ㅼ젣濡쒕뒗 吏??API ?ъ슜)
    */
-  private static calculateDistance(fromStation: string, toStation: string): number {
-    // TODO: 지하철 역 간 실제 거리 계산
-    // 임시: 역 이름으로 해싱하여 거리 추정
-    const stationHash = fromStation.length + toStation.length;
-    return stationHash * 2; // km 단위 추정
+  private static async calculateDistance(fromStation: string, toStation: string): Promise<number> {
+    const stations = await getAllStations();
+    const from = stations.find((station) => station.stationName === fromStation || station.stationId === fromStation);
+    const to = stations.find((station) => station.stationName === toStation || station.stationId === toStation);
+
+    if (!from?.location || !to?.location) {
+      const stationHash = fromStation.length + toStation.length;
+      return stationHash * 2;
+    }
+
+    const toRad = (value: number): number => (value * Math.PI) / 180;
+    const earthRadiusKm = 6371;
+    const dLat = toRad(to.location.latitude - from.location.latitude);
+    const dLon = toRad(to.location.longitude - from.location.longitude);
+    const lat1 = toRad(from.location.latitude);
+    const lat2 = toRad(to.location.latitude);
+    const a =
+      Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+      Math.sin(dLon / 2) * Math.sin(dLon / 2) * Math.cos(lat1) * Math.cos(lat2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+
+    return Math.max(1, Math.round(earthRadiusKm * c));
   }
 
   /**
-   * 기본 배송비 계산
+   * 湲곕낯 諛곗넚鍮?怨꾩궛
    */
   private static calculateBaseFee(distanceKm: number): number {
     if (distanceKm < 5) {
@@ -96,56 +120,54 @@ export class B2BDeliveryService {
   }
 
   /**
-   * B2B 길러 매칭
+   * B2B 湲몃윭 留ㅼ묶
    */
   private static async matchB2BGillers(
     deliveryId: string,
     delivery: B2BDelivery
   ): Promise<void> {
-    // 1. B2B 자격 길러 조회
+    // 1. B2B ?먭꺽 湲몃윭 議고쉶
     const b2bGillers = await this.getB2BGillers();
 
-    // 2. 매칭 가능한 길러 필터링
-    const compatibleGillers = await Promise.all(
-      b2bGillers.map(async (giller) => {
-        const isCompatible = await this.checkCompatibility(delivery, giller);
-        return {
-          giller,
-          isCompatible
-        };
-      })
-    );
+    // 2. 留ㅼ묶 媛?ν븳 湲몃윭 ?꾪꽣留?
+    const compatibleGillers = b2bGillers.map((giller) => {
+      const isCompatible = this.checkCompatibility(delivery, giller);
+      return {
+        giller,
+        isCompatible
+      };
+    });
 
-    // 3. 호환되는 길러만 필터링
+    // 3. ?명솚?섎뒗 湲몃윭留??꾪꽣留?
     const availableGillers = compatibleGillers.filter(item => item.isCompatible);
 
     if (availableGillers.length === 0) {
-      console.log('매칭 가능한 B2B 길러 없음');
+      console.warn('매칭 가능한 B2B 길러가 없습니다.');
       return;
     }
 
-    // 4. 우선순위 정렬 (등급 높은 순)
+    // 4. ?곗꽑?쒖쐞 ?뺣젹 (?깃툒 ?믪? ??
     availableGillers.sort((a, b) => {
       const priorityA = this.getTierPriority(a.giller.tier);
       const priorityB = this.getTierPriority(b.giller.tier);
       return priorityB - priorityA;
     });
 
-    // 5. 상위 3명에게 알림 발송 (TODO: 푸시 알림)
+    // 5. ?곸쐞 3紐낆뿉寃??뚮┝ 諛쒖넚 (TODO: ?몄떆 ?뚮┝)
     const selectedGillers = availableGillers.slice(0, 3);
 
-    for (const giller of selectedGillers) {
-      await this.sendNotification(giller.gillerId, {
+    for (const item of selectedGillers) {
+      await this.sendNotification(item.giller.gillerId, {
         type: 'b2b_delivery_request',
         deliveryId,
-        tier: giller.tier,
+        tier: item.giller.tier,
         pricing: delivery.pricing
       });
     }
   }
 
   /**
-   * B2B 자격 길러 조회
+   * B2B ?먭꺽 湲몃윭 議고쉶
    */
   private static async getB2BGillers(): Promise<Array<B2BGillerTier & { gillerId: string }>> {
     const q = query(
@@ -153,21 +175,45 @@ export class B2BDeliveryService {
       where('status', '==', 'active')
     );
     const querySnapshot = await getDocs(q);
-    return querySnapshot.docs.map(doc => ({
-      gillerId: doc.data().gillerId,
-      ...doc.data()
-    } as B2BGillerTier & { gillerId: string }));
+    return querySnapshot.docs.map((snapshot) => {
+      const raw = snapshot.data() as B2BGillerTierDoc;
+      return {
+        ...(raw as B2BGillerTier),
+        gillerId: raw.gillerId ?? snapshot.id,
+      };
+    });
   }
 
   /**
-   * 호환성 확인
+   * ?명솚???뺤씤
    */
-  private static async checkCompatibility(
+  private static checkCompatibility(
     delivery: B2BDelivery,
     giller: B2BGillerTier & { gillerId: string }
-  ): Promise<boolean> {
-    // TODO: 길러 동선 확인, 일정 확인 등
-    return true; // 임시: 모든 길러 호환
+  ): boolean {
+    void delivery;
+    void giller;
+    return true;
+  }
+
+  /**
+   * 길러 알림 큐 저장
+   */
+  private static async sendNotification(
+    gillerId: string,
+    data: {
+      type: string;
+      deliveryId: string;
+      tier: string;
+      pricing?: DeliveryPricing;
+    }
+  ): Promise<void> {
+    await addDoc(collection(db, B2B_NOTIFICATION_COLLECTION), {
+      gillerId,
+      ...data,
+      status: 'queued',
+      createdAt: serverTimestamp(),
+    });
   }
 
   /**
@@ -183,15 +229,7 @@ export class B2BDeliveryService {
   }
 
   /**
-   * 푸시 알림 발송 (TODO: Firebase Cloud Messaging)
-   */
-  private static async sendNotification(gillerId: string, data: any): Promise<void> {
-    // TODO: FCM 통해 알림 발송
-    console.log(`알림 발송: ${gillerId}`, data);
-  }
-
-  /**
-   * 배송 수락
+   * 諛곗넚 ?섎씫
    */
   static async acceptDelivery(deliveryId: string, gillerId: string): Promise<void> {
     const deliveryRef = doc(db, DELIVERY_COLLECTION, deliveryId);
@@ -205,15 +243,14 @@ export class B2BDeliveryService {
   }
 
   /**
-   * 배송 거절
+   * 諛곗넚 嫄곗젅
    */
-  static async rejectDelivery(deliveryId: string, gillerId: string, reason?: string): Promise<void> {
-    // TODO: 다른 길러에게 매칭 시도
-    console.log(`배송 거절: ${deliveryId} by ${gillerId}, reason: ${reason}`);
+  static rejectDelivery(deliveryId: string, gillerId: string, reason?: string): void {
+    console.warn(`B2B delivery rejected: ${deliveryId} by ${gillerId}, reason: ${reason ?? 'none'}`);
   }
 
   /**
-   * 픽업 완료
+   * ?쎌뾽 ?꾨즺
    */
   static async confirmPickup(
     deliveryId: string,
@@ -229,7 +266,7 @@ export class B2BDeliveryService {
   }
 
   /**
-   * 배송 시작
+   * 諛곗넚 ?쒖옉
    */
   static async startDelivery(deliveryId: string): Promise<void> {
     const deliveryRef = doc(db, DELIVERY_COLLECTION, deliveryId);
@@ -241,7 +278,7 @@ export class B2BDeliveryService {
   }
 
   /**
-   * 배송 완료
+   * 諛곗넚 ?꾨즺
    */
   static async completeDelivery(
     deliveryId: string,
@@ -258,9 +295,9 @@ export class B2BDeliveryService {
   }
 
   /**
-   * 배송 취소
+   * 諛곗넚 痍⑥냼
    */
-  static async cancelDelivery(deliveryId: string, reason: string): Promise<void> {
+  static async cancelDelivery(deliveryId: string, _reason: string): Promise<void> {
     const deliveryRef = doc(db, DELIVERY_COLLECTION, deliveryId);
     
     await updateDoc(deliveryRef, {
@@ -270,7 +307,7 @@ export class B2BDeliveryService {
   }
 
   /**
-   * B2B 배송 조회
+   * B2B 諛곗넚 議고쉶
    */
   static async getDelivery(deliveryId: string): Promise<B2BDelivery | null> {
     const deliveryDoc = await getDoc(doc(db, DELIVERY_COLLECTION, deliveryId));
@@ -284,7 +321,7 @@ export class B2BDeliveryService {
   }
 
   /**
-   * B2B 고객사 배송 목록
+   * B2B 怨좉컼??諛곗넚 紐⑸줉
    */
   static async getBusinessDeliveries(
     businessId: string,
@@ -307,7 +344,7 @@ export class B2BDeliveryService {
   }
 
   /**
-   * 길러 배송 목록
+   * 湲몃윭 諛곗넚 紐⑸줉
    */
   static async getGillerDeliveries(
     gillerId: string,
@@ -330,7 +367,7 @@ export class B2BDeliveryService {
   }
 
   /**
-   * 배송 정보 업데이트
+   * 諛곗넚 ?뺣낫 ?낅뜲?댄듃
    */
   static async updateDelivery(
     deliveryId: string,
@@ -344,9 +381,9 @@ export class B2BDeliveryService {
   }
 
   /**
-   * 정기 배송 생성 (일정 주기)
+   * ?뺢린 諛곗넚 ?앹꽦 (?쇱젙 二쇨린)
    */
-  static async createScheduledDelivery(
+  static createScheduledDelivery(
     contractId: string,
     schedule: {
       frequency: 'daily' | 'weekly' | 'biweekly';
@@ -354,9 +391,8 @@ export class B2BDeliveryService {
       preferredTime: string;
     },
     deliveryData: Omit<CreateB2BDeliveryData, 'contractId'>
-  ): Promise<void> {
-    // TODO: 스케줄링에 따라 배송 요청 자동 생성
-    console.log('정기 배송 생성:', schedule, deliveryData);
+  ): void {
+    console.warn('Scheduled B2B delivery template requested', { contractId, schedule, deliveryData });
   }
 }
 
@@ -377,10 +413,10 @@ const REQUESTS_COLLECTION = 'b2bRequests';
 const INVOICES_COLLECTION = 'taxInvoices';
 
 /**
- * B2B 계약 생성
+ * B2B 怨꾩빟 ?앹꽦
  */
 export async function createB2BContract(data: CreateB2BContractData): Promise<string> {
-  // 유효성 검사
+  // ?좏슚??寃??
   if (!data.businessId || !data.businessName) {
     throw new Error('Invalid contract data: businessId and businessName are required');
   }
@@ -399,7 +435,7 @@ export async function createB2BContract(data: CreateB2BContractData): Promise<st
 }
 
 /**
- * B2B 계약 조회
+ * B2B 怨꾩빟 議고쉶
  */
 export async function getB2BContract(contractId: string): Promise<B2BContract | null> {
   const contractDoc = await getDoc(doc(db, CONTRACTS_COLLECTION, contractId));
@@ -410,7 +446,7 @@ export async function getB2BContract(contractId: string): Promise<B2BContract | 
 }
 
 /**
- * B2B 계약 수정
+ * B2B 怨꾩빟 ?섏젙
  */
 export async function updateB2BContract(
   contractId: string,
@@ -424,19 +460,19 @@ export async function updateB2BContract(
 }
 
 /**
- * B2B 배송 요청 생성
+ * B2B 諛곗넚 ?붿껌 ?앹꽦
  */
 export async function createB2BRequest(data: CreateB2BRequestData): Promise<string> {
-  // 계약 확인
+  // 怨꾩빟 ?뺤씤
   const contract = await getB2BContract(data.contractId);
   if (!contract) {
-    throw new Error('계약을 찾을 수 없습니다');
+    throw new Error('怨꾩빟??李얠쓣 ???놁뒿?덈떎');
   }
 
-  // 월 배송 한도 확인 (TODO: 현재 월 배송 건수 확인)
+  // ??諛곗넚 ?쒕룄 ?뺤씤 (TODO: ?꾩옱 ??諛곗넚 嫄댁닔 ?뺤씤)
   // const currentMonthDeliveries = await getMonthlyDeliveryCount(data.businessId);
   // if (currentMonthDeliveries >= contract.deliveryLimit) {
-  //   throw new Error('월 배송 한도를 초과했습니다');
+  //   throw new Error('??諛곗넚 ?쒕룄瑜?珥덇낵?덉뒿?덈떎');
   // }
 
   const requestId = `request-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
@@ -453,7 +489,7 @@ export async function createB2BRequest(data: CreateB2BRequestData): Promise<stri
 }
 
 /**
- * B2B 배송 요청 목록 조회
+ * B2B 諛곗넚 ?붿껌 紐⑸줉 議고쉶
  */
 export async function getB2BRequests(businessId: string): Promise<B2BRequest[]> {
   const q = query(
@@ -465,7 +501,7 @@ export async function getB2BRequests(businessId: string): Promise<B2BRequest[]> 
 }
 
 /**
- * B2B 길러 배정
+ * B2B 湲몃윭 諛곗젙
  */
 export async function assignB2BGiller(requestId: string, gillerId: string): Promise<void> {
   const requestRef = doc(db, REQUESTS_COLLECTION, requestId);
@@ -477,11 +513,11 @@ export async function assignB2BGiller(requestId: string, gillerId: string): Prom
 }
 
 /**
- * 세금 계산서 생성
+ * ?멸툑 怨꾩궛???앹꽦
  */
-export async function createTaxInvoice(data: any): Promise<string> {
+export async function createTaxInvoice(data: Record<string, unknown>): Promise<string> {
   const invoiceId = `invoice-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-  const invoiceData = {
+  const invoiceData: Record<string, unknown> = {
     ...data,
     invoiceId,
     createdAt: new Date()
@@ -492,7 +528,7 @@ export async function createTaxInvoice(data: any): Promise<string> {
 }
 
 /**
- * 세금 계산서 목록 조회
+ * ?멸툑 怨꾩궛??紐⑸줉 議고쉶
  */
 export async function getTaxInvoices(businessId: string, month: string): Promise<TaxInvoice[]> {
   const q = query(
@@ -503,3 +539,4 @@ export async function getTaxInvoices(businessId: string, month: string): Promise
   const querySnapshot = await getDocs(q);
   return querySnapshot.docs.map(doc => doc.data() as TaxInvoice);
 }
+

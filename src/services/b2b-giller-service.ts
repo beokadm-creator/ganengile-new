@@ -1,179 +1,286 @@
-/**
-
-// @ts-nocheck - Temporarily suppress TypeScript errors for rapid development
- * B2B 길러 서비스
- *
- * B2B 길러 등급 관리 및 승급/강감
- */
-import { collection, doc, getDoc, setDoc, updateDoc, query, where, getDocs, deleteDoc, addDoc } from 'firebase/firestore';
-import { db } from '../config/firebase';
+import {
+  addDoc,
+  collection,
+  deleteDoc,
+  doc,
+  getDoc,
+  getDocs,
+  query,
+  updateDoc,
+  where,
+  type DocumentData,
+  type Timestamp,
+} from 'firebase/firestore';
+import { db } from '../services/firebase';
 import type {
-  B2BGillerTier,
-  B2BGillerStatus,
-  B2BGillerHistory,
-  B2BGillerCriteria,
   B2BGillerBenefits,
+  B2BGillerCriteria,
+  B2BGillerStatus,
+  B2BGillerTier,
+  B2BGillerTierLevel,
 } from '../types/b2b-giller-tier';
 import {
-  B2B_TIER_CRITERIA,
   B2B_TIER_BENEFITS,
-  B2B_TIER_DETAILS
+  B2B_TIER_CRITERIA,
+  B2B_TIER_DETAILS,
 } from '../types/b2b-giller-tier';
 
 const TIER_COLLECTION = 'b2b_giller_tiers';
-const GILLER_COLLECTION = 'users'; // 길러 정보
-const DELIVERY_COLLECTION = 'b2b_deliveries';
+const GILLER_COLLECTION = 'users';
 
-/**
- * B2B 길러 서비스
- */
+type TierEvaluationResult = {
+  tier: B2BGillerTierLevel;
+  criteria: B2BGillerCriteria;
+  benefits: B2BGillerBenefits;
+};
+
+type FirestoreB2BGillerHistory = {
+  promotedAt?: Date | Timestamp | null;
+  lastEvaluated?: Date | Timestamp | null;
+  nextEvaluation?: Date | Timestamp | null;
+};
+
+type FirestoreB2BGillerTierDoc = DocumentData & {
+  gillerId?: string;
+  tier?: B2BGillerTierLevel;
+  criteria?: Partial<B2BGillerCriteria>;
+  benefits?: Partial<B2BGillerBenefits>;
+  history?: FirestoreB2BGillerHistory;
+  status?: B2BGillerStatus;
+  updatedAt?: Date | Timestamp | null;
+};
+
+type FirestoreUserDoc = DocumentData & {
+  rating?: number;
+  createdAt?: Date | Timestamp | null;
+  stats?: {
+    rating?: number;
+    completedDeliveries?: number;
+    recent30DaysDeliveries?: number;
+    accountAgeDays?: number;
+  };
+};
+
+type GillerMetrics = {
+  rating: number;
+  monthlyDeliveries: number;
+  tenureMonths: number;
+};
+
+const DEFAULT_TIER_LEVEL: B2BGillerTierLevel = 'silver';
+const DEFAULT_STATUS: B2BGillerStatus = 'active';
+
+function toDate(value: Date | Timestamp | null | undefined, fallback: Date): Date {
+  if (value instanceof Date) {
+    return value;
+  }
+
+  if (value && typeof value === 'object' && 'toDate' in value && typeof value.toDate === 'function') {
+    return value.toDate();
+  }
+
+  return fallback;
+}
+
+function toTierLevel(value: unknown): B2BGillerTierLevel {
+  return value === 'silver' || value === 'gold' || value === 'platinum' ? value : DEFAULT_TIER_LEVEL;
+}
+
+function toStatus(value: unknown): B2BGillerStatus {
+  return value === 'active' || value === 'suspended' ? value : DEFAULT_STATUS;
+}
+
+function mapTierCriteria(
+  tierLevel: B2BGillerTierLevel,
+  criteria?: Partial<B2BGillerCriteria>,
+): B2BGillerCriteria {
+  const defaults = B2B_TIER_CRITERIA[tierLevel];
+
+  return {
+    rating: typeof criteria?.rating === 'number' ? criteria.rating : defaults.rating,
+    monthlyDeliveries:
+      typeof criteria?.monthlyDeliveries === 'number'
+        ? criteria.monthlyDeliveries
+        : defaults.monthlyDeliveries,
+    tenure: typeof criteria?.tenure === 'number' ? criteria.tenure : defaults.tenure,
+  };
+}
+
+function mapTierBenefits(
+  tierLevel: B2BGillerTierLevel,
+  benefits?: Partial<B2BGillerBenefits>,
+): B2BGillerBenefits {
+  const defaults = B2B_TIER_BENEFITS[tierLevel];
+
+  return {
+    priorityLevel:
+      typeof benefits?.priorityLevel === 'number' ? benefits.priorityLevel : defaults.priorityLevel,
+    rateBonus: typeof benefits?.rateBonus === 'number' ? benefits.rateBonus : defaults.rateBonus,
+    monthlyBonus:
+      typeof benefits?.monthlyBonus === 'number' ? benefits.monthlyBonus : defaults.monthlyBonus,
+  };
+}
+
+function mapTierDocument(snapshot: { id: string; data(): DocumentData }): B2BGillerTier {
+  const raw = snapshot.data() as FirestoreB2BGillerTierDoc;
+  const now = new Date();
+  const tierLevel = toTierLevel(raw.tier);
+  const history = raw.history ?? {};
+
+  return {
+    id: snapshot.id,
+    gillerId: typeof raw.gillerId === 'string' ? raw.gillerId : '',
+    tier: tierLevel,
+    criteria: mapTierCriteria(tierLevel, raw.criteria),
+    benefits: mapTierBenefits(tierLevel, raw.benefits),
+    history: {
+      promotedAt: history.promotedAt ? toDate(history.promotedAt, now) : undefined,
+      lastEvaluated: toDate(history.lastEvaluated, now),
+      nextEvaluation: toDate(history.nextEvaluation, B2BGillerService.getNextEvaluationDate()),
+    },
+    status: toStatus(raw.status),
+    updatedAt: toDate(raw.updatedAt, now),
+  };
+}
+
+function diffMonths(from: Date, to: Date): number {
+  return Math.max(0, (to.getFullYear() - from.getFullYear()) * 12 + (to.getMonth() - from.getMonth()));
+}
+
 export class B2BGillerService {
-  /**
-   * B2B 길러 등록
-   */
-  static async registerB2BGiller(gillerId: string): Promise<void> {
-    // 1. 길러 기본 정보 조회
+  static getNextEvaluationDate(baseDate = new Date()): Date {
+    const nextMonth = new Date(baseDate);
+    nextMonth.setMonth(nextMonth.getMonth() + 1);
+    return nextMonth;
+  }
+
+  private static async getGillerMetrics(gillerId: string): Promise<GillerMetrics> {
     const gillerDoc = await getDoc(doc(db, GILLER_COLLECTION, gillerId));
-    if (!gillerDoc.exists) {
-      throw new Error('길러를 찾을 수 없습니다');
+    if (!gillerDoc.exists()) {
+      throw new Error('길러 정보를 찾을 수 없습니다.');
     }
 
-    // 2. 초기 등급 평가
-    const initialTier = await this.evaluateGiller(gillerId);
+    const raw = gillerDoc.data() as FirestoreUserDoc;
+    const stats = raw.stats ?? {};
+    const rating =
+      typeof stats.rating === 'number'
+        ? stats.rating
+        : typeof raw.rating === 'number'
+          ? raw.rating
+          : 0;
+    const monthlyDeliveries =
+      typeof stats.recent30DaysDeliveries === 'number'
+        ? stats.recent30DaysDeliveries
+        : typeof stats.completedDeliveries === 'number'
+          ? stats.completedDeliveries
+          : 0;
 
-    // 3. B2B 길러 등급 생성
-    const tierData: Omit<B2BGillerTier, 'id' | 'updatedAt'> = {
+    const createdAt = toDate(raw.createdAt, new Date());
+    const tenureMonths =
+      typeof stats.accountAgeDays === 'number'
+        ? Math.max(0, Math.floor(stats.accountAgeDays / 30))
+        : diffMonths(createdAt, new Date());
+
+    return {
+      rating,
+      monthlyDeliveries,
+      tenureMonths,
+    };
+  }
+
+  static async evaluateTierForGiller(gillerId: string): Promise<TierEvaluationResult> {
+    const metrics = await this.getGillerMetrics(gillerId);
+
+    if (this.meetsCriteria(metrics, B2B_TIER_CRITERIA.platinum)) {
+      return {
+        tier: 'platinum',
+        criteria: B2B_TIER_CRITERIA.platinum,
+        benefits: B2B_TIER_BENEFITS.platinum,
+      };
+    }
+
+    if (this.meetsCriteria(metrics, B2B_TIER_CRITERIA.gold)) {
+      return {
+        tier: 'gold',
+        criteria: B2B_TIER_CRITERIA.gold,
+        benefits: B2B_TIER_BENEFITS.gold,
+      };
+    }
+
+    if (this.meetsCriteria(metrics, B2B_TIER_CRITERIA.silver)) {
+      return {
+        tier: 'silver',
+        criteria: B2B_TIER_CRITERIA.silver,
+        benefits: B2B_TIER_BENEFITS.silver,
+      };
+    }
+
+    throw new Error('아직 B2B 길러 등급 기준을 충족하지 못했습니다.');
+  }
+
+  static async registerB2BGiller(gillerId: string): Promise<void> {
+    const initialTier = await this.evaluateTierForGiller(gillerId);
+    const now = new Date();
+
+    const tierData: Omit<B2BGillerTier, 'id'> = {
       gillerId,
       tier: initialTier.tier,
       criteria: initialTier.criteria,
       benefits: initialTier.benefits,
       history: {
-        lastEvaluated: new Date(),
-        nextEvaluation: this.calculateNextEvaluation()
+        lastEvaluated: now,
+        nextEvaluation: this.getNextEvaluationDate(now),
       },
-      status: 'active' as B2BGillerStatus
+      status: 'active',
+      updatedAt: now,
     };
 
     await addDoc(collection(db, TIER_COLLECTION), tierData);
   }
 
-  /**
-   * 길러 등급 평가
-   */
-  private static async evaluateGiller(gillerId: string): Promise<{
-    tier: B2BGillerTier['tier'];
-    criteria: B2BGillerCriteria;
-    benefits: B2BGillerBenefits;
-  }> {
-    // 1. 길러 데이터 조회
-    const gillerDoc = await getDoc(doc(db, GILLER_COLLECTION, gillerId));
-    const giller = gillerDoc.data();
-    
-    // TODO: giller 컬렉션에 rating, completedDeliveries 등 필요
-    // 임시: 기본값 사용
-    const rating = 4.5;
-    const completedDeliveries = 30;
-    const accountAgeMonths = 6;
-
-    // 2. 각 등급 기준 확인
-    if (this.meetsCriteria(accountAgeMonths, completedDeliveries, rating, B2B_TIER_CRITERIA.platinum)) {
-      return {
-        tier: 'platinum',
-        criteria: B2B_TIER_CRITERIA.platinum,
-        benefits: B2B_TIER_BENEFITS.platinum
-      };
-    } else if (this.meetsCriteria(accountAgeMonths, completedDeliveries, rating, B2B_TIER_CRITERIA.gold)) {
-      return {
-        tier: 'gold',
-        criteria: B2B_TIER_CRITERIA.gold,
-        benefits: B2B_TIER_BENEFITS.gold
-      };
-    } else if (this.meetsCriteria(accountAgeMonths, completedDeliveries, rating, B2B_TIER_CRITERIA.silver)) {
-      return {
-        tier: 'silver',
-        criteria: B2B_TIER_CRITERIA.silver,
-        benefits: B2B_TIER_BENEFITS.silver
-      };
-    } else {
-      // B2B 자격 없음
-      throw new Error('B2B 길러 자격 미달');
-    }
-  }
-
-  /**
-   * 기준 충족 확인
-   */
-  private static meetsCriteria(
-    tenure: number,
-    monthlyDeliveries: number,
-    rating: number,
-    criteria: B2BGillerCriteria
-  ): boolean {
-    return tenure >= criteria.tenure &&
-           monthlyDeliveries >= criteria.monthlyDeliveries &&
-           rating >= criteria.rating;
-  }
-
-  /**
-   * 다음 심사 일자 계산 (매월)
-   */
-  private static calculateNextEvaluation(): Date {
-    const nextMonth = new Date();
-    nextMonth.setMonth(nextMonth.getMonth() + 1);
-    return nextMonth;
-  }
-
-  /**
-   * 승급 심사 (매월 1일 실행)
-   */
-  static async evaluateAllGillers(): Promise<void> {
-    const q = query(
-      collection(db, TIER_COLLECTION),
-      where('status', '==', 'active')
+  private static meetsCriteria(metrics: GillerMetrics, criteria: B2BGillerCriteria): boolean {
+    return (
+      metrics.tenureMonths >= criteria.tenure &&
+      metrics.monthlyDeliveries >= criteria.monthlyDeliveries &&
+      metrics.rating >= criteria.rating
     );
-    const querySnapshot = await getDocs(q);
+  }
+
+  static async evaluateAllGillers(): Promise<void> {
+    const tierQuery = query(collection(db, TIER_COLLECTION), where('status', '==', 'active'));
+    const querySnapshot = await getDocs(tierQuery);
 
     for (const tierDoc of querySnapshot.docs) {
-      const tier = tierDoc.data() as B2BGillerTier;
-      const now = new Date();
-      
-      // 다음 심사 일자 도달 여부 확인
-      if (now >= tier.history.nextEvaluation) {
+      const tier = mapTierDocument(tierDoc);
+      if (new Date() >= tier.history.nextEvaluation) {
         await this.reevaluateGiller(tierDoc.id);
       }
     }
   }
 
-  /**
-   * 길러 재심사
-   */
   private static async reevaluateGiller(tierId: string): Promise<void> {
     const tierDoc = await getDoc(doc(db, TIER_COLLECTION, tierId));
-    const currentTier = tierDoc.data() as B2BGillerTier;
-
-    // 새 등급 평가
-    const newTier = await this.evaluateGiller(currentTier.gillerId);
-
-    // 등급 변경 여부 확인
-    if (newTier.tier !== currentTier.tier) {
-      // 등급 상향
-      await this.promoteGiller(tierId, newTier);
-    } else {
-      // 등급 유지: 다음 심사 일자만 업데이트
-      await updateDoc(doc(db, TIER_COLLECTION, tierId), {
-        'history.lastEvaluated': new Date(),
-        'history.nextEvaluation': this.calculateNextEvaluation()
-      });
+    if (!tierDoc.exists()) {
+      throw new Error('B2B 길러 등급 정보를 찾을 수 없습니다.');
     }
+
+    const currentTier = mapTierDocument(tierDoc);
+    const newTier = await this.evaluateTierForGiller(currentTier.gillerId);
+
+    if (newTier.tier !== currentTier.tier) {
+      await this.promoteGiller(tierId, newTier);
+      return;
+    }
+
+    const now = new Date();
+    await updateDoc(doc(db, TIER_COLLECTION, tierId), {
+      'history.lastEvaluated': now,
+      'history.nextEvaluation': this.getNextEvaluationDate(now),
+      updatedAt: now,
+    });
   }
 
-  /**
-   * 승급 (등급 상향)
-   */
-  private static async promoteGiller(
-    tierId: string,
-    newTier: { tier: B2BGillerTier['tier']; criteria: any; benefits: any }
-  ): Promise<void> {
+  private static async promoteGiller(tierId: string, newTier: TierEvaluationResult): Promise<void> {
     const now = new Date();
 
     await updateDoc(doc(db, TIER_COLLECTION, tierId), {
@@ -183,150 +290,103 @@ export class B2BGillerService {
       history: {
         promotedAt: now,
         lastEvaluated: now,
-        nextEvaluation: this.calculateNextEvaluation()
-      }
+        nextEvaluation: this.getNextEvaluationDate(now),
+      },
+      updatedAt: now,
     });
-
-    // TODO: 승급 축하 알림 발송
-    console.log(`승급 완료: ${tierId} -> ${newTier.tier}`);
   }
 
-  /**
-   * 강감 (등급 하향 또는 자격 박탈)
-   */
-  static async demoteGiller(tierId: string, reason: string): Promise<void> {
-    // TODO: 강감 정책 구현
+  static async demoteGiller(tierId: string, _reason: string): Promise<void> {
     await updateDoc(doc(db, TIER_COLLECTION, tierId), {
-      status: 'suspended' as B2BGillerStatus
+      status: 'suspended' as B2BGillerStatus,
+      updatedAt: new Date(),
     });
-
-    console.log(`강감 완료: ${tierId}, reason: ${reason}`);
   }
 
-  /**
-   * B2B 길러 등급 조회
-   */
   static async getB2BGillerTier(gillerId: string): Promise<B2BGillerTier | null> {
-    const q = query(
-      collection(db, TIER_COLLECTION),
-      where('gillerId', '==', gillerId)
-    );
-    const querySnapshot = await getDocs(q);
+    const tierQuery = query(collection(db, TIER_COLLECTION), where('gillerId', '==', gillerId));
+    const querySnapshot = await getDocs(tierQuery);
 
     if (querySnapshot.empty) {
       return null;
     }
 
-    const doc = querySnapshot.docs[0];
-    return {
-      id: doc.id,
-      ...doc.data()
-    } as B2BGillerTier;
+    return mapTierDocument(querySnapshot.docs[0]);
   }
 
-  /**
-   * 활성 B2B 길러 목록
-   */
   static async getActiveB2BGillers(): Promise<Array<B2BGillerTier & { gillerId: string }>> {
-    const q = query(
-      collection(db, TIER_COLLECTION),
-      where('status', '==', 'active')
-    );
-    const querySnapshot = await getDocs(q);
-    return querySnapshot.docs.map(doc => ({
-      id: doc.id,
-      ...doc.data()
-    } as B2BGillerTier & { gillerId: string }));
+    const tierQuery = query(collection(db, TIER_COLLECTION), where('status', '==', 'active'));
+    const querySnapshot = await getDocs(tierQuery);
+    return querySnapshot.docs.map((snapshot) => mapTierDocument(snapshot));
   }
 
-  /**
-   * 등급별 길러 수 통계
-   */
   static async getTierStats(): Promise<Record<string, number>> {
     const snapshot = await getDocs(collection(db, TIER_COLLECTION));
-    
-    const stats: Record<string, number> = {
+    const stats: Record<B2BGillerTierLevel, number> = {
       silver: 0,
       gold: 0,
-      platinum: 0
+      platinum: 0,
     };
 
-    snapshot.docs.forEach(doc => {
-      const tier = doc.data().tier;
-      if (tier in stats) {
-        stats[tier]++;
-      }
+    snapshot.docs.forEach((snapshotDoc) => {
+      const tier = toTierLevel((snapshotDoc.data() as FirestoreB2BGillerTierDoc).tier);
+      stats[tier] += 1;
     });
 
     return stats;
   }
 
-  /**
-   * B2B 자격 확인
-   */
   static async checkB2BEligibility(gillerId: string): Promise<{
     eligible: boolean;
     currentTier?: string;
-    requiredFor?: Partial<Record<B2BGillerTier['tier'], B2BGillerCriteria>>;
+    requiredFor?: Partial<Record<B2BGillerTierLevel, B2BGillerCriteria>>;
   }> {
     const tier = await this.getB2BGillerTier(gillerId);
-    
-    if (!tier) {
+
+    if (tier) {
       return {
-        eligible: false,
-        requiredFor: B2B_TIER_CRITERIA
+        eligible: true,
+        currentTier: tier.tier,
       };
     }
 
-    return {
-      eligible: true,
-      currentTier: tier.tier
-    };
+    try {
+      const preview = await this.evaluateTierForGiller(gillerId);
+      return {
+        eligible: true,
+        currentTier: preview.tier,
+      };
+    } catch {
+      return {
+        eligible: false,
+        requiredFor: B2B_TIER_CRITERIA,
+      };
+    }
   }
 
-  /**
-   * 길러 등급 정보 삭제 (관리자 전용)
-   */
   static async deleteB2BGillerTier(tierId: string): Promise<void> {
     await deleteDoc(doc(db, TIER_COLLECTION, tierId));
   }
 
-  /**
-   * 월간 보너스 계산
-   */
-  static calculateMonthlyBonus(tier: B2BGillerTier['tier'], b2bDeliveries: number): number {
-    const tierBenefits = B2B_TIER_BENEFITS[tier];
-    const monthlyBonusInWon = tierBenefits.monthlyBonus * 10000; // 만원 → 원
-    
-    return monthlyBonusInWon;
+  static calculateMonthlyBonus(tier: B2BGillerTierLevel, _b2bDeliveries: number): number {
+    return B2B_TIER_BENEFITS[tier].monthlyBonus * 10000;
   }
 
-  /**
-   * 요금 보너스 계산
-   */
-  static calculateRateBonus(tier: B2BGillerTier['tier'], baseEarning: number): number {
-    const tierBenefits = B2B_TIER_BENEFITS[tier];
-    return Math.round(baseEarning * (tierBenefits.rateBonus / 100));
+  static calculateRateBonus(tier: B2BGillerTierLevel, baseEarning: number): number {
+    return Math.round(baseEarning * (B2B_TIER_BENEFITS[tier].rateBonus / 100));
   }
 
-  /**
-   * 총 수익 계산 (기본 수익 + 요금 보너스)
-   */
   static calculateTotalEarning(
-    tier: B2BGillerTier['tier'],
+    tier: B2BGillerTierLevel,
     baseEarning: number,
-    b2bDeliveries: number
+    b2bDeliveries: number,
   ): number {
     const rateBonus = this.calculateRateBonus(tier, baseEarning);
     const monthlyBonus = this.calculateMonthlyBonus(tier, b2bDeliveries);
-    
     return baseEarning + rateBonus + monthlyBonus;
   }
 
-  /**
-   * 등급 상세 정보 조회
-   */
-  static getTierDetails(tier: B2BGillerTier['tier']): {
+  static getTierDetails(tier: B2BGillerTierLevel): {
     name: string;
     description: string;
     criteria: B2BGillerCriteria;
@@ -335,13 +395,7 @@ export class B2BGillerService {
     return B2B_TIER_DETAILS[tier];
   }
 
-  /**
-   * 등급별 우선순위 비교
-   */
-  static compareTierPriority(tier1: B2BGillerTier['tier'], tier2: B2BGillerTier['tier']): number {
-    const priority1 = B2B_TIER_BENEFITS[tier1].priorityLevel;
-    const priority2 = B2B_TIER_BENEFITS[tier2].priorityLevel;
-    
-    return priority1 - priority2;
+  static compareTierPriority(tier1: B2BGillerTierLevel, tier2: B2BGillerTierLevel): number {
+    return B2B_TIER_BENEFITS[tier1].priorityLevel - B2B_TIER_BENEFITS[tier2].priorityLevel;
   }
 }

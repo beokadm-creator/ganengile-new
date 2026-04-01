@@ -1,14 +1,14 @@
-import React, { useState } from 'react';
+﻿import React from 'react';
 import {
-  Text,
-  StyleSheet,
-  ViewStyle,
-  TextStyle,
   ActivityIndicator,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
   View,
-  Platform,
+  type StyleProp,
+  type TextStyle,
+  type ViewStyle,
 } from 'react-native';
-import * as Haptics from 'expo-haptics';
 import { Colors, Spacing, BorderRadius, Typography } from '../../theme';
 
 type ButtonVariant = 'primary' | 'secondary' | 'outline' | 'ghost' | 'danger';
@@ -24,8 +24,8 @@ interface ButtonProps {
   fullWidth?: boolean;
   icon?: React.ReactNode;
   iconPosition?: 'left' | 'right';
-  style?: ViewStyle;
-  textStyle?: TextStyle;
+  style?: StyleProp<ViewStyle>;
+  textStyle?: StyleProp<TextStyle>;
   accessibilityLabel?: string;
 }
 
@@ -43,36 +43,23 @@ export default function Button({
   textStyle,
   accessibilityLabel,
 }: ButtonProps) {
+  const isDisabled = disabled || loading;
 
-  // 웹에서는 HTML button 요소 사용
   return (
-    <button
-      onClick={onPress}
-      disabled={disabled || loading}
-      aria-label={accessibilityLabel || title}
-      style={{
-        backgroundColor: variant === 'primary' ? Colors.primary :
-                       variant === 'secondary' ? Colors.secondary :
-                       variant === 'outline' ? 'transparent' :
-                       variant === 'danger' ? Colors.error : 'transparent',
-        borderColor: variant === 'outline' ? Colors.primary : 'transparent',
-        borderRadius: `${BorderRadius.md}px`,
-        borderWidth: variant === 'outline' ? '1px' : '0',
-        color: variant === 'outline' || variant === 'ghost' ? Colors.primary : Colors.white,
-        cursor: (disabled || loading) ? 'not-allowed' : 'pointer',
-        display: 'flex',
-        flexDirection: 'row',
-        fontSize: size === 'large' ? '18px' : size === 'small' ? '14px' : '16px',
-        fontWeight: size === 'large' ? 'bold' : '600',
-        justifyContent: 'center',
-        alignItems: 'center',
-        minHeight: size === 'large' ? '52px' : size === 'small' ? '32px' : '44px',
-        opacity: (disabled || loading) ? 0.6 : 1,
-        padding: size === 'large' ? '16px 24px' : size === 'small' ? '8px 16px' : '12px 16px',
-        width: fullWidth ? '100%' : 'auto',
-        gap: '8px',
-        ...style,
-      }}
+    <TouchableOpacity
+      onPress={onPress}
+      disabled={isDisabled}
+      accessibilityRole="button"
+      accessibilityLabel={accessibilityLabel || title}
+      activeOpacity={0.86}
+      style={[
+        styles.button,
+        styles[variant],
+        styles[`${size}Size`],
+        fullWidth && styles.fullWidth,
+        isDisabled && styles.disabled,
+        style,
+      ]}
     >
       {loading ? (
         <ActivityIndicator
@@ -80,13 +67,23 @@ export default function Button({
           size="small"
         />
       ) : (
-        <>
-          {icon && iconPosition === 'left' && <>{icon}</>}
-          <span>{title}</span>
-          {icon && iconPosition === 'right' && <>{icon}</>}
-        </>
+        <View style={styles.content}>
+          {icon && iconPosition === 'left' ? <View style={styles.iconLeft}>{icon}</View> : null}
+          <Text
+            style={[
+              styles.text,
+              styles[`${variant}Text`],
+              styles[`${size}Text`],
+              isDisabled && styles.disabledText,
+              textStyle,
+            ]}
+          >
+            {title}
+          </Text>
+          {icon && iconPosition === 'right' ? <View style={styles.iconRight}>{icon}</View> : null}
+        </View>
       )}
-    </button>
+    </TouchableOpacity>
   );
 }
 
@@ -98,8 +95,11 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     overflow: 'hidden',
   },
-
-  // Variants
+  content: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    justifyContent: 'center',
+  },
   primary: {
     backgroundColor: Colors.primary,
   },
@@ -117,8 +117,6 @@ const styles = StyleSheet.create({
   danger: {
     backgroundColor: Colors.error,
   },
-
-  // Variant text colors
   primaryText: {
     color: Colors.white,
   },
@@ -134,25 +132,21 @@ const styles = StyleSheet.create({
   dangerText: {
     color: Colors.white,
   },
-
-  // Sizes
-  small: {
+  smallSize: {
     minHeight: 32,
     paddingHorizontal: Spacing.md,
     paddingVertical: Spacing.sm,
   },
-  medium: {
+  mediumSize: {
     minHeight: 44,
     paddingHorizontal: Spacing.lg,
     paddingVertical: Spacing.md,
   },
-  large: {
+  largeSize: {
     minHeight: 52,
     paddingHorizontal: Spacing.xl,
     paddingVertical: Spacing.lg,
   },
-
-  // Size text
   smallText: {
     fontSize: Typography.fontSize.sm,
     fontWeight: Typography.fontWeight.semibold,
@@ -165,31 +159,23 @@ const styles = StyleSheet.create({
     fontSize: Typography.fontSize.lg,
     fontWeight: Typography.fontWeight.bold,
   },
-
-  // States
   disabled: {
     backgroundColor: Colors.gray300,
     borderColor: Colors.gray300,
     opacity: 0.6,
   },
-  pressed: {
-    opacity: 0.8,
-    transform: [{ scale: 0.98 }],
-  },
   disabledText: {
     color: Colors.gray600,
   },
-
-  // Layout
   fullWidth: {
     width: '100%',
   },
   iconLeft: {
     marginRight: Spacing.sm,
-  } as ViewStyle,
+  },
   iconRight: {
     marginLeft: Spacing.sm,
-  } as ViewStyle,
+  },
   text: {
     textAlign: 'center',
   },

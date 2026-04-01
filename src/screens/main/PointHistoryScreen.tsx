@@ -1,122 +1,176 @@
-import React, { useState, useEffect } from 'react';
-import {
-  View,
-  Text,
-  StyleSheet,
-  ScrollView,
-  TouchableOpacity,
-  RefreshControl,
-  ActivityIndicator,
-} from 'react-native';
-import { StackNavigationProp } from '@react-navigation/stack';
-import { PointService } from '../../services/PointService';
+import React, { useEffect, useState } from 'react';
+import { RefreshControl, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { useUser } from '../../contexts/UserContext';
-import { Colors, Typography, Spacing, BorderRadius } from '../../theme';
+import { getBeta1HomeSnapshot } from '../../services/beta1-orchestration-service';
+import { PointService } from '../../services/PointService';
+import { BorderRadius, Shadows, Spacing, Typography } from '../../theme';
+import { WithdrawalEligibilityStatus } from '../../types/beta1-wallet';
+import type { MainStackNavigationProp } from '../../types/navigation';
 
-type NavigationProp = StackNavigationProp<any>;
+type Props = {
+  navigation: MainStackNavigationProp;
+};
 
-interface PointSummary {
-  balance: number;
-  totalEarned: number;
-  totalSpent: number;
-  recentTransactions: any[];
-}
+type WalletSnapshot = {
+  chargeBalance: number;
+  earnedBalance: number;
+  promoBalance: number;
+  pendingWithdrawalBalance: number;
+  withdrawableBalance: number;
+};
 
-export default function PointHistoryScreen({ navigation }: { navigation: NavigationProp }) {
+export default function PointHistoryScreen({ navigation }: Props) {
   const { user } = useUser();
-  const [summary, setSummary] = useState<PointSummary | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [wallet, setWallet] = useState<WalletSnapshot>({
+    chargeBalance: 0,
+    earnedBalance: 0,
+    promoBalance: 0,
+    pendingWithdrawalBalance: 0,
+    withdrawableBalance: 0,
+  });
+  const [eligibilityReasons, setEligibilityReasons] = useState<WithdrawalEligibilityStatus[]>([]);
   const [refreshing, setRefreshing] = useState(false);
 
-  const loadPointSummary = async () => {
-    if (!user?.uid) return;
-    try {
-      setLoading(true);
-      const data = await PointService.getSummary(user.uid);
-      setSummary(data);
-    } catch (error) {
-      console.error('Failed to load point summary:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleRefresh = async () => {
-    setRefreshing(true);
-    await loadPointSummary();
-    setRefreshing(false);
-  };
-
   useEffect(() => {
-    loadPointSummary();
-  }, [user?.uid]);
+    let active = true;
 
-  const formatAmount = (amount: number): string => {
-    return `${amount > 0 ? '+' : ''}${amount.toLocaleString()} P`;
-  };
+    void (async () => {
+      if (!user?.uid) {
+        return;
+      }
+
+      const [snapshot, summary] = await Promise.all([
+        getBeta1HomeSnapshot(user.uid, 'requester'),
+        PointService.getSummary(user.uid),
+      ]);
+
+      if (!active) {
+        return;
+      }
+
+      setWallet(snapshot.wallet);
+      setEligibilityReasons(summary.withdrawalEligibility?.reasons ?? []);
+    })();
+
+    return () => {
+      active = false;
+    };
+  }, [user]);
+
+  async function refreshWallet() {
+    if (!user?.uid) {
+      setRefreshing(false);
+      return;
+    }
+
+    const [snapshot, summary] = await Promise.all([
+      getBeta1HomeSnapshot(user.uid, 'requester'),
+      PointService.getSummary(user.uid),
+    ]);
+
+    setWallet(snapshot.wallet);
+    setEligibilityReasons(summary.withdrawalEligibility?.reasons ?? []);
+    setRefreshing(false);
+  }
+
+  const rows = [
+    {
+      label: '충전금',
+      value: wallet.chargeBalance,
+      hint: '결제와 보증금 결제에 먼저 사용되는 금액입니다.',
+    },
+    {
+      label: '정산금',
+      value: wallet.earnedBalance,
+      hint: '길러 수익으로 적립된 금액입니다.',
+    },
+    {
+      label: '프로모션',
+      value: wallet.promoBalance,
+      hint: '이벤트 또는 보상으로 적립된 금액입니다.',
+    },
+    {
+      label: '출금 대기',
+      value: wallet.pendingWithdrawalBalance,
+      hint: '운영 검토 또는 실제 이체 처리 중인 금액입니다.',
+    },
+  ];
 
   return (
-    <View style={styles.container}>
-      <ScrollView
-        contentContainerStyle={styles.scrollContent}
-        refreshControl={
-          <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />
-        }
-      >
-        <View style={styles.summaryCard}>
-          <Text style={styles.summaryTitle}>현재 포인트</Text>
-          <Text style={styles.balance}>
-            {summary?.balance?.toLocaleString() || '0'} P
-          </Text>
+    <ScrollView
+      style={styles.container}
+      contentContainerStyle={styles.content}
+      refreshControl={
+        <RefreshControl
+          refreshing={refreshing}
+          onRefresh={() => {
+            setRefreshing(true);
+            void refreshWallet();
+          }}
+        />
+      }
+    >
+      <View style={styles.hero}>
+        <Text style={styles.kicker}>wallet ledger</Text>
+        <Text style={styles.title}>지갑은 하나지만 성격은 나눠서 봅니다</Text>
+        <Text style={styles.subtitle}>
+          충전금, 정산금, 프로모션, 출금 대기를 분리해서 보고 출금 가능 조건도 바로 확인할 수 있습니다.
+        </Text>
+      </View>
 
-          <View style={styles.stats}>
-            <View style={styles.stat}>
-              <Text style={styles.statLabel}>총 적립</Text>
-              <Text style={styles.statValue}>
-                +{(summary?.totalEarned || 0).toLocaleString()} P
-              </Text>
-            </View>
-            <View style={styles.stat}>
-              <Text style={styles.statLabel}>총 사용</Text>
-              <Text style={styles.statValue}>
-                -{(summary?.totalSpent || 0).toLocaleString()} P
-              </Text>
-            </View>
-          </View>
+      <View style={styles.totalCard}>
+        <Text style={styles.totalLabel}>출금 가능한 정산금</Text>
+        <Text style={styles.totalValue}>{wallet.withdrawableBalance.toLocaleString()}원</Text>
+        <View style={styles.totalActions}>
+          <TouchableOpacity style={styles.primaryButton} onPress={() => navigation.navigate('PointWithdraw')}>
+            <Text style={styles.primaryButtonText}>출금 요청하기</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.secondaryButton} onPress={() => navigation.navigate('Earnings')}>
+            <Text style={styles.secondaryButtonText}>정산 기준 보기</Text>
+          </TouchableOpacity>
         </View>
+      </View>
 
-        <TouchableOpacity
-          style={styles.withdrawButton}
-          onPress={() => navigation.navigate('PointWithdraw')}
-        >
-          <Text style={styles.withdrawButtonText}>출금하기</Text>
-        </TouchableOpacity>
+      <View style={styles.guardCard}>
+        <Text style={styles.guardTitle}>출금 체크</Text>
+        <GuardRow
+          ok={!eligibilityReasons.includes(WithdrawalEligibilityStatus.IDENTITY_UNVERIFIED)}
+          label="본인 확인 또는 테스트 우회 준비"
+        />
+        <GuardRow
+          ok={!eligibilityReasons.includes(WithdrawalEligibilityStatus.PAYOUT_ACCOUNT_UNVERIFIED)}
+          label="정산 계좌 인증 또는 운영 확인"
+        />
+        <GuardRow
+          ok={!eligibilityReasons.includes(WithdrawalEligibilityStatus.DISPUTE_OPEN)}
+          label="열려 있는 분쟁 없음"
+        />
+        <GuardRow
+          ok={!eligibilityReasons.includes(WithdrawalEligibilityStatus.MANUAL_HOLD)}
+          label="수동 보류 상태 없음"
+        />
+      </View>
 
-        <Text style={styles.sectionTitle}>최근 내역</Text>
-
-        {loading ? (
-          <ActivityIndicator size="large" color={Colors.primary} />
-        ) : summary?.recentTransactions?.map((transaction: any) => (
-          <View key={transaction.transactionId} style={styles.transactionItem}>
-            <View style={styles.transactionLeft}>
-              <Text style={styles.transactionDescription}>
-                {transaction.description}
-              </Text>
-              <Text style={styles.transactionDate}>
-                {new Date(transaction.createdAt?.toDate?.()).toLocaleDateString()}
-              </Text>
-            </View>
-            <Text
-              style={[
-                styles.transactionAmount,
-                transaction.amount > 0 ? styles.amountPositive : styles.amountNegative,
-              ]}
-            >
-              {formatAmount(transaction.amount)}
-            </Text>
+      {rows.map((row) => (
+        <View key={row.label} style={styles.rowCard}>
+          <View style={styles.rowHeader}>
+            <Text style={styles.rowLabel}>{row.label}</Text>
+            <Text style={styles.rowValue}>{row.value.toLocaleString()}원</Text>
           </View>
-        )) || []}
-      </ScrollView>
+          <Text style={styles.rowHint}>{row.hint}</Text>
+        </View>
+      ))}
+    </ScrollView>
+  );
+}
+
+function GuardRow({ ok, label }: { ok: boolean; label: string }) {
+  return (
+    <View style={styles.guardRow}>
+      <Text style={[styles.guardState, ok ? styles.guardStateOk : styles.guardStateBad]}>
+        {ok ? '확인됨' : '보완 필요'}
+      </Text>
+      <Text style={styles.guardText}>{label}</Text>
     </View>
   );
 }
@@ -124,90 +178,138 @@ export default function PointHistoryScreen({ navigation }: { navigation: Navigat
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: Colors.background,
+    backgroundColor: '#F4F7F5',
   },
-  scrollContent: {
-    padding: Spacing.md,
-  },
-  summaryCard: {
-    backgroundColor: Colors.white,
-    borderRadius: BorderRadius.lg,
+  content: {
     padding: Spacing.lg,
-    marginBottom: Spacing.md,
+    gap: Spacing.lg,
   },
-  summaryTitle: {
-    ...Typography.body,
-    color: Colors.textSecondary,
-    marginBottom: Spacing.xs,
+  hero: {
+    backgroundColor: '#EEF2FF',
+    borderRadius: BorderRadius.xl,
+    padding: Spacing.xl,
+    ...Shadows.sm,
   },
-  balance: {
-    ...Typography.h1,
-    fontWeight: 'bold',
-    color: Colors.primary,
-    marginBottom: Spacing.lg,
+  kicker: {
+    fontSize: 11,
+    fontWeight: '800',
+    color: '#4338CA',
+    textTransform: 'uppercase',
+    letterSpacing: 1.2,
+    marginBottom: 8,
   },
-  stats: {
+  title: {
+    fontSize: Typography.fontSize['2xl'],
+    fontWeight: '800',
+    color: '#111827',
+    marginBottom: 8,
+  },
+  subtitle: {
+    fontSize: Typography.fontSize.sm,
+    color: '#475569',
+    lineHeight: 20,
+  },
+  totalCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: BorderRadius.xl,
+    padding: Spacing.xl,
+    gap: 12,
+  },
+  totalLabel: {
+    fontSize: Typography.fontSize.sm,
+    color: '#64748B',
+  },
+  totalValue: {
+    fontSize: Typography.fontSize['3xl'],
+    fontWeight: '800',
+    color: '#0F172A',
+  },
+  totalActions: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 10,
+  },
+  primaryButton: {
+    alignSelf: 'flex-start',
+    backgroundColor: '#0F766E',
+    borderRadius: 999,
+    paddingHorizontal: 18,
+    paddingVertical: 12,
+  },
+  primaryButtonText: {
+    color: '#FFFFFF',
+    fontSize: Typography.fontSize.sm,
+    fontWeight: '800',
+  },
+  secondaryButton: {
+    alignSelf: 'flex-start',
+    backgroundColor: '#ECFDF3',
+    borderRadius: 999,
+    paddingHorizontal: 18,
+    paddingVertical: 12,
+  },
+  secondaryButtonText: {
+    color: '#115E59',
+    fontSize: Typography.fontSize.sm,
+    fontWeight: '800',
+  },
+  guardCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: BorderRadius.xl,
+    padding: Spacing.lg,
+    gap: 10,
+  },
+  guardTitle: {
+    fontSize: Typography.fontSize.base,
+    fontWeight: '800',
+    color: '#111827',
+  },
+  guardRow: {
+    flexDirection: 'row',
+    gap: 10,
+    alignItems: 'flex-start',
+  },
+  guardState: {
+    fontSize: Typography.fontSize.xs,
+    fontWeight: '800',
+    minWidth: 60,
+  },
+  guardStateOk: {
+    color: '#047857',
+  },
+  guardStateBad: {
+    color: '#B91C1C',
+  },
+  guardText: {
+    flex: 1,
+    fontSize: Typography.fontSize.sm,
+    color: '#475569',
+    lineHeight: 20,
+  },
+  rowCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: BorderRadius.xl,
+    padding: Spacing.lg,
+    gap: 8,
+  },
+  rowHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    marginBottom: Spacing.lg,
+    gap: 12,
   },
-  stat: {
-    flex: 1,
+  rowLabel: {
+    fontSize: Typography.fontSize.base,
+    fontWeight: '700',
+    color: '#111827',
   },
-  statLabel: {
-    ...Typography.body,
-    color: Colors.textSecondary,
-    marginBottom: Spacing.xs,
+  rowValue: {
+    fontSize: Typography.fontSize.base,
+    fontWeight: '800',
+    color: '#0F172A',
   },
-  statValue: {
-    ...Typography.h4,
-    fontWeight: '600',
-  },
-  withdrawButton: {
-    backgroundColor: Colors.primary,
-    borderRadius: BorderRadius.md,
-    padding: Spacing.lg,
-    alignItems: 'center',
-    marginBottom: Spacing.lg,
-  },
-  withdrawButtonText: {
-    ...Typography.h3,
-    color: Colors.white,
-    fontWeight: 'bold',
-  },
-  sectionTitle: {
-    ...Typography.h3,
-    marginBottom: Spacing.md,
-    marginTop: Spacing.xl,
-  },
-  transactionItem: {
-    backgroundColor: Colors.white,
-    borderRadius: BorderRadius.md,
-    padding: Spacing.md,
-    marginBottom: Spacing.sm,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  transactionLeft: {
-    flex: 1,
-  },
-  transactionDescription: {
-    ...Typography.body,
-    marginBottom: Spacing.xs,
-  },
-  transactionDate: {
-    ...Typography.bodySmall,
-    color: Colors.textSecondary,
-  },
-  transactionAmount: {
-    ...Typography.h4,
-    fontWeight: '600',
-  },
-  amountPositive: {
-    color: Colors.success,
-  },
-  amountNegative: {
-    color: Colors.error,
+  rowHint: {
+    fontSize: Typography.fontSize.sm,
+    color: '#64748B',
+    lineHeight: 20,
   },
 });

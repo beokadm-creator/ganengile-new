@@ -6,7 +6,6 @@
 import type { NavigatorScreenParams } from '@react-navigation/native';
 import type { StackNavigationProp } from '@react-navigation/stack';
 import type { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
-import type { UserRole } from './user';
 
 // ==================== Auth Navigator ====================
 
@@ -18,55 +17,47 @@ export type AuthStackParamList = {
 
 export type AuthNavigationProp = StackNavigationProp<AuthStackParamList>;
 
-// ==================== Onboarding Navigator ====================
-
-// Profile data type passed between onboarding screens
-export interface GllerProfileData {
-  name: string;
-  phoneNumber: string;
-  nickname: string;
-  profileImage: string | null;
-}
-
-// Giller data type
-export interface GillerRouteData {
-  routes: Array<{
-    departureStationId: string;
-    arrivalStationId: string;
-    daysOfWeek: number[];
-    departureTime: string;
-  }>;
-}
-
-export type OnboardingStackParamList = {
-  BasicInfoOnboarding: undefined;
-  GllerOnboarding: undefined;
-};
-
-export type OnboardingNavigationProp = StackNavigationProp<OnboardingStackParamList>;
-
 // ==================== Main Navigator (Stack + Tab) ====================
 
 export type MainTabParamList = {
   Home: undefined;
   Requests: undefined;
   GillerRequests: undefined;
-  RouteManagement: undefined;
+  RouteManagement: { justAddedRouteId?: string } | undefined;
   ChatList: undefined;
   Profile: undefined;
 };
 
 export type MainStackParamList = {
   Tabs: NavigatorScreenParams<MainTabParamList>;
-  CreateRequest: undefined;
+  CreateRequest:
+    | {
+        mode?: 'new' | 'reservation';
+        sourceRequestId?: string;
+        prefill?: {
+          pickupStation?: import('./request').StationInfo;
+          deliveryStation?: import('./request').StationInfo;
+          packageDescription?: string;
+          packageSize?: 'small' | 'medium' | 'large' | 'xl';
+          weightKg?: number;
+          itemValue?: number;
+          recipientName?: string;
+          recipientPhone?: string;
+          urgency?: 'normal' | 'fast' | 'urgent';
+          directParticipationMode?: 'none' | 'requester_to_station' | 'locker_assisted';
+          preferredPickupTime?: string;
+          preferredArrivalTime?: string;
+        };
+      }
+    | undefined;
   AddRoute: { selectedStation?: import('../types/config').Station };
   EditRoute: { routeId: string };
   RequestDetail: { requestId: string; gillerId?: string };
   DeliveryTracking: { requestId?: string; matchId?: string };
   MatchingResult: {
     requestId: string;
-    success: boolean;
-    gillerId?: string;
+    pickupStationName?: string;
+    deliveryStationName?: string;
   };
   PickupVerification: {
     deliveryId: string;
@@ -107,8 +98,21 @@ export type MainStackParamList = {
   GillerLevelUpgrade: undefined;
   CustomerService: undefined;
   Terms: undefined;
-  RequestConfirmation: { requestId: string };
-  DepositPayment: undefined;
+  RequestConfirmation: {
+    requestId: string;
+    pickupStationName?: string;
+    deliveryStationName?: string;
+    deliveryFee?: {
+      totalFee: number;
+      estimatedTime: number;
+    };
+  };
+  DepositPayment: {
+    gillerId: string;
+    gllerId: string;
+    requestId: string;
+    itemValue: number;
+  };
   PointHistory: undefined;
   PointWithdraw: undefined;
   GillerApply: undefined;
@@ -116,6 +120,7 @@ export type MainStackParamList = {
   LockerSelection: {
     stationId?: string;
     stationName?: string;
+    lockerId?: string;
   };
   BadgeCollection: undefined;
   DisputeResolution: {
@@ -172,7 +177,7 @@ export type B2BStackNavigationProp = StackNavigationProp<B2BStackParamList>;
 
 export type RootStackParamList = {
   Auth: NavigatorScreenParams<AuthStackParamList>;
-  Onboarding: NavigatorScreenParams<OnboardingStackParamList> & { role: UserRole };
+  Onboarding: undefined;
   Main: NavigatorScreenParams<MainStackParamList>;
   B2B: NavigatorScreenParams<B2BStackParamList>;
 };
@@ -185,16 +190,8 @@ export type LandingScreenProps = {
   navigation: AuthNavigationProp;
 };
 
-export type SignUpScreenProps = {
-  navigation: AuthNavigationProp;
-};
-
 export type LoginScreenProps = {
   navigation: AuthNavigationProp;
-};
-
-export type GllerOnboardingProps = {
-  navigation: OnboardingNavigationProp;
 };
 
 export type HomeScreenProps = {
@@ -227,8 +224,8 @@ export type MatchingResultScreenProps = {
   route: {
     params: {
       requestId: string;
-      success: boolean;
-      gillerId?: string;
+      pickupStationName?: string;
+      deliveryStationName?: string;
     };
   };
 };

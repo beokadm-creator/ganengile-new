@@ -16,10 +16,6 @@ import * as FileSystem from 'expo-file-system';
 import { getStorage, ref, uploadBytesResumable, getDownloadURL, deleteObject } from 'firebase/storage';
 import { firebaseApp } from './firebase';
 
-declare global {
-  var atob: (data: string) => string;
-}
-
 export interface MediaUploadResult {
   url: string;
   path: string;
@@ -194,16 +190,22 @@ export class MediaService {
       const blob = await this.uriToBlob(localUri);
 
       // 멀티파트 업로드 (진행률 지원)
-      await uploadBytesResumable(storageRef, blob, {
-        onProgress: (snapshot) => {
-          if (onProgress) {
-            onProgress({
-              bytesTransferred: snapshot.bytesTransferred,
-              totalBytes: snapshot.totalBytes,
-              progress: Math.round((snapshot.bytesTransferred / snapshot.totalBytes) * 100),
-            });
-          }
-        },
+      await new Promise<void>((resolve, reject) => {
+        const task = uploadBytesResumable(storageRef, blob);
+        task.on(
+          'state_changed',
+          (snapshot) => {
+            if (onProgress) {
+              onProgress({
+                bytesTransferred: snapshot.bytesTransferred,
+                totalBytes: snapshot.totalBytes,
+                progress: Math.round((snapshot.bytesTransferred / snapshot.totalBytes) * 100),
+              });
+            }
+          },
+          reject,
+          () => resolve(),
+        );
       });
 
       // 다운로드 URL 가져오기
@@ -238,7 +240,7 @@ export class MediaService {
       });
 
       // Base64를 Blob으로 변환
-      const byteCharacters = atob(fileData);
+      const byteCharacters = globalThis.atob(fileData);
       const byteNumbers = new Array(byteCharacters.length);
       
       for (let i = 0; i < byteCharacters.length; i++) {

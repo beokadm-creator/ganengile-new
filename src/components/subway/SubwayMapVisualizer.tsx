@@ -215,7 +215,7 @@ const styles = StyleSheet.create({
     color: Colors.text.secondary,
   },
   mapContainer: {
-    backgroundColor: Colors.background.secondary,
+    backgroundColor: Colors.gray100,
     borderRadius: 8,
     overflow: 'hidden',
     marginBottom: 16,
@@ -242,7 +242,7 @@ const styles = StyleSheet.create({
     color: Colors.text.secondary,
   },
   infoContainer: {
-    backgroundColor: Colors.background.secondary,
+    backgroundColor: Colors.gray100,
     borderRadius: 8,
     padding: 12,
   },

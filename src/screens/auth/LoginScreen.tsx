@@ -1,163 +1,155 @@
-/**
- * Login Screen
- * 로그인 화면 - Email/Password 및 Google 로그인
- */
-
-import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, TextInput, TouchableOpacity, ActivityIndicator, Alert } from 'react-native';
+﻿import React, { useEffect, useState } from 'react';
+import {
+  ActivityIndicator,
+  Alert,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
+} from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { signInWithEmailAndPassword } from 'firebase/auth';
 import { auth } from '../../services/firebase';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import { handleGoogleSignIn } from '../../services/google-auth';
+import { getKakaoLoginErrorMessage, loginWithKakao } from '../../services/kakao-auth';
+import type { LoginScreenProps } from '../../types/navigation';
 
+function getFirebaseAuthCode(error: unknown): string | undefined {
+  if (error && typeof error === 'object' && 'code' in error) {
+    const code = (error as { code?: unknown }).code;
+    return typeof code === 'string' ? code : undefined;
+  }
+  return undefined;
+}
 
-export default function LoginScreen({ navigation }: any) {
+function getEmailLoginErrorMessage(error: unknown): string {
+  switch (getFirebaseAuthCode(error)) {
+    case 'auth/invalid-credential':
+    case 'auth/user-not-found':
+    case 'auth/wrong-password':
+      return '이메일과 비밀번호를 다시 확인해 주세요.';
+    case 'auth/invalid-email':
+      return '이메일 형식을 확인해 주세요.';
+    case 'auth/user-disabled':
+      return '비활성화된 계정입니다. 운영팀에 문의해 주세요.';
+    case 'auth/too-many-requests':
+      return '로그인 시도가 많습니다. 잠시 후 다시 시도해 주세요.';
+    default:
+      return error instanceof Error && error.message ? error.message : '로그인에 실패했습니다.';
+  }
+}
+
+export default function LoginScreen({ navigation }: LoginScreenProps) {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [loading, setLoading] = useState(false);
   const [saveId, setSaveId] = useState(false);
+  const [emailLoading, setEmailLoading] = useState(false);
+  const [googleLoading, setGoogleLoading] = useState(false);
+  const [kakaoLoading, setKakaoLoading] = useState(false);
 
-  // 앱 시작 시 저장된 ID 불러오기
   useEffect(() => {
-    loadSavedEmail();
+    void (async () => {
+      try {
+        const savedEmail = await AsyncStorage.getItem('@user_email');
+        if (savedEmail) {
+          setEmail(savedEmail);
+          setSaveId(true);
+        }
+      } catch (error) {
+        console.error('Failed to load saved email', error);
+      }
+    })();
   }, []);
 
-  const loadSavedEmail = async () => {
-    try {
-      const savedEmail = await AsyncStorage.getItem('@user_email');
-      if (savedEmail) {
-        setEmail(savedEmail);
-        setSaveId(true);
-      }
-    } catch (error) {
-      console.error('Error loading saved email:', error);
-    }
-  };
-
-  const handleLogin = async () => {
-    if (!email || !password) {
-      Alert.alert('입력 오류', '이메일과 비밀번호를 모두 입력해주세요.');
+  async function handleEmailLogin() {
+    if (!email.trim() || !password) {
+      Alert.alert('입력이 필요합니다', '이메일과 비밀번호를 입력해 주세요.');
       return;
     }
 
-    setLoading(true);
+    setEmailLoading(true);
     try {
-      await signInWithEmailAndPassword(auth, email, password);
-
-      // ID 저장 체크박스가 선택되어 있으면 저장
+      await signInWithEmailAndPassword(auth, email.trim(), password);
       if (saveId) {
-        await AsyncStorage.setItem('@user_email', email);
+        await AsyncStorage.setItem('@user_email', email.trim());
       } else {
-        // 체크 해제되면 저장된 ID 삭제
         await AsyncStorage.removeItem('@user_email');
       }
-
-      // Auth state change will be handled by AppNavigator
-    } catch (error: any) {
-      let errorMessage = '로그인에 실패했습니다.';
-
-      switch (error.code) {
-        case 'auth/invalid-credential':
-        case 'auth/user-not-found':
-        case 'auth/wrong-password':
-          errorMessage = '이메일 또는 비밀번호가 올바르지 않습니다.';
-          break;
-        case 'auth/invalid-email':
-          errorMessage = '이메일 형식이 올바르지 않습니다.';
-          break;
-        case 'auth/user-disabled':
-          errorMessage = '계정이 비활성화되었습니다. 고객센터에 문의해주세요.';
-          break;
-        case 'auth/too-many-requests':
-          errorMessage = '로그인 시도가 너무 많습니다. 잠시 후 다시 시도해주세요.';
-          break;
-        default:
-          errorMessage = error.message || '로그인에 실패했습니다. 다시 시도해주세요.';
-      }
-
-      Alert.alert('로그인 실패', errorMessage);
+    } catch (error) {
+      Alert.alert('로그인 실패', getEmailLoginErrorMessage(error));
     } finally {
-      setLoading(false);
+      setEmailLoading(false);
     }
-  };
+  }
 
-  const handleGoogleLogin = async () => {
-    setLoading(true);
+  async function handleGoogleLoginPress() {
+    setGoogleLoading(true);
     try {
-      // google-auth의 handleGoogleSignIn 사용 (Web + Native 지원)
-      const { handleGoogleSignIn } = await import('../../services/google-auth');
       await handleGoogleSignIn();
-
-      // Auth state change will be handled by AppNavigator
-    } catch (error: any) {
-      console.error('Google login error:', error);
-      Alert.alert('Google 로그인 실패', error.message || 'Google 로그인에 실패했습니다.');
+    } catch (error) {
+      Alert.alert('Google 로그인 실패', error instanceof Error ? error.message : 'Google 로그인에 실패했습니다.');
     } finally {
-      setLoading(false);
+      setGoogleLoading(false);
     }
-  };
+  }
+
+  async function handleKakaoLoginPress() {
+    setKakaoLoading(true);
+    try {
+      await loginWithKakao();
+    } catch (error) {
+      Alert.alert('카카오 로그인 실패', getKakaoLoginErrorMessage(error));
+    } finally {
+      setKakaoLoading(false);
+    }
+  }
 
   return (
     <View style={styles.container}>
       <View style={styles.content}>
         <Text style={styles.title}>로그인</Text>
+        <Text style={styles.subtitle}>가는길에 계정으로 요청, 미션, 채팅, 정산 흐름을 이어서 관리합니다.</Text>
 
-        <View style={styles.inputContainer}>
+        <View style={styles.form}>
           <TextInput
             style={styles.input}
             placeholder="이메일"
+            placeholderTextColor="#94A3B8"
             value={email}
             onChangeText={setEmail}
             autoCapitalize="none"
             keyboardType="email-address"
           />
-
           <TextInput
             style={styles.input}
             placeholder="비밀번호"
+            placeholderTextColor="#94A3B8"
             value={password}
             onChangeText={setPassword}
             secureTextEntry
           />
 
-          <TouchableOpacity
-            style={styles.saveIdContainer}
-            onPress={() => setSaveId(!saveId)}
-            activeOpacity={0.7}
-          >
-            <View style={[styles.checkbox, saveId && styles.checkboxChecked]}>
-              {saveId && <Text style={styles.checkmark}>✓</Text>}
-            </View>
-            <Text style={styles.saveIdLabel}>이메일 저장</Text>
+          <TouchableOpacity style={styles.inlineRow} onPress={() => setSaveId((current) => !current)} activeOpacity={0.8}>
+            <View style={[styles.checkbox, saveId && styles.checkboxActive]}>{saveId ? <Text style={styles.checkmark}>✓</Text> : null}</View>
+            <Text style={styles.inlineLabel}>이메일 저장</Text>
           </TouchableOpacity>
 
-          <TouchableOpacity
-            style={[styles.button, styles.loginButton]}
-            onPress={handleLogin}
-            disabled={loading}
-          >
-            {loading ? (
-              <ActivityIndicator color="#fff" />
-            ) : (
-              <Text style={styles.loginButtonText}>로그인</Text>
-            )}
+          <TouchableOpacity style={styles.primaryButton} onPress={() => void handleEmailLogin()} disabled={emailLoading}>
+            {emailLoading ? <ActivityIndicator color="#FFFFFF" /> : <Text style={styles.primaryButtonText}>이메일로 로그인</Text>}
           </TouchableOpacity>
 
-          {/* Google 로그인 */}
-          <TouchableOpacity
-            style={[styles.button, styles.googleButton]}
-            onPress={handleGoogleLogin}
-            disabled={loading}
-          >
-            {loading ? (
-              <ActivityIndicator color="#333" />
-            ) : (
-              <Text style={styles.googleButtonText}>Google로 계속하기</Text>
-            )}
+          <TouchableOpacity style={styles.kakaoButton} onPress={() => void handleKakaoLoginPress()} disabled={kakaoLoading}>
+            {kakaoLoading ? <ActivityIndicator color="#191600" /> : <Text style={styles.kakaoButtonText}>카카오로 계속하기</Text>}
+          </TouchableOpacity>
+
+          <TouchableOpacity style={styles.secondaryButton} onPress={() => void handleGoogleLoginPress()} disabled={googleLoading}>
+            {googleLoading ? <ActivityIndicator color="#0F172A" /> : <Text style={styles.secondaryButtonText}>Google로 계속하기</Text>}
           </TouchableOpacity>
         </View>
 
-        <TouchableOpacity onPress={() => navigation.navigate('NewSignUp')}>
-          <Text style={styles.signupLink}>계정이 없으신가요? 회원가입</Text>
+        <TouchableOpacity onPress={() => navigation.navigate('NewSignUp')} activeOpacity={0.8}>
+          <Text style={styles.footerLink}>계정이 없다면 회원가입</Text>
         </TouchableOpacity>
       </View>
     </View>
@@ -165,89 +157,59 @@ export default function LoginScreen({ navigation }: any) {
 }
 
 const styles = StyleSheet.create({
-  button: {
-    alignItems: 'center',
-    borderRadius: 8,
-    marginTop: 8,
-    padding: 16,
-  },
-  container: {
-    backgroundColor: '#fff',
-    flex: 1,
-  },
-  content: {
-    flex: 1,
-    justifyContent: 'center',
-    padding: 30,
-  },
-  googleButton: {
-    backgroundColor: '#fff',
-    borderColor: '#ddd',
-    borderWidth: 1,
-  },
-  googleButtonText: {
-    color: '#333',
-    fontSize: 16,
-  },
+  container: { flex: 1, backgroundColor: '#F8FAFC' },
+  content: { flex: 1, justifyContent: 'center', padding: 24 },
+  title: { color: '#0F172A', fontSize: 32, fontWeight: '800', textAlign: 'center', marginBottom: 12 },
+  subtitle: { color: '#64748B', fontSize: 15, lineHeight: 22, textAlign: 'center', marginBottom: 28 },
+  form: { gap: 12 },
   input: {
-    backgroundColor: '#f5f5f5',
-    borderRadius: 8,
-    fontSize: 16,
-    marginBottom: 12,
-    padding: 16,
+    minHeight: 54,
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    borderRadius: 16,
+    paddingHorizontal: 16,
+    color: '#0F172A',
   },
-  inputContainer: {
-    marginBottom: 20,
-  },
-  loginButton: {
-    backgroundColor: '#4CAF50',
-  },
-  loginButtonText: {
-    color: '#fff',
-    fontSize: 16,
-    fontWeight: 'bold',
-  },
-  signupLink: {
-    color: '#4CAF50',
-    fontSize: 14,
-    marginTop: 20,
-    textAlign: 'center',
-  },
-  title: {
-    color: '#4CAF50',
-    fontSize: 32,
-    fontWeight: 'bold',
-    marginBottom: 40,
-    textAlign: 'center',
-  },
-  saveIdContainer: {
-    alignItems: 'center',
-    flexDirection: 'row',
-    marginBottom: 16,
-    marginTop: 8,
-  },
+  inlineRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 4 },
   checkbox: {
+    width: 22,
+    height: 22,
+    borderRadius: 6,
+    borderWidth: 1.5,
+    borderColor: '#CBD5E1',
     alignItems: 'center',
-    backgroundColor: '#fff',
-    borderColor: '#ddd',
-    borderRadius: 4,
-    borderWidth: 2,
-    height: 24,
     justifyContent: 'center',
-    marginRight: 8,
-    width: 24,
+    backgroundColor: '#FFFFFF',
   },
-  checkboxChecked: {
-    backgroundColor: '#4CAF50',
-    borderColor: '#4CAF50',
+  checkboxActive: { backgroundColor: '#0F766E', borderColor: '#0F766E' },
+  checkmark: { color: '#FFFFFF', fontWeight: '800' },
+  inlineLabel: { color: '#475569', fontSize: 14 },
+  primaryButton: {
+    minHeight: 54,
+    borderRadius: 16,
+    backgroundColor: '#0F172A',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
-  checkmark: {
-    color: '#fff',
-    fontSize: 16,
-    fontWeight: 'bold',
+  primaryButtonText: { color: '#FFFFFF', fontSize: 16, fontWeight: '800' },
+  kakaoButton: {
+    minHeight: 54,
+    borderRadius: 16,
+    backgroundColor: '#FEE500',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
-  saveIdLabel: {
-    color: '#666',
-    fontSize: 14,
+  kakaoButtonText: { color: '#191600', fontSize: 16, fontWeight: '800' },
+  secondaryButton: {
+    minHeight: 54,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: '#CBD5E1',
+    backgroundColor: '#FFFFFF',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
+  secondaryButtonText: { color: '#0F172A', fontSize: 16, fontWeight: '700' },
+  footerLink: { color: '#0F766E', fontWeight: '700', textAlign: 'center', marginTop: 20 },
 });

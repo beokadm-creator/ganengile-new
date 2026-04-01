@@ -1,378 +1,126 @@
-import React, { useState, useEffect } from 'react';
-import {
-  View,
-  Text,
-  StyleSheet,
-  TouchableOpacity,
-  ActivityIndicator,
-  ScrollView,
-  Alert,
-} from 'react-native';
-import { StackNavigationProp } from '@react-navigation/stack';
+﻿import React, { useEffect, useMemo, useState } from 'react';
+import { ActivityIndicator, Alert, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import type { RouteProp } from '@react-navigation/native';
 import { DepositService } from '../../services/DepositService';
 import { PointService } from '../../services/PointService';
-import { Colors, Typography, Spacing, BorderRadius } from '../../theme';
+import { getPaymentIntegrationConfig } from '../../services/integration-config-service';
+import { DEPOSIT_RATE, DepositPaymentMethod } from '../../types/point';
+import type { MainStackNavigationProp, MainStackParamList } from '../../types/navigation';
 
-type NavigationProp = StackNavigationProp<any>;
+type DepositPaymentRouteProp = RouteProp<MainStackParamList, 'DepositPayment'>;
 
-interface RouteParams {
-  gillerId: string;
-  gllerId: string;
-  requestId: string;
-  itemValue: number;
-}
-
-export default function DepositPaymentScreen({ navigation }: { navigation: NavigationProp }) {
+export default function DepositPaymentScreen({ navigation, route }: { navigation: MainStackNavigationProp; route: DepositPaymentRouteProp }) {
   const [loading, setLoading] = useState(false);
   const [pointBalance, setPointBalance] = useState(0);
-  const [paymentMethod, setPaymentMethod] = useState<'auto' | 'tosspayments'>('auto');
+  const [modeTitle, setModeTitle] = useState('결제 준비 상태를 불러오는 중입니다.');
+  const [modeBody, setModeBody] = useState('관리자 설정과 현재 결제 공급자 상태를 확인하고 있습니다.');
 
-  const route = navigation.getState().routes.find(
-    route => route.name === 'DepositPayment'
-  )?.params as RouteParams || {
-    gillerId: '',
-    gllerId: '',
-    requestId: '',
-    itemValue: 0,
-  };
-
-  const depositAmount = Math.round(route.itemValue * 0.8);
-
+  const { gillerId, gllerId, requestId, itemValue } = route.params;
+  const depositAmount = Math.round(itemValue * DEPOSIT_RATE);
   const pointCoverage = Math.min(pointBalance, depositAmount);
-  const tossAmount = depositAmount - pointCoverage;
+  const pgAmount = Math.max(0, depositAmount - pointCoverage);
 
   useEffect(() => {
-    loadPointBalance();
-  }, []);
-
-  const loadPointBalance = async () => {
-    try {
-      const balance = await PointService.getBalance(route.gillerId);
-      setPointBalance(balance);
-    } catch (error) {
-      console.error('Failed to load point balance:', error);
+    let mounted = true;
+    async function load() {
+      try {
+        const [balance, paymentConfig] = await Promise.all([PointService.getBalance(gillerId), getPaymentIntegrationConfig()]);
+        if (!mounted) return;
+        setPointBalance(balance);
+        if (paymentConfig.liveReady && !paymentConfig.testMode) {
+          setModeTitle('실서비스 결제 준비 완료');
+          setModeBody(`${paymentConfig.provider} 기준으로 보증금 결제 경로가 준비되어 있습니다. 이후 이체와 최종 정산은 운영 검토를 거칩니다.`);
+        } else {
+          setModeTitle('테스트 또는 운영 검토 모드');
+          setModeBody(paymentConfig.statusMessage);
+        }
+      } catch (error) {
+        console.error('Failed to load deposit payment screen', error);
+        if (mounted) {
+          setModeTitle('기본 결제 모드');
+          setModeBody('결제 설정을 읽지 못해 기본 안내 문구를 보여주고 있습니다.');
+        }
+      }
     }
-  };
+    void load();
+    return () => { mounted = false; };
+  }, [gillerId]);
 
-  const handlePayment = async () => {
-    if (paymentMethod === 'auto') {
-      setPaymentMethod('tosspayments');
-      return;
-    }
+  const summaryRows = useMemo(() => [
+    { label: '물품 가치', value: `${itemValue.toLocaleString()}원` },
+    { label: `보증금(${Math.round(DEPOSIT_RATE * 100)}%)`, value: `${depositAmount.toLocaleString()}원`, strong: true },
+    { label: '포인트 우선 사용', value: `${pointCoverage.toLocaleString()}원` },
+    { label: 'PG 또는 테스트 경로', value: `${pgAmount.toLocaleString()}원` },
+  ], [depositAmount, itemValue, pgAmount, pointCoverage]);
 
+  async function handlePayment() {
     try {
       setLoading(true);
-
-      const result = await DepositService.payDeposit(
-        route.gillerId,
-        route.gllerId,
-        route.requestId,
-        route.itemValue
-      );
-
-      if (result.success) {
-        Alert.alert(
-          '보증금 결제 완료',
-          `보증금 ${depositAmount.toLocaleString()}원이 정상적으로 결제되었습니다.\n\n배송을 시작합니다.`,
-          [
-            {
-              text: '확인',
-              onPress: () => navigation.goBack(),
-            },
-          ]
-        );
-      } else {
-        Alert.alert('결제 실패', result.error || '결제 처리 중 오류가 발생했습니다.');
+      const result = await DepositService.payDeposit(gillerId, gllerId, requestId, itemValue);
+      if (!result.success) {
+        Alert.alert('결제 실패', result.error ?? '보증금 결제 중 문제가 발생했습니다.');
+        return;
       }
-    } catch (error: any) {
-      Alert.alert('오류', error.message || '결제 처리 중 오류가 발생했습니다.');
+      Alert.alert('보증금 결제 완료', result.deposit?.paymentMethod === DepositPaymentMethod.MIXED ? '포인트와 결제 경로를 함께 사용해 보증금 준비를 마쳤습니다. 이후 최종 이체와 차감 판단은 운영 검토를 거칩니다.' : '보증금 준비가 완료되었습니다. 이후 배송 결과와 운영 판단에 따라 이체 또는 차감으로 이어집니다.', [{ text: '정산 보기', onPress: () => navigation.navigate('Earnings') }, { text: '닫기', onPress: () => navigation.goBack() }]);
+    } catch (error) {
+      Alert.alert('오류', error instanceof Error ? error.message : '보증금 결제 중 문제가 발생했습니다.');
     } finally {
       setLoading(false);
     }
-  };
+  }
 
   return (
-    <View style={styles.container}>
-      <ScrollView contentContainerStyle={styles.scrollContent}>
-        <View style={styles.header}>
-          <Text style={styles.headerTitle}>보증금 결제</Text>
-          <Text style={styles.headerSubtitle}>
-            배송을 수락하기 위해 보증금을 납부해주세요
-          </Text>
-        </View>
-
-        <View style={styles.card}>
-          <Text style={styles.cardTitle}>보증금 정보</Text>
-          <View style={styles.infoRow}>
-            <Text style={styles.infoLabel}>물건 가치</Text>
-            <Text style={styles.infoValue}>
-              {route.itemValue.toLocaleString()}원
-            </Text>
-          </View>
-          <View style={styles.infoRow}>
-            <Text style={styles.infoLabel}>보증금 (80%)</Text>
-            <Text style={styles.depositAmount}>
-              {depositAmount.toLocaleString()}원
-            </Text>
-          </View>
-        </View>
-
-        <View style={styles.card}>
-          <Text style={styles.cardTitle}>현재 포인트</Text>
-          <Text style={styles.pointBalance}>
-            {pointBalance.toLocaleString()} P
-          </Text>
-        </View>
-
-        <Text style={styles.sectionTitle}>결제 방식</Text>
-
-        {pointBalance < depositAmount && pointBalance > 0 && (
-          <View style={styles.paymentMethodCard}>
-            <Text style={styles.paymentMethodTitle}>
-              포인트 + 토스페이먼츠 혼합
-            </Text>
-            <View style={styles.paymentBreakdown}>
-              <View style={styles.breakdownRow}>
-                <Text style={styles.breakdownLabel}>포인트</Text>
-                <Text style={styles.breakdownValue}>
-                  -{pointCoverage.toLocaleString()}원
-                </Text>
-              </View>
-              <View style={styles.breakdownRow}>
-                <Text style={styles.breakdownLabel}>토스페이먼츠</Text>
-                <Text style={styles.breakdownValue}>
-                  -{tossAmount.toLocaleString()}원
-                </Text>
-              </View>
-              <View style={styles.breakdownDivider} />
-              <View style={styles.breakdownRow}>
-                <Text style={styles.breakdownLabel}>총 결제</Text>
-                <Text style={styles.breakdownValueTotal}>
-                  {depositAmount.toLocaleString()}원
-                </Text>
-              </View>
-            </View>
-          </View>
-        )}
-
-        {pointBalance >= depositAmount && (
-          <View style={styles.paymentMethodCard}>
-            <Text style={styles.paymentMethodTitle}>
-              포인트 결제
-            </Text>
-            <View style={styles.paymentBreakdown}>
-              <View style={styles.breakdownRow}>
-                <Text style={styles.breakdownLabel}>포인트</Text>
-                <Text style={styles.breakdownValue}>
-                  -{depositAmount.toLocaleString()}원
-                </Text>
-              </View>
-              <View style={styles.breakdownDivider} />
-              <View style={styles.breakdownRow}>
-                <Text style={styles.breakdownLabel}>총 결제</Text>
-                <Text style={styles.breakdownValueTotal}>
-                  {depositAmount.toLocaleString()}원
-                </Text>
-              </View>
-            </View>
-          </View>
-        )}
-
-        {pointBalance === 0 && (
-          <View style={styles.paymentMethodCard}>
-            <Text style={styles.paymentMethodTitle}>
-              토스페이먼츠 결제
-            </Text>
-            <View style={styles.paymentBreakdown}>
-              <View style={styles.breakdownRow}>
-                <Text style={styles.breakdownLabel}>토스페이먼츠</Text>
-                <Text style={styles.breakdownValue}>
-                  -{depositAmount.toLocaleString()}원
-                </Text>
-              </View>
-              <View style={styles.breakdownDivider} />
-              <View style={styles.breakdownRow}>
-                <Text style={styles.breakdownLabel}>총 결제</Text>
-                <Text style={styles.breakdownValueTotal}>
-                  {depositAmount.toLocaleString()}원
-                </Text>
-              </View>
-            </View>
-          </View>
-        )}
-
-        <View style={styles.policyBox}>
-          <Text style={styles.policyTitle}>보증금 정책</Text>
-          <Text style={styles.policyItem}>• 배송 완료 시 보증금 환급</Text>
-          <Text style={styles.policyItem}>• 사고/분실 시 보증금 100% 차감</Text>
-          <Text style={styles.policyItem}>
-            • 추가 페널티: 평점 하락, 정지 등
-          </Text>
-        </View>
-
-        <TouchableOpacity
-          style={styles.payButton}
-          onPress={handlePayment}
-          disabled={loading}
-        >
-          {loading ? (
-            <ActivityIndicator color="#fff" />
-          ) : (
-            <Text style={styles.payButtonText}>
-              {depositAmount.toLocaleString()}원 결제하기
-            </Text>
-          )}
-        </TouchableOpacity>
-
-        <TouchableOpacity
-          style={styles.cancelButton}
-          onPress={() => navigation.goBack()}
-          disabled={loading}
-        >
-          <Text style={styles.cancelButtonText}>취소</Text>
-        </TouchableOpacity>
-      </ScrollView>
-    </View>
+    <ScrollView style={styles.container} contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+      <View style={styles.hero}>
+        <Text style={styles.kicker}>가는길에 보증금</Text>
+        <Text style={styles.title}>보증금 결제</Text>
+        <Text style={styles.subtitle}>배송 시작 전에 필요한 보증금입니다. 결제 준비 상태와 이후 정산 연결을 한 번에 확인합니다.</Text>
+      </View>
+      <View style={styles.noticeCard}><Text style={styles.noticeTitle}>{modeTitle}</Text><Text style={styles.noticeBody}>{modeBody}</Text></View>
+      <View style={styles.card}>
+        <Text style={styles.sectionTitle}>결제 요약</Text>
+        {summaryRows.map((row) => <View key={row.label} style={styles.row}><Text style={styles.rowLabel}>{row.label}</Text><Text style={[styles.rowValue, row.strong && styles.rowValueStrong]}>{row.value}</Text></View>)}
+      </View>
+      <View style={styles.card}>
+        <Text style={styles.sectionTitle}>현재 포인트 잔액</Text>
+        <Text style={styles.balanceValue}>{pointBalance.toLocaleString()}P</Text>
+        <Text style={styles.balanceHint}>포인트가 있으면 먼저 사용하고, 부족한 금액만 결제 공급자 또는 테스트 경로로 이어집니다.</Text>
+      </View>
+      <View style={styles.policyBox}>
+        <Text style={styles.policyTitle}>운영 가드레일</Text>
+        <Text style={styles.policyText}>배송 완료 후 보증금 이체 여부는 배송 상태와 운영 검토를 함께 봅니다.</Text>
+        <Text style={styles.policyText}>분실, 차감, 패널티, 최종 정산은 AI가 단독으로 확정하지 않습니다.</Text>
+      </View>
+      <TouchableOpacity style={[styles.primaryButton, loading && styles.primaryButtonDisabled]} onPress={() => void handlePayment()} disabled={loading} activeOpacity={0.9}>{loading ? <ActivityIndicator color="#FFFFFF" /> : <Text style={styles.primaryButtonText}>{depositAmount.toLocaleString()}원 결제하기</Text>}</TouchableOpacity>
+      <TouchableOpacity style={styles.secondaryButton} onPress={() => navigation.navigate('PointHistory')} activeOpacity={0.9}><Text style={styles.secondaryButtonText}>지갑으로 돌아가기</Text></TouchableOpacity>
+    </ScrollView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: Colors.background,
-  },
-  scrollContent: {
-    padding: Spacing.md,
-  },
-  header: {
-    marginBottom: Spacing.lg,
-  },
-  headerTitle: {
-    ...Typography.h2,
-    marginBottom: Spacing.xs,
-  },
-  headerSubtitle: {
-    ...Typography.body,
-    color: Colors.textSecondary,
-  },
-  card: {
-    backgroundColor: Colors.white,
-    borderRadius: BorderRadius.md,
-    padding: Spacing.md,
-    marginBottom: Spacing.md,
-  },
-  cardTitle: {
-    ...Typography.h4,
-    marginBottom: Spacing.md,
-  },
-  infoRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginBottom: Spacing.sm,
-  },
-  infoLabel: {
-    ...Typography.body,
-    color: Colors.textSecondary,
-  },
-  infoValue: {
-    ...Typography.h4,
-    fontWeight: '600',
-    color: Colors.text,
-  },
-  depositAmount: {
-    ...Typography.h2,
-    fontWeight: 'bold',
-    color: Colors.primary,
-  },
-  pointBalance: {
-    ...Typography.h1,
-    fontWeight: 'bold',
-    color: Colors.primary,
-    textAlign: 'center',
-  },
-  sectionTitle: {
-    ...Typography.h3,
-    marginBottom: Spacing.sm,
-    marginTop: Spacing.lg,
-  },
-  paymentMethodCard: {
-    backgroundColor: Colors.white,
-    borderRadius: BorderRadius.md,
-    padding: Spacing.lg,
-    marginBottom: Spacing.md,
-    borderWidth: 2,
-    borderColor: Colors.primary,
-  },
-  paymentMethodTitle: {
-    ...Typography.h4,
-    marginBottom: Spacing.md,
-    textAlign: 'center',
-  },
-  paymentBreakdown: {
-    marginTop: Spacing.md,
-  },
-  breakdownRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginBottom: Spacing.xs,
-  },
-  breakdownLabel: {
-    ...Typography.body,
-    color: Colors.textSecondary,
-  },
-  breakdownValue: {
-    ...Typography.body,
-    fontWeight: '600',
-    color: Colors.text,
-  },
-  breakdownValueTotal: {
-    ...Typography.h4,
-    fontWeight: 'bold',
-    color: Colors.primary,
-  },
-  breakdownDivider: {
-    height: 1,
-    backgroundColor: Colors.border,
-    marginVertical: Spacing.md,
-  },
-  policyBox: {
-    backgroundColor: Colors.infoLight,
-    borderRadius: BorderRadius.md,
-    padding: Spacing.md,
-    marginBottom: Spacing.lg,
-  },
-  policyTitle: {
-    ...Typography.h4,
-    color: Colors.accent,
-    marginBottom: Spacing.sm,
-  },
-  policyItem: {
-    ...Typography.body,
-    color: Colors.textSecondary,
-    marginBottom: Spacing.xs,
-  },
-  payButton: {
-    backgroundColor: Colors.primary,
-    borderRadius: BorderRadius.md,
-    padding: Spacing.lg,
-    alignItems: 'center',
-  },
-  payButtonText: {
-    ...Typography.h3,
-    color: Colors.white,
-    fontWeight: 'bold',
-  },
-  cancelButton: {
-    backgroundColor: 'transparent',
-    borderRadius: BorderRadius.md,
-    padding: Spacing.lg,
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: Colors.border,
-  },
-  cancelButtonText: {
-    ...Typography.h3,
-    color: Colors.textSecondary,
-    fontWeight: 'bold',
-  },
+  container: { flex: 1, backgroundColor: '#F8FAFC' },
+  content: { padding: 16, paddingBottom: 32, gap: 12 },
+  hero: { backgroundColor: '#FFFFFF', borderRadius: 18, padding: 18, gap: 6 },
+  kicker: { color: '#0F766E', fontSize: 12, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 1.1 },
+  title: { color: '#111827', fontSize: 26, fontWeight: '700' },
+  subtitle: { color: '#4B5563', fontSize: 14, lineHeight: 21 },
+  noticeCard: { backgroundColor: '#FEF3C7', borderRadius: 18, borderWidth: 1, borderColor: '#FDE68A', padding: 16, gap: 6 },
+  noticeTitle: { color: '#92400E', fontSize: 15, fontWeight: '700' },
+  noticeBody: { color: '#78350F', fontSize: 13, lineHeight: 19 },
+  card: { backgroundColor: '#FFFFFF', borderRadius: 18, padding: 18, gap: 10 },
+  sectionTitle: { color: '#111827', fontSize: 17, fontWeight: '700' },
+  row: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: 12 },
+  rowLabel: { color: '#667085', fontSize: 14 },
+  rowValue: { color: '#111827', fontSize: 14, fontWeight: '600' },
+  rowValueStrong: { color: '#0F766E', fontSize: 18, fontWeight: '800' },
+  balanceValue: { color: '#0F766E', fontSize: 32, fontWeight: '800', textAlign: 'center' },
+  balanceHint: { color: '#667085', fontSize: 13, lineHeight: 20, textAlign: 'center' },
+  policyBox: { backgroundColor: '#FFFFFF', borderRadius: 18, padding: 18, gap: 6 },
+  policyTitle: { color: '#111827', fontWeight: '700' },
+  policyText: { color: '#4B5563', lineHeight: 20 },
+  primaryButton: { minHeight: 54, borderRadius: 18, backgroundColor: '#115E59', alignItems: 'center', justifyContent: 'center' },
+  primaryButtonDisabled: { opacity: 0.7 },
+  primaryButtonText: { color: '#FFFFFF', fontWeight: '800', fontSize: 16 },
+  secondaryButton: { minHeight: 54, borderRadius: 18, backgroundColor: '#FFFFFF', alignItems: 'center', justifyContent: 'center' },
+  secondaryButtonText: { color: '#0F172A', fontWeight: '700' },
 });

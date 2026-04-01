@@ -1,709 +1,355 @@
-/**
- * Pickup Verification Screen
- * 길러가 픽업 시 QR코드/4자리 코드 + 사진으로 인증
- * 개선사항: 네트워크 에러 처리, 권한 처리, 타임아웃, 더 나은 UX
- */
-
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState } from 'react';
 import {
-  View,
-  Text,
-  StyleSheet,
-  TouchableOpacity,
-  TextInput,
-  Alert,
   ActivityIndicator,
-  ScrollView,
+  Alert,
   Image,
-  Modal,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
 } from 'react-native';
-import { StackNavigationProp } from '@react-navigation/stack';
+import { RouteProp, useNavigation, useRoute } from '@react-navigation/native';
+import type { MainStackNavigationProp, MainStackParamList } from '../../types/navigation';
 import { requireUserId } from '../../services/firebase';
 import { verifyPickup, type PickupVerificationData } from '../../services/delivery-service';
-import QRScanner from '../../components/delivery/QRScanner';
+import { takePhoto, uploadPhotoWithThumbnail } from '../../services/photo-service';
+import { getCurrentLocation } from '../../utils/permission-handler';
+import * as Location from 'expo-location';
 
-// Utils
-import { retryWithBackoff } from '../../utils/retry-with-backoff';
-import { showErrorAlert, createPermissionError } from '../../utils/error-handler';
-import { getCurrentLocation, ensurePermission, requestCameraPermission } from '../../utils/permission-handler';
-import { isNetworkAvailable } from '../../utils/network-detector';
-import { SuccessOverlay } from '../../utils/success-animation';
+type PickupRoute = RouteProp<MainStackParamList, 'PickupVerification'>;
+type VerificationMethod = 'qr' | 'code';
 
-type NavigationProp = StackNavigationProp<any>;
-
-interface Props {
-  navigation: NavigationProp;
-  route: {
-    params: {
-      deliveryId: string;
-      requestId: string;
-    };
-  };
-}
-
-type VerificationMethod = 'qr' | 'code' | null;
-
-export default function PickupVerificationScreen({ navigation, route }: Props) {
+export default function PickupVerificationScreen() {
+  const navigation = useNavigation<MainStackNavigationProp>();
+  const route = useRoute<PickupRoute>();
   const { deliveryId, requestId } = route.params;
-  const [method, setMethod] = useState<VerificationMethod>(null);
+
+  const [method, setMethod] = useState<VerificationMethod>('code');
   const [verificationCode, setVerificationCode] = useState('');
   const [photoUri, setPhotoUri] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
-  const [locationLoading, setLocationLoading] = useState(true);
-  const [location, setLocation] = useState<{ latitude: number; longitude: number } | null>(null);
-  const [showQRScanner, setShowQRScanner] = useState(false);
-  const [cameraPermissionGranted, setCameraPermissionGranted] = useState(false);
-  const [showSuccess, setShowSuccess] = useState(false);
-  const [isRetrying, setIsRetrying] = useState(false);
+  const [photoLoading, setPhotoLoading] = useState(false);
 
-  // Get current location and check permissions on mount
-  useEffect(() => {
-    initialize();
-  }, []);
-
-  const initialize = async () => {
-    setLocationLoading(true);
-
-    // Check camera permission first
-    const hasCameraPermission = await ensurePermission('camera', {
-      showSettingsAlert: true,
-    });
-    setCameraPermissionGranted(hasCameraPermission);
-
-    // Get location
-    const loc = await getCurrentLocation({
-      showSettingsAlert: true,
-      accuracy: 'high',
-    });
-
-    if (loc) {
-      setLocation({
-        latitude: loc.coords.latitude,
-        longitude: loc.coords.longitude,
-      });
-    }
-
-    setLocationLoading(false);
-  };
-
-  const selectVerificationMethod = useCallback((selectedMethod: VerificationMethod) => {
-    setMethod(selectedMethod);
-  }, []);
-
-  const takePhoto = async () => {
+  const handleCapturePhoto = async (): Promise<void> => {
     try {
-      // Check camera permission first
-      const hasPermission = await requestCameraPermission({
-        showSettingsAlert: true,
-      });
-
-      if (!hasPermission) {
+      setPhotoLoading(true);
+      const userId = requireUserId();
+      const capturedUri = await takePhoto();
+      if (!capturedUri) {
         return;
       }
 
-      // Import ImagePicker dynamically to avoid permission issues
-      const ImagePicker = require('expo-image-picker');
-
-      const result = await ImagePicker.launchCameraAsync({
-        mediaTypes: ImagePicker.MediaTypeOptions.Images,
-        allowsEditing: true,
-        aspect: [4, 3],
-        quality: 0.8,
-      });
-
-      if (!result.canceled && result.assets[0]) {
-        setPhotoUri(result.assets[0].uri);
-      }
+      const uploaded = await uploadPhotoWithThumbnail(capturedUri, userId, 'pickup_verification');
+      setPhotoUri(uploaded.url);
     } catch (error) {
-      console.error('Error taking photo:', error);
-
-      if (String(error).includes('Permission')) {
-        showErrorAlert(createPermissionError('camera'));
-      } else {
-        showErrorAlert(error, takePhoto);
-      }
+      console.error('Failed to capture pickup verification photo:', error);
+      Alert.alert('사진 업로드 실패', '인수 증빙 사진을 다시 촬영해 주세요.');
+    } finally {
+      setPhotoLoading(false);
     }
   };
 
-  const handleVerifyPickup = async () => {
-    // Validation
-    if (!location) {
-      Alert.alert('위치 필요', '위치 정보를 가져올 수 없습니다. 위치 서비스를 확인해주세요.', [
-        { text: '취소', style: 'cancel' },
-        { text: '다시 시도', onPress: initialize },
-      ]);
+  const handleVerifyPickup = async (): Promise<void> => {
+    if (method === 'code' && verificationCode.trim().length !== 4) {
+      Alert.alert('코드 확인', '4자리 인수 코드를 입력해 주세요.');
       return;
     }
 
     if (!photoUri) {
-      Alert.alert('사진 필요', '픽업 사진을 촬영해주세요.');
+      Alert.alert('증빙 확인', '인수 증빙 사진을 먼저 촬영해 주세요.');
       return;
     }
-
-    if (method === 'code' && (verificationCode?.length !== 4)) {
-      Alert.alert('코드 오류', '4자리 인증 코드를 입력해주세요.');
-      return;
-    }
-
-    // Check network
-    const isOnline = await isNetworkAvailable();
-    if (!isOnline) {
-      Alert.alert(
-        '네트워크 오류',
-        '인터넷 연결을 확인해주세요.',
-        [
-          { text: '취소', style: 'cancel' },
-          { text: '다시 시도', onPress: handleVerifyPickup },
-        ]
-      );
-      return;
-    }
-
-    setLoading(true);
-    setIsRetrying(false);
 
     try {
+      setLoading(true);
       const gillerId = requireUserId();
-      const data: PickupVerificationData = {
+      const locationResult = await getCurrentLocation({
+        showSettingsAlert: true,
+        accuracy: Location.Accuracy.Balanced,
+      });
+
+      if (!locationResult) {
+        Alert.alert('위치 확인', '현재 위치를 확인하지 못했습니다. 다시 시도해 주세요.');
+        return;
+      }
+
+      const payload: PickupVerificationData = {
         deliveryId,
         gillerId,
-        verificationCode: method === 'code' ? verificationCode : '',
+        qrCodeData: method === 'qr' ? verificationCode.trim() : undefined,
+        verificationCode: method === 'code' ? verificationCode.trim() : '',
         photoUri,
-        location,
+        location: {
+          latitude: locationResult.coords.latitude,
+          longitude: locationResult.coords.longitude,
+        },
       };
 
-      const result = await retryWithBackoff(
-        () => verifyPickup(data),
-        {
-          maxAttempts: 3,
-          timeoutMs: 30000,
-          onRetry: (attempt) => {
-            setIsRetrying(true);
-            console.log(`Retry attempt ${attempt}...`);
-          },
-        }
-      );
-
-      if (result.success) {
-        // Show success animation
-        setShowSuccess(true);
-
-        // Navigate after animation
-        setTimeout(() => {
-          Alert.alert(
-            '픽업 완료',
-            '물품을 수령했습니다!\n이제 목적지로 이동해 배송을 완료해주세요.',
-            [
-              {
-                text: '배송 추적 보기',
-                onPress: () => {
-                  navigation.replace('DeliveryTracking', { requestId });
-                },
-              },
-            ]
-          );
-        }, 1500);
-      } else {
-        Alert.alert('실패', result.message, [
-          { text: '확인' },
-          { text: '다시 시도', onPress: handleVerifyPickup },
-        ]);
+      const result = await verifyPickup(payload);
+      if (!result.success) {
+        Alert.alert('인수 확인 실패', result.message);
+        return;
       }
+
+      Alert.alert('인수 완료', '물품 인수가 확인되었습니다.', [
+        {
+          text: '배송 추적으로 이동',
+          onPress: () => navigation.replace('DeliveryTracking', { requestId }),
+        },
+      ]);
     } catch (error) {
-      console.error('Error verifying pickup:', error);
-      showErrorAlert(error, () => handleVerifyPickup());
+      console.error('Failed to verify pickup:', error);
+      Alert.alert('인수 확인 실패', '잠시 후 다시 시도해 주세요.');
     } finally {
       setLoading(false);
-      setIsRetrying(false);
     }
   };
 
-  const handleQRScan = useCallback((data: string) => {
-    setShowQRScanner(false);
-
-    // QR 데이터 형식: "GANENGILE:{verificationCode}"
-    // 예: "GANENGILE:1234"
-    if (data.startsWith('GANENGILE:')) {
-      const code = data.split(':')[1];
-      if (code?.length === 4) {
-        setVerificationCode(code);
-        Alert.alert('QR 스캔 성공', `인증 코드 ${code}가 입력되었습니다.`);
-      } else {
-        Alert.alert('QR 오류', '잘못된 QR 코드 형식입니다.');
-      }
-    } else {
-      Alert.alert('QR 오류', '가는길에 QR 코드가 아닙니다.');
-    }
-  }, []);
-
-  const handleQRError = useCallback((error: string) => {
-    setShowQRScanner(false);
-    Alert.alert('카메라 오류', error, [
-      { text: '확인' },
-      { text: '다시 시도', onPress: () => setShowQRScanner(true) },
-    ]);
-  }, []);
-
-  if (locationLoading) {
-    return (
-      <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color="#4CAF50" />
-        <Text style={styles.loadingText}>위치 정보 가져오는 중...</Text>
-      </View>
-    );
-  }
-
   return (
-    <View style={styles.container}>
-      <ScrollView style={styles.content}>
-        {/* Header */}
-        <View style={styles.header}>
-          <Text style={styles.title}>픽업 인증</Text>
-          <Text style={styles.subtitle}>물품 수령을 위해 인증해주세요</Text>
+    <ScrollView style={styles.container} contentContainerStyle={styles.content}>
+      <View style={styles.header}>
+        <Text style={styles.title}>인수 확인</Text>
+        <Text style={styles.subtitle}>
+          길러가 물품을 넘겨받았는지 확인하고 배송 추적 단계로 이어집니다.
+        </Text>
+      </View>
+
+      <View style={styles.card}>
+        <Text style={styles.sectionTitle}>확인 방식</Text>
+        <View style={styles.toggleRow}>
+          <MethodButton active={method === 'code'} title="4자리 코드" onPress={() => setMethod('code')} />
+          <MethodButton active={method === 'qr'} title="QR 값 입력" onPress={() => setMethod('qr')} />
         </View>
 
-        {/* Location Status */}
-        {location && (
-          <View style={styles.locationSection}>
-            <Text style={styles.locationTitle}>📍 위치 확인됨</Text>
-            <Text style={styles.locationText}>
-              {location.latitude.toFixed(6)}, {location.longitude.toFixed(6)}
-            </Text>
-          </View>
-        )}
-
-        {/* Permission Warning */}
-        {!cameraPermissionGranted && (
-          <View style={styles.warningCard}>
-            <Text style={styles.warningIcon}>⚠️</Text>
-            <Text style={styles.warningText}>
-              카메라 권한이 필요합니다. 사진 촬영을 위해 권한을 허용해주세요.
-            </Text>
-          </View>
-        )}
-
-        {/* Verification Method Selection */}
-        {!method && (
-          <View style={styles.methodSelection}>
-            <TouchableOpacity
-              style={styles.methodCard}
-              onPress={() => selectVerificationMethod('code')}
-              accessibilityLabel="4자리 코드로 인증"
-              accessibilityHint="요청자에게 받은 4자리 코드를 입력합니다"
-            >
-              <Text style={styles.methodIcon}>🔢</Text>
-              <Text style={styles.methodTitle}>4자리 코드</Text>
-              <Text style={styles.methodDesc}>요청자에게 받은 코드 입력</Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              style={styles.methodCard}
-              onPress={() => selectVerificationMethod('qr')}
-              accessibilityLabel="QR 코드로 인증"
-              accessibilityHint="요청자의 QR 코드를 스캔합니다"
-            >
-              <Text style={styles.methodIcon}>📷</Text>
-              <Text style={styles.methodTitle}>QR 코드</Text>
-              <Text style={styles.methodDesc}>요청자의 QR 코드 스캔</Text>
-            </TouchableOpacity>
-          </View>
-        )}
-
-        {/* Code Input Method */}
-        {method === 'code' && (
-          <View style={styles.verificationSection}>
-            <TouchableOpacity
-              style={styles.backButton}
-              onPress={() => setMethod(null)}
-              accessibilityLabel="다른 방법 선택"
-            >
-              <Text style={styles.backButtonText}>← 다른 방법 선택</Text>
-            </TouchableOpacity>
-
-            <Text style={styles.sectionTitle}>4자리 인증 코드</Text>
-            <Text style={styles.sectionDesc}>
-              요청자에게 받은 4자리 코드를 입력하세요
-            </Text>
-
-            <View style={styles.codeInputContainer}>
-              <TextInput
-                style={styles.codeInput}
-                value={verificationCode}
-                onChangeText={setVerificationCode}
-                placeholder="0000"
-                keyboardType="number-pad"
-                maxLength={4}
-                textAlign="center"
-                autoFocus
-                accessibilityLabel="인증 코드 입력"
-                accessibilityHint="4자리 숫자를 입력하세요"
-              />
-            </View>
-          </View>
-        )}
-
-        {/* QR Code Scanner Method */}
-        {method === 'qr' && (
-          <View style={styles.verificationSection}>
-            <TouchableOpacity
-              style={styles.backButton}
-              onPress={() => setMethod(null)}
-              accessibilityLabel="다른 방법 선택"
-            >
-              <Text style={styles.backButtonText}>← 다른 방법 선택</Text>
-            </TouchableOpacity>
-
-            <Text style={styles.sectionTitle}>QR 코드 스캔</Text>
-            <Text style={styles.sectionDesc}>
-              요청자의 QR 코드를 스캔하세요
-            </Text>
-
-            {!cameraPermissionGranted ? (
-              <TouchableOpacity
-                style={styles.permissionButton}
-                onPress={initialize}
-              >
-                <Text style={styles.permissionButtonText}>카메라 권한 허용</Text>
-              </TouchableOpacity>
-            ) : (
-              <TouchableOpacity
-                style={styles.qrButton}
-                onPress={() => setShowQRScanner(true)}
-                accessibilityLabel="QR 코드 스캔 시작"
-              >
-                <Text style={styles.qrButtonText}>📷 QR 코드 스캔 시작</Text>
-              </TouchableOpacity>
-            )}
-
-            {verificationCode && (
-              <View style={styles.scannedCodeContainer}>
-                <Text style={styles.scannedCodeLabel}>스캔된 코드:</Text>
-                <Text style={styles.scannedCode}>{verificationCode}</Text>
-              </View>
-            )}
-          </View>
-        )}
-
-        {/* Photo Section */}
-        {method && (
-          <View style={styles.photoSection}>
-            <Text style={styles.sectionTitle}>픽업 사진 촬영</Text>
-            <Text style={styles.sectionDesc}>
-              물품과 함께 사진을 찍어주세요
-            </Text>
-
-            {photoUri ? (
-              <View style={styles.photoPreview}>
-                <Image source={{ uri: photoUri }} style={styles.photo} />
-                <TouchableOpacity
-                  style={styles.retakeButton}
-                  onPress={takePhoto}
-                  accessibilityLabel="사진 다시 찍기"
-                >
-                  <Text style={styles.retakeButtonText}>다시 찍기</Text>
-                </TouchableOpacity>
-              </View>
-            ) : (
-              <TouchableOpacity
-                style={styles.photoButton}
-                onPress={takePhoto}
-                accessibilityLabel="사진 촬영"
-                accessibilityHint="카메라로 물품 사진을 찍습니다"
-              >
-                <Text style={styles.photoButtonIcon}>📷</Text>
-                <Text style={styles.photoButtonText}>사진 촬영</Text>
-              </TouchableOpacity>
-            )}
-          </View>
-        )}
-
-        {/* Verify Button */}
-        {method && (
-          <TouchableOpacity
-            style={[
-              styles.verifyButton,
-              (!photoUri || (method === 'code' && !verificationCode)) &&
-              styles.verifyButtonDisabled
-            ]}
-            onPress={handleVerifyPickup}
-            disabled={
-              !photoUri ||
-              (method === 'code' && !verificationCode) ||
-              loading
+        <View style={styles.codeBox}>
+          <Text style={styles.codeLabel}>{method === 'code' ? '인수 코드' : 'QR 원문'}</Text>
+          <TextInput
+            style={[styles.input, method === 'qr' ? styles.inputMultiline : undefined]}
+            placeholder={method === 'code' ? '4자리 인수 코드 입력' : 'QR 원문을 붙여넣어 주세요'}
+            value={verificationCode}
+            onChangeText={(text) =>
+              setVerificationCode(method === 'code' ? text.replace(/\D/g, '').slice(0, 4) : text)
             }
-            accessibilityLabel="픽업 완료"
-            accessibilityHint="픽업을 완료하고 인증합니다"
-          >
-            {loading ? (
-              <>
-                <ActivityIndicator color="#fff" />
-                <Text style={styles.verifyButtonText}>
-                  {isRetrying ? '재시도 중...' : '인증 중...'}
-                </Text>
-              </>
-            ) : (
-              <Text style={styles.verifyButtonText}>픽업 완료</Text>
-            )}
-          </TouchableOpacity>
-        )}
-      </ScrollView>
+            keyboardType={method === 'code' ? 'number-pad' : 'default'}
+            maxLength={method === 'code' ? 4 : undefined}
+            multiline={method === 'qr'}
+            autoCapitalize="none"
+          />
+          {method === 'code' ? (
+            <View style={styles.codeRow}>
+              {Array.from({ length: 4 }).map((_, index) => (
+                <View key={`code-${index}`} style={styles.codeChip}>
+                  <Text style={styles.codeChipText}>{verificationCode[index] ?? '-'}</Text>
+                </View>
+              ))}
+            </View>
+          ) : (
+            <View style={styles.qrBox}>
+              <Text style={styles.qrText}>{verificationCode || 'QR 값을 아직 입력하지 않았습니다.'}</Text>
+            </View>
+          )}
+        </View>
+      </View>
 
-      {/* QR Scanner Modal */}
-      <Modal
-        visible={showQRScanner}
-        animationType="slide"
-        onRequestClose={() => setShowQRScanner(false)}
-      >
-        <QRScanner
-          onScan={handleQRScan}
-          onError={handleQRError}
-          onClose={() => setShowQRScanner(false)}
-        />
-      </Modal>
+      <View style={styles.card}>
+        <Text style={styles.sectionTitle}>인수 증빙 사진</Text>
+        <Text style={styles.helperText}>
+          물품과 전달 지점이 함께 보이도록 촬영하면 분쟁 대응과 운영 확인이 쉬워집니다.
+        </Text>
+        {photoUri ? <Image source={{ uri: photoUri }} style={styles.previewImage} /> : null}
+        <TouchableOpacity style={styles.photoButton} onPress={() => void handleCapturePhoto()} disabled={photoLoading}>
+          {photoLoading ? (
+            <ActivityIndicator size="small" color="#1D4ED8" />
+          ) : (
+            <Text style={styles.photoButtonText}>{photoUri ? '사진 다시 촬영하기' : '사진 촬영하기'}</Text>
+          )}
+        </TouchableOpacity>
+      </View>
 
-      {/* Success Overlay */}
-      <SuccessOverlay
-        visible={showSuccess}
-        message="픽업 완료!"
-        submessage="성공적으로 인증되었습니다"
-        duration={2000}
-        onComplete={() => setShowSuccess(false)}
-      />
-    </View>
+      <TouchableOpacity style={styles.primaryButton} onPress={() => void handleVerifyPickup()} disabled={loading}>
+        {loading ? <ActivityIndicator size="small" color="#FFFFFF" /> : <Text style={styles.primaryButtonText}>인수 확인하기</Text>}
+      </TouchableOpacity>
+    </ScrollView>
+  );
+}
+
+function MethodButton({ active, title, onPress }: { active: boolean; title: string; onPress: () => void }) {
+  return (
+    <TouchableOpacity style={[styles.methodButton, active ? styles.methodButtonActive : undefined]} onPress={onPress}>
+      <Text style={[styles.methodButtonText, active ? styles.methodButtonTextActive : undefined]}>{title}</Text>
+    </TouchableOpacity>
   );
 }
 
 const styles = StyleSheet.create({
-  backButton: {
-    marginBottom: 16,
-  },
-  backButtonText: {
-    color: '#4CAF50',
-    fontSize: 14,
-    fontWeight: '600',
-  },
-  codeInput: {
-    color: '#333',
-    fontSize: 32,
-    fontWeight: 'bold',
-    letterSpacing: 8,
-  },
-  codeInputContainer: {
-    backgroundColor: '#fff',
-    borderColor: '#4CAF50',
-    borderRadius: 12,
-    borderWidth: 2,
-    padding: 16,
-  },
   container: {
-    backgroundColor: '#f5f5f5',
     flex: 1,
+    backgroundColor: '#F8FAFC',
   },
   content: {
-    flex: 1,
+    padding: 20,
+    gap: 16,
   },
   header: {
-    backgroundColor: '#4CAF50',
-    padding: 20,
-    paddingBottom: 24,
-    paddingTop: 60,
-  },
-  loadingContainer: {
-    alignItems: 'center',
-    flex: 1,
-    justifyContent: 'center',
-  },
-  loadingText: {
-    color: '#666',
-    fontSize: 16,
-    marginTop: 12,
-  },
-  locationSection: {
-    backgroundColor: '#E8F5E9',
-    borderRadius: 12,
-    margin: 16,
-    padding: 16,
-  },
-  locationText: {
-    color: '#666',
-    fontSize: 12,
-  },
-  locationTitle: {
-    color: '#4CAF50',
-    fontSize: 14,
-    fontWeight: 'bold',
-    marginBottom: 4,
-  },
-  methodCard: {
-    alignItems: 'center',
-    backgroundColor: '#fff',
-    borderColor: '#e0e0e0',
-    borderRadius: 12,
-    borderWidth: 1,
-    padding: 20,
-  },
-  methodDesc: {
-    color: '#666',
-    fontSize: 14,
-    textAlign: 'center',
-  },
-  methodIcon: {
-    fontSize: 40,
-    marginBottom: 8,
-  },
-  methodSelection: {
-    gap: 12,
-    padding: 16,
-  },
-  methodTitle: {
-    color: '#333',
-    fontSize: 18,
-    fontWeight: 'bold',
-    marginBottom: 4,
-  },
-  photo: {
-    borderRadius: 12,
-    height: 250,
-    marginBottom: 12,
-    width: '100%',
-  },
-  photoButton: {
-    alignItems: 'center',
-    backgroundColor: '#fff',
-    borderColor: '#e0e0e0',
-    borderRadius: 12,
-    borderStyle: 'dashed',
-    borderWidth: 2,
-    padding: 24,
-  },
-  photoButtonIcon: {
-    fontSize: 40,
-    marginBottom: 8,
-  },
-  photoButtonText: {
-    color: '#666',
-    fontSize: 16,
-    fontWeight: '600',
-  },
-  photoPreview: {
-    alignItems: 'center',
-  },
-  photoSection: {
-    padding: 16,
-  },
-  permissionButton: {
-    alignItems: 'center',
-    backgroundColor: '#FF9800',
-    borderRadius: 12,
-    padding: 24,
-  },
-  permissionButtonText: {
-    color: '#fff',
-    fontSize: 16,
-    fontWeight: 'bold',
-  },
-  qrButton: {
-    alignItems: 'center',
-    backgroundColor: '#000',
-    borderRadius: 12,
-    padding: 24,
-  },
-  qrButtonText: {
-    color: '#fff',
-    fontSize: 18,
-    fontWeight: 'bold',
-  },
-  scannedCode: {
-    backgroundColor: '#E8F5E9',
-    borderColor: '#4CAF50',
-    borderRadius: 8,
-    borderWidth: 2,
-    color: '#333',
-    fontSize: 24,
-    fontWeight: 'bold',
-    letterSpacing: 4,
-    marginTop: 8,
-    padding: 16,
-    textAlign: 'center',
-  },
-  scannedCodeContainer: {
-    alignItems: 'center',
-    marginTop: 16,
-  },
-  scannedCodeLabel: {
-    color: '#666',
-    fontSize: 14,
-    marginBottom: 4,
-  },
-  retakeButton: {
-    backgroundColor: '#FF9800',
-    borderRadius: 8,
-    paddingHorizontal: 24,
-    paddingVertical: 12,
-  },
-  retakeButtonText: {
-    color: '#fff',
-    fontSize: 14,
-    fontWeight: 'bold',
-  },
-  sectionDesc: {
-    color: '#666',
-    fontSize: 14,
-    marginBottom: 16,
-  },
-  sectionTitle: {
-    color: '#333',
-    fontSize: 20,
-    fontWeight: 'bold',
-    marginBottom: 8,
-  },
-  subtitle: {
-    color: '#fff',
-    fontSize: 14,
-    opacity: 0.9,
-  },
-  title: {
-    color: '#fff',
-    fontSize: 28,
-    fontWeight: 'bold',
-    marginBottom: 4,
-  },
-  verificationSection: {
-    padding: 16,
-  },
-  verifyButton: {
-    alignItems: 'center',
-    backgroundColor: '#4CAF50',
-    borderRadius: 12,
-    margin: 16,
-    paddingVertical: 16,
-    flexDirection: 'row',
-    justifyContent: 'center',
     gap: 8,
   },
-  verifyButtonDisabled: {
-    backgroundColor: '#ccc',
+  title: {
+    fontSize: 28,
+    fontWeight: '800',
+    color: '#0F172A',
   },
-  verifyButtonText: {
-    color: '#fff',
+  subtitle: {
+    fontSize: 15,
+    lineHeight: 22,
+    color: '#64748B',
+  },
+  card: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 24,
+    padding: 20,
+    gap: 12,
+    shadowColor: '#0F172A',
+    shadowOpacity: 0.06,
+    shadowRadius: 10,
+    shadowOffset: { width: 0, height: 4 },
+    elevation: 3,
+  },
+  sectionTitle: {
     fontSize: 18,
-    fontWeight: 'bold',
+    fontWeight: '800',
+    color: '#0F172A',
   },
-  warningCard: {
-    backgroundColor: '#FFF3E0',
-    borderRadius: 12,
+  toggleRow: {
     flexDirection: 'row',
-    margin: 16,
-    marginBottom: 0,
-    padding: 16,
+    gap: 10,
   },
-  warningIcon: {
-    fontSize: 20,
-    marginRight: 12,
-  },
-  warningText: {
-    color: '#E65100',
+  methodButton: {
     flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 14,
+    borderRadius: 16,
+    backgroundColor: '#E2E8F0',
+  },
+  methodButtonActive: {
+    backgroundColor: '#DBEAFE',
+  },
+  methodButtonText: {
     fontSize: 14,
+    fontWeight: '700',
+    color: '#475569',
+  },
+  methodButtonTextActive: {
+    color: '#1D4ED8',
+  },
+  codeBox: {
+    borderWidth: 1,
+    borderColor: '#CBD5E1',
+    borderRadius: 18,
+    padding: 16,
+    gap: 12,
+    backgroundColor: '#FFFFFF',
+  },
+  codeLabel: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#334155',
+  },
+  codeRow: {
+    flexDirection: 'row',
+    gap: 10,
+  },
+  codeChip: {
+    flex: 1,
+    minHeight: 52,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: 14,
+    backgroundColor: '#EFF6FF',
+    borderWidth: 1,
+    borderColor: '#BFDBFE',
+  },
+  codeChipText: {
+    fontSize: 16,
+    fontWeight: '800',
+    color: '#1D4ED8',
+  },
+  qrBox: {
+    minHeight: 72,
+    borderRadius: 14,
+    backgroundColor: '#EFF6FF',
+    borderWidth: 1,
+    borderColor: '#BFDBFE',
+    padding: 14,
+    justifyContent: 'center',
+  },
+  qrText: {
+    fontSize: 14,
+    lineHeight: 20,
+    color: '#1D4ED8',
+  },
+  input: {
+    borderWidth: 1,
+    borderColor: '#CBD5E1',
+    borderRadius: 14,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    fontSize: 15,
+    color: '#0F172A',
+    backgroundColor: '#FFFFFF',
+  },
+  inputMultiline: {
+    minHeight: 92,
+    textAlignVertical: 'top',
+  },
+  secondaryButton: {
+    minHeight: 46,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: 14,
+    backgroundColor: '#E2E8F0',
+  },
+  secondaryButtonText: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#334155',
+  },
+  helperText: {
+    fontSize: 14,
+    lineHeight: 20,
+    color: '#64748B',
+  },
+  previewImage: {
+    width: '100%',
+    height: 220,
+    borderRadius: 18,
+    backgroundColor: '#E2E8F0',
+  },
+  photoButton: {
+    minHeight: 48,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: 16,
+    backgroundColor: '#DBEAFE',
+  },
+  photoButtonText: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#1D4ED8',
+  },
+  primaryButton: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 16,
+    borderRadius: 18,
+    backgroundColor: '#2563EB',
+    marginBottom: 8,
+  },
+  primaryButtonText: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: '#FFFFFF',
   },
 });

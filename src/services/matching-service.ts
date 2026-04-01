@@ -1,4 +1,3 @@
-// @ts-nocheck - Temporarily suppress TypeScript errors for rapid development
 /**
  * Matching Service
  * Integrates matching engine with Firestore
@@ -19,17 +18,13 @@ import { db } from '../services/firebase';
 import { gillerAcceptRequest } from './delivery-service';
 import {
   matchGillersToRequest,
-  getTopMatches,
-  type GillerRoute,
-  type DeliveryRequest,
   type MatchingResult,
 } from '../../data/matching-engine';
-import { getStationByName } from '../../data/subway-stations';
+import { getStationByName } from '../data/subway-stations';
 import {
   sendMatchFoundNotification,
 } from './matching-notification';
 import { createChatService, getChatRoomByRequestId } from './chat-service';
-import { MessageType } from '../types/chat';
 import { BadgeService } from './BadgeService';
 import { getUserActiveRoutes } from './route-service';
 import { locationService, type LocationData } from './location-service';
@@ -40,10 +35,199 @@ import type {
   MatchingFilterOptions,
   GillerMatchingStats,
 } from '../types/matching-extended';
-import type { Route, StationInfo } from '../types/route';
+import type { Route } from '../types/route';
+
+type LooseStationInput = {
+  stationId?: string;
+  id?: string;
+  stationName?: string;
+  line?: string;
+  lineName?: string;
+  lat?: number;
+  lng?: number;
+  latitude?: number;
+  longitude?: number;
+};
+
+type LooseRouteInput = {
+  userId?: string;
+  startStation?: LooseStationInput;
+  endStation?: LooseStationInput;
+  departureTime?: string;
+  daysOfWeek?: number[];
+  isActive?: boolean;
+};
+
+type LooseRequestStation = {
+  stationName?: string;
+  lat?: number;
+  lng?: number;
+  latitude?: number;
+  longitude?: number;
+};
+
+type RouteHeuristicRequest = {
+  id?: string;
+  pickupStation?: LooseRequestStation;
+  deliveryStation?: LooseRequestStation;
+};
+
+type RouteScoreRequest = {
+  pickupStation?: { stationName?: string };
+  deliveryStation?: { stationName?: string };
+  preferredTime?: { departureTime?: string };
+};
+
+type FilterStation = {
+  stationName?: string;
+  line?: string;
+  region?: string;
+  lat?: number;
+  lng?: number;
+  latitude?: number;
+  longitude?: number;
+  location?: {
+    latitude?: number;
+    longitude?: number;
+  };
+};
+
+type FilterRequestBase = {
+  pickupStation: FilterStation;
+  deliveryStation: FilterStation;
+  fee?: { totalFee?: number };
+  matchScore?: { score?: number };
+  metadata?: {
+    distanceFromCurrent?: number;
+    nearestStation?: string;
+    estimatedTimeMinutes?: number;
+    distanceRank?: number;
+  };
+  [key: string]: unknown;
+};
+
+type EngineGillerRoute = {
+  gillerId: string;
+  gillerName?: string;
+  departureStation: string;
+  arrivalStation: string;
+  departureTime: string;
+  daysOfWeek: number[];
+  rating?: number;
+  totalDeliveries?: number;
+  completedDeliveries?: number;
+  badgeBonus?: number;
+  priorityBoost?: number;
+};
+
+type EngineDeliveryRequest = {
+  pickupStation: string;
+  deliveryStation: string;
+  dayOfWeek: string;
+  time: string;
+};
+
+const runMatchingEngine = matchGillersToRequest as unknown as (
+  request: EngineDeliveryRequest,
+  gillerRoutes: EngineGillerRoute[]
+) => MatchingResult[];
+
+type RouteMatchableRequest = FilterRequestBase & RouteScoreRequest;
+
+type BadgeCollections = {
+  activity?: string[];
+  quality?: string[];
+  expertise?: string[];
+  community?: string[];
+};
+
+type NormalizedBadgeCollections = {
+  activity: string[];
+  quality: string[];
+  expertise: string[];
+  community: string[];
+};
+
+type FirestoreUserDoc = {
+  name?: string;
+  rating?: number;
+  profilePhoto?: string;
+  profileImage?: string;
+  badges?: BadgeCollections;
+  stats?: {
+    rating?: number;
+    totalDeliveries?: number;
+    completedDeliveries?: number;
+    averageResponseTime?: number;
+  };
+  gillerInfo?: {
+    totalDeliveries?: number;
+    completedDeliveries?: number;
+  };
+  professionalLevel?: 'regular' | 'professional' | 'master';
+  badgeBonus?: number;
+};
+
+type FirestoreRouteDoc = {
+  userId?: string;
+  gillerName?: string;
+  startStation?: { stationName?: string };
+  endStation?: { stationName?: string };
+  departureTime?: string;
+  daysOfWeek?: number[];
+  rating?: number;
+  totalDeliveries?: number;
+  completedDeliveries?: number;
+};
+
+type FirestoreTimestampLike = {
+  toDate?: () => Date;
+};
+
+type FirestoreMatchingRequestDoc = {
+  id?: string;
+  requesterId?: string;
+  pickupStation?: { stationName?: string };
+  deliveryStation?: { stationName?: string };
+  preferredTime?: {
+    departureTime?: string;
+    arrivalTime?: string;
+  };
+  deadline?: Date | FirestoreTimestampLike;
+  packageInfo?: {
+    size?: string;
+    weight?: string | number;
+  };
+  fee?: {
+    totalFee?: number;
+  };
+  status?: string;
+};
+
+type FirestorePendingRequestDoc = FilterRequestBase & {
+  requestId?: string;
+  requesterId?: string;
+  requesterName?: string;
+  senderName?: string;
+  matchedGillerId?: string;
+  feeBreakdown?: { totalFee?: number };
+};
+
+function normalizeBadges(badges?: BadgeCollections): NormalizedBadgeCollections {
+  return {
+    activity: badges?.activity ?? [],
+    quality: badges?.quality ?? [],
+    expertise: badges?.expertise ?? [],
+    community: badges?.community ?? [],
+  };
+}
+
+function getErrorMessage(error: unknown, fallback: string): string {
+  return error instanceof Error ? error.message : fallback;
+}
 
 function normalizeStationName(name?: string): string {
-  return (name || '').replace(/\s+/g, '').replace(/역$/, '').toLowerCase();
+  return (name ?? '').replace(/\s+/g, '').replace(/\?/g, '').toLowerCase();
 }
 
 function namesLooselyEqual(a?: string, b?: string): boolean {
@@ -53,25 +237,28 @@ function namesLooselyEqual(a?: string, b?: string): boolean {
   return na === nb || na.includes(nb) || nb.includes(na);
 }
 
-function normalizeRouteForMatching(routeData: any, routeId: string): Route | null {
+function normalizeRouteForMatching(routeData: LooseRouteInput, routeId: string): Route | null {
   if (!routeData?.userId || !routeData?.startStation || !routeData?.endStation) {
     return null;
   }
 
+  const start = routeData.startStation;
+  const end = routeData.endStation;
+
   const startStation = {
-    stationId: routeData.startStation.stationId || routeData.startStation.id,
-    stationName: routeData.startStation.stationName || '',
-    line: routeData.startStation.line || routeData.startStation.lineName || '',
-    lat: routeData.startStation.lat ?? routeData.startStation.latitude ?? 0,
-    lng: routeData.startStation.lng ?? routeData.startStation.longitude ?? 0,
+    stationId: start.stationId ?? start.id,
+    stationName: start.stationName ?? '',
+    line: start.line ?? start.lineName ?? '',
+    lat: start.lat ?? start.latitude ?? 0,
+    lng: start.lng ?? start.longitude ?? 0,
   };
 
   const endStation = {
-    stationId: routeData.endStation.stationId || routeData.endStation.id,
-    stationName: routeData.endStation.stationName || '',
-    line: routeData.endStation.line || routeData.endStation.lineName || '',
-    lat: routeData.endStation.lat ?? routeData.endStation.latitude ?? 0,
-    lng: routeData.endStation.lng ?? routeData.endStation.longitude ?? 0,
+    stationId: end.stationId ?? end.id,
+    stationName: end.stationName ?? '',
+    line: end.line ?? end.lineName ?? '',
+    lat: end.lat ?? end.latitude ?? 0,
+    lng: end.lng ?? end.longitude ?? 0,
   };
 
   if (!startStation.stationName || !endStation.stationName) {
@@ -83,7 +270,7 @@ function normalizeRouteForMatching(routeData: any, routeId: string): Route | nul
     userId: routeData.userId,
     startStation,
     endStation,
-    departureTime: routeData.departureTime || '08:00',
+    departureTime: routeData.departureTime ?? '08:00',
     daysOfWeek: Array.isArray(routeData.daysOfWeek) && routeData.daysOfWeek.length > 0
       ? routeData.daysOfWeek
       : [1, 2, 3, 4, 5, 6, 7],
@@ -93,12 +280,15 @@ function normalizeRouteForMatching(routeData: any, routeId: string): Route | nul
   } as Route;
 }
 
-async function findMatchesByRouteHeuristic(requestData: any, topN: number): Promise<MatchingResult[]> {
+async function findMatchesByRouteHeuristic(
+  requestData: RouteHeuristicRequest,
+  topN: number
+): Promise<MatchingResult[]> {
   const snapshot = await getDocs(query(collection(db, 'routes'), where('isActive', '==', true)));
   const today = new Date().getDay();
   const dayOfWeek = today === 0 ? 7 : today;
-  const requestPickup = requestData?.pickupStation?.stationName || '';
-  const requestDelivery = requestData?.deliveryStation?.stationName || '';
+  const requestPickup = requestData.pickupStation?.stationName ?? '';
+  const requestDelivery = requestData.deliveryStation?.stationName ?? '';
 
   const routeCandidates: Array<{
     gillerId: string;
@@ -158,7 +348,7 @@ async function findMatchesByRouteHeuristic(requestData: any, topN: number): Prom
 
       return {
         gillerId: item.gillerId,
-        gillerName: item.userInfo.name || '길러',
+        gillerName: item.userInfo.name ?? 'giller',
         totalScore,
         routeMatchScore,
         timeMatchScore,
@@ -179,8 +369,8 @@ async function findMatchesByRouteHeuristic(requestData: any, topN: number): Prom
           congestionLevel: 'medium' as const,
         },
         reasons: [
-          item.routeScore.pickupMatch ? '픽업 역이 동선과 일치합니다.' : '픽업 역 인접 동선입니다.',
-          item.routeScore.deliveryMatch ? '도착 역이 동선과 일치합니다.' : '도착 역 인접 동선입니다.',
+          item.routeScore.pickupMatch ? '?????????????????????????嚥???癲????繹먮굞議?????遺얘턁????????' : '?????????????븐뼐???????????????????????嶺??',
+          item.routeScore.deliveryMatch ? '??????熬곣뫖利당춯??쎾퐲?????????몃뼁?????????????????????嚥???癲????繹먮굞議?????遺얘턁????????' : '??????熬곣뫖利당춯??쎾퐲?????????몃뼁?????????븐뼐???????????????????????嶺??',
         ],
       } as MatchingResult;
     })
@@ -204,14 +394,14 @@ export async function calculateBadgeBonus(userId: string): Promise<{
       return { feeBonus: 0, priorityBoost: 0 };
     }
 
-    const user = userDoc.data();
-    const badgeTier = BadgeService.calculateBadgeTier(user.badges);
+    const user = userDoc.data() as FirestoreUserDoc;
+    const badgeTier = BadgeService.calculateBadgeTier(normalizeBadges(user.badges));
 
-    // 배지 보너스 로직
-    // Bronze (3개): 요금 5% 보너스
-    // Silver (5개): 요금 10% 보너스
-    // Gold (7개): 요금 15% 보너스 + 우선순위
-    // Platinum (10개): 요금 20% 보너스 + 높은 우선순위
+    // ??????꾩룆梨띰쭕?뚢뵾?????? ???????ㅻ깹????????????????붺몭?????
+    // Bronze (3??: ??????5% ???????ㅻ깹??????
+    // Silver (5??: ??????10% ???????ㅻ깹??????
+    // Gold (7??: ??????15% ???????ㅻ깹??????+ ?????????????遺얘턁????????嶺뚮죭?댁젘?
+    // Platinum (10??: ??????20% ???????ㅻ깹??????+ ??? ?????????????遺얘턁????????嶺뚮죭?댁젘?
     const bonusConfig = {
       bronze: { feeBonus: 0.05, priorityBoost: 0 },
       silver: { feeBonus: 0.10, priorityBoost: 0 },
@@ -249,13 +439,14 @@ async function fetchUserStats(userId: string): Promise<{
       };
     }
 
-    const data = userDoc.data();
-    const stats = data.stats || {};
+    const data = userDoc.data() as FirestoreUserDoc;
+    const stats = data.stats ?? {};
+    const gillerInfo = data.gillerInfo ?? {};
 
     return {
-      rating: stats.rating || data.rating || 3.5,
-      totalDeliveries: stats.completedDeliveries || data.gillerInfo?.totalDeliveries || 0,
-      completedDeliveries: stats.completedDeliveries || data.gillerInfo?.totalDeliveries || 0,
+      rating: stats.rating ?? data.rating ?? 3.5,
+      totalDeliveries: stats.totalDeliveries ?? stats.completedDeliveries ?? gillerInfo.totalDeliveries ?? 0,
+      completedDeliveries: stats.completedDeliveries ?? gillerInfo.completedDeliveries ?? gillerInfo.totalDeliveries ?? 0,
     };
   } catch (error) {
     console.error('Error fetching user stats:', error);
@@ -271,7 +462,7 @@ async function fetchUserStats(userId: string): Promise<{
  * Fetch all active giller routes from Firestore
  * @returns Array of giller routes
  */
-export async function fetchActiveGillerRoutes(): Promise<GillerRoute[]> {
+export async function fetchActiveGillerRoutes(): Promise<EngineGillerRoute[]> {
   try {
     const q = query(
       collection(db, 'routes'),
@@ -279,14 +470,21 @@ export async function fetchActiveGillerRoutes(): Promise<GillerRoute[]> {
     );
 
     const snapshot = await getDocs(q);
-    const routes: GillerRoute[] = [];
+    const routes: EngineGillerRoute[] = [];
 
     snapshot.forEach((docSnapshot) => {
-      const data = docSnapshot.data();
+      const data = docSnapshot.data() as FirestoreRouteDoc;
+
+      const startStationName = data.startStation?.stationName;
+      const endStationName = data.endStation?.stationName;
+
+      if (!data.userId || !startStationName || !endStationName) {
+        return;
+      }
 
       // Convert Firestore data to GillerRoute format
-      const startStation = getStationByName(data.startStation.stationName);
-      const endStation = getStationByName(data.endStation.stationName);
+      const startStation = getStationByName(startStationName);
+      const endStation = getStationByName(endStationName);
 
       if (!startStation || !endStation) {
         console.warn(`Station not found for route ${docSnapshot.id}`);
@@ -295,24 +493,24 @@ export async function fetchActiveGillerRoutes(): Promise<GillerRoute[]> {
 
       // Fetch user stats from users collection (using defaults for now)
       const userStats = {
-        rating: data.rating || 4.5,
-        totalDeliveries: data.totalDeliveries || 0,
-        completedDeliveries: data.completedDeliveries || 0,
+        rating: data.rating ?? 4.5,
+        totalDeliveries: data.totalDeliveries ?? 0,
+        completedDeliveries: data.completedDeliveries ?? 0,
       };
 
       // Calculate badge bonus (using default for now)
       const badgeBonus = {
         feeBonus: 0,
-        currentTier: 'none' as const,
+        priorityBoost: 0,
       };
 
       routes.push({
         gillerId: data.userId,
-        gillerName: data.gillerName || '익명',
-        startStation,
-        endStation,
-        departureTime: data.departureTime,
-        daysOfWeek: data.daysOfWeek,
+        gillerName: data.gillerName ?? 'giller',
+        departureStation: startStation.stationName,
+        arrivalStation: endStation.stationName,
+        departureTime: data.departureTime ?? '08:00',
+        daysOfWeek: data.daysOfWeek ?? [1, 2, 3, 4, 5],
         rating: userStats.rating,
         totalDeliveries: userStats.totalDeliveries,
         completedDeliveries: userStats.completedDeliveries,
@@ -345,7 +543,7 @@ export async function fetchUserInfo(userId: string): Promise<{
 
     if (!userDoc.exists()) {
       return {
-        name: '익명',
+        name: 'giller',
         rating: 3.5,
         totalDeliveries: 0,
         completedDeliveries: 0,
@@ -353,18 +551,19 @@ export async function fetchUserInfo(userId: string): Promise<{
       };
     }
 
-    const data = userDoc.data();
+    const data = userDoc.data() as FirestoreUserDoc;
+    const gillerInfo = data.gillerInfo ?? {};
     return {
-      name: data.name || '익명',
-      rating: data.rating || 3.5,
-      totalDeliveries: data.gillerInfo?.totalDeliveries || 0,
-      completedDeliveries: data.gillerInfo?.totalDeliveries || 0, // Assuming completed = total for now
-      profileImage: data.profilePhoto || data.profileImage || undefined,
+      name: data.name ?? 'giller',
+      rating: data.rating ?? 3.5,
+      totalDeliveries: gillerInfo.totalDeliveries ?? 0,
+      completedDeliveries: gillerInfo.completedDeliveries ?? gillerInfo.totalDeliveries ?? 0,
+      profileImage: data.profilePhoto ?? data.profileImage ?? undefined,
     };
   } catch (error) {
     console.error('Error fetching user info:', error);
     return {
-      name: '익명',
+      name: 'giller',
       rating: 3.5,
       totalDeliveries: 0,
       completedDeliveries: 0,
@@ -378,31 +577,16 @@ export async function fetchUserInfo(userId: string): Promise<{
  * @param requestDoc Firestore request document
  * @returns DeliveryRequest object
  */
-export function convertToDeliveryRequest(requestDoc: any): DeliveryRequest {
-  // preferredTime에서 departureTime 추출, 없으면 기본값 사용
-  const departureTime = requestDoc.preferredTime?.departureTime || '08:00';
-  const arrivalTime = requestDoc.preferredTime?.arrivalTime || '09:00';
-
-  // deadline에서 배송 마감 시간 추출
-  const deadlineTime = requestDoc.deadline
-    ? new Date(requestDoc.deadline.toDate?.() || requestDoc.deadline)
-    : new Date();
+export function convertToDeliveryRequest(requestDoc: FirestoreMatchingRequestDoc): EngineDeliveryRequest {
+  const departureTime = requestDoc.preferredTime?.departureTime ?? '08:00';
+  const today = new Date().getDay();
+  const dayOfWeek = today === 0 ? 'sun' : today === 1 ? 'mon' : today === 2 ? 'tue' : today === 3 ? 'wed' : today === 4 ? 'thu' : today === 5 ? 'fri' : 'sat';
 
   return {
-    requestId: requestDoc.id,
-    pickupStationName: requestDoc.pickupStation.stationName,
-    deliveryStationName: requestDoc.deliveryStation.stationName,
-    pickupStartTime: departureTime,
-    pickupEndTime: arrivalTime,
-    deliveryDeadline: deadlineTime.toLocaleTimeString('ko-KR', {
-      hour: '2-digit',
-      minute: '2-digit',
-      hour12: false,
-    }),
-    preferredDays: [1, 2, 3, 4, 5], // 평일 기본값 (필요시 우선순위 필드 추가)
-    packageSize: requestDoc.packageInfo.size,
-    packageWeight: requestDoc.packageInfo.weight === 'light' ? 1 :
-                   requestDoc.packageInfo.weight === 'medium' ? 3 : 7,
+    pickupStation: requestDoc.pickupStation?.stationName ?? '',
+    deliveryStation: requestDoc.deliveryStation?.stationName ?? '',
+    dayOfWeek,
+    time: departureTime,
   };
 }
 
@@ -424,7 +608,7 @@ export async function findMatchesForRequest(
       throw new Error('Request not found');
     }
 
-    const requestData = requestDoc.data();
+    const requestData = { id: requestDoc.id, ...(requestDoc.data() as FirestoreMatchingRequestDoc) };
     const request = convertToDeliveryRequest(requestData);
 
     // 2. Fetch active giller routes
@@ -440,13 +624,13 @@ export async function findMatchesForRequest(
     );
 
     // 4. Find matches (major station engine first)
-    const matches = matchGillersToRequest(availableGillers, request).slice(0, topN);
+    const matches = runMatchingEngine(request, availableGillers).slice(0, topN);
     if (matches.length > 0) {
       return matches;
     }
 
     // 5. Fallback: route heuristic (works even for stations outside major station dataset)
-    console.warn(`⚠️ Matching engine returned 0 for request ${requestId}. Falling back to route heuristic.`);
+    console.warn(`????????Matching engine returned 0 for request ${requestId}. Falling back to route heuristic.`);
     return await findMatchesByRouteHeuristic(requestData, topN);
   } catch (error) {
     console.error('Error finding matches:', error);
@@ -456,7 +640,7 @@ export async function findMatchesForRequest(
       if (!requestDoc.exists()) {
         return [];
       }
-      return await findMatchesByRouteHeuristic(requestDoc.data(), topN);
+      return await findMatchesByRouteHeuristic({ id: requestDoc.id, ...(requestDoc.data() as FirestoreMatchingRequestDoc) }, topN);
     } catch (fallbackError) {
       console.error('Error in fallback matching:', fallbackError);
       throw error;
@@ -480,8 +664,8 @@ export async function createMatchDocument(
   try {
     const matchData = {
       requestId,
-      gllerId,   // 요청자(이용자) ID
-      gillerId,  // 배송자 ID
+      gllerId,   // ???????????????????泥??? ID
+      gillerId,  // ??????꾩룆梨띰쭕?뚢뵾????????ID
       matchScore: matchScore.totalScore,
       matchingDetails: {
         routeScore: matchScore.scores.pickupMatchScore + matchScore.scores.deliveryMatchScore,
@@ -513,19 +697,19 @@ export async function processMatchingForRequest(
   requestId: string
 ): Promise<number> {
   try {
-    // 1. Find top 3 matches (상위 3명 길러)
+    // 1. Find top 3 matches (??????????筌??3?????????곷♧??????
     const matches = await findMatchesForRequest(requestId, 3);
 
     if (matches.length === 0) {
-      console.log('No matches found for request', requestId);
+      console.warn('No matches found for request', requestId);
       return 0;
     }
 
-    // 2. 요청 문서에서 requesterId(이용자 ID) 조회
+    // 2. ????????????????????requesterId(??????????泥???ID) ?????????????
     const requestRef = doc(db, 'requests', requestId);
     const requestDoc = await getDoc(requestRef);
-    const request = requestDoc.data();
-    const requesterId = request?.requesterId || '';
+    const request = requestDoc.data() as FirestoreMatchingRequestDoc | undefined;
+    const requesterId = request?.requesterId ?? '';
 
     // 3. Create match documents for each
     const matchPromises = matches.map((match) =>
@@ -547,17 +731,17 @@ export async function processMatchingForRequest(
         sendMatchFoundNotification(
           match.gillerId,
           requestId,
-          request.pickupStation.stationName,
-          request.deliveryStation.stationName,
-          request.fee.totalFee
+          request.pickupStation?.stationName ?? '',
+          request.deliveryStation?.stationName ?? '',
+          request.fee?.totalFee ?? 0
         )
       );
 
       await Promise.all(notificationPromises);
-      console.log(`📤 Sent ${matches.length} notifications`);
+      console.warn(`Sent ${matches.length} notifications`);
     }
 
-    console.log(`✅ Created ${matches.length} matches for request ${requestId}`);
+    console.warn(`Created ${matches.length} matches for request ${requestId}`);
 
     return matches.length;
   } catch (error) {
@@ -576,8 +760,8 @@ export async function getMatchingResults(requestId: string) {
 
   // Fetch request to get fee information
   const requestDoc = await getDoc(doc(db, 'requests', requestId));
-  const requestData = requestDoc.data();
-  const baseFee = requestData?.fee?.totalFee || 3000;
+  const requestData = requestDoc.data() as FirestoreMatchingRequestDoc | undefined;
+  const baseFee = requestData?.fee?.totalFee ?? 3000;
 
   return await Promise.all(
     matches.map(async (match, index) => {
@@ -622,13 +806,14 @@ export async function acceptRequest(
     const requestDoc = await getDoc(requestRef);
 
     if (!requestDoc.exists()) {
-      return { success: false, message: '요청을 찾을 수 없습니다.' };
+      return { success: false, message: '?붿껌??李얠쓣 ???놁뒿?덈떎.' };
     }
 
-    const request = requestDoc.data();
+    const request = requestDoc.data() as FirestoreMatchingRequestDoc;
+    const requesterId = request.requesterId ?? '';
 
     if (request.status !== 'matched' && request.status !== 'pending') {
-      return { success: false, message: '이미 매칭된 요청입니다.' };
+      return { success: false, message: '?대? 泥섎━???붿껌?낅땲??' };
     }
 
     const result = await gillerAcceptRequest(requestId, gillerId);
@@ -639,21 +824,25 @@ export async function acceptRequest(
       if (!existingChatRoom) {
         const chatService = createChatService();
 
-        const gllerDoc = await getDoc(doc(db, 'users', request.requesterId));
-        const gllerData = gllerDoc.data();
+        if (!requesterId) {
+          return { success: false, message: 'requester id is missing' };
+        }
+
+        const gllerDoc = await getDoc(doc(db, 'users', requesterId));
+        const gllerData = (gllerDoc.data() as FirestoreUserDoc | undefined) ?? {};
 
         const gillerDoc = await getDoc(doc(db, 'users', gillerId));
-        const gillerData = gillerDoc.data();
+        const gillerData = (gillerDoc.data() as FirestoreUserDoc | undefined) ?? {};
 
         await chatService.createChatRoom({
           user1: {
-            userId: request.requesterId,
-            name: gllerData?.name || '이용자',
+            userId: requesterId,
+            name: gllerData.name ?? 'requester',
             profileImage: gllerData?.profileImage,
           },
           user2: {
             userId: gillerId,
-            name: gillerData?.name || '길러',
+            name: gillerData.name ?? 'giller',
             profileImage: gillerData?.profileImage,
           },
           requestId,
@@ -666,7 +855,7 @@ export async function acceptRequest(
           await chatService.sendSystemMessage(
             newChatRoom.chatRoomId,
             'match_accepted',
-            '✅ 배송이 매칭되었습니다. 채팅을 시작하세요!',
+            '諛곗넚??留ㅼ묶?섏뿀?듬땲?? 梨꾪똿???쒖옉??二쇱꽭??',
             { requestId, matchId: result.deliveryId }
           );
         }
@@ -676,7 +865,7 @@ export async function acceptRequest(
     return result;
   } catch (error) {
     console.error('Error accepting request:', error);
-    return { success: false, message: '수락에 실패했습니다.' };
+    return { success: false, message: '?붿껌 ?섎씫???ㅽ뙣?덉뒿?덈떎.' };
   }
 }
 
@@ -700,7 +889,7 @@ export async function declineRequest(
     const matchSnapshot = await getDocs(matchQuery);
 
     if (matchSnapshot.empty) {
-      return { success: false, message: '매칭 정보를 찾을 수 없습니다.' };
+      return { success: false, message: '留ㅼ묶 ?뺣낫瑜?李얠쓣 ???놁뒿?덈떎.' };
     }
 
     matchSnapshot.forEach(async (matchDoc) => {
@@ -710,10 +899,10 @@ export async function declineRequest(
       });
     });
 
-    return { success: true, message: '요청을 거절했습니다.' };
+    return { success: true, message: '?붿껌??嫄곗젅?덉뒿?덈떎.' };
   } catch (error) {
     console.error('Error declining request:', error);
-    return { success: false, message: '거절에 실패했습니다.' };
+    return { success: false, message: '?붿껌 嫄곗젅???ㅽ뙣?덉뒿?덈떎.' };
   }
 }
 
@@ -734,7 +923,7 @@ export async function findGiller(requestId: string): Promise<{
       estimatedTime?: number;
       fee?: number;
     };
-    rank?: number; // 순위 추가
+    rank?: number; // ????遺얘턁????????嶺뚮죭?댁젘????????ш끽紐???
   };
   error?: string;
 }> {
@@ -742,7 +931,7 @@ export async function findGiller(requestId: string): Promise<{
     const matches = await getMatchingResults(requestId);
 
     if (matches.length === 0) {
-      return { success: false, error: '매칭 가능한 기일러를 찾을 수 없습니다.' };
+      return { success: false, error: '????釉먮폁???????????????????????????轝?癰궽븐숯????????????? ????釉먮폁?????????????????嚥싲갭큔?????????????ㅼ굣塋?' };
     }
 
     // Return the best match (first in array is highest ranked)
@@ -765,12 +954,12 @@ export async function findGiller(requestId: string): Promise<{
           fee: bestMatch.estimatedFee,
           profileImage: bestMatch.profileImage,
         },
-        rank: bestMatch.rank, // 순위 추가
+        rank: bestMatch.rank, // ????遺얘턁????????嶺뚮죭?댁젘????????ш끽紐???
       },
     };
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Error finding giller:', error);
-    return { success: false, error: error.message || '기일러 찾기에 실패했습니다.' };
+    return { success: false, error: getErrorMessage(error, '길러를 찾는 중 오류가 발생했습니다.') };
   }
 }
 
@@ -787,9 +976,9 @@ export async function acceptMatch(
   try {
     const result = await acceptRequest(requestId, gillerId);
     return { success: result.success, error: result.success ? undefined : result.message };
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Error accepting match:', error);
-    return { success: false, error: error.message || '매칭 수락에 실패했습니다.' };
+    return { success: false, error: getErrorMessage(error, '길러를 찾는 중 오류가 발생했습니다.') };
   }
 }
 
@@ -806,45 +995,45 @@ export async function rejectMatch(
   try {
     const result = await declineRequest(requestId, gillerId);
     return { success: result.success, error: result.success ? undefined : result.message };
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Error rejecting match:', error);
-    return { success: false, error: error.message || '매칭 거절에 실패했습니다.' };
+    return { success: false, error: getErrorMessage(error, '길러를 찾는 중 오류가 발생했습니다.') };
   }
 }
 
-// ===== 길러 배송 매칭 시스템 개선 =====
+// ===== ???????곷♧????????????꾩룆梨띰쭕?뚢뵾???????????釉먮폁???????????????????????????????遺븍き???욎췀??????=====
 
 /**
- * 동선 기반 요청 필터링
- * @param requests 전체 배송 요청 목록
- * @param gillerId 길러 ID
- * @returns 동선이 일치하는 요청 목록과 매칭 점수
+ * ??????? ?????????????????????????????????????????거?????
+ * @param requests ??????熬곣뫖利당춯??쎾퐲????????꾩룆梨띰쭕?뚢뵾???????????????????釉먮폁???????????釉먮폇?????썹땟戮?눀筌롢룗爰??⑸역??????
+ * @param gillerId ???????곷♧??????ID
+ * @returns ???????????????嚥???癲????繹먮굞議??????留⑶뜮??????猷몄굡?????????????????釉먮폁???????????釉먮폇?????썹땟戮?눀筌롢룗爰??⑸역???????????沃섃뫂???????釉먮폁???????????????
  */
 export async function filterRequestsByGillerRoutes(
-  requests: any[],
+  requests: RouteMatchableRequest[],
   gillerId: string
 ): Promise<RouteFilteredRequest[]> {
   try {
-    // 1. 길러의 활성 동선 조회
+    // 1. ???????곷♧???????????????????? ?????????????
     const gillerRoutes = await getUserActiveRoutes(gillerId);
 
     if (gillerRoutes.length === 0) {
-      console.log('[filterRequestsByGillerRoutes] 등록된 동선 없음');
+      console.warn('[filterRequestsByGillerRoutes] no active routes');
       return [];
     }
 
-    // 2. 오늘 요일 계산
+    // 2. ?????饔낅떽??????????????????????????
     const today = new Date().getDay();
-    const dayOfWeek = today === 0 ? 7 : today; // 1(월) - 7(일)
+    const dayOfWeek = today === 0 ? 7 : today; // 1(?? - 7(??
 
-    // 3. 오늘 운행 동선 우선 사용, 없으면 전체 활성 동선 사용 (fallback)
+    // 3. ?????饔낅떽?????????????袁⑸즴筌?씛彛?????????? ????????? ???? ??????????泥??饔낅떽???????믩베?????????熬곣뫖利당춯??쎾퐲??????????????? ????(fallback)
     const todayRoutes = gillerRoutes.filter(route =>
       route.daysOfWeek.includes(dayOfWeek)
     );
     const routesToMatch = todayRoutes.length > 0 ? todayRoutes : gillerRoutes;
-    console.log(`[filterRequestsByGillerRoutes] 오늘 동선: ${todayRoutes.length}개, 매칭 대상: ${routesToMatch.length}개`);
+    console.warn(`[filterRequestsByGillerRoutes] today routes: ${todayRoutes.length}, match targets: ${routesToMatch.length}`);
 
-    // 4. 각 요청에 대해 매칭 점수 계산 (최소 점수 10점으로 대폭 완화)
+    // 4. ???????????????????釉먮폁???????????????????????????(????釉먮폁???????????????10?????遺얘턁?????꿔꺂?????????????????????????
     const matchedRequests: RouteFilteredRequest[] = [];
     const MIN_MATCH_SCORE = 10;
 
@@ -859,22 +1048,33 @@ export async function filterRequestsByGillerRoutes(
       }
 
       if (matchResults.length > 0) {
-        // 가장 높은 점수 선택
+        // ???????????????? ????????????????????
         matchResults.sort((a, b) => b.score.score - a.score.score);
         const bestMatch = matchResults[0];
+        const requestWithFallback = request as RouteMatchableRequest & Partial<RouteFilteredRequest>;
 
         matchedRequests.push({
-          ...request,
+          ...requestWithFallback,
+          requestId: requestWithFallback.requestId ?? '',
+          gllerId: requestWithFallback.gllerId ?? '',
+          deliveryType: requestWithFallback.deliveryType ?? 'subway',
+          packageInfo: requestWithFallback.packageInfo ?? { size: 'small', weight: 'light', description: '' },
+          status: requestWithFallback.status ?? 'pending',
+          requesterId: requestWithFallback.requesterId ?? '',
+          initialNegotiationFee: requestWithFallback.initialNegotiationFee ?? requestWithFallback.fee?.totalFee ?? 0,
+          deadline: requestWithFallback.deadline ?? new Date(),
+          createdAt: requestWithFallback.createdAt ?? new Date(),
+          updatedAt: requestWithFallback.updatedAt ?? new Date(),
           matchScore: bestMatch.score,
           matchedRouteCount: matchResults.length,
           matchedRoutes: matchResults.map(m => m.route),
-        });
+        } as RouteFilteredRequest);
       }
     }
 
-    // 5. 매칭 점수 기반 정렬
+    // 5. ????釉먮폁???????????????????????????????????븐뼐?????????????
     matchedRequests.sort((a, b) => b.matchScore.score - a.matchScore.score);
-    console.log(`[filterRequestsByGillerRoutes] 매칭된 요청: ${matchedRequests.length}건`);
+    console.warn(`[filterRequestsByGillerRoutes] matched requests: ${matchedRequests.length}`);
 
     return matchedRequests;
   } catch (error) {
@@ -884,20 +1084,20 @@ export async function filterRequestsByGillerRoutes(
 }
 
 /**
- * 동선 매칭 점수 계산
- * @param request 배송 요청
- * @param route 길러 동선
- * @returns 매칭 점수 (0-100)
+ * ??????? ????釉먮폁???????????????????????????
+ * @param request ??????꾩룆梨띰쭕?뚢뵾???????????????
+ * @param route ???????곷♧?????????????
+ * @returns ????釉먮폁???????????????(0-100)
  */
 export function calculateRouteMatchScore(
-  request: any,
+  request: RouteScoreRequest,
   route: Route
 ): RouteMatchScore {
   let score = 0;
 
-  // 역이름 유연 비교 ('역' 접미사 무시, 부분 매칭 지원)
+  // ????????????????????????('?? ?????????饔낅떽???????? ???????源녾텛????????釉먮폁??????????????釉먮폁????????
   const normalizeStationName = (name: string) =>
-    (name || '').replace(/역$/, '').trim().toLowerCase();
+    (name ?? '').replace(/\?/g, '').trim().toLowerCase();
 
   const stationNamesMatch = (name1: string, name2: string): boolean => {
     const n1 = normalizeStationName(name1);
@@ -905,7 +1105,7 @@ export function calculateRouteMatchScore(
     return n1 === n2 || n1.includes(n2) || n2.includes(n1);
   };
 
-  // 점수 상세
+  // ???????????꿔꺂???癰귥쥒???
   const details = {
     pickupStationScore: 0,
     deliveryStationScore: 0,
@@ -914,7 +1114,7 @@ export function calculateRouteMatchScore(
     directionBonus: 0,
   };
 
-  // 1. 픽업역 일치: +30점
+  // 1. ?????????????嚥???癲????繹먮굞議?? +30??
   const pickupMatch = stationNamesMatch(
     route.startStation?.stationName || '',
     request.pickupStation?.stationName || ''
@@ -924,7 +1124,7 @@ export function calculateRouteMatchScore(
     score += 30;
   }
 
-  // 2. 배송역 일치: +30점
+  // 2. ??????꾩룆梨띰쭕?뚢뵾??????????????嚥???癲????繹먮굞議?? +30??
   const deliveryMatch = stationNamesMatch(
     route.endStation?.stationName || '',
     request.deliveryStation?.stationName || ''
@@ -934,7 +1134,7 @@ export function calculateRouteMatchScore(
     score += 30;
   }
 
-  // 3. 요일 일치: +10점
+  // 3. ??????????????嚥???癲????繹먮굞議?? +10??
   const today = new Date().getDay();
   const dayOfWeek = today === 0 ? 7 : today;
   const dayMatch = route.daysOfWeek.includes(dayOfWeek);
@@ -943,8 +1143,8 @@ export function calculateRouteMatchScore(
     score += 10;
   }
 
-  // 4. 시간대 일치 (±30분): +15점
-  const requestTime = request.preferredTime?.departureTime || '08:00';
+  // 4. ??????? ??????嚥???癲????繹먮굞議??(??0??: +15??
+  const requestTime = request.preferredTime?.departureTime ?? '08:00';
   const [requestHour, requestMinute] = requestTime.split(':').map(Number);
   const [routeHour, routeMinute] = (route.departureTime || '08:00').split(':').map(Number);
 
@@ -954,12 +1154,12 @@ export function calculateRouteMatchScore(
 
   let timeMatch = 0;
   if (timeDiff <= 30) {
-    timeMatch = Math.round(15 * (1 - timeDiff / 30)); // 30분일수록 높은 점수
+    timeMatch = Math.round(15 * (1 - timeDiff / 30)); // 30??????????藥??????????? ?????
     details.timeScore = timeMatch;
     score += timeMatch;
   }
 
-  // 5. 방향성 보너스: +15점
+  // 5. ??????꾩룆梨띰쭕???녾낮?녔틦釉껊뼀????????????ㅻ깹?????? +15??
   let routeDirection: 'exact' | 'partial' | 'reverse' = 'partial';
   if (pickupMatch && deliveryMatch) {
     routeDirection = 'exact';
@@ -971,12 +1171,12 @@ export function calculateRouteMatchScore(
     score += 5;
   } else {
     routeDirection = 'reverse';
-    // 역방향은 감점
+    // ?????? ?????????????
     score -= 10;
   }
 
   return {
-    score: Math.max(0, Math.min(score, 100)), // 0~100점 범위
+    score: Math.max(0, Math.min(score, 100)), // 0~100?????????
     pickupMatch,
     deliveryMatch,
     timeMatch,
@@ -989,46 +1189,49 @@ export function calculateRouteMatchScore(
 }
 
 /**
- * 위치 기반 요청 필터링
- * @param requests 전체 배송 요청 목록
- * @param currentLocation 현재 위치
- * @param radiusKm 반경 (km, 기본값 30)
- * @returns 위치 기반 필터링된 요청 목록
+ * ??????熬곣뫖利당춯??쎾퐲???????????????????????????????????????????거?????
+ * @param requests ??????熬곣뫖利당춯??쎾퐲????????꾩룆梨띰쭕?뚢뵾???????????????????釉먮폁???????????釉먮폇?????썹땟戮?눀筌롢룗爰??⑸역??????
+ * @param currentLocation ??????熬곣뫖利당춯??쎾퐲????????熬곣뫖利당춯??쎾퐲??
+ * @param radiusKm ??????꾩룆梨띰쭕?뚢뵾????????????紐??(km, ??????????30)
+ * @returns ??????熬곣뫖利당춯??쎾퐲???????????????????????????????????거??????????影?력????????????????釉먮폁???????????釉먮폇?????썹땟戮?눀筌롢룗爰??⑸역??????
  */
-export async function filterRequestsByLocation(
-  requests: any[],
+export function filterRequestsByLocation(
+  requests: FilterRequestBase[],
   currentLocation: LocationData,
   radiusKm: number = 30
-): Promise<LocationFilteredRequest[]> {
+): LocationFilteredRequest[] {
   try {
+    const getLat = (station: FilterStation): number => station.lat ?? station.latitude ?? 0;
+    const getLng = (station: FilterStation): number => station.lng ?? station.longitude ?? 0;
+
     const radiusMeters = radiusKm * 1000;
     const filteredRequests: LocationFilteredRequest[] = [];
 
     for (const request of requests) {
-      // 픽업역과 배송역 중 더 가까운 역 찾기
+      // ???????????????꾩룆梨띰쭕?뚢뵾??????????????????????????????????????????釉먮폁??????????椰?筌???????
       const pickupDist = locationService.calculateDistance(
         currentLocation.latitude,
         currentLocation.longitude,
-        request.pickupStation.lat || request.pickupStation.latitude,
-        request.pickupStation.lng || request.pickupStation.longitude
+        getLat(request.pickupStation),
+        getLng(request.pickupStation)
       );
 
       const deliveryDist = locationService.calculateDistance(
         currentLocation.latitude,
         currentLocation.longitude,
-        request.deliveryStation.lat || request.deliveryStation.latitude,
-        request.deliveryStation.lng || request.deliveryStation.longitude
+        getLat(request.deliveryStation),
+        getLng(request.deliveryStation)
       );
 
       const minDistance = Math.min(pickupDist, deliveryDist);
 
-      // 반경 내에 있는 경우만 포함
+      // ??????꾩룆梨띰쭕?뚢뵾????????????紐????????嚥싲갭큔?댁쉩????????????????뀀맩鍮???癲??????????
       if (minDistance <= radiusMeters) {
         const nearestStation = pickupDist < deliveryDist
           ? request.pickupStation.stationName
           : request.deliveryStation.stationName;
 
-        // 예상 시간 (지하철 평균 속도 40km/h 가정)
+        // ????????????(????釉먮폁?????????????ㅼ뒧???怨?????????????????40km/h ?????????????
         const estimatedTimeMinutes = Math.round(minDistance / 1000 / 40 * 60);
 
         filteredRequests.push({
@@ -1038,16 +1241,16 @@ export async function filterRequestsByLocation(
             nearestStation,
             estimatedTimeMinutes,
           },
-        });
+        } as LocationFilteredRequest);
       }
     }
 
-    // 거리 기반 정렬
+    // ????釉먮폁?怨?땡?塋??????????????????????????븐뼐?????????????
     filteredRequests.sort((a, b) =>
       a.metadata.distanceFromCurrent - b.metadata.distanceFromCurrent
     );
 
-    // 거리 순위 부여
+    // ????釉먮폁?怨?땡?塋??????????遺얘턁????????嶺뚮죭?댁젘????????源녾텛????
     filteredRequests.forEach((req, index) => {
       req.metadata.distanceRank = index + 1;
     });
@@ -1060,9 +1263,9 @@ export async function filterRequestsByLocation(
 }
 
 /**
- * 길러 통계 조회
- * @param gillerId 길러 ID
- * @returns 길러 통계 정보
+ * ???????곷♧????????????????????????
+ * @param gillerId ???????곷♧??????ID
+ * @returns ???????곷♧????????????????븐뼐??????????
  */
 export async function fetchGillerStats(
   gillerId: string
@@ -1073,7 +1276,7 @@ export async function fetchGillerStats(
     if (!userDoc.exists()) {
       return {
         gillerId,
-        gillerName: '익명',
+        gillerName: 'giller',
         rating: 3.5,
         totalDeliveries: 0,
         completedDeliveries: 0,
@@ -1082,31 +1285,34 @@ export async function fetchGillerStats(
       };
     }
 
-    const data = userDoc.data();
-    const stats = data.stats || data.gillerInfo || {};
+    const data = userDoc.data() as FirestoreUserDoc;
+    const stats = data.stats ?? data.gillerInfo ?? {};
+    const ratingValue = 'rating' in stats ? Number(stats.rating ?? data.rating ?? 3.5) : (data.rating ?? 3.5);
+    const averageResponseTime =
+      'averageResponseTime' in stats ? Number(stats.averageResponseTime ?? 30) : 30;
 
-    const totalDeliveries = stats.completedDeliveries || stats.totalDeliveries || 0;
-    const completedDeliveries = stats.completedDeliveries || totalDeliveries;
+    const totalDeliveries = stats.totalDeliveries ?? stats.completedDeliveries ?? 0;
+    const completedDeliveries = stats.completedDeliveries ?? totalDeliveries;
     const completionRate = totalDeliveries > 0
       ? (completedDeliveries / totalDeliveries) * 100
       : 0;
 
     return {
       gillerId,
-      gillerName: data.name || '익명',
-      rating: stats.rating || data.rating || 3.5,
+      gillerName: data.name ?? 'giller',
+      rating: ratingValue,
       totalDeliveries,
       completedDeliveries,
       completionRate: Math.round(completionRate),
-      averageResponseTime: stats.averageResponseTime || 30,
-      professionalLevel: data.professionalLevel || 'regular',
-      badgeBonus: data.badgeBonus || 0,
+      averageResponseTime,
+      professionalLevel: data.professionalLevel ?? 'regular',
+      badgeBonus: data.badgeBonus ?? 0,
     };
   } catch (error) {
     console.error('Error fetching giller stats:', error);
     return {
       gillerId,
-      gillerName: '익명',
+      gillerName: 'giller',
       rating: 3.5,
       totalDeliveries: 0,
       completedDeliveries: 0,
@@ -1117,10 +1323,10 @@ export async function fetchGillerStats(
 }
 
 /**
- * 필터 옵션 적용
- * @param requests 필터링할 요청 목록
- * @param filters 필터 옵션
- * @returns 필터링된 요청 목록
+ * ?????????????????????????????筌??
+ * @param requests ??????????????????거??????????影?력???????????????釉먮폁???????????釉먮폇?????썹땟戮?눀筌롢룗爰??⑸역??????
+ * @param filters ???????????????????
+ * @returns ??????????????????거??????????影?력????????????????釉먮폁???????????釉먮폇?????썹땟戮?눀筌롢룗爰??⑸역??????
  */
 export function applyMatchingFilters<T extends LocationFilteredRequest | RouteFilteredRequest>(
   requests: T[],
@@ -1128,9 +1334,9 @@ export function applyMatchingFilters<T extends LocationFilteredRequest | RouteFi
 ): T[] {
   let filtered = [...requests];
 
-  // 호선 필터
+  // ?????븐뼐??????????????????????
   if (filters.lineFilter && !filters.lineFilter.showAllLines && filters.lineFilter.selectedLines.length > 0) {
-    filtered = filtered.filter((request: any) => {
+    filtered = filtered.filter((request) => {
       const pickupLine = request.pickupStation.line;
       const deliveryLine = request.deliveryStation.line;
       return filters.lineFilter!.selectedLines.some(line =>
@@ -1139,38 +1345,40 @@ export function applyMatchingFilters<T extends LocationFilteredRequest | RouteFi
     });
   }
 
-  // 지역 필터
+  // ????釉먮폁??????????????????????
   if (filters.regionFilter && !filters.regionFilter.showAllRegions && filters.regionFilter.selectedRegions.length > 0) {
-    filtered = filtered.filter((request: any) => {
-      const pickupRegion = request.pickupStation.region;
-      const deliveryRegion = request.deliveryStation.region;
-      return filters.regionFilter!.selectedRegions.includes(pickupRegion || deliveryRegion);
+    filtered = filtered.filter((request) => {
+      const pickupRegion = (request.pickupStation as FilterStation).region;
+      const deliveryRegion = (request.deliveryStation as FilterStation).region;
+      return filters.regionFilter!.selectedRegions.includes(pickupRegion ?? deliveryRegion ?? '');
     });
   }
 
-  // 최소 매칭 점수 (동선 매칭인 경우)
+  // ????釉먮폁??????????????釉먮폁???????????????(??????? ????釉먮폁??????????????뀀맩鍮???癲????
   if (filters.minMatchScore) {
-    filtered = filtered.filter((request: any) =>
-      request.matchScore?.score >= filters.minMatchScore!
-    );
+    filtered = filtered.filter((request) => {
+      if (!('matchScore' in request)) return true;
+      return (request.matchScore?.score ?? 0) >= filters.minMatchScore!;
+    });
   }
 
-  // 최대 거리 (위치 매칭인 경우)
+  // ????釉먮폁????????? ????釉먮폁?怨?땡?塋??????(??????熬곣뫖利당춯??쎾퐲??????釉먮폁??????????????뀀맩鍮???癲????
   if (filters.maxDistance) {
-    filtered = filtered.filter((request: any) =>
-      request.metadata?.distanceFromCurrent <= filters.maxDistance!
-    );
+    filtered = filtered.filter((request) => {
+      if (!('metadata' in request)) return true;
+      return (request.metadata?.distanceFromCurrent ?? Number.MAX_SAFE_INTEGER) <= filters.maxDistance!;
+    });
   }
 
-  // 배송비 필터
+  // ??????꾩룆梨띰쭕?뚢뵾????????????????????????
   if (filters.minFee) {
-    filtered = filtered.filter((request: any) =>
+    filtered = filtered.filter((request) =>
       request.fee?.totalFee >= filters.minFee!
     );
   }
 
   if (filters.maxFee) {
-    filtered = filtered.filter((request: any) =>
+    filtered = filtered.filter((request) =>
       request.fee?.totalFee <= filters.maxFee!
     );
   }
@@ -1179,9 +1387,9 @@ export function applyMatchingFilters<T extends LocationFilteredRequest | RouteFi
 }
 
 /**
- * 역 정보 정규화 - Firestore 저장 형태와 관계없이 lat/lng 보장
+ * ???????븐뼐????????????????- Firestore ?????????븐뼐?????????怨뚮뼺獒뺣폍????? ????????노듋???????????????lat/lng ???????ㅻ깹?????
  */
-function normalizeStation(station: any): any {
+function normalizeStation<T extends FilterStation>(station: T | undefined): T | undefined {
   if (!station) return station;
 
   const lat = station.lat ?? station.latitude ?? station.location?.latitude ?? 0;
@@ -1197,10 +1405,10 @@ function normalizeStation(station: any): any {
 }
 
 /**
- * 대기 중인 배송 요청 조회 (길러용)
- * @returns 대기 중인 요청 목록
+ * ????????????썼린?濾?????熬곥끇??????????꾩룆梨띰쭕?뚢뵾????????????????????????????(???????곷♧???????
+ * @returns ????????????썼린?濾?????熬곥끇????????????????釉먮폁???????????釉먮폇?????썹땟戮?눀筌롢룗爰??⑸역??????
  */
-export async function getPendingGillerRequests(): Promise<any[]> {
+export async function getPendingGillerRequests(): Promise<FilterRequestBase[]> {
   try {
     const q = query(
       collection(db, 'requests'),
@@ -1208,18 +1416,24 @@ export async function getPendingGillerRequests(): Promise<any[]> {
     );
 
     const snapshot = await getDocs(q);
-    const requests: any[] = [];
+    const requests: FilterRequestBase[] = [];
 
     snapshot.forEach((doc) => {
-      const data = doc.data();
+      const data = doc.data() as FirestorePendingRequestDoc;
 
-      // fee 필드 정규화: fee가 없으면 feeBreakdown 사용
-      const fee = data.fee || data.feeBreakdown || { totalFee: 0, baseFee: 0, distanceFee: 0, weightFee: 0, sizeFee: 0, serviceFee: 0, vat: 0 };
+      const fee = data.fee ?? data.feeBreakdown ?? {
+        totalFee: 0,
+        baseFee: 0,
+        distanceFee: 0,
+        weightFee: 0,
+        sizeFee: 0,
+        serviceFee: 0,
+        vat: 0,
+      };
 
-      // 수신자 이름 (채팅 시 필요)
-      const recipientName = data.requesterName || data.senderName || '이용자';
+      const recipientName = data.requesterName ?? data.senderName ?? 'requester';
 
-      // 이미 다른 길러가 매칭된 건 제외
+      // ???? ?????????堉온?????????곷♧???????? ????釉먮폁?????????????????遺얘턁???????
       if (data.matchedGillerId) {
         return;
       }
@@ -1229,9 +1443,9 @@ export async function getPendingGillerRequests(): Promise<any[]> {
         ...data,
         fee,
         recipientName,
-        // 역 정보 좌표 정규화
-        pickupStation: normalizeStation(data.pickupStation),
-        deliveryStation: normalizeStation(data.deliveryStation),
+        // ???????븐뼐???????????????雅?퍔瑗?땟??????????
+        pickupStation: normalizeStation(data.pickupStation) as FilterStation,
+        deliveryStation: normalizeStation(data.deliveryStation) as FilterStation,
       });
     });
 
@@ -1241,3 +1455,5 @@ export async function getPendingGillerRequests(): Promise<any[]> {
     return [];
   }
 }
+
+

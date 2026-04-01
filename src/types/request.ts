@@ -68,6 +68,11 @@ export interface StationInfo {
  */
 export interface Request {
   requestId: string;
+  requestDraftId?: string;
+  pricingQuoteId?: string;
+  primaryDeliveryId?: string;
+  requestMode?: 'immediate' | 'reservation';
+  sourceRequestId?: string | null;
 
   // 요청자 정보
   requesterId: string;
@@ -163,6 +168,7 @@ export interface Request {
  */
 export interface CreateRequestData {
   requesterId: string;
+  requestMode?: 'immediate' | 'reservation';
   pickupStation: StationInfo;
   deliveryStation: StationInfo;
   packageInfo: PackageInfo;
@@ -211,6 +217,8 @@ export interface CreateRequestData {
  */
 export interface UpdateRequestData {
   status?: RequestStatus;
+  pricingQuoteId?: string;
+  primaryDeliveryId?: string;
   matchedGillerId?: string;
   gillerRating?: number;
   gllerRating?: number;

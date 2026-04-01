@@ -1,20 +1,18 @@
 import {
-  collection,
-  doc,
-  getDoc,
-  getDocs,
   addDoc,
-  updateDoc,
-  query,
-  where,
+  collection,
+  getDocs,
   orderBy,
+  query,
   Timestamp,
+  updateDoc,
+  where,
 } from 'firebase/firestore';
 import { db } from './firebase';
 import { PointService } from './PointService';
 import { TossPaymentService } from './TossPaymentService';
-import type { Deposit, DepositStatus, DepositPaymentMethod } from '../types/point';
-import { DEPOSIT_RATE } from '../types/point';
+import { DepositCompensationService } from './deposit-compensation-service';
+import { DEPOSIT_RATE, DepositPaymentMethod, PointCategory, type Deposit, type DepositStatus } from '../types/point';
 
 const DEPOSITS_COLLECTION = 'deposits';
 
@@ -31,7 +29,6 @@ export class DepositService {
   }> {
     try {
       const depositAmount = Math.round(itemValue * DEPOSIT_RATE);
-
       const pointBalance = await PointService.getBalance(gillerId);
 
       let paymentMethod: DepositPaymentMethod;
@@ -40,11 +37,10 @@ export class DepositService {
       let paymentId: string | undefined;
 
       if (pointBalance >= depositAmount) {
-        paymentMethod = 'point_only' as DepositPaymentMethod;
+        paymentMethod = DepositPaymentMethod.POINT_ONLY;
         pointAmount = depositAmount;
-        tossAmount = 0;
       } else {
-        paymentMethod = 'mixed' as DepositPaymentMethod;
+        paymentMethod = DepositPaymentMethod.MIXED;
         pointAmount = pointBalance;
         tossAmount = depositAmount - pointBalance;
 
@@ -57,15 +53,14 @@ export class DepositService {
         if (!tossResult.success) {
           return {
             success: false,
-            error: tossResult.error || '토스페이먼츠 결제 실패',
+            error: tossResult.error ?? '결제 공급자 결제에 실패했습니다.',
           };
         }
 
         paymentId = tossResult.paymentId;
       }
 
-      const depositRef = collection(db, DEPOSITS_COLLECTION);
-      const depositData: Deposit = {
+      const depositPayload: Deposit = {
         depositId: '',
         userId: gillerId,
         gllerId,
@@ -82,26 +77,31 @@ export class DepositService {
         updatedAt: Timestamp.now(),
       };
 
-      const newDepositRef = await addDoc(depositRef, depositData);
-
-      const depositId = newDepositRef.id;
-
-      await updateDoc(newDepositRef, { depositId });
+      const depositRef = await addDoc(collection(db, DEPOSITS_COLLECTION), depositPayload);
+      await updateDoc(depositRef, { depositId: depositRef.id });
 
       if (pointAmount > 0) {
         await PointService.spendPoints(
           gillerId,
           pointAmount,
-          'deposit_payment' as any,
+          PointCategory.DEPOSIT_PAYMENT,
           `보증금 결제 (${depositAmount.toLocaleString()}원)`
         );
       }
 
-      console.log(`💳 Deposit paid: ${depositAmount} for user ${gillerId}`);
-      return { success: true, deposit: depositData };
-    } catch (error: any) {
+      return {
+        success: true,
+        deposit: {
+          ...depositPayload,
+          depositId: depositRef.id,
+        },
+      };
+    } catch (error: unknown) {
       console.error('Deposit payment failed:', error);
-      return { success: false, error: error.message };
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : '보증금 결제 중 오류가 발생했습니다.',
+      };
     }
   }
 
@@ -111,49 +111,7 @@ export class DepositService {
     success: boolean;
     error?: string;
   }> {
-    try {
-      const depositRef = doc(db, DEPOSITS_COLLECTION, depositId);
-      const depositDoc = await getDoc(depositRef);
-
-      if (!depositDoc.exists()) {
-        return { success: false, error: 'Deposit not found' };
-      }
-
-      const deposit = depositDoc.data() as Deposit;
-
-      if (deposit.status !== 'paid') {
-        return { success: false, error: 'Deposit is not paid' };
-      }
-
-      if (deposit.pointAmount && deposit.pointAmount > 0) {
-        await PointService.earnPoints(
-          deposit.userId,
-          deposit.pointAmount,
-          'deposit_refund' as any,
-          `보증금 환급 (${deposit.pointAmount.toLocaleString()}원)`
-        );
-      }
-
-      if (deposit.tossAmount && deposit.tossAmount > 0 && deposit.paymentId) {
-        await TossPaymentService.refundPayment(
-          deposit.paymentId,
-          deposit.tossAmount,
-          '배송 완료로 인한 보증금 환급'
-        );
-      }
-
-      await updateDoc(depositRef, {
-        status: 'refunded' as DepositStatus,
-        refundedAt: Timestamp.now(),
-        updatedAt: Timestamp.now(),
-      });
-
-      console.log(`💸 Deposit refunded: ${deposit.depositAmount} for user ${deposit.userId}`);
-      return { success: true };
-    } catch (error: any) {
-      console.error('Deposit refund failed:', error);
-      return { success: false, error: error.message };
-    }
+    return DepositCompensationService.refundDeposit(depositId);
   }
 
   static async deductCompensation(
@@ -162,74 +120,37 @@ export class DepositService {
     success: boolean;
     error?: string;
   }> {
-    try {
-      const depositRef = doc(db, DEPOSITS_COLLECTION, depositId);
-      const depositDoc = await getDoc(depositRef);
-
-      if (!depositDoc.exists()) {
-        return { success: false, error: 'Deposit not found' };
-      }
-
-      const deposit = depositDoc.data() as Deposit;
-
-      if (deposit.status !== 'paid') {
-        return { success: false, error: 'Deposit is not paid' };
-      }
-
-      await PointService.spendPoints(
-        deposit.userId,
-        deposit.depositAmount,
-        'deposit_compensation' as any,
-        `사고/분실로 인한 보증금 배상 차감 (${deposit.depositAmount.toLocaleString()}원)`
-      );
-
-      await updateDoc(depositRef, {
-        status: 'deducted' as DepositStatus,
-        deductedAt: Timestamp.now(),
-        compensationAmount: deposit.depositAmount,
-        updatedAt: Timestamp.now(),
-      });
-
-      console.log(`⚠️ Deposit deducted: ${deposit.depositAmount} for user ${deposit.userId}`);
-      return { success: true };
-    } catch (error: any) {
-      console.error('Deposit compensation deduction failed:', error);
-      return { success: false, error: error.message };
-    }
+    return DepositCompensationService.deductCompensation(depositId);
   }
 
-  static async getDeposits(
-    userId: string
-  ): Promise<Deposit[]> {
-    const q = query(
+  static async getDeposits(userId: string): Promise<Deposit[]> {
+    const depositQuery = query(
       collection(db, DEPOSITS_COLLECTION),
       where('userId', '==', userId),
       orderBy('createdAt', 'desc')
     );
 
-    const snapshot = await getDocs(q);
-    return snapshot.docs.map((doc) => doc.data() as Deposit);
+    const snapshot = await getDocs(depositQuery);
+    return snapshot.docs.map((docItem) => docItem.data() as Deposit);
   }
 
-  static async getDepositByRequestId(
-    requestId: string
-  ): Promise<Deposit | null> {
+  static async getDepositByRequestId(requestId: string): Promise<Deposit | null> {
     try {
-      const q = query(
+      const depositQuery = query(
         collection(db, DEPOSITS_COLLECTION),
         where('requestId', '==', requestId),
         orderBy('createdAt', 'desc')
       );
 
-      const snapshot = await getDocs(q);
+      const snapshot = await getDocs(depositQuery);
       if (snapshot.empty) {
         return null;
       }
 
       const docSnap = snapshot.docs[0];
       return {
-        depositId: docSnap.id,
         ...(docSnap.data() as Deposit),
+        depositId: docSnap.id,
       };
     } catch (error) {
       console.error('Error fetching deposit by request ID:', error);

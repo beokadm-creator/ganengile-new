@@ -1,221 +1,333 @@
-/**
-
-// @ts-nocheck - Temporarily suppress TypeScript errors for rapid development
- * Penalty Service
- * 페널티 부과 서비스
- */
-
 import {
-  collection,
-  doc,
-  getDoc,
-  getDocs,
   addDoc,
-  updateDoc,
+  collection,
+  getDocs,
   query,
-  where,
   serverTimestamp,
-  increment,
+  where,
+  type DocumentData,
+  type QueryDocumentSnapshot,
 } from 'firebase/firestore';
-import { db } from './firebase';
-import {
-  requireUserId,
-} from './firebase';
+
+import { db, requireUserId } from './firebase';
 import type {
   Penalty,
-  PenaltyType,
   PenaltySeverity,
   PenaltySummary,
+  PenaltyType,
   Warning,
 } from '../types/penalty';
 import {
+  CANCELLATION_PENALTIES,
   LATE_ARRIVAL_PENALTIES,
   NO_SHOW_PENALTIES,
-  RATING_PENALTIES,
-  CANCELLATION_PENALTIES,
+  PenaltySeverity as PenaltySeverityEnum,
+  PenaltyType as PenaltyTypeEnum,
 } from '../types/penalty';
 
 const PENALTIES_COLLECTION = 'penalties';
 const WARNINGS_COLLECTION = 'warnings';
 
+interface FirestorePenaltyDoc extends DocumentData {
+  userId?: string;
+  type?: PenaltyType;
+  severity?: PenaltySeverity;
+  reason?: string;
+  lateMinutes?: number;
+  noShowCount?: number;
+  ratingAtTime?: number;
+  cancelledAtPickup?: boolean;
+  fine?: number;
+  suspensionDays?: number;
+  suspensionStartsAt?: unknown;
+  suspensionEndsAt?: unknown;
+  isPermanent?: boolean;
+  warningId?: string;
+  createdAt?: unknown;
+  createdBy?: 'system' | 'admin';
+}
+
+interface FirestoreWarningDoc extends DocumentData {
+  userId?: string;
+  type?: PenaltyType;
+  severity?: PenaltySeverity;
+  message?: string;
+  expiresAt?: unknown;
+  createdAt?: unknown;
+}
+
+function toDateValue(value: unknown): Date | undefined {
+  if (value instanceof Date) {
+    return value;
+  }
+
+  if (typeof value === 'object' && value !== null && 'toDate' in value) {
+    const toDate = (value as { toDate?: () => Date }).toDate;
+    if (typeof toDate === 'function') {
+      return toDate();
+    }
+  }
+
+  if (typeof value === 'string' || typeof value === 'number') {
+    const parsed = new Date(value);
+    if (!Number.isNaN(parsed.getTime())) {
+      return parsed;
+    }
+  }
+
+  return undefined;
+}
+
+function mapPenalty(docSnapshot: QueryDocumentSnapshot<DocumentData>): Penalty {
+  const data = docSnapshot.data() as FirestorePenaltyDoc;
+
+  return {
+    penaltyId: docSnapshot.id,
+    userId: data.userId ?? '',
+    type: data.type ?? PenaltyTypeEnum.LATE_ARRIVAL,
+    severity: data.severity ?? PenaltySeverityEnum.WARNING,
+    reason: data.reason ?? '',
+    lateMinutes: data.lateMinutes,
+    noShowCount: data.noShowCount,
+    ratingAtTime: data.ratingAtTime,
+    cancelledAtPickup: data.cancelledAtPickup,
+    fine: data.fine ?? 0,
+    suspensionDays: data.suspensionDays,
+    suspensionStartsAt: toDateValue(data.suspensionStartsAt),
+    suspensionEndsAt: toDateValue(data.suspensionEndsAt),
+    isPermanent: data.isPermanent ?? false,
+    warningId: data.warningId,
+    createdAt: toDateValue(data.createdAt) ?? new Date(0),
+    createdBy: data.createdBy ?? 'system',
+  };
+}
+
+function mapWarning(docSnapshot: QueryDocumentSnapshot<DocumentData>): Warning {
+  const data = docSnapshot.data() as FirestoreWarningDoc;
+
+  return {
+    warningId: docSnapshot.id,
+    userId: data.userId ?? '',
+    type: data.type ?? PenaltyTypeEnum.LATE_ARRIVAL,
+    severity: data.severity ?? PenaltySeverityEnum.WARNING,
+    message: data.message ?? '',
+    expiresAt: toDateValue(data.expiresAt),
+    createdAt: toDateValue(data.createdAt) ?? new Date(0),
+  };
+}
+
 export class PenaltyService {
-  private userId: string;
+  private readonly userId: string;
 
   constructor(userId?: string) {
-    this.userId = userId || this.getCurrentUserId();
+    this.userId = userId ?? requireUserId();
   }
 
-  private getCurrentUserId(): string {
-    return requireUserId();
-  }
+  async applyLateArrivalPenalty(lateMinutes: number, requestId: string): Promise<Penalty> {
+    let rule = LATE_ARRIVAL_PENALTIES[0];
 
-  /**
-   * 지연 페널티 부과
-   */
-  async applyLateArrivalPenalty(
-    lateMinutes: number,
-    requestId: string
-  ): Promise<Penalty> {
-    // 해당 페널티 기준 찾기
-    let penalty = LATE_ARRIVAL_PENALTIES[0]; // 기본: 5분 미만 (경고)
-    
-    for (const p of LATE_ARRIVAL_PENALTIES) {
-      if (lateMinutes >= p.minutes) {
-        penalty = p;
+    for (const candidate of LATE_ARRIVAL_PENALTIES) {
+      if (lateMinutes >= candidate.minutes) {
+        rule = candidate;
       }
     }
 
-    // 페널티 생성
+    const createdAt = new Date();
     const penaltyData = {
       userId: this.userId,
-      type: PenaltyType.LATE_ARRIVAL,
-      severity: penalty.severity,
-      reason: `${lateMinutes}분 지연`,
+      type: PenaltyTypeEnum.LATE_ARRIVAL,
+      severity: rule.severity,
+      reason: `Late arrival by ${lateMinutes} minutes`,
       lateMinutes,
-      fine: penalty.fine,
-      suspensionDays: penalty.suspensionDays,
+      fine: rule.fine,
+      suspensionDays: rule.suspensionDays,
       isPermanent: false,
       createdAt: serverTimestamp(),
-      createdBy: 'system',
+      createdBy: 'system' as const,
+      requestId,
     };
 
     const docRef = await addDoc(collection(db, PENALTIES_COLLECTION), penaltyData);
 
-    // 사용자 평점 업데이트
-    if (penalty.ratingPenalty !== 0) {
-      // TODO: GillerService의 updateGillerStats 호출
-      // await gillerService.updateRating(this.userId, penalty.ratingPenalty);
-    }
-
-    // 정지가 필요하면 경고 생성
-    if (penalty.suspensionDays && penalty.suspensionDays > 0) {
-      await this.createWarning(
-        PenaltyType.LATE_ARRIVAL,
-        penalty.severity,
-        `${lateMinutes}분 지연으로 ${penalty.suspensionDays}일 정지`
+    let warningId: string | undefined;
+    if ((rule.suspensionDays ?? 0) > 0) {
+      const warning = await this.createWarning(
+        PenaltyTypeEnum.LATE_ARRIVAL,
+        rule.severity,
+        `Late arrival caused a ${rule.suspensionDays}-day suspension review.`
       );
+      warningId = warning.warningId;
     }
 
     return {
       penaltyId: docRef.id,
-      ...penaltyData,
-    } as Penalty;
-  }
-
-  /**
-   * 노쇼 페널티 부과
-   */
-  async applyNoShowPenalty(
-    requestId: string
-  ): Promise<Penalty> {
-    // 최근 30일간 노쇼 횟수 조회
-    const recentNoShows = await this.getRecentPenaltyCount(
-      PenaltyType.NO_SHOW,
-      30
-    );
-    const count = recentNoShows + 1; // 현재 노쇼 포함
-
-    // 해당 페널티 기준 찾기
-    let penalty = NO_SHOW_PENALTIES[0]; // 기본: 1회
-    for (const p of NO_SHOW_PENALTIES) {
-      if (count === p.count) {
-        penalty = p;
-      }
-    }
-
-    // 페널티 생성
-    const penaltyData = {
       userId: this.userId,
-      type: PenaltyType.NO_SHOW,
-      severity: count >= 3 ? PenaltySeverity.SEVERE : PenaltySeverity.MODERATE,
-      reason: `${count}회 노쇼`,
-      noShowCount: count,
-      ratingPenalty: penalty.ratingPenalty,
-      fine: 0,
-      suspensionDays: penalty.suspensionDays,
-      isPermanent: penalty.suspensionDays === 0, // 영구 정지
-      compensation: penalty.compensation,
-      createdAt: serverTimestamp(),
-      createdBy: 'system',
-    };
-
-    const docRef = await addDoc(collection(db, PENALTIES_COLLECTION), penaltyData);
-
-    // 사용자 평점 업데이트
-    if (penalty.ratingPenalty !== 0) {
-      // TODO: GillerService의 updateRating 호출
-    }
-
-    return {
-      penaltyId: docRef.id,
-      ...penaltyData,
-    } as Penalty;
-  }
-
-  /**
-   * 취소 페널티 부과
-   */
-  async applyCancellationPenalty(
-    cancelledAtPickup: boolean,
-    requestId: string
-  ): Promise<Penalty> {
-    // 최근 취소 횟수 조회
-    const recentCancellations = await this.getRecentPenaltyCount(
-      PenaltyType.CANCELLATION,
-      30
-    );
-    const count = recentCancellations + 1;
-
-    // 해당 페널티 기준 찾기
-    let penalty = CANCELLATION_PENALTIES[0]; // 기본: 인수 전 1회
-    for (const p of CANCELLATION_PENALTIES) {
-      if (p.timing === (cancelledAtPickup ? 'after_pickup' : 'before_pickup') &&
-          p.count === count) {
-        penalty = p;
-      }
-    }
-
-    // 페널티 생성
-    const severity = cancelledAtPickup 
-      ? (count >= 2 ? PenaltySeverity.MODERATE : PenaltySeverity.MILD)
-      : (count >= 3 ? PenaltySeverity.MILD : PenaltySeverity.WARNING);
-
-    const penaltyData = {
-      userId: this.userId,
-      type: PenaltyType.CANCELLATION,
-      severity,
-      reason: `${cancelledAtPickup ? '인수 후' : '인수 전'} 취소 (${count}회)`,
-      cancelledAtPickup,
-      fine: penalty.fine || 0,
-      suspensionDays: penalty.suspensionDays,
+      type: PenaltyTypeEnum.LATE_ARRIVAL,
+      severity: rule.severity,
+      reason: `Late arrival by ${lateMinutes} minutes`,
+      lateMinutes,
+      fine: rule.fine,
+      suspensionDays: rule.suspensionDays,
       isPermanent: false,
-      ratingPenalty: penalty.ratingPenalty,
-      createdAt: serverTimestamp(),
+      warningId,
+      createdAt,
       createdBy: 'system',
+    };
+  }
+
+  async applyNoShowPenalty(requestId: string): Promise<Penalty> {
+    const recentNoShows = await this.getRecentPenaltyCount(PenaltyTypeEnum.NO_SHOW, 30);
+    const noShowCount = recentNoShows + 1;
+    let rule = NO_SHOW_PENALTIES[0];
+
+    for (const candidate of NO_SHOW_PENALTIES) {
+      if (noShowCount >= candidate.count) {
+        rule = candidate;
+      }
+    }
+
+    const createdAt = new Date();
+    const suspensionStartsAt = rule.suspensionDays > 0 ? createdAt : undefined;
+    const suspensionEndsAt =
+      rule.suspensionDays > 0
+        ? new Date(createdAt.getTime() + rule.suspensionDays * 24 * 60 * 60 * 1000)
+        : undefined;
+
+    const penaltyData = {
+      userId: this.userId,
+      type: PenaltyTypeEnum.NO_SHOW,
+      severity: noShowCount >= 3 ? PenaltySeverityEnum.SEVERE : PenaltySeverityEnum.MODERATE,
+      reason: `No-show count reached ${noShowCount}`,
+      noShowCount,
+      fine: 0,
+      suspensionDays: rule.suspensionDays,
+      suspensionStartsAt: suspensionStartsAt ?? null,
+      suspensionEndsAt: suspensionEndsAt ?? null,
+      isPermanent: rule.suspensionDays === 0,
+      createdAt: serverTimestamp(),
+      createdBy: 'system' as const,
+      requestId,
     };
 
     const docRef = await addDoc(collection(db, PENALTIES_COLLECTION), penaltyData);
 
     return {
       penaltyId: docRef.id,
-      ...penaltyData,
-    } as Penalty;
+      userId: this.userId,
+      type: PenaltyTypeEnum.NO_SHOW,
+      severity: noShowCount >= 3 ? PenaltySeverityEnum.SEVERE : PenaltySeverityEnum.MODERATE,
+      reason: `No-show count reached ${noShowCount}`,
+      noShowCount,
+      fine: 0,
+      suspensionDays: rule.suspensionDays,
+      suspensionStartsAt,
+      suspensionEndsAt,
+      isPermanent: rule.suspensionDays === 0,
+      createdAt,
+      createdBy: 'system',
+    };
   }
 
-  /**
-   * 경고 생성
-   */
+  async applyCancellationPenalty(cancelledAtPickup: boolean, requestId: string): Promise<Penalty> {
+    const recentCancellations = await this.getRecentPenaltyCount(PenaltyTypeEnum.CANCELLATION, 30);
+    const cancellationCount = recentCancellations + 1;
+    let rule = CANCELLATION_PENALTIES[0];
+
+    for (const candidate of CANCELLATION_PENALTIES) {
+      const timingMatches = candidate.timing === (cancelledAtPickup ? 'after_pickup' : 'before_pickup');
+      if (timingMatches && cancellationCount >= candidate.count) {
+        rule = candidate;
+      }
+    }
+
+    const severity: PenaltySeverity = cancelledAtPickup
+      ? (cancellationCount >= 2 ? PenaltySeverityEnum.MODERATE : PenaltySeverityEnum.MILD)
+      : (cancellationCount >= 3 ? PenaltySeverityEnum.MILD : PenaltySeverityEnum.WARNING);
+
+    const createdAt = new Date();
+    const penaltyData = {
+      userId: this.userId,
+      type: PenaltyTypeEnum.CANCELLATION,
+      severity,
+      reason: cancelledAtPickup
+        ? `Cancelled after pickup (${cancellationCount})`
+        : `Cancelled before pickup (${cancellationCount})`,
+      cancelledAtPickup,
+      fine: rule.fine ?? 0,
+      suspensionDays: rule.suspensionDays,
+      isPermanent: false,
+      createdAt: serverTimestamp(),
+      createdBy: 'system' as const,
+      requestId,
+    };
+
+    const docRef = await addDoc(collection(db, PENALTIES_COLLECTION), penaltyData);
+
+    return {
+      penaltyId: docRef.id,
+      userId: this.userId,
+      type: PenaltyTypeEnum.CANCELLATION,
+      severity,
+      reason: penaltyData.reason,
+      cancelledAtPickup,
+      fine: rule.fine ?? 0,
+      suspensionDays: rule.suspensionDays,
+      isPermanent: false,
+      createdAt,
+      createdBy: 'system',
+    };
+  }
+
+  async getPenaltySummary(userId?: string): Promise<PenaltySummary> {
+    const targetUserId = userId ?? this.userId;
+    const since = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+
+    const penaltiesQuery = query(
+      collection(db, PENALTIES_COLLECTION),
+      where('userId', '==', targetUserId),
+      where('createdAt', '>=', since)
+    );
+    const penaltiesSnapshot = await getDocs(penaltiesQuery);
+    const penalties = penaltiesSnapshot.docs.map(mapPenalty);
+
+    const warningsQuery = query(
+      collection(db, WARNINGS_COLLECTION),
+      where('userId', '==', targetUserId)
+    );
+    const warningsSnapshot = await getDocs(warningsQuery);
+    const warnings = warningsSnapshot.docs.map(mapWarning);
+
+    const totalFines = penalties.reduce((sum, penalty) => sum + penalty.fine, 0);
+    const totalSuspensionDays = penalties.reduce((sum, penalty) => sum + (penalty.suspensionDays ?? 0), 0);
+    const activeSuspension = penalties
+      .filter((penalty) => penalty.suspensionEndsAt && penalty.suspensionEndsAt > new Date())
+      .sort((left, right) => (right.suspensionEndsAt?.getTime() ?? 0) - (left.suspensionEndsAt?.getTime() ?? 0))[0];
+
+    return {
+      userId: targetUserId,
+      totalPenalties: penalties.length,
+      totalFines,
+      totalSuspensionDays,
+      isSuspended: Boolean(activeSuspension),
+      suspensionEndsAt: activeSuspension?.suspensionEndsAt,
+      warnings,
+      recentPenalties: penalties,
+    };
+  }
+
   private async createWarning(
     type: PenaltyType,
     severity: PenaltySeverity,
     message: string
   ): Promise<Warning> {
+    const createdAt = new Date();
+    const expiresAt = new Date(createdAt.getTime() + 30 * 24 * 60 * 60 * 1000);
     const warningData = {
       userId: this.userId,
       type,
       severity,
       message,
-      expiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000), // 30일 후 소멸
+      expiresAt,
       createdAt: serverTimestamp(),
     };
 
@@ -223,91 +335,25 @@ export class PenaltyService {
 
     return {
       warningId: docRef.id,
-      ...warningData,
-    } as Warning;
-  }
-
-  /**
-   * 사용자 페널티 요약 조회
-   */
-  async getPenaltySummary(userId?: string): Promise<PenaltySummary> {
-    const targetUserId = userId || this.userId;
-
-    // 최근 30일간 페널티 조회
-    const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
-    const pQ = query(
-      collection(db, PENALTIES_COLLECTION),
-      where('userId', '==', targetUserId),
-      where('createdAt', '>=', thirtyDaysAgo)
-    );
-
-    const pSnapshot = await getDocs(pQ);
-    const penalties = pSnapshot.docs.map((doc) => ({
-      penaltyId: doc.id,
-      ...doc.data(),
-    } as Penalty));
-
-    // 총 페널티 계산
-    const totalFines = penalties.reduce((sum, p) => sum + p.fine, 0);
-    const totalSuspensionDays = penalties.reduce(
-      (sum, p) => sum + (p.suspensionDays || 0),
-      0
-    );
-
-    // 현재 정지 상태 확인
-    const isSuspended = penalties.some((p) => {
-      if (!p.suspensionEndsAt) return false;
-      return new Date(p.suspensionEndsAt) > new Date();
-    });
-
-    // 가장 최근 정지 종료일
-    const activeSuspension = penalties
-      .filter((p) => p.suspensionEndsAt && new Date(p.suspensionEndsAt) > new Date())
-      .sort((a, b) => new Date(b.suspensionEndsAt!).getTime() - new Date(a.suspensionEndsAt!).getTime())[0];
-
-    // 경고 조회
-    const wQ = query(
-      collection(db, WARNINGS_COLLECTION),
-      where('userId', '==', targetUserId)
-    );
-
-    const wSnapshot = await getDocs(wQ);
-    const warnings: Warning[] = [];
-    wSnapshot.forEach((doc) => {
-      warnings.push({
-        warningId: doc.id,
-        ...doc.data(),
-      } as Warning);
-    });
-
-    return {
-      userId: targetUserId,
-      totalPenalties: penalties.length,
-      totalFines,
-      totalSuspensionDays,
-      isSuspended,
-      suspensionEndsAt: activeSuspension?.suspensionEndsAt,
-      warnings,
-      recentPenalties: penalties,
+      userId: this.userId,
+      type,
+      severity,
+      message,
+      expiresAt,
+      createdAt,
     };
   }
 
-  /**
-   * 최근 페널티 횟수 조회
-   */
-  private async getRecentPenaltyCount(
-    type: PenaltyType,
-    days: number
-  ): Promise<number> {
-    const daysAgo = new Date(Date.now() - days * 24 * 60 * 60 * 1000);
-    const q = query(
+  private async getRecentPenaltyCount(type: PenaltyType, days: number): Promise<number> {
+    const since = new Date(Date.now() - days * 24 * 60 * 60 * 1000);
+    const penaltiesQuery = query(
       collection(db, PENALTIES_COLLECTION),
       where('userId', '==', this.userId),
       where('type', '==', type),
-      where('createdAt', '>=', daysAgo)
+      where('createdAt', '>=', since)
     );
 
-    const snapshot = await getDocs(q);
+    const snapshot = await getDocs(penaltiesQuery);
     return snapshot.size;
   }
 }

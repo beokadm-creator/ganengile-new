@@ -1,9 +1,4 @@
-/**
- * TimePicker Component
- * 시간 선택기 컴포넌트 (슬라이더 방식 개선)
- */
-
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import {
   View,
   Text,
@@ -16,197 +11,109 @@ import { Ionicons } from '@expo/vector-icons';
 import { Colors, Spacing, Typography, BorderRadius } from '../../theme';
 
 interface TimePickerProps {
-  value: string; // HH:mm format
+  value: string;
   onChange: (time: string) => void;
   label?: string;
   placeholder?: string;
   minuteInterval?: 1 | 5 | 10 | 15 | 20 | 30;
 }
 
-// 시간 슬라이더 스텝 생성 (30분 단위)
-const generateTimeSteps = (): Array<{ hour: number; minute: number; label: string }> => {
-  const steps: Array<{ hour: number; minute: number; label: string }> = [];
-  for (let h = 0; h < 24; h++) {
-    for (let m = 0; m < 60; m += 30) {
-      const label = `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
-      steps.push({ hour: h, minute: m, label });
+const QUICK_PRESETS = ['08:00', '09:00', '12:00', '18:00', '21:00'];
+
+function generateTimeSteps(interval: number): string[] {
+  const steps: string[] = [];
+  for (let hour = 0; hour < 24; hour += 1) {
+    for (let minute = 0; minute < 60; minute += interval) {
+      steps.push(`${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}`);
     }
   }
   return steps;
-};
+}
 
-const TIME_STEPS = generateTimeSteps();
-
-// 빠른 선택 프리셋
-const QUICK_PRESETS = [
-  { hour: 9, minute: 0, label: '09:00' },
-  { hour: 12, minute: 0, label: '12:00' },
-  { hour: 15, minute: 0, label: '15:00' },
-  { hour: 18, minute: 0, label: '18:00' },
-  { hour: 21, minute: 0, label: '21:00' },
-];
+function getAmPmLabel(time: string): string {
+  const [hourText] = time.split(':');
+  const hour = Number(hourText);
+  return hour < 12 ? '오전' : '오후';
+}
 
 export default function TimePicker({
   value,
   onChange,
-  label = '시간 선택',
-  placeholder = '시간을 선택해주세요',
-  minuteInterval: _minuteInterval = 10,
+  label = '출발 시간',
+  placeholder = '시간을 선택해 주세요',
+  minuteInterval = 10,
 }: TimePickerProps) {
   const [modalVisible, setModalVisible] = useState(false);
+  const timeSteps = useMemo(() => generateTimeSteps(minuteInterval), [minuteInterval]);
+  const initialIndex = Math.max(timeSteps.indexOf(value), 0);
+  const [selectedIndex, setSelectedIndex] = useState(initialIndex);
 
-  // 현재 시간에서 인덱스 찾기
-  const getCurrentIndex = (): number => {
-    const [h, m] = value.split(':').map(Number);
-    const stepMinute = m >= 30 ? 30 : 0;
-    return TIME_STEPS.findIndex(s => s.hour === h && s.minute === stepMinute);
-  };
+  const selectedTime = timeSteps[selectedIndex] ?? timeSteps[0] ?? '08:00';
 
-  const [selectedIndex, setSelectedIndex] = useState(getCurrentIndex());
-
-  const handleTimeSelect = (index: number) => {
-    setSelectedIndex(index);
-  };
-
-  const handleQuickSelect = (hour: number, minute: number) => {
-    const timeString = `${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}`;
-    const newIndex = TIME_STEPS.findIndex(s => s.hour === hour && s.minute === minute);
-    if (newIndex !== -1) {
-      setSelectedIndex(newIndex);
-      onChange(timeString);
-    }
+  const handleOpen = () => {
+    setSelectedIndex(Math.max(timeSteps.indexOf(value), 0));
+    setModalVisible(true);
   };
 
   const handleConfirm = () => {
-    const selectedTime = TIME_STEPS[selectedIndex];
-    const timeString = `${String(selectedTime.hour).padStart(2, '0')}:${String(selectedTime.minute).padStart(2, '0')}`;
-    onChange(timeString);
+    onChange(selectedTime);
     setModalVisible(false);
-  };
-
-  const handleCancel = () => {
-    setSelectedIndex(getCurrentIndex()); // 원래 값으로 복원
-    setModalVisible(false);
-  };
-
-  const formatTime = (hour: number, minute: number): string => {
-    const h = String(hour).padStart(2, '0');
-    const m = String(minute).padStart(2, '0');
-    return `${h}:${m}`;
-  };
-
-  const getAmPm = (hour: number): string => {
-    return hour < 12 ? '오전' : '오후';
-  };
-
-  const getCurrentTime = () => {
-    const selected = TIME_STEPS[selectedIndex];
-    return {
-      hour: selected.hour,
-      minute: selected.minute,
-      formatted: formatTime(selected.hour, selected.minute),
-      ampm: getAmPm(selected.hour),
-    };
   };
 
   return (
     <View style={styles.container}>
-      {label && <Text style={styles.label}>{label}</Text>}
+      {label ? <Text style={styles.label}>{label}</Text> : null}
 
-      <TouchableOpacity
-        style={styles.timeButton}
-        onPress={() => setModalVisible(true)}
-      >
-        <Text style={styles.timeText}>
-          {value || placeholder}
-        </Text>
+      <TouchableOpacity style={styles.timeButton} onPress={handleOpen}>
+        <Text style={styles.timeText}>{value || placeholder}</Text>
         <Ionicons name="time-outline" size={20} color={Colors.primary} />
       </TouchableOpacity>
 
-      <Modal
-        visible={modalVisible}
-        animationType="slide"
-        transparent
-        onRequestClose={handleCancel}
-      >
+      <Modal visible={modalVisible} animationType="slide" transparent onRequestClose={() => setModalVisible(false)}>
         <View style={styles.modalContainer}>
           <View style={styles.modalContent}>
             <View style={styles.modalHeader}>
               <Text style={styles.modalTitle}>{label}</Text>
-              <TouchableOpacity onPress={handleCancel}>
+              <TouchableOpacity onPress={() => setModalVisible(false)}>
                 <Ionicons name="close" size={28} color={Colors.textSecondary} />
               </TouchableOpacity>
             </View>
 
-            {/* 현재 선택된 시간 표시 (큰 숫자) */}
             <View style={styles.selectedTimeDisplay}>
-              <Text style={styles.ampmText}>{getCurrentTime().ampm}</Text>
-              <Text style={styles.timeLarge}>{getCurrentTime().formatted}</Text>
+              <Text style={styles.ampmText}>{getAmPmLabel(selectedTime)}</Text>
+              <Text style={styles.timeLarge}>{selectedTime}</Text>
             </View>
 
-            {/* 빠른 선택 버튼 */}
             <View style={styles.quickSelectContainer}>
               {QUICK_PRESETS.map((preset) => {
-                const isSelected = TIME_STEPS[selectedIndex].hour === preset.hour && TIME_STEPS[selectedIndex].minute === preset.minute;
+                const isSelected = preset === selectedTime;
                 return (
                   <TouchableOpacity
-                    key={preset.label}
-                    style={[
-                      styles.quickButton,
-                      isSelected && styles.quickButtonSelected,
-                    ]}
-                    onPress={() => handleQuickSelect(preset.hour, preset.minute)}
+                    key={preset}
+                    style={[styles.quickButton, isSelected && styles.quickButtonSelected]}
+                    onPress={() => setSelectedIndex(Math.max(timeSteps.indexOf(preset), 0))}
                   >
-                    <Text style={[
-                      styles.quickButtonText,
-                      isSelected && styles.quickButtonTextSelected
-                    ]}>
-                      {preset.label}
+                    <Text style={[styles.quickButtonText, isSelected && styles.quickButtonTextSelected]}>
+                      {preset}
                     </Text>
                   </TouchableOpacity>
                 );
               })}
             </View>
 
-            {/* 시간 슬라이더 (가로 스크롤) */}
             <View style={styles.sliderContainer}>
               <Text style={styles.sliderLabel}>시간 선택</Text>
-              <ScrollView
-                horizontal
-                showsHorizontalScrollIndicator={false}
-                contentContainerStyle={styles.sliderScrollContent}
-                onMomentumScrollEnd={(event) => {
-                  const offsetX = event.nativeEvent.contentOffset.x;
-                  const itemWidth = 70; // 각 아이템 너비
-                  const index = Math.round(offsetX / itemWidth);
-                  if (index >= 0 && index < TIME_STEPS.length) {
-                    handleTimeSelect(index);
-                  }
-                }}
-                scrollEventThrottle={16}
-              >
-                {TIME_STEPS.map((step, index) => {
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.sliderScrollContent}>
+                {timeSteps.map((step, index) => {
                   const isSelected = index === selectedIndex;
-                  const isHour = step.minute === 0;
-
                   return (
                     <TouchableOpacity
-                      key={`${step.hour}-${step.minute}`}
-                      style={[
-                        styles.timeStep,
-                        isSelected && styles.timeStepSelected,
-                        isHour && styles.timeStepHour,
-                      ]}
-                      onPress={() => handleTimeSelect(index)}
+                      key={step}
+                      style={[styles.timeStep, isSelected && styles.timeStepSelected]}
+                      onPress={() => setSelectedIndex(index)}
                     >
-                      <Text
-                        style={[
-                          styles.timeStepText,
-                          isSelected && styles.timeStepTextSelected,
-                          isHour && styles.timeStepTextHour,
-                        ]}
-                      >
-                        {step.label}
+                      <Text style={[styles.timeStepText, isSelected && styles.timeStepTextSelected]}>
+                        {step}
                       </Text>
                     </TouchableOpacity>
                   );
@@ -214,9 +121,8 @@ export default function TimePicker({
               </ScrollView>
             </View>
 
-            {/* 확인 버튼 */}
             <TouchableOpacity style={styles.confirmButton} onPress={handleConfirm}>
-              <Text style={styles.confirmButtonText}>확인</Text>
+              <Text style={styles.confirmButtonText}>선택 완료</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -250,7 +156,6 @@ const styles = StyleSheet.create({
     color: Colors.textPrimary,
     fontSize: Typography.fontSize.base,
   },
-  // Modal styles
   modalContainer: {
     backgroundColor: Colors.overlay,
     flex: 1,
@@ -260,10 +165,10 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.white,
     borderTopLeftRadius: BorderRadius.lg,
     borderTopRightRadius: BorderRadius.lg,
+    maxHeight: '80%',
     paddingBottom: Spacing.xl,
     paddingHorizontal: Spacing.lg,
     paddingTop: Spacing.lg,
-    maxHeight: '80%',
   },
   modalHeader: {
     alignItems: 'center',
@@ -278,7 +183,6 @@ const styles = StyleSheet.create({
     fontSize: Typography.fontSize.lg,
     fontWeight: Typography.fontWeight.bold,
   },
-  // 큰 시간 표시
   selectedTimeDisplay: {
     alignItems: 'center',
     paddingVertical: Spacing.xl,
@@ -294,7 +198,6 @@ const styles = StyleSheet.create({
     fontWeight: Typography.fontWeight.bold,
     letterSpacing: 2,
   },
-  // 빠른 선택 버튼
   quickSelectContainer: {
     flexDirection: 'row',
     gap: Spacing.sm,
@@ -319,7 +222,6 @@ const styles = StyleSheet.create({
     color: Colors.white,
     fontWeight: Typography.fontWeight.semibold,
   },
-  // 슬라이더
   sliderContainer: {
     marginBottom: Spacing.lg,
   },
@@ -339,13 +241,10 @@ const styles = StyleSheet.create({
     height: 50,
     justifyContent: 'center',
     marginRight: Spacing.sm,
-    width: 70,
+    width: 76,
   },
   timeStepSelected: {
     backgroundColor: Colors.primary,
-  },
-  timeStepHour: {
-    backgroundColor: Colors.gray200,
   },
   timeStepText: {
     color: Colors.textSecondary,
@@ -355,10 +254,6 @@ const styles = StyleSheet.create({
     color: Colors.white,
     fontWeight: Typography.fontWeight.semibold,
   },
-  timeStepTextHour: {
-    fontWeight: Typography.fontWeight.medium,
-  },
-  // 확인 버튼
   confirmButton: {
     alignItems: 'center',
     backgroundColor: Colors.primary,

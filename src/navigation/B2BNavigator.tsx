@@ -1,8 +1,7 @@
-/**
+﻿/**
  * B2B Navigator
  * Stack navigator for B2B (business) screens
- * 기업 고객 전용 네비게이션
- */
+ * 湲곗뾽 怨좉컼 ?꾩슜 ?ㅻ퉬寃뚯씠?? */
 
 import React from 'react';
 import { createStackNavigator } from '@react-navigation/stack';
@@ -29,7 +28,6 @@ export default function B2BNavigator() {
       screenOptions={{
         headerShown: false,
         headerBackTitle: '뒤로',
-        headerBackTitleVisible: false,
         headerTitleAlign: 'center',
         headerTitleStyle: { fontWeight: '800', fontSize: 18 },
         headerStyle: {
@@ -61,42 +59,42 @@ export default function B2BNavigator() {
       />
       <Stack.Screen
         name="B2BRequest"
-        component={B2BRequestScreen as any}
+        component={B2BRequestScreen}
         options={{ headerShown: true, title: '배송 요청' }}
       />
       <Stack.Screen
         name="B2BGiller"
-        component={B2BGillerScreen as any}
+        component={B2BGillerScreen}
         options={{ headerShown: true, title: '길러 관리' }}
       />
       <Stack.Screen
         name="B2BMatchingResult"
-        component={B2BMatchingResultScreen as any}
+        component={B2BMatchingResultScreen}
         options={{ headerShown: true, title: '매칭 결과' }}
       />
       <Stack.Screen
         name="B2BOnboarding"
-        component={B2BOnboardingScreen as any}
+        component={B2BOnboardingScreen}
         options={{ headerShown: true, title: 'B2B 가입' }}
       />
       <Stack.Screen
         name="BusinessProfile"
-        component={BusinessProfileScreen as any}
+        component={BusinessProfileScreen}
         options={{ headerShown: true, title: '기업 프로필' }}
       />
       <Stack.Screen
         name="MonthlySettlement"
-        component={MonthlySettlementScreen as any}
-        options={{ headerShown: true, title: '월간 정산' }}
+        component={MonthlySettlementScreen}
+        options={{ headerShown: true, title: '월 정산' }}
       />
       <Stack.Screen
         name="SubscriptionTierSelection"
-        component={SubscriptionTierSelectionScreen as any}
+        component={SubscriptionTierSelectionScreen}
         options={{ headerShown: true, title: '구독 관리' }}
       />
       <Stack.Screen
         name="TaxInvoiceRequest"
-        component={TaxInvoiceRequestScreen as any}
+        component={TaxInvoiceRequestScreen}
         options={{ headerShown: true, title: '세금계산서' }}
       />
     </Stack.Navigator>

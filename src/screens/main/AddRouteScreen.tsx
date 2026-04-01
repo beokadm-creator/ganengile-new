@@ -1,60 +1,62 @@
-/**
- * Add Route Screen
- * 동선 (출퇴근 경로) 등록 화면
- */
-
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import {
   View,
   Text,
   StyleSheet,
-  TextInput,
   TouchableOpacity,
-  ScrollView,
-  Alert,
   ActivityIndicator,
-  Modal,
-  FlatList,
-  SafeAreaView,
-  Platform,
+  Alert,
+  ScrollView,
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { requireUserId } from '../../services/firebase';
 import { getAllStations } from '../../services/config-service';
 import { createRoute } from '../../services/route-service';
-import type { MainStackNavigationProp } from '../../types/navigation';
+import type { MainStackWithTabNavigationProp } from '../../types/navigation';
 import type { Station } from '../../types/config';
 import type { StationInfo } from '../../types/route';
 import { Colors, Spacing, Typography, BorderRadius } from '../../theme';
+import Button from '../../components/common/Button';
+import TimePicker from '../../components/common/TimePicker';
+import DaySelector, { DAY_LABELS } from '../../components/common/DaySelector';
+import StationSelectModal from '../../components/common/StationSelectModal';
 
 type PickTarget = 'start' | 'end' | null;
 
-export default function AddRouteScreen() {
-  const navigation = useNavigation<MainStackNavigationProp>();
+function toStationInfo(station: Station): StationInfo {
+  return {
+    id: station.stationId,
+    stationId: station.stationId,
+    stationName: station.stationName,
+    line: station.lines[0]?.lineId ?? '',
+    lineCode: station.lines[0]?.lineCode ?? '',
+    lat: station.location?.latitude ?? 0,
+    lng: station.location?.longitude ?? 0,
+  };
+}
 
+export default function AddRouteScreen() {
+  const navigation = useNavigation<MainStackWithTabNavigationProp>();
   const [stations, setStations] = useState<Station[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-
-  const [startStationName, setStartStationName] = useState('');
-  const [endStationName, setEndStationName] = useState('');
+  const [pickTarget, setPickTarget] = useState<PickTarget>(null);
+  const [startStation, setStartStation] = useState<Station | null>(null);
+  const [endStation, setEndStation] = useState<Station | null>(null);
   const [departureTime, setDepartureTime] = useState('08:00');
   const [selectedDays, setSelectedDays] = useState<number[]>([1, 2, 3, 4, 5]);
 
-  // 역 선택 모달
-  const [pickTarget, setPickTarget] = useState<PickTarget>(null);
-  const [stationQuery, setStationQuery] = useState('');
-
-  const filteredStations = useMemo(() => {
-    if (!stationQuery.trim()) return stations;
-    return stations.filter((s) =>
-      s.stationName.includes(stationQuery.trim())
-    );
-  }, [stations, stationQuery]);
-
   useEffect(() => {
-    loadStations();
+    void loadStations();
   }, []);
+
+  const routeSummary = useMemo(() => {
+    if (!startStation || !endStation) {
+      return null;
+    }
+
+    return `${startStation.stationName} → ${endStation.stationName}`;
+  }, [startStation, endStation]);
 
   const loadStations = async () => {
     try {
@@ -63,251 +65,169 @@ export default function AddRouteScreen() {
       setStations(stationList);
     } catch (error) {
       console.error('역 목록 로드 실패:', error);
-      Alert.alert('오류', '역 목록을 불러오는데 실패했습니다.');
+      Alert.alert('역 정보를 불러오지 못했어요', '잠시 후 다시 시도해 주세요.');
     } finally {
       setLoading(false);
     }
   };
 
-  const openPicker = (target: PickTarget) => {
-    setStationQuery('');
-    setPickTarget(target);
-  };
-
-  const selectStation = (stationName: string) => {
-    if (pickTarget === 'start') setStartStationName(stationName);
-    else if (pickTarget === 'end') setEndStationName(stationName);
-    setPickTarget(null);
-  };
-
   const handleSave = async () => {
-    if (!startStationName || !endStationName) {
-      Alert.alert('필수 입력', '출발역과 도착역을 모두 선택해주세요.');
-      return;
-    }
-    if (selectedDays.length === 0) {
-      Alert.alert('필수 입력', '운영 요일을 최소 1개 이상 선택해주세요.');
-      return;
-    }
-    if (startStationName === endStationName) {
-      Alert.alert('입력 오류', '출발역과 도착역이 같습니다.');
-      return;
-    }
-
-    const startStation = stations.find((s) => s.stationName === startStationName);
-    const endStation = stations.find((s) => s.stationName === endStationName);
-
     if (!startStation || !endStation) {
-      Alert.alert('오류', '선택한 역을 찾을 수 없습니다.');
+      Alert.alert('출발역과 도착역을 선택해 주세요');
       return;
     }
 
-    const toStationInfo = (s: Station): StationInfo => ({
-      id: s.stationId,
-      stationId: s.stationId,
-      stationName: s.stationName,
-      line: s.lines[0]?.lineId || '',
-      lineCode: s.lines[0]?.lineCode || '',
-      lat: s.location?.latitude || 0,
-      lng: s.location?.longitude || 0,
-    });
+    if (startStation.stationId === endStation.stationId) {
+      Alert.alert('같은 역으로는 경로를 만들 수 없어요', '서로 다른 역을 선택해 주세요.');
+      return;
+    }
+
+    if (selectedDays.length === 0) {
+      Alert.alert('운행 요일을 하나 이상 선택해 주세요');
+      return;
+    }
 
     try {
       setSaving(true);
-      const userId = await requireUserId();
+      const userId = requireUserId();
       const createdRoute = await createRoute(
         userId,
         toStationInfo(startStation),
         toStationInfo(endStation),
         departureTime,
-        selectedDays
+        selectedDays,
       );
+
       Alert.alert(
-        '✅ 동선 등록 완료',
-        `${startStationName} → ${endStationName}\n출발: ${departureTime}\n요일: ${selectedDays.map((d) => DAY_LABELS[d - 1]).join(', ')}`,
-        [{
-          text: '확인',
-          onPress: () => navigation.navigate('Tabs', {
-            screen: 'RouteManagement',
-            params: { justAddedRouteId: createdRoute.routeId },
-          } as any),
-        }]
+        '경로를 등록했어요',
+        `${startStation.stationName} → ${endStation.stationName}\n${departureTime} 출발 · ${selectedDays
+          .map((day) => DAY_LABELS[day])
+          .join(', ')}`,
+        [
+          {
+            text: '확인',
+            onPress: () =>
+              navigation.navigate('Tabs', {
+                screen: 'RouteManagement',
+                params: { justAddedRouteId: createdRoute.routeId },
+              }),
+          },
+        ],
       );
     } catch (error) {
-      Alert.alert('실패', error instanceof Error ? error.message : '동선 저장에 실패했습니다.');
+      Alert.alert(
+        '경로 등록에 실패했어요',
+        error instanceof Error ? error.message : '잠시 후 다시 시도해 주세요.',
+      );
     } finally {
       setSaving(false);
     }
   };
 
-  const toggleDay = (day: number) => {
-    setSelectedDays((prev) =>
-      prev.includes(day) ? prev.filter((d) => d !== day) : [...prev, day]
-    );
-  };
-
-  const DAY_LABELS = ['월', '화', '수', '목', '금', '토', '일'];
-
   if (loading) {
     return (
       <View style={styles.centerContainer}>
         <ActivityIndicator size="large" color={Colors.primary} />
-        <Text style={styles.loadingText}>로딩 중...</Text>
+        <Text style={styles.loadingText}>경로에 사용할 역을 불러오는 중입니다.</Text>
       </View>
     );
   }
 
   return (
     <View style={styles.container}>
-      {/* Header */}
       <View style={styles.header}>
-        <Text style={styles.headerTitle}>동선 등록</Text>
-        <Text style={styles.headerSubtitle}>출퇴근 경로를 등록하세요</Text>
+        <Text style={styles.headerTitle}>출퇴근 경로 등록</Text>
+        <Text style={styles.headerSubtitle}>
+          자주 이동하는 동선을 등록해 두면 매칭과 추천이 더 빨라집니다.
+        </Text>
       </View>
 
-      <ScrollView style={styles.content} keyboardShouldPersistTaps="handled">
-        {/* 출발역 */}
-        <View style={styles.field}>
-          <Text style={styles.label}>출발역</Text>
+      <ScrollView style={styles.content} contentContainerStyle={styles.contentInner}>
+        <View style={styles.card}>
+          <Text style={styles.sectionTitle}>기본 경로</Text>
           <TouchableOpacity
-            style={[styles.stationButton, startStationName ? styles.stationButtonFilled : null]}
-            onPress={() => openPicker('start')}
-            activeOpacity={0.7}
+            style={styles.stationButton}
+            onPress={() => setPickTarget('start')}
+            activeOpacity={0.8}
           >
-            <Text style={[styles.stationButtonText, !startStationName && styles.placeholder]}>
-              {startStationName || '출발역 선택'}
-            </Text>
-            <Text style={styles.chevron}>›</Text>
+            <View>
+              <Text style={styles.stationLabel}>출발역</Text>
+              <Text style={styles.stationValue}>
+                {startStation?.stationName ?? '출발역을 선택해 주세요'}
+              </Text>
+            </View>
+            <Text style={styles.stationAction}>선택</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={styles.stationButton}
+            onPress={() => setPickTarget('end')}
+            activeOpacity={0.8}
+          >
+            <View>
+              <Text style={styles.stationLabel}>도착역</Text>
+              <Text style={styles.stationValue}>
+                {endStation?.stationName ?? '도착역을 선택해 주세요'}
+              </Text>
+            </View>
+            <Text style={styles.stationAction}>선택</Text>
           </TouchableOpacity>
         </View>
 
-        {/* 도착역 */}
-        <View style={styles.field}>
-          <Text style={styles.label}>도착역</Text>
-          <TouchableOpacity
-            style={[styles.stationButton, endStationName ? styles.stationButtonFilled : null]}
-            onPress={() => openPicker('end')}
-            activeOpacity={0.7}
-          >
-            <Text style={[styles.stationButtonText, !endStationName && styles.placeholder]}>
-              {endStationName || '도착역 선택'}
-            </Text>
-            <Text style={styles.chevron}>›</Text>
-          </TouchableOpacity>
-        </View>
-
-        {/* 출발 시간 */}
-        <View style={styles.field}>
-          <Text style={styles.label}>출발 시간</Text>
-          <TextInput
-            style={styles.input}
+        <View style={styles.card}>
+          <TimePicker
+            label="출발 시간"
             value={departureTime}
-            onChangeText={setDepartureTime}
-            placeholder="HH:MM (예: 08:00)"
-            keyboardType="numbers-and-punctuation"
+            onChange={setDepartureTime}
+            placeholder="출발 시간을 선택해 주세요"
+            minuteInterval={10}
+          />
+          <DaySelector
+            selectedDays={selectedDays}
+            onChange={setSelectedDays}
+            label="운행 요일"
+            hint="선택한 요일"
           />
         </View>
 
-        {/* 운영 요일 */}
-        <View style={styles.field}>
-          <Text style={styles.label}>운영 요일</Text>
-          <View style={styles.daysContainer}>
-            {DAY_LABELS.map((label, index) => {
-              const day = index + 1;
-              const isSelected = selectedDays.includes(day);
-              return (
-                <TouchableOpacity
-                  key={day}
-                  style={[styles.dayButton, isSelected && styles.dayButtonSelected]}
-                  onPress={() => toggleDay(day)}
-                  activeOpacity={0.7}
-                >
-                  <Text style={[styles.dayLabel, isSelected && styles.dayLabelSelected]}>
-                    {label}
-                  </Text>
-                </TouchableOpacity>
-              );
-            })}
-          </View>
+        <View style={styles.summaryCard}>
+          <Text style={styles.summaryTitle}>등록 예정 경로</Text>
+          <Text style={styles.summaryRoute}>{routeSummary ?? '역을 먼저 선택해 주세요'}</Text>
+          <Text style={styles.summaryMeta}>
+            {departureTime} 출발 · {selectedDays.map((day) => DAY_LABELS[day]).join(', ')}
+          </Text>
         </View>
 
-        {/* 저장 버튼 */}
-        <TouchableOpacity
-          style={[styles.saveButton, saving && styles.saveButtonDisabled]}
-          onPress={handleSave}
+        <Button
+          title={saving ? '등록 중...' : '경로 등록'}
+          onPress={() => {
+            void handleSave();
+          }}
+          loading={saving}
           disabled={saving}
-          activeOpacity={0.8}
-        >
-          <Text style={styles.saveButtonText}>
-            {saving ? '저장 중...' : '동선 등록'}
-          </Text>
-        </TouchableOpacity>
+          variant="primary"
+          size="large"
+          fullWidth
+        />
       </ScrollView>
 
-      {/* 역 선택 Modal — 앱 루트 레벨에서 렌더링됨 */}
-      <Modal
-        visible={pickTarget !== null}
-        animationType="slide"
-        transparent={true}
-        onRequestClose={() => setPickTarget(null)}
-      >
-        <SafeAreaView style={styles.modalOverlay}>
-          <View style={styles.modalSheet}>
-            {/* 모달 헤더 */}
-            <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>
-                {pickTarget === 'start' ? '출발역 선택' : '도착역 선택'}
-              </Text>
-              <TouchableOpacity
-                onPress={() => setPickTarget(null)}
-                style={styles.modalCloseBtn}
-                hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-              >
-                <Text style={styles.modalCloseText}>✕</Text>
-              </TouchableOpacity>
-            </View>
+      <StationSelectModal
+        visible={pickTarget === 'start'}
+        onClose={() => setPickTarget(null)}
+        onStationSelect={setStartStation}
+        title="출발역 선택"
+        stations={stations}
+        searchPlaceholder="출발역 이름을 검색해 주세요"
+      />
 
-            {/* 검색 입력 */}
-            <View style={styles.searchContainer}>
-              <TextInput
-                style={styles.searchInput}
-                placeholder="역 이름 검색..."
-                value={stationQuery}
-                onChangeText={setStationQuery}
-                autoFocus={Platform.OS !== 'web'}
-                clearButtonMode="while-editing"
-              />
-            </View>
-
-            {/* 역 목록 */}
-            <FlatList
-              data={filteredStations}
-              keyExtractor={(item) => item.stationId}
-              keyboardShouldPersistTaps="handled"
-              renderItem={({ item }) => (
-                <TouchableOpacity
-                  style={styles.stationItem}
-                  onPress={() => selectStation(item.stationName)}
-                  activeOpacity={0.6}
-                >
-                  <Text style={styles.stationItemText}>{item.stationName}</Text>
-                  {item.lines?.length > 0 && (
-                    <Text style={styles.stationLineText}>
-                      {item.lines.map((l: any) => l.lineName || l.lineId).join(' · ')}
-                    </Text>
-                  )}
-                </TouchableOpacity>
-              )}
-              ListEmptyComponent={
-                <View style={styles.emptyContainer}>
-                  <Text style={styles.emptyText}>검색 결과가 없습니다.</Text>
-                </View>
-              }
-              ItemSeparatorComponent={() => <View style={styles.separator} />}
-            />
-          </View>
-        </SafeAreaView>
-      </Modal>
+      <StationSelectModal
+        visible={pickTarget === 'end'}
+        onClose={() => setPickTarget(null)}
+        onStationSelect={setEndStation}
+        title="도착역 선택"
+        stations={stations}
+        searchPlaceholder="도착역 이름을 검색해 주세요"
+      />
     </View>
   );
 }
@@ -322,10 +242,12 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     backgroundColor: Colors.gray100,
+    padding: Spacing.xl,
   },
   loadingText: {
     marginTop: Spacing.md,
     color: Colors.textSecondary,
+    textAlign: 'center',
   },
   header: {
     backgroundColor: Colors.secondary,
@@ -338,176 +260,73 @@ const styles = StyleSheet.create({
     color: Colors.white,
   },
   headerSubtitle: {
+    marginTop: Spacing.xs,
     fontSize: Typography.fontSize.base,
     color: Colors.white,
-    opacity: 0.9,
-    marginTop: Spacing.xs,
+    opacity: 0.92,
   },
   content: {
     flex: 1,
+  },
+  contentInner: {
     padding: Spacing.lg,
+    gap: Spacing.md,
   },
-  field: {
-    marginBottom: Spacing.lg,
-  },
-  label: {
-    fontSize: Typography.fontSize.sm,
-    fontWeight: Typography.fontWeight.semibold,
-    color: Colors.textPrimary,
-    marginBottom: Spacing.sm,
-  },
-  input: {
+  card: {
     backgroundColor: Colors.white,
-    borderWidth: 1,
-    borderColor: Colors.gray300,
-    borderRadius: BorderRadius.md,
-    padding: Spacing.md,
+    borderRadius: BorderRadius.lg,
+    padding: Spacing.lg,
+    gap: Spacing.md,
+  },
+  sectionTitle: {
     fontSize: Typography.fontSize.base,
+    fontWeight: Typography.fontWeight.bold,
     color: Colors.textPrimary,
   },
   stationButton: {
-    backgroundColor: Colors.white,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
     borderWidth: 1,
     borderColor: Colors.gray300,
     borderRadius: BorderRadius.md,
     padding: Spacing.md,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
+    backgroundColor: Colors.gray50,
   },
-  stationButtonFilled: {
-    borderColor: Colors.primary,
-    backgroundColor: Colors.primary + '08',
-  },
-  stationButtonText: {
-    fontSize: Typography.fontSize.base,
-    color: Colors.textPrimary,
-    flex: 1,
-  },
-  placeholder: {
-    color: Colors.gray400,
-  },
-  chevron: {
-    fontSize: 22,
-    color: Colors.gray400,
-    marginLeft: Spacing.sm,
-  },
-  daysContainer: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: Spacing.sm,
-  },
-  dayButton: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    backgroundColor: Colors.white,
-    borderWidth: 1,
-    borderColor: Colors.gray300,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  dayButtonSelected: {
-    backgroundColor: Colors.primary,
-    borderColor: Colors.primary,
-  },
-  dayLabel: {
-    fontSize: Typography.fontSize.sm,
-    color: Colors.textPrimary,
-    fontWeight: Typography.fontWeight.medium,
-  },
-  dayLabelSelected: {
-    color: Colors.white,
-  },
-  saveButton: {
-    backgroundColor: Colors.primary,
-    borderRadius: BorderRadius.md,
-    padding: Spacing.lg,
-    alignItems: 'center',
-    marginTop: Spacing.md,
-    marginBottom: Spacing.xl,
-  },
-  saveButtonDisabled: {
-    opacity: 0.6,
-  },
-  saveButtonText: {
-    color: Colors.white,
-    fontSize: Typography.fontSize.lg,
-    fontWeight: Typography.fontWeight.bold,
-  },
-  // Modal
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.5)',
-    justifyContent: 'flex-end',
-  },
-  modalSheet: {
-    backgroundColor: Colors.white,
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
-    maxHeight: '85%',
-    flex: 1,
-  },
-  modalHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    padding: Spacing.md,
-    paddingHorizontal: Spacing.lg,
-    borderBottomWidth: 1,
-    borderBottomColor: Colors.gray200,
-  },
-  modalTitle: {
-    fontSize: Typography.fontSize.lg,
-    fontWeight: Typography.fontWeight.semibold,
-    color: Colors.textPrimary,
-  },
-  modalCloseBtn: {
-    padding: Spacing.xs,
-  },
-  modalCloseText: {
-    fontSize: 20,
-    color: Colors.gray600,
-  },
-  searchContainer: {
-    padding: Spacing.md,
-    paddingHorizontal: Spacing.lg,
-    borderBottomWidth: 1,
-    borderBottomColor: Colors.gray100,
-  },
-  searchInput: {
-    backgroundColor: Colors.gray100,
-    borderRadius: BorderRadius.md,
-    paddingHorizontal: Spacing.md,
-    paddingVertical: Platform.OS === 'ios' ? Spacing.sm : Spacing.xs,
-    fontSize: Typography.fontSize.base,
-    color: Colors.textPrimary,
-  },
-  stationItem: {
-    paddingVertical: Spacing.md,
-    paddingHorizontal: Spacing.lg,
-  },
-  stationItemText: {
-    fontSize: Typography.fontSize.base,
-    color: Colors.textPrimary,
-    fontWeight: Typography.fontWeight.medium,
-  },
-  stationLineText: {
+  stationLabel: {
     fontSize: Typography.fontSize.xs,
     color: Colors.textSecondary,
-    marginTop: 2,
+    marginBottom: 4,
   },
-  separator: {
-    height: 1,
-    backgroundColor: Colors.gray100,
-    marginHorizontal: Spacing.lg,
+  stationValue: {
+    fontSize: Typography.fontSize.base,
+    color: Colors.textPrimary,
+    fontWeight: Typography.fontWeight.medium,
   },
-  emptyContainer: {
-    padding: Spacing.xl,
-    alignItems: 'center',
-  },
-  emptyText: {
-    color: Colors.textSecondary,
+  stationAction: {
     fontSize: Typography.fontSize.sm,
+    color: Colors.primary,
+    fontWeight: Typography.fontWeight.semibold,
+  },
+  summaryCard: {
+    backgroundColor: Colors.primaryLight,
+    borderRadius: BorderRadius.lg,
+    padding: Spacing.lg,
+  },
+  summaryTitle: {
+    fontSize: Typography.fontSize.sm,
+    fontWeight: Typography.fontWeight.semibold,
+    color: Colors.primary,
+    marginBottom: Spacing.xs,
+  },
+  summaryRoute: {
+    fontSize: Typography.fontSize.lg,
+    fontWeight: Typography.fontWeight.bold,
+    color: Colors.textPrimary,
+  },
+  summaryMeta: {
+    marginTop: Spacing.xs,
+    fontSize: Typography.fontSize.sm,
+    color: Colors.textSecondary,
   },
 });

@@ -1,323 +1,395 @@
-import React, { useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import {
-  View,
-  Text,
+  ActivityIndicator,
+  Alert,
+  ScrollView,
   StyleSheet,
+  Text,
   TextInput,
   TouchableOpacity,
-  Alert,
-  ActivityIndicator,
-  ScrollView,
-  KeyboardAvoidingView,
+  View,
 } from 'react-native';
-import { StackNavigationProp } from '@react-navigation/stack';
-import { PointService } from '../../services/PointService';
 import { useUser } from '../../contexts/UserContext';
-import { WITHDRAW_MIN_AMOUNT } from '../../types/point';
-import { Colors, Typography, Spacing, BorderRadius } from '../../theme';
+import { PointService } from '../../services/PointService';
+import { getBeta1HomeSnapshot } from '../../services/beta1-orchestration-service';
+import { getBankIntegrationConfig } from '../../services/integration-config-service';
+import { getWithdrawalEligibility } from '../../services/beta1-wallet-service';
+import { WithdrawalEligibilityStatus } from '../../types/beta1-wallet';
+import type { MainStackNavigationProp } from '../../types/navigation';
+import { BorderRadius, Spacing, Typography } from '../../theme';
 
-type NavigationProp = StackNavigationProp<any>;
+type Props = {
+  navigation: MainStackNavigationProp;
+};
 
-export default function PointWithdrawScreen({ navigation }: { navigation: NavigationProp }) {
+export default function PointWithdrawScreen({ navigation }: Props) {
   const { user } = useUser();
-  const [loading, setLoading] = useState(false);
   const [amount, setAmount] = useState('');
   const [bankName, setBankName] = useState('');
   const [accountNumber, setAccountNumber] = useState('');
   const [accountHolder, setAccountHolder] = useState('');
-  const [errors, setErrors] = useState<Record<string, string>>({});
-  const [balance, setBalance] = useState(0);
+  const [loading, setLoading] = useState(false);
+  const [initializing, setInitializing] = useState(true);
+  const [withdrawable, setWithdrawable] = useState(0);
+  const [bankStatusMessage, setBankStatusMessage] = useState('계좌 인증 상태를 확인하고 있습니다.');
+  const [eligibilityReasons, setEligibilityReasons] = useState<WithdrawalEligibilityStatus[]>([]);
 
-  React.useEffect(() => {
-    if (!user?.uid) return;
-    PointService.getSummary(user.uid)
-      .then((s) => setBalance(s.balance ?? 0))
-      .catch(() => {});
-  }, [user?.uid]);
-
-  const validateForm = (): boolean => {
-    const newErrors: Record<string, string> = {};
-
-    if (!amount || parseFloat(amount) <= 0) {
-      newErrors.amount = '출금 금액을 입력해주세요.';
-    } else if (parseFloat(amount) < WITHDRAW_MIN_AMOUNT) {
-      newErrors.amount = `최소 출금 금액은 ${WITHDRAW_MIN_AMOUNT.toLocaleString()}원입니다.`;
-    } else if (parseFloat(amount) > balance) {
-      newErrors.amount = '보유 포인트가 부족합니다.';
-    }
-
-    if (!bankName || bankName.trim().length === 0) {
-      newErrors.bankName = '은행명을 입력해주세요.';
-    }
-
-    if (!accountNumber || accountNumber.trim().length === 0) {
-      newErrors.accountNumber = '계좌 번호를 입력해주세요.';
-    } else if (!/^\d{10,13}$/.test(accountNumber)) {
-      newErrors.accountNumber = '올바른 계좌 번호가 아닙니다. (예: 0101234567890)';
-    }
-
-    if (!accountHolder || accountHolder.trim().length === 0) {
-      newErrors.accountHolder = '예금주 명을 입력해주세요.';
-    }
-
-    setErrors(newErrors);
-    return Object.keys(newErrors).length === 0;
-  };
-
-  const handleSubmit = async () => {
-    if (!validateForm()) {
+  const loadWithdrawContext = useCallback(async () => {
+    if (!user?.uid) {
+      setInitializing(false);
       return;
     }
 
     try {
-      setLoading(true);
+      const [snapshot, bankConfig, eligibility] = await Promise.all([
+        getBeta1HomeSnapshot(user.uid, 'requester'),
+        getBankIntegrationConfig(),
+        getWithdrawalEligibility(user.uid),
+      ]);
+
+      setWithdrawable(snapshot.wallet.withdrawableBalance);
+      setAccountHolder(user.name ?? '');
+      setBankStatusMessage(bankConfig.statusMessage);
+      setEligibilityReasons(eligibility.reasons);
+    } catch (error) {
+      console.error('Failed to load withdrawal context', error);
+      Alert.alert('출금 정보를 불러오지 못했습니다', '잠시 후 다시 시도해 주세요.');
+    } finally {
+      setInitializing(false);
+    }
+  }, [user?.name, user?.uid]);
+
+  useEffect(() => {
+    void loadWithdrawContext();
+  }, [loadWithdrawContext]);
+
+  const submit = async () => {
+    const numericAmount = Number(amount || 0);
+
+    if (!user?.uid || !numericAmount || !bankName || !accountNumber || !accountHolder) {
+      Alert.alert('입력 확인', '출금 금액과 계좌 정보를 다시 확인해 주세요.');
+      return;
+    }
+
+    if (numericAmount > withdrawable) {
+      Alert.alert('출금 금액 확인', '출금 가능한 정산금보다 큰 금액은 요청할 수 없습니다.');
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const eligibility = await getWithdrawalEligibility(user.uid, numericAmount);
+      if (!eligibility.allowed) {
+        Alert.alert('출금 조건 확인', getEligibilityMessage(eligibility.reasons));
+        return;
+      }
 
       await PointService.requestWithdrawal({
-        userId: user?.uid ?? '',
-        amount: parseFloat(amount),
-        bankName: bankName.trim(),
-        accountNumber: accountNumber.trim(),
-        accountHolder: accountHolder.trim(),
+        userId: user.uid,
+        amount: numericAmount,
+        bankName,
+        accountNumber,
+        accountHolder,
       });
 
       Alert.alert(
-        '출금 요청 완료',
-        `${parseFloat(amount).toLocaleString()}원 출금 요청이 접수되었습니다.\n\n영업일 기준으로 입금됩니다.`,
-        [
-          {
-            text: '확인',
-            onPress: () => navigation.goBack(),
-          },
-        ]
+        '출금 요청이 접수됐습니다',
+        '운영 검토 후 실제 이체가 진행됩니다. 진행 상태는 지갑 내역과 관리자 처리 단계에 함께 반영됩니다.',
+        [{ text: '확인', onPress: () => navigation.goBack() }]
       );
-    } catch (error: any) {
-      Alert.alert('오류', error.message || '출금 요청 처리 중 오류가 발생했습니다.');
+    } catch (error: unknown) {
+      const message =
+        error instanceof Error ? error.message : '출금 요청 중 문제가 발생했습니다.';
+      Alert.alert('출금 요청 실패', message);
     } finally {
       setLoading(false);
     }
   };
 
+  if (initializing) {
+    return (
+      <View style={styles.loadingContainer}>
+        <ActivityIndicator size="large" color="#0F766E" />
+        <Text style={styles.loadingText}>출금 가능 조건을 확인하는 중입니다.</Text>
+      </View>
+    );
+  }
+
   return (
-    <KeyboardAvoidingView style={styles.container} behavior="padding">
-      <ScrollView contentContainerStyle={styles.scrollContent}>
-        <View style={styles.header}>
-          <Text style={styles.headerTitle}>포인트 출금</Text>
-          <Text style={styles.headerSubtitle}>
-            보유 포인트를 은행으로 출금하세요
-          </Text>
+    <ScrollView style={styles.container} contentContainerStyle={styles.content}>
+      <View style={styles.hero}>
+        <Text style={styles.kicker}>withdrawal guard</Text>
+        <Text style={styles.title}>정산금은 조건을 확인한 뒤 출금됩니다</Text>
+        <Text style={styles.subtitle}>
+          본인 확인, 계좌 인증, 분쟁 여부, 운영 보류 상태를 먼저 보고 안전한 요청만 접수합니다.
+        </Text>
+      </View>
+
+      <View style={styles.noticeCard}>
+        <Text style={styles.noticeTitle}>계좌 준비 상태</Text>
+        <Text style={styles.noticeText}>{bankStatusMessage}</Text>
+      </View>
+
+      <View style={styles.guardCard}>
+        <Text style={styles.guardTitle}>출금 체크리스트</Text>
+        <GuardRow
+          ok={!eligibilityReasons.includes(WithdrawalEligibilityStatus.IDENTITY_UNVERIFIED)}
+          label="본인 확인 또는 테스트 우회 준비가 반영되어 있어야 합니다."
+        />
+        <GuardRow
+          ok={!eligibilityReasons.includes(WithdrawalEligibilityStatus.PAYOUT_ACCOUNT_UNVERIFIED)}
+          label="정산 계좌 인증 또는 운영 확인이 필요합니다."
+        />
+        <GuardRow
+          ok={!eligibilityReasons.includes(WithdrawalEligibilityStatus.DISPUTE_OPEN)}
+          label="열려 있는 분쟁이 없어야 합니다."
+        />
+        <GuardRow
+          ok={!eligibilityReasons.includes(WithdrawalEligibilityStatus.MANUAL_HOLD)}
+          label="수동 보류 상태가 없어야 합니다."
+        />
+      </View>
+
+      <View style={styles.balanceCard}>
+        <Text style={styles.balanceLabel}>현재 출금 가능한 정산금</Text>
+        <Text style={styles.balanceValue}>{withdrawable.toLocaleString()}원</Text>
+        <View style={styles.quickActions}>
+          <TouchableOpacity style={styles.secondaryButton} onPress={() => navigation.navigate('PointHistory')}>
+            <Text style={styles.secondaryButtonText}>지갑 내역 보기</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.secondaryButton} onPress={() => navigation.navigate('Earnings')}>
+            <Text style={styles.secondaryButtonText}>정산 기준 보기</Text>
+          </TouchableOpacity>
         </View>
+      </View>
 
-        <View style={styles.balanceCard}>
-          <Text style={styles.balanceTitle}>보유 포인트</Text>
-          <Text style={styles.balanceAmount}>
-            {balance.toLocaleString()} P
-          </Text>
-          <Text style={styles.balanceNote}>
-            최소 출금: {WITHDRAW_MIN_AMOUNT.toLocaleString()}원
-          </Text>
-        </View>
+      <View style={styles.formCard}>
+        <Field label="출금 금액" value={amount} onChangeText={setAmount} keyboardType="number-pad" />
+        <Field label="은행명" value={bankName} onChangeText={setBankName} />
+        <Field label="계좌번호" value={accountNumber} onChangeText={setAccountNumber} keyboardType="number-pad" />
+        <Field label="예금주" value={accountHolder} onChangeText={setAccountHolder} />
+      </View>
 
-        <Text style={styles.sectionTitle}>은행 정보</Text>
-
-        <View style={styles.formSection}>
-          <View style={styles.fieldGroup}>
-            <Text style={styles.label}>출금 금액</Text>
-            <TextInput
-              style={[styles.input, errors.amount && styles.inputError]}
-              value={amount}
-              onChangeText={(text) => {
-                setAmount(text);
-                if (errors.amount) {
-                  setErrors(prev => ({ ...prev, amount: '' }));
-                }
-              }}
-              placeholder="10,000원 이상 입력"
-              keyboardType="number-pad"
-              accessibilityLabel="출금 금액 입력"
-            />
-            {errors.amount && <Text style={styles.errorText}>{errors.amount}</Text>}
-          </View>
-
-          <View style={styles.fieldGroup}>
-            <Text style={styles.label}>은행명</Text>
-            <TextInput
-              style={[styles.input, errors.bankName && styles.inputError]}
-              value={bankName}
-              onChangeText={(text) => {
-                setBankName(text);
-                if (errors.bankName) {
-                  setErrors(prev => ({ ...prev, bankName: '' }));
-                }
-              }}
-              placeholder="은행명 (예: 카카오은행)"
-              accessibilityLabel="은행명 입력"
-            />
-            {errors.bankName && <Text style={styles.errorText}>{errors.bankName}</Text>}
-          </View>
-
-          <View style={styles.fieldGroup}>
-            <Text style={styles.label}>계좌 번호</Text>
-            <TextInput
-              style={[styles.input, errors.accountNumber && styles.inputError]}
-              value={accountNumber}
-              onChangeText={(text) => {
-                setAccountNumber(text);
-                if (errors.accountNumber) {
-                  setErrors(prev => ({ ...prev, accountNumber: '' }));
-                }
-              }}
-              placeholder="0101234567890"
-              keyboardType="number-pad"
-              maxLength={11}
-              accessibilityLabel="계좌 번호 입력"
-            />
-            {errors.accountNumber && <Text style={styles.errorText}>{errors.accountNumber}</Text>}
-          </View>
-
-          <View style={styles.fieldGroup}>
-            <Text style={styles.label}>예금주</Text>
-            <TextInput
-              style={[styles.input, errors.accountHolder && styles.inputError]}
-              value={accountHolder}
-              onChangeText={(text) => {
-                setAccountHolder(text);
-                if (errors.accountHolder) {
-                  setErrors(prev => ({ ...prev, accountHolder: '' }));
-                }
-              }}
-              placeholder="예금주 (예: 김길러)"
-              accessibilityLabel="예금주 입력"
-            />
-            {errors.accountHolder && <Text style={styles.errorText}>{errors.accountHolder}</Text>}
-          </View>
-        </View>
-
-        <TouchableOpacity
-          style={[styles.submitButton, !amount && styles.submitButtonDisabled]}
-          onPress={handleSubmit}
-          disabled={loading || !amount}
-        >
-          {loading ? (
-            <ActivityIndicator color="#fff" />
-          ) : (
-            <Text style={styles.submitButtonText}>
-              {parseFloat(amount).toLocaleString()}원 출금하기
-            </Text>
-          )}
-        </TouchableOpacity>
-
-        <TouchableOpacity
-          style={styles.cancelButton}
-          onPress={() => navigation.goBack()}
-          disabled={loading}
-        >
-          <Text style={styles.cancelButtonText}>취소</Text>
-        </TouchableOpacity>
-      </ScrollView>
-    </KeyboardAvoidingView>
+      <TouchableOpacity
+        style={[styles.submitButton, loading && styles.submitButtonDisabled]}
+        onPress={() => {
+          void submit();
+        }}
+        disabled={loading}
+      >
+        {loading ? <ActivityIndicator color="#FFFFFF" /> : <Text style={styles.submitButtonText}>출금 요청 등록</Text>}
+      </TouchableOpacity>
+    </ScrollView>
   );
+}
+
+function Field(props: {
+  label: string;
+  value: string;
+  onChangeText: (text: string) => void;
+  keyboardType?: 'default' | 'number-pad';
+}) {
+  return (
+    <View style={styles.field}>
+      <Text style={styles.fieldLabel}>{props.label}</Text>
+      <TextInput
+        style={styles.input}
+        value={props.value}
+        onChangeText={props.onChangeText}
+        keyboardType={props.keyboardType}
+        placeholderTextColor="#94A3B8"
+      />
+    </View>
+  );
+}
+
+function GuardRow({ ok, label }: { ok: boolean; label: string }) {
+  return (
+    <View style={styles.guardRow}>
+      <Text style={[styles.guardState, ok ? styles.guardStateOk : styles.guardStateBad]}>
+        {ok ? '확인됨' : '보완 필요'}
+      </Text>
+      <Text style={styles.guardText}>{label}</Text>
+    </View>
+  );
+}
+
+function getEligibilityMessage(reasons: WithdrawalEligibilityStatus[]) {
+  const labels: Record<WithdrawalEligibilityStatus, string> = {
+    [WithdrawalEligibilityStatus.ELIGIBLE]: '출금이 가능합니다.',
+    [WithdrawalEligibilityStatus.INSUFFICIENT_BALANCE]: '출금 가능한 정산금이 부족합니다.',
+    [WithdrawalEligibilityStatus.BELOW_MINIMUM]: '최소 출금 금액을 충족해야 합니다.',
+    [WithdrawalEligibilityStatus.IDENTITY_UNVERIFIED]: '본인 확인 또는 테스트 우회 준비가 필요합니다.',
+    [WithdrawalEligibilityStatus.PAYOUT_ACCOUNT_UNVERIFIED]: '계좌 인증 또는 운영 확인이 필요합니다.',
+    [WithdrawalEligibilityStatus.ACCOUNT_OWNER_MISMATCH]: '예금주 일치 여부를 다시 확인해 주세요.',
+    [WithdrawalEligibilityStatus.RISK_REVIEW_REQUIRED]: '운영 수동 검토가 필요합니다.',
+    [WithdrawalEligibilityStatus.DISPUTE_OPEN]: '열려 있는 분쟁이 있어 출금이 보류됩니다.',
+    [WithdrawalEligibilityStatus.MANUAL_HOLD]: '수동 보류 상태라 운영 확인이 필요합니다.',
+  };
+
+  return reasons.map((reason) => labels[reason]).join('\n');
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: Colors.background,
+    backgroundColor: '#F4F7F5',
   },
-  scrollContent: {
-    padding: Spacing.md,
+  content: {
+    padding: Spacing.lg,
+    gap: Spacing.lg,
   },
-  header: {
-    marginBottom: Spacing.lg,
+  loadingContainer: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#F4F7F5',
+    gap: 12,
   },
-  headerTitle: {
-    ...Typography.h2,
-    marginBottom: Spacing.xs,
+  loadingText: {
+    fontSize: Typography.fontSize.sm,
+    color: '#475569',
   },
-  headerSubtitle: {
-    ...Typography.body,
-    color: Colors.textSecondary,
+  hero: {
+    backgroundColor: '#FEE2E2',
+    borderRadius: BorderRadius.xl,
+    padding: Spacing.xl,
+  },
+  kicker: {
+    fontSize: 11,
+    fontWeight: '800',
+    color: '#B91C1C',
+    textTransform: 'uppercase',
+    letterSpacing: 1.2,
+    marginBottom: 8,
+  },
+  title: {
+    fontSize: Typography.fontSize['2xl'],
+    fontWeight: '800',
+    color: '#111827',
+    marginBottom: 8,
+  },
+  subtitle: {
+    fontSize: Typography.fontSize.sm,
+    color: '#475569',
+    lineHeight: 20,
+  },
+  noticeCard: {
+    backgroundColor: '#FEF3C7',
+    borderRadius: BorderRadius.xl,
+    padding: Spacing.lg,
+  },
+  noticeTitle: {
+    fontSize: Typography.fontSize.base,
+    fontWeight: '800',
+    color: '#92400E',
+    marginBottom: 8,
+  },
+  noticeText: {
+    fontSize: Typography.fontSize.sm,
+    color: '#78350F',
+    lineHeight: 20,
+  },
+  guardCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: BorderRadius.xl,
+    padding: Spacing.lg,
+    gap: 10,
+  },
+  guardTitle: {
+    fontSize: Typography.fontSize.base,
+    fontWeight: '800',
+    color: '#0F172A',
+  },
+  guardRow: {
+    flexDirection: 'row',
+    gap: 10,
+    alignItems: 'flex-start',
+  },
+  guardState: {
+    fontSize: Typography.fontSize.xs,
+    fontWeight: '800',
+    minWidth: 60,
+  },
+  guardStateOk: {
+    color: '#047857',
+  },
+  guardStateBad: {
+    color: '#B91C1C',
+  },
+  guardText: {
+    flex: 1,
+    fontSize: Typography.fontSize.sm,
+    color: '#475569',
+    lineHeight: 20,
   },
   balanceCard: {
-    backgroundColor: Colors.white,
+    backgroundColor: '#FFFFFF',
+    borderRadius: BorderRadius.xl,
+    padding: Spacing.xl,
+    gap: 12,
+  },
+  balanceLabel: {
+    fontSize: Typography.fontSize.sm,
+    color: '#64748B',
+  },
+  balanceValue: {
+    fontSize: Typography.fontSize['3xl'],
+    fontWeight: '800',
+    color: '#0F172A',
+  },
+  quickActions: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 10,
+  },
+  secondaryButton: {
     borderRadius: BorderRadius.lg,
+    backgroundColor: '#ECFDF3',
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+  },
+  secondaryButtonText: {
+    color: '#115E59',
+    fontSize: Typography.fontSize.sm,
+    fontWeight: '800',
+  },
+  formCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: BorderRadius.xl,
     padding: Spacing.lg,
-    marginBottom: Spacing.lg,
+    gap: Spacing.md,
   },
-  balanceTitle: {
-    ...Typography.body,
-    color: Colors.textSecondary,
-    marginBottom: Spacing.xs,
+  field: {
+    gap: 8,
   },
-  balanceAmount: {
-    ...Typography.h1,
-    fontWeight: 'bold',
-    color: Colors.primary,
-  },
-  balanceNote: {
-    ...Typography.bodySmall,
-    color: Colors.textSecondary,
-    marginTop: Spacing.xs,
-  },
-  sectionTitle: {
-    ...Typography.h3,
-    marginBottom: Spacing.md,
-    marginTop: Spacing.xl,
-  },
-  formSection: {
-    backgroundColor: Colors.white,
-    borderRadius: BorderRadius.md,
-    padding: Spacing.lg,
-    marginBottom: Spacing.md,
-  },
-  fieldGroup: {
-    marginBottom: Spacing.md,
-  },
-  label: {
-    ...Typography.body,
-    marginBottom: Spacing.xs,
-    color: Colors.text,
+  fieldLabel: {
+    fontSize: Typography.fontSize.sm,
+    fontWeight: '700',
+    color: '#334155',
   },
   input: {
     borderWidth: 1,
-    borderColor: Colors.border,
-    borderRadius: BorderRadius.md,
-    padding: Spacing.md,
-    ...Typography.body,
-  },
-  inputError: {
-    borderColor: Colors.error,
-  },
-  errorText: {
-    ...Typography.bodySmall,
-    color: Colors.error,
-    marginTop: Spacing.xs,
+    borderColor: '#CBD5E1',
+    borderRadius: BorderRadius.lg,
+    paddingHorizontal: 14,
+    paddingVertical: 14,
+    color: '#0F172A',
+    fontSize: Typography.fontSize.base,
   },
   submitButton: {
-    backgroundColor: Colors.primary,
-    borderRadius: BorderRadius.md,
-    padding: Spacing.lg,
+    backgroundColor: '#0F766E',
+    borderRadius: BorderRadius.xl,
     alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 18,
   },
   submitButtonDisabled: {
-    backgroundColor: Colors.gray400,
+    opacity: 0.5,
   },
   submitButtonText: {
-    ...Typography.h3,
-    color: Colors.white,
-    fontWeight: 'bold',
-  },
-  cancelButton: {
-    backgroundColor: 'transparent',
-    borderWidth: 1,
-    borderColor: Colors.border,
-    borderRadius: BorderRadius.md,
-    padding: Spacing.lg,
-    alignItems: 'center',
-    marginTop: Spacing.md,
-  },
-  cancelButtonText: {
-    ...Typography.h3,
-    color: Colors.textSecondary,
-    fontWeight: 'bold',
+    color: '#FFFFFF',
+    fontSize: Typography.fontSize.base,
+    fontWeight: '800',
   },
 });

@@ -1,185 +1,352 @@
-/**
- * Locker Service
- * 사물함 관리 서비스
- */
-
 import {
+  addDoc,
   collection,
   doc,
   getDoc,
   getDocs,
-  addDoc,
-  updateDoc,
   query,
-  where,
   serverTimestamp,
+  updateDoc,
+  where,
+  Timestamp,
 } from 'firebase/firestore';
 import { db } from './firebase';
 import {
   Locker,
-  LockerReservation,
-  LockerType,
+  LockerAvailability,
   LockerOperator,
-  LockerStatus,
+  LockerReservation,
   LockerSize,
+  LockerStatus,
+  LockerType,
 } from '../types/locker';
 import { getStationConfig } from './config-service';
+import { QRCodeService, verifyQRCode } from './qrcode-service';
 
 const LOCKERS_COLLECTION = 'lockers';
 const RESERVATIONS_COLLECTION = 'locker_reservations';
 const NON_SUBWAY_LOCKERS_COLLECTION = 'non_subway_lockers';
-const EXTERNAL_LOCKER_API_URL = process.env.EXPO_PUBLIC_LOCKER_API_URL || '';
-const EXTERNAL_LOCKER_API_KEY = process.env.EXPO_PUBLIC_LOCKER_API_KEY || '';
+const EXTERNAL_LOCKER_API_URL = String(process.env.EXPO_PUBLIC_LOCKER_API_URL ?? '');
+const EXTERNAL_LOCKER_API_KEY = String(process.env.EXPO_PUBLIC_LOCKER_API_KEY ?? '');
 const KRIC_LOCKER_API_URL =
-  process.env.EXPO_PUBLIC_KRIC_LOCKER_API_URL ||
+  String(process.env.EXPO_PUBLIC_KRIC_LOCKER_API_URL ?? '') ||
   'https://openapi.kric.go.kr/openapi/convenientInfo/stationLocker';
-const KRIC_SERVICE_KEY = process.env.EXPO_PUBLIC_KRIC_SERVICE_KEY || '';
-const KRIC_RAIL_OPR_ISTT_CD = process.env.EXPO_PUBLIC_KRIC_RAIL_OPR_ISTT_CD || 'S1';
+const KRIC_SERVICE_KEY = String(process.env.EXPO_PUBLIC_KRIC_SERVICE_KEY ?? '');
+const KRIC_RAIL_OPR_ISTT_CD = String(process.env.EXPO_PUBLIC_KRIC_RAIL_OPR_ISTT_CD ?? 'S1');
+
+type UnknownRecord = Record<string, unknown>;
+type LockerDoc = Partial<Locker> & {
+  status?: string;
+  operator?: string;
+};
+type ReservationStatus = LockerReservation['status'];
+type ReservationDoc = Partial<LockerReservation> & {
+  startTime?: Timestamp | Date | string | number;
+  endTime?: Timestamp | Date | string | number;
+  createdAt?: Timestamp | Date | string | number;
+  updatedAt?: Timestamp | Date | string | number;
+  status?: ReservationStatus;
+};
+type ExternalLockerPayload = UnknownRecord & {
+  items?: unknown;
+  item?: unknown;
+  stationLocker?: unknown;
+  response?: {
+    body?: {
+      items?: {
+        item?: unknown;
+      };
+    };
+  };
+  body?: {
+    items?: {
+      item?: unknown;
+    };
+  };
+};
+
+function asRecord(value: unknown): UnknownRecord {
+  return typeof value === 'object' && value !== null ? (value as UnknownRecord) : {};
+}
+
+function readString(record: UnknownRecord, ...keys: string[]): string | undefined {
+  for (const key of keys) {
+    const value = record[key];
+    if (typeof value === 'string' && value.trim()) {
+      return value;
+    }
+  }
+  return undefined;
+}
+
+function readNumber(record: UnknownRecord, ...keys: string[]): number | undefined {
+  for (const key of keys) {
+    const value = record[key];
+    if (typeof value === 'number' && Number.isFinite(value)) {
+      return value;
+    }
+    if (typeof value === 'string' && value.trim()) {
+      const parsed = Number(value);
+      if (Number.isFinite(parsed)) {
+        return parsed;
+      }
+    }
+  }
+  return undefined;
+}
+
+function readBoolean(record: UnknownRecord, ...keys: string[]): boolean | undefined {
+  for (const key of keys) {
+    const value = record[key];
+    if (typeof value === 'boolean') {
+      return value;
+    }
+    if (value === 'true') return true;
+    if (value === 'false') return false;
+  }
+  return undefined;
+}
+
+function toArray<T>(value: unknown): T[] {
+  return Array.isArray(value) ? (value as T[]) : [];
+}
+
+function toDate(value: Timestamp | Date | string | number | undefined): Date {
+  if (value instanceof Timestamp) return value.toDate();
+  if (value instanceof Date) return value;
+  if (typeof value === 'string' || typeof value === 'number') {
+    const date = new Date(value);
+    if (!Number.isNaN(date.getTime())) {
+      return date;
+    }
+  }
+  return new Date();
+}
 
 function normalizeLockerSize(value?: string): LockerSize {
-  const v = (value || '').toLowerCase();
-  if (v.includes('small') || v.includes('소')) return LockerSize.SMALL;
-  if (v.includes('medium') || v.includes('중')) return LockerSize.MEDIUM;
-  if (v.includes('large') || v.includes('대')) return LockerSize.LARGE;
+  const normalized = (value ?? '').toLowerCase();
+  if (normalized.includes('small')) return LockerSize.SMALL;
+  if (normalized.includes('large')) return LockerSize.LARGE;
   return LockerSize.MEDIUM;
 }
 
 function normalizeLockerStatus(value?: string): LockerStatus {
-  const v = (value || '').toLowerCase();
-  if (v.includes('available') || v.includes('free') || v.includes('empty')) return LockerStatus.AVAILABLE;
-  if (v.includes('occupied') || v.includes('in_use') || v.includes('busy')) return LockerStatus.OCCUPIED;
-  if (v.includes('maintenance') || v.includes('broken')) return LockerStatus.MAINTENANCE;
+  const normalized = (value ?? '').toLowerCase();
+  if (normalized.includes('occupied') || normalized.includes('busy') || normalized.includes('in_use')) {
+    return LockerStatus.OCCUPIED;
+  }
+  if (normalized.includes('maintenance') || normalized.includes('broken')) {
+    return LockerStatus.MAINTENANCE;
+  }
   return LockerStatus.AVAILABLE;
 }
 
-function mapExternalLocker(raw: any): Locker | null {
-  const lockerId = raw?.lockerId ?? raw?.id ?? raw?.locker_id;
-  const stationId = raw?.stationId ?? raw?.station_id;
-  if (!lockerId || !stationId) return null;
+function normalizeOperator(value?: string): LockerOperator {
+  switch (value) {
+    case LockerOperator.KORAIL:
+    case LockerOperator.LOCAL_GOV:
+    case LockerOperator.CU:
+    case LockerOperator.GS25:
+    case LockerOperator.LOCKER_BOX:
+      return value;
+    default:
+      return LockerOperator.SEOUL_METRO;
+  }
+}
 
-  const status = normalizeLockerStatus(raw?.status);
-  const size = normalizeLockerSize(raw?.size);
-
+function buildAvailability(total: number, occupied: number, available: number): LockerAvailability {
   return {
-    lockerId: String(lockerId),
-    type: LockerType.PUBLIC,
-    operator: (raw?.operator ?? 'seoul_metro'),
-    location: {
-      stationId: String(stationId),
-      stationName: raw?.stationName ?? raw?.station_name ?? '',
-      line: raw?.line ?? raw?.line_name ?? '',
-      floor: raw?.floor ?? 1,
-      section: raw?.section ?? raw?.locker_no ?? String(lockerId),
-      address: raw?.address,
-      contactPhone: raw?.telNo ?? raw?.phone ?? raw?.contactPhone,
-      nearby: raw?.nearby ?? false,
-    },
-    size,
-    pricing: {
-      base: raw?.basePrice ?? raw?.base_price ?? 0,
-      baseDuration: raw?.baseDuration ?? raw?.base_duration ?? 240,
-      extension: raw?.extensionPrice ?? raw?.extension_price ?? 0,
-      maxDuration: raw?.maxDuration ?? raw?.max_duration,
-    },
-    availability: {
-      total: raw?.total ?? 1,
-      occupied: raw?.occupied ?? (status === LockerStatus.OCCUPIED ? 1 : 0),
-      available: raw?.available ?? (status === LockerStatus.AVAILABLE ? 1 : 0),
-    },
-    status,
-    qrCode: raw?.qrCode ?? raw?.qr_code ?? '',
-    accessMethod: raw?.accessMethod ?? 'qr',
+    total: total > 0 ? total : Math.max(available + occupied, 1),
+    occupied: occupied >= 0 ? occupied : 0,
+    available: available >= 0 ? available : 0,
   };
 }
 
-function normalizeKricSize(value?: string): LockerSize {
-  const v = (value || '').toLowerCase();
-  if (v.includes('소') || v.includes('small')) return LockerSize.SMALL;
-  if (v.includes('중') || v.includes('medium')) return LockerSize.MEDIUM;
-  if (v.includes('대') || v.includes('large')) return LockerSize.LARGE;
-  return LockerSize.MEDIUM;
+function mapFirestoreLocker(lockerId: string, raw: LockerDoc): Locker {
+  const location = raw.location;
+  const pricing = raw.pricing;
+  const availability = raw.availability;
+  const status = typeof raw.status === 'string' ? normalizeLockerStatus(raw.status) : raw.status ?? LockerStatus.AVAILABLE;
+
+  return {
+    lockerId,
+    type: raw.type ?? LockerType.PUBLIC,
+    operator: normalizeOperator(typeof raw.operator === 'string' ? raw.operator : raw.operator),
+    location: {
+      stationId: location?.stationId ?? '',
+      stationName: location?.stationName ?? '',
+      line: location?.line ?? '',
+      floor: location?.floor ?? 1,
+      section: location?.section ?? lockerId,
+      address: location?.address,
+      contactPhone: location?.contactPhone,
+      nearby: location?.nearby ?? false,
+    },
+    size: raw.size ?? LockerSize.MEDIUM,
+    pricing: {
+      base: pricing?.base ?? 0,
+      baseDuration: pricing?.baseDuration ?? 240,
+      extension: pricing?.extension ?? 0,
+      maxDuration: pricing?.maxDuration,
+    },
+    availability: buildAvailability(
+      availability?.total ?? 1,
+      availability?.occupied ?? (status === LockerStatus.OCCUPIED ? 1 : 0),
+      availability?.available ?? (status === LockerStatus.AVAILABLE ? 1 : 0)
+    ),
+    status,
+    qrCode: raw.qrCode ?? '',
+    accessMethod: raw.accessMethod ?? 'qr',
+    isSubway: raw.isSubway ?? true,
+  };
+}
+
+function mapExternalLocker(raw: unknown): Locker | null {
+  const record = asRecord(raw);
+  const lockerId = readString(record, 'lockerId', 'id', 'locker_id');
+  const stationId = readString(record, 'stationId', 'station_id');
+
+  if (!lockerId || !stationId) {
+    return null;
+  }
+
+  const status = normalizeLockerStatus(readString(record, 'status'));
+
+  return {
+    lockerId,
+    type: LockerType.PUBLIC,
+    operator: normalizeOperator(readString(record, 'operator')),
+    location: {
+      stationId,
+      stationName: readString(record, 'stationName', 'station_name') ?? '',
+      line: readString(record, 'line', 'line_name') ?? '',
+      floor: readNumber(record, 'floor') ?? 1,
+      section: readString(record, 'section', 'locker_no') ?? lockerId,
+      address: readString(record, 'address'),
+      contactPhone: readString(record, 'telNo', 'phone', 'contactPhone'),
+      nearby: readBoolean(record, 'nearby') ?? false,
+    },
+    size: normalizeLockerSize(readString(record, 'size')),
+    pricing: {
+      base: readNumber(record, 'basePrice', 'base_price') ?? 0,
+      baseDuration: readNumber(record, 'baseDuration', 'base_duration') ?? 240,
+      extension: readNumber(record, 'extensionPrice', 'extension_price') ?? 0,
+      maxDuration: readNumber(record, 'maxDuration', 'max_duration'),
+    },
+    availability: buildAvailability(
+      readNumber(record, 'total') ?? 1,
+      readNumber(record, 'occupied') ?? (status === LockerStatus.OCCUPIED ? 1 : 0),
+      readNumber(record, 'available') ?? (status === LockerStatus.AVAILABLE ? 1 : 0)
+    ),
+    status,
+    qrCode: readString(record, 'qrCode', 'qr_code') ?? '',
+    accessMethod: (readString(record, 'accessMethod') as Locker['accessMethod'] | undefined) ?? 'qr',
+    isSubway: true,
+  };
+}
+
+function mapReservation(reservationId: string, raw: ReservationDoc): LockerReservation {
+  return {
+    reservationId,
+    lockerId: raw.lockerId ?? '',
+    userId: raw.userId ?? '',
+    requestId: raw.requestId ?? '',
+    deliveryId: raw.deliveryId,
+    type: raw.type,
+    size: raw.size ?? LockerSize.MEDIUM,
+    startTime: toDate(raw.startTime),
+    endTime: toDate(raw.endTime),
+    accessCode: raw.accessCode ?? '',
+    qrCode: raw.qrCode ?? '',
+    status: raw.status ?? 'pending',
+    pickupPhotoUrl: raw.pickupPhotoUrl,
+    dropoffPhotoUrl: raw.dropoffPhotoUrl,
+    createdAt: toDate(raw.createdAt),
+    updatedAt: toDate(raw.updatedAt),
+  };
 }
 
 async function fetchKricLockers(stationId?: string): Promise<Locker[]> {
-  if (!KRIC_SERVICE_KEY) return [];
-  if (!stationId) return [];
+  if (!KRIC_SERVICE_KEY || !stationId) {
+    return [];
+  }
 
   try {
-    const stationConfig = await getStationConfig(stationId);
-    const lineCode =
-      stationConfig?.kric?.lineCode ||
-      stationConfig?.lines?.[0]?.lineCode ||
-      '';
-    const stinCd =
-      stationConfig?.kric?.stationCode ||
-      stationId;
-    const railOprIsttCd =
-      stationConfig?.kric?.railOprIsttCd ||
-      KRIC_RAIL_OPR_ISTT_CD;
+    const stationConfig = (await getStationConfig(stationId)) as {
+      stationName?: string;
+      kric?: {
+        lineCode?: string;
+        stationCode?: string;
+        railOprIsttCd?: string;
+      };
+      lines?: Array<{ lineCode?: string }>;
+    } | null;
+    const lineCode = stationConfig?.kric?.lineCode ?? stationConfig?.lines?.[0]?.lineCode ?? '';
+    const stationCode = stationConfig?.kric?.stationCode ?? stationId;
+    const railCode = stationConfig?.kric?.railOprIsttCd ?? KRIC_RAIL_OPR_ISTT_CD;
 
-    if (!lineCode || !stinCd) {
+    if (!lineCode || !stationCode) {
       return [];
     }
 
     const url = new URL(KRIC_LOCKER_API_URL);
     url.searchParams.set('serviceKey', KRIC_SERVICE_KEY);
     url.searchParams.set('format', 'json');
-    url.searchParams.set('railOprIsttCd', railOprIsttCd);
+    url.searchParams.set('railOprIsttCd', railCode);
     url.searchParams.set('lnCd', lineCode);
-    url.searchParams.set('stinCd', stinCd);
+    url.searchParams.set('stinCd', stationCode);
 
-    const res = await fetch(url.toString());
-    if (!res.ok) return [];
+    const response = await fetch(url.toString());
+    if (!response.ok) {
+      return [];
+    }
 
-    const data = await res.json();
-    const items =
-      data?.response?.body?.items?.item ||
-      data?.body?.items?.item ||
-      data?.items ||
-      data?.item ||
-      data?.stationLocker ||
+    const payload = (await response.json()) as ExternalLockerPayload;
+    const rawItems =
+      payload.response?.body?.items?.item ??
+      payload.body?.items?.item ??
+      payload.items ??
+      payload.item ??
+      payload.stationLocker ??
       [];
 
-    const list = Array.isArray(items) ? items : [items];
-    const stationName = stationConfig?.stationName || '';
+    const stationName = stationConfig?.stationName ?? '';
 
-    return list
-      .filter(Boolean)
-      .map((item: any, index: number) => {
-        const size = normalizeKricSize(item?.szNm);
-        const facilityCount = Number(item?.faclNum ?? 0);
-        const baseFare = Number(item?.utlFare ?? 0);
+    return toArray(rawItems)
+      .map((item, index) => {
+        const record = asRecord(item);
+        const facilityCount = readNumber(record, 'faclNum') ?? 1;
+        const baseFare = readNumber(record, 'utlFare') ?? 0;
+        const line = readString(record, 'lnCd');
 
         return {
-          lockerId: `${stinCd}-${size}-${index}`,
+          lockerId: `${stationCode}-${index + 1}`,
           type: LockerType.PUBLIC,
           operator: LockerOperator.SEOUL_METRO,
           location: {
-            stationId: stinCd,
+            stationId: stationCode,
             stationName,
-            line: item?.lnCd ? `${item.lnCd}호선` : '',
-            floor: Number(item?.stinFlor ?? 1),
-            section: item?.dtlLoc ?? `보관함-${index + 1}`,
+            line: line ? `${line}호선` : '',
+            floor: readNumber(record, 'stinFlor') ?? 1,
+            section: readString(record, 'dtlLoc') ?? `보관함 ${index + 1}`,
             address: '',
-            contactPhone: item?.telNo ?? '',
+            contactPhone: readString(record, 'telNo'),
             nearby: false,
           },
-          size,
+          size: normalizeLockerSize(readString(record, 'szNm')),
           pricing: {
             base: baseFare,
             baseDuration: 240,
             extension: 0,
           },
-          availability: {
-            total: facilityCount || 1,
-            occupied: 0,
-            available: facilityCount || 1,
-          },
+          availability: buildAvailability(facilityCount, 0, facilityCount),
           status: LockerStatus.AVAILABLE,
           qrCode: '',
           accessMethod: 'qr',
-        } as Locker;
-      });
+          isSubway: true,
+        } satisfies Locker;
+      })
+      .filter(Boolean);
   } catch (error) {
     console.error('KRIC locker API fetch failed:', error);
     return [];
@@ -188,138 +355,108 @@ async function fetchKricLockers(stationId?: string): Promise<Locker[]> {
 
 async function fetchExternalLockers(stationId?: string): Promise<Locker[]> {
   if (KRIC_SERVICE_KEY) {
-    const kric = await fetchKricLockers(stationId);
-    if (kric.length > 0) return kric;
+    const kricLockers = await fetchKricLockers(stationId);
+    if (kricLockers.length > 0) {
+      return kricLockers;
+    }
   }
-  if (!EXTERNAL_LOCKER_API_URL) return [];
+
+  if (!EXTERNAL_LOCKER_API_URL) {
+    return [];
+  }
+
   try {
     const url = new URL(EXTERNAL_LOCKER_API_URL);
     if (stationId) {
       url.searchParams.set('stationId', stationId);
     }
-    const res = await fetch(url.toString(), {
-      headers: EXTERNAL_LOCKER_API_KEY
-        ? { Authorization: `Bearer ${EXTERNAL_LOCKER_API_KEY}` }
-        : undefined,
+
+    const response = await fetch(url.toString(), {
+      headers: EXTERNAL_LOCKER_API_KEY ? { Authorization: `Bearer ${EXTERNAL_LOCKER_API_KEY}` } : undefined,
     });
-    if (!res.ok) {
+
+    if (!response.ok) {
       return [];
     }
-    const data = await res.json();
-    const items = Array.isArray(data) ? data : data?.items ?? [];
-    const mapped = items.map(mapExternalLocker).filter(Boolean) as Locker[];
-    return mapped;
+
+    const payload = (await response.json()) as unknown;
+    const records = Array.isArray(payload) ? payload : toArray(asRecord(payload).items);
+    return records.map(mapExternalLocker).filter((locker): locker is Locker => locker !== null);
   } catch (error) {
     console.error('External locker API fetch failed:', error);
     return [];
   }
 }
 
+async function readFirestoreLockers(
+  collectionName: string,
+  onlyAvailable = false
+): Promise<Locker[]> {
+  const baseQuery = onlyAvailable
+    ? query(collection(db, collectionName), where('status', '==', LockerStatus.AVAILABLE))
+    : query(collection(db, collectionName));
+
+  const snapshot = await getDocs(baseQuery);
+  return snapshot.docs.map((snapshotDoc) => mapFirestoreLocker(snapshotDoc.id, snapshotDoc.data() as LockerDoc));
+}
+
+async function readReservationList(filters: { field: 'requestId' | 'userId' | 'deliveryId'; value: string }): Promise<LockerReservation[]> {
+  const reservationQuery = query(collection(db, RESERVATIONS_COLLECTION), where(filters.field, '==', filters.value));
+  const snapshot = await getDocs(reservationQuery);
+  return snapshot.docs.map((snapshotDoc) => mapReservation(snapshotDoc.id, snapshotDoc.data() as ReservationDoc));
+}
+
 export class LockerService {
-  /**
-   * 모든 사물함 조회
-   */
   async getAllLockers(): Promise<Locker[]> {
-    const external = await fetchExternalLockers();
-    const q = query(collection(db, LOCKERS_COLLECTION));
-    const snapshot = await getDocs(q);
+    const [firestoreLockers, externalLockers] = await Promise.all([
+      readFirestoreLockers(LOCKERS_COLLECTION),
+      fetchExternalLockers(),
+    ]);
 
-    const lockers: Locker[] = [];
-    snapshot.forEach((doc) => {
-      lockers.push({
-        lockerId: doc.id,
-        ...doc.data(),
-      } as Locker);
-    });
-
-    if (external.length === 0) {
-      return lockers.filter((l) => l.isSubway !== false);
+    if (externalLockers.length === 0) {
+      return firestoreLockers.filter((locker) => locker.isSubway !== false);
     }
 
     const merged = new Map<string, Locker>();
-    lockers.forEach((l) => {
-      if (l.isSubway !== false) merged.set(l.lockerId, l);
-    });
-    external.forEach((l) => merged.set(l.lockerId, l));
+    firestoreLockers
+      .filter((locker) => locker.isSubway !== false)
+      .forEach((locker) => merged.set(locker.lockerId, locker));
+    externalLockers.forEach((locker) => merged.set(locker.lockerId, locker));
     return Array.from(merged.values());
   }
 
-  /**
-   * 가용 사물함 조회
-   */
-  async getAvailableLockers(
-    stationId?: string,
-    size?: string
-  ): Promise<Locker[]> {
-    const external = await fetchExternalLockers(stationId);
+  async getAvailableLockers(stationId?: string, size?: string): Promise<Locker[]> {
+    const [firestoreLockers, externalLockers] = await Promise.all([
+      readFirestoreLockers(LOCKERS_COLLECTION, true),
+      fetchExternalLockers(stationId),
+    ]);
 
-    const q = query(
-      collection(db, LOCKERS_COLLECTION),
-      where('status', '==', LockerStatus.AVAILABLE)
-    );
-
-    const snapshot = await getDocs(q);
-
-    const lockers: Locker[] = [];
-    snapshot.forEach((doc) => {
-      const locker = {
-        lockerId: doc.id,
-        ...doc.data(),
-      } as Locker;
-
-      // 필터링
-      if (stationId && locker.location.stationId !== stationId) {
-        return;
-      }
-      if (size && locker.size !== size) {
-        return;
-      }
-
-      if (locker.isSubway !== false) {
-        lockers.push(locker);
-      }
-    });
-
-    if (external.length === 0) {
-      return lockers;
-    }
-
-    const filteredExternal = external.filter((locker) => {
-      if (stationId && locker.location.stationId !== stationId) {
-        return false;
-      }
-      if (size && locker.size !== size) {
-        return false;
-      }
+    const normalizedSize = size ? normalizeLockerSize(size) : undefined;
+    const matches = (locker: Locker): boolean => {
+      if (stationId && locker.location.stationId !== stationId) return false;
+      if (normalizedSize && locker.size !== normalizedSize) return false;
       return locker.status === LockerStatus.AVAILABLE;
-    });
+    };
 
     const merged = new Map<string, Locker>();
-    lockers.forEach((l) => merged.set(l.lockerId, l));
-    filteredExternal.forEach((l) => merged.set(l.lockerId, l));
+    firestoreLockers
+      .filter((locker) => locker.isSubway !== false)
+      .filter(matches)
+      .forEach((locker) => merged.set(locker.lockerId, locker));
+    externalLockers.filter(matches).forEach((locker) => merged.set(locker.lockerId, locker));
     return Array.from(merged.values());
   }
 
-  /**
-   * 사물함 조회
-   */
   async getLocker(lockerId: string): Promise<Locker | null> {
-    const docRef = doc(db, LOCKERS_COLLECTION, lockerId);
-    const docSnap = await getDoc(docRef);
-
-    if (!docSnap.exists()) {
-      return null;
+    const snapshot = await getDoc(doc(db, LOCKERS_COLLECTION, lockerId));
+    if (snapshot.exists()) {
+      return mapFirestoreLocker(snapshot.id, snapshot.data() as LockerDoc);
     }
 
-    return {
-      lockerId: docSnap.id,
-      ...docSnap.data(),
-    } as Locker;
+    const external = await fetchExternalLockers();
+    return external.find((locker) => locker.lockerId === lockerId) ?? null;
   }
 
-  /**
-   * 사물함 예약 생성
-   */
   async createReservation(
     lockerId: string,
     userId: string,
@@ -331,158 +468,82 @@ export class LockerService {
     if (!locker) {
       throw new Error('Locker not found');
     }
-
     if (locker.status !== LockerStatus.AVAILABLE) {
       throw new Error('Locker is not available');
     }
 
     const startTime = new Date();
     const endTime = new Date(startTime.getTime() + durationMinutes * 60 * 1000);
-
-    // 예약 생성
     const reservationData = {
       lockerId,
       userId,
       requestId,
-      size,
+      size: normalizeLockerSize(size),
       startTime,
       endTime,
       accessCode: this.generateAccessCode(),
-      qrCode: '', // TODO: QRCodeService로 생성
-      status: 'pending',
+      qrCode: '',
+      status: 'pending' as ReservationStatus,
       createdAt: serverTimestamp(),
       updatedAt: serverTimestamp(),
     };
 
-    const docRef = await addDoc(collection(db, RESERVATIONS_COLLECTION), reservationData);
-
-    // 사물함 상태 업데이트
+    const snapshot = await addDoc(collection(db, RESERVATIONS_COLLECTION), reservationData);
     await this.updateLockerStatus(lockerId, LockerStatus.OCCUPIED);
 
     return {
-      reservationId: docRef.id,
+      reservationId: snapshot.id,
       ...reservationData,
-    } as unknown as LockerReservation;
+      createdAt: startTime,
+      updatedAt: startTime,
+    };
   }
 
-  /**
-   * 예약 조회
-   */
   async getReservation(reservationId: string): Promise<LockerReservation | null> {
-    const docRef = doc(db, RESERVATIONS_COLLECTION, reservationId);
-    const docSnap = await getDoc(docRef);
-
-    if (!docSnap.exists()) {
+    const snapshot = await getDoc(doc(db, RESERVATIONS_COLLECTION, reservationId));
+    if (!snapshot.exists()) {
       return null;
     }
 
-    return {
-      reservationId: docSnap.id,
-      ...docSnap.data(),
-    } as LockerReservation;
+    return mapReservation(snapshot.id, snapshot.data() as ReservationDoc);
   }
 
-  /**
-   * 요청에 대한 예약 조회
-   */
   async getReservationByRequestId(requestId: string): Promise<LockerReservation[]> {
-    const q = query(
-      collection(db, RESERVATIONS_COLLECTION),
-      where('requestId', '==', requestId)
-    );
-
-    const snapshot = await getDocs(q);
-    const reservations: LockerReservation[] = [];
-
-    snapshot.forEach((doc) => {
-      reservations.push({
-        reservationId: doc.id,
-        ...doc.data(),
-      } as LockerReservation);
-    });
-
-    return reservations;
+    return readReservationList({ field: 'requestId', value: requestId });
   }
 
-  /**
-   * 사용자의 예약 목록 조회
-   */
   async getUserReservations(userId: string): Promise<LockerReservation[]> {
-    const q = query(
-      collection(db, RESERVATIONS_COLLECTION),
-      where('userId', '==', userId)
-    );
-
-    const snapshot = await getDocs(q);
-    const reservations: LockerReservation[] = [];
-
-    snapshot.forEach((doc) => {
-      reservations.push({
-        reservationId: doc.id,
-        ...doc.data(),
-      } as LockerReservation);
-    });
-
-    return reservations;
+    return readReservationList({ field: 'userId', value: userId });
   }
 
-  /**
-   * 예약 완료 (사물함 반납)
-   */
   async completeReservation(reservationId: string): Promise<void> {
     const reservation = await this.getReservation(reservationId);
     if (!reservation) {
       throw new Error('Reservation not found');
     }
 
-    // 예약 상태 업데이트
-    const docRef = doc(db, RESERVATIONS_COLLECTION, reservationId);
-    await updateDoc(docRef, {
+    await updateDoc(doc(db, RESERVATIONS_COLLECTION, reservationId), {
       status: 'completed',
       updatedAt: serverTimestamp(),
     });
 
-    // 사물함 상태 업데이트
     await this.updateLockerStatus(reservation.lockerId, LockerStatus.AVAILABLE);
   }
 
-  /**
-   * 사물함 상태 업데이트
-   */
-  private async updateLockerStatus(
-    lockerId: string,
-    status: LockerStatus
-  ): Promise<void> {
-    const docRef = doc(db, LOCKERS_COLLECTION, lockerId);
-    await updateDoc(docRef, {
+  private async updateLockerStatus(lockerId: string, status: LockerStatus): Promise<void> {
+    await updateDoc(doc(db, LOCKERS_COLLECTION, lockerId), {
       status,
       updatedAt: serverTimestamp(),
     });
   }
 
-  /**
-   * 접근 코드 생성 (4자리 숫자)
-   */
   private generateAccessCode(): string {
     return Math.floor(1000 + Math.random() * 9000).toString();
   }
 
-  /**
-   * 추천 사물함 계산
-   */
-  async recommendLockers(
-    pickupStationId: string,
-    _deliveryStationId: string
-  ): Promise<Locker[]> {
-    // 픽업역과 배송역 중간에 있는 사물함 추천
+  async recommendLockers(pickupStationId: string, _deliveryStationId: string): Promise<Locker[]> {
     const allLockers = await this.getAllLockers();
-
-    // TODO: 실제 거리 계산 로직 추가
-    const pickupLockers = allLockers.filter(
-      (locker) => locker.location.stationId === pickupStationId
-    );
-
-    return pickupLockers.slice(0, 5); // 상위 5개 반환
+    return allLockers.filter((locker) => locker.location.stationId === pickupStationId).slice(0, 5);
   }
 }
 
@@ -490,40 +551,25 @@ export function createLockerService(): LockerService {
   return new LockerService();
 }
 
-// Convenience functions for backward compatibility
 const lockerService = new LockerService();
 
-/**
- * Get locker reservation by ID
- */
 export async function getLockerReservation(reservationId: string): Promise<LockerReservation | null> {
   return lockerService.getReservation(reservationId);
 }
 
-/**
- * Update reservation status
- */
-export async function updateReservationStatus(
-  reservationId: string,
-  status: string
-): Promise<void> {
-  const docRef = doc(db, RESERVATIONS_COLLECTION, reservationId);
-  await updateDoc(docRef, {
+export async function updateReservationStatus(reservationId: string, status: string): Promise<void> {
+  await updateDoc(doc(db, RESERVATIONS_COLLECTION, reservationId), {
     status,
     updatedAt: serverTimestamp(),
   });
 }
 
-/**
- * Add photos to reservation
- */
 export async function addReservationPhotos(
   reservationId: string,
-  pickupPhotoUrl: string,
+  pickupPhotoUrl?: string,
   deliveryPhotoUrl?: string
 ): Promise<void> {
-  const docRef = doc(db, RESERVATIONS_COLLECTION, reservationId);
-  const updateData: any = {
+  const updateData: Record<string, unknown> = {
     updatedAt: serverTimestamp(),
   };
 
@@ -532,46 +578,20 @@ export async function addReservationPhotos(
   }
 
   if (deliveryPhotoUrl) {
-    updateData.deliveryPhotoUrl = deliveryPhotoUrl;
+    updateData.dropoffPhotoUrl = deliveryPhotoUrl;
   }
 
-  await updateDoc(docRef, updateData);
+  await updateDoc(doc(db, RESERVATIONS_COLLECTION, reservationId), updateData);
 }
 
-/**
- * Get all reservations for a delivery
- */
 export async function getDeliveryReservations(deliveryId: string): Promise<LockerReservation[]> {
-  const q = query(
-    collection(db, RESERVATIONS_COLLECTION),
-    where('deliveryId', '==', deliveryId)
-  );
-
-  const snapshot = await getDocs(q);
-  const reservations: LockerReservation[] = [];
-
-  snapshot.forEach((doc) => {
-    reservations.push({
-      reservationId: doc.id,
-      ...doc.data(),
-    } as LockerReservation);
-  });
-
-  return reservations;
+  return readReservationList({ field: 'deliveryId', value: deliveryId });
 }
 
-// ==================== Standalone named exports ====================
-
-/**
- * 단일 사물함 조회
- */
 export async function getLocker(lockerId: string): Promise<Locker | null> {
-  return createLockerService().getLocker(lockerId);
+  return lockerService.getLocker(lockerId);
 }
 
-/**
- * 사물함 예약 생성 (화면에서 사용하는 시그니처)
- */
 export async function createLockerReservation(
   lockerId: string,
   deliveryId: string,
@@ -581,76 +601,72 @@ export async function createLockerReservation(
   endTime: Date,
   qrCode: string
 ): Promise<LockerReservation> {
-  const durationMinutes = Math.round((endTime.getTime() - startTime.getTime()) / 60000);
-  const reservation = await createLockerService().createReservation(
+  const durationMinutes = Math.max(1, Math.round((endTime.getTime() - startTime.getTime()) / 60000));
+  const reservation = await lockerService.createReservation(lockerId, userId, deliveryId, 'medium', durationMinutes);
+
+  const accessQrCode = QRCodeService.generateLockerAccessQRCode({
     lockerId,
+    reservationId: reservation.reservationId,
     userId,
-    deliveryId, // requestId 자리에 deliveryId 사용
-    'medium',   // 기본 size
-    durationMinutes
-  );
-  // type과 qrCode는 별도 업데이트
-  const docRef = doc(db, RESERVATIONS_COLLECTION, reservation.reservationId);
-  await updateDoc(docRef, { type, qrCode, deliveryId, updatedAt: serverTimestamp() });
-  return { ...reservation, type, qrCode } as unknown as LockerReservation;
+    deliveryId,
+    step: type === 'giller_dropoff' ? 'dropoff' : 'pickup',
+  });
+
+  await updateDoc(doc(db, RESERVATIONS_COLLECTION, reservation.reservationId), {
+    type,
+    qrCode: accessQrCode || qrCode,
+    deliveryId,
+    updatedAt: serverTimestamp(),
+  });
+
+  return {
+    ...reservation,
+    type,
+    deliveryId,
+    qrCode: accessQrCode || qrCode,
+    startTime,
+    endTime,
+  };
 }
 
-/**
- * 사물함 잠금 해제 (QR 코드 검증 후)
- */
 export async function unlockLocker(
   lockerId: string,
   qrCode: string
 ): Promise<{ success: boolean; message?: string }> {
   try {
-    const { verifyQRCode } = await import('./qrcode-service');
-    const verification = verifyQRCode(qrCode);
+    const verification = verifyQRCode(qrCode, 'locker_access');
     if (!verification.isValid) {
       return { success: false, message: verification.error };
     }
+
+    const qrLockerId = verification.data?.metadata?.lockerId;
+    if (qrLockerId && qrLockerId !== lockerId) {
+      return { success: false, message: '이 QR 코드는 다른 사물함용입니다.' };
+    }
+
     await updateDoc(doc(db, LOCKERS_COLLECTION, lockerId), {
       status: LockerStatus.OCCUPIED,
       updatedAt: serverTimestamp(),
     });
     return { success: true };
-  } catch (error: any) {
-    return { success: false, message: error.message };
+  } catch (error) {
+    const message = error instanceof Error ? error.message : '사물함을 열 수 없습니다.';
+    return { success: false, message };
   }
 }
 
-/**
- * 사용 가능한 전체 사물함 목록 조회
- */
 export async function getAvailableLockers(): Promise<Locker[]> {
-  return createLockerService().getAvailableLockers();
+  return lockerService.getAvailableLockers();
 }
 
-/**
- * 역 ID로 사물함 목록 조회
- */
 export async function getLockersByStation(stationId: string): Promise<Locker[]> {
-  return createLockerService().getAvailableLockers(stationId);
+  return lockerService.getAvailableLockers(stationId);
 }
 
-/**
- * 비지하철 사물함 목록 조회
- */
 export async function getNonSubwayLockers(): Promise<Locker[]> {
-  const q = query(collection(db, NON_SUBWAY_LOCKERS_COLLECTION));
-  const snapshot = await getDocs(q);
-  const lockers: Locker[] = [];
-  snapshot.forEach((docSnapshot) => {
-    lockers.push({
-      lockerId: docSnapshot.id,
-      ...(docSnapshot.data() as any),
-    } as Locker);
-  });
-  return lockers;
+  return readFirestoreLockers(NON_SUBWAY_LOCKERS_COLLECTION);
 }
 
-/**
- * Locker 객체를 표시용 LockerLocation 형태로 변환
- */
 export function createLockerLocation(locker: Locker): {
   lockerId: string;
   name: string;
@@ -665,37 +681,27 @@ export function createLockerLocation(locker: Locker): {
 } {
   return {
     lockerId: locker.lockerId,
-    name: locker.location?.section ?? locker.lockerId,
-    stationName: locker.location?.stationName ?? '',
-    line: locker.location?.line ?? '',
-    floor: Number(locker.location?.floor ?? 1),
-    section: locker.location?.section ?? '',
-    pricePer4Hours: Number(locker.pricing?.base ?? 0),
-    telNo: locker.location?.contactPhone ?? '',
+    name: locker.location.section || locker.lockerId,
+    stationName: locker.location.stationName,
+    line: locker.location.line,
+    floor: locker.location.floor,
+    section: locker.location.section,
+    pricePer4Hours: locker.pricing.base,
+    telNo: locker.location.contactPhone,
     status: locker.status,
     isAvailable: locker.status === LockerStatus.AVAILABLE,
   };
 }
 
-/**
- * QR 코드로 예약 조회
- */
 export async function getReservationByQRCode(qrCode: string): Promise<LockerReservation | null> {
-  const q = query(
-    collection(db, RESERVATIONS_COLLECTION),
-    where('qrCode', '==', qrCode)
-  );
-  const snapshot = await getDocs(q);
-  if (snapshot.empty) return null;
-  const d = snapshot.docs[0];
-  return { reservationId: d.id, ...d.data() } as LockerReservation;
+  const reservationQuery = query(collection(db, RESERVATIONS_COLLECTION), where('qrCode', '==', qrCode));
+  const snapshot = await getDocs(reservationQuery);
+  const first = snapshot.docs[0];
+  return first ? mapReservation(first.id, first.data() as ReservationDoc) : null;
 }
 
-/**
- * 사물함 열기 (예약 상태를 active로 변경)
- */
 export async function openLocker(
-  lockerId: string,
+  _lockerId: string,
   reservationId: string
 ): Promise<{ success: boolean; message?: string }> {
   try {
@@ -704,7 +710,8 @@ export async function openLocker(
       updatedAt: serverTimestamp(),
     });
     return { success: true };
-  } catch (error: any) {
-    return { success: false, message: error.message };
+  } catch (error) {
+    const message = error instanceof Error ? error.message : '사물함을 열 수 없습니다.';
+    return { success: false, message };
   }
 }

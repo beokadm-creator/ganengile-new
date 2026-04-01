@@ -1,19 +1,15 @@
-/**
- * Station Select Modal Component
- * 역 선택 모달 컴포넌트
- */
-
-import React, { useState } from 'react';
+﻿import React, { useMemo, useState } from 'react';
 import {
-  View,
-  Text,
-  StyleSheet,
-  TouchableOpacity,
   Modal,
   ScrollView,
+  StyleSheet,
+  Text,
   TextInput,
+  TouchableOpacity,
+  View,
 } from 'react-native';
-import { Colors, Spacing, Typography, BorderRadius } from '../../theme';
+import { Ionicons } from '@expo/vector-icons';
+import { BorderRadius, Spacing, Typography } from '../../theme';
 import type { Station } from '../../types/config';
 
 interface StationSelectModalProps {
@@ -25,19 +21,46 @@ interface StationSelectModalProps {
   searchPlaceholder?: string;
 }
 
+function getLineColor(index: number) {
+  const palette = ['#1D4ED8', '#059669', '#EA580C', '#7C3AED', '#DC2626', '#0891B2'];
+  return palette[index % palette.length];
+}
+
+function getLineLabel(station: Station) {
+  return station.lines
+    .slice(0, 2)
+    .map((line) => line.lineName || line.lineCode || line.lineId)
+    .filter(Boolean)
+    .join(' · ');
+}
+
 export default function StationSelectModal({
   visible,
   onClose,
   onStationSelect,
   title,
   stations,
-  searchPlaceholder = '역 이름 검색...',
+  searchPlaceholder = '역 이름으로 검색',
 }: StationSelectModalProps) {
   const [searchQuery, setSearchQuery] = useState('');
 
-  const filteredStations = stations.filter((station) =>
-    station.stationName.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  const filteredStations = useMemo(() => {
+    const keyword = searchQuery.trim().toLowerCase();
+    if (!keyword) {
+      return stations;
+    }
+
+    return stations.filter((station) => {
+      const name = station.stationName.toLowerCase();
+      const line = getLineLabel(station).toLowerCase();
+      return name.includes(keyword) || line.includes(keyword);
+    });
+  }, [searchQuery, stations]);
+
+  const handleClose = () => {
+    setSearchQuery('');
+    onClose();
+  };
 
   const handleSelect = (station: Station) => {
     onStationSelect(station);
@@ -45,158 +68,181 @@ export default function StationSelectModal({
     onClose();
   };
 
-  const handleClose = () => {
-    setSearchQuery('');
-    onClose();
-  };
-
   return (
-    <Modal
-      visible={visible}
-      animationType="slide"
-      onRequestClose={handleClose}
-    >
-      <View style={styles.modalContainer}>
-        <View style={styles.modalHeader}>
-          <Text style={styles.modalTitle}>{title}</Text>
-          <TouchableOpacity onPress={handleClose}>
-            <Text style={styles.modalClose}>✕</Text>
+    <Modal visible={visible} animationType="slide" onRequestClose={handleClose}>
+      <View style={styles.container}>
+        <View style={styles.header}>
+          <View>
+            <Text style={styles.headerEyebrow}>가는길에</Text>
+            <Text style={styles.title}>{title}</Text>
+          </View>
+          <TouchableOpacity style={styles.iconButton} onPress={handleClose}>
+            <Ionicons name="close" size={22} color="#0F172A" />
           </TouchableOpacity>
         </View>
 
-        <View style={styles.searchContainer}>
+        <View style={styles.searchWrap}>
+          <Ionicons name="search" size={18} color="#94A3B8" />
           <TextInput
             style={styles.searchInput}
-            placeholder={searchPlaceholder}
-            placeholderTextColor={Colors.gray400}
             value={searchQuery}
             onChangeText={setSearchQuery}
+            placeholder={searchPlaceholder}
+            placeholderTextColor="#94A3B8"
             autoFocus
           />
+          {searchQuery.length > 0 ? (
+            <TouchableOpacity onPress={() => setSearchQuery('')}>
+              <Ionicons name="close-circle" size={18} color="#94A3B8" />
+            </TouchableOpacity>
+          ) : null}
         </View>
 
-        {searchQuery.length > 0 && filteredStations.length === 0 && (
-          <View style={styles.emptyContainer}>
-            <Text style={styles.emptyText}>
-              &apos;{searchQuery}&apos;에 대한 검색 결과가 없습니다.
-            </Text>
-          </View>
-        )}
-
-        <ScrollView style={styles.modalContent}>
-          {filteredStations.map((station) => (
-            <TouchableOpacity
-              key={station.stationId}
-              style={styles.stationItem}
-              onPress={() => handleSelect(station)}
-              activeOpacity={0.7}
-            >
-              <View style={styles.stationItemLeft}>
-                <Text style={styles.stationItemName}>{station.stationName}</Text>
-                <Text style={styles.stationItemLine}>
-                  {station.lines.map((l) => l.lineName).join(', ')}
-                </Text>
-              </View>
-              <Text style={styles.stationItemArrow}>›</Text>
-            </TouchableOpacity>
-          ))}
+        <ScrollView style={styles.list} contentContainerStyle={styles.listContent}>
+          {filteredStations.length === 0 ? (
+            <View style={styles.emptyState}>
+              <Text style={styles.emptyTitle}>검색 결과가 없습니다</Text>
+              <Text style={styles.emptyBody}>다른 역 이름으로 다시 검색해 주세요.</Text>
+            </View>
+          ) : (
+            filteredStations.map((station) => (
+              <TouchableOpacity
+                key={station.stationId}
+                style={styles.stationItem}
+                activeOpacity={0.86}
+                onPress={() => handleSelect(station)}
+              >
+                <View style={styles.stationMain}>
+                  <View style={styles.lineRow}>
+                    {station.lines.slice(0, 2).map((line, index) => (
+                      <View
+                        key={`${station.stationId}-${line.lineId}-${index}`}
+                        style={[styles.lineChip, { backgroundColor: line.lineColor || getLineColor(index) }]}
+                      >
+                        <Text style={styles.lineChipText}>{line.lineName || line.lineCode || line.lineId}</Text>
+                      </View>
+                    ))}
+                  </View>
+                  <Text style={styles.stationName}>{station.stationName}</Text>
+                  <Text style={styles.stationMeta}>{getLineLabel(station) || '노선 정보 없음'}</Text>
+                </View>
+                <Ionicons name="chevron-forward" size={18} color="#94A3B8" />
+              </TouchableOpacity>
+            ))
+          )}
         </ScrollView>
-
-        {filteredStations.length > 0 && (
-          <View style={styles.resultCountContainer}>
-            <Text style={styles.resultCountText}>
-              {filteredStations.length}개의 역
-            </Text>
-          </View>
-        )}
       </View>
     </Modal>
   );
 }
 
 const styles = StyleSheet.create({
-  modalContainer: {
-    backgroundColor: Colors.white,
+  container: {
     flex: 1,
+    backgroundColor: '#F8FAFC',
+    paddingTop: 20,
   },
-  modalHeader: {
-    alignItems: 'center',
-    borderBottomColor: Colors.gray200,
-    borderBottomWidth: 1,
+  header: {
+    paddingHorizontal: Spacing.lg,
+    paddingBottom: Spacing.md,
     flexDirection: 'row',
+    alignItems: 'center',
     justifyContent: 'space-between',
-    padding: Spacing.md,
-    paddingTop: 60,
   },
-  modalTitle: {
-    color: Colors.textPrimary,
-    fontSize: Typography.fontSize.lg,
-    fontWeight: Typography.fontWeight.semibold,
+  headerEyebrow: {
+    fontSize: 12,
+    fontWeight: '700',
+    letterSpacing: 1,
+    color: '#0F766E',
+    textTransform: 'uppercase',
   },
-  modalClose: {
-    color: Colors.gray600,
+  title: {
+    marginTop: 6,
     fontSize: 24,
-    paddingHorizontal: Spacing.sm,
+    fontWeight: '800',
+    color: '#0F172A',
   },
-  searchContainer: {
-    borderBottomColor: Colors.gray200,
-    borderBottomWidth: 1,
-    padding: Spacing.md,
+  iconButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: '#FFFFFF',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  searchWrap: {
+    marginHorizontal: Spacing.lg,
+    marginBottom: Spacing.md,
+    borderRadius: BorderRadius.xl,
+    backgroundColor: '#FFFFFF',
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    paddingHorizontal: Spacing.md,
+    minHeight: 52,
   },
   searchInput: {
-    backgroundColor: Colors.gray50,
-    borderRadius: BorderRadius.sm,
-    color: Colors.textPrimary,
-    fontSize: Typography.fontSize.base,
-    padding: Spacing.md,
-  },
-  emptyContainer: {
-    alignItems: 'center',
-    padding: Spacing.xl,
-  },
-  emptyText: {
-    color: Colors.gray500,
-    fontSize: Typography.fontSize.sm,
-    textAlign: 'center',
-  },
-  modalContent: {
     flex: 1,
+    color: '#0F172A',
+    ...Typography.body,
+  },
+  list: {
+    flex: 1,
+  },
+  listContent: {
+    paddingHorizontal: Spacing.lg,
+    paddingBottom: Spacing['4xl'],
+    gap: Spacing.sm,
+  },
+  emptyState: {
+    marginTop: Spacing['4xl'],
+    alignItems: 'center',
+    gap: 8,
+  },
+  emptyTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: '#0F172A',
+  },
+  emptyBody: {
+    color: '#64748B',
+    ...Typography.body,
   },
   stationItem: {
-    alignItems: 'center',
-    borderBottomColor: Colors.gray100,
-    borderBottomWidth: 1,
+    backgroundColor: '#FFFFFF',
+    borderRadius: BorderRadius.xl,
+    paddingHorizontal: Spacing.lg,
+    paddingVertical: Spacing.md,
     flexDirection: 'row',
-    justifyContent: 'space-between',
-    padding: Spacing.md,
-  },
-  stationItemLeft: {
-    flex: 1,
-  },
-  stationItemName: {
-    color: Colors.textPrimary,
-    fontSize: Typography.fontSize.base,
-    fontWeight: Typography.fontWeight.medium,
-    marginBottom: Spacing.xs,
-  },
-  stationItemLine: {
-    color: Colors.gray500,
-    fontSize: Typography.fontSize.sm,
-  },
-  stationItemArrow: {
-    color: Colors.gray400,
-    fontSize: 24,
-    fontWeight: '300',
-  },
-  resultCountContainer: {
     alignItems: 'center',
-    backgroundColor: Colors.gray50,
-    borderTopColor: Colors.gray200,
-    borderTopWidth: 1,
-    padding: Spacing.sm,
+    justifyContent: 'space-between',
   },
-  resultCountText: {
-    color: Colors.gray500,
-    fontSize: Typography.fontSize.xs,
+  stationMain: {
+    flex: 1,
+    gap: 6,
+  },
+  lineRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 6,
+  },
+  lineChip: {
+    borderRadius: 999,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+  },
+  lineChipText: {
+    color: '#FFFFFF',
+    fontSize: 11,
+    fontWeight: '700',
+  },
+  stationName: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: '#0F172A',
+  },
+  stationMeta: {
+    color: '#64748B',
+    ...Typography.bodySmall,
   },
 });

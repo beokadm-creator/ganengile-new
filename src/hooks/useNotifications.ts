@@ -1,4 +1,4 @@
-/**
+﻿/**
  * useNotifications Hook
  * Handles push notification permissions, registration, and event handling
  * for Expo Notifications
@@ -9,7 +9,8 @@ import * as Notifications from 'expo-notifications';
 import { Platform } from 'react-native';
 import { useUser } from '../contexts/UserContext';
 import { createNotificationService } from '../services/notification-service';
-import type { ChatMessage } from '../types/chat';
+import { NotificationType } from '../types/chat';
+import type { ChatMessage, PushNotificationData } from '../types/chat';
 
 // Configure notification behavior
 Notifications.setNotificationHandler({
@@ -28,6 +29,8 @@ export interface NotificationHandlers {
   onNotificationTapped?: (response: Notifications.NotificationResponse) => void;
 }
 
+type NotificationPayload = NonNullable<PushNotificationData['data']>;
+
 export function useNotifications(handlers?: NotificationHandlers) {
   const { user } = useUser();
   const [expoPushToken, setExpoPushToken] = useState<string | null>(null);
@@ -44,26 +47,25 @@ export function useNotifications(handlers?: NotificationHandlers) {
   const requestPermissions = useCallback(async (): Promise<boolean> => {
     if (Platform.OS === 'web') {
       // Web doesn't support push notifications in Expo
-      console.warn('Push notifications not supported on web');
       return false;
     }
 
     const { status: existingStatus } = await Notifications.getPermissionsAsync();
     let finalStatus = existingStatus;
 
-    if (existingStatus !== 'granted') {
+    if (existingStatus !== Notifications.PermissionStatus.GRANTED) {
       const { status } = await Notifications.requestPermissionsAsync();
       finalStatus = status;
     }
 
     setPermissionStatus(finalStatus);
 
-    if (finalStatus !== 'granted') {
+    if (finalStatus !== Notifications.PermissionStatus.GRANTED) {
       console.warn('Notification permissions not granted');
       return false;
     }
 
-    return true;
+    return finalStatus === Notifications.PermissionStatus.GRANTED;
   }, []);
 
   /**
@@ -80,18 +82,19 @@ export function useNotifications(handlers?: NotificationHandlers) {
     }
 
     // Get Expo push token
-    const token = await Notifications.getExpoPushTokenAsync({
-      projectId: process.env.EXPO_PROJECT_ID || '',
+    const tokenResponse = await Notifications.getExpoPushTokenAsync({
+      projectId: String(process.env.EXPO_PROJECT_ID ?? ''),
     });
+    const token = typeof tokenResponse.data === 'string' ? tokenResponse.data : null;
 
-    setExpoPushToken(token.data);
+    setExpoPushToken(token);
 
     // Save token to notification service via updateNotificationSettings
-    if (user && token.data) {
-      await notificationService.updateNotificationSettings({ fcmToken: token.data });
+    if (user && token) {
+      await notificationService.updateNotificationSettings({ fcmToken: token });
     }
 
-    return token.data;
+    return token;
   }, [requestPermissions, notificationService, user]);
 
   /**
@@ -100,7 +103,7 @@ export function useNotifications(handlers?: NotificationHandlers) {
   const sendLocalNotification = useCallback(async (
     title: string,
     body: string,
-    data?: any
+    data?: NotificationPayload
   ): Promise<void> => {
     if (Platform.OS === 'web') {
       return;
@@ -110,7 +113,7 @@ export function useNotifications(handlers?: NotificationHandlers) {
       content: {
         title,
         body,
-        data: data || {},
+        data: data ?? {},
         sound: 'default',
         badge: 1,
       },
@@ -133,14 +136,14 @@ export function useNotifications(handlers?: NotificationHandlers) {
 
     // Check if notification is enabled for NEW_MESSAGE
     const settings = await notificationService.getNotificationSettings();
-    if (!notificationService.canSendNotification(settings, 'new_message' as any)) {
+    if (!notificationService.canSendNotification(settings, NotificationType.NEW_MESSAGE)) {
       return;
     }
 
     await sendLocalNotification(
-      `${senderName}님으로부터 새 메시지`,
+      `${senderName}님의 새 메시지`,
       message.content,
-      { chatRoomId, senderId: message.senderId, type: 'new_message' }
+      { chatRoomId, senderId: message.senderId }
     );
   }, [user, notificationService, sendLocalNotification]);
 
@@ -166,8 +169,6 @@ export function useNotifications(handlers?: NotificationHandlers) {
     // Listen for notification tap/response
     responseListener.current = Notifications.addNotificationResponseReceivedListener(
       (response) => {
-        const { chatRoomId: _chatRoomId } = response.notification.request.content.data as any;
-
         handlers?.onNotificationTapped?.(response);
       }
     );

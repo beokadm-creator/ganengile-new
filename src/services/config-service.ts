@@ -4,15 +4,19 @@
  */
 
 import {
+  DocumentSnapshot,
   doc,
   getDoc,
   getDocs,
   query,
   where,
   collection,
-  QueryDocumentSnapshot,
 } from 'firebase/firestore';
 import { db } from './firebase';
+import { MAJOR_STATIONS, type Station as LocalStation } from '../data/subway-stations';
+import { TRAVEL_TIME_MATRIX } from '../data/travel-times';
+import { EXPRESS_TRAIN_SCHEDULES } from '../data/express-trains';
+import { CONGESTION_DATA as LOCAL_CONGESTION_DATA } from '../data/congestion';
 import type {
   Station,
   TravelTime,
@@ -83,13 +87,114 @@ function convertTimestampToDate(timestamp: { seconds: number; nanoseconds?: numb
   return new Date(timestamp.seconds * 1000 + (timestamp.nanoseconds || 0) / 1000000);
 }
 
+function toFallbackDate(): Date {
+  return new Date('2026-01-01T00:00:00.000Z');
+}
+
 function convertDocument<T>(
-  docSnapshot: QueryDocumentSnapshot,
+  docSnapshot: DocumentSnapshot,
   converter: (data: any, docId: string) => T
 ): T {
   const data = docSnapshot.data();
   const docId = docSnapshot.id;
+  if (!data) {
+    throw new Error(`Missing document data for ${docId}`);
+  }
   return converter(data, docId);
+}
+
+function convertLocalStation(station: LocalStation): Station {
+  return {
+    stationId: station.stationId,
+    stationName: station.stationName,
+    stationNameEnglish: station.stationNameEnglish,
+    lines: station.lines,
+    location: station.location,
+    isTransferStation: station.isTransferStation,
+    isExpressStop: station.isExpressStop,
+    isTerminus: station.isTerminus,
+    facilities: {
+      hasElevator: station.facilities.hasElevator,
+      hasEscalator: station.facilities.hasEscalator,
+      wheelchairAccessible: station.facilities.wheelchairAccessible,
+    },
+    isActive: true,
+    region: station.region ?? 'seoul',
+    priority: station.priority ?? 100,
+    createdAt: toFallbackDate(),
+    updatedAt: toFallbackDate(),
+  };
+}
+
+function getFallbackStations(): Station[] {
+  return MAJOR_STATIONS.map(convertLocalStation);
+}
+
+function getFallbackTravelTimes(): TravelTime[] {
+  return Object.entries(TRAVEL_TIME_MATRIX).map(([routeId, info]) => {
+    const [fromStationId, toStationId] = routeId.split('-');
+    const fromStation = MAJOR_STATIONS.find((station) => station.stationId === fromStationId);
+    const toStation = MAJOR_STATIONS.find((station) => station.stationId === toStationId);
+
+    return {
+      travelTimeId: routeId,
+      fromStationId,
+      toStationId,
+      fromStationName: fromStation?.stationName ?? fromStationId,
+      toStationName: toStation?.stationName ?? toStationId,
+      normalTime: info.normalTime,
+      expressTime: info.expressTime,
+      transferCount: info.transferCount,
+      transferStations: info.transferStations,
+      hasExpress: info.hasExpress,
+      walkingDistance: info.walkingDistance,
+      distance: info.walkingDistance,
+      lineIds: Array.from(new Set([...(fromStation?.lines.map((line) => line.lineId) ?? []), ...(toStation?.lines.map((line) => line.lineId) ?? [])])),
+      reliability: 7,
+      lastVerified: toFallbackDate(),
+      isActive: true,
+      createdAt: toFallbackDate(),
+      updatedAt: toFallbackDate(),
+    };
+  });
+}
+
+function getFallbackExpressTrains(): ExpressTrain[] {
+  return EXPRESS_TRAIN_SCHEDULES.map((schedule, index) => ({
+    expressId: `${schedule.lineId}-${schedule.type}-${index + 1}`,
+    lineId: schedule.lineId,
+    lineName: schedule.lineName ?? schedule.lineId,
+    type: schedule.type,
+    typeName: schedule.typeName,
+    operatingDays: schedule.operatingDays,
+    firstTrain: schedule.firstTrain,
+    lastTrain: schedule.lastTrain,
+    rushHourMorningInterval: schedule.intervals.rushHourMorning,
+    rushHourEveningInterval: schedule.intervals.rushHourEvening,
+    daytimeInterval: schedule.intervals.daytime,
+    nightInterval: schedule.intervals.night,
+    stops: schedule.stops,
+    avgSpeed: 42,
+    timeSavings: schedule.timeSavings,
+    isActive: true,
+    createdAt: toFallbackDate(),
+    updatedAt: toFallbackDate(),
+  }));
+}
+
+function getFallbackCongestionConfigs(): CongestionData[] {
+  return LOCAL_CONGESTION_DATA.map((item, index) => ({
+    congestionId: `${item.lineId}-${index + 1}`,
+    lineId: item.lineId,
+    lineName: item.lineName,
+    timeSlots: item.timeSlots,
+    sections: item.sections,
+    dataSource: item.dataSource ?? 'local_fallback',
+    lastUpdated: toFallbackDate(),
+    isValid: true,
+    createdAt: toFallbackDate(),
+    updatedAt: toFallbackDate(),
+  }));
 }
 
 // ==================== Station Config ====================
@@ -159,11 +264,14 @@ export async function getAllStations(): Promise<Station[]> {
       stations.push(convertDocument(docSnapshot, convertStation));
     });
 
-    cache.set(cacheKey, stations);
-    return stations;
+    const finalStations = stations.length > 0 ? stations : getFallbackStations();
+    cache.set(cacheKey, finalStations);
+    return finalStations;
   } catch (error) {
-    console.error('Error fetching all stations:', error);
-    throw error;
+    console.error('Error fetching all stations, using fallback dataset:', error);
+    const fallbackStations = getFallbackStations();
+    cache.set(cacheKey, fallbackStations);
+    return fallbackStations;
   }
 }
 
@@ -295,11 +403,14 @@ export async function getAllTravelTimes(): Promise<TravelTime[]> {
       travelTimes.push(convertDocument(docSnapshot, convertTravelTime));
     });
 
-    cache.set(cacheKey, travelTimes);
-    return travelTimes;
+    const finalTravelTimes = travelTimes.length > 0 ? travelTimes : getFallbackTravelTimes();
+    cache.set(cacheKey, finalTravelTimes);
+    return finalTravelTimes;
   } catch (error) {
-    console.error('Error fetching all travel times:', error);
-    throw error;
+    console.error('Error fetching all travel times, using fallback dataset:', error);
+    const fallbackTravelTimes = getFallbackTravelTimes();
+    cache.set(cacheKey, fallbackTravelTimes);
+    return fallbackTravelTimes;
   }
 }
 
@@ -403,11 +514,14 @@ export async function getAllExpressTrains(): Promise<ExpressTrain[]> {
       expressTrains.push(convertDocument(docSnapshot, convertExpressTrain));
     });
 
-    cache.set(cacheKey, expressTrains);
-    return expressTrains;
+    const finalExpressTrains = expressTrains.length > 0 ? expressTrains : getFallbackExpressTrains();
+    cache.set(cacheKey, finalExpressTrains);
+    return finalExpressTrains;
   } catch (error) {
-    console.error('Error fetching all express trains:', error);
-    throw error;
+    console.error('Error fetching all express trains, using fallback dataset:', error);
+    const fallbackExpressTrains = getFallbackExpressTrains();
+    cache.set(cacheKey, fallbackExpressTrains);
+    return fallbackExpressTrains;
   }
 }
 
@@ -506,11 +620,14 @@ export async function getAllCongestionConfigs(): Promise<CongestionData[]> {
       congestionConfigs.push(convertDocument(docSnapshot, convertCongestionData));
     });
 
-    cache.set(cacheKey, congestionConfigs);
-    return congestionConfigs;
+    const finalCongestionConfigs = congestionConfigs.length > 0 ? congestionConfigs : getFallbackCongestionConfigs();
+    cache.set(cacheKey, finalCongestionConfigs);
+    return finalCongestionConfigs;
   } catch (error) {
-    console.error('Error fetching all congestion configs:', error);
-    throw error;
+    console.error('Error fetching all congestion configs, using fallback dataset:', error);
+    const fallbackCongestionConfigs = getFallbackCongestionConfigs();
+    cache.set(cacheKey, fallbackCongestionConfigs);
+    return fallbackCongestionConfigs;
   }
 }
 

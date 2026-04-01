@@ -1,601 +1,681 @@
-/**
- * GillerApplyScreen
- * 이용자 → 길러 신청 화면 (4단계)
- * Step 1: 신청 안내 + 필요 서류 확인
- * Step 2: 기본 정보 (연락처, 운행 노선, 자기소개)
- * Step 3: PASS 본인인증 (현재 테스트 모드)
- * Step 4: 계좌 정보 입력 (현재 형식 검증만)
- *
- * 완료 시 giller_applications 컬렉션에 pending 상태로 저장
- * → 관리자 승인 후 role: 'giller' 활성화
- */
-
-import React, { useCallback, useEffect, useState } from 'react';
+﻿import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
-  View,
-  Text,
-  StyleSheet,
-  TextInput,
-  TouchableOpacity,
-  Alert,
   ActivityIndicator,
-  ScrollView,
+  Alert,
   KeyboardAvoidingView,
   Platform,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
 } from 'react-native';
-import { useUser } from '../../contexts/UserContext';
-import { doc, setDoc, addDoc, collection, serverTimestamp } from 'firebase/firestore';
-import { FirebaseError } from 'firebase/app';
-import { db } from '../../services/firebase';
-import type { StackNavigationProp } from '@react-navigation/stack';
+import { addDoc, collection, doc, serverTimestamp, setDoc } from 'firebase/firestore';
 import { useFocusEffect } from '@react-navigation/native';
+import { FirebaseError } from 'firebase/app';
+import { useUser } from '../../contexts/UserContext';
+import { db } from '../../services/firebase';
 import { getUserVerification, getVerificationStatusDisplay } from '../../services/verification-service';
+import {
+  getBankIntegrationConfig,
+  getIdentityIntegrationConfig,
+  type BankIntegrationConfig,
+  type IdentityIntegrationConfig,
+} from '../../services/integration-config-service';
+import type { MainStackNavigationProp } from '../../types/navigation';
 import type { UserVerification } from '../../types/profile';
-import { getIdentityTestMode } from '../../services/integration-config-service';
 import AppTopBar from '../../components/common/AppTopBar';
 import BankSelectModal from '../../components/common/BankSelectModal';
-
-type Props = { navigation: StackNavigationProp<any> };
+import { createProtectedBankAccount } from '../../../shared/bank-account';
 
 const TOTAL_STEPS = 4;
+const ACCENT = '#0F766E';
 
-export default function GillerApplyScreen({ navigation }: Props) {
+export default function GillerApplyScreen({ navigation }: { navigation: MainStackNavigationProp }) {
   const { user, refreshUser } = useUser();
   const [step, setStep] = useState(1);
   const [loading, setLoading] = useState(false);
+  const [verificationLoading, setVerificationLoading] = useState(false);
+  const [verification, setVerification] = useState<UserVerification | null>(null);
+  const [identityConfig, setIdentityConfig] = useState<IdentityIntegrationConfig | null>(null);
+  const [bankConfig, setBankConfig] = useState<BankIntegrationConfig | null>(null);
+  const [submitHint, setSubmitHint] = useState('');
+  const [bankModalVisible, setBankModalVisible] = useState(false);
 
-  // Step 2 — 기본 정보
-  const [phone, setPhone] = useState(user?.phoneNumber || '');
+  const [phone, setPhone] = useState(user?.phoneNumber ?? '');
   const [routeDescription, setRouteDescription] = useState('');
   const [selfIntroduction, setSelfIntroduction] = useState('');
-
-  // Step 3 — 신원 인증
-  const [passTestMode, setPassTestMode] = useState(true);
-  const [verification, setVerification] = useState<UserVerification | null>(null);
-  const [verificationLoading, setVerificationLoading] = useState(false);
-
-  // Step 4 — 계좌 정보
   const [bankName, setBankName] = useState('');
   const [accountNumber, setAccountNumber] = useState('');
-  const [accountHolder, setAccountHolder] = useState(user?.name || '');
-  const [bankModalVisible, setBankModalVisible] = useState(false);
-  const [submitHint, setSubmitHint] = useState('');
+  const [accountHolder, setAccountHolder] = useState(user?.name ?? '');
 
-  const loadVerification = useCallback(async () => {
-    if (!user?.uid) return;
+  const verificationDisplay = useMemo(() => getVerificationStatusDisplay(verification), [verification]);
+  const identityTestMode = identityConfig?.testMode ?? true;
+  const bankTestMode = bankConfig?.testMode ?? true;
+
+  const load = useCallback(async () => {
+    if (!user?.uid) {
+      return;
+    }
+
     setVerificationLoading(true);
     try {
-      const data = await getUserVerification(user.uid);
-      setVerification(data);
+      const [verificationData, identityData, bankData] = await Promise.all([
+        getUserVerification(user.uid),
+        getIdentityIntegrationConfig(),
+        getBankIntegrationConfig(),
+      ]);
+      setVerification(verificationData);
+      setIdentityConfig(identityData);
+      setBankConfig(bankData);
     } catch (error) {
-      console.error('Verification load error:', error);
+      console.error('Failed to load giller apply screen', error);
     } finally {
       setVerificationLoading(false);
     }
   }, [user?.uid]);
 
   useEffect(() => {
-    loadVerification();
-    getIdentityTestMode().then(setPassTestMode).catch(() => setPassTestMode(true));
-  }, [loadVerification]);
+    void load();
+  }, [load]);
 
   useFocusEffect(
     useCallback(() => {
-      loadVerification();
-    }, [loadVerification])
+      void load();
+    }, [load])
   );
 
-  // 인증 완료 후 IdentityVerificationScreen에서 돌아오면 자동으로 Step 4로 이동
   useEffect(() => {
     if (step === 3 && verification?.status === 'approved') {
       setStep(4);
     }
   }, [step, verification?.status]);
 
-  // ─── Validation ─────────────────────────────────────
+  const steps = ['안내', '기본 정보', '본인확인', '정산 계좌'];
 
-  const validateStep2 = () => {
-    if (!phone.trim()) { Alert.alert('필수 입력', '연락처를 입력해주세요.'); return false; }
+  const validateProfileStep = () => {
+    if (!phone.trim()) {
+      Alert.alert('입력 확인', '연락처를 입력해 주세요.');
+      return false;
+    }
+
     const cleaned = phone.replace(/-/g, '');
-    if (!/^010[0-9]{8}$/.test(cleaned)) { Alert.alert('형식 오류', '올바른 휴대폰 번호를 입력해주세요. (010-XXXX-XXXX)'); return false; }
-    if (!routeDescription.trim()) { Alert.alert('필수 입력', '주로 이용하는 노선을 입력해주세요.'); return false; }
+    if (!/^010[0-9]{8}$/.test(cleaned)) {
+      Alert.alert('입력 확인', '휴대폰 번호를 확인해 주세요.');
+      return false;
+    }
+
+    if (!routeDescription.trim()) {
+      Alert.alert('입력 확인', '주요 이동 구간을 입력해 주세요.');
+      return false;
+    }
+
     return true;
   };
 
-  const validateStep3 = () => {
-    if (passTestMode) {
+  const validateIdentityStep = () => {
+    if (!identityConfig?.requiredForGillerUpgrade) {
       return true;
     }
-    if (!verification) {
-      Alert.alert('인증 필요', '신원 인증을 제출해주세요.');
+
+    if (identityTestMode && identityConfig.allowTestBypass) {
+      return true;
+    }
+
+    if (verification?.status !== 'approved') {
+      Alert.alert('본인확인 필요', '본인확인을 완료해 주세요.');
       return false;
     }
-    if (verification.status === 'rejected') {
-      Alert.alert('인증 반려', '신원 인증이 반려되었습니다. 다시 제출해주세요.');
-      return false;
-    }
+
     return true;
   };
 
-  const validateStep4 = () => {
+  const validateBankStep = () => {
     if (!bankName.trim()) {
-      setSubmitHint('은행을 선택해주세요.');
-      Alert.alert('필수 입력', '은행을 선택해주세요.');
+      setSubmitHint('은행을 선택해 주세요.');
+      Alert.alert('입력 확인', '은행을 선택해 주세요.');
       return false;
     }
+
     if (!accountNumber.trim()) {
-      setSubmitHint('계좌번호를 입력해주세요.');
-      Alert.alert('필수 입력', '계좌번호를 입력해주세요.');
+      setSubmitHint('계좌번호를 입력해 주세요.');
+      Alert.alert('입력 확인', '계좌번호를 입력해 주세요.');
       return false;
     }
+
     if (accountNumber.replace(/-/g, '').length < 10) {
-      setSubmitHint('올바른 계좌번호를 입력해주세요.');
-      Alert.alert('형식 오류', '올바른 계좌번호를 입력해주세요.');
+      setSubmitHint('계좌번호를 확인해 주세요.');
+      Alert.alert('입력 확인', '계좌번호를 확인해 주세요.');
       return false;
     }
+
     if (!accountHolder.trim()) {
-      setSubmitHint('예금주명을 입력해주세요.');
-      Alert.alert('필수 입력', '예금주명을 입력해주세요.');
+      setSubmitHint('예금주명을 입력해 주세요.');
+      Alert.alert('입력 확인', '예금주명을 입력해 주세요.');
       return false;
     }
+
     return true;
   };
 
-  // ─── Navigation ─────────────────────────────────────
-
-  const goNext = async () => {
-    if (step === 2 && !validateStep2()) return;
-    if (step === 3 && !validateStep3()) return;
+  const handleNext = async () => {
+    if (step === 2 && !validateProfileStep()) {
+      return;
+    }
+    if (step === 3 && !validateIdentityStep()) {
+      return;
+    }
     if (step === 4) {
       await handleSubmit();
       return;
     }
-    setStep((s) => s + 1);
+    setStep((current) => current + 1);
   };
 
-  const goBack = () => {
-    if (step === 1) { navigation.goBack(); return; }
-    setStep((s) => s - 1);
+  const handleBack = () => {
+    if (step === 1) {
+      navigation.goBack();
+      return;
+    }
+    setStep((current) => current - 1);
   };
-
-  // ─── Submit ──────────────────────────────────────────
 
   const handleSubmit = async () => {
     setSubmitHint('');
-    if (!validateStep4()) return;
-    if (!user?.uid) { Alert.alert('오류', '로그인 정보를 찾을 수 없습니다.'); return; }
+    if (!validateBankStep()) {
+      return;
+    }
+    if (!user?.uid) {
+      Alert.alert('로그인 필요', '사용자 정보를 찾을 수 없습니다.');
+      return;
+    }
 
     setLoading(true);
-    setSubmitHint('신청을 처리하고 있습니다...');
+    setSubmitHint('신청을 접수하고 있습니다.');
+
     try {
-      // 1. giller_applications 컬렉션에 신청서 저장
+      const bankVerificationStatus =
+        bankTestMode && bankConfig?.allowTestBypass ? 'approved_test_bypass' : 'manual_review';
+      const protectedBankAccount = createProtectedBankAccount({
+        bankName,
+        accountNumber,
+        accountHolder,
+        verificationStatus: bankVerificationStatus,
+      });
+
       await addDoc(collection(db, 'giller_applications'), {
         userId: user.uid,
         userName: user.name,
         phone: phone.trim(),
         routeDescription: routeDescription.trim(),
         selfIntroduction: selfIntroduction.trim(),
-        verificationStatus: passTestMode ? 'approved' : verification?.status ?? 'not_submitted',
-        bankAccount: {
-          bankName: bankName.trim(),
-          accountNumber: accountNumber.replace(/-/g, ''),
-          accountHolder: accountHolder.trim(),
+        verificationStatus:
+          identityTestMode && identityConfig?.allowTestBypass
+            ? 'approved_test_bypass'
+            : verification?.status ?? 'not_submitted',
+        verificationProvider: verification?.externalAuth?.provider ?? null,
+        bankAccount: protectedBankAccount,
+        integrationSnapshot: {
+          identity: {
+            testMode: identityTestMode,
+            liveReady: identityConfig?.liveReady ?? false,
+            allowTestBypass: identityConfig?.allowTestBypass ?? true,
+          },
+          bank: {
+            testMode: bankTestMode,
+            liveReady: bankConfig?.liveReady ?? false,
+            allowTestBypass: bankConfig?.allowTestBypass ?? true,
+            provider: bankConfig?.provider ?? 'manual_review',
+            verificationMode: bankConfig?.verificationMode ?? 'manual_review',
+          },
         },
         status: 'pending',
         createdAt: serverTimestamp(),
       });
 
-      // 2. 사용자 문서에 신청 중 상태 + 계좌 정보 저장 (role은 관리자 승인 후 변경)
-      await setDoc(doc(db, 'users', user.uid), {
-        gillerApplicationStatus: 'pending',
-        gillerInfo: {
-          bankAccount: {
-            bankName: bankName.trim(),
-            accountNumber: accountNumber.replace(/-/g, ''),
-            accountHolder: accountHolder.trim(),
+      await setDoc(
+        doc(db, 'users', user.uid),
+        {
+          gillerApplicationStatus: 'pending',
+          gillerInfo: {
+            bankAccount: protectedBankAccount,
+            identityVerificationStatus:
+              identityTestMode && identityConfig?.allowTestBypass
+                ? 'approved_test_bypass'
+                : verification?.status ?? 'not_submitted',
           },
+          updatedAt: serverTimestamp(),
         },
-        updatedAt: serverTimestamp(),
-      }, { merge: true });
+        { merge: true }
+      );
 
       await refreshUser();
-      setSubmitHint('신청이 정상 접수되었습니다.');
-
-      Alert.alert(
-        '신청 완료 🎉',
-        '길러 신청이 접수되었습니다.\n\n관리자 심사 후 결과를 앱 알림으로 알려드립니다.\n보통 1~3 영업일 내 처리됩니다.',
-        [{
-          text: '확인',
-          onPress: () => navigation.navigate('Tabs', { screen: 'Home' } as never),
-        }]
-      );
+      Alert.alert('신청 완료', '길러 신청이 접수되었습니다.', [
+        { text: '확인', onPress: () => navigation.navigate('Tabs', { screen: 'Profile' }) },
+      ]);
     } catch (error) {
-      console.error('길러 신청 오류:', error);
-      const firebaseMessage =
-        error instanceof FirebaseError ? `${error.code}: ${error.message}` : null;
-      const message = firebaseMessage || (error instanceof Error ? error.message : '신청 처리 중 문제가 발생했습니다.');
-      setSubmitHint(`오류: ${message}`);
-      Alert.alert('오류', '신청 처리 중 문제가 발생했습니다. 다시 시도해주세요.');
+      console.error('Failed to submit giller application', error);
+      const message =
+        error instanceof FirebaseError
+          ? `${error.code}: ${error.message}`
+          : error instanceof Error
+            ? error.message
+            : '신청 처리 중 문제가 발생했습니다.';
+      setSubmitHint(message);
+      Alert.alert('신청 실패', '잠시 후 다시 시도해 주세요.');
     } finally {
       setLoading(false);
     }
   };
 
-  // ─── Render Steps ────────────────────────────────────
+  const renderStep = () => {
+    switch (step) {
+      case 1:
+        return (
+          <ScrollView style={styles.stepContent} showsVerticalScrollIndicator={false}>
+            <Text style={styles.stepTitle}>길러 신청</Text>
+            <Text style={styles.stepDescription}>기본 정보와 계좌를 등록하면 심사로 넘어갑니다.</Text>
 
-  const renderStep1 = () => (
-    <ScrollView style={styles.stepContent} showsVerticalScrollIndicator={false}>
-      <Text style={styles.stepTitle}>길러 신청 안내</Text>
-      <Text style={styles.stepDescription}>
-        길러는 출퇴근 동선으로 이웃의 물건을 배달하고 수익을 얻는 배송 파트너입니다.{'\n'}
-        아래 내용을 확인하고 신청을 시작하세요.
-      </Text>
+            <View style={styles.card}>
+              <Text style={styles.cardTitle}>진행 순서</Text>
+              {steps.map((item, index) => (
+                <View key={item} style={styles.timelineRow}>
+                  <View style={styles.timelineIndex}>
+                    <Text style={styles.timelineIndexText}>{index + 1}</Text>
+                  </View>
+                  <Text style={styles.timelineText}>{item}</Text>
+                </View>
+              ))}
+            </View>
 
-      <View style={styles.infoCard}>
-        <Text style={styles.infoCardTitle}>📋 신청 절차</Text>
-        {['기본 정보 입력 (연락처, 노선)', '신원 인증 제출', '정산 계좌 등록', '관리자 심사 (1~3 영업일)'].map((t, i) => (
-          <View key={i} style={styles.infoRow}>
-            <View style={styles.stepBadge}><Text style={styles.stepBadgeText}>{i + 1}</Text></View>
-            <Text style={styles.infoText}>{t}</Text>
-          </View>
-        ))}
-      </View>
+            <View style={[styles.card, styles.alertCard]}>
+              <Text style={styles.alertText}>본인확인: {identityTestMode ? '테스트 가능' : '실서비스 대기'}</Text>
+              <Text style={styles.alertText}>계좌확인: {bankTestMode ? '테스트 또는 수동 검토' : '실서비스 대기'}</Text>
+            </View>
+          </ScrollView>
+        );
+      case 2:
+        return (
+          <ScrollView style={styles.stepContent} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
+            <Text style={styles.stepTitle}>기본 정보</Text>
+            <Text style={styles.stepDescription}>연락처와 활동 정보를 입력해 주세요.</Text>
 
-      <View style={styles.infoCard}>
-        <Text style={styles.infoCardTitle}>✅ 심사 기준</Text>
-        {[
-          '만 19세 이상 성인',
-          '정기적인 지하철 출퇴근 가능',
-          '배송 물품 안전 취급 가능',
-          '앱 서비스 정책 준수',
-        ].map((t, i) => (
-          <View key={i} style={styles.infoRow}>
-            <Text style={styles.bullet}>•</Text>
-            <Text style={styles.infoText}>{t}</Text>
-          </View>
-        ))}
-      </View>
+            <InputField
+              label="연락처"
+              value={phone}
+              onChangeText={setPhone}
+              placeholder="010-0000-0000"
+              keyboardType="phone-pad"
+            />
+            <InputField
+              label="주요 이동 구간"
+              value={routeDescription}
+              onChangeText={setRouteDescription}
+              placeholder="예: 강남-여의도, 평일 저녁 이동"
+            />
+            <InputField
+              label="소개"
+              value={selfIntroduction}
+              onChangeText={setSelfIntroduction}
+              placeholder="선택 입력"
+              multiline
+            />
+          </ScrollView>
+        );
+      case 3:
+        return (
+          <ScrollView style={styles.stepContent} showsVerticalScrollIndicator={false}>
+            <Text style={styles.stepTitle}>본인확인</Text>
+            <Text style={styles.stepDescription}>현재 상태를 확인합니다.</Text>
 
-      <View style={[styles.infoCard, styles.warningCard]}>
-        <Text style={styles.warningText}>
-          ⚠️ 현재 신원 인증 및 계좌 인증은 테스트 모드로 운영될 수 있습니다. 정식 서비스 출시 전 실제 인증으로 전환될 예정입니다.
-        </Text>
-      </View>
-    </ScrollView>
-  );
-
-  const renderStep2 = () => (
-    <ScrollView style={styles.stepContent} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
-      <Text style={styles.stepTitle}>기본 정보</Text>
-      <Text style={styles.stepDescription}>연락처와 주로 이용하는 노선을 알려주세요.</Text>
-
-      <View style={styles.field}>
-        <Text style={styles.label}>휴대폰 번호 *</Text>
-        <TextInput
-          style={styles.input}
-          placeholder="010-0000-0000"
-          value={phone}
-          onChangeText={setPhone}
-          keyboardType="phone-pad"
-        />
-      </View>
-
-      <View style={styles.field}>
-        <Text style={styles.label}>주 이용 노선 *</Text>
-        <TextInput
-          style={styles.input}
-          placeholder="예: 2호선 강남역 ↔ 홍대입구역 (평일 출근)"
-          value={routeDescription}
-          onChangeText={setRouteDescription}
-        />
-        <Text style={styles.helper}>배송 가능한 경로를 구체적으로 적어주세요.</Text>
-      </View>
-
-      <View style={styles.field}>
-        <Text style={styles.label}>자기소개 (선택)</Text>
-        <TextInput
-          style={[styles.input, styles.textarea]}
-          placeholder="간단한 자기소개나 배송 경험을 입력해주세요."
-          value={selfIntroduction}
-          onChangeText={setSelfIntroduction}
-          multiline
-          numberOfLines={4}
-          textAlignVertical="top"
-        />
-      </View>
-    </ScrollView>
-  );
-
-  const renderStep3 = () => (
-    <ScrollView style={styles.stepContent} showsVerticalScrollIndicator={false}>
-      <Text style={styles.stepTitle}>신원 인증</Text>
-      <Text style={styles.stepDescription}>
-        PASS/카카오 인증을 완료한 뒤 다음 단계로 이동해주세요.
-      </Text>
-
-      {passTestMode && (
-        <View style={styles.testBanner}>
-          <Text style={styles.testBannerTitle}>🧪 테스트 모드</Text>
-          <Text style={styles.testBannerText}>
-            테스트 모드에서는 인증 제출 없이 다음 단계로 진행됩니다.{'\n'}
-            정식 서비스 전 실명 인증으로 전환됩니다.
-          </Text>
-        </View>
-      )}
-
-      {!passTestMode && (
-        <>
-          <View style={styles.verifiedBox}>
-            <Text style={styles.verifiedIcon}>
-              {verification ? getVerificationStatusDisplay(verification).icon : '❓'}
-            </Text>
-            <Text style={styles.verifiedText}>
-              {verification
-                ? getVerificationStatusDisplay(verification).description
-                : '신원 인증을 제출해주세요.'}
-            </Text>
-          </View>
-          {verification?.status !== 'approved' && (
-            <>
-              <TouchableOpacity
-                style={styles.passButton}
-                disabled={verificationLoading}
-                onPress={() => navigation.navigate('IdentityVerification')}
-              >
-                <Text style={styles.passButtonText}>PASS/카카오 인증 진행하기</Text>
-              </TouchableOpacity>
-              <Text style={styles.step3GuideText}>
-                인증 완료 후 이 화면으로 돌아와 하단 `다음` 버튼을 눌러주세요.
+            <View style={styles.card}>
+              <Text style={styles.cardTitle}>현재 상태</Text>
+              <Text style={styles.statusHeadline}>{verificationDisplay.statusKo}</Text>
+              <Text style={styles.statusBody}>{verificationDisplay.description}</Text>
+              <Text style={styles.helperText}>
+                PASS {identityConfig?.providers.pass.liveReady ? '준비됨' : '대기'} / Kakao {identityConfig?.providers.kakao.liveReady ? '준비됨' : '대기'}
               </Text>
-            </>
-          )}
-          {verification?.status === 'approved' && (
-            <TouchableOpacity
-              style={styles.step3NextButton}
-              onPress={() => setStep(4)}
-              activeOpacity={0.85}
-            >
-              <Text style={styles.step3NextButtonText}>인증 완료 - 다음 단계로 이동</Text>
-            </TouchableOpacity>
-          )}
-        </>
-      )}
-    </ScrollView>
-  );
+            </View>
 
-  const renderStep4 = () => (
-    <ScrollView style={styles.stepContent} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
-      <Text style={styles.stepTitle}>정산 계좌 등록</Text>
-      <Text style={styles.stepDescription}>
-        배송 수익을 받을 계좌를 등록해주세요.
-      </Text>
+            {verification?.status === 'approved' ? (
+              <TouchableOpacity style={styles.secondaryAction} onPress={() => setStep(4)} activeOpacity={0.9}>
+                <Text style={styles.secondaryActionText}>다음 단계</Text>
+              </TouchableOpacity>
+            ) : (
+              <>
+                <TouchableOpacity
+                  style={styles.primaryAction}
+                  onPress={() => navigation.navigate('IdentityVerification')}
+                  disabled={verificationLoading}
+                  activeOpacity={0.9}
+                >
+                  <Text style={styles.primaryActionText}>본인확인 하러 가기</Text>
+                </TouchableOpacity>
+                <Text style={styles.helperText}>완료 후 돌아오면 계속 진행됩니다.</Text>
+              </>
+            )}
+          </ScrollView>
+        );
+      default:
+        return (
+          <ScrollView style={styles.stepContent} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
+            <Text style={styles.stepTitle}>정산 계좌</Text>
+            <Text style={styles.stepDescription}>계좌 정보를 입력해 주세요.</Text>
 
-      {/* 테스트 모드 배너 */}
-      <View style={styles.testBanner}>
-        <Text style={styles.testBannerTitle}>🧪 테스트 모드</Text>
-        <Text style={styles.testBannerText}>
-          현재 1원 계좌인증이 구현되지 않아 형식 검증만 진행합니다.{'\n'}
-          정식 서비스 전 실계좌 인증으로 전환됩니다.
-        </Text>
-      </View>
+            <View style={[styles.card, styles.infoCard]}>
+              <Text style={styles.cardTitle}>{bankTestMode ? '테스트 또는 수동 검토' : '실서비스 준비 상태'}</Text>
+              <Text style={styles.statusBody}>
+                {bankConfig?.statusMessage ?? '관리자 설정 상태를 불러오고 있습니다.'}
+              </Text>
+            </View>
 
-      <View style={styles.field}>
-        <Text style={styles.label}>은행 *</Text>
-        <TouchableOpacity
-          style={styles.bankSelectButton}
-          onPress={() => setBankModalVisible(true)}
-          activeOpacity={0.8}
-        >
-          <Text style={[styles.bankSelectText, !bankName && styles.bankSelectPlaceholder]}>
-            {bankName || '은행을 선택해주세요'}
-          </Text>
-          <Text style={styles.bankSelectArrow}>▾</Text>
-        </TouchableOpacity>
-      </View>
+            <View style={styles.field}>
+              <Text style={styles.label}>은행</Text>
+              <TouchableOpacity style={styles.bankButton} onPress={() => setBankModalVisible(true)} activeOpacity={0.9}>
+                <Text style={[styles.bankButtonText, !bankName && styles.bankPlaceholder]}>
+                  {bankName || '은행 선택'}
+                </Text>
+                <Text style={styles.bankButtonArrow}>{'>'}</Text>
+              </TouchableOpacity>
+            </View>
 
-      <View style={styles.field}>
-        <Text style={styles.label}>계좌번호 *</Text>
-        <TextInput
-          style={styles.input}
-          placeholder="숫자만 입력 (하이픈 제외)"
-          value={accountNumber}
-          onChangeText={setAccountNumber}
-          keyboardType="number-pad"
-        />
-        <Text style={styles.helper}>계좌번호는 암호화되어 안전하게 보관됩니다.</Text>
-      </View>
-
-      <View style={styles.field}>
-        <Text style={styles.label}>예금주 *</Text>
-        <TextInput
-          style={styles.input}
-          placeholder="예금주 이름"
-          value={accountHolder}
-          onChangeText={setAccountHolder}
-        />
-      </View>
-    </ScrollView>
-  );
-
-  // ─── Layout ──────────────────────────────────────────
+            <InputField
+              label="계좌번호"
+              value={accountNumber}
+              onChangeText={setAccountNumber}
+              placeholder="숫자만 입력"
+              keyboardType="number-pad"
+            />
+            <InputField
+              label="예금주명"
+              value={accountHolder}
+              onChangeText={setAccountHolder}
+              placeholder="예금주명"
+            />
+          </ScrollView>
+        );
+    }
+  };
 
   return (
-    <KeyboardAvoidingView
-      style={styles.container}
-      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-    >
-      <AppTopBar title="길러 신청" onBack={goBack} />
+    <KeyboardAvoidingView style={styles.container} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
+      <AppTopBar title="길러 신청" onBack={handleBack} />
 
-      {/* 프로그레스 바 */}
       <View style={styles.progressTrack}>
         <View style={[styles.progressFill, { width: `${(step / TOTAL_STEPS) * 100}%` }]} />
       </View>
-      <Text style={styles.progressLabel}>{step} / {TOTAL_STEPS} 단계</Text>
+      <Text style={styles.progressLabel}>
+        {step} / {TOTAL_STEPS} 단계 · {steps[step - 1]}
+      </Text>
 
-      {/* 컨텐츠 */}
-      {step === 1 && renderStep1()}
-      {step === 2 && renderStep2()}
-      {step === 3 && renderStep3()}
-      {step === 4 && renderStep4()}
+      {renderStep()}
 
-      {/* 다음/완료 버튼 */}
       <View style={styles.footer}>
         <TouchableOpacity
-          style={[styles.nextButton, loading && styles.disabled]}
-          onPress={() => { void goNext(); }}
+          style={[styles.footerButton, loading && styles.footerButtonDisabled]}
+          onPress={() => void handleNext()}
           disabled={loading}
-          activeOpacity={0.8}
+          activeOpacity={0.9}
         >
           {loading ? (
-            <ActivityIndicator color="#fff" />
+            <ActivityIndicator color="#FFFFFF" />
           ) : (
-            <Text style={styles.nextButtonText}>
-              {step === TOTAL_STEPS ? '신청 완료하기' : '다음'}
-            </Text>
+            <Text style={styles.footerButtonText}>{step === TOTAL_STEPS ? '신청하기' : '다음'}</Text>
           )}
         </TouchableOpacity>
-        {!!submitHint && <Text style={styles.submitHintText}>{submitHint}</Text>}
+        {submitHint ? <Text style={styles.submitHint}>{submitHint}</Text> : null}
       </View>
 
       <BankSelectModal
         visible={bankModalVisible}
+        selectedBank={bankName}
         onClose={() => setBankModalVisible(false)}
-        onSelect={(selectedBank) => {
+        onSelect={(selectedBank: string) => {
           setBankName(selectedBank);
           setBankModalVisible(false);
         }}
-        selectedBank={bankName}
       />
     </KeyboardAvoidingView>
   );
 }
 
-const ACCENT = '#4CAF50';
+function InputField({
+  label,
+  value,
+  onChangeText,
+  placeholder,
+  helper,
+  multiline,
+  keyboardType,
+}: {
+  label: string;
+  value: string;
+  onChangeText: (value: string) => void;
+  placeholder: string;
+  helper?: string;
+  multiline?: boolean;
+  keyboardType?: 'default' | 'phone-pad' | 'number-pad';
+}) {
+  return (
+    <View style={styles.field}>
+      <Text style={styles.label}>{label}</Text>
+      <TextInput
+        style={[styles.input, multiline ? styles.textArea : undefined]}
+        value={value}
+        onChangeText={onChangeText}
+        placeholder={placeholder}
+        placeholderTextColor="#94A3B8"
+        multiline={multiline}
+        keyboardType={keyboardType ?? 'default'}
+        textAlignVertical={multiline ? 'top' : 'center'}
+      />
+      {helper ? <Text style={styles.helperText}>{helper}</Text> : null}
+    </View>
+  );
+}
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#fff' },
-  progressTrack: { height: 4, backgroundColor: '#f0f0f0' },
-  progressFill: { height: '100%', backgroundColor: ACCENT },
-  progressLabel: { fontSize: 12, color: '#999', textAlign: 'center', marginTop: 8 },
-  stepContent: { flex: 1, padding: 20 },
-  stepTitle: { fontSize: 22, fontWeight: 'bold', color: '#333', marginBottom: 10 },
-  stepDescription: { fontSize: 15, color: '#666', lineHeight: 24, marginBottom: 24 },
-  infoCard: {
-    backgroundColor: '#f8f8f8',
-    borderRadius: 12,
-    padding: 16,
+  container: {
+    flex: 1,
+    backgroundColor: '#F8FAFC',
+  },
+  progressTrack: {
+    height: 6,
+    backgroundColor: '#E2E8F0',
+  },
+  progressFill: {
+    height: 6,
+    backgroundColor: ACCENT,
+  },
+  progressLabel: {
+    paddingHorizontal: 20,
+    paddingTop: 12,
+    color: '#475467',
+    fontSize: 13,
+    fontWeight: '700',
+  },
+  stepContent: {
+    flex: 1,
+    paddingHorizontal: 20,
+    paddingTop: 16,
+  },
+  stepTitle: {
+    fontSize: 28,
+    fontWeight: '800',
+    color: '#0F172A',
+    marginBottom: 8,
+  },
+  stepDescription: {
+    fontSize: 15,
+    lineHeight: 22,
+    color: '#64748B',
+    marginBottom: 20,
+  },
+  card: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 24,
+    padding: 20,
+    gap: 12,
+    shadowColor: '#0F172A',
+    shadowOpacity: 0.06,
+    shadowRadius: 10,
+    shadowOffset: { width: 0, height: 4 },
+    elevation: 3,
     marginBottom: 16,
   },
-  warningCard: { backgroundColor: '#FFF8E1', borderWidth: 1, borderColor: '#FFD54F' },
-  infoCardTitle: { fontSize: 15, fontWeight: 'bold', color: '#333', marginBottom: 12 },
-  infoRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 10 },
-  stepBadge: {
-    width: 24, height: 24, borderRadius: 12,
-    backgroundColor: ACCENT, alignItems: 'center', justifyContent: 'center', marginRight: 10,
+  infoCard: {
+    backgroundColor: '#F0FDFA',
   },
-  stepBadgeText: { color: '#fff', fontSize: 12, fontWeight: 'bold' },
-  bullet: { fontSize: 16, color: ACCENT, marginRight: 10 },
-  infoText: { fontSize: 14, color: '#555', flex: 1, lineHeight: 20 },
-  warningText: { fontSize: 13, color: '#795548', lineHeight: 20 },
-  field: { marginBottom: 20 },
-  label: { fontSize: 14, fontWeight: '600', color: '#333', marginBottom: 8 },
+  cardTitle: {
+    fontSize: 17,
+    fontWeight: '800',
+    color: '#0F172A',
+  },
+  field: {
+    marginBottom: 16,
+    gap: 8,
+  },
+  label: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#334155',
+  },
   input: {
-    backgroundColor: '#fafafa',
     borderWidth: 1,
-    borderColor: '#ddd',
-    borderRadius: 10,
-    paddingHorizontal: 14,
-    paddingVertical: 13,
+    borderColor: '#CBD5E1',
+    borderRadius: 16,
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    backgroundColor: '#FFFFFF',
+    color: '#0F172A',
     fontSize: 15,
-    color: '#333',
   },
-  bankSelectButton: {
-    backgroundColor: '#fafafa',
+  textArea: {
+    minHeight: 120,
+  },
+  helperText: {
+    fontSize: 13,
+    lineHeight: 19,
+    color: '#64748B',
+  },
+  timelineRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  timelineIndex: {
+    width: 30,
+    height: 30,
+    borderRadius: 15,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#DBEAFE',
+  },
+  timelineIndexText: {
+    fontSize: 14,
+    fontWeight: '800',
+    color: '#1D4ED8',
+  },
+  timelineText: {
+    flex: 1,
+    fontSize: 15,
+    color: '#334155',
+  },
+  alertCard: {
+    backgroundColor: '#FFF7ED',
+  },
+  alertText: {
+    fontSize: 14,
+    lineHeight: 20,
+    color: '#9A3412',
+  },
+  statusHeadline: {
+    fontSize: 20,
+    fontWeight: '800',
+    color: '#0F172A',
+  },
+  statusBody: {
+    fontSize: 14,
+    lineHeight: 21,
+    color: '#475467',
+  },
+  primaryAction: {
+    minHeight: 52,
+    borderRadius: 18,
+    backgroundColor: ACCENT,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 12,
+  },
+  primaryActionText: {
+    fontSize: 15,
+    fontWeight: '800',
+    color: '#FFFFFF',
+  },
+  secondaryAction: {
+    minHeight: 52,
+    borderRadius: 18,
+    backgroundColor: '#DBEAFE',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 12,
+  },
+  secondaryActionText: {
+    fontSize: 15,
+    fontWeight: '800',
+    color: '#1D4ED8',
+  },
+  bankButton: {
     borderWidth: 1,
-    borderColor: '#ddd',
-    borderRadius: 10,
-    paddingHorizontal: 14,
-    paddingVertical: 13,
+    borderColor: '#CBD5E1',
+    borderRadius: 16,
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    backgroundColor: '#FFFFFF',
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
   },
-  bankSelectText: {
+  bankButtonText: {
     fontSize: 15,
-    color: '#333',
+    color: '#0F172A',
   },
-  bankSelectPlaceholder: {
-    color: '#9CA3AF',
+  bankPlaceholder: {
+    color: '#94A3B8',
   },
-  bankSelectArrow: {
-    fontSize: 16,
-    color: '#6B7280',
-  },
-  textarea: { height: 100, textAlignVertical: 'top' },
-  helper: { fontSize: 12, color: '#999', marginTop: 6 },
-  testBanner: {
-    backgroundColor: '#FFF3CD',
-    borderLeftWidth: 4,
-    borderLeftColor: '#FF9800',
-    borderRadius: 8,
-    padding: 14,
-    marginBottom: 20,
-  },
-  testBannerTitle: { fontSize: 14, fontWeight: 'bold', color: '#E65100', marginBottom: 4 },
-  testBannerText: { fontSize: 13, color: '#795548', lineHeight: 20 },
-  verifiedBox: {
-    backgroundColor: '#E8F5E9',
-    borderRadius: 12,
-    padding: 20,
-    alignItems: 'center',
-    gap: 8,
-  },
-  verifiedIcon: { fontSize: 36 },
-  verifiedText: { fontSize: 15, color: '#2E7D32', textAlign: 'center' },
-  passButton: {
-    backgroundColor: '#FFC107',
-    borderRadius: 10,
-    padding: 16,
-    alignItems: 'center',
-    marginTop: 8,
-  },
-  passButtonText: { fontSize: 15, fontWeight: 'bold', color: '#333' },
-  step3GuideText: {
-    marginTop: 10,
-    fontSize: 12,
-    color: '#6B7280',
-    textAlign: 'center',
-  },
-  step3NextButton: {
-    marginTop: 12,
-    backgroundColor: '#0F766E',
-    borderRadius: 10,
-    padding: 14,
-    alignItems: 'center',
-  },
-  step3NextButtonText: {
-    fontSize: 14,
+  bankButtonArrow: {
+    fontSize: 18,
+    color: '#64748B',
     fontWeight: '700',
-    color: '#fff',
   },
   footer: {
-    padding: 20,
+    paddingHorizontal: 20,
+    paddingTop: 12,
+    paddingBottom: Platform.OS === 'ios' ? 28 : 20,
+    backgroundColor: '#FFFFFF',
     borderTopWidth: 1,
-    borderTopColor: '#f0f0f0',
-    backgroundColor: '#fff',
+    borderTopColor: '#E5E7EB',
   },
-  nextButton: {
+  footerButton: {
+    minHeight: 54,
+    borderRadius: 18,
     backgroundColor: ACCENT,
-    borderRadius: 12,
-    paddingVertical: 16,
     alignItems: 'center',
+    justifyContent: 'center',
   },
-  disabled: { opacity: 0.5 },
-  nextButtonText: { color: '#fff', fontSize: 16, fontWeight: 'bold' },
-  submitHintText: {
+  footerButtonDisabled: {
+    opacity: 0.6,
+  },
+  footerButtonText: {
+    fontSize: 16,
+    fontWeight: '800',
+    color: '#FFFFFF',
+  },
+  submitHint: {
     marginTop: 10,
-    textAlign: 'center',
-    fontSize: 12,
-    color: '#6B7280',
+    fontSize: 13,
+    lineHeight: 18,
+    color: '#B42318',
   },
 });

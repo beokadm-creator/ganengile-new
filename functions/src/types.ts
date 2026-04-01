@@ -175,6 +175,12 @@ export interface TriggerMatchingData {
 export interface TriggerMatchingResult {
   success: boolean;
   matchesFound: number;
+  matches?: Array<{
+    matchId: string;
+    gillerId: string;
+    gillerName: string;
+    score: number;
+  }>;
 }
 
 export interface SaveFCMTokenData {

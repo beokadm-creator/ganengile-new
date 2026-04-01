@@ -9,6 +9,7 @@ import {
 } from '../types/payment';
 import { GillerType } from '../types/user';
 import { UrgencyLevel } from '../types/matching';
+import { calculateWithholdingTax, SETTLEMENT_POLICY } from '../constants/settlementPolicy';
 
 const COMMISSION_CONSTANTS = {
   BASE_RATE: 0.05,
@@ -23,7 +24,7 @@ const COMMISSION_CONSTANTS = {
     [UrgencyLevel.URGENT]: 0.20,
     [UrgencyLevel.VERY_URGENT]: 0.50,
   },
-  TAX_RATE: 0.033,
+  TAX_RATE: SETTLEMENT_POLICY.combinedWithholdingRate,
 };
 
 export class CommissionService {
@@ -78,7 +79,7 @@ export class CommissionService {
   }
 
   static calculateTax(amount: number): number {
-    return Math.round(amount * COMMISSION_CONSTANTS.TAX_RATE);
+    return calculateWithholdingTax(amount);
   }
 
   static calculateNetSettlement(

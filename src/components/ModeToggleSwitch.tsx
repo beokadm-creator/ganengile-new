@@ -1,178 +1,177 @@
-/**
- * Mode Toggle Switch Component
- * 모드 전환 토글 (P0-4)
- *
- * 기능:
- * - 정기 동선 / 일회성 모드 전환
- * - 슬라이더 애니메이션
- * - 현재 모드 표시
- * - 모드별 설명 표시
- */
-
-import React, { useState, useEffect } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import {
-  View,
-  Text,
-  StyleSheet,
-  TouchableOpacity,
   Animated,
-  Dimensions,
+  LayoutChangeEvent,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
+  type DimensionValue,
+  type StyleProp,
+  type ViewStyle,
 } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Colors, Typography, Spacing, BorderRadius } from '../../theme';
+import { doc, onSnapshot, updateDoc } from 'firebase/firestore';
+import { db } from '../core/firebase';
+import { useAuth } from '../contexts/AuthContext';
+import { BorderRadius, Colors, Shadows, Spacing, Typography } from '../theme';
 
 export type GillerMode = 'regular' | 'onetime';
 
 interface Props {
   mode: GillerMode;
   onModeChange: (mode: GillerMode) => void;
-  style?: any;
+  style?: StyleProp<ViewStyle>;
 }
 
 export default function ModeToggleSwitch({ mode, onModeChange, style }: Props) {
-  const [sliderAnim] = useState(new Animated.Value(0));
-  const _insets = useSafeAreaInsets();
+  const { user } = useAuth();
+  const [containerWidth, setContainerWidth] = useState(0);
+  const [animValue] = useState(() => new Animated.Value(mode === 'onetime' ? 0 : 1));
 
   useEffect(() => {
-    // 모드 변경 시 애니메이션
-    Animated.timing(sliderAnim, {
+    Animated.spring(animValue, {
       toValue: mode === 'onetime' ? 0 : 1,
-      duration: 300,
+      friction: 8,
+      tension: 40,
       useNativeDriver: true,
     }).start();
-  }, [mode]);
+  }, [animValue, mode]);
 
-  const _handleModeToggle = () => {
-    const newMode: GillerMode = mode === 'regular' ? 'onetime' : 'regular';
-    onModeChange(newMode);
+  useEffect(() => {
+    if (!user?.uid) {
+      return;
+    }
+
+    const unsubscribe = onSnapshot(doc(db, 'users', user.uid), (snapshot) => {
+      if (!snapshot.exists()) {
+        return;
+      }
+
+      const enabled = Boolean(snapshot.data().onetimeModeEnabled);
+      onModeChange(enabled ? 'onetime' : 'regular');
+    });
+
+    return () => unsubscribe();
+  }, [onModeChange, user?.uid]);
+
+  const handleToggle = async (nextMode: GillerMode) => {
+    if (!user?.uid || nextMode === mode) {
+      return;
+    }
+
+    try {
+      await updateDoc(doc(db, 'users', user.uid), {
+        onetimeModeEnabled: nextMode === 'onetime',
+      });
+      onModeChange(nextMode);
+    } catch (error) {
+      console.error('Failed to toggle giller mode', error);
+    }
   };
 
-  const getSliderWidth = () => {
-    const screenWidth = Dimensions.get('window').width;
-    const cardWidth = screenWidth - Spacing.md * 2;
-    return (cardWidth - Spacing.md) / 2 - 4;
+  const handleLayout = (event: LayoutChangeEvent) => {
+    setContainerWidth(event.nativeEvent.layout.width);
   };
 
-  const sliderWidth = getSliderWidth();
+  const sliderWidth = useMemo(() => {
+    if (containerWidth <= 12) {
+      return 0;
+    }
+    return Math.max((containerWidth - 12) / 2, 0);
+  }, [containerWidth]);
+
+  const sliderTranslateX = useMemo(
+    () =>
+      animValue.interpolate({
+        inputRange: [0, 1],
+        outputRange: [4, sliderWidth + 8],
+      }),
+    [animValue, sliderWidth],
+  );
+
+  const sliderHeight: DimensionValue = 92;
 
   return (
     <View style={[styles.container, style]}>
-      {/* 헤더 텍스트 */}
       <View style={styles.header}>
         <Text style={styles.headerTitle}>길러 모드</Text>
         <Text style={styles.headerSubtitle}>
           {mode === 'onetime'
-            ? '현재 위치에서 일회성 배송을 수락합니다'
-            : '등록된 동선으로 배송합니다'}
+            ? '현재 위치 주변 즉시 요청을 빠르게 확인합니다.'
+            : '등록한 이동 경로를 기준으로 미션을 추천받습니다.'}
         </Text>
       </View>
 
-      {/* 모드 토글 컨테이너 */}
-      <View style={styles.toggleContainer}>
-        {/* 배경 */}
+      <View style={styles.toggleContainer} onLayout={handleLayout}>
         <View style={styles.toggleBackground}>
-          {/* 일회성 모드 */}
           <TouchableOpacity
+            activeOpacity={0.85}
+            onPress={() => void handleToggle('onetime')}
             style={[styles.modeButton, styles.modeButtonLeft]}
-            onPress={() => onModeChange('onetime')}
-            activeOpacity={0.7}
           >
             <View style={styles.modeContent}>
-              <Text style={[styles.modeIcon, mode === 'onetime' && styles.modeIconActive]}>
-                📍
-              </Text>
-              <Text style={[styles.modeTitle, mode === 'onetime' && styles.modeTitleActive]}>
-                일회성
-              </Text>
-              <Text
-                style={[styles.modeDescription, mode === 'onetime' && styles.modeDescriptionActive]}
-              >
-                현재 위치에서 수락
+              <Text style={[styles.modeIcon, mode === 'onetime' && styles.modeIconActive]}>번개</Text>
+              <Text style={[styles.modeTitle, mode === 'onetime' && styles.modeTitleActive]}>즉시형</Text>
+              <Text style={[styles.modeDescription, mode === 'onetime' && styles.modeDescriptionActive]}>
+                현재 위치 기준으로 바로 수락
               </Text>
             </View>
           </TouchableOpacity>
 
-          {/* 정기 동선 모드 */}
           <TouchableOpacity
-            style={[styles.modeButton, styles.modeButtonRight]}
-            onPress={() => onModeChange('regular')}
-            activeOpacity={0.7}
+            activeOpacity={0.85}
+            onPress={() => void handleToggle('regular')}
+            style={styles.modeButton}
           >
             <View style={styles.modeContent}>
-              <Text style={[styles.modeIcon, mode === 'regular' && styles.modeIconActive]}>
-                🗓️
-              </Text>
-              <Text style={[styles.modeTitle, mode === 'regular' && styles.modeTitleActive]}>
-                정기 동선
-              </Text>
-              <Text
-                style={[styles.modeDescription, mode === 'regular' && styles.modeDescriptionActive]}
-              >
-                등록된 동선으로 배송
+              <Text style={[styles.modeIcon, mode === 'regular' && styles.modeIconActive]}>경로</Text>
+              <Text style={[styles.modeTitle, mode === 'regular' && styles.modeTitleActive]}>정기 경로</Text>
+              <Text style={[styles.modeDescription, mode === 'regular' && styles.modeDescriptionActive]}>
+                등록한 동선에 맞춰 추천
               </Text>
             </View>
           </TouchableOpacity>
         </View>
 
-        {/* 슬라이더 애니메이션 */}
-        <Animated.View
-          style={[
-            styles.slider,
-            {
-              transform: [
-                {
-                  translateX: sliderAnim.interpolate({
-                    inputRange: [0, 1],
-                    outputRange: [0, sliderWidth + 8],
-                  }),
-                },
-              ],
-            },
-          ]}
-        />
+        {sliderWidth > 0 ? (
+          <Animated.View
+            pointerEvents="none"
+            style={[
+              styles.slider,
+              {
+                width: sliderWidth,
+                height: sliderHeight,
+                transform: [{ translateX: sliderTranslateX }],
+              },
+            ]}
+          />
+        ) : null}
       </View>
 
-      {/* 모드별 추가 정보 */}
       <View style={styles.modeInfo}>
-        {mode === 'regular' ? (
-          <>
-            <View style={styles.infoItem}>
-              <Text style={styles.infoIcon}>✅</Text>
-              <Text style={styles.infoText}>등록된 동선 자동 매칭</Text>
-            </View>
-            <View style={styles.infoItem}>
-              <Text style={styles.infoIcon}>📅</Text>
-              <Text style={styles.infoText}>반복적인 출퇴근길 활용</Text>
-            </View>
-            <View style={styles.infoItem}>
-              <Text style={styles.infoIcon}>💰</Text>
-              <Text style={styles.infoText}>안정적인 수익</Text>
-            </View>
-          </>
-        ) : (
-          <>
-            <View style={styles.infoItem}>
-              <Text style={styles.infoIcon}>⏰</Text>
-              <Text style={styles.infoText}>원할 때만 참여</Text>
-            </View>
-            <View style={styles.infoItem}>
-              <Text style={styles.infoIcon}>🔄</Text>
-              <Text style={styles.infoText}>환승 허용 시 보너스</Text>
-            </View>
-            <View style={styles.infoItem}>
-              <Text style={styles.infoIcon}>📍</Text>
-              <Text style={styles.infoText}>현재 위치 기반 매칭</Text>
-            </View>
-          </>
-        )}
+        {(mode === 'regular'
+          ? [
+              '등록한 경로 기반으로 미션을 추천합니다.',
+              '반복 동선이 많은 길러에게 적합합니다.',
+              '예측 가능한 수익 흐름을 만들기 쉽습니다.',
+            ]
+          : [
+              '현재 위치 근처 요청만 빠르게 확인합니다.',
+              '긴급 재매칭이나 단기 참여에 유리합니다.',
+              '짧은 시간 활용이 필요할 때 적합합니다.',
+            ]).map((text) => (
+          <InfoItem key={text} text={text} />
+        ))}
       </View>
+    </View>
+  );
+}
 
-      {/* 일회성 모드 설정 버튼 */}
-      {mode === 'onetime' && (
-        <TouchableOpacity style={styles.settingsButton} activeOpacity={0.7}>
-          <Text style={styles.settingsButtonText}>일회성 모드 설정</Text>
-        </TouchableOpacity>
-      )}
+function InfoItem({ text }: { text: string }) {
+  return (
+    <View style={styles.infoItem}>
+      <Text style={styles.infoBullet}>•</Text>
+      <Text style={styles.infoText}>{text}</Text>
     </View>
   );
 }
@@ -180,117 +179,106 @@ export default function ModeToggleSwitch({ mode, onModeChange, style }: Props) {
 const styles = StyleSheet.create({
   container: {
     backgroundColor: Colors.surface,
+    marginBottom: Spacing.sm,
+    paddingBottom: Spacing.md,
     paddingHorizontal: Spacing.md,
     paddingTop: Spacing.lg,
-    paddingBottom: Spacing.md,
-    marginBottom: Spacing.sm,
   },
   header: {
     marginBottom: Spacing.md,
   },
   headerTitle: {
     ...Typography.h2,
-    color: Colors.text,
+    color: Colors.text.primary,
     marginBottom: Spacing.xs,
   },
   headerSubtitle: {
     ...Typography.body2,
-    color: Colors.textSecondary,
+    color: Colors.text.secondary,
   },
   toggleContainer: {
-    position: 'relative',
     marginBottom: Spacing.md,
+    position: 'relative',
   },
   toggleBackground: {
-    flexDirection: 'row',
     backgroundColor: Colors.background,
-    borderRadius: BorderRadius.lg,
-    overflow: 'hidden',
-    borderWidth: 1,
     borderColor: Colors.border,
+    borderRadius: BorderRadius.lg,
+    borderWidth: 1,
+    flexDirection: 'row',
+    overflow: 'hidden',
   },
   modeButton: {
-    flex: 1,
-    padding: Spacing.md,
     alignItems: 'center',
+    flex: 1,
     justifyContent: 'center',
     minHeight: 100,
+    padding: Spacing.md,
   },
   modeButtonLeft: {
-    borderRightWidth: 1,
     borderRightColor: Colors.border,
+    borderRightWidth: 1,
   },
-  modeButtonRight: {},
   modeContent: {
     alignItems: 'center',
   },
   modeIcon: {
-    fontSize: 32,
+    color: Colors.text.secondary,
+    fontSize: 18,
+    fontWeight: '700',
     marginBottom: Spacing.xs,
-    opacity: 0.5,
+    opacity: 0.6,
   },
   modeIconActive: {
+    color: Colors.text.primary,
     opacity: 1,
   },
   modeTitle: {
     ...Typography.h3,
-    color: Colors.textSecondary,
+    color: Colors.text.secondary,
     marginBottom: Spacing.xs,
     textAlign: 'center',
   },
   modeTitleActive: {
-    color: Colors.text,
+    color: Colors.text.primary,
     fontWeight: '700',
   },
   modeDescription: {
     ...Typography.bodySmall,
-    color: Colors.textDisabled,
-    textAlign: 'center',
+    color: Colors.text.disabled,
     paddingHorizontal: Spacing.xs,
+    textAlign: 'center',
   },
   modeDescriptionActive: {
-    color: Colors.textSecondary,
+    color: Colors.text.secondary,
   },
   slider: {
+    ...Shadows.sm,
+    backgroundColor: Colors.primaryLight,
+    borderRadius: BorderRadius.md,
+    left: 0,
+    opacity: 0.25,
     position: 'absolute',
     top: 4,
-    left: 4,
-    width: '48%',
-    height: 'calc(100% - 8px)',
-    backgroundColor: Colors.primary,
-    borderRadius: BorderRadius.md,
-    opacity: 0.1,
   },
   modeInfo: {
     flexDirection: 'row',
     flexWrap: 'wrap',
   },
   infoItem: {
+    alignItems: 'flex-start',
     flexDirection: 'row',
-    alignItems: 'center',
-    width: '100%',
     marginBottom: Spacing.xs,
+    width: '100%',
   },
-  infoIcon: {
-    fontSize: 16,
+  infoBullet: {
+    color: Colors.primary,
+    fontWeight: '700',
     marginRight: Spacing.xs,
   },
   infoText: {
     ...Typography.body2,
-    color: Colors.textSecondary,
+    color: Colors.text.secondary,
     flex: 1,
-  },
-  settingsButton: {
-    backgroundColor: Colors.background,
-    borderRadius: BorderRadius.md,
-    padding: Spacing.md,
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: Colors.primary,
-  },
-  settingsButtonText: {
-    ...Typography.body1,
-    color: Colors.primary,
-    fontWeight: '600',
   },
 });

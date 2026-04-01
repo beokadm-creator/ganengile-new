@@ -50,6 +50,11 @@ export interface Settlement {
   transferredAt?: string;
 }
 
+type RecentDelivery = {
+  id: string;
+  [key: string]: unknown;
+};
+
 export class B2BFirestoreService {
   private readonly B2B_DELIVERIES_COLLECTION = 'b2b_deliveries';
   private readonly B2B_TAX_INVOICES_COLLECTION = 'b2b_tax_invoices';
@@ -60,7 +65,7 @@ export class B2BFirestoreService {
   private statsCache = new Map<string, CacheEntry<MonthlyStats>>();
   private invoicesCache = new Map<string, CacheEntry<TaxInvoice[]>>();
   private settlementsCache = new Map<string, CacheEntry<Settlement[]>>();
-  private recentDeliveriesCache = new Map<string, CacheEntry<any[]>>();
+  private recentDeliveriesCache = new Map<string, CacheEntry<RecentDelivery[]>>();
 
   /**
    * 월간 배송 통계 가져오기 (캐싱 지원)
@@ -243,7 +248,7 @@ export class B2BFirestoreService {
    * 최근 배송 내역 가져오기 (캐싱 지원)
    * @version 2.0.0 - 캐싱 추가
    */
-  async getRecentDeliveries(businessId: string, limitCount: number = 5) {
+  async getRecentDeliveries(businessId: string, limitCount: number = 5): Promise<RecentDelivery[]> {
     try {
       // 캐싱 키 생성
       const cacheKey = `${businessId}-recent-${limitCount}`;
@@ -263,7 +268,7 @@ export class B2BFirestoreService {
       );
 
       const querySnapshot = await getDocs(deliveriesQuery);
-      const deliveries = [];
+      const deliveries: RecentDelivery[] = [];
 
       querySnapshot.forEach((doc) => {
         deliveries.push({
@@ -293,7 +298,7 @@ export class B2BFirestoreService {
     try {
       const businessDoc = await getDoc(doc(db, this.USERS_COLLECTION, businessId));
 
-      if (businessDoc.exists) {
+      if (businessDoc.exists()) {
         return {
           id: businessDoc.id,
           ...businessDoc.data(),
@@ -329,11 +334,6 @@ export class B2BFirestoreService {
    * 캐싱 초기화 (데이터 업데이트 시 호출)
    */
   invalidateCache(businessId: string): void {
-    const patterns = [
-      `${businessId}-`,
-      `${businessId}-`,
-    ];
-
     // 모든 관련 캐싱 제거
     for (const key of this.statsCache.keys()) {
       if (key.startsWith(businessId)) {

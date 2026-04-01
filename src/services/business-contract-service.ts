@@ -3,17 +3,16 @@
  * 
  * B2B 고객사의 계약 관리 (신청, 승인, 해지)
  */
-import { collection, doc, getDoc, setDoc, updateDoc, query, where, getDocs, addDoc, serverTimestamp } from 'firebase/firestore';
+import { collection, doc, getDoc, updateDoc, query, where, getDocs, addDoc } from 'firebase/firestore';
 import { db } from '../config/firebase';
 import type { 
   BusinessContract, 
-  ContractStatus, 
   SubscriptionTier, 
-  Location,
   ContractDuration,
   DeliverySettings,
   BillingInfo
 } from '../types/business-contract';
+import { SUBSCRIPTION_TIERS } from '../types/business-contract';
 
 const COLLECTION = 'business_contracts';
 
@@ -21,6 +20,98 @@ const COLLECTION = 'business_contracts';
  * B2B 계약 서비스
  */
 export class BusinessContractService {
+  static async getSubscriptionTiers(): Promise<Array<{
+    id: SubscriptionTier;
+    name: string;
+    price: number;
+    deliveryLimit: number;
+    pricePerDelivery: number;
+    features: string[];
+    isPopular?: boolean;
+  }>> {
+    return await Promise.resolve([
+      {
+        id: 'basic',
+        name: '베이직',
+        price: SUBSCRIPTION_TIERS.basic.pricing.monthly,
+        deliveryLimit: SUBSCRIPTION_TIERS.basic.features.maxDeliveries,
+        pricePerDelivery: SUBSCRIPTION_TIERS.basic.pricing.perDelivery,
+        features: [
+          '월 20건까지 이용',
+          '이메일 지원',
+          '소규모 매장에 적합',
+        ],
+      },
+      {
+        id: 'standard',
+        name: '스탠다드',
+        price: SUBSCRIPTION_TIERS.standard.pricing.monthly,
+        deliveryLimit: SUBSCRIPTION_TIERS.standard.features.maxDeliveries,
+        pricePerDelivery: SUBSCRIPTION_TIERS.standard.pricing.perDelivery,
+        features: [
+          '월 100건까지 이용',
+          '전화 지원',
+          '보험 및 리포트 포함',
+        ],
+        isPopular: true,
+      },
+      {
+        id: 'premium',
+        name: '프리미엄',
+        price: SUBSCRIPTION_TIERS.premium.pricing.monthly,
+        deliveryLimit: SUBSCRIPTION_TIERS.premium.features.maxDeliveries,
+        pricePerDelivery: SUBSCRIPTION_TIERS.premium.pricing.perDelivery,
+        features: [
+          '월 500건까지 이용',
+          '전담 지원',
+          '보험 및 운영 분석 포함',
+        ],
+      },
+    ]);
+  }
+
+  static async subscribeToTier(businessId: string, tier: SubscriptionTier): Promise<void> {
+    const existingContracts = await this.getBusinessContracts(businessId);
+    const activeContract = existingContracts.find((contract) => contract.status === 'active');
+
+    if (activeContract) {
+      await this.changeTier(activeContract.id, tier);
+      return;
+    }
+
+    const now = new Date();
+    const end = new Date(now);
+    end.setMonth(end.getMonth() + 1);
+
+    await this.createContract({
+      businessId,
+      tier,
+      duration: {
+        start: now,
+        end,
+        minDuration: 1,
+        autoRenew: true,
+      },
+      deliverySettings: {
+        frequency: 'weekly',
+        preferredTime: '12:00',
+        pickupLocation: {
+          station: '미설정',
+          address: '미설정',
+          contact: '미설정',
+        },
+        dropoffLocation: {
+          station: '미설정',
+          address: '미설정',
+          contact: '미설정',
+        },
+      },
+      billing: {
+        method: 'invoice',
+        cycle: 'monthly',
+      },
+    });
+  }
   /**
    * 계약 신청 생성
    */
@@ -31,11 +122,11 @@ export class BusinessContractService {
     deliverySettings: DeliverySettings;
     billing: BillingInfo;
   }): Promise<string> {
-    const contractData: Omit<BusinessContract, 'id' | 'status' | 'createdAt' | 'updatedAt'> = {
+    const contractData = {
       ...data,
       status: 'pending',
       createdAt: new Date(),
-      updatedAt: new Date()
+      updatedAt: new Date(),
     };
 
     const docRef = await addDoc(collection(db, COLLECTION), contractData);
@@ -58,7 +149,7 @@ export class BusinessContractService {
   /**
    * 계약 해지
    */
-  static async cancelContract(contractId: string, reason?: string): Promise<void> {
+  static async cancelContract(contractId: string, _reason?: string): Promise<void> {
     const contractRef = doc(db, COLLECTION, contractId);
     await updateDoc(contractRef, {
       status: 'cancelled',
@@ -71,7 +162,7 @@ export class BusinessContractService {
   /**
    * 계약 일시 정지
    */
-  static async suspendContract(contractId: string, reason: string): Promise<void> {
+  static async suspendContract(contractId: string, _reason: string): Promise<void> {
     const contractRef = doc(db, COLLECTION, contractId);
     await updateDoc(contractRef, {
       status: 'suspended',
@@ -216,3 +307,5 @@ export class BusinessContractService {
     });
   }
 }
+
+export const businessContractService = BusinessContractService;

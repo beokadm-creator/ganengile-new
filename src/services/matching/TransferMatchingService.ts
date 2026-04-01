@@ -126,11 +126,14 @@ export class TransferMatchingService {
     const stationRef = doc(db, 'config_stations', stationId);
     const stationDoc = await getDoc(stationRef);
 
-    if (!stationDoc.exists) {
+    if (!stationDoc.exists()) {
       return null;
     }
 
     const station = stationDoc.data();
+    if (!station) {
+      return null;
+    }
 
     // 환승역인지 확인 (2개 이상 노선)
     if (!station.transferLines || station.transferLines.length < 2) {
@@ -169,6 +172,9 @@ export class TransferMatchingService {
 
     snapshot.forEach(doc => {
       const station = doc.data();
+      if (!station) {
+        return;
+      }
 
       // 환승역이고, 두 노선 모두 환승 가능한지 확인
       if (

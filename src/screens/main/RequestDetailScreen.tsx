@@ -1,775 +1,566 @@
-/**
- * Request Detail Screen
- * 배송 요청 상세 화면 - 요청 정보와 매칭된 길러 목록 표시
- */
-
-import React, { useState, useEffect } from 'react';
+﻿import React, { useCallback, useEffect, useState } from 'react';
 import {
-  View,
-  Text,
-  StyleSheet,
-  ScrollView,
-  TouchableOpacity,
-  Alert,
   ActivityIndicator,
+  Alert,
+  RefreshControl,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
 } from 'react-native';
-import { StackNavigationProp } from '@react-navigation/stack';
-import { getRequest, cancelRequest } from '../../services/request-service';
-import { requireUserId } from '../../services/firebase';
-import { getMatchingResults } from '../../services/matching-service';
-import { confirmDeliveryByRequester, getDeliveryByRequestId } from '../../services/delivery-service';
+import { MaterialIcons } from '@expo/vector-icons';
+import { RouteProp, useNavigation, useRoute } from '@react-navigation/native';
+import { Timestamp } from 'firebase/firestore';
 import { getChatRoomByRequestId } from '../../services/chat-service';
-import type { Request } from '../../types/request';
-import { RequestStatus } from '../../types/request';
-import { toRequestDetailView } from '../../utils/request-adapters';
-import { formatDateTimeKR } from '../../utils/date';
-import { TextInputModal } from '../../components/common';
-import AppTopBar from '../../components/common/AppTopBar';
-import { formatWeightDisplay } from '../../utils/package-weight';
+import { cancelDeliveryFlow, confirmDeliveryByRequester, getDeliveryByRequestId } from '../../services/delivery-service';
+import { requireUserId } from '../../services/firebase';
+import { cancelRequest, getRequestById, increaseRequestBid } from '../../services/request-service';
+import { BorderRadius, Shadows, Spacing, Typography } from '../../theme';
+import type { MainStackNavigationProp, MainStackParamList } from '../../types/navigation';
+import { RequestStatus, type Request } from '../../types/request';
 
-type NavigationProp = StackNavigationProp<any>;
+type RequestDetailRoute = RouteProp<MainStackParamList, 'RequestDetail'>;
 
-interface Props {
-  navigation: NavigationProp;
-  route: {
-    params: {
-      requestId: string;
-      gillerId?: string;  // 선택한 길러 ID (선택 사항)
-    };
-  };
-}
+export default function RequestDetailScreen() {
+  const navigation = useNavigation<MainStackNavigationProp>();
+  const route = useRoute<RequestDetailRoute>();
+  const { requestId } = route.params;
 
-interface MatchingGiller {
-  rank: number;
-  gillerId: string;
-  gillerName: string;
-  score: number;
-  travelTime: number;
-  hasExpress: boolean;
-  transferCount: number;
-  reasons: string[];
-}
-
-export default function RequestDetailScreen({ navigation, route }: Props) {
-  const { requestId, gillerId: selectedGillerId } = route.params;
   const [request, setRequest] = useState<Request | null>(null);
-  const [detailView, setDetailView] = useState<ReturnType<typeof toRequestDetailView> | null>(null);
-  const [matches, setMatches] = useState<MatchingGiller[]>([]);
   const [loading, setLoading] = useState(true);
-  const [cancelling, setCancelling] = useState(false);
-  const [cancelModalVisible, setCancelModalVisible] = useState(false);
-  const [cancelReason, setCancelReason] = useState('');
-  const [confirming, setConfirming] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
+  const [working, setWorking] = useState<'cancel' | 'rematch' | 'confirm' | null>(null);
 
-  useEffect(() => {
-    loadData();
+  const loadRequest = useCallback(async () => {
+    try {
+      const nextRequest = await getRequestById(requestId);
+      setRequest(nextRequest);
+    } catch (error) {
+      console.error('Failed to load request detail', error);
+      Alert.alert('요청을 불러오지 못했습니다', '잠시 후 다시 시도해 주세요.');
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
   }, [requestId]);
 
-  const loadData = async () => {
-    try {
-      const userId = requireUserId();
+  useEffect(() => {
+    void loadRequest();
+  }, [loadRequest]);
 
-      // 요청 정보 조회
-      const requestData = await getRequest(requestId, userId);
-      if (!requestData) {
-        Alert.alert('오류', '요청을 찾을 수 없습니다.');
-        navigation.goBack();
+  async function onRefresh() {
+    setRefreshing(true);
+    await loadRequest();
+  }
+
+  async function openChat() {
+    try {
+      const room = await getChatRoomByRequestId(requestId);
+      if (!room) {
+        Alert.alert('아직 채팅이 열리지 않았습니다', '매칭이나 미션 확정 뒤에 채팅이 열립니다.');
         return;
       }
 
-      const typedRequest = requestData;
-      setRequest(typedRequest);
-      setDetailView(toRequestDetailView(typedRequest));
-
-      // 매칭 결과 조회 (PENDING 상태인 경우만)
-      if ((requestData as any).status === 'pending' || (requestData as any).status === 'matched') {
-        try {
-          const matchingResults = await getMatchingResults(requestId);
-          setMatches(matchingResults);
-        } catch (error) {
-          console.error('Error loading matches:', error);
-          // 매칭 실패해도 요청은 표시
-        }
-      }
+      const me = requireUserId();
+      const otherParticipant = room.participants.user1.userId === me ? room.participants.user2 : room.participants.user1;
+      navigation.navigate('Chat', {
+        chatRoomId: room.chatRoomId,
+        otherUserId: otherParticipant.userId,
+        otherUserName: otherParticipant.name,
+      });
     } catch (error) {
-      console.error('Error loading request detail:', error);
-      Alert.alert('오류', '요청 정보를 불러오는데 실패했습니다.');
-      navigation.goBack();
-    } finally {
-      setLoading(false);
+      console.error('Failed to open chat', error);
+      Alert.alert('채팅 연결에 실패했습니다', '잠시 후 다시 시도해 주세요.');
     }
-  };
+  }
 
-  const handleCancel = () => {
+  async function handleIncreaseBid(amount: number) {
     if (!request) return;
-    setCancelReason('');
-    setCancelModalVisible(true);
-  };
 
-  const handleConfirmCancel = async () => {
-    if (!cancelReason.trim()) {
-      Alert.alert('오류', '취소 사유를 입력해주세요.');
+    setWorking('rematch');
+    try {
+      const result = await increaseRequestBid(request.requestId, requireUserId(), amount);
+      if (!result.success) {
+        Alert.alert('금액 조정 실패', result.message ?? '지금은 금액을 조정할 수 없습니다.');
+        return;
+      }
+
+      Alert.alert('제안 금액을 올렸습니다', `현재 제안 금액은 ${(result.newFee ?? 0).toLocaleString()}원입니다.`);
+      await loadRequest();
+    } catch (error) {
+      console.error('Failed to increase bid', error);
+      Alert.alert('금액 조정 실패', '잠시 후 다시 시도해 주세요.');
+    } finally {
+      setWorking(null);
+    }
+  }
+
+  function handleRematchAction() {
+    if (!request) return;
+
+    Alert.alert(
+      '다시 연결할까요?',
+      '급하면 금액을 올려 더 빨리 연결하고, 급하지 않다면 예약 요청으로 전환할 수 있습니다.',
+      [
+        { text: 'AI 추천 금액 올리기', onPress: () => void handleIncreaseBid(1000) },
+        {
+          text: '예약으로 전환하기',
+          onPress: () =>
+            navigation.navigate('CreateRequest', {
+              mode: 'reservation',
+              sourceRequestId: request.requestId,
+              prefill: {
+                pickupStation: request.pickupStation,
+                deliveryStation: request.deliveryStation,
+                packageDescription: request.packageInfo.description,
+                packageSize: request.packageInfo.size as 'small' | 'medium' | 'large' | 'xl',
+                weightKg:
+                  typeof request.packageInfo.weightKg === 'number'
+                    ? request.packageInfo.weightKg
+                    : typeof request.packageInfo.weight === 'number'
+                      ? request.packageInfo.weight
+                      : 1,
+                itemValue: request.itemValue,
+                urgency: 'normal',
+                directParticipationMode: 'none',
+                preferredPickupTime: request.preferredTime?.departureTime,
+                preferredArrivalTime: request.preferredTime?.arrivalTime,
+              },
+            }),
+        },
+        { text: '그대로 둘게요', style: 'cancel' },
+      ]
+    );
+  }
+
+  function openDispute() {
+    navigation.navigate('DisputeReport', { deliveryId: request?.primaryDeliveryId });
+  }
+
+  function handleCancel() {
+    if (!request) return;
+
+    const isAccepted = request.status === RequestStatus.ACCEPTED;
+    Alert.alert(
+      isAccepted ? '수락된 배송을 취소할까요?' : '요청을 취소할까요?',
+      isAccepted
+        ? '픽업 전 취소라면 보증금 환불과 배송 취소를 함께 처리합니다. 진행 중이면 분쟁 접수로 이어집니다.'
+        : '지금 취소해도 기본 정보는 다음 요청에 참고할 수 있습니다.',
+      [
+        { text: '유지하기', style: 'cancel' },
+        {
+          text: '취소하기',
+          style: 'destructive',
+          onPress: () => {
+            void (async () => {
+              try {
+                setWorking('cancel');
+                const userId = requireUserId();
+
+                if (isAccepted) {
+                  const result = await cancelDeliveryFlow({
+                    requestId: request.requestId,
+                    actorId: userId,
+                    actorType: 'requester',
+                    reason: 'requester_cancelled_before_pickup_from_request_detail',
+                  });
+
+                  if (!result.success) {
+                    Alert.alert('취소를 진행할 수 없습니다', result.message, [
+                      { text: '분쟁 접수', onPress: openDispute },
+                      { text: '닫기', style: 'cancel' },
+                    ]);
+                    return;
+                  }
+
+                  const completionMessage =
+                    result.depositStatus === 'refunded'
+                      ? '배송 취소와 보증금 환불까지 처리했습니다.'
+                      : result.depositStatus === 'failed'
+                        ? '배송 취소는 처리했지만 보증금 환불은 운영 확인이 필요합니다.'
+                        : result.message;
+
+                  Alert.alert('배송 취소 완료', completionMessage);
+                } else {
+                  await cancelRequest(request.requestId, userId, 'requester cancelled from 가는길에');
+                  Alert.alert('요청 취소 완료', '요청을 취소했습니다.');
+                }
+
+                await loadRequest();
+              } catch (error) {
+                console.error('Failed to cancel request', error);
+                Alert.alert('취소에 실패했습니다', '잠시 후 다시 시도해 주세요.');
+              } finally {
+                setWorking(null);
+              }
+            })();
+          },
+        },
+      ]
+    );
+  }
+
+  async function handleConfirmDelivery() {
+    if (!request) return;
+
+    try {
+      setWorking('confirm');
+      const delivery = (await getDeliveryByRequestId(request.requestId)) as { deliveryId?: string; gillerId?: string | null } | null;
+      const deliveryId = typeof delivery?.deliveryId === 'string' ? delivery.deliveryId : null;
+      const deliveryGillerId = typeof delivery?.gillerId === 'string' ? delivery.gillerId : '';
+
+      if (!deliveryId) {
+        Alert.alert('배송 정보를 찾지 못했습니다', '배송 생성 뒤 다시 시도해 주세요.');
+        return;
+      }
+
+      const result = await confirmDeliveryByRequester({
+        deliveryId,
+        requesterId: requireUserId(),
+      });
+
+      if (!result.success) {
+        Alert.alert('수령 확인 실패', result.message);
+        return;
+      }
+
+      Alert.alert('수령 확인 완료', '배송을 완료 처리했습니다. 평가와 최종 정산으로 이어집니다.', [
+        {
+          text: '평가 남기기',
+          onPress: () =>
+            navigation.navigate('Rating', {
+              deliveryId,
+              gillerId: deliveryGillerId,
+              gllerId: deliveryGillerId,
+            }),
+        },
+        { text: '닫기', style: 'cancel' },
+      ]);
+      await loadRequest();
+    } catch (error) {
+      console.error('Failed to confirm delivery', error);
+      Alert.alert('수령 확인 실패', '잠시 후 다시 시도해 주세요.');
+    } finally {
+      setWorking(null);
+    }
+  }
+
+  function handleDepositPayment() {
+    if (!request?.matchedGillerId || !request.itemValue || request.itemValue <= 0) {
+      Alert.alert('보증금 준비 중', '길러 매칭과 물품 가치를 확인하면 보증금 결제로 이어집니다.');
       return;
     }
 
-    setCancelling(true);
-    try {
-      const userId = requireUserId();
-      await cancelRequest(requestId, userId, cancelReason.trim());
-
-      // 로컬 상태 즉시 업데이트
-      if (request) {
-        setRequest({
-          ...request,
-          status: RequestStatus.CANCELLED,
-          cancellationReason: cancelReason.trim(),
-          cancelledAt: new Date() as any,
-        });
-        setDetailView(toRequestDetailView({
-          ...request,
-          status: RequestStatus.CANCELLED,
-          cancellationReason: cancelReason.trim(),
-          cancelledAt: new Date() as any,
-        }));
-      }
-
-      setCancelModalVisible(false);
-
-      Alert.alert(
-        '✅ 취소 완료',
-        '배송 요청이 취소되었습니다.\n\n이용해 주셔서 감사합니다. 다음에 또 이용해주세요!',
-        [
-          {
-            text: '확인',
-            onPress: () => navigation.goBack()
-          }
-        ]
-      );
-    } catch (error: any) {
-      console.error('Error cancelling request:', error);
-      Alert.alert(
-        '❌ 취소 실패',
-        error.message || '요청 취소에 실패했습니다. 다시 시도해주세요.',
-        [{ text: '확인' }]
-      );
-    } finally {
-      setCancelling(false);
-    }
-  };
-
-  const handleConfirmDelivery = async () => {
-    if (!detailView) return;
-    setConfirming(true);
-    try {
-      const requesterId = requireUserId();
-      const delivery = await getDeliveryByRequestId(detailView.requestId);
-      if (!delivery?.deliveryId) {
-        Alert.alert('오류', '배송 정보를 찾을 수 없습니다.');
-        return;
-      }
-      const result = await confirmDeliveryByRequester({
-        deliveryId: delivery.deliveryId,
-        requesterId,
-      });
-      if (result.success) {
-        Alert.alert('수령 완료', '배송 수령이 확인되었습니다.\n길러를 평가해주세요!', [
-          {
-            text: '평가하기',
-            onPress: () => navigation.navigate('Rating', {
-              deliveryId: delivery.deliveryId,
-              gillerId: delivery.gillerId,
-              gllerId: delivery.gillerId,
-            }),
-          },
-          { text: '나중에', style: 'cancel', onPress: () => loadData() },
-        ]);
-      } else {
-        Alert.alert('실패', result.message);
-      }
-    } catch (error: any) {
-      Alert.alert('오류', error?.message || '수령 확인에 실패했습니다.');
-    } finally {
-      setConfirming(false);
-    }
-  };
-
-  const getStatusColor = (status: RequestStatus): string => {
-    switch (status) {
-      case RequestStatus.PENDING:
-        return '#FFA726';
-      case RequestStatus.MATCHED:
-        return '#42A5F5';
-      case RequestStatus.ACCEPTED:
-        return '#26C6DA';
-      case RequestStatus.IN_TRANSIT:
-        return '#AB47BC';
-      case RequestStatus.ARRIVED:
-        return '#66BB6A';
-      case RequestStatus.AT_LOCKER:
-        return '#7CB342';
-      case RequestStatus.DELIVERED:
-        return '#8BC34A';
-      case RequestStatus.COMPLETED:
-        return '#4CAF50';
-      case RequestStatus.CANCELLED:
-        return '#EF5350';
-      default:
-        return '#9E9E9E';
-    }
-  };
-
-  const getStatusText = (status: RequestStatus): string => {
-    switch (status) {
-      case RequestStatus.PENDING:
-        return '매칭 대기 중';
-      case RequestStatus.MATCHED:
-        return '매칭 완료';
-      case RequestStatus.ACCEPTED:
-        return '수락 완료';
-      case RequestStatus.IN_TRANSIT:
-        return '배송 중';
-      case RequestStatus.ARRIVED:
-        return '도착 완료';
-      case RequestStatus.AT_LOCKER:
-        return '사물함 보관 완료';
-      case RequestStatus.DELIVERED:
-        return '수령 확인 대기';
-      case RequestStatus.COMPLETED:
-        return '배송 완료';
-      case RequestStatus.CANCELLED:
-        return '취소됨';
-      default:
-        return status;
-    }
-  };
-
-  const formatDate = (date?: Date | null): string => formatDateTimeKR(date);
+    navigation.navigate('DepositPayment', {
+      gillerId: request.matchedGillerId,
+      gllerId: request.requesterId,
+      requestId: request.requestId,
+      itemValue: request.itemValue,
+    });
+  }
 
   if (loading) {
     return (
-      <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color="#00BCD4" />
-        <Text style={styles.loadingText}>로딩 중...</Text>
+      <View style={styles.centerState}>
+        <ActivityIndicator size="large" color="#0F766E" />
+        <Text style={styles.centerText}>요청 상세를 불러오는 중입니다.</Text>
       </View>
     );
   }
 
-  if (!request || !detailView) {
-    return null;
+  if (!request) {
+    return (
+      <View style={styles.centerState}>
+        <Text style={styles.errorText}>요청 정보를 찾을 수 없습니다.</Text>
+      </View>
+    );
   }
 
+  const amount = getRequestAmount(request);
+  const canRematch = request.status === RequestStatus.PENDING || request.status === RequestStatus.MATCHED;
+  const canCancel = canRematch || request.status === RequestStatus.ACCEPTED;
+  const canDispute =
+    request.status === RequestStatus.IN_TRANSIT ||
+    request.status === RequestStatus.ARRIVED ||
+    request.status === RequestStatus.AT_LOCKER ||
+    request.status === RequestStatus.DELIVERED;
+  const canConfirm = request.status === RequestStatus.DELIVERED || request.status === RequestStatus.AT_LOCKER;
+
   return (
-    <View style={styles.container}>
-      {/* Header */}
-      <AppTopBar title="요청 상세" onBack={() => navigation.goBack()} />
+    <ScrollView
+      style={styles.container}
+      contentContainerStyle={styles.content}
+      showsVerticalScrollIndicator={false}
+      refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => void onRefresh()} />}
+    >
+      <View style={styles.hero}>
+        <Text style={styles.kicker}>가는길에</Text>
+        <Text style={styles.title}>
+          {request.pickupStation.stationName} {'->'} {request.deliveryStation.stationName}
+        </Text>
+        <Text style={styles.subtitle}>{request.packageInfo.description || '물품 설명 없음'}</Text>
+      </View>
 
-      <ScrollView style={styles.content}>
-        {/* Status Badge */}
-        <View style={[styles.statusBanner, { backgroundColor: getStatusColor(detailView.status) }]}>
-          <Text style={styles.statusText}>{getStatusText(detailView.status)}</Text>
-        </View>
+      <Panel title="현재 상태">
+        <InfoRow label="상태" value={getStatusLabel(request.status)} />
+        <InfoRow label="요청 방식" value={request.requestMode === 'reservation' ? '예약' : '즉시'} />
+        <InfoRow label="제안 금액" value={`${amount.toLocaleString()}원`} />
+        <InfoRow label="마감" value={formatDateTime(request.deadline)} />
+      </Panel>
 
-        {/* Route Info */}
-        <View style={styles.card}>
-          <Text style={styles.cardTitle}>배송 경로</Text>
-          <View style={styles.routeContainer}>
-            <View style={styles.stationInfo}>
-              <Text style={styles.stationLabel}>픽업</Text>
-              <Text style={styles.stationName}>{detailView.pickupStation.stationName}</Text>
-              <Text style={styles.stationLine}>{detailView.pickupStation.line}</Text>
-            </View>
+      <Panel title="배송 정보">
+        <InfoRow label="출발" value={`${request.pickupStation.stationName} · ${request.pickupStation.line}`} />
+        <InfoRow label="도착" value={`${request.deliveryStation.stationName} · ${request.deliveryStation.line}`} />
+        <InfoRow
+          label="희망 시간"
+          value={request.preferredTime ? `${request.preferredTime.departureTime} 출발 · ${request.preferredTime.arrivalTime ?? '-'} 도착` : '미설정'}
+        />
+        <InfoRow label="물품 가치" value={typeof request.itemValue === 'number' ? `${request.itemValue.toLocaleString()}원` : '미입력'} />
+      </Panel>
 
-            <View style={styles.arrowContainer}>
-              <Text style={styles.arrow}>↓</Text>
-              <Text style={styles.travelTime}>약 25분</Text>
-            </View>
+      <View style={styles.actionSection}>
+        <ActionButton primary icon="chat-bubble-outline" label="채팅 열기" onPress={() => void openChat()} />
 
-            <View style={styles.stationInfo}>
-              <Text style={styles.stationLabel}>배송</Text>
-              <Text style={styles.stationName}>{detailView.deliveryStation.stationName}</Text>
-              <Text style={styles.stationLine}>{detailView.deliveryStation.line}</Text>
-            </View>
-          </View>
-        </View>
+        {Boolean(request.matchedGillerId) && (request.itemValue ?? 0) > 0 ? (
+          <ActionButton icon="lock" label="보증금 결제" onPress={handleDepositPayment} />
+        ) : null}
 
-        {/* Package Info */}
-        <View style={styles.card}>
-          <Text style={styles.cardTitle}>패키지 정보</Text>
-          <View style={styles.infoRow}>
-            <Text style={styles.infoLabel}>크기</Text>
-            <Text style={styles.infoValue}>
-              {detailView.packageInfo.size === 'small' ? '소형' :
-               detailView.packageInfo.size === 'medium' ? '중형' :
-               detailView.packageInfo.size === 'large' ? '대형' : detailView.packageInfo.size}
-            </Text>
-          </View>
-          <View style={styles.infoRow}>
-            <Text style={styles.infoLabel}>무게</Text>
-            <Text style={styles.infoValue}>
-              {formatWeightDisplay(detailView.packageInfo.weight, detailView.packageInfo.weightKg)}
-            </Text>
-          </View>
-          <View style={styles.infoRow}>
-            <Text style={styles.infoLabel}>설명</Text>
-            <Text style={styles.infoValue}>{detailView.packageInfo.description}</Text>
-          </View>
-        </View>
+        {canRematch ? (
+          <ActionButton
+            icon="trending-up"
+            label={working === 'rematch' ? '조정 중...' : '다시 잡기'}
+            onPress={handleRematchAction}
+            disabled={working !== null}
+          />
+        ) : null}
 
-        {/* Time Info */}
-        <View style={styles.card}>
-          <Text style={styles.cardTitle}>시간 정보</Text>
-          <View style={styles.infoRow}>
-            <Text style={styles.infoLabel}>요청 마감</Text>
-        <Text style={styles.infoValue}>{formatDate(detailView.deadline || null)}</Text>
-          </View>
-          <View style={styles.infoRow}>
-            <Text style={styles.infoLabel}>희망 시간</Text>
-            <Text style={styles.infoValue}>
-              {detailView.preferredTime?.departureTime || '-'} → {detailView.preferredTime?.arrivalTime || '-'}
-            </Text>
-          </View>
-          <View style={styles.infoRow}>
-            <Text style={styles.infoLabel}>생성일</Text>
-        <Text style={styles.infoValue}>{formatDate(detailView.createdAt || null)}</Text>
-          </View>
-        </View>
+        {canCancel ? (
+          <ActionButton
+            icon="close"
+            label={working === 'cancel' ? '취소 중...' : request.status === RequestStatus.ACCEPTED ? '배송 취소' : '요청 취소'}
+            onPress={handleCancel}
+            disabled={working !== null}
+            warning
+          />
+        ) : null}
 
-        {/* Fee Info */}
-        <View style={styles.card}>
-            <Text style={styles.cardTitle}>배송비</Text>
-          <View style={styles.feeTotal}>
-            <Text style={styles.feeTotalLabel}>총합계</Text>
-            <Text style={styles.feeTotalValue}>
-              {Number.isFinite(detailView.feeTotal) ? detailView.feeTotal.toLocaleString() : '0'}원
-            </Text>
-          </View>
-        </View>
+        {canDispute ? <ActionButton icon="report-problem" label="분쟁 접수" onPress={openDispute} /> : null}
 
-        {/* Matching Gillers */}
-        {detailView.status === RequestStatus.PENDING && matches.length > 0 && (
-          <View style={styles.card}>
-            <Text style={styles.cardTitle}>🎯 매칭된 길러 ({matches.length})</Text>
-            {matches.map((match) => {
-              const isSelected = match.gillerId === selectedGillerId;
-              return (
-                <View
-                  key={match.gillerId}
-                  style={[styles.gillerCard, isSelected && styles.selectedGillerCard]}
-                >
-                  {isSelected && (
-                    <View style={styles.selectedBadge}>
-                      <Text style={styles.selectedBadgeText}>선택됨</Text>
-                    </View>
-                  )}
-                  <View style={styles.gillerHeader}>
-                    <View style={styles.gillerRank}>
-                      <Text style={styles.gillerRankText}>#{match.rank}</Text>
-                    </View>
-                    <View style={styles.gillerInfo}>
-                      <Text style={styles.gillerName}>{match.gillerName}</Text>
-                      <View style={styles.gillerStats}>
-                        <Text style={styles.gillerScore}>⭐ {match.score.toFixed(1)}점</Text>
-                        <Text style={styles.gillerTime}>⏱ {match.travelTime}분</Text>
-                      </View>
-                    </View>
-                  </View>
-                  {match.hasExpress && (
-                    <View style={styles.expressBadge}>
-                      <Text style={styles.expressText}>급행</Text>
-                    </View>
-                  )}
-                  {match.reasons && match.reasons.length > 0 && (
-                    <View style={styles.reasonsContainer}>
-                      {match.reasons.map((reason, index) => (
-                        <Text key={index} style={styles.reasonText}>✓ {reason}</Text>
-                      ))}
-                    </View>
-                  )}
-                </View>
-              );
-            })}
-          </View>
-        )}
+        {canConfirm ? (
+          <ActionButton
+            icon="verified"
+            label={working === 'confirm' ? '확인 중...' : '수령 확인'}
+            onPress={() => void handleConfirmDelivery()}
+            disabled={working !== null}
+          />
+        ) : null}
 
-        {/* Cancellation Info */}
-        {detailView.status === RequestStatus.CANCELLED && (
-          <View style={[styles.card, styles.cancelledCard]}>
-            <Text style={styles.cardTitle}>⚠️ 취소 정보</Text>
-            <View style={styles.infoRow}>
-              <Text style={styles.infoLabel}>사유</Text>
-              <Text style={styles.infoValue}>{detailView.cancellationReason}</Text>
-            </View>
-            {detailView.cancelledAt && (
-              <View style={styles.infoRow}>
-                <Text style={styles.infoLabel}>취소일</Text>
-                <Text style={styles.infoValue}>{formatDate(detailView.cancelledAt)}</Text>
-              </View>
-            )}
-          </View>
-        )}
+        <ActionButton icon="local-shipping" label="배송 추적" onPress={() => navigation.navigate('DeliveryTracking', { requestId })} />
+      </View>
+    </ScrollView>
+  );
+}
 
-        {/* Actions */}
-        {(detailView.status === RequestStatus.PENDING || detailView.status === RequestStatus.MATCHED) && (
-          <View style={styles.actions}>
-            <TouchableOpacity
-              style={[styles.actionButton, styles.cancelButton]}
-              onPress={handleCancel}
-              disabled={cancelling}
-            >
-              {cancelling ? (
-                <ActivityIndicator color="#fff" />
-              ) : (
-                <Text style={styles.actionButtonText}>요청 취소</Text>
-              )}
-            </TouchableOpacity>
-          </View>
-        )}
-
-        {(detailView.status === RequestStatus.ACCEPTED ||
-          detailView.status === RequestStatus.IN_TRANSIT ||
-          detailView.status === RequestStatus.ARRIVED ||
-          detailView.status === RequestStatus.AT_LOCKER) && (
-          <View style={styles.actions}>
-            <TouchableOpacity
-              style={[styles.actionButton, styles.chatButton]}
-              onPress={async () => {
-                const chatRoom = await getChatRoomByRequestId(requestId);
-                if (chatRoom) {
-                  const userId = requireUserId();
-                  const otherUserId = chatRoom.participants.user1.userId === userId
-                    ? chatRoom.participants.user2.userId
-                    : chatRoom.participants.user1.userId;
-                  const otherUserName = chatRoom.participants.user1.userId === userId
-                    ? chatRoom.participants.user2.name
-                    : chatRoom.participants.user1.name;
-                  navigation.navigate('Chat', {
-                    chatRoomId: chatRoom.chatRoomId,
-                    otherUserId,
-                    otherUserName,
-                  });
-                } else {
-                  Alert.alert('안내', '채팅방을 찾을 수 없습니다.');
-                }
-              }}
-            >
-              <Text style={styles.actionButtonText}>💬 길러와 채팅</Text>
-            </TouchableOpacity>
-          </View>
-        )}
-
-        {detailView.status === RequestStatus.DELIVERED && (
-          <View style={styles.actions}>
-            <TouchableOpacity
-              style={[styles.actionButton, styles.confirmButton]}
-              onPress={handleConfirmDelivery}
-              disabled={confirming}
-            >
-              {confirming ? (
-                <ActivityIndicator color="#fff" />
-              ) : (
-                <Text style={styles.actionButtonText}>수령 확인</Text>
-              )}
-            </TouchableOpacity>
-          </View>
-        )}
-      </ScrollView>
-
-      <TextInputModal
-        visible={cancelModalVisible}
-        title="취소 사유"
-        subtitle="배송 요청을 취소하는 사유를 입력해주세요."
-        value={cancelReason}
-        onChangeText={setCancelReason}
-        placeholder="예: 일정 변경"
-        confirmText="확인"
-        cancelText="취소"
-        loading={cancelling}
-        onConfirm={handleConfirmCancel}
-        onCancel={() => setCancelModalVisible(false)}
-      />
+function Panel({ title, children }: { title: string; children: React.ReactNode }) {
+  return (
+    <View style={styles.panel}>
+      <Text style={styles.panelTitle}>{title}</Text>
+      {children}
     </View>
   );
 }
 
+function InfoRow({ label, value }: { label: string; value: string }) {
+  return (
+    <View style={styles.infoRow}>
+      <Text style={styles.infoLabel}>{label}</Text>
+      <Text style={styles.infoValue}>{value}</Text>
+    </View>
+  );
+}
+
+function ActionButton({
+  icon,
+  label,
+  onPress,
+  primary = false,
+  warning = false,
+  disabled = false,
+}: {
+  icon: React.ComponentProps<typeof MaterialIcons>['name'];
+  label: string;
+  onPress: () => void;
+  primary?: boolean;
+  warning?: boolean;
+  disabled?: boolean;
+}) {
+  return (
+    <TouchableOpacity
+      style={[
+        styles.actionButton,
+        primary && styles.primaryAction,
+        warning && styles.warningAction,
+        disabled && styles.disabledAction,
+      ]}
+      onPress={onPress}
+      disabled={disabled}
+    >
+      <MaterialIcons name={icon} size={18} color={primary ? '#FFFFFF' : warning ? '#B42318' : '#115E59'} />
+      <Text style={[styles.actionText, primary && styles.primaryActionText, warning && styles.warningText]}>{label}</Text>
+    </TouchableOpacity>
+  );
+}
+
+function formatDateTime(value?: Timestamp | null): string {
+  if (!value) return '-';
+  const date = value instanceof Timestamp ? value.toDate() : null;
+  if (!(date instanceof Date) || Number.isNaN(date.getTime())) return '-';
+  return date.toLocaleString('ko-KR', {
+    month: 'numeric',
+    day: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  });
+}
+
+function getRequestAmount(request: Request): number {
+  return request.fee?.totalFee ?? request.feeBreakdown?.totalFee ?? request.initialNegotiationFee ?? 0;
+}
+
+function getStatusLabel(status: RequestStatus): string {
+  switch (status) {
+    case RequestStatus.PENDING:
+      return '매칭 대기';
+    case RequestStatus.MATCHED:
+      return '견적 도착';
+    case RequestStatus.ACCEPTED:
+      return '길러 수락';
+    case RequestStatus.IN_TRANSIT:
+      return '배송 중';
+    case RequestStatus.ARRIVED:
+      return '도착 확인';
+    case RequestStatus.AT_LOCKER:
+      return '사물함 보관';
+    case RequestStatus.DELIVERED:
+      return '수령 확인 대기';
+    case RequestStatus.COMPLETED:
+      return '완료';
+    case RequestStatus.CANCELLED:
+      return '취소';
+    default:
+      return status;
+  }
+}
+
 const styles = StyleSheet.create({
-  actionButton: {
-    alignItems: 'center',
-    borderRadius: 8,
-    padding: 16,
-  },
-  actionButtonText: {
-    color: '#fff',
-    fontSize: 16,
-    fontWeight: 'bold',
-  },
-  actions: {
-    gap: 12,
-    marginTop: 8,
-  },
-  arrow: {
-    color: '#666',
-    fontSize: 24,
-  },
-  arrowContainer: {
-    alignItems: 'center',
-    marginHorizontal: 16,
-  },
-  backButton: {
-    width: 40,
-  },
-  backButtonText: {
-    color: '#333',
-    fontSize: 24,
-  },
-  cancelButton: {
-    backgroundColor: '#EF5350',
-  },
-  confirmButton: {
-    backgroundColor: '#4CAF50',
-  },
-  chatButton: {
-    backgroundColor: '#1976D2',
-  },
-  cancelledCard: {
-    backgroundColor: '#FFEBEE',
-    borderColor: '#EF5350',
-  },
-  card: {
-    backgroundColor: '#fff',
-    borderColor: '#e0e0e0',
-    borderRadius: 12,
-    borderWidth: 1,
-    marginBottom: 12,
-    padding: 16,
-  },
-  cardTitle: {
-    color: '#333',
-    fontSize: 18,
-    fontWeight: 'bold',
-    marginBottom: 12,
-  },
   container: {
-    backgroundColor: '#f5f5f5',
     flex: 1,
+    backgroundColor: '#F8FAFC',
   },
   content: {
+    padding: Spacing.lg,
+    gap: Spacing.md,
+  },
+  centerState: {
     flex: 1,
-    padding: 16,
-  },
-  expressBadge: {
-    backgroundColor: '#FF5722',
-    borderRadius: 4,
-    paddingHorizontal: 8,
-    paddingVertical: 2,
-    position: 'absolute',
-    right: 12,
-    top: 12,
-  },
-  expressText: {
-    color: '#fff',
-    fontSize: 10,
-    fontWeight: 'bold',
-  },
-  feeBreakdown: {
-    gap: 8,
-  },
-  feeItem: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-  },
-  feeItemLabel: {
-    color: '#666',
-    fontSize: 14,
-  },
-  feeItemValue: {
-    color: '#333',
-    fontSize: 14,
-  },
-  feeTotal: {
     alignItems: 'center',
-    borderBottomColor: '#e0e0e0',
-    borderBottomWidth: 1,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginBottom: 12,
-    paddingVertical: 12,
+    justifyContent: 'center',
+    padding: Spacing.xl,
+    backgroundColor: '#F8FAFC',
   },
-  feeTotalLabel: {
-    color: '#333',
-    fontSize: 16,
-    fontWeight: 'bold',
+  centerText: {
+    marginTop: Spacing.md,
+    color: '#475569',
+    ...Typography.body,
   },
-  feeTotalValue: {
-    color: '#00BCD4',
-    fontSize: 20,
-    fontWeight: 'bold',
+  errorText: {
+    color: '#B42318',
+    ...Typography.body,
   },
-  gillerCard: {
-    backgroundColor: '#f5f5f5',
-    borderRadius: 8,
-    marginBottom: 8,
-    padding: 12,
+  hero: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: BorderRadius.xl,
+    padding: Spacing.lg,
+    ...Shadows.sm,
+    gap: 6,
   },
-  selectedGillerCard: {
-    backgroundColor: '#E1F5FE',
-    borderColor: '#00BCD4',
-    borderWidth: 2,
-  },
-  selectedBadge: {
-    position: 'absolute',
-    top: 8,
-    right: 8,
-    backgroundColor: '#00BCD4',
-    borderRadius: 12,
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-  },
-  selectedBadgeText: {
-    color: '#fff',
-    fontSize: 11,
-    fontWeight: 'bold',
-  },
-  gillerHeader: {
-    alignItems: 'center',
-    flexDirection: 'row',
-    marginBottom: 8,
-  },
-  gillerInfo: {
-    flex: 1,
-  },
-  gillerName: {
-    color: '#333',
-    fontSize: 16,
-    fontWeight: 'bold',
-    marginBottom: 4,
-  },
-  gillerRank: {
-    backgroundColor: '#00BCD4',
-    borderRadius: 16,
-    marginRight: 12,
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-  },
-  gillerRankText: {
-    color: '#fff',
+  kicker: {
     fontSize: 12,
-    fontWeight: 'bold',
+    fontWeight: '700',
+    color: '#0F766E',
+    textTransform: 'uppercase',
+    letterSpacing: 1,
   },
-  gillerScore: {
-    color: '#FFA726',
-    fontSize: 14,
+  title: {
+    fontSize: 24,
+    fontWeight: '800',
+    color: '#0F172A',
   },
-  gillerStats: {
-    flexDirection: 'row',
-    gap: 12,
+  subtitle: {
+    color: '#475569',
+    ...Typography.body,
   },
-  gillerTime: {
-    color: '#666',
-    fontSize: 14,
+  panel: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: BorderRadius.xl,
+    padding: Spacing.lg,
+    ...Shadows.sm,
+    gap: Spacing.sm,
   },
-  header: {
-    alignItems: 'center',
-    backgroundColor: '#fff',
-    borderBottomColor: '#e0e0e0',
-    borderBottomWidth: 1,
-    flexDirection: 'row',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-  },
-  headerSpacer: {
-    width: 40,
-  },
-  headerTitle: {
-    color: '#333',
-    flex: 1,
-    fontSize: 18,
-    fontWeight: 'bold',
-    textAlign: 'center',
-  },
-  infoLabel: {
-    color: '#666',
-    fontSize: 14,
+  panelTitle: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#0F172A',
+    marginBottom: 4,
   },
   infoRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    marginBottom: 8,
+    gap: Spacing.md,
+  },
+  infoLabel: {
+    color: '#64748B',
+    ...Typography.bodySmall,
   },
   infoValue: {
-    color: '#333',
     flex: 1,
-    fontSize: 14,
-    fontWeight: '600',
     textAlign: 'right',
+    color: '#0F172A',
+    ...Typography.bodySmall,
   },
-  loadingContainer: {
+  actionSection: {
+    gap: Spacing.sm,
+  },
+  actionButton: {
+    minHeight: 52,
+    borderRadius: BorderRadius.lg,
+    paddingHorizontal: Spacing.lg,
+    backgroundColor: '#FFFFFF',
+    flexDirection: 'row',
     alignItems: 'center',
-    flex: 1,
     justifyContent: 'center',
+    gap: Spacing.sm,
+    ...Shadows.sm,
   },
-  loadingText: {
-    color: '#666',
-    fontSize: 16,
-    marginTop: 12,
+  primaryAction: {
+    backgroundColor: '#115E59',
   },
-  reasonText: {
-    color: '#666',
-    fontSize: 12,
+  warningAction: {
+    backgroundColor: '#FFF5F5',
   },
-  reasonsContainer: {
-    gap: 4,
+  disabledAction: {
+    opacity: 0.6,
   },
-  routeContainer: {
-    alignItems: 'center',
-    flexDirection: 'row',
-    justifyContent: 'space-between',
+  actionText: {
+    color: '#115E59',
+    ...Typography.bodyBold,
   },
-  stationInfo: {
-    alignItems: 'center',
-    flex: 1,
+  primaryActionText: {
+    color: '#FFFFFF',
   },
-  stationLabel: {
-    color: '#666',
-    fontSize: 12,
-    marginBottom: 4,
-  },
-  stationLine: {
-    color: '#00BCD4',
-    fontSize: 14,
-  },
-  stationName: {
-    color: '#333',
-    fontSize: 16,
-    fontWeight: 'bold',
-    marginBottom: 4,
-  },
-  statusBanner: {
-    alignItems: 'center',
-    borderRadius: 8,
-    marginBottom: 16,
-    padding: 12,
-  },
-  statusText: {
-    color: '#fff',
-    fontSize: 16,
-    fontWeight: 'bold',
-  },
-  tag: {
-    backgroundColor: '#FFF3E0',
-    borderRadius: 12,
-    color: '#F57C00',
-    fontSize: 12,
-    marginRight: 8,
-    paddingHorizontal: 12,
-    paddingVertical: 4,
-  },
-  tagContainer: {
-    flexDirection: 'row',
-    marginTop: 8,
-  },
-  travelTime: {
-    color: '#999',
-    fontSize: 12,
-    marginTop: 4,
+  warningText: {
+    color: '#B42318',
   },
 });
+

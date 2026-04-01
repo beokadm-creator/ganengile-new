@@ -1,276 +1,261 @@
-/**
- * B2B Giller Screen
- * B2B 길러 전용 대시보드
- */
-
-import React, { useState, useEffect } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
+import { ActivityIndicator, ScrollView, StyleSheet, Text, View, type DimensionValue } from 'react-native';
+import type { StackNavigationProp } from '@react-navigation/stack';
+import { auth } from '../../services/firebase';
+import { b2bFirestoreService, type MonthlyStats } from '../../services/b2b-firestore-service';
+import { B2BGillerService } from '../../services/b2b-giller-service';
 import {
-  View,
-  Text,
-  StyleSheet,
-  ScrollView,
-  ActivityIndicator,
-} from 'react-native';
-import { StackNavigationProp } from '@react-navigation/stack';
-import { auth, db } from '../../services/firebase';
-import { collection, query, where, orderBy, limit, getDocs } from 'firebase/firestore';
-import { b2bFirestoreService } from '../../services/b2b-firestore-service';
-import { Colors, Typography, Spacing, BorderRadius, Shadows } from '../../theme';
+  B2B_TIER_BENEFITS,
+  B2B_TIER_CRITERIA,
+  B2B_TIER_DETAILS,
+  type B2BGillerTierLevel,
+} from '../../types/b2b-giller-tier';
+import type { B2BStackParamList } from '../../types/navigation';
 
-type NavigationProp = StackNavigationProp<any>;
+type NavigationProp = StackNavigationProp<B2BStackParamList, 'B2BGiller'>;
 
-interface Props {
+type Props = {
   navigation: NavigationProp;
-}
+};
 
-interface GillerDelivery {
+type DeliveryStatus = 'pending' | 'matched' | 'in_progress' | 'completed';
+
+type GillerDelivery = {
   id: string;
   requestId: string;
   pickupStation: string;
   deliveryStation: string;
-  status: 'pending' | 'matched' | 'in_progress' | 'completed';
+  status: DeliveryStatus;
   fee: number;
   createdAt: string;
-}
+};
 
-interface MonthlyEarnings {
+type MonthlyEarnings = {
   totalDeliveries: number;
   totalEarnings: number;
   tierBonus: number;
-  activityBonus: number;
-  qualityBonus: number;
+  monthlyBonus: number;
   netEarnings: number;
-  currentTier: 'silver' | 'gold' | 'platinum';
-  nextTier?: 'silver' | 'gold' | 'platinum';
+  currentTier: B2BGillerTierLevel;
+  nextTier?: B2BGillerTierLevel;
   progressToNext?: number;
+};
+
+type RecentDeliveryDoc = {
+  id?: string;
+  requestId?: string;
+  pickupStation?: string;
+  deliveryStation?: string;
+  status?: DeliveryStatus;
+  fee?: number;
+  pricing?: {
+    totalFee?: number;
+  };
+  createdAt?: {
+    toDate?: () => Date;
+  };
+};
+
+function formatCurrency(amount: number): string {
+  return `${amount.toLocaleString('ko-KR')}원`;
+}
+
+function getStatusColor(status: DeliveryStatus): string {
+  switch (status) {
+    case 'pending':
+      return '#64748B';
+    case 'matched':
+      return '#2563EB';
+    case 'in_progress':
+      return '#D97706';
+    case 'completed':
+      return '#16A34A';
+  }
+}
+
+function getStatusText(status: DeliveryStatus): string {
+  switch (status) {
+    case 'pending':
+      return '대기 중';
+    case 'matched':
+      return '매칭 완료';
+    case 'in_progress':
+      return '배송 중';
+    case 'completed':
+      return '완료';
+  }
+}
+
+function mapRecentDelivery(rawId: string, raw: RecentDeliveryDoc): GillerDelivery {
+  const createdAt = raw.createdAt?.toDate?.() ?? new Date();
+  const status: DeliveryStatus =
+    raw.status === 'pending' || raw.status === 'matched' || raw.status === 'in_progress' || raw.status === 'completed'
+      ? raw.status
+      : 'pending';
+
+  return {
+    id: rawId,
+    requestId: raw.requestId ?? '',
+    pickupStation: raw.pickupStation ?? '출발역 미기록',
+    deliveryStation: raw.deliveryStation ?? '도착역 미기록',
+    status,
+    fee: raw.fee ?? raw.pricing?.totalFee ?? 0,
+    createdAt: createdAt.toLocaleString('ko-KR'),
+  };
+}
+
+function getNextTier(currentTier: B2BGillerTierLevel): B2BGillerTierLevel | undefined {
+  if (currentTier === 'silver') {
+    return 'gold';
+  }
+  if (currentTier === 'gold') {
+    return 'platinum';
+  }
+  return undefined;
+}
+
+function getProgressToNextTier(currentTier: B2BGillerTierLevel, totalDeliveries: number): number {
+  const nextTier = getNextTier(currentTier);
+  if (!nextTier) {
+    return 100;
+  }
+
+  const currentRequirement = B2B_TIER_CRITERIA[currentTier].monthlyDeliveries;
+  const nextRequirement = B2B_TIER_CRITERIA[nextTier].monthlyDeliveries;
+  const progress = ((totalDeliveries - currentRequirement) / Math.max(1, nextRequirement - currentRequirement)) * 100;
+
+  return Math.max(0, Math.min(99, Math.round(progress)));
 }
 
 export default function B2BGillerScreen({ navigation: _navigation }: Props) {
   const [loading, setLoading] = useState(true);
   const [deliveries, setDeliveries] = useState<GillerDelivery[]>([]);
-  const [earnings, setEarnings] = useState<MonthlyEarnings>({
+  const [stats, setStats] = useState<MonthlyStats>({
     totalDeliveries: 0,
-    totalEarnings: 0,
-    tierBonus: 0,
-    activityBonus: 0,
-    qualityBonus: 0,
-    netEarnings: 0,
-    currentTier: 'silver',
+    totalAmount: 0,
+    avgCostPerDelivery: 0,
   });
+  const [currentTier, setCurrentTier] = useState<B2BGillerTierLevel>('silver');
 
   useEffect(() => {
-    loadGillerData();
+    void loadGillerData();
   }, []);
 
-  const loadGillerData = async () => {
+  async function loadGillerData(): Promise<void> {
     try {
+      setLoading(true);
       const currentUser = auth.currentUser;
       if (!currentUser) {
-        console.error('No authenticated user');
         setLoading(false);
         return;
       }
 
       const gillerId = currentUser.uid;
-
-      // 1. 최근 배송 내역 가져오기
-      const deliveriesQuery = query(
-        collection(db, 'b2b_deliveries'),
-        where('gillerId', '==', gillerId),
-        orderBy('createdAt', 'desc'),
-        limit(10)
-      );
-
-      const deliveriesSnapshot = await getDocs(deliveriesQuery);
-      const deliveriesData: GillerDelivery[] = [];
-
-      deliveriesSnapshot.forEach((doc) => {
-        const data = doc.data();
-        deliveriesData.push({
-          id: doc.id,
-          requestId: data.requestId || '',
-          pickupStation: data.pickupStation || '',
-          deliveryStation: data.deliveryStation || '',
-          status: data.status || 'pending',
-          fee: data.fee || 0,
-          createdAt: data.createdAt?.toDate?.().toISOString() || new Date().toISOString(),
-        });
-      });
-
-      setDeliveries(deliveriesData);
-
-      // 2. 월간 수익 계산
       const { year, month } = b2bFirestoreService.getCurrentYearMonth();
-      const stats = await b2bFirestoreService.getMonthlyStats(gillerId, year, month);
 
-      if (stats) {
-        // 등급 보너스 계산 (예시)
-        const tierBonusRate = 0.1; // Gold 등급 10%
-        const tierBonus = Math.round(stats.totalAmount * tierBonusRate);
-        const activityBonus = 0; // 활동 보너스 (추후 구현)
-        const qualityBonus = 0; // 품질 보너스 (추후 구현)
-        const netEarnings = stats.totalAmount + tierBonus + activityBonus + qualityBonus;
+      const [statsData, recentDeliveries, savedTier, evaluatedTier] = await Promise.all([
+        b2bFirestoreService.getMonthlyStats(gillerId, year, month),
+        b2bFirestoreService.getRecentDeliveries(gillerId, 10),
+        B2BGillerService.getB2BGillerTier(gillerId),
+        B2BGillerService.evaluateTierForGiller(gillerId).catch(() => null),
+      ]);
 
-        setEarnings({
-          totalDeliveries: stats.totalDeliveries,
-          totalEarnings: stats.totalAmount,
-          tierBonus,
-          activityBonus,
-          qualityBonus,
-          netEarnings,
-          currentTier: stats.totalDeliveries >= 60 ? 'gold' : stats.totalDeliveries >= 30 ? 'silver' : 'silver',
-          nextTier: stats.totalDeliveries >= 60 ? 'platinum' : stats.totalDeliveries >= 30 ? 'gold' : 'silver',
-          progressToNext: stats.totalDeliveries >= 60 ? 83 : stats.totalDeliveries >= 30 ? 50 : 20,
-        });
+      if (statsData) {
+        setStats(statsData);
       }
 
-      setLoading(false);
+      const tierLevel = savedTier?.tier ?? evaluatedTier?.tier ?? 'silver';
+      setCurrentTier(tierLevel);
+
+      const normalizedDeliveries = Array.isArray(recentDeliveries)
+        ? (recentDeliveries as RecentDeliveryDoc[]).map((item, index) =>
+            mapRecentDelivery(typeof item.id === 'string' ? item.id : `recent-${index}`, item ?? {}),
+          )
+        : [];
+
+      setDeliveries(normalizedDeliveries);
     } catch (error) {
-      console.error('Error loading giller data:', error);
+      console.error('Failed to load B2B giller dashboard', error);
+    } finally {
       setLoading(false);
     }
-  };
+  }
 
-  const formatCurrency = (amount: number): string => {
-    return amount.toLocaleString('ko-KR') + '원';
-  };
+  const earnings = useMemo<MonthlyEarnings>(() => {
+    const benefits = B2B_TIER_BENEFITS[currentTier];
+    const nextTier = getNextTier(currentTier);
+    const tierBonus = Math.round(stats.totalAmount * (benefits.rateBonus / 100));
+    const monthlyBonus = B2BGillerService.calculateMonthlyBonus(currentTier, stats.totalDeliveries);
 
-  const getStatusColor = (status: string): string => {
-    switch (status) {
-      case 'pending':
-        return Colors.text.tertiary;
-      case 'matched':
-        return Colors.info;
-      case 'in_progress':
-        return Colors.warning;
-      case 'completed':
-        return Colors.success;
-      default:
-        return Colors.text.tertiary;
-    }
-  };
+    return {
+      totalDeliveries: stats.totalDeliveries,
+      totalEarnings: stats.totalAmount,
+      tierBonus,
+      monthlyBonus,
+      netEarnings: stats.totalAmount + tierBonus + monthlyBonus,
+      currentTier,
+      nextTier,
+      progressToNext: nextTier ? getProgressToNextTier(currentTier, stats.totalDeliveries) : 100,
+    };
+  }, [currentTier, stats]);
 
-  const getStatusText = (status: string): string => {
-    switch (status) {
-      case 'pending':
-        return '대기중';
-      case 'matched':
-        return '매칭완료';
-      case 'in_progress':
-        return '배송중';
-      case 'completed':
-        return '완료';
-      default:
-        return status;
-    }
-  };
-
-  const getTierInfo = (tier: string) => {
-    switch (tier) {
-      case 'silver':
-        return { name: 'Silver', color: '#C0C0C0', bonus: '5%', minDeliveries: 30 };
-      case 'gold':
-        return { name: 'Gold', color: '#FFD700', bonus: '10%', minDeliveries: 60 };
-      case 'platinum':
-        return { name: 'Platinum', color: '#E5E4E2', bonus: '15%', minDeliveries: 100 };
-      default:
-        return { name: 'Regular', color: '#999999', bonus: '0%', minDeliveries: 0 };
-    }
-  };
-
-  const tierInfo = getTierInfo(earnings.currentTier);
+  const tierInfo = B2B_TIER_DETAILS[earnings.currentTier];
+  const progressWidth = `${earnings.progressToNext ?? 100}%` as DimensionValue;
+  const tierCardColor =
+    tierInfo.benefits.priorityLevel >= 10 ? '#7C3AED' : tierInfo.benefits.priorityLevel >= 7 ? '#D97706' : '#475569';
 
   if (loading) {
     return (
       <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color={Colors.primary} />
+        <ActivityIndicator size="large" color="#2563EB" />
       </View>
     );
   }
 
   return (
-    <ScrollView style={styles.container}>
-      <View style={styles.content}>
-        {/* Header */}
-        <View style={styles.header}>
-          <Text style={styles.title}>B2B 길러 대시보드</Text>
-          <Text style={styles.subtitle}>
-            배송 현황과 수익을 확인하세요.
+    <ScrollView style={styles.container} contentContainerStyle={styles.content}>
+      <View style={styles.header}>
+        <Text style={styles.title}>B2B 길러 홈</Text>
+        <Text style={styles.subtitle}>최근 배송, 월 수익, 등급 기준을 한 화면에서 확인합니다.</Text>
+      </View>
+
+      <View style={[styles.tierCard, { backgroundColor: tierCardColor }]}>
+        <Text style={styles.tierName}>{tierInfo.name}</Text>
+        <Text style={styles.tierBonus}>등급 보너스 {tierInfo.benefits.rateBonus}% · 월 보너스 {tierInfo.benefits.monthlyBonus}만원</Text>
+        <Text style={styles.tierDescription}>{tierInfo.description}</Text>
+      </View>
+
+      <View style={styles.card}>
+        <Text style={styles.sectionTitle}>이번 달 수익 현황</Text>
+        <EarningRow label="배송 건수" value={`${earnings.totalDeliveries}건`} />
+        <EarningRow label="기본 수익" value={formatCurrency(earnings.totalEarnings)} />
+        <EarningRow label="등급 추가 수익" value={formatCurrency(earnings.tierBonus)} />
+        <EarningRow label="월 보너스" value={formatCurrency(earnings.monthlyBonus)} />
+        <EarningRow label="세전 합계" value={formatCurrency(earnings.netEarnings)} emphasize />
+      </View>
+
+      <View style={styles.card}>
+        <Text style={styles.sectionTitle}>다음 등급 진행률</Text>
+        <Text style={styles.progressLabel}>
+          {earnings.nextTier
+            ? `${earnings.nextTier.toUpperCase()} 등급까지 ${earnings.progressToNext ?? 0}%`
+            : '최상위 등급을 유지하고 있습니다.'}
+        </Text>
+        <View style={styles.progressTrack}>
+          <View style={[styles.progressFill, { width: progressWidth }]} />
+        </View>
+        {earnings.nextTier ? (
+          <Text style={styles.criteriaText}>
+            다음 기준: 평점 {B2B_TIER_CRITERIA[earnings.nextTier].rating.toFixed(1)}점 이상 · 월 배송 {B2B_TIER_CRITERIA[earnings.nextTier].monthlyDeliveries}건 · 가입 {B2B_TIER_CRITERIA[earnings.nextTier].tenure}개월 이상
           </Text>
-        </View>
+        ) : null}
+      </View>
 
-        {/* Tier Badge */}
-        <View style={[styles.tierBadge, { backgroundColor: tierInfo.color }]}>
-          <Text style={styles.tierName}>{tierInfo.name} 길러</Text>
-          <Text style={styles.tierBonus}>보너스 {tierInfo.bonus}</Text>
-        </View>
-
-        {/* Monthly Earnings */}
-        <View style={styles.earningsCard}>
-          <Text style={styles.earningsTitle}>📊 2월 수익 현황</Text>
-
-          <View style={styles.earningsRow}>
-            <Text style={styles.earningsLabel}>총 배송 건수</Text>
-            <Text style={styles.earningsValue}>{earnings.totalDeliveries}건</Text>
-          </View>
-
-          <View style={styles.earningsRow}>
-            <Text style={styles.earningsLabel}>기본 수익</Text>
-            <Text style={styles.earningsValue}>{formatCurrency(earnings.totalEarnings)}</Text>
-          </View>
-
-          <View style={styles.earningsRow}>
-            <Text style={styles.earningsLabel}>등급 보너스</Text>
-            <Text style={[styles.earningsValue, styles.bonusValue]}>
-              +{formatCurrency(earnings.tierBonus)}
-            </Text>
-          </View>
-
-          <View style={styles.earningsRow}>
-            <Text style={styles.earningsLabel}>활동 보너스</Text>
-            <Text style={[styles.earningsValue, styles.bonusValue]}>
-              +{formatCurrency(earnings.activityBonus)}
-            </Text>
-          </View>
-
-          <View style={styles.earningsRow}>
-            <Text style={styles.earningsLabel}>품질 보너스</Text>
-            <Text style={[styles.earningsValue, styles.bonusValue]}>
-              +{formatCurrency(earnings.qualityBonus)}
-            </Text>
-          </View>
-
-          <View style={[styles.earningsDivider]} />
-
-          <View style={styles.earningsRow}>
-            <Text style={[styles.earningsLabel, styles.earningsLabelTotal]}>실수익 (세후)</Text>
-            <Text style={[styles.earningsValue, styles.earningsValueTotal]}>
-              {formatCurrency(earnings.netEarnings)}
-            </Text>
-          </View>
-        </View>
-
-        {/* Tier Progress */}
-        {earnings.nextTier && (
-          <View style={styles.progressCard}>
-            <Text style={styles.progressTitle}>
-              🎖️ {getTierInfo(earnings.nextTier).name} 승급까지
-            </Text>
-            <View style={styles.progressBar}>
-              <View style={[styles.progressFill, { width: `${earnings.progressToNext}%` }]} />
-            </View>
-            <Text style={styles.progressText}>
-              {earnings.progressToNext}% 완료
-            </Text>
-          </View>
-        )}
-
-        {/* Deliveries List */}
-        <View style={styles.deliveriesSection}>
-          <Text style={styles.sectionTitle}>📦 내 배송</Text>
-
-          {deliveries.map((delivery) => (
-            <View key={delivery.id} style={styles.deliveryCard}>
+      <View style={styles.card}>
+        <Text style={styles.sectionTitle}>최근 배송</Text>
+        {deliveries.length > 0 ? (
+          deliveries.map((delivery) => (
+            <View key={delivery.id} style={styles.deliveryItem}>
               <View style={styles.deliveryHeader}>
                 <Text style={styles.deliveryRoute}>
                   {delivery.pickupStation} → {delivery.deliveryStation}
@@ -279,230 +264,169 @@ export default function B2BGillerScreen({ navigation: _navigation }: Props) {
                   {getStatusText(delivery.status)}
                 </Text>
               </View>
-              <View style={styles.deliveryDetails}>
-                <Text style={styles.deliveryFee}>{formatCurrency(delivery.fee)}</Text>
-                <Text style={styles.deliveryDate}>{delivery.createdAt}</Text>
-              </View>
+              <Text style={styles.deliveryMeta}>{delivery.createdAt}</Text>
+              <Text style={styles.deliveryFee}>{formatCurrency(delivery.fee)}</Text>
             </View>
-          ))}
-        </View>
-
-        {/* Tier Benefits */}
-        <View style={styles.benefitsCard}>
-          <Text style={styles.benefitsTitle}>🏆 등급 혜택</Text>
-
-          <View style={styles.benefitRow}>
-            <View style={styles.benefitTierBadge} style={{ backgroundColor: '#C0C0C0' }}>
-              <Text style={styles.benefitTierName}>Silver</Text>
-            </View>
-            <Text style={styles.benefitDesc}>30건 이상: 5% 보너스</Text>
-          </View>
-
-          <View style={styles.benefitRow}>
-            <View style={styles.benefitTierBadge} style={{ backgroundColor: '#FFD700' }}>
-              <Text style={styles.benefitTierName}>Gold</Text>
-            </View>
-            <Text style={styles.benefitDesc}>60건 이상: 10% 보너스</Text>
-          </View>
-
-          <View style={styles.benefitRow}>
-            <View style={styles.benefitTierBadge} style={{ backgroundColor: '#E5E4E2' }}>
-              <Text style={styles.benefitTierName}>Platinum</Text>
-            </View>
-            <Text style={styles.benefitDesc}>100건 이상: 15% 보너스</Text>
-          </View>
-        </View>
+          ))
+        ) : (
+          <Text style={styles.emptyText}>아직 표시할 최근 배송이 없습니다.</Text>
+        )}
       </View>
     </ScrollView>
+  );
+}
+
+function EarningRow({ label, value, emphasize }: { label: string; value: string; emphasize?: boolean }) {
+  return (
+    <View style={styles.row}>
+      <Text style={[styles.rowLabel, emphasize ? styles.emphasizeLabel : null]}>{label}</Text>
+      <Text style={[styles.rowValue, emphasize ? styles.emphasizeValue : null]}>{value}</Text>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: Colors.background.primary,
+    backgroundColor: '#F8FAFC',
   },
   content: {
-    padding: Spacing.lg,
+    padding: 20,
+    gap: 16,
   },
   loadingContainer: {
     flex: 1,
-    justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: Colors.background.primary,
+    justifyContent: 'center',
+    backgroundColor: '#F8FAFC',
   },
   header: {
-    marginBottom: Spacing.lg,
+    gap: 8,
   },
   title: {
-    ...Typography.h1,
-    color: Colors.text.primary,
-    marginBottom: Spacing.xs,
+    fontSize: 28,
+    fontWeight: '800',
+    color: '#0F172A',
   },
   subtitle: {
-    ...Typography.body,
-    color: Colors.text.secondary,
+    fontSize: 15,
+    lineHeight: 22,
+    color: '#64748B',
   },
-  tierBadge: {
-    borderRadius: BorderRadius.lg,
-    padding: Spacing.lg,
-    marginBottom: Spacing.lg,
-    alignItems: 'center',
-    ...Shadows.md,
+  tierCard: {
+    borderRadius: 24,
+    padding: 20,
+    gap: 8,
   },
   tierName: {
-    ...Typography.h2,
-    color: Colors.white,
-    fontWeight: 'bold',
-    marginBottom: Spacing.xs,
+    fontSize: 24,
+    fontWeight: '800',
+    color: '#FFFFFF',
   },
   tierBonus: {
-    ...Typography.body,
-    color: Colors.white,
-    fontWeight: '600',
+    fontSize: 15,
+    color: '#F8FAFC',
   },
-  earningsCard: {
-    backgroundColor: Colors.white,
-    borderRadius: BorderRadius.lg,
-    padding: Spacing.lg,
-    marginBottom: Spacing.lg,
-    ...Shadows.md,
+  tierDescription: {
+    fontSize: 14,
+    lineHeight: 20,
+    color: '#E2E8F0',
   },
-  earningsTitle: {
-    ...Typography.h3,
-    color: Colors.text.primary,
-    marginBottom: Spacing.md,
+  card: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 24,
+    padding: 20,
+    shadowColor: '#0F172A',
+    shadowOpacity: 0.06,
+    shadowRadius: 10,
+    shadowOffset: { width: 0, height: 4 },
+    elevation: 3,
   },
-  earningsRow: {
+  sectionTitle: {
+    fontSize: 18,
+    fontWeight: '800',
+    color: '#0F172A',
+    marginBottom: 16,
+  },
+  row: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    marginBottom: Spacing.sm,
+    marginBottom: 12,
   },
-  earningsLabel: {
-    ...Typography.body,
-    color: Colors.text.secondary,
+  rowLabel: {
+    fontSize: 14,
+    color: '#64748B',
   },
-  earningsLabelTotal: {
-    ...Typography.bodyBold,
-    color: Colors.text.primary,
+  rowValue: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: '#0F172A',
   },
-  earningsValue: {
-    ...Typography.bodyBold,
-    color: Colors.text.primary,
+  emphasizeLabel: {
+    color: '#1D4ED8',
+    fontWeight: '700',
   },
-  earningsValueTotal: {
-    ...Typography.h2,
-    color: Colors.primary,
+  emphasizeValue: {
+    color: '#1D4ED8',
+    fontSize: 18,
   },
-  bonusValue: {
-    color: Colors.success,
+  progressLabel: {
+    fontSize: 14,
+    color: '#475569',
+    marginBottom: 12,
   },
-  earningsDivider: {
-    height: 1,
-    backgroundColor: Colors.border,
-    marginVertical: Spacing.sm,
-  },
-  progressCard: {
-    backgroundColor: Colors.background.secondary,
-    borderRadius: BorderRadius.lg,
-    padding: Spacing.lg,
-    marginBottom: Spacing.lg,
-  },
-  progressTitle: {
-    ...Typography.bodyBold,
-    color: Colors.text.primary,
-    marginBottom: Spacing.sm,
-  },
-  progressBar: {
-    height: 8,
-    backgroundColor: Colors.border,
-    borderRadius: BorderRadius.sm,
+  progressTrack: {
+    height: 10,
+    borderRadius: 999,
+    backgroundColor: '#E2E8F0',
     overflow: 'hidden',
   },
   progressFill: {
     height: '100%',
-    backgroundColor: Colors.primary,
+    borderRadius: 999,
+    backgroundColor: '#2563EB',
   },
-  progressText: {
-    ...Typography.bodySmall,
-    color: Colors.text.secondary,
-    marginTop: Spacing.xs,
-    textAlign: 'right',
+  criteriaText: {
+    marginTop: 12,
+    fontSize: 13,
+    lineHeight: 20,
+    color: '#64748B',
   },
-  deliveriesSection: {
-    marginBottom: Spacing.lg,
-  },
-  sectionTitle: {
-    ...Typography.h3,
-    color: Colors.text.primary,
-    marginBottom: Spacing.md,
-  },
-  deliveryCard: {
-    backgroundColor: Colors.white,
-    borderRadius: BorderRadius.md,
-    padding: Spacing.md,
-    marginBottom: Spacing.sm,
-    ...Shadows.sm,
+  deliveryItem: {
+    paddingVertical: 12,
+    borderTopWidth: 1,
+    borderTopColor: '#E2E8F0',
   },
   deliveryHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    marginBottom: Spacing.xs,
+    alignItems: 'center',
   },
   deliveryRoute: {
-    ...Typography.bodyBold,
-    color: Colors.text.primary,
+    fontSize: 15,
+    fontWeight: '700',
+    color: '#0F172A',
     flex: 1,
+    marginRight: 12,
   },
   deliveryStatus: {
-    ...Typography.bodySmall,
-    fontWeight: 'bold',
+    fontSize: 13,
+    fontWeight: '700',
   },
-  deliveryDetails: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
+  deliveryMeta: {
+    marginTop: 6,
+    fontSize: 13,
+    color: '#64748B',
   },
   deliveryFee: {
-    ...Typography.h3,
-    color: Colors.primary,
-    fontWeight: 'bold',
+    marginTop: 8,
+    fontSize: 16,
+    fontWeight: '800',
+    color: '#0F172A',
   },
-  deliveryDate: {
-    ...Typography.bodySmall,
-    color: Colors.text.secondary,
-  },
-  benefitsCard: {
-    backgroundColor: Colors.white,
-    borderRadius: BorderRadius.lg,
-    padding: Spacing.lg,
-    marginBottom: Spacing.lg,
-    ...Shadows.sm,
-  },
-  benefitsTitle: {
-    ...Typography.h3,
-    color: Colors.text.primary,
-    marginBottom: Spacing.md,
-  },
-  benefitRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: Spacing.md,
-  },
-  benefitTierBadge: {
-    width: 80,
-    paddingVertical: Spacing.xs,
-    borderRadius: BorderRadius.sm,
-    alignItems: 'center',
-    marginRight: Spacing.md,
-  },
-  benefitTierName: {
-    ...Typography.bodySmall,
-    fontWeight: 'bold',
-    color: Colors.white,
-  },
-  benefitDesc: {
-    ...Typography.body,
-    color: Colors.text.secondary,
+  emptyText: {
+    fontSize: 14,
+    lineHeight: 21,
+    color: '#64748B',
   },
 });

@@ -72,7 +72,7 @@ export interface PointTransaction {
 
   // 메타데이터
   metadata?: {
-    [key: string]: any;
+    [key: string]: unknown;
   };
 
   // 시간
@@ -172,6 +172,7 @@ export interface WithdrawRequestData {
   bankName: string;
   accountNumber: string;
   accountHolder: string;
+  bankCode?: string;
 }
 
 /**
@@ -182,10 +183,24 @@ export interface WithdrawRequest {
   userId: string;
   amount: number;
   bankName: string;
-  accountNumber: string;
+  accountNumber?: string;
+  accountNumberMasked?: string;
+  accountLast4?: string;
   accountHolder: string;
+  bankCode?: string;
   status: 'pending' | 'completed' | 'failed';
   createdAt: Timestamp;
   completedAt?: Timestamp;
   failureReason?: string;
+  integrationSnapshot?: {
+    bank?: {
+      testMode?: boolean;
+      liveReady?: boolean;
+      provider?: string;
+      verificationMode?: string;
+      requiresAccountHolderMatch?: boolean;
+      manualReviewFallback?: boolean;
+    };
+  };
+  processedContext?: Record<string, unknown>;
 }

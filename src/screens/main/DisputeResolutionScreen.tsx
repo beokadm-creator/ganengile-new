@@ -1,618 +1,501 @@
-/**
- * Dispute Resolution Screen
- * 분쟁 해결 화면 (P2-2)
- *
-// @ts-nocheck - Temporarily suppress TypeScript errors for rapid development
- * 기능:
- * - 분쟁 내역 표시
- * - 증거 수집 현황
- * - 자동 판정 결과 표시
- * - 보상 지급 현황
- */
-
-import React, { useState, useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
-  View,
-  Text,
-  StyleSheet,
-  ScrollView,
   ActivityIndicator,
   Alert,
+  ScrollView,
+  StyleSheet,
+  Text,
+  View,
 } from 'react-native';
-import { StackNavigationProp } from '@react-navigation/stack';
-import { getFirestore, doc, getDoc, collection, query, where, getDocs } from 'firebase/firestore';
-import { Colors, Typography, Spacing, BorderRadius } from '../../theme';
+import { Ionicons } from '@expo/vector-icons';
+import { RouteProp, useRoute } from '@react-navigation/native';
+import { collection, doc, getDoc, getDocs, query, where } from 'firebase/firestore';
+import { db } from '../../services/firebase';
+import type { MainStackParamList } from '../../types/navigation';
 
-type NavigationProp = StackNavigationProp<any>;
+type DisputeResolutionRoute = RouteProp<MainStackParamList, 'DisputeResolution'>;
+type DisputeType = 'damage' | 'loss' | 'delay' | 'other' | 'quality';
+type DisputeUrgency = 'normal' | 'urgent' | 'critical';
+type DisputeStatus = 'pending' | 'investigating' | 'resolved' | 'rejected';
+type ResolutionDecision = 'accepted' | 'rejected' | 'partial';
+type ResponsibleParty = 'giller' | 'requester' | 'platform' | 'system';
 
-interface Props {
-  navigation: NavigationProp;
-  route?: {
-    params?: {
-      disputeId: string;
-    };
-  };
-}
+type DisputeResolution = {
+  decision: ResolutionDecision;
+  reason: string;
+  compensationAmount?: number;
+  responsibleParty?: ResponsibleParty;
+  determinedAt?: Date;
+};
 
-interface DisputeDetail {
+type DisputeDetail = {
   id: string;
-  type: 'damage' | 'loss' | 'delay' | 'other';
+  type: DisputeType;
   description: string;
-  photos: string[];
-  urgency: 'normal' | 'urgent' | 'critical';
+  photoUrls: string[];
+  urgency: DisputeUrgency;
   deliveryId?: string;
   matchId?: string;
   reporterId: string;
-  status: 'pending' | 'investigating' | 'resolved';
-  resolution?: {
-    decision: 'accepted' | 'rejected' | 'partial';
-    reason: string;
-    compensationAmount?: number;
-    responsibleParty?: 'giller' | 'requester' | 'platform';
-    determinedAt: any;
-  };
-  createdAt: any;
+  status: DisputeStatus;
+  resolution?: DisputeResolution;
+  createdAt?: Date;
+};
+
+type DisputeHistoryItem = {
+  id: string;
+  action: string;
+  note: string;
+  actorName: string;
+  createdAt?: Date;
+};
+
+function toDate(value: unknown): Date | undefined {
+  if (value instanceof Date) {
+    return value;
+  }
+
+  if (value && typeof value === 'object' && 'toDate' in value) {
+    const maybeTimestamp = value as { toDate?: () => Date };
+    if (typeof maybeTimestamp.toDate === 'function') {
+      return maybeTimestamp.toDate();
+    }
+  }
+
+  return undefined;
 }
 
-export default function DisputeResolutionScreen({ navigation, route }: Props) {
+function toType(value: unknown): DisputeType {
+  return value === 'damage' || value === 'loss' || value === 'delay' || value === 'other' || value === 'quality'
+    ? value
+    : 'other';
+}
+
+function toUrgency(value: unknown): DisputeUrgency {
+  return value === 'normal' || value === 'urgent' || value === 'critical' ? value : 'normal';
+}
+
+function toStatus(value: unknown): DisputeStatus {
+  return value === 'pending' || value === 'investigating' || value === 'resolved' || value === 'rejected'
+    ? value
+    : 'pending';
+}
+
+function toDecision(value: unknown): ResolutionDecision | undefined {
+  return value === 'accepted' || value === 'rejected' || value === 'partial' ? value : undefined;
+}
+
+function toResponsibleParty(value: unknown): ResponsibleParty | undefined {
+  return value === 'giller' || value === 'requester' || value === 'platform' || value === 'system' ? value : undefined;
+}
+
+function getTypeLabel(type: DisputeType): string {
+  switch (type) {
+    case 'damage':
+      return '파손';
+    case 'loss':
+      return '분실';
+    case 'delay':
+      return '지연';
+    case 'quality':
+      return '품질';
+    case 'other':
+      return '기타';
+  }
+}
+
+function getTypeIcon(type: DisputeType): React.ComponentProps<typeof Ionicons>['name'] {
+  switch (type) {
+    case 'damage':
+      return 'warning-outline';
+    case 'loss':
+      return 'help-buoy-outline';
+    case 'delay':
+      return 'time-outline';
+    case 'quality':
+      return 'ribbon-outline';
+    case 'other':
+      return 'document-text-outline';
+  }
+}
+
+function getUrgencyLabel(urgency: DisputeUrgency): string {
+  switch (urgency) {
+    case 'normal':
+      return '일반';
+    case 'urgent':
+      return '긴급';
+    case 'critical':
+      return '매우 긴급';
+  }
+}
+
+function getUrgencyColor(urgency: DisputeUrgency): string {
+  switch (urgency) {
+    case 'normal':
+      return '#475569';
+    case 'urgent':
+      return '#D97706';
+    case 'critical':
+      return '#DC2626';
+  }
+}
+
+function getStatusMeta(status: DisputeStatus): { label: string; color: string } {
+  switch (status) {
+    case 'pending':
+      return { label: '접수 대기', color: '#D97706' };
+    case 'investigating':
+      return { label: '조사 중', color: '#2563EB' };
+    case 'resolved':
+      return { label: '해결 완료', color: '#16A34A' };
+    case 'rejected':
+      return { label: '반려', color: '#64748B' };
+  }
+}
+
+function getDecisionLabel(decision: ResolutionDecision): string {
+  switch (decision) {
+    case 'accepted':
+      return '인정';
+    case 'rejected':
+      return '기각';
+    case 'partial':
+      return '부분 인정';
+  }
+}
+
+function getResponsiblePartyLabel(party?: ResponsibleParty): string {
+  switch (party) {
+    case 'giller':
+      return '길러';
+    case 'requester':
+      return '요청자';
+    case 'platform':
+      return '플랫폼';
+    case 'system':
+      return '시스템';
+    default:
+      return '운영 검토 중';
+  }
+}
+
+function formatDate(value?: Date): string {
+  return value ? value.toLocaleString('ko-KR') : '-';
+}
+
+function mapDispute(rawId: string, raw: Record<string, unknown>): DisputeDetail {
+  const resolutionRaw = raw.resolution;
+  const resolutionRecord =
+    resolutionRaw && typeof resolutionRaw === 'object' ? (resolutionRaw as Record<string, unknown>) : undefined;
+  const decision = toDecision(resolutionRecord?.decision);
+
+  return {
+    id: rawId,
+    type: toType(raw.type),
+    description: typeof raw.description === 'string' ? raw.description : '',
+    photoUrls: Array.isArray(raw.photoUrls)
+      ? raw.photoUrls.filter((item): item is string => typeof item === 'string')
+      : [],
+    urgency: toUrgency(raw.urgency),
+    deliveryId: typeof raw.deliveryId === 'string' ? raw.deliveryId : undefined,
+    matchId: typeof raw.matchId === 'string' ? raw.matchId : undefined,
+    reporterId: typeof raw.reporterId === 'string' ? raw.reporterId : '',
+    status: toStatus(raw.status),
+    resolution:
+      resolutionRecord && decision
+        ? {
+            decision,
+            reason: typeof resolutionRecord.reason === 'string' ? resolutionRecord.reason : '',
+            compensationAmount:
+              typeof resolutionRecord.compensationAmount === 'number'
+                ? resolutionRecord.compensationAmount
+                : undefined,
+            responsibleParty: toResponsibleParty(resolutionRecord.responsibleParty),
+            determinedAt: toDate(resolutionRecord.determinedAt),
+          }
+        : undefined,
+    createdAt: toDate(raw.createdAt),
+  };
+}
+
+function mapHistoryItem(rawId: string, raw: Record<string, unknown>): DisputeHistoryItem {
+  return {
+    id: rawId,
+    action: typeof raw.action === 'string' ? raw.action : '업데이트',
+    note: typeof raw.note === 'string' ? raw.note : '',
+    actorName: typeof raw.actorName === 'string' ? raw.actorName : '운영 시스템',
+    createdAt: toDate(raw.createdAt),
+  };
+}
+
+export default function DisputeResolutionScreen() {
+  const route = useRoute<DisputeResolutionRoute>();
   const [loading, setLoading] = useState(true);
   const [dispute, setDispute] = useState<DisputeDetail | null>(null);
-  const [loadingHistory, setLoadingHistory] = useState(false);
-  const [history, setHistory] = useState<any[]>([]);
+  const [history, setHistory] = useState<DisputeHistoryItem[]>([]);
 
   useEffect(() => {
-    const disputeId = route?.params?.disputeId;
+    void loadDispute(route.params.disputeId);
+  }, [route.params.disputeId]);
 
-    if (disputeId) {
-      loadDispute(disputeId);
-    } else {
-      setLoading(false);
-    }
-  }, [route]);
-
-  const loadDispute = async (disputeId: string) => {
+  const loadDispute = async (disputeId: string): Promise<void> => {
     try {
       setLoading(true);
+      const disputeSnapshot = await getDoc(doc(db, 'disputes', disputeId));
 
-      const db = getFirestore();
-      const disputeRef = doc(db, 'disputes', disputeId);
-      const disputeDoc = await getDoc(disputeRef);
-
-      if (disputeDoc.exists()) {
-        const data = disputeDoc.data();
-        setDispute({
-          id: disputeDoc.id,
-          type: data.type,
-          description: data.description,
-          photos: data.photos || [],
-          urgency: data.urgency,
-          deliveryId: data.deliveryId,
-          matchId: data.matchId,
-          reporterId: data.reporterId,
-          status: data.status,
-          resolution: data.resolution,
-          createdAt: data.createdAt,
-        });
-
-        // 분쟁 처리 이력 로드
-        await loadDisputeHistory(disputeId);
+      if (!disputeSnapshot.exists()) {
+        setDispute(null);
+        setHistory([]);
+        return;
       }
+
+      setDispute(mapDispute(disputeSnapshot.id, disputeSnapshot.data() as Record<string, unknown>));
+
+      const historyQuery = query(collection(db, 'dispute_history'), where('disputeId', '==', disputeId));
+      const historySnapshot = await getDocs(historyQuery);
+      const items = historySnapshot.docs.map((snapshot) =>
+        mapHistoryItem(snapshot.id, snapshot.data() as Record<string, unknown>)
+      );
+      setHistory(items.sort((a, b) => (b.createdAt?.getTime() ?? 0) - (a.createdAt?.getTime() ?? 0)));
     } catch (error) {
-      console.error('Error loading dispute:', error);
-      Alert.alert('오류', '분쟁 정보를 불러올 수 없습니다.');
+      console.error('Failed to load dispute resolution data:', error);
+      Alert.alert('분쟁 정보를 불러오지 못했습니다', '잠시 후 다시 시도해 주세요.');
     } finally {
       setLoading(false);
-    }
-  };
-
-  const loadDisputeHistory = async (disputeId: string) => {
-    try {
-      setLoadingHistory(true);
-
-      const db = getFirestore();
-      const historyRef = collection(db, 'dispute_history');
-      const q = query(
-        historyRef,
-        where('disputeId', '==', disputeId)
-      );
-
-      const snapshot = await getDocs(q);
-      const historyData: any[] = [];
-
-      snapshot.forEach((docSnapshot) => {
-        const data = docSnapshot.data();
-        historyData.push({
-          id: docSnapshot.id,
-          ...data,
-        });
-      });
-
-      setHistory(historyData);
-    } catch (error) {
-      console.error('Error loading dispute history:', error);
-    } finally {
-      setLoadingHistory(false);
-    }
-  };
-
-  const getTypeLabel = (type: string): string => {
-    switch (type) {
-      case 'damage':
-        return '파손';
-      case 'loss':
-        return '분실';
-      case 'delay':
-        return '지연';
-      case 'other':
-        return '기타';
-      default:
-        return '';
-    }
-  };
-
-  const getTypeIcon = (type: string): string => {
-    switch (type) {
-      case 'damage':
-        return '💥';
-      case 'loss':
-        return '📦';
-      case 'delay':
-        return '⏰';
-      case 'other':
-        return '❓';
-      default:
-        return '';
-    }
-  };
-
-  const getStatusLabel = (status: string): { label: string; color: string } => {
-    switch (status) {
-      case 'pending':
-        return { label: '접수 대기', color: '#FF9800' }; // Orange
-      case 'investigating':
-        return { label: '조사 중', color: '#2196F3' }; // Blue
-      case 'resolved':
-        return { label: '해결 완료', color: '#4CAF50' }; // Green
-      default:
-        return { label: '알 수 없음', color: '#9E9E9E' };
-    }
-  };
-
-  const getResolutionDecisionLabel = (decision: string): string => {
-    switch (decision) {
-      case 'accepted':
-        return '승인';
-      case 'rejected':
-        return '기각';
-      case 'partial':
-        return '일부 승인';
-      default:
-        return '';
-    }
-  };
-
-  const getResponsiblePartyLabel = (party: string): string => {
-    switch (party) {
-      case 'giller':
-        return '길러';
-      case 'requester':
-        return '의뢰인';
-      case 'platform':
-        return '플랫폼';
-      default:
-        return '';
     }
   };
 
   if (loading) {
     return (
       <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color={Colors.primary} />
-        <Text style={styles.loadingText}>분쟁 정보를 불러오는 중...</Text>
+        <ActivityIndicator size="large" color="#2563EB" />
+        <Text style={styles.loadingText}>분쟁 처리 정보를 확인하고 있습니다.</Text>
       </View>
     );
   }
 
-  return (
-    <View style={styles.container}>
-      {/* 헤더 */}
-      <View style={styles.header}>
-        <Text style={styles.headerTitle}>분쟁 해결</Text>
-        <Text style={styles.headerSubtitle}>
-          분쟁 처리 결과를 확인하세요
-        </Text>
+  if (!dispute) {
+    return (
+      <View style={styles.emptyContainer}>
+        <Text style={styles.emptyTitle}>분쟁 정보를 찾을 수 없습니다.</Text>
+        <Text style={styles.emptyDescription}>접수 직후라면 잠시 뒤 다시 확인해 주세요.</Text>
       </View>
+    );
+  }
 
-      <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
-        {dispute && (
-          <>
-            {/* 분쟁 기본 정보 */}
-            <View style={styles.section}>
-              <Text style={styles.sectionTitle}>분쟁 정보</Text>
+  const statusMeta = getStatusMeta(dispute.status);
 
-              <View style={styles.infoRow}>
-                <Text style={styles.infoLabel}>분쟁 유형</Text>
-                <View style={styles.infoValue}>
-                  <Text style={styles.typeIcon}>{getTypeIcon(dispute.type)}</Text>
-                  <Text style={styles.typeText}>{getTypeLabel(dispute.type)}</Text>
-                </View>
-              </View>
-
-              <View style={styles.infoRow}>
-                <Text style={styles.infoLabel}>긴급도</Text>
-                <View style={[styles.urgencyBadge, { backgroundColor: getUrgencyColor(dispute.urgency) }]}>
-                  <Text style={styles.urgencyBadgeText}>{dispute.urgency.toUpperCase()}</Text>
-                </View>
-              </View>
-
-              <View style={styles.infoRow}>
-                <Text style={styles.infoLabel}>접수 일자</Text>
-                <Text style={styles.infoValue}>
-                  {dispute.createdAt ? new Date(dispute.createdAt.toDate()).toLocaleDateString('ko-KR') : '-'}
-                </Text>
-              </View>
-            </View>
-
-            {/* 처리 상태 */}
-            <View style={styles.section}>
-              <Text style={styles.sectionTitle}>처리 상태</Text>
-
-              <View style={styles.statusCard}>
-                <View style={[styles.statusBadge, { backgroundColor: getStatusLabel(dispute.status).color }]}>
-                  <Text style={styles.statusBadgeText}>{getStatusLabel(dispute.status).label}</Text>
-                </View>
-              </View>
-            </View>
-
-            {/* 해결 결과 */}
-            {dispute.resolution && (
-              <View style={styles.section}>
-                <Text style={styles.sectionTitle}>해결 결과</Text>
-
-                <View style={styles.resolutionCard}>
-                  {/* 판정 결과 */}
-                  <View style={styles.resolutionItem}>
-                    <Text style={styles.resolutionLabel}>판정 결과</Text>
-                    <View style={[styles.resolutionBadge, { backgroundColor: getResolutionColor(dispute.resolution.decision) }]}>
-                      <Text style={styles.resolutionBadgeText}>
-                        {getResolutionDecisionLabel(dispute.resolution.decision)}
-                      </Text>
-                    </View>
-                  </View>
-
-                  {/* 사유 */}
-                  <View style={styles.resolutionItem}>
-                    <Text style={styles.resolutionLabel}>사유</Text>
-                    <Text style={styles.resolutionValue}>{dispute.resolution.reason}</Text>
-                  </View>
-
-                  {/* 책임 당사자 */}
-                  {dispute.resolution.responsibleParty && (
-                    <View style={styles.resolutionItem}>
-                      <Text style={styles.resolutionLabel}>책임 당사자</Text>
-                      <Text style={styles.resolutionValue}>
-                        {getResponsiblePartyLabel(dispute.resolution.responsibleParty)}
-                      </Text>
-                    </View>
-                  )}
-
-                  {/* 보상 금액 */}
-                  {dispute.resolution.compensationAmount && (
-                    <View style={styles.resolutionItem}>
-                      <Text style={styles.resolutionLabel}>보상 금액</Text>
-                      <Text style={styles.resolutionValue}>
-                        {dispute.resolution.compensationAmount.toLocaleString()}원
-                      </Text>
-                    </View>
-                  )}
-
-                  {/* 판정 일자 */}
-                  <View style={styles.resolutionItem}>
-                    <Text style={styles.resolutionLabel}>판정 일자</Text>
-                    <Text style={styles.resolutionValue}>
-                      {dispute.resolution.determinedAt ? new Date(dispute.resolution.determinedAt.toDate()).toLocaleDateString('ko-KR') : '-'}
-                    </Text>
-                  </View>
-                </View>
-              </View>
-            )}
-
-            {/* 상세 설명 */}
-            <View style={styles.section}>
-              <Text style={styles.sectionTitle}>상세 설명</Text>
-
-              <View style={styles.descriptionCard}>
-                <Text style={styles.descriptionText}>{dispute.description}</Text>
-              </View>
-
-              {/* 사진 증거 */}
-              {dispute.photos.length > 0 && (
-                <>
-                  <Text style={styles.photosTitle}>증거 사진</Text>
-                  <ScrollView horizontal style={styles.photosScroll} showsHorizontalScrollIndicator={false}>
-                    {dispute.photos.map((photo, index) => (
-                      <Image key={index} source={{ uri: photo }} style={styles.photoImage} />
-                    ))}
-                  </ScrollView>
-                </>
-              )}
-            </View>
-
-            {/* 처리 이력 */}
-            <View style={styles.section}>
-              <Text style={styles.sectionTitle}>처리 이력</Text>
-
-              {loadingHistory ? (
-                <ActivityIndicator size="small" color={Colors.primary} />
-              ) : history.length > 0 ? (
-                history.map((item, index) => (
-                  <View key={index} style={styles.historyItem}>
-                    <Text style={styles.historyTime}>
-                      {item.createdAt ? new Date(item.createdAt.toDate()).toLocaleString('ko-KR') : '-'}
-                    </Text>
-                    <Text style={styles.historyAction}>{item.action}</Text>
-                  </View>
-                ))
-              ) : (
-                <Text style={styles.emptyText}>처리 이력이 없습니다</Text>
-              )}
-            </View>
-          </>
-        )}
-
-        {dispute?.status === 'resolved' && (
-          <View style={styles.noticeCard}>
-            <Text style={styles.noticeIcon}>✅</Text>
-            <Text style={styles.noticeText}>
-              분쟁이 해결되었습니다. 만족하시는 결과인지 체크해주세요.
+  return (
+    <ScrollView style={styles.container} contentContainerStyle={styles.content}>
+      <View style={styles.heroCard}>
+        <View style={styles.heroRow}>
+          <View style={styles.iconBadge}>
+            <Ionicons name={getTypeIcon(dispute.type)} size={22} color="#1D4ED8" />
+          </View>
+          <View style={styles.heroText}>
+            <Text style={styles.title}>{getTypeLabel(dispute.type)} 분쟁</Text>
+            <Text style={styles.subtitle}>
+              접수 시각 {formatDate(dispute.createdAt)} · 긴급도{' '}
+              <Text style={[styles.urgencyText, { color: getUrgencyColor(dispute.urgency) }]}>
+                {getUrgencyLabel(dispute.urgency)}
+              </Text>
             </Text>
           </View>
-        )}
-      </ScrollView>
-
-      {/* 하단 버튼 */}
-      {dispute?.status === 'resolved' && (
-        <View style={styles.footer}>
-          <TouchableOpacity
-            style={styles.closeButton}
-            onPress={() => navigation.goBack()}
-          >
-            <Text style={styles.closeButtonText}>닫기</Text>
-          </TouchableOpacity>
         </View>
-      )}
-    </View>
+        <View style={[styles.statusBadge, { backgroundColor: `${statusMeta.color}14` }]}>
+          <Text style={[styles.statusText, { color: statusMeta.color }]}>{statusMeta.label}</Text>
+        </View>
+      </View>
+
+      <View style={styles.card}>
+        <Text style={styles.sectionTitle}>신고 내용</Text>
+        <Text style={styles.description}>{dispute.description}</Text>
+        <Text style={styles.metaText}>배송 ID: {dispute.deliveryId ?? '-'}</Text>
+        <Text style={styles.metaText}>매칭 ID: {dispute.matchId ?? '-'}</Text>
+        <Text style={styles.metaText}>신고자: {dispute.reporterId}</Text>
+      </View>
+
+      <View style={styles.card}>
+        <Text style={styles.sectionTitle}>증빙 사진</Text>
+        {dispute.photoUrls.length === 0 ? (
+          <Text style={styles.metaText}>등록된 사진 증빙이 아직 없습니다.</Text>
+        ) : (
+          dispute.photoUrls.map((url, index) => (
+            <Text key={url} style={styles.metaText}>
+              {index + 1}. {url}
+            </Text>
+          ))
+        )}
+      </View>
+
+      <View style={styles.card}>
+        <Text style={styles.sectionTitle}>운영 판단</Text>
+        {dispute.resolution ? (
+          <>
+            <Text style={styles.metaText}>결정: {getDecisionLabel(dispute.resolution.decision)}</Text>
+            <Text style={styles.metaText}>책임 주체: {getResponsiblePartyLabel(dispute.resolution.responsibleParty)}</Text>
+            <Text style={styles.metaText}>
+              보상 금액: {typeof dispute.resolution.compensationAmount === 'number'
+                ? `${dispute.resolution.compensationAmount.toLocaleString('ko-KR')}원`
+                : '-'}
+            </Text>
+            <Text style={styles.metaText}>판정 시각: {formatDate(dispute.resolution.determinedAt)}</Text>
+            <Text style={styles.description}>{dispute.resolution.reason || '운영 메모가 아직 없습니다.'}</Text>
+          </>
+        ) : (
+          <Text style={styles.metaText}>아직 운영 검토가 진행 중입니다. 보증금, 환불, 패널티는 운영 판단 뒤 확정됩니다.</Text>
+        )}
+      </View>
+
+      <View style={styles.card}>
+        <Text style={styles.sectionTitle}>처리 이력</Text>
+        {history.length === 0 ? (
+          <Text style={styles.metaText}>운영 이력이 아직 기록되지 않았습니다.</Text>
+        ) : (
+          history.map((item) => (
+            <View key={item.id} style={styles.historyItem}>
+              <Text style={styles.historyTitle}>{item.action}</Text>
+              <Text style={styles.metaText}>{item.note || '메모 없음'}</Text>
+              <Text style={styles.historyMeta}>
+                {item.actorName} · {formatDate(item.createdAt)}
+              </Text>
+            </View>
+          ))
+        )}
+      </View>
+    </ScrollView>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: Colors.background,
-  },
-  header: {
-    paddingHorizontal: Spacing.md,
-    paddingTop: Spacing.lg,
-    paddingBottom: Spacing.sm,
-    backgroundColor: Colors.surface,
-  },
-  headerTitle: {
-    ...Typography.h2,
-    color: Colors.text,
-    marginBottom: Spacing.xs,
-  },
-  headerSubtitle: {
-    ...Typography.body2,
-    color: Colors.textSecondary,
+    backgroundColor: '#F8FAFC',
   },
   content: {
-    flex: 1,
+    padding: 20,
+    gap: 16,
   },
   loadingContainer: {
     flex: 1,
-    justifyContent: 'center',
     alignItems: 'center',
+    justifyContent: 'center',
+    gap: 12,
+    backgroundColor: '#F8FAFC',
   },
   loadingText: {
-    ...Typography.body1,
-    color: Colors.textSecondary,
-    marginTop: Spacing.md,
+    fontSize: 15,
+    color: '#64748B',
   },
-  section: {
-    backgroundColor: Colors.surface,
-    paddingHorizontal: Spacing.md,
-    paddingVertical: Spacing.lg,
-    marginBottom: Spacing.sm,
+  emptyContainer: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 24,
+    gap: 8,
+    backgroundColor: '#F8FAFC',
   },
-  sectionTitle: {
-    ...Typography.h3,
-    color: Colors.text,
-    marginBottom: Spacing.md,
+  emptyTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: '#0F172A',
   },
-  infoRow: {
+  emptyDescription: {
+    fontSize: 14,
+    color: '#64748B',
+    textAlign: 'center',
+  },
+  heroCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 24,
+    padding: 20,
+    gap: 16,
+    shadowColor: '#0F172A',
+    shadowOpacity: 0.08,
+    shadowRadius: 14,
+    shadowOffset: { width: 0, height: 6 },
+    elevation: 4,
+  },
+  heroRow: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: Spacing.sm,
-  },
-  infoLabel: {
-    ...Typography.body1,
-    color: Colors.textSecondary,
-  },
-  infoValue: {
-    flexDirection: 'row',
+    gap: 14,
     alignItems: 'center',
   },
-  typeIcon: {
-    fontSize: 24,
-    marginRight: Spacing.sm,
-  },
-  typeText: {
-    ...Typography.h3,
-    color: Colors.text,
-    fontWeight: '600',
-  },
-  urgencyBadge: {
-    paddingHorizontal: Spacing.sm,
-    paddingVertical: Spacing.xs,
-    borderRadius: BorderRadius.sm,
-  },
-  urgencyBadgeText: {
-    ...Typography.bodySmall,
-    color: Colors.white,
-    fontWeight: '600',
-  },
-  statusCard: {
+  iconBadge: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
     alignItems: 'center',
-    padding: Spacing.md,
+    justifyContent: 'center',
+    backgroundColor: '#DBEAFE',
+  },
+  heroText: {
+    flex: 1,
+    gap: 4,
+  },
+  title: {
+    fontSize: 22,
+    fontWeight: '800',
+    color: '#0F172A',
+  },
+  subtitle: {
+    fontSize: 14,
+    color: '#64748B',
+  },
+  urgencyText: {
+    fontWeight: '700',
   },
   statusBadge: {
-    paddingHorizontal: Spacing.lg,
-    paddingVertical: Spacing.md,
-    borderRadius: BorderRadius.lg,
+    alignSelf: 'flex-start',
+    borderRadius: 999,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
   },
-  statusBadgeText: {
-    ...Typography.h3,
-    color: Colors.white,
+  statusText: {
+    fontSize: 13,
     fontWeight: '700',
   },
-  resolutionCard: {
-    backgroundColor: Colors.background,
-    borderRadius: BorderRadius.md,
-    padding: Spacing.md,
+  card: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 24,
+    padding: 20,
+    gap: 10,
+    shadowColor: '#0F172A',
+    shadowOpacity: 0.06,
+    shadowRadius: 10,
+    shadowOffset: { width: 0, height: 4 },
+    elevation: 3,
   },
-  resolutionItem: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: Spacing.sm,
+  sectionTitle: {
+    fontSize: 18,
+    fontWeight: '800',
+    color: '#0F172A',
   },
-  resolutionLabel: {
-    ...Typography.body1,
-    color: Colors.textSecondary,
-  },
-  resolutionValue: {
-    ...Typography.body1,
-    color: Colors.text,
-    fontWeight: '600',
-  },
-  resolutionBadge: {
-    paddingHorizontal: Spacing.sm,
-    paddingVertical: Spacing.xs,
-    borderRadius: BorderRadius.sm,
-  },
-  resolutionBadgeText: {
-    ...Typography.body2,
-    color: Colors.white,
-    fontWeight: '600',
-  },
-  descriptionCard: {
-    backgroundColor: Colors.background,
-    borderRadius: BorderRadius.md,
-    padding: Spacing.md,
-  },
-  descriptionText: {
-    ...Typography.body1,
-    color: Colors.text,
+  description: {
+    fontSize: 15,
     lineHeight: 22,
+    color: '#1E293B',
   },
-  photosTitle: {
-    ...Typography.h3,
-    color: Colors.text,
-    marginTop: Spacing.md,
-    marginBottom: Spacing.sm,
-  },
-  photosScroll: {
-    marginTop: Spacing.sm,
-  },
-  photoImage: {
-    width: 100,
-    height: 100,
-    borderRadius: BorderRadius.md,
-    marginRight: Spacing.sm,
+  metaText: {
+    fontSize: 14,
+    lineHeight: 20,
+    color: '#64748B',
   },
   historyItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: Colors.background,
-    padding: Spacing.md,
-    marginBottom: Spacing.xs,
-    borderRadius: BorderRadius.md,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    borderRadius: 16,
+    padding: 14,
+    gap: 6,
   },
-  historyTime: {
-    ...Typography.body2,
-    color: Colors.textSecondary,
-    marginRight: Spacing.md,
-  },
-  historyAction: {
-    ...Typography.body1,
-    color: Colors.text,
-    flex: 1,
-  },
-  emptyText: {
-    ...Typography.body2,
-    color: Colors.textSecondary,
-    textAlign: 'center',
-    padding: Spacing.lg,
-  },
-  noticeCard: {
-    backgroundColor: '#4CAF50',
-    margin: Spacing.md,
-    padding: Spacing.lg,
-    borderRadius: BorderRadius.lg,
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  noticeIcon: {
-    fontSize: 32,
-    marginRight: Spacing.md,
-  },
-  noticeText: {
-    ...Typography.body1,
-    color: Colors.white,
-    flex: 1,
-  },
-  footer: {
-    backgroundColor: Colors.surface,
-    paddingHorizontal: Spacing.md,
-    paddingVertical: Spacing.lg,
-  },
-  closeButton: {
-    backgroundColor: Colors.primary,
-    borderRadius: BorderRadius.md,
-    padding: Spacing.lg,
-    alignItems: 'center',
-  },
-  closeButtonText: {
-    ...Typography.h3,
-    color: Colors.white,
+  historyTitle: {
+    fontSize: 15,
     fontWeight: '700',
+    color: '#0F172A',
+  },
+  historyMeta: {
+    fontSize: 12,
+    color: '#94A3B8',
   },
 });
-
-// Helper functions
-function getUrgencyColor(urgency: string): string {
-  switch (urgency) {
-    case 'normal':
-      return '#4CAF50'; // Green
-    case 'urgent':
-      return '#FF9800'; // Orange
-    case 'critical':
-      return '#FF5252'; // Red
-    default:
-      return '#9E9E9E';
-  }
-}
-
-function getResolutionColor(decision: string): string {
-  switch (decision) {
-    case 'accepted':
-      return '#4CAF50'; // Green
-    case 'rejected':
-      return '#FF5252'; // Red
-    case 'partial':
-      return '#FF9800'; // Orange
-    default:
-      return '#9E9E9E';
-  }
-}

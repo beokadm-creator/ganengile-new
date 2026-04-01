@@ -1,576 +1,302 @@
-/**
- * Dispute Report Screen
- * 분쟁 신고 화면 (P1-5)
- *
- * 기능:
- * - 분쟁 유형 선택 (파손, 분실, 지연, 기타)
- * - 사진 증거 업로드
- * - 상세 설명 입력
- * - 긴급도 선택
- */
-
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import {
-  View,
-  Text,
-  StyleSheet,
-  ScrollView,
-  TouchableOpacity,
-  TextInput,
-  Alert,
   ActivityIndicator,
-  Image,
+  Alert,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
 } from 'react-native';
-import { StackNavigationProp } from '@react-navigation/stack';
-import * as ImagePicker from 'expo-image-picker';
-import { getFirestore, collection, addDoc, serverTimestamp } from 'firebase/firestore';
-import { uploadPhoto } from '../../services/storage-service';
+import { RouteProp, useNavigation, useRoute } from '@react-navigation/native';
 import { requireUserId } from '../../services/firebase';
-import { useUser } from '../../contexts/UserContext';
-import { Colors, Typography, Spacing, BorderRadius } from '../../theme';
+import { createPhotoService, takePhoto, uploadPhotoWithThumbnail } from '../../services/photo-service';
+import type { MainStackNavigationProp, MainStackParamList } from '../../types/navigation';
 
-type NavigationProp = StackNavigationProp<any>;
-
-interface Props {
-  navigation: NavigationProp;
-  route?: { params?: { requestId?: string; deliveryId?: string; matchId?: string } };
-}
-
+type DisputeRoute = RouteProp<MainStackParamList, 'DisputeReport'>;
 type DisputeType = 'damage' | 'loss' | 'delay' | 'other';
 type UrgencyLevel = 'normal' | 'urgent' | 'critical';
 
-interface DisputeData {
-  type: DisputeType;
-  description: string;
-  photos: string[];
-  urgency: UrgencyLevel;
-  deliveryId?: string;
-  matchId?: string;
-}
+const disputeTypes: Array<{ value: DisputeType; label: string; helper: string }> = [
+  { value: 'damage', label: '파손', helper: '물품이 훼손되었거나 상태가 달라졌을 때 선택해 주세요.' },
+  { value: 'loss', label: '분실', helper: '물품이 확인되지 않거나 인계가 누락된 경우에 해당합니다.' },
+  { value: 'delay', label: '지연', helper: '예정된 시간보다 크게 늦어져 운영 확인이 필요한 경우입니다.' },
+  { value: 'other', label: '기타', helper: '위 유형에 딱 맞지 않는 운영 이슈를 남겨 주세요.' },
+];
 
-export default function DisputeReportScreen({ navigation, route }: Props) {
-  const { user } = useUser();
-  const requestId = route?.params?.requestId;
-  const deliveryId = route?.params?.deliveryId;
-  const matchId = route?.params?.matchId;
-  const [loading, setLoading] = useState(false);
-  const [submitting, setSubmitting] = useState(false);
-  
-  // 폼 데이터
-  const [disputeType, setDisputeType] = useState<DisputeType | null>(null);
-  const [description, setDescription] = useState('');
-  const [photos, setPhotos] = useState<string[]>([]);
+const urgencyLevels: Array<{ value: UrgencyLevel; label: string }> = [
+  { value: 'normal', label: '일반' },
+  { value: 'urgent', label: '긴급' },
+  { value: 'critical', label: '매우 긴급' },
+];
+
+export default function DisputeReportScreen() {
+  const navigation = useNavigation<MainStackNavigationProp>();
+  const route = useRoute<DisputeRoute>();
+  const { deliveryId, matchId } = route.params;
+
+  const [disputeType, setDisputeType] = useState<DisputeType>('damage');
   const [urgency, setUrgency] = useState<UrgencyLevel>('normal');
+  const [description, setDescription] = useState('');
+  const [evidenceUrls, setEvidenceUrls] = useState<string[]>([]);
+  const [submitting, setSubmitting] = useState(false);
+  const [uploadingPhoto, setUploadingPhoto] = useState(false);
 
-  // 분쟁 유형
-  const DISPUTE_TYPES: { type: DisputeType; label: string; description: string }[] = [
-    {
-      type: 'damage',
-      label: '파손',
-      description: '배송 물건이 파손되었을 때',
-    },
-    {
-      type: 'loss',
-      label: '분실',
-      description: '배송 물건이 분실되었을 때',
-    },
-    {
-      type: 'delay',
-      label: '지연',
-      description: '배송이 지연되었을 때',
-    },
-    {
-      type: 'other',
-      label: '기타',
-      description: '그 외 문제가 발생했을 때',
-    },
-  ];
+  const helperText = useMemo(
+    () => disputeTypes.find((item) => item.value === disputeType)?.helper ?? '',
+    [disputeType]
+  );
 
-  // 긴급도
-  const URGENCY_LEVELS: { level: UrgencyLevel; label: string; color: string }[] = [
-    {
-      level: 'normal',
-      label: '일반',
-      color: '#4CAF50', // Green
-    },
-    {
-      level: 'urgent',
-      label: '긴급',
-      color: '#FF9800', // Orange
-    },
-    {
-      level: 'critical',
-      label: '매우 긴급',
-      color: '#FF5252', // Red
-    },
-  ];
-
-  const handlePhotoSelect = async () => {
+  const handleAddEvidence = async (): Promise<void> => {
     try {
-      const result = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: ImagePicker.MediaTypeOptions.Images,
-        allowsMultipleSelection: true,
-        quality: 0.8,
-      });
-
-      if (!result.canceled && result.assets) {
-        const uploadedPhotos: string[] = [];
-
-        for (const asset of result.assets) {
-          if (asset.uri) {
-            setLoading(true);
-            const photoUrl = await uploadPhoto(`disputes/${Date.now()}_${asset.uri.split('/').pop()}`, asset.uri);
-            uploadedPhotos.push(photoUrl);
-            setLoading(false);
-          }
-        }
-
-        setPhotos([...photos, ...uploadedPhotos]);
+      setUploadingPhoto(true);
+      const photoUri = await takePhoto();
+      if (!photoUri) {
+        return;
       }
+
+      const userId = requireUserId();
+      const uploaded = await uploadPhotoWithThumbnail(photoUri, userId, 'dispute-evidence');
+      setEvidenceUrls((current) => [...current, uploaded.url]);
     } catch (error) {
-      console.error('Error selecting photo:', error);
-      Alert.alert('오류', '사진을 선택할 수 없습니다.');
+      console.error('Failed to upload dispute evidence:', error);
+      Alert.alert('증빙 업로드 실패', '사진 업로드 중 문제가 발생했습니다. 다시 시도해 주세요.');
     } finally {
-      setLoading(false);
+      setUploadingPhoto(false);
     }
   };
 
-  const handleSubmit = async () => {
-    // 유효성 검사
-    if (!disputeType) {
-      Alert.alert('필수 입력', '분쟁 유형을 선택해주세요.');
-      return;
-    }
-
+  const handleSubmit = async (): Promise<void> => {
     if (description.trim().length < 10) {
-      Alert.alert('필수 입력', '상세 설명을 10자 이상 입력해주세요.');
-      return;
-    }
-
-    if (photos.length === 0) {
-      Alert.alert('필수 입력', '증거 사진을 1장 이상 업로드해주세요.');
+      Alert.alert('설명을 더 적어 주세요', '운영 검토가 가능하도록 10자 이상 작성해 주세요.');
       return;
     }
 
     try {
       setSubmitting(true);
-
-      const db = getFirestore();
       const userId = requireUserId();
-      const reporterType = user?.role === 'giller' ? 'giller' : 'requester';
+      const requestId = deliveryId ?? matchId ?? `manual-${Date.now()}`;
+      const reporterType = 'requester';
 
-      // Firestore에 저장 (disputes 컬렉션) — 어드민이 기대하는 필드명 사용
-      const disputeRef = await addDoc(collection(db, 'disputes'), {
-        reporterId: userId,
+      const dispute = await createPhotoService().reportDispute(
+        userId,
         reporterType,
-        requestId: requestId ?? '',
-        type: disputeType,
-        description: description.trim(),
-        photoUrls: photos,     // admin reads as photoUrls
-        urgency,
-        deliveryId: deliveryId ?? '',
-        matchId: matchId ?? '',
-        status: 'pending',
-        createdAt: serverTimestamp(),
-      });
-
-      const disputeId = disputeRef.id;
-
-      Alert.alert(
-        '신고 완료',
-        '분쟁 신고가 접수되었습니다.\n\n빠른 시간 내 조사 후 답변드리겠습니다.',
-        [
-          {
-            text: '확인',
-            onPress: () => navigation.navigate('DisputeResolution', { disputeId }),
-          },
-        ]
+        requestId,
+        disputeType,
+        description.trim(),
+        evidenceUrls,
+        {
+          deliveryId,
+          matchId,
+          urgency,
+          evidenceUrls,
+        }
       );
+
+      Alert.alert('분쟁 신고 접수 완료', '운영팀이 증빙과 배송 이력을 함께 확인한 뒤 다음 조치를 안내합니다.', [
+        {
+          text: '처리 화면 보기',
+          onPress: () => navigation.replace('DisputeResolution', { disputeId: dispute.disputeId }),
+        },
+      ]);
     } catch (error) {
-      console.error('Error submitting dispute:', error);
-      Alert.alert('오류', '분쟁 신고를 제출할 수 없습니다.');
+      console.error('Failed to submit dispute:', error);
+      Alert.alert('분쟁 신고 실패', '잠시 후 다시 시도해 주세요.');
     } finally {
       setSubmitting(false);
     }
   };
 
-  const getDisputeTypeIcon = (type: DisputeType): string => {
-    switch (type) {
-      case 'damage':
-        return '💥';
-      case 'loss':
-        return '📦';
-      case 'delay':
-        return '⏰';
-      case 'other':
-        return '❓';
-      default:
-        return '';
-    }
-  };
-
-  const renderDisputeTypeCard = (item: { type: DisputeType; label: string; description: string }) => {
-    const isSelected = disputeType === item.type;
-    const urgencyColor = URGENCY_LEVELS.find((u) => u.level === urgency)?.color || '#4CAF50';
-
-    return (
-      <TouchableOpacity
-        key={item.type}
-        style={[styles.disputeTypeCard, isSelected && styles.disputeTypeCardSelected]}
-        onPress={() => setDisputeType(item.type)}
-        activeOpacity={0.7}
-      >
-        <View style={styles.disputeTypeHeader}>
-          <Text style={styles.disputeTypeIcon}>{getDisputeTypeIcon(item.type)}</Text>
-          <View style={styles.disputeTypeHeaderRight}>
-            <Text style={styles.disputeTypeLabel}>{item.label}</Text>
-            {isSelected && (
-              <View style={[styles.selectedBadge, { backgroundColor: urgencyColor }]}>
-                <Text style={styles.selectedBadgeText}>선택</Text>
-              </View>
-            )}
-          </View>
-        </View>
-        <Text style={styles.disputeTypeDescription}>{item.description}</Text>
-      </TouchableOpacity>
-    );
-  };
-
-  const renderPhotoItem = (photoUri: string, index: number) => {
-    return (
-      <View key={index} style={styles.photoItem}>
-        <Image source={{ uri: photoUri }} style={styles.photoImage} />
-        <TouchableOpacity
-          style={styles.photoRemoveButton}
-          onPress={() => {
-            const updatedPhotos = [...photos];
-            updatedPhotos.splice(index, 1);
-            setPhotos(updatedPhotos);
-          }}
-        >
-          <Text style={styles.photoRemoveButtonText}>✕</Text>
-        </TouchableOpacity>
-      </View>
-    );
-  };
-
-  const renderUrgencyLevel = (item: { level: UrgencyLevel; label: string; color: string }) => {
-    const isSelected = urgency === item.level;
-
-    return (
-      <TouchableOpacity
-        key={item.level}
-        style={[styles.urgencyLevelCard, isSelected && styles.urgencyLevelCardSelected]}
-        onPress={() => setUrgency(item.level)}
-        activeOpacity={0.7}
-      >
-        <View style={[styles.urgencyDot, { backgroundColor: item.color }]} />
-        <Text style={styles.urgencyLabel}>{item.label}</Text>
-      </TouchableOpacity>
-    );
-  };
-
   return (
-    <View style={styles.container}>
-      {/* 헤더 */}
+    <ScrollView style={styles.container} contentContainerStyle={styles.content}>
       <View style={styles.header}>
-        <Text style={styles.headerTitle}>분쟁 신고</Text>
-        <Text style={styles.headerSubtitle}>
-          배송 중 문제가 발생했을 때 신고해주세요
+        <Text style={styles.title}>분쟁 신고</Text>
+        <Text style={styles.subtitle}>
+          파손, 분실, 지연 같은 이슈를 운영팀에 바로 전달합니다. 설명과 사진 증빙을 함께 남기면 처리 속도가 빨라집니다.
         </Text>
       </View>
 
-      <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
-        {/* 분쟁 유형 선택 */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>분쟁 유형</Text>
-          <Text style={styles.sectionDescription}>
-            문제 유형을 선택해주세요
-          </Text>
-
-          <View style={styles.disputeTypesGrid}>
-            {DISPUTE_TYPES.map((item) => renderDisputeTypeCard(item))}
-          </View>
-        </View>
-
-        {/* 긴급도 선택 */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>긴급도</Text>
-          <Text style={styles.sectionDescription}>
-            얼마나 긴급한 상황인지 선택해주세요
-          </Text>
-
-          <View style={styles.urgencyLevelsRow}>
-            {URGENCY_LEVELS.map((item) => renderUrgencyLevel(item))}
-          </View>
-        </View>
-
-        {/* 상세 설명 */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>상세 설명</Text>
-          <Text style={styles.sectionDescription}>
-            최소 10자 이상 입력해주세요
-          </Text>
-
-          <TextInput
-            style={styles.descriptionInput}
-            placeholder="문제가 발생한 경위, 시간, 구체적인 내용을 설명해주세요..."
-            multiline
-            numberOfLines={6}
-            value={description}
-            onChangeText={setDescription}
-            maxLength={500}
-            textAlignVertical="top"
-          />
-          <Text style={styles.charCount}>{description.length} / 500</Text>
-        </View>
-
-        {/* 사진 증거 */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>사진 증거</Text>
-          <Text style={styles.sectionDescription}>
-            최소 1장 이상 업로드해주세요 (최대 3장)
-          </Text>
-
-          <View style={styles.photosGrid}>
-            {photos.map((photo, index) => renderPhotoItem(photo, index))}
-
-            {photos.length < 3 && (
+      <View style={styles.card}>
+        <Text style={styles.sectionTitle}>분쟁 유형</Text>
+        <View style={styles.chipGrid}>
+          {disputeTypes.map((item) => {
+            const active = disputeType === item.value;
+            return (
               <TouchableOpacity
-                style={styles.addPhotoButton}
-                onPress={handlePhotoSelect}
-                disabled={loading}
+                key={item.value}
+                style={[styles.chip, active ? styles.chipActive : undefined]}
+                onPress={() => setDisputeType(item.value)}
               >
-                {loading ? (
-                  <ActivityIndicator size="small" color={Colors.primary} />
-                ) : (
-                  <>
-                    <Text style={styles.addPhotoButtonText}>+</Text>
-                    <Text style={styles.addPhotoLabel}>사진 추가</Text>
-                  </>
-                )}
+                <Text style={[styles.chipText, active ? styles.chipTextActive : undefined]}>{item.label}</Text>
               </TouchableOpacity>
-            )}
-          </View>
+            );
+          })}
         </View>
+        <Text style={styles.helperText}>{helperText}</Text>
+      </View>
 
-        {/* 제출 버튼 */}
-        <View style={styles.submitSection}>
-          <TouchableOpacity
-            style={[styles.submitButton, submitting && styles.submitButtonDisabled]}
-            onPress={handleSubmit}
-            disabled={submitting || !disputeType || description.length < 10 || photos.length === 0}
-          >
-            <Text style={styles.submitButtonText}>
-              {submitting ? '제출 중...' : '분쟁 신고'}
-            </Text>
-          </TouchableOpacity>
+      <View style={styles.card}>
+        <Text style={styles.sectionTitle}>긴급도</Text>
+        <View style={styles.chipGrid}>
+          {urgencyLevels.map((item) => {
+            const active = urgency === item.value;
+            return (
+              <TouchableOpacity
+                key={item.value}
+                style={[styles.chip, active ? styles.chipActive : undefined]}
+                onPress={() => setUrgency(item.value)}
+              >
+                <Text style={[styles.chipText, active ? styles.chipTextActive : undefined]}>{item.label}</Text>
+              </TouchableOpacity>
+            );
+          })}
         </View>
-      </ScrollView>
-    </View>
+      </View>
+
+      <View style={styles.card}>
+        <Text style={styles.sectionTitle}>상세 설명</Text>
+        <TextInput
+          style={[styles.input, styles.descriptionInput]}
+          placeholder="무슨 일이 있었는지, 어떤 확인이 필요한지 적어 주세요."
+          value={description}
+          onChangeText={setDescription}
+          multiline
+          textAlignVertical="top"
+        />
+      </View>
+
+      <View style={styles.card}>
+        <Text style={styles.sectionTitle}>사진 증빙</Text>
+        <Text style={styles.helperText}>
+          현재는 카메라 촬영 후 업로드한 사진 URL을 운영 검토 증빙으로 저장합니다.
+        </Text>
+        <TouchableOpacity style={styles.secondaryButton} onPress={() => void handleAddEvidence()} disabled={uploadingPhoto}>
+          {uploadingPhoto ? (
+            <ActivityIndicator size="small" color="#2563EB" />
+          ) : (
+            <Text style={styles.secondaryButtonText}>증빙 사진 추가</Text>
+          )}
+        </TouchableOpacity>
+        {evidenceUrls.map((url, index) => (
+          <Text key={url} style={styles.evidenceItem}>
+            {index + 1}. {url}
+          </Text>
+        ))}
+      </View>
+
+      <TouchableOpacity style={styles.primaryButton} onPress={() => void handleSubmit()} disabled={submitting}>
+        {submitting ? <ActivityIndicator size="small" color="#FFFFFF" /> : <Text style={styles.primaryButtonText}>분쟁 접수하기</Text>}
+      </TouchableOpacity>
+    </ScrollView>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: Colors.background,
-  },
-  header: {
-    paddingHorizontal: Spacing.md,
-    paddingTop: Spacing.lg,
-    paddingBottom: Spacing.sm,
-    backgroundColor: Colors.surface,
-  },
-  headerTitle: {
-    ...Typography.h2,
-    color: Colors.text.primary,
-    marginBottom: Spacing.xs,
-  },
-  headerSubtitle: {
-    ...Typography.body2,
-    color: Colors.textSecondary,
+    backgroundColor: '#F8FAFC',
   },
   content: {
-    flex: 1,
+    padding: 20,
+    gap: 16,
   },
-  section: {
-    backgroundColor: Colors.surface,
-    paddingHorizontal: Spacing.md,
-    paddingVertical: Spacing.lg,
-    marginBottom: Spacing.sm,
+  header: {
+    gap: 8,
+  },
+  title: {
+    fontSize: 28,
+    fontWeight: '800',
+    color: '#0F172A',
+  },
+  subtitle: {
+    fontSize: 15,
+    lineHeight: 22,
+    color: '#64748B',
+  },
+  card: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 24,
+    padding: 20,
+    gap: 12,
+    shadowColor: '#0F172A',
+    shadowOpacity: 0.06,
+    shadowRadius: 10,
+    shadowOffset: { width: 0, height: 4 },
+    elevation: 3,
   },
   sectionTitle: {
-    ...Typography.h3,
-    color: Colors.text.primary,
-    marginBottom: Spacing.sm,
+    fontSize: 18,
+    fontWeight: '800',
+    color: '#0F172A',
   },
-  sectionDescription: {
-    ...Typography.body2,
-    color: Colors.textSecondary,
-    marginBottom: Spacing.md,
-  },
-  disputeTypesGrid: {
+  chipGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
+    gap: 10,
   },
-  disputeTypeCard: {
-    flex: 1,
-    minWidth: '48%',
-    backgroundColor: Colors.background,
-    borderRadius: BorderRadius.md,
-    padding: Spacing.md,
-    marginRight: Spacing.sm,
-    marginBottom: Spacing.sm,
+  chip: {
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    borderRadius: 999,
+    backgroundColor: '#E2E8F0',
+  },
+  chipActive: {
+    backgroundColor: '#DBEAFE',
+  },
+  chipText: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#475569',
+  },
+  chipTextActive: {
+    color: '#1D4ED8',
+  },
+  helperText: {
+    fontSize: 14,
+    lineHeight: 20,
+    color: '#64748B',
+  },
+  input: {
     borderWidth: 1,
-    borderColor: Colors.border,
-  },
-  disputeTypeCardSelected: {
-    borderColor: Colors.primary,
-    backgroundColor: Colors.primary + '10',
-  },
-  disputeTypeHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: Spacing.sm,
-  },
-  disputeTypeIcon: {
-    fontSize: 24,
-    marginRight: Spacing.sm,
-  },
-  disputeTypeHeaderRight: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  disputeTypeLabel: {
-    ...Typography.body1,
-    color: Colors.text.primary,
-    fontWeight: '600',
-  },
-  selectedBadge: {
-    paddingHorizontal: Spacing.sm,
-    paddingVertical: Spacing.xs,
-    borderRadius: BorderRadius.sm,
-  },
-  selectedBadgeText: {
-    ...Typography.bodySmall,
-    color: Colors.white,
-    fontWeight: '600',
-  },
-  disputeTypeDescription: {
-    ...Typography.bodySmall,
-    color: Colors.textSecondary,
-  },
-  urgencyLevelsRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-around',
-  },
-  urgencyLevelCard: {
-    flex: 1,
-    backgroundColor: Colors.background,
-    borderRadius: BorderRadius.md,
-    padding: Spacing.md,
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: Colors.border,
-  },
-  urgencyLevelCardSelected: {
-    borderColor: Colors.primary,
-    backgroundColor: Colors.primary + '10',
-  },
-  urgencyDot: {
-    width: 12,
-    height: 12,
-    borderRadius: 6,
-    marginRight: Spacing.sm,
-  },
-  urgencyLabel: {
-    ...Typography.body1,
-    color: Colors.text.primary,
+    borderColor: '#CBD5E1',
+    borderRadius: 16,
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    fontSize: 15,
+    backgroundColor: '#FFFFFF',
+    color: '#0F172A',
   },
   descriptionInput: {
-    backgroundColor: Colors.background,
-    borderRadius: BorderRadius.md,
-    padding: Spacing.md,
-    ...Typography.body1,
-    color: Colors.text.primary,
-    height: 120,
-    textAlignVertical: 'top',
+    minHeight: 120,
   },
-  charCount: {
-    ...Typography.bodySmall,
-    color: Colors.textSecondary,
-    textAlign: 'right',
-    marginTop: Spacing.xs,
-  },
-  photosGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    marginTop: Spacing.md,
-  },
-  photoItem: {
-    width: 100,
-    height: 100,
-    marginRight: Spacing.sm,
-    marginBottom: Spacing.sm,
-  },
-  photoImage: {
-    width: '100%',
-    height: '100%',
-    borderRadius: BorderRadius.md,
-  },
-  photoRemoveButton: {
-    position: 'absolute',
-    top: -5,
-    right: -5,
-    backgroundColor: 'rgba(0, 0, 0, 0.7)',
-    width: 24,
-    height: 24,
-    borderRadius: 12,
+  secondaryButton: {
     alignItems: 'center',
     justifyContent: 'center',
+    paddingVertical: 14,
+    borderRadius: 16,
+    backgroundColor: '#EFF6FF',
   },
-  photoRemoveButtonText: {
-    color: Colors.white,
-    fontSize: 16,
-    fontWeight: 'bold',
-  },
-  addPhotoButton: {
-    width: 100,
-    height: 100,
-    backgroundColor: Colors.background,
-    borderRadius: BorderRadius.md,
-    borderWidth: 1,
-    borderColor: Colors.border,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  addPhotoButtonText: {
-    fontSize: 32,
-    color: Colors.textSecondary,
-    fontWeight: '300',
-  },
-  addPhotoLabel: {
-    ...Typography.bodySmall,
-    color: Colors.textSecondary,
-    marginTop: Spacing.xs,
-  },
-  submitSection: {
-    padding: Spacing.md,
-  },
-  submitButton: {
-    backgroundColor: Colors.primary,
-    borderRadius: BorderRadius.md,
-    padding: Spacing.lg,
-    alignItems: 'center',
-  },
-  submitButtonDisabled: {
-    backgroundColor: Colors.border,
-  },
-  submitButtonText: {
-    ...Typography.h3,
-    color: Colors.white,
+  secondaryButtonText: {
+    fontSize: 14,
     fontWeight: '700',
+    color: '#2563EB',
+  },
+  evidenceItem: {
+    fontSize: 12,
+    lineHeight: 18,
+    color: '#475569',
+  },
+  primaryButton: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 16,
+    borderRadius: 18,
+    backgroundColor: '#2563EB',
+  },
+  primaryButtonText: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: '#FFFFFF',
   },
 });

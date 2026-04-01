@@ -1,34 +1,38 @@
-/**
- * Earnings Screen
- * 수익 관리 화면 (길러 전용)
- * 총 수익, 정산 내역, 세금, 출금 기능 + 계좌 정보
- */
-
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
-  View,
-  Text,
-  StyleSheet,
-  ScrollView,
-  TouchableOpacity,
   ActivityIndicator,
   RefreshControl,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
 } from 'react-native';
+import { ParamListBase } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
 import { useUser } from '../../contexts/UserContext';
 import {
-  getUserPayments,
   getUserMonthlyEarnings,
+  getUserPayments,
   Payment,
-  PaymentType,
   PaymentStatus,
+  PaymentType,
 } from '../../services/payment-service';
+import { SETTLEMENT_POLICY, SETTLEMENT_POLICY_LABELS } from '../../constants/settlementPolicy';
 
-type NavigationProp = StackNavigationProp<any>;
+type NavigationProp = StackNavigationProp<ParamListBase>;
 
 interface Props {
   navigation: NavigationProp;
 }
+
+const TAX_GUIDE = {
+  platformFeeRateLabel: SETTLEMENT_POLICY_LABELS.platformFee,
+  withholdingRateLabel: SETTLEMENT_POLICY_LABELS.combinedWithholding,
+  annualFilingLabel: '종합소득세 신고 안내',
+  annualFilingBody: `연간 지급 내역은 ${SETTLEMENT_POLICY.annualFilingWindowLabel} 종합소득세 신고 때 참고해야 합니다. 최종 신고 의무와 필요 서류는 개인 상황에 따라 달라질 수 있습니다.`,
+  taxCaution: SETTLEMENT_POLICY.caution,
+};
 
 export default function EarningsScreen({ navigation }: Props) {
   const { user } = useUser();
@@ -44,7 +48,11 @@ export default function EarningsScreen({ navigation }: Props) {
   } | null>(null);
 
   const loadEarnings = useCallback(async () => {
-    if (!user) return;
+    if (!user) {
+      setLoading(false);
+      setRefreshing(false);
+      return;
+    }
 
     try {
       const now = new Date();
@@ -53,9 +61,10 @@ export default function EarningsScreen({ navigation }: Props) {
         getUserMonthlyEarnings(user.uid, now.getFullYear(), now.getMonth() + 1),
       ]);
 
-      // 길러 수익만 필터
       const earningPayments = allPayments.filter(
-        (p) => p.type === PaymentType.GILLER_EARNING && p.status === PaymentStatus.COMPLETED
+        (payment) =>
+          payment.type === PaymentType.GILLER_EARNING &&
+          payment.status === PaymentStatus.COMPLETED
       );
 
       setPayments(earningPayments);
@@ -75,173 +84,176 @@ export default function EarningsScreen({ navigation }: Props) {
   }, [user]);
 
   useEffect(() => {
-    loadEarnings();
+    void loadEarnings();
   }, [loadEarnings]);
 
-  const onRefresh = () => {
-    setRefreshing(true);
-    loadEarnings();
-  };
-
-  // 전체 합계 계산
-  const totalGross = payments.reduce((sum, p) => sum + (p.amount || 0), 0);
-  const totalFees = payments.reduce((sum, p) => sum + (p.fee || 0), 0);
-  const totalTax = payments.reduce((sum, p) => sum + (p.tax || 0), 0);
-  const totalNet = payments.reduce((sum, p) => sum + (p.netAmount || 0), 0);
+  const totals = useMemo(() => {
+    return payments.reduce(
+      (acc, payment) => {
+        acc.totalGross += payment.amount ?? 0;
+        acc.totalFees += payment.fee ?? 0;
+        acc.totalTax += payment.tax ?? 0;
+        acc.totalNet += payment.netAmount ?? 0;
+        return acc;
+      },
+      {
+        totalGross: 0,
+        totalFees: 0,
+        totalTax: 0,
+        totalNet: 0,
+      }
+    );
+  }, [payments]);
 
   if (loading) {
     return (
       <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color="#FFC107" />
-        <Text style={styles.loadingText}>수익 정보를 불러오는 중...</Text>
+        <ActivityIndicator size="large" color="#0F766E" />
+        <Text style={styles.loadingText}>정산 데이터를 불러오는 중입니다.</Text>
       </View>
     );
   }
 
   return (
     <View style={styles.container}>
-      {/* Header */}
       <View style={styles.header}>
-        <Text style={styles.headerTitle}>수익 관리</Text>
-        <Text style={styles.headerSubtitle}>총 수익과 정산 내역</Text>
+        <Text style={styles.headerKicker}>giller settlement</Text>
+        <Text style={styles.headerTitle}>수익과 정산 기준</Text>
+        <Text style={styles.headerSubtitle}>
+          매출, 플랫폼 수수료, 원천징수 3.3%, 실수령액을 분리해서 보여줍니다.
+        </Text>
       </View>
 
       <ScrollView
         style={styles.content}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={() => {
+              setRefreshing(true);
+              void loadEarnings();
+            }}
+          />
+        }
       >
-        {/* 이번 달 요약 */}
-        {monthlySummary && (
-          <View style={styles.monthlyCard}>
-            <Text style={styles.monthlyTitle}>이번 달 수익</Text>
-            <Text style={styles.monthlyCount}>{monthlySummary.count}건 완료</Text>
-            <View style={styles.monthlyRow}>
-              <Text style={styles.monthlyLabel}>총 수익 (세전)</Text>
-              <Text style={styles.monthlyValue}>₩{monthlySummary.total.toLocaleString()}</Text>
-            </View>
-            <View style={styles.monthlyRow}>
-              <Text style={styles.monthlyLabel}>플랫폼 수수료 (10%)</Text>
-              <Text style={[styles.monthlyValue, { color: '#f44336' }]}>
-                -₩{monthlySummary.platformFee.toLocaleString()}
-              </Text>
-            </View>
-            <View style={styles.monthlyRow}>
-              <Text style={styles.monthlyLabel}>원천징수세 (3.3%)</Text>
-              <Text style={[styles.monthlyValue, { color: '#f44336' }]}>
-                -₩{monthlySummary.taxWithheld.toLocaleString()}
-              </Text>
-            </View>
-            <View style={[styles.monthlyRow, styles.monthlyTotalRow]}>
-              <Text style={styles.monthlyTotalLabel}>실수익</Text>
-              <Text style={styles.monthlyTotalValue}>₩{monthlySummary.netIncome.toLocaleString()}</Text>
-            </View>
+        {monthlySummary ? (
+          <View style={styles.heroCard}>
+            <Text style={styles.heroTitle}>이번 달 정산 요약</Text>
+            <Text style={styles.heroCount}>완료 건수 {monthlySummary.count}건</Text>
+            <SettlementRow label="세전 수익" value={monthlySummary.total} />
+            <SettlementRow label={TAX_GUIDE.platformFeeRateLabel} value={monthlySummary.platformFee} negative />
+            <SettlementRow label={TAX_GUIDE.withholdingRateLabel} value={monthlySummary.taxWithheld} negative />
+            <SettlementRow label="실수령 예정액" value={monthlySummary.netIncome} strong />
           </View>
-        )}
+        ) : null}
 
-        {/* Summary Cards (전체) */}
-        <View style={styles.summaryContainer}>
-          <Text style={styles.sectionTitle}>전체 수익 요약</Text>
-          <View style={styles.summaryCard}>
-            <Text style={styles.summaryLabel}>총 수익 (세전)</Text>
-            <Text style={styles.summaryValue}>₩{totalGross.toLocaleString()}</Text>
-          </View>
+        <View style={styles.summaryCard}>
+          <Text style={styles.sectionTitle}>누적 수익 요약</Text>
+          <SettlementRow label="누적 세전 수익" value={totals.totalGross} />
+          <SettlementRow label="누적 플랫폼 수수료" value={totals.totalFees} negative />
+          <SettlementRow label="누적 원천징수" value={totals.totalTax} negative />
+          <SettlementRow label="누적 실수령액" value={totals.totalNet} strong />
+        </View>
 
-          <View style={styles.summaryCard}>
-            <Text style={styles.summaryLabel}>플랫폼 수수료 (10%)</Text>
-            <Text style={[styles.summaryValue, { color: '#f44336' }]}>
-              -₩{totalFees.toLocaleString()}
-            </Text>
-          </View>
+        <TouchableOpacity style={styles.withdrawButton} onPress={() => navigation.navigate('PointWithdraw')}>
+          <Text style={styles.withdrawButtonText}>정산금 출금하기</Text>
+          <Text style={styles.withdrawButtonSubtext}>
+            출금 전에는 계좌 상태, 본인 확인, 운영 검토 여부를 먼저 확인합니다.
+          </Text>
+        </TouchableOpacity>
 
-          <View style={styles.summaryCard}>
-            <Text style={styles.summaryLabel}>원천징수세 (3.3%)</Text>
-            <Text style={[styles.summaryValue, { color: '#f44336' }]}>
-              -₩{totalTax.toLocaleString()}
-            </Text>
-          </View>
-
-          <View style={[styles.summaryCard, styles.summaryCardHighlight]}>
-            <Text style={styles.summaryLabel}>총 수익 (세후)</Text>
-            <Text style={[styles.summaryValue, styles.summaryValueHighlight]}>
-              ₩{totalNet.toLocaleString()}
-            </Text>
+        <View style={styles.policyCard}>
+          <Text style={styles.sectionTitle}>세금과 정산 안내</Text>
+          <PolicyItem
+            title={TAX_GUIDE.platformFeeRateLabel}
+            body="배송 수익 정산 전 플랫폼 수수료가 먼저 반영됩니다."
+          />
+          <PolicyItem
+            title={TAX_GUIDE.withholdingRateLabel}
+            body="길러 지급액은 사업소득 원천징수 기준을 반영해 실수령액으로 표시됩니다."
+          />
+          <PolicyItem
+            title={TAX_GUIDE.annualFilingLabel}
+            body={TAX_GUIDE.annualFilingBody}
+          />
+          <View style={styles.noticeBox}>
+            <Text style={styles.noticeTitle}>안내</Text>
+            <Text style={styles.noticeText}>{TAX_GUIDE.taxCaution}</Text>
           </View>
         </View>
 
-        {/* Withdraw Button */}
-        <TouchableOpacity style={styles.withdrawButton} onPress={() => navigation.navigate('PointWithdraw')}>
-          <Text style={styles.withdrawButtonText}>출금하기</Text>
-          <Text style={styles.withdrawButtonSubtext}>최소 ₩10,000부터 출금 가능</Text>
-        </TouchableOpacity>
-
-        {/* Earnings History */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>수익 내역</Text>
-
+        <View style={styles.historySection}>
+          <Text style={styles.sectionTitle}>최근 수익 내역</Text>
           {payments.length === 0 ? (
-            <View style={styles.emptyContainer}>
-              <Text style={styles.emptyText}>아직 수익 내역이 없습니다.</Text>
-              <Text style={styles.emptySubtext}>배송을 완료하면 수익이 쌓입니다.</Text>
+            <View style={styles.emptyCard}>
+              <Text style={styles.emptyTitle}>아직 수익 내역이 없습니다.</Text>
+              <Text style={styles.emptySubtitle}>
+                배송 완료 후 최종 정산 데이터가 정리되면 이곳에 반영됩니다.
+              </Text>
             </View>
           ) : (
             payments.map((payment) => (
               <View key={payment.paymentId} style={styles.recordCard}>
                 <View style={styles.recordHeader}>
-                  <Text style={styles.recordDate}>
-                    {payment.createdAt instanceof Date
-                      ? payment.createdAt.toLocaleDateString('ko-KR')
-                      : '날짜 없음'}
-                  </Text>
-                  <View style={[styles.statusBadge, styles.statusCompleted]}>
+                  <View>
+                    <Text style={styles.recordDate}>
+                      {payment.createdAt instanceof Date
+                        ? payment.createdAt.toLocaleDateString('ko-KR')
+                        : '날짜 정보 없음'}
+                    </Text>
+                    <Text style={styles.recordDescription}>
+                      {payment.description || '정산 지급 완료'}
+                    </Text>
+                  </View>
+                  <View style={styles.statusBadge}>
                     <Text style={styles.statusText}>지급 완료</Text>
                   </View>
                 </View>
-
-                <View style={styles.recordDetails}>
-                  <View style={styles.recordRow}>
-                    <Text style={styles.recordLabel}>기본 요금</Text>
-                    <Text style={styles.recordValue}>₩{(payment.amount || 0).toLocaleString()}</Text>
-                  </View>
-
-                  <View style={styles.recordRow}>
-                    <Text style={styles.recordLabel}>수수료 (10%)</Text>
-                    <Text style={[styles.recordValue, { color: '#f44336' }]}>
-                      -₩{(payment.fee || 0).toLocaleString()}
-                    </Text>
-                  </View>
-
-                  <View style={styles.recordRow}>
-                    <Text style={styles.recordLabel}>세금 (3.3%)</Text>
-                    <Text style={[styles.recordValue, { color: '#f44336' }]}>
-                      -₩{(payment.tax || 0).toLocaleString()}
-                    </Text>
-                  </View>
-
-                  <View style={[styles.recordRow, styles.recordRowTotal]}>
-                    <Text style={styles.recordLabelTotal}>실수익</Text>
-                    <Text style={styles.recordValueTotal}>
-                      ₩{(payment.netAmount || 0).toLocaleString()}
-                    </Text>
-                  </View>
-
-                  {payment.description && (
-                    <Text style={styles.recordDescription}>{payment.description}</Text>
-                  )}
-                </View>
+                <SettlementRow label="세전 수익" value={payment.amount ?? 0} compact />
+                <SettlementRow label="플랫폼 수수료" value={payment.fee ?? 0} negative compact />
+                <SettlementRow label="원천징수" value={payment.tax ?? 0} negative compact />
+                <SettlementRow label="실수령액" value={payment.netAmount ?? 0} strong compact />
               </View>
             ))
           )}
         </View>
-
-        {/* Tax Notice */}
-        <View style={styles.noticeBox}>
-          <Text style={styles.noticeIcon}>ℹ️</Text>
-          <Text style={styles.noticeText}>
-            연간 수익 300만 원 초과 시 종합소득세 신고가 필요합니다.
-            원천징수세는 매월 다음달 10일에 납부됩니다.
-          </Text>
-        </View>
       </ScrollView>
+    </View>
+  );
+}
+
+function SettlementRow({
+  label,
+  value,
+  negative,
+  strong,
+  compact,
+}: {
+  label: string;
+  value: number;
+  negative?: boolean;
+  strong?: boolean;
+  compact?: boolean;
+}) {
+  const color = strong ? '#0F766E' : negative ? '#DC2626' : '#0F172A';
+  const prefix = negative ? '-' : '';
+
+  return (
+    <View style={[styles.row, compact ? styles.rowCompact : undefined]}>
+      <Text style={[styles.rowLabel, strong ? styles.rowLabelStrong : undefined]}>{label}</Text>
+      <Text style={[styles.rowValue, { color }, strong ? styles.rowValueStrong : undefined]}>
+        {prefix}
+        {value.toLocaleString()}원
+      </Text>
+    </View>
+  );
+}
+
+function PolicyItem({ title, body }: { title: string; body: string }) {
+  return (
+    <View style={styles.policyItem}>
+      <Text style={styles.policyTitle}>{title}</Text>
+      <Text style={styles.policyBody}>{body}</Text>
     </View>
   );
 }
@@ -249,271 +261,234 @@ export default function EarningsScreen({ navigation }: Props) {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f5f5f5',
+    backgroundColor: '#F3F4F6',
   },
   header: {
-    backgroundColor: '#FFC107',
-    padding: 20,
+    backgroundColor: '#0F172A',
+    paddingHorizontal: 20,
     paddingTop: 60,
-    borderBottomLeftRadius: 20,
-    borderBottomRightRadius: 20,
+    paddingBottom: 24,
+    borderBottomLeftRadius: 24,
+    borderBottomRightRadius: 24,
+  },
+  headerKicker: {
+    color: '#67E8F9',
+    fontSize: 11,
+    fontWeight: '700',
+    textTransform: 'uppercase',
+    letterSpacing: 1.2,
   },
   headerTitle: {
-    color: '#fff',
-    fontSize: 24,
-    fontWeight: 'bold',
+    marginTop: 8,
+    color: '#FFFFFF',
+    fontSize: 26,
+    fontWeight: '700',
   },
   headerSubtitle: {
-    color: 'rgba(255, 255, 255, 0.9)',
+    marginTop: 8,
+    color: '#CBD5E1',
     fontSize: 14,
-    marginTop: 4,
-  },
-  loadingContainer: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    padding: 20,
-  },
-  loadingText: {
-    color: '#666',
-    fontSize: 16,
-    marginTop: 12,
+    lineHeight: 20,
   },
   content: {
     flex: 1,
     padding: 16,
   },
-  monthlyCard: {
-    backgroundColor: '#fff',
-    borderRadius: 12,
-    padding: 16,
+  loadingContainer: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#F3F4F6',
+  },
+  loadingText: {
+    marginTop: 12,
+    color: '#64748B',
+    fontSize: 14,
+  },
+  heroCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 20,
+    padding: 20,
     marginBottom: 16,
-    borderLeftWidth: 4,
-    borderLeftColor: '#FFC107',
-    elevation: 2,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.1,
-    shadowRadius: 2,
+    shadowColor: '#0F172A',
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.06,
+    shadowRadius: 18,
+    elevation: 3,
   },
-  monthlyTitle: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    color: '#333',
-    marginBottom: 4,
-  },
-  monthlyCount: {
-    fontSize: 12,
-    color: '#999',
-    marginBottom: 12,
-  },
-  monthlyRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    paddingVertical: 4,
-  },
-  monthlyLabel: {
-    fontSize: 13,
-    color: '#666',
-  },
-  monthlyValue: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: '#333',
-  },
-  monthlyTotalRow: {
-    borderTopWidth: 1,
-    borderTopColor: '#f0f0f0',
-    marginTop: 8,
-    paddingTop: 8,
-  },
-  monthlyTotalLabel: {
-    fontSize: 15,
-    fontWeight: 'bold',
-    color: '#333',
-  },
-  monthlyTotalValue: {
+  heroTitle: {
     fontSize: 18,
-    fontWeight: 'bold',
-    color: '#FFC107',
+    fontWeight: '700',
+    color: '#0F172A',
   },
-  summaryContainer: {
-    backgroundColor: '#fff',
-    borderRadius: 12,
-    padding: 16,
-    marginBottom: 16,
-    elevation: 2,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.1,
-    shadowRadius: 2,
+  heroCount: {
+    marginTop: 4,
+    marginBottom: 12,
+    fontSize: 12,
+    color: '#64748B',
   },
   summaryCard: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingVertical: 12,
-    borderBottomColor: '#f0f0f0',
-    borderBottomWidth: 1,
-  },
-  summaryCardHighlight: {
-    backgroundColor: '#FFF8E1',
-    borderRadius: 8,
-    paddingHorizontal: 12,
-    marginTop: 8,
-    marginBottom: 0,
-    borderBottomWidth: 0,
-  },
-  summaryLabel: {
-    fontSize: 14,
-    color: '#666',
-  },
-  summaryValue: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#333',
-  },
-  summaryValueHighlight: {
-    color: '#FFC107',
-    fontSize: 22,
-  },
-  withdrawButton: {
-    backgroundColor: '#FFC107',
-    borderRadius: 12,
-    padding: 16,
-    alignItems: 'center',
+    backgroundColor: '#FFFFFF',
+    borderRadius: 20,
+    padding: 20,
     marginBottom: 16,
-    elevation: 2,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.1,
-    shadowRadius: 2,
-  },
-  withdrawButtonText: {
-    color: '#fff',
-    fontSize: 18,
-    fontWeight: 'bold',
-  },
-  withdrawButtonSubtext: {
-    color: 'rgba(255, 255, 255, 0.8)',
-    fontSize: 12,
-    marginTop: 4,
-  },
-  section: {
-    marginBottom: 16,
+    shadowColor: '#0F172A',
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.05,
+    shadowRadius: 18,
+    elevation: 3,
   },
   sectionTitle: {
     fontSize: 18,
-    fontWeight: 'bold',
-    color: '#333',
+    fontWeight: '700',
+    color: '#0F172A',
     marginBottom: 12,
   },
-  emptyContainer: {
-    backgroundColor: '#fff',
-    borderRadius: 12,
-    padding: 32,
+  row: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: 9,
+  },
+  rowCompact: {
+    paddingVertical: 6,
+  },
+  rowLabel: {
+    fontSize: 14,
+    color: '#64748B',
+  },
+  rowLabelStrong: {
+    fontWeight: '700',
+    color: '#0F172A',
+  },
+  rowValue: {
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  rowValueStrong: {
+    fontSize: 18,
+    fontWeight: '800',
+  },
+  withdrawButton: {
+    backgroundColor: '#0F766E',
+    borderRadius: 18,
+    paddingVertical: 16,
+    paddingHorizontal: 18,
+    marginBottom: 16,
+  },
+  withdrawButtonText: {
+    color: '#FFFFFF',
+    fontSize: 17,
+    fontWeight: '700',
+  },
+  withdrawButtonSubtext: {
+    marginTop: 4,
+    color: '#CCFBF1',
+    fontSize: 12,
+    lineHeight: 18,
+  },
+  policyCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 20,
+    padding: 20,
+    marginBottom: 16,
+    shadowColor: '#0F172A',
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.05,
+    shadowRadius: 18,
+    elevation: 3,
+  },
+  policyItem: {
+    borderRadius: 16,
+    backgroundColor: '#F8FAFC',
+    padding: 14,
+    marginBottom: 10,
+  },
+  policyTitle: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#0F172A',
+  },
+  policyBody: {
+    marginTop: 6,
+    fontSize: 13,
+    lineHeight: 19,
+    color: '#64748B',
+  },
+  noticeBox: {
+    marginTop: 6,
+    borderRadius: 16,
+    backgroundColor: '#FEF3C7',
+    padding: 14,
+  },
+  noticeTitle: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#92400E',
+  },
+  noticeText: {
+    marginTop: 6,
+    fontSize: 13,
+    lineHeight: 19,
+    color: '#92400E',
+  },
+  historySection: {
+    marginBottom: 24,
+  },
+  emptyCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 20,
+    padding: 28,
     alignItems: 'center',
   },
-  emptyText: {
+  emptyTitle: {
     fontSize: 16,
-    color: '#666',
-    marginBottom: 8,
+    fontWeight: '700',
+    color: '#475569',
   },
-  emptySubtext: {
+  emptySubtitle: {
+    marginTop: 8,
     fontSize: 13,
-    color: '#999',
+    lineHeight: 19,
+    color: '#94A3B8',
+    textAlign: 'center',
   },
   recordCard: {
-    backgroundColor: '#fff',
-    borderRadius: 12,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 18,
     padding: 16,
     marginBottom: 12,
+    shadowColor: '#0F172A',
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.04,
+    shadowRadius: 18,
     elevation: 2,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.1,
-    shadowRadius: 2,
   },
   recordHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'center',
+    alignItems: 'flex-start',
     marginBottom: 12,
   },
   recordDate: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    color: '#333',
-  },
-  statusBadge: {
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 12,
-  },
-  statusCompleted: {
-    backgroundColor: '#E8F5E9',
-  },
-  statusText: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: '#2E7D32',
-  },
-  recordDetails: {
-    borderTopColor: '#f0f0f0',
-    borderTopWidth: 1,
-    paddingTop: 12,
-  },
-  recordRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    paddingVertical: 4,
-  },
-  recordRowTotal: {
-    borderTopColor: '#f0f0f0',
-    borderTopWidth: 1,
-    marginTop: 8,
-    paddingTop: 8,
-  },
-  recordLabel: {
-    fontSize: 14,
-    color: '#666',
-  },
-  recordLabelTotal: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    color: '#333',
-  },
-  recordValue: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#333',
-  },
-  recordValueTotal: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#FFC107',
+    fontSize: 15,
+    fontWeight: '700',
+    color: '#0F172A',
   },
   recordDescription: {
+    marginTop: 4,
     fontSize: 12,
-    color: '#999',
-    marginTop: 8,
+    color: '#64748B',
   },
-  noticeBox: {
-    backgroundColor: '#E3F2FD',
-    borderRadius: 12,
-    padding: 16,
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    marginBottom: 20,
+  statusBadge: {
+    borderRadius: 999,
+    backgroundColor: '#DCFCE7',
+    paddingHorizontal: 10,
+    paddingVertical: 6,
   },
-  noticeIcon: {
-    fontSize: 20,
-    marginRight: 12,
-  },
-  noticeText: {
-    flex: 1,
-    fontSize: 13,
-    color: '#1976D2',
-    lineHeight: 20,
+  statusText: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#166534',
   },
 });

@@ -1,20 +1,19 @@
 /**
  * Main Navigator
- * Tab navigator for authenticated screens with stack for modals
- * Role-based tab configuration
+ * beta1 기준 메인 탭과 스택 구성
  */
 
 import React from 'react';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { createStackNavigator } from '@react-navigation/stack';
+import { MaterialIcons } from '@expo/vector-icons';
 import { View, StyleSheet } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { MaterialIcons } from '@expo/vector-icons';
-import type { MainTabParamList } from '../types/navigation';
+import type { MainStackParamList, MainTabParamList } from '../types/navigation';
 import { useUser } from '../contexts/UserContext';
 import { useGillerAccess } from '../hooks/useGillerAccess';
+import { UserRole } from '../types/user';
 
-// Screens
 import HomeScreen from '../screens/main/HomeScreen';
 import AddRouteScreen from '../screens/main/AddRouteScreen';
 import EditRouteScreen from '../screens/main/EditRouteScreen';
@@ -58,11 +57,58 @@ import RealtimeTrackingScreen from '../screens/main/RealtimeTrackingScreen';
 import OnetimeModeScreen from '../screens/main/OnetimeModeScreen';
 import CreateAuctionScreen from '../screens/main/CreateAuctionScreen';
 import AuctionListScreen from '../screens/main/AuctionListScreen';
+
 const Tab = createBottomTabNavigator<MainTabParamList>();
-const Stack = createStackNavigator();
+const Stack = createStackNavigator<MainStackParamList>();
+
+const TAB_LABELS: Record<keyof MainTabParamList, string> = {
+  Home: '홈',
+  Requests: '요청',
+  GillerRequests: '미션 보드',
+  RouteManagement: '경로',
+  ChatList: '채팅',
+  Profile: '프로필',
+};
+
+const SCREEN_TITLES: Record<string, string> = {
+  RequestConfirmation: '요청 확인',
+  AddRoute: '경로 등록',
+  MatchingResult: '매칭 진행',
+  PickupVerification: '픽업 확인',
+  DeliveryCompletion: '배송 완료',
+  DepositPayment: '보증금 결제',
+  PointHistory: '지갑 내역',
+  PointWithdraw: '출금 요청',
+  Rating: '평가 남기기',
+  Chat: '미션 채팅',
+  ChatList: '채팅 목록',
+  NotificationSettings: '알림 설정',
+  Earnings: '정산 관리',
+  MyRating: '내 평점',
+  BadgeCollection: '배지 컬렉션',
+  GillerLevelUpgrade: '길러 승급',
+  CustomerService: '고객센터',
+  Terms: '약관 및 정책',
+  GillerPickupFromLocker: '사물함 픽업',
+  GillerDropoffAtLocker: '사물함 보관',
+  GillerPickupAtLocker: '사물함 회수',
+  LockerMap: '사물함 지도',
+  DisputeReport: '분쟁 신고',
+  IdentityVerification: '본인 확인',
+  LockerSelection: '사물함 선택',
+  DisputeResolution: '분쟁 처리',
+  LevelBenefits: '레벨 혜택',
+  UnlockLocker: '사물함 열기',
+  OnetimeMode: '일회성 매칭',
+  CreateAuction: '경매 생성',
+  AuctionList: '경매 목록',
+};
 
 function TabBarIcon({ name, focused }: { name: string; focused: boolean }) {
-  const icons: { [key: string]: { active: keyof typeof MaterialIcons.glyphMap; inactive: keyof typeof MaterialIcons.glyphMap } } = {
+  const icons: Record<
+    string,
+    { active: keyof typeof MaterialIcons.glyphMap; inactive: keyof typeof MaterialIcons.glyphMap }
+  > = {
     Home: { active: 'home', inactive: 'home' },
     RouteManagement: { active: 'alt-route', inactive: 'alt-route' },
     Requests: { active: 'inventory-2', inactive: 'inventory-2' },
@@ -71,7 +117,7 @@ function TabBarIcon({ name, focused }: { name: string; focused: boolean }) {
     Profile: { active: 'person', inactive: 'person-outline' },
   };
 
-  const icon = icons[name as keyof typeof icons] || { active: 'help-outline', inactive: 'help-outline' };
+  const icon = icons[name] ?? { active: 'help-outline', inactive: 'help-outline' };
 
   return (
     <MaterialIcons
@@ -87,12 +133,14 @@ function TabNavigator() {
   const { canAccessGiller } = useGillerAccess();
   const insets = useSafeAreaInsets();
 
+  const showRequesterTab = currentRole === UserRole.GLER || currentRole === UserRole.BOTH;
+  const showGillerTabs =
+    (currentRole === UserRole.GILLER || currentRole === UserRole.BOTH) && canAccessGiller;
+
   return (
     <Tab.Navigator
       screenOptions={({ route }) => ({
-        tabBarIcon: ({ focused }) => (
-          <TabBarIcon name={route.name} focused={focused} />
-        ),
+        tabBarIcon: ({ focused }) => <TabBarIcon name={route.name} focused={focused} />,
         tabBarActiveTintColor: '#0F766E',
         tabBarInactiveTintColor: '#6B7280',
         tabBarStyle: {
@@ -127,70 +175,65 @@ function TabNavigator() {
         headerShown: false,
       })}
     >
-      {/* Common tab: Home */}
-      <Tab.Screen
-        name="Home"
-        component={HomeScreen}
-        options={{ tabBarLabel: '홈' }}
-      />
+      <Tab.Screen name="Home" component={HomeScreen} options={{ tabBarLabel: TAB_LABELS.Home }} />
 
-      {/* Gller-specific tab: Requests */}
-      {(currentRole === 'gller' || currentRole === 'both') && (
+      {showRequesterTab ? (
         <Tab.Screen
           name="Requests"
           component={RequestsScreen}
-          options={{ tabBarLabel: '요청 목록' }}
+          options={{ tabBarLabel: TAB_LABELS.Requests }}
         />
-      )}
+      ) : null}
 
-      {/* Giller-specific tab: GillerRequests (배송 매칭) */}
-      {(currentRole === 'giller' || currentRole === 'both') && canAccessGiller && (
+      {showGillerTabs ? (
         <Tab.Screen
           name="GillerRequests"
           component={GillerRequestsScreen}
-          options={{ tabBarLabel: '배송 매칭' }}
+          options={{ tabBarLabel: TAB_LABELS.GillerRequests }}
         />
-      )}
+      ) : null}
 
       <Tab.Screen
         name="ChatList"
         component={ChatListScreen}
-        options={{ tabBarLabel: '채팅' }}
+        options={{ tabBarLabel: TAB_LABELS.ChatList }}
       />
 
-      {/* Route Management: for giller and both */}
-      {(currentRole === 'giller' || currentRole === 'both') && canAccessGiller && (
+      {showGillerTabs ? (
         <Tab.Screen
           name="RouteManagement"
           component={RouteManagementScreen}
           options={{
-            tabBarLabel: '동선 관리',
-            tabBarAccessibilityLabel: '동선 등록',
+            tabBarLabel: TAB_LABELS.RouteManagement,
+            tabBarAccessibilityLabel: '경로 관리',
           }}
         />
-      )}
+      ) : null}
 
-      {/* Common tab: Profile */}
       <Tab.Screen
         name="Profile"
         component={ProfileScreen}
-        options={{ tabBarLabel: '프로필' }}
+        options={{ tabBarLabel: TAB_LABELS.Profile }}
       />
     </Tab.Navigator>
   );
 }
 
+function stackTitle(name: string): string | undefined {
+  return SCREEN_TITLES[name];
+}
+
 export default function MainNavigator() {
   return (
     <Stack.Navigator
-      screenOptions={{
+      screenOptions={({ route }) => ({
         headerShown: false,
         headerBackTitle: '뒤로',
         headerBackTitleVisible: false,
         headerTitleAlign: 'center',
         headerTitleStyle: { fontWeight: '800', fontSize: 18 },
         headerStyle: {
-          backgroundColor: '#fff',
+          backgroundColor: '#FFFFFF',
           shadowColor: '#0F172A',
           shadowOffset: { width: 0, height: 2 },
           shadowOpacity: 0.1,
@@ -209,305 +252,179 @@ export default function MainNavigator() {
         cardOverlayEnabled: true,
         cardShadowEnabled: true,
         cardStyle: { flex: 1 },
-      }}
+        title: stackTitle(route.name),
+      })}
     >
       <Stack.Screen name="Tabs" component={TabNavigator} />
       <Stack.Screen
         name="CreateRequest"
         component={CreateRequestScreen}
-        options={{
-          headerShown: false,
-        }}
+        options={{ headerShown: false }}
       />
       <Stack.Screen
         name="RequestConfirmation"
         component={RequestConfirmationScreen}
-        options={{
-          headerShown: true,
-          title: '요청 완료',
-        }}
+        options={{ headerShown: true }}
       />
-      <Stack.Screen
-        name="AddRoute"
-        component={AddRouteScreen}
-        options={{
-          headerShown: true,
-          title: '동선 등록',
-        }}
-      />
-      <Stack.Screen
-        name="EditRoute"
-        component={EditRouteScreen}
-        options={{
-          headerShown: false,
-        }}
-      />
+      <Stack.Screen name="AddRoute" component={AddRouteScreen} options={{ headerShown: true }} />
+      <Stack.Screen name="EditRoute" component={EditRouteScreen} options={{ headerShown: false }} />
       <Stack.Screen
         name="RequestDetail"
-        component={RequestDetailScreen as any}
-        options={{
-          headerShown: false,
-        }}
+        component={RequestDetailScreen}
+        options={{ headerShown: false }}
       />
       <Stack.Screen
         name="DeliveryTracking"
-        component={DeliveryTrackingScreen as any}
-        options={{
-          headerShown: false,
-        }}
+        component={DeliveryTrackingScreen}
+        options={{ headerShown: false }}
       />
       <Stack.Screen
         name="MatchingResult"
-        component={MatchingResultScreen as any}
-        options={{
-          headerShown: true,
-          title: '매칭 결과',
-        }}
+        component={MatchingResultScreen}
+        options={{ headerShown: true }}
       />
       <Stack.Screen
         name="PickupVerification"
-        component={PickupVerificationScreen as any}
-        options={{
-          headerShown: true,
-          title: '픽업 인증',
-        }}
+        component={PickupVerificationScreen}
+        options={{ headerShown: true }}
       />
       <Stack.Screen
         name="DeliveryCompletion"
-        component={DeliveryCompletionScreen as any}
-        options={{
-          headerShown: true,
-          title: '배송 완료',
-        }}
+        component={DeliveryCompletionScreen}
+        options={{ headerShown: true }}
       />
       <Stack.Screen
         name="DepositPayment"
         component={DepositPaymentScreen}
-        options={{
-          headerShown: true,
-          title: '보증금 결제',
-        }}
+        options={{ headerShown: true }}
       />
       <Stack.Screen
         name="PointHistory"
         component={PointHistoryScreen}
-        options={{
-          headerShown: true,
-          title: '포인트 내역',
-        }}
+        options={{ headerShown: true }}
       />
       <Stack.Screen
         name="PointWithdraw"
         component={PointWithdrawScreen}
-        options={{
-          headerShown: true,
-          title: '포인트 출금',
-        }}
+        options={{ headerShown: true }}
       />
-      <Stack.Screen
-        name="Rating"
-        component={RatingScreen as any}
-        options={{
-          headerShown: true,
-          title: '평가',
-        }}
-      />
+      <Stack.Screen name="Rating" component={RatingScreen} options={{ headerShown: true }} />
       <Stack.Screen
         name="GillerPickupFromLocker"
         component={GillerPickupFromLockerScreen}
-        options={{
-          headerShown: true,
-          title: '사물함 수령',
-        }}
+        options={{ headerShown: true }}
       />
-      <Stack.Screen
-        name="Chat"
-        component={ChatScreen as any}
-        options={{
-          headerShown: true,
-          title: '채팅',
-        }}
-      />
+      <Stack.Screen name="Chat" component={ChatScreen} options={{ headerShown: true }} />
       <Stack.Screen
         name="ChatList"
         component={ChatListScreen}
-        options={{
-          headerShown: true,
-          title: '채팅 목록',
-        }}
+        options={{ headerShown: true }}
       />
       <Stack.Screen
         name="NotificationSettings"
         component={NotificationSettingsScreen}
-        options={{
-          headerShown: true,
-          title: '알림 설정',
-        }}
+        options={{ headerShown: true }}
       />
       <Stack.Screen
         name="Earnings"
         component={EarningsScreen}
-        options={{
-          headerShown: true,
-          title: '수익 관리',
-        }}
+        options={{ headerShown: true }}
       />
       <Stack.Screen
         name="MyRating"
         component={MyRatingScreen}
-        options={{
-          headerShown: true,
-          title: '내 평가',
-        }}
+        options={{ headerShown: true }}
       />
       <Stack.Screen
         name="BadgeCollection"
         component={BadgeCollectionScreen}
-        options={{
-          headerShown: true,
-          title: '내 배지',
-        }}
+        options={{ headerShown: true }}
       />
       <Stack.Screen
         name="GillerLevelUpgrade"
         component={GillerLevelUpgradeScreen}
-        options={{
-          headerShown: true,
-          title: '길러 승급',
-        }}
+        options={{ headerShown: true }}
       />
       <Stack.Screen
         name="CustomerService"
         component={CustomerServiceScreen}
-        options={{
-          headerShown: true,
-          title: '고객센터',
-        }}
+        options={{ headerShown: true }}
       />
-      <Stack.Screen
-        name="Terms"
-        component={TermsScreen}
-        options={{
-          headerShown: true,
-          title: '약관 및 정책',
-        }}
-      />
+      <Stack.Screen name="Terms" component={TermsScreen} options={{ headerShown: true }} />
       <Stack.Screen
         name="GillerDropoffAtLocker"
-        component={GillerDropoffAtLockerScreen as any}
-        options={{
-          headerShown: true,
-          title: '사물함 보관',
-        }}
+        component={GillerDropoffAtLockerScreen}
+        options={{ headerShown: true }}
       />
       <Stack.Screen
         name="GillerPickupAtLocker"
-        component={GillerPickupAtLockerScreen as any}
-        options={{
-          headerShown: true,
-          title: '사물함 수거',
-        }}
+        component={GillerPickupAtLockerScreen}
+        options={{ headerShown: true }}
       />
       <Stack.Screen
         name="LockerMap"
-        component={LockerMapScreen as any}
-        options={{
-          headerShown: true,
-          title: '사물함 지도',
-        }}
+        component={LockerMapScreen}
+        options={{ headerShown: true }}
       />
       <Stack.Screen
         name="DisputeReport"
-        component={DisputeReportScreen as any}
-        options={{
-          headerShown: true,
-          title: '분쟁 신고',
-        }}
+        component={DisputeReportScreen}
+        options={{ headerShown: true }}
       />
       <Stack.Screen
         name="GillerApply"
         component={GillerApplyScreen}
-        options={{
-          headerShown: false,
-        }}
+        options={{ headerShown: false }}
       />
       <Stack.Screen
         name="IdentityVerification"
         component={IdentityVerificationScreen}
-        options={{
-          headerShown: true,
-          title: '신원 인증',
-        }}
+        options={{ headerShown: true }}
       />
       <Stack.Screen
         name="LockerSelection"
-        component={LockerSelectionScreen as any}
-        options={{
-          headerShown: true,
-          title: '사물함 선택',
-        }}
+        component={LockerSelectionScreen}
+        options={{ headerShown: true }}
       />
       <Stack.Screen
         name="DisputeResolution"
-        component={DisputeResolutionScreen as any}
-        options={{
-          headerShown: true,
-          title: '분쟁 해결',
-        }}
+        component={DisputeResolutionScreen}
+        options={{ headerShown: true }}
       />
       <Stack.Screen
         name="LevelBenefits"
-        component={LevelBenefitsScreen as any}
-        options={{
-          headerShown: true,
-          title: '등급 혜택',
-        }}
+        component={LevelBenefitsScreen}
+        options={{ headerShown: true }}
       />
       <Stack.Screen
         name="UnlockLocker"
-        component={UnlockLockerScreen as any}
-        options={{
-          headerShown: true,
-          title: '사물함 수령',
-        }}
+        component={UnlockLockerScreen}
+        options={{ headerShown: true }}
       />
       <Stack.Screen
         name="QRCodeScanner"
-        component={QRCodeScannerScreen as any}
-        options={{
-          headerShown: false,
-        }}
+        component={QRCodeScannerScreen}
+        options={{ headerShown: false }}
       />
       <Stack.Screen
         name="RealtimeTracking"
-        component={RealtimeTrackingScreen as any}
-        options={{
-          headerShown: false,
-        }}
+        component={RealtimeTrackingScreen}
+        options={{ headerShown: false }}
       />
       <Stack.Screen
         name="OnetimeMode"
-        component={OnetimeModeScreen as any}
-        options={{
-          headerShown: true,
-          title: '원타임 매칭',
-        }}
+        component={OnetimeModeScreen}
+        options={{ headerShown: true }}
       />
       <Stack.Screen
         name="CreateAuction"
-        component={CreateAuctionScreen as any}
-        options={{
-          headerShown: true,
-          title: '경매 생성',
-        }}
+        component={CreateAuctionScreen}
+        options={{ headerShown: true }}
       />
       <Stack.Screen
         name="AuctionList"
-        component={AuctionListScreen as any}
-        options={{
-          headerShown: true,
-          title: '경매 목록',
-        }}
+        component={AuctionListScreen}
+        options={{ headerShown: true }}
       />
     </Stack.Navigator>
   );

@@ -1,9 +1,6 @@
 /**
-
-// @ts-nocheck - Temporarily suppress TypeScript errors for rapid development
  * User Service
- * Firebase Users Collection 관리 서비스
- * @version 2.1.0 - 통계 계산 로직 개선
+ * Provides a typed access layer for user profile and activity data.
  */
 
 import {
@@ -11,137 +8,232 @@ import {
   doc,
   getDoc,
   getDocs,
-  updateDoc,
-  setDoc,
   query,
-  where,
   serverTimestamp,
-  sum,
+  setDoc,
+  updateDoc,
+  where,
+  type DocumentData,
 } from 'firebase/firestore';
-import { db } from './firebase';
-import { auth } from './firebase';
-import type { User } from '../types/user';
-import { UserRole } from '../types/user';
-import type { Request } from '../types/request';
 
-/**
- * Get current authenticated user
- * @returns Current user or null (partial user object)
- */
+import { auth, db } from './firebase';
+import { getRequestsByRequester as getRequestsByRequesterFromRequestService } from './request-service';
+import type { Request } from '../types/request';
+import { AuthProviderType, UserRole, type Badge, type User } from '../types/user';
+
+type TimestampLike = {
+  toDate?: () => Date;
+};
+
+interface UserDoc extends DocumentData {
+  email?: string;
+  name?: string;
+  phoneNumber?: string;
+  authProvider?: AuthProviderType;
+  authProviderUserId?: string;
+  signupMethod?: 'email' | 'google' | 'kakao' | 'unknown';
+  providerLinkedAt?: unknown;
+  role?: UserRole;
+  agreedTerms?: User['agreedTerms'];
+  createdAt?: unknown;
+  updatedAt?: unknown;
+  isActive?: boolean;
+  hasCompletedOnboarding?: boolean;
+  rating?: number;
+  totalRatings?: number;
+  profilePhoto?: string;
+  fcmToken?: string;
+  isVerified?: boolean;
+  gillerApplicationStatus?: User['gillerApplicationStatus'];
+  gillerInfo?: User['gillerInfo'];
+  gllerInfo?: User['gllerInfo'];
+  pointBalance?: number;
+  totalEarnedPoints?: number;
+  totalSpentPoints?: number;
+  stats?: User['stats'];
+  badges?: User['badges'];
+  badgeBenefits?: User['badgeBenefits'];
+}
+
+interface DeliveryDoc extends DocumentData {
+  fee?: {
+    gillerFee?: number;
+  };
+  completedAt?: unknown;
+}
+
+interface RatingDoc extends DocumentData {
+  rating?: number;
+}
+
+type UserStatsResult = {
+  totalRequests: number;
+  totalDeliveries: number;
+  totalEarnings: number;
+  averageRating: number;
+  completionRate: number;
+};
+
+type DetailedUserStatsResult = UserStatsResult & {
+  recent30DaysDeliveries: number;
+  recentPenalties: number;
+  accountAgeDays: number;
+};
+
+type UserHistoryItem = Record<string, unknown> & {
+  requestId: string;
+  createdAt: Date | null;
+};
+
+const DEFAULT_AGREED_TERMS: NonNullable<User['agreedTerms']> = {
+  giller: false,
+  gller: false,
+  privacy: false,
+  marketing: false,
+};
+
+const DEFAULT_STATS: NonNullable<User['stats']> = {
+  completedDeliveries: 0,
+  totalEarnings: 0,
+  rating: 0,
+  recentPenalties: 0,
+  accountAgeDays: 0,
+  recent30DaysDeliveries: 0,
+};
+
+const DEFAULT_BADGES: NonNullable<User['badges']> = {
+  activity: [],
+  quality: [],
+  expertise: [],
+  community: [],
+};
+
+const DEFAULT_BADGE_BENEFITS: NonNullable<User['badgeBenefits']> = {
+  profileFrame: 'none',
+  totalBadges: 0,
+  currentTier: 'none',
+};
+
+function toDate(value: unknown): Date | null {
+  if (value instanceof Date) {
+    return value;
+  }
+
+  if (typeof value === 'object' && value !== null && 'toDate' in value) {
+    const maybeTimestamp = value as TimestampLike;
+    if (typeof maybeTimestamp.toDate === 'function') {
+      return maybeTimestamp.toDate();
+    }
+  }
+
+  if (typeof value === 'string' || typeof value === 'number') {
+    const parsed = new Date(value);
+    if (!Number.isNaN(parsed.getTime())) {
+      return parsed;
+    }
+  }
+
+  return null;
+}
+
+function mapUser(docId: string, data: UserDoc): User {
+  return {
+    uid: docId,
+    email: data.email ?? '',
+    name: data.name ?? '',
+    phoneNumber: data.phoneNumber,
+    authProvider: data.authProvider ?? AuthProviderType.UNKNOWN,
+    authProviderUserId: data.authProviderUserId,
+    signupMethod: data.signupMethod ?? 'unknown',
+    providerLinkedAt: data.providerLinkedAt as User['providerLinkedAt'],
+    role: data.role ?? UserRole.GLER,
+    agreedTerms: data.agreedTerms ?? DEFAULT_AGREED_TERMS,
+    createdAt: (data.createdAt ?? null) as User['createdAt'],
+    updatedAt: (data.updatedAt ?? null) as User['updatedAt'],
+    isActive: data.isActive ?? true,
+    hasCompletedOnboarding: data.hasCompletedOnboarding ?? false,
+    rating: data.rating,
+    totalRatings: data.totalRatings,
+    profilePhoto: data.profilePhoto,
+    fcmToken: data.fcmToken,
+    isVerified: data.isVerified,
+    gillerApplicationStatus: data.gillerApplicationStatus,
+    gillerInfo: data.gillerInfo,
+    gllerInfo: data.gllerInfo,
+    pointBalance: data.pointBalance ?? 0,
+    totalEarnedPoints: data.totalEarnedPoints ?? 0,
+    totalSpentPoints: data.totalSpentPoints ?? 0,
+    stats: data.stats ?? DEFAULT_STATS,
+    badges: data.badges ?? DEFAULT_BADGES,
+    badgeBenefits: data.badgeBenefits ?? DEFAULT_BADGE_BENEFITS,
+  };
+}
+
+function getDefaultUserStats(): UserStatsResult {
+  return {
+    totalRequests: 0,
+    totalDeliveries: 0,
+    totalEarnings: 0,
+    averageRating: 0,
+    completionRate: 0,
+  };
+}
+
+function getDefaultDetailedUserStats(): DetailedUserStatsResult {
+  return {
+    ...getDefaultUserStats(),
+    recent30DaysDeliveries: 0,
+    recentPenalties: 0,
+    accountAgeDays: 0,
+  };
+}
+
 export function getCurrentUser(): Partial<User> | null {
   const currentUser = auth.currentUser;
-
   if (!currentUser) {
     return null;
   }
 
   return {
     uid: currentUser.uid,
-    email: currentUser.email || '',
-    name: currentUser.displayName || '',
-    role: UserRole.GLER, // Default role
-    createdAt: new Date() as any, // Placeholder
-    updatedAt: new Date() as any,
+    email: currentUser.email ?? '',
+    name: currentUser.displayName ?? '',
+    role: UserRole.GLER,
+    createdAt: new Date() as unknown as User['createdAt'],
+    updatedAt: new Date() as unknown as User['updatedAt'],
     isActive: true,
-    agreedTerms: {
-      giller: false,
-      gller: false,
-      privacy: false,
-      marketing: false,
-    },
+    agreedTerms: DEFAULT_AGREED_TERMS,
   };
 }
 
-/**
- * Get user by ID from Firestore
- * @param userId User ID
- * @returns User data or null
- */
 export async function getUserById(userId: string): Promise<User | null> {
   try {
-    const docRef = doc(db, 'users', userId);
-    const docSnapshot = await getDoc(docRef);
-
+    const docSnapshot = await getDoc(doc(db, 'users', userId));
     if (!docSnapshot.exists()) {
       return null;
     }
 
-    const data = docSnapshot.data();
+    const data = docSnapshot.data() as UserDoc | undefined;
     if (!data) {
       return null;
     }
-    return {
-      uid: docSnapshot.id,
-      email: data.email || '',
-      name: data.name || '',
-      role: data.role || UserRole.GLER,
-      agreedTerms: data.agreedTerms || {
-        giller: false,
-        gller: false,
-        privacy: false,
-        marketing: false,
-      },
-      createdAt: data.createdAt || null,
-      updatedAt: data.updatedAt || null,
-      isActive: data.isActive ?? true,
-      hasCompletedOnboarding: data.hasCompletedOnboarding || false,
-      rating: data.rating,
-      totalRatings: data.totalRatings,
-      profilePhoto: data.profilePhoto,
-      fcmToken: data.fcmToken,
-      isVerified: data.isVerified,
-      gillerApplicationStatus: data.gillerApplicationStatus,
-      gillerInfo: data.gillerInfo,
-      pointBalance: data.pointBalance || 0,
-      totalEarnedPoints: data.totalEarnedPoints || 0,
-      totalSpentPoints: data.totalSpentPoints || 0,
-      gllerInfo: data.gllerInfo,
-      // P1 추가 필드
-      stats: data.stats || {
-        completedDeliveries: 0,
-        totalEarnings: 0,
-        rating: 0,
-        recentPenalties: 0,
-        accountAgeDays: 0,
-        recent30DaysDeliveries: 0,
-      },
-      badges: data.badges || {
-        activity: [],
-        quality: [],
-        expertise: [],
-        community: [],
-      },
-      badgeBenefits: data.badgeBenefits || {
-        profileFrame: 'none',
-        totalBadges: 0,
-        currentTier: 'none',
-      },
-    };
+
+    return mapUser(docSnapshot.id, data);
   } catch (error) {
     console.error('Error fetching user:', error);
     throw error;
   }
 }
 
-/**
- * Create or update user profile
- * @param userId User ID
- * @param userData User data
- * @returns Updated user
- */
 export async function updateUserProfile(
   userId: string,
   userData: Partial<Pick<User, 'name' | 'email' | 'phoneNumber'>>
 ): Promise<User> {
   try {
-    const userRef = doc(db, 'users', userId);
-
-    const updateData: any = {
+    await updateDoc(doc(db, 'users', userId), {
       ...userData,
       updatedAt: serverTimestamp(),
-    };
-
-    await updateDoc(userRef, updateData);
+    });
 
     const updated = await getUserById(userId);
     if (!updated) {
@@ -155,145 +247,81 @@ export async function updateUserProfile(
   }
 }
 
-/**
- * Get user statistics
- * @param userId User ID
- * @returns User statistics
- * @version 2.1.0 - 실제 데이터 계산 로직 구현
- */
-export async function getUserStats(userId: string): Promise<{
-  totalRequests: number;
-  totalDeliveries: number;
-  totalEarnings: number;
-  averageRating: number;
-  completionRate: number;
-}> {
+export async function getUserStats(userId: string): Promise<UserStatsResult> {
   try {
-    const requestsQuery = query(
+    const completedRequestsQuery = query(
       collection(db, 'requests'),
       where('requesterId', '==', userId),
       where('status', '==', 'completed')
     );
+    const completedRequestsSnapshot = await getDocs(completedRequestsQuery);
 
-    const requestsSnapshot = await getDocs(requestsQuery);
-    const totalRequests = requestsSnapshot.size;
-
-    // Get completed deliveries (as giller) from deliveries collection
     const deliveriesQuery = query(
       collection(db, 'deliveries'),
       where('gillerId', '==', userId),
       where('status', '==', 'delivered')
     );
-
     const deliveriesSnapshot = await getDocs(deliveriesQuery);
-    const totalDeliveries = deliveriesSnapshot.size;
 
-    // Calculate total earnings from completed deliveries
     let totalEarnings = 0;
-    deliveriesSnapshot.forEach((doc) => {
-      const data = doc.data();
-      totalEarnings += data.fee?.gillerFee || 0;
+    deliveriesSnapshot.forEach((docSnapshot) => {
+      const data = docSnapshot.data() as DeliveryDoc;
+      totalEarnings += data.fee?.gillerFee ?? 0;
     });
 
-    // Get average rating from ratings collection
-    const ratingsQuery = query(
-      collection(db, 'ratings'),
-      where('ratedUserId', '==', userId)
-    );
-
+    const ratingsQuery = query(collection(db, 'ratings'), where('ratedUserId', '==', userId));
     const ratingsSnapshot = await getDocs(ratingsQuery);
     let averageRating = 0;
 
     if (!ratingsSnapshot.empty) {
       let totalRating = 0;
-      ratingsSnapshot.forEach((doc) => {
-        const data = doc.data();
-        totalRating += data.rating || 0;
+      ratingsSnapshot.forEach((docSnapshot) => {
+        const data = docSnapshot.data() as RatingDoc;
+        totalRating += data.rating ?? 0;
       });
       averageRating = totalRating / ratingsSnapshot.size;
     }
 
-    // Calculate completion rate (as gller)
-    const allRequestsQuery = query(
-      collection(db, 'requests'),
-      where('gllerId', '==', userId)
-    );
-
-    const allRequestsSnapshot = await getDocs(allRequestsQuery);
-    const completionRate = allRequestsSnapshot.size > 0
-      ? (totalRequests / allRequestsSnapshot.size) * 100
-      : 0;
+    const allGillerRequestsQuery = query(collection(db, 'requests'), where('gllerId', '==', userId));
+    const allGillerRequestsSnapshot = await getDocs(allGillerRequestsQuery);
+    const completionRate =
+      allGillerRequestsSnapshot.size > 0
+        ? (completedRequestsSnapshot.size / allGillerRequestsSnapshot.size) * 100
+        : 0;
 
     return {
-      totalRequests,
-      totalDeliveries,
+      totalRequests: completedRequestsSnapshot.size,
+      totalDeliveries: deliveriesSnapshot.size,
       totalEarnings,
-      averageRating: Math.round(averageRating * 10) / 10, // 소수점 1자리
+      averageRating: Math.round(averageRating * 10) / 10,
       completionRate: Math.round(completionRate * 10) / 10,
     };
   } catch (error) {
-    // Silently return default stats if permission denied or error occurs
-    // This is expected in development without proper Firestore rules
-    if ((error as any)?.code !== 'permission-denied') {
+    const permissionError =
+      typeof error === 'object' &&
+      error !== null &&
+      'code' in error &&
+      (error as { code?: string }).code === 'permission-denied';
+
+    if (!permissionError) {
       console.error('Error fetching user stats:', error);
     }
-    return {
-      totalRequests: 0,
-      totalDeliveries: 0,
-      totalEarnings: 0,
-      averageRating: 0,
-      completionRate: 0,
-    };
+
+    return getDefaultUserStats();
   }
 }
 
-/**
- * Get detailed user statistics (includes recent activity)
- * @param userId User ID
- * @returns Detailed user statistics
- */
-export async function getDetailedUserStats(userId: string): Promise<{
-  totalRequests: number;
-  totalDeliveries: number;
-  totalEarnings: number;
-  averageRating: number;
-  completionRate: number;
-  recent30DaysDeliveries: number;
-  recentPenalties: number;
-  accountAgeDays: number;
-}> {
+export async function getDetailedUserStats(userId: string): Promise<DetailedUserStatsResult> {
   try {
     const baseStats = await getUserStats(userId);
-
-    // Get user data for additional stats
     const userDoc = await getDoc(doc(db, 'users', userId));
-    if (!userDoc.exists) {
-      return {
-        ...baseStats,
-        recent30DaysDeliveries: 0,
-        recentPenalties: 0,
-        accountAgeDays: 0,
-      };
-    }
+    const userData = userDoc.data() as UserDoc | undefined;
+    const createdAt = toDate(userData?.createdAt);
 
-    const userData = userDoc.data();
-    if (!userData) {
-      return {
-        ...baseStats,
-        recent30DaysDeliveries: 0,
-        recentPenalties: 0,
-        accountAgeDays: 0,
-      };
-    }
-    const createdAt = userData.createdAt?.toDate();
+    const accountAgeDays = createdAt
+      ? Math.floor((Date.now() - createdAt.getTime()) / (1000 * 60 * 60 * 24))
+      : 0;
 
-    // Calculate account age in days
-    let accountAgeDays = 0;
-    if (createdAt) {
-      accountAgeDays = Math.floor((Date.now() - createdAt.getTime()) / (1000 * 60 * 60 * 24));
-    }
-
-    // Get recent 30 days deliveries
     const thirtyDaysAgo = new Date();
     thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
 
@@ -303,113 +331,70 @@ export async function getDetailedUserStats(userId: string): Promise<{
       where('status', '==', 'delivered'),
       where('completedAt', '>=', thirtyDaysAgo)
     );
-
     const recentDeliveriesSnapshot = await getDocs(recentDeliveriesQuery);
-    const recent30DaysDeliveries = recentDeliveriesSnapshot.size;
 
-    // Get recent penalties (last 30 days)
     const recentPenaltiesQuery = query(
       collection(db, 'penalties'),
       where('userId', '==', userId),
       where('createdAt', '>=', thirtyDaysAgo)
     );
-
     const recentPenaltiesSnapshot = await getDocs(recentPenaltiesQuery);
-    const recentPenalties = recentPenaltiesSnapshot.size;
 
     return {
       ...baseStats,
-      recent30DaysDeliveries,
-      recentPenalties,
+      recent30DaysDeliveries: recentDeliveriesSnapshot.size,
+      recentPenalties: recentPenaltiesSnapshot.size,
       accountAgeDays,
     };
   } catch (error) {
     console.error('Error fetching detailed user stats:', error);
-    return {
-      totalRequests: 0,
-      totalDeliveries: 0,
-      totalEarnings: 0,
-      averageRating: 0,
-      completionRate: 0,
-      recent30DaysDeliveries: 0,
-      recentPenalties: 0,
-      accountAgeDays: 0,
-    };
+    return getDefaultDetailedUserStats();
   }
 }
 
-/**
- * Save FCM token for push notifications
- * @param userId User ID
- * @param token FCM token
- */
 export async function saveFCMToken(userId: string, token: string): Promise<void> {
   try {
-    const userRef = doc(db, 'users', userId);
-
-    await updateDoc(userRef, {
+    await updateDoc(doc(db, 'users', userId), {
       fcmToken: token,
       fcmTokenUpdatedAt: serverTimestamp(),
     });
-
-    console.log('✅ FCM token saved for user:', userId);
+    console.warn('FCM token saved for user:', userId);
   } catch (error) {
     console.error('Error saving FCM token:', error);
     throw error;
   }
 }
 
-/**
- * Get user's delivery history
- * @param userId User ID
- * @param limit Max number of items
- * @returns Array of delivery history
- */
-export async function getUserDeliveryHistory(
-  userId: string,
-  limit: number = 20
-): Promise<any[]> {
+export async function getUserDeliveryHistory(userId: string, limitCount: number = 20): Promise<UserHistoryItem[]> {
   try {
-    const q = query(
-      collection(db, 'requests'),
-      where('gllerId', '==', userId)
-    );
+    const requestsQuery = query(collection(db, 'requests'), where('gllerId', '==', userId));
+    const snapshot = await getDocs(requestsQuery);
 
-    const snapshot = await getDocs(q);
-    const history: any[] = [];
-
-    snapshot.forEach((docSnapshot) => {
+    const history = snapshot.docs.map((docSnapshot) => {
       const data = docSnapshot.data();
-      history.push({
+      return {
         requestId: docSnapshot.id,
         ...data,
-        createdAt: data.createdAt?.toDate() ?? null,
-      });
+        createdAt: toDate(data.createdAt),
+      };
     });
 
-    // Sort by created date (newest first)
-    history.sort((a, b) => {
-      const aTime = a.createdAt?.getTime?.() ?? 0;
-      const bTime = b.createdAt?.getTime?.() ?? 0;
-      return bTime - aTime;
+    history.sort((left, right) => {
+      const leftTime = left.createdAt?.getTime() ?? 0;
+      const rightTime = right.createdAt?.getTime() ?? 0;
+      return rightTime - leftTime;
     });
 
-    return history.slice(0, limit);
+    return history.slice(0, limitCount);
   } catch (error) {
     console.error('Error fetching delivery history:', error);
     return [];
   }
 }
 
-/**
- * Update user's last active timestamp
- * @param userId User ID
- */
 export async function updateLastActive(userId: string): Promise<void> {
   try {
-    const userRef = doc(db, 'users', userId);
-
-    await updateDoc(userRef, {
+    await updateDoc(doc(db, 'users', userId), {
       lastActiveAt: serverTimestamp(),
     });
   } catch (error) {
@@ -417,47 +402,43 @@ export async function updateLastActive(userId: string): Promise<void> {
   }
 }
 
-/**
- * Create user document in Firestore (for development/testing)
- * @param userId User ID from Firebase Auth
- * @param email User email
- * @param name User name
- * @param role User role (default: both for testing)
- * @returns Created user
- */
 export async function createUser(
   userId: string,
   email: string,
   name: string,
-  role: UserRole = UserRole.GLER
+  role: UserRole = UserRole.GLER,
+  authProvider: AuthProviderType = AuthProviderType.UNKNOWN
 ): Promise<User> {
   try {
     const userRef = doc(db, 'users', userId);
 
     const userDoc: User = {
       uid: userId,
-      email: email,
-      name: name,
+      email,
+      name,
       phoneNumber: '',
-
-      // 역할 (기본: both)
-      role: role,
-
-      // 약관 동의 (테스트용으로 모두 true)
+      authProvider,
+      authProviderUserId: userId,
+      signupMethod:
+        authProvider === AuthProviderType.GOOGLE
+          ? 'google'
+          : authProvider === AuthProviderType.KAKAO
+            ? 'kakao'
+            : authProvider === AuthProviderType.EMAIL
+              ? 'email'
+              : 'unknown',
+      providerLinkedAt: serverTimestamp() as User['providerLinkedAt'],
+      role,
       agreedTerms: {
         giller: true,
         gller: true,
         privacy: true,
         marketing: false,
       },
-
-      // 기본 설정
-      rating: 5.0,
+      rating: 5,
       totalRatings: 0,
       isActive: true,
       isVerified: false,
-
-      // 길러 정보
       gillerInfo: {
         totalDeliveries: 0,
         totalEarnings: 0,
@@ -467,50 +448,38 @@ export async function createUser(
           vehicleType: 'walk',
         },
       },
-
-      // 이용자 정보
       gllerInfo: {
         totalRequests: 0,
         successfulDeliveries: 0,
       },
-
-      // P1 추가 필드
       stats: {
         completedDeliveries: 0,
         totalEarnings: 0,
-        rating: 5.0,
+        rating: 5,
         recentPenalties: 0,
         accountAgeDays: 0,
         recent30DaysDeliveries: 0,
       },
-
       badges: {
         activity: [],
         quality: [],
         expertise: [],
         community: [],
       },
-
       badgeBenefits: {
         profileFrame: 'none',
         totalBadges: 0,
         currentTier: 'none',
       },
-
-      // 포인트 시스템 (P1)
       pointBalance: 0,
       totalEarnedPoints: 0,
       totalSpentPoints: 0,
-
-      // 타임스탬프
-      createdAt: serverTimestamp() as any,
-      updatedAt: serverTimestamp() as any,
+      createdAt: serverTimestamp() as User['createdAt'],
+      updatedAt: serverTimestamp() as User['updatedAt'],
     };
 
     await setDoc(userRef, userDoc);
-
-    console.log('✅ User created in Firestore:', userId);
-
+    console.warn('User created in Firestore:', userId);
     return userDoc;
   } catch (error) {
     console.error('Error creating user:', error);
@@ -518,12 +487,8 @@ export async function createUser(
   }
 }
 
-/**
- * Get requests by requester (wrapper for request-service)
- * @param requesterId Requester ID
- * @returns Array of requests
- */
 export async function getRequestsByRequester(requesterId: string): Promise<Request[]> {
-  const { getRequestsByRequester: getRequests } = require('./request-service');
-  return await getRequests(requesterId);
+  return await getRequestsByRequesterFromRequestService(requesterId);
 }
+
+export type { Badge };

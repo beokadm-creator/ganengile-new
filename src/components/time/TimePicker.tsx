@@ -1,25 +1,36 @@
-/**
- * TimePicker Component
- * 시간 선택기 (출발/도착 시간)
- */
-
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import {
-  View,
-  Text,
-  StyleSheet,
-  TouchableOpacity,
   Modal,
   ScrollView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
 } from 'react-native';
-import { Colors, Typography, Spacing, BorderRadius, Shadows } from '../../theme';
+import { BorderRadius, Colors, Shadows, Spacing, Typography } from '../../theme';
 
 interface TimePickerProps {
-  value: string; // HH:MM 형식
+  value: string;
   onChange: (time: string) => void;
   label?: string;
   placeholder?: string;
-  minuteInterval?: number; // 분 단위 (기본값: 10분)
+  minuteInterval?: number;
+}
+
+function parseTime(value: string): { hour: number; minute: number } {
+  const [hourText = '09', minuteText = '00'] = value.split(':');
+  const hour = Number(hourText);
+  const minute = Number(minuteText);
+  return {
+    hour: Number.isFinite(hour) ? hour : 9,
+    minute: Number.isFinite(minute) ? minute : 0,
+  };
+}
+
+function formatTime(hour: number, minute: number): string {
+  const period = hour >= 12 ? '오후' : '오전';
+  const displayHour = hour === 0 ? 12 : hour > 12 ? hour - 12 : hour;
+  return `${period} ${displayHour}:${String(minute).padStart(2, '0')}`;
 }
 
 export default function TimePicker({
@@ -29,44 +40,37 @@ export default function TimePicker({
   placeholder = '시간 선택',
   minuteInterval = 10,
 }: TimePickerProps) {
+  const parsed = useMemo(() => parseTime(value), [value]);
   const [modalVisible, setModalVisible] = useState(false);
-  const [selectedHour, setSelectedHour] = useState(value ? parseInt(value.split(':')[0]) : 9);
-  const [selectedMinute, setSelectedMinute] = useState(value ? parseInt(value.split(':')[1]) : 0);
+  const [selectedHour, setSelectedHour] = useState(parsed.hour);
+  const [selectedMinute, setSelectedMinute] = useState(parsed.minute);
 
-  const hours = Array.from({ length: 24 }, (_, i) => i);
-  const minutes = Array.from({ length: 60 / minuteInterval }, (_, i) => i * minuteInterval);
+  const hours = useMemo(() => Array.from({ length: 24 }, (_, index) => index), []);
+  const minutes = useMemo(
+    () => Array.from({ length: Math.floor(60 / minuteInterval) }, (_, index) => index * minuteInterval),
+    [minuteInterval],
+  );
 
-  const handleConfirm = () => {
-    const timeString = `${String(selectedHour).padStart(2, '0')}:${String(selectedMinute).padStart(2, '0')}`;
-    onChange(timeString);
-    setModalVisible(false);
+  const handleOpen = () => {
+    setSelectedHour(parsed.hour);
+    setSelectedMinute(parsed.minute);
+    setModalVisible(true);
   };
 
-  const formatTime = (hour: number, minute: number): string => {
-    const period = hour >= 12 ? '오후' : '오전';
-    const displayHour = hour === 0 ? 12 : hour > 12 ? hour - 12 : hour;
-    return `${period} ${displayHour}:${String(minute).padStart(2, '0')}`;
+  const handleConfirm = () => {
+    onChange(`${String(selectedHour).padStart(2, '0')}:${String(selectedMinute).padStart(2, '0')}`);
+    setModalVisible(false);
   };
 
   return (
     <View style={styles.container}>
-      {label && <Text style={styles.label}>{label}</Text>}
-      
-      <TouchableOpacity
-        style={styles.button}
-        onPress={() => setModalVisible(true)}
-      >
-        <Text style={styles.buttonText}>
-          {value ? formatTime(selectedHour, selectedMinute) : placeholder}
-        </Text>
+      {label ? <Text style={styles.label}>{label}</Text> : null}
+
+      <TouchableOpacity activeOpacity={0.85} style={styles.button} onPress={handleOpen}>
+        <Text style={styles.buttonText}>{value ? formatTime(parsed.hour, parsed.minute) : placeholder}</Text>
       </TouchableOpacity>
 
-      <Modal
-        animationType="slide"
-        transparent={true}
-        visible={modalVisible}
-        onRequestClose={() => setModalVisible(false)}
-      >
+      <Modal animationType="slide" transparent visible={modalVisible} onRequestClose={() => setModalVisible(false)}>
         <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>
             <View style={styles.modalHeader}>
@@ -80,28 +84,16 @@ export default function TimePicker({
             </View>
 
             <View style={styles.pickersContainer}>
-              {/* Hour Picker */}
               <View style={styles.pickerColumn}>
                 <Text style={styles.pickerLabel}>시</Text>
-                <ScrollView
-                  showsVerticalScrollIndicator={false}
-                  contentContainerStyle={styles.pickerScroll}
-                >
+                <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.pickerScroll}>
                   {hours.map((hour) => (
                     <TouchableOpacity
                       key={hour}
-                      style={[
-                        styles.pickerItem,
-                        selectedHour === hour && styles.pickerItemActive,
-                      ]}
+                      style={[styles.pickerItem, selectedHour === hour && styles.pickerItemActive]}
                       onPress={() => setSelectedHour(hour)}
                     >
-                      <Text
-                        style={[
-                          styles.pickerItemText,
-                          selectedHour === hour && styles.pickerItemTextActive,
-                        ]}
-                      >
+                      <Text style={[styles.pickerItemText, selectedHour === hour && styles.pickerItemTextActive]}>
                         {String(hour).padStart(2, '0')}
                       </Text>
                     </TouchableOpacity>
@@ -109,28 +101,16 @@ export default function TimePicker({
                 </ScrollView>
               </View>
 
-              {/* Minute Picker */}
               <View style={styles.pickerColumn}>
                 <Text style={styles.pickerLabel}>분</Text>
-                <ScrollView
-                  showsVerticalScrollIndicator={false}
-                  contentContainerStyle={styles.pickerScroll}
-                >
+                <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.pickerScroll}>
                   {minutes.map((minute) => (
                     <TouchableOpacity
                       key={minute}
-                      style={[
-                        styles.pickerItem,
-                        selectedMinute === minute && styles.pickerItemActive,
-                      ]}
+                      style={[styles.pickerItem, selectedMinute === minute && styles.pickerItemActive]}
                       onPress={() => setSelectedMinute(minute)}
                     >
-                      <Text
-                        style={[
-                          styles.pickerItemText,
-                          selectedMinute === minute && styles.pickerItemTextActive,
-                        ]}
-                      >
+                      <Text style={[styles.pickerItemText, selectedMinute === minute && styles.pickerItemTextActive]}>
                         {String(minute).padStart(2, '0')}
                       </Text>
                     </TouchableOpacity>
@@ -139,25 +119,12 @@ export default function TimePicker({
               </View>
             </View>
 
-            {/* Quick Select */}
             <View style={styles.quickSelect}>
-              <TouchableOpacity
-                style={styles.quickSelectButton}
-                onPress={() => {
-                  setSelectedHour(8);
-                  setSelectedMinute(0);
-                }}
-              >
-                <Text style={styles.quickSelectText}>출근 (8:00)</Text>
+              <TouchableOpacity style={styles.quickSelectButton} onPress={() => { setSelectedHour(8); setSelectedMinute(0); }}>
+                <Text style={styles.quickSelectText}>출근 08:00</Text>
               </TouchableOpacity>
-              <TouchableOpacity
-                style={styles.quickSelectButton}
-                onPress={() => {
-                  setSelectedHour(18);
-                  setSelectedMinute(0);
-                }}
-              >
-                <Text style={styles.quickSelectText}>퇴근 (18:00)</Text>
+              <TouchableOpacity style={styles.quickSelectButton} onPress={() => { setSelectedHour(18); setSelectedMinute(0); }}>
+                <Text style={styles.quickSelectText}>퇴근 18:00</Text>
               </TouchableOpacity>
             </View>
           </View>
@@ -186,13 +153,12 @@ const styles = StyleSheet.create({
     ...Shadows.sm,
   },
   buttonText: {
-    ...Typography.body,
+    ...Typography.bodyLarge,
     color: Colors.text.primary,
-    fontSize: 18,
   },
   modalOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    backgroundColor: Colors.overlay,
     justifyContent: 'flex-end',
   },
   modalContent: {
@@ -257,7 +223,6 @@ const styles = StyleSheet.create({
   },
   pickerItemTextActive: {
     color: Colors.white,
-    fontWeight: 'bold',
   },
   quickSelect: {
     flexDirection: 'row',
@@ -266,7 +231,7 @@ const styles = StyleSheet.create({
   },
   quickSelectButton: {
     flex: 1,
-    backgroundColor: Colors.background.secondary,
+    backgroundColor: Colors.gray100,
     borderRadius: BorderRadius.md,
     paddingVertical: Spacing.md,
     alignItems: 'center',

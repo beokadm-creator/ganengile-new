@@ -3,41 +3,82 @@ import {
   doc,
   getDoc,
   getDocs,
-  setDoc,
-  query,
-  where,
   orderBy,
-  limit as limitQuery,
+  query,
   runTransaction,
+  setDoc,
   Timestamp,
+  where,
+  limit as limitQuery,
 } from 'firebase/firestore';
 import { db } from '../core/firebase';
 import type {
   PointTransaction,
-  PointType,
-  PointCategory,
-  PointTransactionStatus,
   PointTransactionFilter,
-  WithdrawRequestData,
+  PointTransactionStatus,
+  PointType,
   WithdrawRequest,
+  WithdrawRequestData,
 } from '../types/point';
-import { DEPOSIT_RATE, WITHDRAW_MIN_AMOUNT } from '../types/point';
+import { PointCategory, WITHDRAW_MIN_AMOUNT } from '../types/point';
+import { getWithdrawalEligibility, getWalletLedger } from './beta1-wallet-service';
+import { getBankIntegrationConfig } from './integration-config-service';
+import { createProtectedBankAccount } from '../../shared/bank-account';
 
 const TRANSACTIONS_COLLECTION = 'point_transactions';
 const WITHDRAW_COLLECTION = 'withdraw_requests';
-const USERS_COLLECTION = 'users'; // payment-service, Cloud Function과 동일 컬렉션
+const USERS_COLLECTION = 'users';
 
-interface PointBalance {
-  balance: number;
-  totalEarned: number;
-  totalSpent: number;
-}
+type PointMetadata = {
+  relatedPaymentId?: string;
+  relatedDeliveryId?: string;
+  relatedRequestId?: string;
+  relatedDepositId?: string;
+  [key: string]: unknown;
+};
 
 interface PointSummary {
   balance: number;
   totalEarned: number;
   totalSpent: number;
+  chargeBalance: number;
+  earnedBalance: number;
+  withdrawableBalance: number;
+  pendingWithdrawalBalance: number;
+  lockedBalance: number;
+  withdrawalEligibility?: Awaited<ReturnType<typeof getWithdrawalEligibility>>;
   recentTransactions: PointTransaction[];
+}
+
+function asNumber(value: unknown): number {
+  return typeof value === 'number' ? value : 0;
+}
+
+function createTransactionRecord(input: {
+  transactionId: string;
+  userId: string;
+  amount: number;
+  type: PointType;
+  category: PointCategory;
+  balanceBefore: number;
+  balanceAfter: number;
+  description: string;
+  metadata?: PointMetadata;
+}): PointTransaction {
+  return {
+    transactionId: input.transactionId,
+    userId: input.userId,
+    amount: input.amount,
+    type: input.type,
+    category: input.category,
+    balanceBefore: input.balanceBefore,
+    balanceAfter: input.balanceAfter,
+    status: 'completed' as PointTransactionStatus,
+    description: input.description,
+    ...input.metadata,
+    createdAt: Timestamp.now(),
+    completedAt: Timestamp.now(),
+  };
 }
 
 export class PointService {
@@ -46,19 +87,13 @@ export class PointService {
     amount: number,
     category: PointCategory,
     description: string,
-    metadata?: {
-      relatedPaymentId?: string;
-      relatedDeliveryId?: string;
-      relatedRequestId?: string;
-      relatedDepositId?: string;
-      [key: string]: any;
-    }
+    metadata?: PointMetadata
   ): Promise<PointTransaction> {
     if (amount <= 0) {
       throw new Error('Amount must be positive');
     }
 
-    const result = await runTransaction(db, async (transaction) => {
+    return runTransaction(db, async (transaction) => {
       const userRef = doc(db, USERS_COLLECTION, userId);
       const userDoc = await transaction.get(userRef);
 
@@ -66,12 +101,11 @@ export class PointService {
         throw new Error('User not found');
       }
 
-      const userData = userDoc.data();
-      const balanceBefore = userData?.pointBalance || 0;
+      const userData = (userDoc.data() ?? {}) as Record<string, unknown>;
+      const balanceBefore = asNumber(userData.pointBalance);
       const balanceAfter = balanceBefore + amount;
-
       const transactionRef = doc(collection(db, TRANSACTIONS_COLLECTION));
-      const transactionData: PointTransaction = {
+      const transactionData = createTransactionRecord({
         transactionId: transactionRef.id,
         userId,
         amount,
@@ -79,26 +113,19 @@ export class PointService {
         category,
         balanceBefore,
         balanceAfter,
-        status: 'completed' as PointTransactionStatus,
         description,
-        ...metadata,
-        createdAt: Timestamp.now(),
-        completedAt: Timestamp.now(),
-      };
+        metadata,
+      });
 
       transaction.set(transactionRef, transactionData);
-
       transaction.update(userRef, {
         pointBalance: balanceAfter,
-        totalEarnedPoints: (userData?.totalEarnedPoints || 0) + amount,
+        totalEarnedPoints: asNumber(userData.totalEarnedPoints) + amount,
         updatedAt: Timestamp.now(),
       });
 
       return transactionData;
     });
-
-    console.log(`💰 Points earned: ${amount} for user ${userId} (${description})`);
-    return result;
   }
 
   static async spendPoints(
@@ -106,19 +133,13 @@ export class PointService {
     amount: number,
     category: PointCategory,
     description: string,
-    metadata?: {
-      relatedPaymentId?: string;
-      relatedDeliveryId?: string;
-      relatedRequestId?: string;
-      relatedDepositId?: string;
-      [key: string]: any;
-    }
+    metadata?: PointMetadata
   ): Promise<PointTransaction> {
     if (amount <= 0) {
       throw new Error('Amount must be positive');
     }
 
-    const result = await runTransaction(db, async (transaction) => {
+    return runTransaction(db, async (transaction) => {
       const userRef = doc(db, USERS_COLLECTION, userId);
       const userDoc = await transaction.get(userRef);
 
@@ -126,155 +147,180 @@ export class PointService {
         throw new Error('User not found');
       }
 
-      const userData = userDoc.data();
-      const balanceBefore = userData?.pointBalance || 0;
-
+      const userData = (userDoc.data() ?? {}) as Record<string, unknown>;
+      const balanceBefore = asNumber(userData.pointBalance);
       if (balanceBefore < amount) {
         throw new Error(`Insufficient points. Balance: ${balanceBefore}, Required: ${amount}`);
       }
 
       const balanceAfter = balanceBefore - amount;
-
       const transactionRef = doc(collection(db, TRANSACTIONS_COLLECTION));
-      const transactionData: PointTransaction = {
+      const transactionData = createTransactionRecord({
         transactionId: transactionRef.id,
         userId,
         amount: -amount,
-        type: category === 'withdraw' ? 'withdraw' as PointType : 'spend' as PointType,
+        type: (category === PointCategory.WITHDRAW ? 'withdraw' : 'spend') as PointType,
         category,
         balanceBefore,
         balanceAfter,
-        status: 'completed' as PointTransactionStatus,
         description,
-        ...metadata,
-        createdAt: Timestamp.now(),
-        completedAt: Timestamp.now(),
-      };
+        metadata,
+      });
 
       transaction.set(transactionRef, transactionData);
-
       transaction.update(userRef, {
         pointBalance: balanceAfter,
-        totalSpentPoints: (userData?.totalSpentPoints || 0) + amount,
+        totalSpentPoints: asNumber(userData.totalSpentPoints) + amount,
         updatedAt: Timestamp.now(),
       });
 
       return transactionData;
     });
-
-    console.log(`💸 Points spent: ${amount} for user ${userId} (${description})`);
-    return result;
   }
 
   static async getBalance(userId: string): Promise<number> {
-    const userRef = doc(db, USERS_COLLECTION, userId);
-    const userDoc = await getDoc(userRef);
+    const walletLedger = await getWalletLedger(userId);
+    return walletLedger.summary.totalUsableBalance;
+  }
 
-    if (!userDoc.exists()) {
-      return 0;
-    }
-
-    return userDoc.data()?.pointBalance || 0;
+  static async getWithdrawableBalance(userId: string): Promise<number> {
+    const walletLedger = await getWalletLedger(userId);
+    return walletLedger.summary.withdrawableBalance;
   }
 
   static async getTransactions(
     userId: string,
     filter?: PointTransactionFilter
   ): Promise<PointTransaction[]> {
-    let q = query(
+    let transactionQuery = query(
       collection(db, TRANSACTIONS_COLLECTION),
       where('userId', '==', userId)
     );
 
     if (filter?.type) {
-      q = query(q, where('type', '==', filter.type));
+      transactionQuery = query(transactionQuery, where('type', '==', filter.type));
     }
 
     if (filter?.category) {
-      q = query(q, where('category', '==', filter.category));
+      transactionQuery = query(transactionQuery, where('category', '==', filter.category));
     }
 
     if (filter?.startDate) {
-      q = query(q, where('createdAt', '>=', Timestamp.fromDate(filter.startDate)));
+      transactionQuery = query(
+        transactionQuery,
+        where('createdAt', '>=', Timestamp.fromDate(filter.startDate))
+      );
     }
 
     if (filter?.endDate) {
-      q = query(q, where('createdAt', '<=', Timestamp.fromDate(filter.endDate)));
+      transactionQuery = query(
+        transactionQuery,
+        where('createdAt', '<=', Timestamp.fromDate(filter.endDate))
+      );
     }
 
-    q = query(q, orderBy('createdAt', 'desc'));
+    transactionQuery = query(transactionQuery, orderBy('createdAt', 'desc'));
 
     if (filter?.limit) {
-      q = query(q, limitQuery(filter.limit));
+      transactionQuery = query(transactionQuery, limitQuery(filter.limit));
     }
 
-    const snapshot = await getDocs(q);
-    return snapshot.docs.map((doc) => doc.data() as PointTransaction);
+    const snapshot = await getDocs(transactionQuery);
+    return snapshot.docs.map((docSnap) => docSnap.data() as PointTransaction);
   }
 
   static async getSummary(userId: string): Promise<PointSummary> {
-    const balance = await this.getBalance(userId);
-
-    const recentQ = query(
+    const recentQuery = query(
       collection(db, TRANSACTIONS_COLLECTION),
       where('userId', '==', userId),
       orderBy('createdAt', 'desc'),
       limitQuery(20)
     );
 
-    const recentSnapshot = await getDocs(recentQ);
-    const recentTransactions = recentSnapshot.docs.map(
-      (doc) => doc.data() as PointTransaction
-    );
+    const [walletLedger, recentSnapshot, userDoc, withdrawalEligibility] = await Promise.all([
+      getWalletLedger(userId),
+      getDocs(recentQuery),
+      getDoc(doc(db, USERS_COLLECTION, userId)),
+      getWithdrawalEligibility(userId),
+    ]);
 
-    const userRef = doc(db, USERS_COLLECTION, userId);
-    const userDoc = await getDoc(userRef);
+    const recentTransactions = recentSnapshot.docs.map(
+      (docSnap) => docSnap.data() as PointTransaction
+    );
 
     if (!userDoc.exists()) {
       return {
-        balance,
+        balance: walletLedger.summary.totalUsableBalance,
         totalEarned: 0,
         totalSpent: 0,
+        chargeBalance: walletLedger.summary.chargeBalance,
+        earnedBalance: walletLedger.summary.earnedBalance,
+        withdrawableBalance: walletLedger.summary.withdrawableBalance,
+        pendingWithdrawalBalance: walletLedger.summary.pendingWithdrawalBalance,
+        lockedBalance: walletLedger.summary.lockedBalance,
+        withdrawalEligibility,
         recentTransactions,
       };
     }
 
-    const userData = userDoc.data();
+    const userData = (userDoc.data() ?? {}) as Record<string, unknown>;
 
     return {
-      balance,
-      totalEarned: userData?.totalEarnedPoints || 0,
-      totalSpent: userData?.totalSpentPoints || 0,
-      recentTransactions
+      balance: walletLedger.summary.totalUsableBalance,
+      totalEarned: asNumber(userData.totalEarnedPoints),
+      totalSpent: asNumber(userData.totalSpentPoints),
+      chargeBalance: walletLedger.summary.chargeBalance,
+      earnedBalance: walletLedger.summary.earnedBalance,
+      withdrawableBalance: walletLedger.summary.withdrawableBalance,
+      pendingWithdrawalBalance: walletLedger.summary.pendingWithdrawalBalance,
+      lockedBalance: walletLedger.summary.lockedBalance,
+      withdrawalEligibility,
+      recentTransactions,
     };
   }
 
-  static async requestWithdrawal(
-    data: WithdrawRequestData
-  ): Promise<WithdrawRequest> {
+  static async requestWithdrawal(data: WithdrawRequestData): Promise<WithdrawRequest> {
     if (data.amount < WITHDRAW_MIN_AMOUNT) {
       throw new Error(`Minimum withdrawal amount is ${WITHDRAW_MIN_AMOUNT.toLocaleString()}원`);
     }
 
-    if (data.amount > (await this.getBalance(data.userId))) {
-      throw new Error('Insufficient points');
+    const eligibility = await getWithdrawalEligibility(data.userId, data.amount);
+    if (!eligibility.allowed) {
+      throw new Error(`Withdrawal not allowed: ${eligibility.reasons.join(', ')}`);
     }
 
-    const withdrawsCollection = collection(db, WITHDRAW_COLLECTION);
-    const withdrawRef = doc(withdrawsCollection);
+    const bankConfig = await getBankIntegrationConfig();
+    const withdrawRef = doc(collection(db, WITHDRAW_COLLECTION));
+    const protectedBankAccount = createProtectedBankAccount({
+      bankName: data.bankName,
+      accountNumber: data.accountNumber,
+      accountHolder: data.accountHolder,
+      bankCode: data.bankCode,
+    });
     const withdrawData: WithdrawRequest = {
       requestId: withdrawRef.id,
       userId: data.userId,
       amount: data.amount,
-      bankName: data.bankName,
-      accountNumber: data.accountNumber,
-      accountHolder: data.accountHolder,
+      bankName: protectedBankAccount.bankName,
+      accountNumberMasked: protectedBankAccount.accountNumberMasked,
+      accountLast4: protectedBankAccount.accountLast4,
+      accountHolder: protectedBankAccount.accountHolder,
+      bankCode: protectedBankAccount.bankCode,
       status: 'pending',
-      createdAt: Timestamp.now()
+      createdAt: Timestamp.now(),
+      integrationSnapshot: {
+        bank: {
+          testMode: bankConfig.testMode,
+          liveReady: bankConfig.liveReady,
+          provider: bankConfig.provider,
+          verificationMode: bankConfig.verificationMode,
+          requiresAccountHolderMatch: bankConfig.requiresAccountHolderMatch,
+          manualReviewFallback: bankConfig.manualReviewFallback,
+        },
+      },
     };
 
     await setDoc(withdrawRef, withdrawData);
-
     await this.spendPoints(
       data.userId,
       data.amount,
@@ -285,20 +331,17 @@ export class PointService {
       }
     );
 
-    console.log(`💸 Withdrawal requested: ${data.amount} for user ${data.userId}`);
     return withdrawData;
   }
 
-  static async getWithdrawRequests(
-    userId: string
-  ): Promise<WithdrawRequest[]> {
-    const q = query(
+  static async getWithdrawRequests(userId: string): Promise<WithdrawRequest[]> {
+    const withdrawQuery = query(
       collection(db, WITHDRAW_COLLECTION),
       where('userId', '==', userId),
       orderBy('createdAt', 'desc')
     );
 
-    const snapshot = await getDocs(q);
-    return snapshot.docs.map((doc) => doc.data() as WithdrawRequest);
+    const snapshot = await getDocs(withdrawQuery);
+    return snapshot.docs.map((docSnap) => docSnap.data() as WithdrawRequest);
   }
 }
