@@ -1,3 +1,4 @@
+import { Colors } from '../../theme';
 import React, { useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,

@@ -1,3 +1,4 @@
+import { Colors } from '../../theme';
 import React, { useState } from 'react';
 import {
   ActivityIndicator,
