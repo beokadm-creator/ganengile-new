@@ -37,8 +37,8 @@ export default function ProfileScreen({ navigation }: { navigation: MainStackNav
   const { canAccessGiller, applicationStatus } = useGillerAccess();
   const [loading, setLoading] = useState(true);
   const [profileState, setProfileState] = useState<ProfileState>({
-    verificationLabel: '확인 중',
-    bankLabel: '확인 중',
+    verificationLabel: '본인확인 필요',
+    bankLabel: '계좌 상태 확인 필요',
     withdrawableBalance: 0,
   });
 
@@ -67,18 +67,21 @@ export default function ProfileScreen({ navigation }: { navigation: MainStackNav
 
         const verificationDisplay = getVerificationStatusDisplay(verification);
         setProfileState({
-          verificationLabel: identityConfig.testMode
-            ? `${verificationDisplay.statusKo} · 테스트`
-            : verificationDisplay.statusKo,
-          bankLabel: bankConfig.liveReady ? '준비됨' : bankConfig.statusMessage,
+          verificationLabel:
+            user.isVerified === true
+              ? identityConfig.testMode
+                ? `${verificationDisplay.statusKo} · 테스트`
+                : verificationDisplay.statusKo
+              : '본인확인 필요',
+          bankLabel: bankConfig.liveReady ? '계좌 준비됨' : bankConfig.statusMessage || '계좌 상태 확인 필요',
           withdrawableBalance: pointSummary.withdrawableBalance,
         });
       } catch (error) {
         console.error('Failed to load profile state', error);
         if (mounted) {
           setProfileState({
-            verificationLabel: '확인 실패',
-            bankLabel: '확인 실패',
+            verificationLabel: '상태 불러오기 실패',
+            bankLabel: '상태 불러오기 실패',
             withdrawableBalance: 0,
           });
         }
@@ -128,13 +131,10 @@ export default function ProfileScreen({ navigation }: { navigation: MainStackNav
   const gillerLinks = useMemo<LinkItem[]>(
     () => [
       {
-        title: canAccessGiller ? '미션 보드' : '길러 신청',
-        subtitle: canAccessGiller ? '받을 미션 보기' : '승급 진행',
+        title: '미션 보드',
+        subtitle: '받을 미션 보기',
         icon: 'two-wheeler',
-        onPress: () =>
-          canAccessGiller
-            ? navigation.navigate('Tabs', { screen: 'GillerRequests' })
-            : navigation.navigate('GillerApply'),
+        onPress: () => navigation.navigate('Tabs', { screen: 'GillerRequests' }),
       },
       {
         title: '내 동선',
@@ -155,7 +155,7 @@ export default function ProfileScreen({ navigation }: { navigation: MainStackNav
         onPress: () => navigation.navigate('PointWithdraw'),
       },
     ],
-    [canAccessGiller, navigation],
+    [navigation],
   );
 
   function handleRoleSwitch() {
@@ -236,7 +236,30 @@ export default function ProfileScreen({ navigation }: { navigation: MainStackNav
       </View>
 
       <MenuSection title="사용자 메뉴" items={userLinks} />
-      <MenuSection title="길러 메뉴" items={gillerLinks} />
+
+      {canAccessGiller ? (
+        <MenuSection title="길러 메뉴" items={gillerLinks} />
+      ) : (
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>길러 시작</Text>
+          <TouchableOpacity
+            style={styles.linkCard}
+            onPress={() => navigation.navigate(user.isVerified ? 'GillerApply' : 'IdentityVerification')}
+            activeOpacity={0.92}
+          >
+            <View style={styles.linkIconWrap}>
+              <MaterialIcons name="two-wheeler" size={20} color={Colors.primaryDark} />
+            </View>
+            <View style={styles.linkCopy}>
+              <Text style={styles.linkTitle}>길러 등록하기</Text>
+              <Text style={styles.linkSubtitle}>
+                {user.isVerified ? '신청 진행' : '본인확인부터 시작'}
+              </Text>
+            </View>
+            <MaterialIcons name="chevron-right" size={22} color={Colors.gray400} />
+          </TouchableOpacity>
+        </View>
+      )}
 
       {!canAccessGiller ? (
         <TouchableOpacity

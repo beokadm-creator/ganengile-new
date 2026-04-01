@@ -283,7 +283,7 @@ export default function DashboardPage(): ReactElement {
         <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
           <MetricCard title="오늘 요청" value={dashboard?.metrics.todayRequests ?? 0} hint="오늘 들어온 전체 요청 건수" tone="neutral" />
           <MetricCard title="활성 배송" value={dashboard?.metrics.activeDeliveries ?? 0} hint="현재 진행 중인 배송 건수" tone="positive" />
-          <MetricCard title="운영 우선 순위" value={serviceRisk} hint="분쟁, 출금, 수동 검토, 저신뢰 분석을 합친 우선 확인 수치" tone="warning" />
+          <MetricCard title="운영 우선 순위" value={serviceRisk} hint="먼저 확인할 항목" tone="warning" />
           <MetricCard title="전체 사용자" value={dashboard?.metrics.totalUsers ?? 0} hint="현재 서비스 전체 가입자 수" tone="neutral" />
         </section>
 
@@ -344,8 +344,8 @@ export default function DashboardPage(): ReactElement {
           </div>
 
           <div className="rounded-[24px] bg-white p-6 shadow-sm">
-            <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-400">beta1 infrastructure</p>
-            <h2 className="mt-2 text-xl font-bold text-slate-900">엔진 상태</h2>
+            <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-400">service infrastructure</p>
+            <h2 className="mt-2 text-xl font-bold text-slate-900">서비스 상태</h2>
             <div className="mt-5 grid gap-4 md:grid-cols-2">
               <MetricTile
                 title="역 카탈로그"
@@ -353,7 +353,7 @@ export default function DashboardPage(): ReactElement {
                 caption={infra?.stationCatalog.stationsReady ? '역 데이터가 준비된 상태입니다.' : '역 데이터 준비 상태를 다시 확인해야 합니다.'}
               />
               <MetricTile title="이동 시간 edge" value={`${infra?.routing.travelTimeEdges ?? 0}`} caption="라우팅 계산에 사용하는 이동 시간 데이터 수" />
-              <MetricTile title="미션 / Leg" value={`${infra?.beta1Engine.missions ?? 0} / ${infra?.beta1Engine.deliveryLegs ?? 0}`} caption="beta1 미션과 delivery leg 추적 현황" />
+              <MetricTile title="미션 / Leg" value={`${infra?.beta1Engine.missions ?? 0} / ${infra?.beta1Engine.deliveryLegs ?? 0}`} caption="미션과 배송 구간 현황" />
               <MetricTile title="요금 캐시" value={`${dashboard?.metrics.fareCount ?? 0}`} caption={`마지막 갱신 ${fareUpdatedAt}`} />
             </div>
           </div>
@@ -362,24 +362,12 @@ export default function DashboardPage(): ReactElement {
         <section className="grid gap-4 xl:grid-cols-[1.15fr_0.85fr]">
           <div className="rounded-[24px] bg-white p-6 shadow-sm">
             <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-400">decision memo</p>
-            <h2 className="mt-2 text-xl font-bold text-slate-900">운영 메모</h2>
+            <h2 className="mt-2 text-xl font-bold text-slate-900">운영 기준</h2>
             <div className="mt-5 grid gap-4 md:grid-cols-2">
-              <PrincipleCard
-                title="즉시형과 예약형을 같은 요청 구조에서 판단합니다"
-                body={`즉시형 ${dashboard?.metrics.immediateDraftCount ?? 0}건과 예약형 ${dashboard?.metrics.reservationDraftCount ?? 0}건이 같은 요청 구조에서 가격과 actor fallback 판단을 받습니다.`}
-              />
-              <PrincipleCard
-                title="AI는 빠르게 제안하고 운영이 최종 마감합니다"
-                body={`${review?.summary.analysisCount ?? 0}건의 최근 분석과 ${review?.summary.selectedQuoteCount ?? 0}건의 선택 이력이 보이지만, 환불·보증금·패널티·정산은 운영 검토가 마지막 책임입니다.`}
-              />
-              <PrincipleCard
-                title="분쟁과 보증금은 같이 봐야 합니다"
-                body={`현재 분쟁 ${dashboard?.metrics.pendingDisputes ?? 0}건, 출금 ${dashboard?.metrics.pendingWithdrawals ?? 0}건이 있어 보증금 환불·차감과 정산 판단을 함께 볼 필요가 있습니다.`}
-              />
-              <PrincipleCard
-                title="테스트 모드는 연결 실패를 막기 위한 안전장치입니다"
-                body="CI, 계좌 인증, PG, AI가 아직 실서비스 준비 전이어도 테스트 모드와 live-ready 상태를 분리해서 운영합니다."
-              />
+              <PrincipleCard title="즉시 요청" body={`${dashboard?.metrics.immediateDraftCount ?? 0}건`} />
+              <PrincipleCard title="예약 요청" body={`${dashboard?.metrics.reservationDraftCount ?? 0}건`} />
+              <PrincipleCard title="최근 분석" body={`${review?.summary.analysisCount ?? 0}건`} />
+              <PrincipleCard title="운영 검토" body={`${dashboard?.metrics.pendingDisputes ?? 0}건 분쟁 / ${dashboard?.metrics.pendingWithdrawals ?? 0}건 출금`} />
             </div>
           </div>
 
@@ -387,7 +375,7 @@ export default function DashboardPage(): ReactElement {
             <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-400">next moves</p>
             <h2 className="mt-2 text-xl font-bold text-slate-900">바로가기</h2>
             <div className="mt-5 space-y-4">
-              <TaskCard title="beta1 AI 관제" body="저신뢰 분석, 선택된 견적, actor 결정, 활성 미션을 한 번에 확인합니다." href="/beta1/ai-review" />
+              <TaskCard title="AI 관제" body="분석, 견적, 결정, 미션" href="/beta1/ai-review" />
               <TaskCard title="분쟁 처리" body="책임 주체, 보상 금액, 보증금 환불·차감 판단을 바로 진행합니다." href="/disputes" />
               <TaskCard title="보증금 운영" body="요청자 보호 환불과 길러 책임 차감을 운영 체크리스트로 마감합니다." href="/deposits" />
               <TaskCard title="정산 운영" body="개인 3.3% 정산과 B2B 월 청구를 다른 규칙으로 관리합니다." href="/settlements" />
@@ -398,7 +386,7 @@ export default function DashboardPage(): ReactElement {
         <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
           <CompactCard title="활성 mission" value={`${review?.summary.activeMissionCount ?? 0}`} hint="현재 운영 추적이 필요한 mission 수" />
           <CompactCard title="AI 저신뢰" value={`${review?.summary.lowConfidenceCount ?? 0}`} hint="운영 검토 우선순위가 높은 분석 건수" />
-          <CompactCard title="선택된 견적" value={`${review?.summary.selectedQuoteCount ?? 0}`} hint="최근 beta1 quote 중 실제 선택된 건수" />
+          <CompactCard title="선택된 견적" value={`${review?.summary.selectedQuoteCount ?? 0}`} hint="최근 선택 수" />
           <CompactCard title="AI 상태" value={dashboard?.integrations.ai.enabled ? 'enabled' : 'disabled'} hint={`${dashboard?.integrations.ai.provider ?? 'unknown'} / ${dashboard?.integrations.ai.model ?? 'unknown'}`} />
         </section>
       </div>
