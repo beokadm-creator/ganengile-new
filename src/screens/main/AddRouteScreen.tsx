@@ -20,6 +20,8 @@ import Button from '../../components/common/Button';
 import TimePicker from '../../components/common/TimePicker';
 import DaySelector, { DAY_LABELS } from '../../components/common/DaySelector';
 import StationSelectModal from '../../components/common/StationSelectModal';
+import AppTopBar from '../../components/common/AppTopBar';
+import { Shadows } from '../../theme';
 
 type PickTarget = 'start' | 'end' | null;
 
@@ -135,14 +137,14 @@ export default function AddRouteScreen() {
 
   return (
     <View style={styles.container}>
-      <View style={styles.header}>
-        <Text style={styles.headerTitle}>출퇴근 경로 등록</Text>
-        <Text style={styles.headerSubtitle}>
-          자주 이동하는 동선을 등록해 두면 매칭과 추천이 더 빨라집니다.
-        </Text>
-      </View>
+      <AppTopBar title="경로 등록" onBack={() => navigation.goBack()} />
 
-      <ScrollView style={styles.content} contentContainerStyle={styles.contentInner}>
+      <ScrollView style={styles.content} contentContainerStyle={styles.contentInner} showsVerticalScrollIndicator={false}>
+        <View style={styles.heroCard}>
+          <Text style={styles.heroKicker}>가는길에</Text>
+          <Text style={styles.heroTitle}>새 경로 등록</Text>
+          <Text style={styles.heroSubtitle}>자주 이동하는 동선을 등록해 공간을 매칭받으세요.</Text>
+        </View>
         <View style={styles.card}>
           <Text style={styles.sectionTitle}>기본 경로</Text>
           <TouchableOpacity
@@ -233,100 +235,23 @@ export default function AddRouteScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: Colors.gray100,
-  },
-  centerContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: Colors.gray100,
-    padding: Spacing.xl,
-  },
-  loadingText: {
-    marginTop: Spacing.md,
-    color: Colors.textSecondary,
-    textAlign: 'center',
-  },
-  header: {
-    backgroundColor: Colors.secondary,
-    padding: Spacing.lg,
-    paddingTop: 60,
-  },
-  headerTitle: {
-    fontSize: Typography.fontSize['3xl'],
-    fontWeight: Typography.fontWeight.bold,
-    color: Colors.white,
-  },
-  headerSubtitle: {
-    marginTop: Spacing.xs,
-    fontSize: Typography.fontSize.base,
-    color: Colors.white,
-    opacity: 0.92,
-  },
-  content: {
-    flex: 1,
-  },
-  contentInner: {
-    padding: Spacing.lg,
-    gap: Spacing.md,
-  },
-  card: {
-    backgroundColor: Colors.white,
-    borderRadius: BorderRadius.lg,
-    padding: Spacing.lg,
-    gap: Spacing.md,
-  },
-  sectionTitle: {
-    fontSize: Typography.fontSize.base,
-    fontWeight: Typography.fontWeight.bold,
-    color: Colors.textPrimary,
-  },
-  stationButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    borderWidth: 1,
-    borderColor: Colors.gray300,
-    borderRadius: BorderRadius.md,
-    padding: Spacing.md,
-    backgroundColor: Colors.gray50,
-  },
-  stationLabel: {
-    fontSize: Typography.fontSize.xs,
-    color: Colors.textSecondary,
-    marginBottom: 4,
-  },
-  stationValue: {
-    fontSize: Typography.fontSize.base,
-    color: Colors.textPrimary,
-    fontWeight: Typography.fontWeight.medium,
-  },
-  stationAction: {
-    fontSize: Typography.fontSize.sm,
-    color: Colors.primary,
-    fontWeight: Typography.fontWeight.semibold,
-  },
-  summaryCard: {
-    backgroundColor: Colors.primaryLight,
-    borderRadius: BorderRadius.lg,
-    padding: Spacing.lg,
-  },
-  summaryTitle: {
-    fontSize: Typography.fontSize.sm,
-    fontWeight: Typography.fontWeight.semibold,
-    color: Colors.primary,
-    marginBottom: Spacing.xs,
-  },
-  summaryRoute: {
-    fontSize: Typography.fontSize.lg,
-    fontWeight: Typography.fontWeight.bold,
-    color: Colors.textPrimary,
-  },
-  summaryMeta: {
-    marginTop: Spacing.xs,
-    fontSize: Typography.fontSize.sm,
-    color: Colors.textSecondary,
-  },
+  container: { flex: 1, backgroundColor: Colors.background },
+  centerContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: Colors.background, padding: Spacing.xl },
+  loadingText: { marginTop: Spacing.md, color: Colors.textSecondary, textAlign: 'center' },
+  content: { flex: 1 },
+  contentInner: { padding: Spacing.lg, gap: Spacing.md, paddingBottom: Spacing['5xl'] },
+  heroCard: { backgroundColor: Colors.primaryMint, borderRadius: BorderRadius.xl, padding: Spacing.xl, ...Shadows.sm },
+  heroKicker: { color: Colors.primary, fontSize: Typography.fontSize.sm, fontWeight: '800', textTransform: 'uppercase', letterSpacing: 0.8 },
+  heroTitle: { color: Colors.textPrimary, fontSize: Typography.fontSize['2xl'], fontWeight: '800', marginTop: 4, marginBottom: 6 },
+  heroSubtitle: { color: Colors.textSecondary, ...Typography.body },
+  card: { backgroundColor: Colors.surface, borderRadius: BorderRadius.xl, padding: Spacing.lg, gap: Spacing.md, ...Shadows.sm },
+  sectionTitle: { fontSize: Typography.fontSize.lg, fontWeight: '800', color: Colors.textPrimary },
+  stationButton: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', borderWidth: 1, borderColor: Colors.border, borderRadius: BorderRadius.md, padding: Spacing.md, backgroundColor: Colors.surface, minHeight: 58 },
+  stationLabel: { fontSize: Typography.fontSize.xs, color: Colors.textSecondary, marginBottom: 4 },
+  stationValue: { fontSize: Typography.fontSize.base, color: Colors.textPrimary, fontWeight: '700' },
+  stationAction: { fontSize: Typography.fontSize.sm, color: Colors.primary, fontWeight: '700' },
+  summaryCard: { backgroundColor: Colors.surface, borderRadius: BorderRadius.xl, padding: Spacing.lg, ...Shadows.sm, borderWidth: 1, borderColor: Colors.primary },
+  summaryTitle: { fontSize: Typography.fontSize.sm, fontWeight: '700', color: Colors.primary, marginBottom: Spacing.xs },
+  summaryRoute: { fontSize: Typography.fontSize.lg, fontWeight: '800', color: Colors.textPrimary },
+  summaryMeta: { marginTop: Spacing.xs, fontSize: Typography.fontSize.sm, color: Colors.textSecondary },
 });

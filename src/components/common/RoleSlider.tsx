@@ -50,7 +50,7 @@ export default function RoleSlider({
                 <Ionicons
                   name="cube-outline"
                   size={24}
-                  color={isGllerActive ? '#00BCD4' : Colors.white}
+                  color={isGllerActive ? Colors.primaryLight : Colors.white}
                   style={styles.labelIcon}
                 />
               )}
@@ -78,7 +78,7 @@ export default function RoleSlider({
                 <Ionicons
                   name="bicycle-outline"
                   size={24}
-                  color={!isGllerActive ? '#00BCD4' : Colors.white}
+                  color={!isGllerActive ? Colors.primaryLight : Colors.white}
                   style={styles.labelIcon}
                 />
               )}
@@ -102,7 +102,7 @@ export default function RoleSlider({
 const styles = StyleSheet.create({
   activeLabel: {
     opacity: 1,
-    color: '#00BCD4',
+    color: Colors.primaryLight,
   },
   activeSubtitle: {
     opacity: 0.9,

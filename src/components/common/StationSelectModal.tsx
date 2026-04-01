@@ -9,7 +9,7 @@ import {
   View,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { BorderRadius, Spacing, Typography } from '../../theme';
+import { BorderRadius, Colors, Spacing, Typography } from '../../theme';
 import type { Station } from '../../types/config';
 
 interface StationSelectModalProps {
@@ -77,23 +77,23 @@ export default function StationSelectModal({
             <Text style={styles.title}>{title}</Text>
           </View>
           <TouchableOpacity style={styles.iconButton} onPress={handleClose}>
-            <Ionicons name="close" size={22} color="#0F172A" />
+            <Ionicons name="close" size={22} color={Colors.textPrimary} />
           </TouchableOpacity>
         </View>
 
         <View style={styles.searchWrap}>
-          <Ionicons name="search" size={18} color="#94A3B8" />
+          <Ionicons name="search" size={18} color={Colors.gray400} />
           <TextInput
             style={styles.searchInput}
             value={searchQuery}
             onChangeText={setSearchQuery}
             placeholder={searchPlaceholder}
-            placeholderTextColor="#94A3B8"
+            placeholderTextColor={Colors.gray400}
             autoFocus
           />
           {searchQuery.length > 0 ? (
             <TouchableOpacity onPress={() => setSearchQuery('')}>
-              <Ionicons name="close-circle" size={18} color="#94A3B8" />
+              <Ionicons name="close-circle" size={18} color={Colors.gray400} />
             </TouchableOpacity>
           ) : null}
         </View>
@@ -126,7 +126,7 @@ export default function StationSelectModal({
                   <Text style={styles.stationName}>{station.stationName}</Text>
                   <Text style={styles.stationMeta}>{getLineLabel(station) || '노선 정보 없음'}</Text>
                 </View>
-                <Ionicons name="chevron-forward" size={18} color="#94A3B8" />
+                <Ionicons name="chevron-forward" size={18} color={Colors.gray400} />
               </TouchableOpacity>
             ))
           )}
@@ -139,7 +139,7 @@ export default function StationSelectModal({
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F8FAFC',
+    backgroundColor: Colors.background,
     paddingTop: 20,
   },
   header: {
@@ -153,20 +153,20 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '700',
     letterSpacing: 1,
-    color: '#0F766E',
+    color: Colors.primary,
     textTransform: 'uppercase',
   },
   title: {
     marginTop: 6,
     fontSize: 24,
     fontWeight: '800',
-    color: '#0F172A',
+    color: Colors.textPrimary,
   },
   iconButton: {
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: Colors.surface,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -174,7 +174,7 @@ const styles = StyleSheet.create({
     marginHorizontal: Spacing.lg,
     marginBottom: Spacing.md,
     borderRadius: BorderRadius.xl,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: Colors.surface,
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
@@ -183,7 +183,7 @@ const styles = StyleSheet.create({
   },
   searchInput: {
     flex: 1,
-    color: '#0F172A',
+    color: Colors.textPrimary,
     ...Typography.body,
   },
   list: {
@@ -202,14 +202,14 @@ const styles = StyleSheet.create({
   emptyTitle: {
     fontSize: 18,
     fontWeight: '700',
-    color: '#0F172A',
+    color: Colors.textPrimary,
   },
   emptyBody: {
-    color: '#64748B',
+    color: Colors.textTertiary,
     ...Typography.body,
   },
   stationItem: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: Colors.surface,
     borderRadius: BorderRadius.xl,
     paddingHorizontal: Spacing.lg,
     paddingVertical: Spacing.md,
@@ -227,22 +227,22 @@ const styles = StyleSheet.create({
     gap: 6,
   },
   lineChip: {
-    borderRadius: 999,
+    borderRadius: BorderRadius.full,
     paddingHorizontal: 10,
     paddingVertical: 4,
   },
   lineChipText: {
-    color: '#FFFFFF',
+    color: Colors.white,
     fontSize: 11,
     fontWeight: '700',
   },
   stationName: {
     fontSize: 18,
     fontWeight: '700',
-    color: '#0F172A',
+    color: Colors.textPrimary,
   },
   stationMeta: {
-    color: '#64748B',
+    color: Colors.textTertiary,
     ...Typography.bodySmall,
   },
 });

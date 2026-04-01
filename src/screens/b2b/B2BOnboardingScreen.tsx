@@ -177,7 +177,7 @@ export default function B2BOnboardingScreen({ navigation }: Props) {
           value={agreed}
           onValueChange={setAgreed}
           trackColor={{ false: Colors.border, true: Colors.textTertiary }}
-          thumbColor=Colors.white
+          thumbColor={Colors.white}
         />
       </View>
 

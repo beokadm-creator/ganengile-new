@@ -47,14 +47,12 @@ export class ChatService {
   subscribeToUserChatRooms(listener: ChatRoomListener): () => void {
     const qUser1 = query(
       collection(db, CHAT_ROOMS_COLLECTION),
-      where('participants.user1.userId', '==', this.userId),
-      orderBy('updatedAt', 'desc')
+      where('participants.user1.userId', '==', this.userId)
     );
 
     const qUser2 = query(
       collection(db, CHAT_ROOMS_COLLECTION),
-      where('participants.user2.userId', '==', this.userId),
-      orderBy('updatedAt', 'desc')
+      where('participants.user2.userId', '==', this.userId)
     );
 
     let roomsAsUser1: ChatRoom[] = [];
@@ -82,6 +80,8 @@ export class ChatService {
       emitMerged();
     }, (error) => {
       console.error('Error subscribing to chat rooms (user1):', error);
+      roomsAsUser1 = [];
+      emitMerged();
     });
 
     const unsubUser2 = onSnapshot(qUser2, (snapshot) => {
@@ -92,6 +92,8 @@ export class ChatService {
       emitMerged();
     }, (error) => {
       console.error('Error subscribing to chat rooms (user2):', error);
+      roomsAsUser2 = [];
+      emitMerged();
     });
 
     return () => {

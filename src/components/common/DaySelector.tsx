@@ -178,8 +178,8 @@ const styles = StyleSheet.create({
     width: 48,
   },
   dayButtonSelected: {
-    backgroundColor: Colors.secondary,
-    borderColor: Colors.secondary,
+    backgroundColor: Colors.primary,
+    borderColor: Colors.primary,
   },
   dayButtonText: {
     color: Colors.gray600,

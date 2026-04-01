@@ -12,6 +12,7 @@ import {
 } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { RouteProp, useRoute } from '@react-navigation/native';
+
 import { createChatService } from '../../services/chat-service';
 import { getBeta1ChatContext, type Beta1ChatContext } from '../../services/beta1-orchestration-service';
 import { useUser } from '../../contexts/UserContext';
@@ -23,8 +24,7 @@ type ChatRoute = RouteProp<MainStackParamList, 'Chat'>;
 
 export default function ChatScreen() {
   const route = useRoute<ChatRoute>();
-  const { user } = useUser();
-  const chatService = useRef(createChatService()).current;
+  const { user, loading: userLoading } = useUser();
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [context, setContext] = useState<Beta1ChatContext | null>(null);
   const [loading, setLoading] = useState(true);
@@ -33,20 +33,47 @@ export default function ChatScreen() {
   const flatListRef = useRef<FlatList<ChatMessage>>(null);
 
   useEffect(() => {
+    if (userLoading) {
+      return;
+    }
+
+    if (!user?.uid) {
+      setLoading(false);
+      return;
+    }
+
+    const chatService = createChatService();
     const unsubscribe = chatService.subscribeToChatMessages(route.params.chatRoomId, (nextMessages) => {
       setMessages(nextMessages);
       setLoading(false);
     });
-    void chatService.markMessagesAsRead(route.params.chatRoomId);
+
+    void chatService.markMessagesAsRead(route.params.chatRoomId).catch((error) => {
+      console.error('Failed to mark messages as read', error);
+    });
+
     return unsubscribe;
-  }, [chatService, route.params.chatRoomId]);
+  }, [route.params.chatRoomId, user?.uid, userLoading]);
 
   useEffect(() => {
+    let cancelled = false;
+
     const loadContext = async () => {
-      const nextContext = await getBeta1ChatContext(route.params.chatRoomId);
-      setContext(nextContext);
+      try {
+        const nextContext = await getBeta1ChatContext(route.params.chatRoomId);
+        if (!cancelled) {
+          setContext(nextContext);
+        }
+      } catch (error) {
+        console.error('Failed to load chat context', error);
+      }
     };
+
     void loadContext();
+
+    return () => {
+      cancelled = true;
+    };
   }, [route.params.chatRoomId]);
 
   const sendMessage = useCallback(async () => {
@@ -56,6 +83,7 @@ export default function ChatScreen() {
 
     setSending(true);
     try {
+      const chatService = createChatService();
       await chatService.sendMessage({
         chatRoomId: route.params.chatRoomId,
         senderId: user.uid,
@@ -66,13 +94,24 @@ export default function ChatScreen() {
     } finally {
       setSending(false);
     }
-  }, [chatService, input, route.params.chatRoomId, sending, user?.uid]);
+  }, [input, route.params.chatRoomId, sending, user?.uid]);
+
+  if (loading) {
+    return (
+      <View style={styles.loaderWrap}>
+        <ActivityIndicator size="large" color={Colors.primary} />
+        <Text style={styles.loaderText}>채팅을 불러오는 중입니다.</Text>
+      </View>
+    );
+  }
 
   return (
     <KeyboardAvoidingView style={styles.container} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
       <View style={styles.topPanel}>
         <Text style={styles.chatTitle}>{context?.title ?? route.params.otherUserName}</Text>
-        <Text style={styles.chatSubtitle}>{context?.subtitle ?? '미션 진행과 인계 협의를 위한 채팅입니다.'}</Text>
+        <Text style={styles.chatSubtitle}>
+          {context?.subtitle ?? '배송 진행 상황과 필요한 이야기만 간단히 주고받습니다.'}
+        </Text>
 
         <View style={styles.contextCard}>
           <View style={styles.contextHeader}>
@@ -82,10 +121,15 @@ export default function ChatScreen() {
 
           <View style={styles.metaRow}>
             <StatusBadge label={`공개 수준 ${context?.recipientRevealLevel ?? 'minimal'}`} />
-            {context?.currentDeliveryStatus ? <StatusBadge label={`상태 ${context.currentDeliveryStatus}`} /> : null}
+            {context?.currentDeliveryStatus ? (
+              <StatusBadge label={`상태 ${context.currentDeliveryStatus}`} />
+            ) : null}
           </View>
 
-          <Text style={styles.contextRecipient}>{context?.recipientSummary ?? '수령인 정보는 아직 제한 공개 상태입니다.'}</Text>
+          <Text style={styles.contextRecipient}>
+            {context?.recipientSummary ?? '수령인 정보는 필요한 범위까지만 공개됩니다.'}
+          </Text>
+
           {(context?.trustSummary ?? []).map((item) => (
             <View key={item} style={styles.trustRow}>
               <MaterialIcons name="check-circle" size={16} color={Colors.successDark} />
@@ -95,43 +139,39 @@ export default function ChatScreen() {
         </View>
       </View>
 
-      {loading ? (
-        <View style={styles.loaderWrap}>
-          <ActivityIndicator size="large" color={Colors.primary} />
-        </View>
-      ) : (
-        <FlatList
-          ref={flatListRef}
-          data={messages}
-          keyExtractor={(item) => item.messageId}
-          renderItem={({ item }) =>
-            item.type === MessageType.SYSTEM ? (
-              <View style={styles.systemRow}>
-                <Text style={styles.systemText}>{item.content}</Text>
+      <FlatList
+        ref={flatListRef}
+        data={messages}
+        keyExtractor={(item) => item.messageId}
+        renderItem={({ item }) =>
+          item.type === MessageType.SYSTEM ? (
+            <View style={styles.systemRow}>
+              <Text style={styles.systemText}>{item.content}</Text>
+            </View>
+          ) : (
+            <View style={[styles.messageRow, item.senderId === user?.uid ? styles.myRow : styles.otherRow]}>
+              <View style={[styles.bubble, item.senderId === user?.uid ? styles.myBubble : styles.otherBubble]}>
+                <Text style={[styles.messageText, item.senderId === user?.uid && styles.myMessageText]}>
+                  {item.content}
+                </Text>
+                <Text style={[styles.messageMeta, item.senderId === user?.uid && styles.myMessageMeta]}>
+                  {formatMessageTime(item.createdAt)}
+                </Text>
               </View>
-            ) : (
-              <View style={[styles.messageRow, item.senderId === user?.uid ? styles.myRow : styles.otherRow]}>
-                <View style={[styles.bubble, item.senderId === user?.uid ? styles.myBubble : styles.otherBubble]}>
-                  <Text style={[styles.messageText, item.senderId === user?.uid && styles.myMessageText]}>{item.content}</Text>
-                  <Text style={[styles.messageMeta, item.senderId === user?.uid && styles.myMessageMeta]}>
-                    {formatMessageTime(item.createdAt)}
-                  </Text>
-                </View>
-              </View>
-            )
-          }
-          contentContainerStyle={styles.listContent}
-          onContentSizeChange={() => flatListRef.current?.scrollToEnd({ animated: false })}
-        />
-      )}
+            </View>
+          )
+        }
+        contentContainerStyle={styles.listContent}
+        onContentSizeChange={() => flatListRef.current?.scrollToEnd({ animated: false })}
+      />
 
       <View style={styles.inputBar}>
         <TextInput
           style={styles.input}
           value={input}
           onChangeText={setInput}
-          placeholder="인계 방식, 위치, 사진 요청을 간단히 남겨보세요"
-          placeholderTextcolor={Colors.textTertiary}
+          placeholder="메시지를 입력해 주세요"
+          placeholderTextColor={Colors.textTertiary}
           multiline
         />
         <TouchableOpacity
@@ -323,5 +363,11 @@ const styles = StyleSheet.create({
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
+    backgroundColor: Colors.background,
+  },
+  loaderText: {
+    marginTop: Spacing.md,
+    color: Colors.textSecondary,
+    ...Typography.body,
   },
 });

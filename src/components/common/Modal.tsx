@@ -100,15 +100,15 @@ const styles = StyleSheet.create({
 
   // Content
   content: {
-    backgroundColor: Colors.white,
-    borderRadius: BorderRadius.lg,
-    elevation: 5,
+    backgroundColor: Colors.surface,
+    borderRadius: BorderRadius.xl,
+    elevation: 3,
     maxWidth: '90%',
     padding: Spacing.lg,
-    shadowColor: '#000',
+    shadowColor: Colors.gray900,
     shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.15,
-    shadowRadius: 8,
+    shadowOpacity: 0.08,
+    shadowRadius: 12,
     width: '100%',
   },
 

@@ -1,8 +1,3 @@
-/**
- * User Context
- * Manages app profile state and active role on top of AuthContext.
- */
-
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import React, { createContext, useContext, useEffect, useRef, useState, type ReactNode } from 'react';
 import { signOut } from 'firebase/auth';
@@ -33,12 +28,32 @@ interface UserProviderProps {
   children: ReactNode;
 }
 
+const STORAGE_KEYS_TO_CLEAR = [
+  '@user_email',
+  '@user_data',
+  '@auth_state',
+  'user_current_role',
+  'currentRole',
+];
+
 function resolveActiveRole(user: User | null): UserRole | null {
   if (!user) {
     return null;
   }
 
   return user.role === UserRole.BOTH ? UserRole.GLER : (user.role ?? null);
+}
+
+async function clearStoredSession(): Promise<void> {
+  if (typeof window !== 'undefined') {
+    STORAGE_KEYS_TO_CLEAR.forEach((key) => {
+      window.localStorage.removeItem(key);
+      window.sessionStorage.removeItem(key);
+    });
+    return;
+  }
+
+  await AsyncStorage.multiRemove(STORAGE_KEYS_TO_CLEAR);
 }
 
 export function UserProvider({ children }: UserProviderProps) {
@@ -125,14 +140,14 @@ export function UserProvider({ children }: UserProviderProps) {
       updatedAt: serverTimestamp(),
     });
 
-    setUser((currentUser) => (
+    setUser((currentUser) =>
       currentUser
         ? {
             ...currentUser,
             hasCompletedOnboarding: true,
           }
         : currentUser
-    ));
+    );
   };
 
   const switchRole = (role: UserRole) => {
@@ -144,21 +159,15 @@ export function UserProvider({ children }: UserProviderProps) {
   const logout = async () => {
     try {
       await signOut(auth);
+      await clearStoredSession();
+
+      refreshInFlightRef.current = null;
       setUser(null);
       setCurrentRole(null);
       setLoading(false);
 
-      try {
-        if (typeof window !== 'undefined' && window.localStorage) {
-          localStorage.removeItem('@user_email');
-          localStorage.removeItem('@user_data');
-          localStorage.removeItem('@auth_state');
-        } else {
-          await AsyncStorage.removeItem('@user_email');
-          await AsyncStorage.multiRemove(['@user_email', '@user_data', '@auth_state']);
-        }
-      } catch (storageError) {
-        console.warn('Storage cleanup warning:', storageError);
+      if (typeof window !== 'undefined') {
+        window.location.replace('/');
       }
     } catch (error) {
       console.error('Logout error:', error);

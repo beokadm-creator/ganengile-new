@@ -47,6 +47,7 @@ export default function Chip({
     styles.text,
     styles[`${variant}Text`],
     styles[`${size}Text`],
+    selected && styles.selectedText,
     disabled && styles.disabledText,
   ];
 
@@ -97,28 +98,28 @@ const styles = StyleSheet.create({
 
   // Variants
   filled: {
-    backgroundColor: Colors.primary,
-    borderColor: Colors.primary,
+    backgroundColor: Colors.gray100,
+    borderColor: Colors.gray100,
   },
   outlined: {
     backgroundColor: 'transparent',
-    borderColor: Colors.primary,
+    borderColor: Colors.border,
   },
 
   // Variant text colors
   filledText: {
-    color: Colors.white,
+    color: Colors.textSecondary,
   },
   outlinedText: {
-    color: Colors.primary,
+    color: Colors.textSecondary,
   },
 
   // Variant close icon
   filledCloseIcon: {
-    color: Colors.white,
+    color: Colors.textSecondary,
   },
   outlinedCloseIcon: {
-    color: Colors.primary,
+    color: Colors.textSecondary,
   },
 
   // Sizes
@@ -145,8 +146,11 @@ const styles = StyleSheet.create({
 
   // States
   selected: {
-    backgroundColor: Colors.primaryDark,
-    borderColor: Colors.primaryDark,
+    backgroundColor: Colors.primaryMint,
+    borderColor: Colors.primaryMint,
+  },
+  selectedText: {
+    color: Colors.primary,
   },
   disabled: {
     opacity: 0.5,

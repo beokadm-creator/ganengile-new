@@ -11,9 +11,10 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-import { MaterialIcons } from '@expo/vector-icons';
+
 import AppTopBar from '../../components/common/AppTopBar';
 import { OptimizedStationSelectModal } from '../../components/OptimizedStationSelectModal';
+import { useUser } from '../../contexts/UserContext';
 import {
   buildBeta1QuoteCards,
   createBeta1Request,
@@ -23,10 +24,11 @@ import { getAllStations } from '../../services/config-service';
 import { requireUserId } from '../../services/firebase';
 import { BorderRadius, Colors, Shadows, Spacing, Typography } from '../../theme';
 import type { Station } from '../../types/config';
-import type { MainStackParamList, MainStackNavigationProp } from '../../types/navigation';
+import type { MainStackNavigationProp, MainStackParamList } from '../../types/navigation';
 import type { StationInfo } from '../../types/request';
 
 type RequestPackageSize = 'small' | 'medium' | 'large' | 'xl';
+type PickerType = 'pickup' | 'delivery';
 
 type Props = {
   navigation: MainStackNavigationProp;
@@ -42,7 +44,9 @@ function parseEtaMinutes(etaLabel: string): number {
 
 function toStationInfo(station: Station): StationInfo {
   const line = station.lines?.[0];
-  const location = station.location as { lat?: number; lng?: number; latitude?: number; longitude?: number } | undefined;
+  const location = station.location as
+    | { lat?: number; lng?: number; latitude?: number; longitude?: number }
+    | undefined;
 
   return {
     id: station.stationId || station.stationName,
@@ -93,7 +97,89 @@ function fromPrefillStation(station?: StationInfo): Station | null {
   };
 }
 
+function getFallbackStation(type: PickerType): Station {
+  const isPickup = type === 'pickup';
+  return {
+    stationId: isPickup ? 'preview-pickup' : 'preview-delivery',
+    stationName: isPickup ? '출발역' : '도착역',
+    stationNameEnglish: isPickup ? 'Pickup' : 'Dropoff',
+    isTransferStation: false,
+    isExpressStop: false,
+    isTerminus: false,
+    lines: [
+      {
+        lineId: isPickup ? '2' : '3',
+        lineCode: isPickup ? '2' : '3',
+        lineName: isPickup ? '2호선' : '3호선',
+        lineColor: Colors.primary,
+        lineType: 'general',
+      },
+    ],
+    location: {
+      latitude: isPickup ? 37.5665 : 37.5704,
+      longitude: isPickup ? 126.978 : 126.991,
+    },
+    facilities: {
+      hasElevator: false,
+      hasEscalator: false,
+      wheelchairAccessible: false,
+    },
+    isActive: true,
+    region: '서울',
+    priority: 0,
+    createdAt: new Date(),
+    updatedAt: new Date(),
+  };
+}
+
+function SectionCard({ title, children }: { title: string; children: React.ReactNode }) {
+  return (
+    <View style={styles.sectionCard}>
+      <Text style={styles.sectionTitle}>{title}</Text>
+      {children}
+    </View>
+  );
+}
+
+function SegmentButton({
+  label,
+  active,
+  onPress,
+}: {
+  label: string;
+  active: boolean;
+  onPress: () => void;
+}) {
+  return (
+    <TouchableOpacity
+      style={[styles.segmentButton, active && styles.segmentButtonActive]}
+      onPress={onPress}
+      activeOpacity={0.9}
+    >
+      <Text style={[styles.segmentButtonText, active && styles.segmentButtonTextActive]}>{label}</Text>
+    </TouchableOpacity>
+  );
+}
+
+function StationButton({
+  label,
+  value,
+  onPress,
+}: {
+  label: string;
+  value: string;
+  onPress: () => void;
+}) {
+  return (
+    <TouchableOpacity style={styles.stationButton} onPress={onPress} activeOpacity={0.92}>
+      <Text style={styles.stationLabel}>{label}</Text>
+      <Text style={styles.stationValue}>{value}</Text>
+    </TouchableOpacity>
+  );
+}
+
 export default function CreateRequestScreen({ navigation, route }: Props) {
+  const { user } = useUser();
   const params = route?.params;
   const prefill = params?.prefill;
   const isReservationFlow = params?.mode === 'reservation';
@@ -102,7 +188,7 @@ export default function CreateRequestScreen({ navigation, route }: Props) {
   const [loadingStations, setLoadingStations] = useState(true);
   const [saving, setSaving] = useState(false);
   const [pickerVisible, setPickerVisible] = useState(false);
-  const [pickerType, setPickerType] = useState<'pickup' | 'delivery'>('pickup');
+  const [pickerType, setPickerType] = useState<PickerType>('pickup');
 
   const [pickupStation, setPickupStation] = useState<Station | null>(() => fromPrefillStation(prefill?.pickupStation));
   const [deliveryStation, setDeliveryStation] = useState<Station | null>(() => fromPrefillStation(prefill?.deliveryStation));
@@ -115,8 +201,12 @@ export default function CreateRequestScreen({ navigation, route }: Props) {
   const [directMode, setDirectMode] = useState<'none' | 'requester_to_station' | 'locker_assisted'>(
     prefill?.directParticipationMode ?? 'none'
   );
-  const [urgency, setUrgency] = useState<'normal' | 'fast' | 'urgent'>(prefill?.urgency ?? (isReservationFlow ? 'normal' : 'fast'));
-  const [requestMode, setRequestMode] = useState<'immediate' | 'reservation'>(isReservationFlow ? 'reservation' : 'immediate');
+  const [urgency, setUrgency] = useState<'normal' | 'fast' | 'urgent'>(
+    prefill?.urgency ?? (isReservationFlow ? 'normal' : 'fast')
+  );
+  const [requestMode, setRequestMode] = useState<'immediate' | 'reservation'>(
+    isReservationFlow ? 'reservation' : 'immediate'
+  );
   const [preferredPickupTime, setPreferredPickupTime] = useState(prefill?.preferredPickupTime ?? '');
   const [preferredArrivalTime, setPreferredArrivalTime] = useState(prefill?.preferredArrivalTime ?? '');
   const [selectedQuoteType, setSelectedQuoteType] = useState<Beta1QuoteCard['quoteType']>(
@@ -151,26 +241,11 @@ export default function CreateRequestScreen({ navigation, route }: Props) {
   }, [deliveryStation, pickupStation, prefill?.deliveryStation, prefill?.pickupStation]);
 
   const quoteCards = useMemo<Beta1QuoteCard[]>(() => {
-    const fallbackPickup =
-      pickupStation ??
-      (stations[0] ?? {
-        stationId: 'preview-pickup',
-        stationName: '출발역',
-        lines: [{ lineCode: '1', lineName: '1호선' }],
-        location: { lat: 37.5665, lng: 126.978 },
-      });
-
-    const fallbackDelivery =
-      deliveryStation ??
-      (stations[1] ?? {
-        stationId: 'preview-delivery',
-        stationName: '도착역',
-        lines: [{ lineCode: '2', lineName: '2호선' }],
-        location: { lat: 37.57, lng: 126.99 },
-      });
+    const fallbackPickup = pickupStation ?? stations[0] ?? getFallbackStation('pickup');
+    const fallbackDelivery = deliveryStation ?? stations[1] ?? getFallbackStation('delivery');
 
     return buildBeta1QuoteCards({
-      requesterUserId: 'preview',
+      requesterUserId: user?.uid ?? 'preview',
       requestMode,
       pickupStation: toStationInfo(fallbackPickup),
       deliveryStation: toStationInfo(fallbackDelivery),
@@ -201,8 +276,10 @@ export default function CreateRequestScreen({ navigation, route }: Props) {
     selectedQuoteType,
     stations,
     urgency,
+    user?.uid,
     weightKg,
   ]);
+
   const submitDisabled =
     !pickupStation ||
     !deliveryStation ||
@@ -213,13 +290,18 @@ export default function CreateRequestScreen({ navigation, route }: Props) {
 
   async function handleSubmit() {
     if (submitDisabled || !pickupStation || !deliveryStation) {
-      Alert.alert('입력 확인', '출발지, 도착지, 물품 설명, 수령인 정보와 예약 시간을 먼저 입력해 주세요.');
+      Alert.alert('입력 확인', '출발역, 도착역, 물품 정보, 수령인 정보를 확인해 주세요.');
+      return;
+    }
+
+    if (pickupStation.stationId === deliveryStation.stationId) {
+      Alert.alert('역 선택 확인', '출발역과 도착역은 서로 다르게 선택해 주세요.');
       return;
     }
 
     setSaving(true);
     try {
-      const requesterUserId = requireUserId();
+      const requesterUserId = user?.uid ?? requireUserId();
       const result = await createBeta1Request({
         requesterUserId,
         requestMode,
@@ -235,28 +317,36 @@ export default function CreateRequestScreen({ navigation, route }: Props) {
         urgency: requestMode === 'reservation' ? 'normal' : urgency,
         selectedQuoteType,
         directParticipationMode: directMode,
-        preferredPickupTime: requestMode === 'reservation' ? preferredPickupTime : preferredPickupTime || '지금 바로',
+        preferredPickupTime:
+          requestMode === 'reservation' ? preferredPickupTime : preferredPickupTime || '지금 바로',
         preferredArrivalTime: preferredArrivalTime || undefined,
       });
 
-      const selectedQuoteCard = Array.isArray(result.quoteCards) ? result.quoteCards[0] : undefined;
-      const deliveryFee =
-        selectedQuoteCard && typeof selectedQuoteCard.pricing?.publicPrice === 'number'
+      const selectedQuoteCard =
+        result.quoteCards.find((card) => card.quoteType === selectedQuoteType) ?? result.quoteCards[0];
+
+      navigation.replace('RequestConfirmation', {
+        requestId: result.requestId,
+        pickupStationName: pickupStation.stationName,
+        deliveryStationName: deliveryStation.stationName,
+        deliveryFee: selectedQuoteCard
           ? {
               totalFee: Number(selectedQuoteCard.pricing.publicPrice),
               estimatedTime: parseEtaMinutes(selectedQuoteCard.etaLabel),
             }
-          : undefined;
-
-      navigation.replace('RequestConfirmation', {
-        requestId: result.requestId,
-        pickupStationName: pickupStation?.stationName,
-        deliveryStationName: deliveryStation?.stationName,
-        deliveryFee,
+          : undefined,
       });
     } catch (error) {
       console.error('Failed to create request', error);
-      Alert.alert('요청 생성 실패', '요청을 준비하는 중 문제가 발생했습니다.');
+      const isAuthError =
+        error instanceof Error && /login|auth|로그인|세션|인증/i.test(error.message);
+
+      Alert.alert(
+        '요청 생성 실패',
+        isAuthError
+          ? '로그인 상태를 다시 확인한 뒤 요청을 생성해 주세요.'
+          : '요청을 만드는 중 문제가 발생했습니다. 잠시 후 다시 시도해 주세요.'
+      );
     } finally {
       setSaving(false);
     }
@@ -272,33 +362,46 @@ export default function CreateRequestScreen({ navigation, route }: Props) {
   }
 
   return (
-    <KeyboardAvoidingView style={styles.container} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-      <AppTopBar title={requestMode === 'reservation' ? '예약 요청' : '배송 요청'} onBack={() => navigation.goBack()} />
+    <KeyboardAvoidingView
+      style={styles.container}
+      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+    >
+      <AppTopBar
+        title={requestMode === 'reservation' ? '예약 요청' : '배송 요청'}
+        onBack={() => navigation.goBack()}
+      />
+
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
         <View style={styles.heroCard}>
           <Text style={styles.heroKicker}>가는길에</Text>
           <Text style={styles.heroTitle}>
-            {requestMode === 'reservation'
-              ? '예약 요청을 만듭니다.'
-              : '배송 요청을 만듭니다.'}
+            {requestMode === 'reservation' ? '예약 배송을 준비합니다.' : '배송 요청을 시작합니다.'}
           </Text>
           <Text style={styles.heroSubtitle}>
             {requestMode === 'reservation'
-              ? '시간만 정하면 됩니다.'
-              : '출발역과 도착역을 선택해 주세요.'}
+              ? '시간과 구간만 정하면 됩니다.'
+              : '출발역과 도착역을 먼저 선택해 주세요.'}
           </Text>
         </View>
 
-        <SectionCard title="1. 요청 모드">
+        <SectionCard title="요청 방식">
           <View style={styles.segmentRow}>
-            <SegmentButton label="지금 바로" active={requestMode === 'immediate'} onPress={() => setRequestMode('immediate')} />
-            <SegmentButton label="예약하기" active={requestMode === 'reservation'} onPress={() => setRequestMode('reservation')} />
+            <SegmentButton
+              label="지금 바로"
+              active={requestMode === 'immediate'}
+              onPress={() => setRequestMode('immediate')}
+            />
+            <SegmentButton
+              label="예약하기"
+              active={requestMode === 'reservation'}
+              onPress={() => setRequestMode('reservation')}
+            />
           </View>
         </SectionCard>
 
-        <SectionCard title="2. 이동 구간">
+        <SectionCard title="이동 구간">
           <StationButton
-            label="출발지"
+            label="출발역"
             value={pickupStation ? pickupStation.stationName : '출발역 선택'}
             onPress={() => {
               setPickerType('pickup');
@@ -306,7 +409,7 @@ export default function CreateRequestScreen({ navigation, route }: Props) {
             }}
           />
           <StationButton
-            label="도착지"
+            label="도착역"
             value={deliveryStation ? deliveryStation.stationName : '도착역 선택'}
             onPress={() => {
               setPickerType('delivery');
@@ -315,17 +418,22 @@ export default function CreateRequestScreen({ navigation, route }: Props) {
           />
         </SectionCard>
 
-        <SectionCard title="3. 물품 정보">
+        <SectionCard title="물품 정보">
           <TextInput
             style={styles.textInput}
             value={packageDescription}
             onChangeText={setPackageDescription}
-            placeholder="예: 노트북 파우치, 서류 봉투, 작은 박스"
+            placeholder="예: 서류 봉투, 작은 박스, 노트북 가방"
             placeholderTextColor={Colors.gray400}
           />
           <View style={styles.segmentRow}>
             {(['small', 'medium', 'large'] as const).map((size) => (
-              <SegmentButton key={size} label={size} active={packageSize === size} onPress={() => setPackageSize(size)} />
+              <SegmentButton
+                key={size}
+                label={size}
+                active={packageSize === size}
+                onPress={() => setPackageSize(size)}
+              />
             ))}
           </View>
           <TextInput
@@ -346,48 +454,57 @@ export default function CreateRequestScreen({ navigation, route }: Props) {
           />
         </SectionCard>
 
-        <SectionCard title="4. 시간과 참여 방식">
+        <SectionCard title="시간과 참여 방식">
           {requestMode === 'reservation' ? (
             <>
               <TextInput
                 style={styles.textInput}
                 value={preferredPickupTime}
                 onChangeText={setPreferredPickupTime}
-                placeholder="희망 출발 시간 예: 오늘 19:30"
+                placeholder="예: 오늘 19:30"
                 placeholderTextColor={Colors.gray400}
               />
               <TextInput
                 style={styles.textInput}
                 value={preferredArrivalTime}
                 onChangeText={setPreferredArrivalTime}
-                placeholder="희망 도착 시간(선택)"
+                placeholder="도착 희망 시간(선택)"
                 placeholderTextColor={Colors.gray400}
               />
             </>
           ) : (
             <View style={styles.segmentRow}>
               {(['normal', 'fast', 'urgent'] as const).map((level) => (
-                <SegmentButton key={level} label={level} active={urgency === level} onPress={() => setUrgency(level)} />
+                <SegmentButton
+                  key={level}
+                  label={level}
+                  active={urgency === level}
+                  onPress={() => setUrgency(level)}
+                />
               ))}
             </View>
           )}
 
           <View style={styles.segmentColumn}>
-            <SegmentButton label="전체 맡기기" active={directMode === 'none'} onPress={() => setDirectMode('none')} />
+            <SegmentButton
+              label="전부 맡기기"
+              active={directMode === 'none'}
+              onPress={() => setDirectMode('none')}
+            />
             <SegmentButton
               label="출발역까지 직접 전달"
               active={directMode === 'requester_to_station'}
               onPress={() => setDirectMode('requester_to_station')}
             />
             <SegmentButton
-              label="사물함 포함 우선"
+              label="사물함 포함"
               active={directMode === 'locker_assisted'}
               onPress={() => setDirectMode('locker_assisted')}
             />
           </View>
         </SectionCard>
 
-        <SectionCard title="5. 수령인 정보">
+        <SectionCard title="수령인 정보">
           <TextInput
             style={styles.textInput}
             value={recipientName}
@@ -406,7 +523,7 @@ export default function CreateRequestScreen({ navigation, route }: Props) {
         </SectionCard>
 
         <View style={styles.sectionHeader}>
-          <Text style={styles.sectionHeaderTitle}>6. AI 가격 카드</Text>
+          <Text style={styles.sectionHeaderTitle}>가격 선택</Text>
         </View>
 
         {quoteCards.map((card) => (
@@ -421,43 +538,33 @@ export default function CreateRequestScreen({ navigation, route }: Props) {
                 <Text style={styles.quoteLabel}>{card.label}</Text>
                 <Text style={styles.quoteHeadline}>{card.headline}</Text>
               </View>
-              {selectedQuoteType === card.quoteType ? (
-                <View style={styles.quoteBadge}>
-                  <Text style={styles.quoteBadgeText}>선택됨</Text>
-                </View>
-              ) : null}
+              <View style={styles.quotePriceWrap}>
+                <Text style={styles.quotePrice}>{card.priceLabel}</Text>
+                <Text style={styles.quoteEta}>{card.etaLabel}</Text>
+              </View>
             </View>
-
-            <View style={styles.quoteMetaRow}>
-              <Text style={styles.quotePrice}>{card.priceLabel}</Text>
-              <Text style={styles.quoteEta}>{card.etaLabel}</Text>
-            </View>
-            <Text style={styles.quoteReason}>{card.recommendationReason}</Text>
           </TouchableOpacity>
         ))}
 
         <TouchableOpacity
           style={[styles.submitButton, submitDisabled && styles.submitButtonDisabled]}
-          onPress={() => {
-            void handleSubmit();
-          }}
+          onPress={() => void handleSubmit()}
           disabled={submitDisabled || saving}
+          activeOpacity={0.9}
         >
           {saving ? (
             <ActivityIndicator color={Colors.white} />
           ) : (
-            <Text style={styles.submitButtonText}>
-              {requestMode === 'reservation' ? '예약 요청 확정' : '요청 확정'}
-            </Text>
+            <Text style={styles.submitButtonText}>요청 생성</Text>
           )}
         </TouchableOpacity>
       </ScrollView>
 
       <OptimizedStationSelectModal
         visible={pickerVisible}
-        onClose={() => setPickerVisible(false)}
         stations={stations}
-        onSelectStation={(station) => {
+        onClose={() => setPickerVisible(false)}
+        onSelectStation={(station: Station) => {
           if (pickerType === 'pickup') {
             setPickupStation(station);
           } else {
@@ -465,91 +572,54 @@ export default function CreateRequestScreen({ navigation, route }: Props) {
           }
           setPickerVisible(false);
         }}
-          title={pickerType === 'pickup' ? '출발역 선택' : '도착역 선택'}
+        title={pickerType === 'pickup' ? '출발역 선택' : '도착역 선택'}
       />
     </KeyboardAvoidingView>
   );
 }
 
-function SectionCard({ title, children }: { title: string; children: React.ReactNode }) {
-  return (
-    <View style={styles.sectionCard}>
-      <Text style={styles.sectionTitle}>{title}</Text>
-      <View style={styles.sectionBody}>{children}</View>
-    </View>
-  );
-}
-
-function StationButton({ label, value, onPress }: { label: string; value: string; onPress: () => void }) {
-  return (
-    <TouchableOpacity style={styles.stationButton} onPress={onPress}>
-      <Text style={styles.stationLabel}>{label}</Text>
-      <View style={styles.stationValueRow}>
-        <Text style={styles.stationValue}>{value}</Text>
-        <MaterialIcons name="chevron-right" size={24} color={Colors.gray400} />
-      </View>
-    </TouchableOpacity>
-  );
-}
-
-function SegmentButton({ label, active, onPress }: { label: string; active: boolean; onPress: () => void }) {
-  return (
-    <TouchableOpacity style={[styles.segmentButton, active && styles.segmentButtonActive]} onPress={onPress}>
-      <Text style={[styles.segmentButtonText, active && styles.segmentButtonTextActive]}>{label}</Text>
-    </TouchableOpacity>
-  );
-}
-
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: Colors.background,
-  },
+  container: { flex: 1, backgroundColor: Colors.background },
+  content: { padding: Spacing.lg, gap: Spacing.md },
   loadingWrap: {
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    gap: Spacing.md,
     backgroundColor: Colors.background,
   },
   loadingText: {
+    marginTop: Spacing.md,
     color: Colors.textSecondary,
-    fontSize: 16,
-  },
-  content: {
-    padding: Spacing.lg,
-    gap: Spacing.md,
-    paddingBottom: 48,
+    ...Typography.body,
   },
   heroCard: {
-    backgroundColor: Colors.primaryMint,
+    backgroundColor: Colors.surface,
     borderRadius: BorderRadius.xl,
-    padding: Spacing.xl,
-    gap: Spacing.sm,
+    padding: Spacing.lg,
+    gap: 8,
+    ...Shadows.sm,
   },
   heroKicker: {
     color: Colors.primary,
-    fontSize: Typography.fontSize.xs,
-    fontWeight: Typography.fontWeight.bold,
+    fontSize: Typography.fontSize.sm,
+    fontWeight: '800',
+    letterSpacing: 0.8,
     textTransform: 'uppercase',
-    letterSpacing: 1,
   },
   heroTitle: {
     color: Colors.textPrimary,
     fontSize: Typography.fontSize['2xl'],
     fontWeight: '800',
-    lineHeight: 32,
   },
   heroSubtitle: {
     color: Colors.textSecondary,
-    fontSize: Typography.fontSize.sm,
-    lineHeight: 22,
+    ...Typography.body,
   },
   sectionCard: {
     backgroundColor: Colors.surface,
     borderRadius: BorderRadius.xl,
     padding: Spacing.lg,
-    gap: Spacing.md,
+    gap: Spacing.sm,
     ...Shadows.sm,
   },
   sectionTitle: {
@@ -557,174 +627,122 @@ const styles = StyleSheet.create({
     fontSize: Typography.fontSize.lg,
     fontWeight: '800',
   },
-  sectionBody: {
-    gap: Spacing.sm,
-  },
-  helperText: {
-    color: Colors.textSecondary,
-    fontSize: Typography.fontSize.sm,
-    lineHeight: 21,
-  },
-  stationButton: {
-    borderRadius: BorderRadius.lg,
-    borderWidth: 1,
-    borderColor: Colors.border,
-    padding: Spacing.md,
-    gap: 6,
-  },
-  stationLabel: {
-    color: Colors.textTertiary,
-    fontSize: Typography.fontSize.xs,
-    fontWeight: Typography.fontWeight.bold,
-  },
-  stationValueRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    gap: Spacing.md,
-  },
-  stationValue: {
-    color: Colors.textPrimary,
-    fontSize: Typography.fontSize.lg,
-    fontWeight: '700',
-  },
-  textInput: {
-    borderRadius: BorderRadius.lg,
-    borderWidth: 1,
-    borderColor: Colors.border,
-    paddingHorizontal: Spacing.md,
-    paddingVertical: Platform.OS === 'ios' ? 14 : 12,
-    fontSize: Typography.fontSize.base,
-    color: Colors.textPrimary,
-    backgroundColor: Colors.surface,
-  },
-  segmentRow: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: Spacing.sm,
-  },
-  segmentColumn: {
-    gap: Spacing.sm,
-  },
-  segmentButton: {
-    borderRadius: BorderRadius.lg,
-    borderWidth: 1,
-    borderColor: Colors.gray300,
-    paddingVertical: 12,
-    paddingHorizontal: Spacing.md,
-    backgroundColor: Colors.surface,
-  },
-  segmentButtonActive: {
-    borderColor: Colors.primary,
-    backgroundColor: Colors.primaryMint,
-  },
-  segmentButtonText: {
-    color: Colors.textSecondary,
-    fontSize: Typography.fontSize.sm,
-    fontWeight: Typography.fontWeight.medium,
-  },
-  segmentButtonTextActive: {
-    color: Colors.primary,
-    fontWeight: Typography.fontWeight.bold,
-  },
   sectionHeader: {
-    gap: 4,
-    marginTop: Spacing.sm,
+    paddingTop: 4,
   },
   sectionHeaderTitle: {
     color: Colors.textPrimary,
-    fontSize: Typography.fontSize.xl,
+    fontSize: Typography.fontSize.lg,
     fontWeight: '800',
   },
-  sectionHeaderText: {
+  segmentRow: {
+    flexDirection: 'row',
+    gap: 8,
+    flexWrap: 'wrap',
+  },
+  segmentColumn: {
+    gap: 8,
+  },
+  segmentButton: {
+    minHeight: 44,
+    borderRadius: BorderRadius.lg,
+    paddingHorizontal: Spacing.md,
+    backgroundColor: Colors.gray50,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  segmentButtonActive: {
+    backgroundColor: Colors.primary,
+    borderColor: Colors.primary,
+  },
+  segmentButtonText: {
+    color: Colors.textPrimary,
+    fontWeight: '700',
+  },
+  segmentButtonTextActive: {
+    color: Colors.white,
+  },
+  stationButton: {
+    minHeight: 58,
+    borderRadius: BorderRadius.lg,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    backgroundColor: Colors.surface,
+    paddingHorizontal: Spacing.md,
+    justifyContent: 'center',
+    gap: 4,
+  },
+  stationLabel: {
     color: Colors.textSecondary,
-    fontSize: Typography.fontSize.sm,
-    lineHeight: 21,
+    ...Typography.caption,
+  },
+  stationValue: {
+    color: Colors.textPrimary,
+    fontWeight: '700',
+  },
+  textInput: {
+    minHeight: 52,
+    borderRadius: BorderRadius.lg,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    backgroundColor: Colors.surface,
+    paddingHorizontal: Spacing.md,
+    color: Colors.textPrimary,
   },
   quoteCard: {
     backgroundColor: Colors.surface,
     borderRadius: BorderRadius.xl,
     padding: Spacing.lg,
-    gap: Spacing.sm,
-    borderWidth: 1,
-    borderColor: Colors.border,
     ...Shadows.sm,
   },
   quoteCardSelected: {
+    borderWidth: 2,
     borderColor: Colors.primary,
-    backgroundColor: Colors.primaryMint,
   },
   quoteHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'flex-start',
-    gap: Spacing.md,
+    gap: 12,
   },
   quoteHeaderText: {
     flex: 1,
-    gap: 4,
+    gap: 6,
   },
   quoteLabel: {
     color: Colors.primary,
-    fontSize: Typography.fontSize.xs,
-    fontWeight: Typography.fontWeight.bold,
-    textTransform: 'uppercase',
+    fontWeight: '800',
   },
   quoteHeadline: {
     color: Colors.textPrimary,
-    fontSize: Typography.fontSize.base,
-    fontWeight: '800',
-    lineHeight: 22,
+    ...Typography.bodySmall,
   },
-  quoteBadge: {
-    borderRadius: BorderRadius.full,
-    backgroundColor: Colors.primary,
-    paddingHorizontal: Spacing.sm,
-    paddingVertical: 6,
-  },
-  quoteBadgeText: {
-    color: Colors.white,
-    fontSize: Typography.fontSize.xs,
-    fontWeight: Typography.fontWeight.bold,
-  },
-  quoteMetaRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    gap: Spacing.md,
+  quotePriceWrap: {
+    alignItems: 'flex-end',
+    gap: 4,
   },
   quotePrice: {
     color: Colors.textPrimary,
-    fontSize: Typography.fontSize.xl,
     fontWeight: '800',
   },
   quoteEta: {
     color: Colors.textSecondary,
-    fontSize: Typography.fontSize.sm,
-    fontWeight: '600',
-  },
-  quoteReason: {
-    color: Colors.textSecondary,
-    fontSize: Typography.fontSize.sm,
-    lineHeight: 21,
+    ...Typography.caption,
   },
   submitButton: {
+    minHeight: 54,
     borderRadius: BorderRadius.full,
     backgroundColor: Colors.primary,
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: Spacing.lg,
-    marginTop: Spacing.md,
   },
   submitButtonDisabled: {
-    opacity: 0.45,
+    opacity: 0.5,
   },
   submitButtonText: {
     color: Colors.white,
-    fontSize: Typography.fontSize.lg,
+    fontSize: 16,
     fontWeight: '800',
   },
 });
-
-
-

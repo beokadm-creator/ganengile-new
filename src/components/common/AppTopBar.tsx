@@ -36,8 +36,8 @@ export default function AppTopBar({ title, onBack, rightSlot, style }: AppTopBar
 const styles = StyleSheet.create({
   container: {
     alignItems: 'center',
-    backgroundColor: Colors.white,
-    borderBottomColor: Colors.gray300,
+    backgroundColor: Colors.surface,
+    borderBottomColor: Colors.border,
     borderBottomWidth: 1,
     flexDirection: 'row',
     minHeight: 60,

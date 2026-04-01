@@ -87,13 +87,13 @@ export default function Card({
 
 const styles = StyleSheet.create({
   card: {
-    backgroundColor: Colors.white,
+    backgroundColor: Colors.surface,
     borderRadius: BorderRadius.lg,
   },
 
   // Variants
   default: {
-    borderColor: Colors.gray200,
+    borderColor: Colors.border,
     borderWidth: 1,
   },
   elevated: {

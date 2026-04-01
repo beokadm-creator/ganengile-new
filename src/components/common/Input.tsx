@@ -140,14 +140,14 @@ const styles = StyleSheet.create({
 
   // Variants
   default: {
-    backgroundColor: Colors.white,
-    borderColor: Colors.gray300,
+    backgroundColor: Colors.gray100,
+    borderColor: Colors.border,
     borderWidth: 1,
   },
   outlined: {
-    backgroundColor: Colors.white,
-    borderColor: Colors.gray300,
-    borderWidth: 2,
+    backgroundColor: Colors.gray100,
+    borderColor: Colors.border,
+    borderWidth: 1,
   },
   filled: {
     backgroundColor: Colors.gray100,

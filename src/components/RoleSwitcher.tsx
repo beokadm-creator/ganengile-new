@@ -12,7 +12,7 @@ import {
   Animated,
   Dimensions,
 } from 'react-native';
-import { Colors, Spacing, Typography, BorderRadius } from './theme';
+import { Colors, Spacing, Typography, BorderRadius } from '../theme';
 import { UserRole } from '../types/user';
 
 const { width } = Dimensions.get('window');
@@ -99,7 +99,7 @@ export const RoleSwitcher: React.FC<RoleSwitcherProps> = ({
 
 const styles = StyleSheet.create({
   container: {
-    backgroundColor: Colors.background.primary,
+    backgroundColor: Colors.background,
     borderRadius: BorderRadius.lg,
     padding: Spacing.lg,
     marginBottom: Spacing.lg,
@@ -109,7 +109,7 @@ const styles = StyleSheet.create({
   },
   sliderContainer: {
     flexDirection: 'row',
-    backgroundColor: Colors.background.secondary,
+    backgroundColor: Colors.gray100,
     borderRadius: BorderRadius.md,
     position: 'relative',
     height: 56,
@@ -121,7 +121,7 @@ const styles = StyleSheet.create({
     top: 4,
     width: '48%',
     height: 48,
-    backgroundColor: Colors.secondary,
+    backgroundColor: Colors.primary,
     borderRadius: BorderRadius.md,
     zIndex: 1,
   },
@@ -132,16 +132,16 @@ const styles = StyleSheet.create({
     zIndex: 2,
   },
   optionText: {
-    fontSize: Typography.fontSize.md,
+    fontSize: Typography.fontSize.base,
     fontWeight: Typography.fontWeight.semibold,
-    color: Colors.text.secondary,
+    color: Colors.textSecondary,
   },
   activeText: {
-    color: '#FFFFFF',
+    color: Colors.white,
   },
   description: {
     fontSize: Typography.fontSize.sm,
-    color: Colors.text.secondary,
+    color: Colors.textSecondary,
     textAlign: 'center',
     marginTop: Spacing.sm,
   },

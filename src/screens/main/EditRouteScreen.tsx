@@ -22,6 +22,8 @@ import Button from '../../components/common/Button';
 import TimePicker from '../../components/common/TimePicker';
 import DaySelector, { DAY_LABELS } from '../../components/common/DaySelector';
 import StationSelectModal from '../../components/common/StationSelectModal';
+import AppTopBar from '../../components/common/AppTopBar';
+import { Shadows } from '../../theme';
 
 type EditRouteRouteProp = RouteProp<MainStackParamList, 'EditRoute'>;
 type PickTarget = 'start' | 'end' | null;
@@ -240,18 +242,9 @@ export default function EditRouteScreen() {
 
   return (
     <View style={styles.container}>
-      <View style={styles.header}>
-        <View style={styles.headerTop}>
-          <TouchableOpacity style={styles.backButton} onPress={handleBack}>
-            <Ionicons name="arrow-back" size={24} color={Colors.white} />
-          </TouchableOpacity>
-          <Text style={styles.title}>경로 수정</Text>
-          <View style={styles.backButton} />
-        </View>
-        <Text style={styles.subtitle}>기존 동선을 현재 일정과 이동 패턴에 맞게 업데이트해 주세요.</Text>
-      </View>
+      <AppTopBar title="경로 수정" onBack={handleBack} />
 
-      <ScrollView style={styles.content} contentContainerStyle={styles.contentInner}>
+      <ScrollView style={styles.content} contentContainerStyle={styles.contentInner} showsVerticalScrollIndicator={false}>
         <View style={styles.summaryCard}>
           <Text style={styles.summaryTitle}>현재 요약</Text>
           <Text style={styles.summaryRoute}>
@@ -336,116 +329,20 @@ export default function EditRouteScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: {
-    backgroundColor: Colors.gray100,
-    flex: 1,
-  },
-  loadingContainer: {
-    alignItems: 'center',
-    backgroundColor: Colors.gray100,
-    flex: 1,
-    justifyContent: 'center',
-    padding: Spacing.xl,
-  },
-  loadingText: {
-    color: Colors.gray600,
-    fontSize: Typography.fontSize.base,
-    marginTop: Spacing.md,
-    textAlign: 'center',
-  },
-  header: {
-    backgroundColor: Colors.primary,
-    paddingBottom: Spacing.lg,
-    paddingHorizontal: Spacing.lg,
-    paddingTop: 60,
-  },
-  headerTop: {
-    alignItems: 'center',
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginBottom: Spacing.xs,
-  },
-  backButton: {
-    width: 40,
-  },
-  title: {
-    color: Colors.white,
-    fontSize: Typography.fontSize['2xl'],
-    fontWeight: Typography.fontWeight.bold,
-  },
-  subtitle: {
-    color: Colors.white,
-    fontSize: Typography.fontSize.base,
-    opacity: 0.92,
-  },
-  content: {
-    flex: 1,
-  },
-  contentInner: {
-    gap: Spacing.md,
-    padding: Spacing.lg,
-  },
-  summaryCard: {
-    backgroundColor: Colors.white,
-    borderRadius: BorderRadius.lg,
-    padding: Spacing.lg,
-  },
-  summaryTitle: {
-    color: Colors.textSecondary,
-    fontSize: Typography.fontSize.sm,
-    fontWeight: Typography.fontWeight.semibold,
-    marginBottom: Spacing.xs,
-  },
-  summaryRoute: {
-    color: Colors.textPrimary,
-    fontSize: Typography.fontSize.lg,
-    fontWeight: Typography.fontWeight.bold,
-  },
-  summaryMeta: {
-    color: Colors.textSecondary,
-    fontSize: Typography.fontSize.sm,
-    marginTop: Spacing.xs,
-  },
-  changeBadge: {
-    color: Colors.primary,
-    fontSize: Typography.fontSize.xs,
-    fontWeight: Typography.fontWeight.semibold,
-    marginTop: Spacing.sm,
-  },
-  card: {
-    backgroundColor: Colors.white,
-    borderRadius: BorderRadius.lg,
-    gap: Spacing.md,
-    padding: Spacing.lg,
-  },
-  stationButton: {
-    alignItems: 'center',
-    backgroundColor: Colors.gray50,
-    borderColor: Colors.gray300,
-    borderRadius: BorderRadius.md,
-    borderWidth: 1,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    padding: Spacing.md,
-  },
-  stationLabel: {
-    color: Colors.textSecondary,
-    fontSize: Typography.fontSize.xs,
-    marginBottom: 4,
-  },
-  stationValue: {
-    color: Colors.textPrimary,
-    fontSize: Typography.fontSize.base,
-    fontWeight: Typography.fontWeight.medium,
-  },
-  stationAction: {
-    color: Colors.primary,
-    fontSize: Typography.fontSize.sm,
-    fontWeight: Typography.fontWeight.semibold,
-  },
-  footerHint: {
-    color: Colors.gray500,
-    fontSize: Typography.fontSize.xs,
-    textAlign: 'center',
-  },
+  container: { flex: 1, backgroundColor: Colors.background },
+  loadingContainer: { alignItems: 'center', backgroundColor: Colors.background, flex: 1, justifyContent: 'center', padding: Spacing.xl },
+  loadingText: { color: Colors.textSecondary, fontSize: Typography.fontSize.base, marginTop: Spacing.md, textAlign: 'center' },
+  content: { flex: 1 },
+  contentInner: { gap: Spacing.md, padding: Spacing.lg, paddingBottom: Spacing['5xl'] },
+  summaryCard: { backgroundColor: Colors.surface, borderRadius: BorderRadius.xl, padding: Spacing.lg, ...Shadows.sm },
+  summaryTitle: { color: Colors.primary, fontSize: Typography.fontSize.sm, fontWeight: '800', marginBottom: Spacing.xs },
+  summaryRoute: { color: Colors.textPrimary, fontSize: Typography.fontSize.lg, fontWeight: '800' },
+  summaryMeta: { color: Colors.textSecondary, fontSize: Typography.fontSize.sm, marginTop: Spacing.xs },
+  changeBadge: { color: Colors.warningDark, fontSize: Typography.fontSize.xs, fontWeight: '700', marginTop: Spacing.sm },
+  card: { backgroundColor: Colors.surface, borderRadius: BorderRadius.xl, gap: Spacing.md, padding: Spacing.lg, ...Shadows.sm },
+  stationButton: { alignItems: 'center', backgroundColor: Colors.surface, borderColor: Colors.border, borderRadius: BorderRadius.md, borderWidth: 1, flexDirection: 'row', justifyContent: 'space-between', padding: Spacing.md, minHeight: 58 },
+  stationLabel: { color: Colors.textSecondary, fontSize: Typography.fontSize.xs, marginBottom: 4 },
+  stationValue: { color: Colors.textPrimary, fontSize: Typography.fontSize.base, fontWeight: '700' },
+  stationAction: { color: Colors.primary, fontSize: Typography.fontSize.sm, fontWeight: '700' },
+  footerHint: { color: Colors.textTertiary, fontSize: Typography.fontSize.xs, textAlign: 'center', marginTop: Spacing.md },
 });

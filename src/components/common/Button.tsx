@@ -90,7 +90,7 @@ export default function Button({
 const styles = StyleSheet.create({
   button: {
     alignItems: 'center',
-    borderRadius: BorderRadius.md,
+    borderRadius: BorderRadius.full,
     flexDirection: 'row',
     justifyContent: 'center',
     overflow: 'hidden',
