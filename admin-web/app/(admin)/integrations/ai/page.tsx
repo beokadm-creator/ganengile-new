@@ -53,10 +53,10 @@ const emptyConfig: AIConfig = {
   provider: 'zai',
   apiKey: '',
   baseUrl: 'https://api.z.ai/api/paas/v4',
-  model: 'glm-4.7-flash',
-  analysisModel: 'glm-4.7-flash',
-  pricingModel: 'glm-4.7-flash',
-  missionModel: 'glm-4.7-flash',
+  model: 'glm-4.7',
+  analysisModel: 'glm-4.7',
+  pricingModel: 'glm-4.7',
+  missionModel: 'glm-4.7',
   confidenceThreshold: 0.75,
   fallbackMode: 'manual',
   disableThinking: true,
@@ -91,8 +91,8 @@ export default function AIIntegrationPage() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [testing, setTesting] = useState(false);
-  const [testModel, setTestModel] = useState('glm-4.7-flash');
-  const [testPrompt, setTestPrompt] = useState('간단히 OK만 답해주세요.');
+  const [testModel, setTestModel] = useState('glm-4.7');
+  const [testPrompt, setTestPrompt] = useState('OK만 답해주세요.');
   const [testResult, setTestResult] = useState<TestResponse | null>(null);
 
   useEffect(() => {
@@ -133,7 +133,7 @@ export default function AIIntegrationPage() {
         window.alert(json.error ?? '저장에 실패했습니다.');
         return;
       }
-      window.alert('저장 완료: beta1 AI 엔진 설정이 반영되었습니다.');
+      window.alert('AI 설정을 저장했습니다.');
     } finally {
       setSaving(false);
     }
@@ -186,20 +186,12 @@ export default function AIIntegrationPage() {
   return (
     <div className="max-w-5xl p-6">
       <div className="mb-6">
-        <h1 className="text-2xl font-bold text-slate-900">beta1 AI 엔진 설정</h1>
-        <p className="mt-2 text-sm text-slate-500">
-          GLM 기반 요청 분석, 가격 제안, 미션 오케스트레이션 엔진을 운영자가 직접 제어합니다.
-        </p>
+        <h1 className="text-2xl font-bold text-slate-900">AI 설정</h1>
       </div>
 
-      <div className="mb-4 rounded-2xl border border-amber-200 bg-amber-50 p-5">
+      <div className="mb-4 rounded-2xl border border-slate-200 bg-white p-5">
         <div className="flex items-center justify-between gap-4">
-          <div>
-            <h2 className="text-base font-semibold text-amber-950">beta1 AI 엔진 활성화</h2>
-            <p className="mt-1 text-sm text-amber-800">
-              OFF면 규칙 기반 수동 흐름으로 남고, ON이면 저장된 GLM 설정을 엔진이 사용합니다.
-            </p>
-          </div>
+          <h2 className="text-base font-semibold text-slate-900">AI 사용</h2>
           <button
             type="button"
             onClick={() => updateField('enabled', !config.enabled)}
@@ -207,14 +199,14 @@ export default function AIIntegrationPage() {
               config.enabled ? 'bg-emerald-600 text-white' : 'bg-slate-300 text-slate-700'
             }`}
           >
-            {config.enabled ? '활성' : '비활성'}
+            {config.enabled ? '사용 중' : '꺼짐'}
           </button>
         </div>
       </div>
 
       <div className="grid gap-4 lg:grid-cols-2">
         <section className="rounded-2xl border border-slate-200 bg-white p-5">
-          <h2 className="text-base font-semibold text-slate-900">엔진 연결</h2>
+          <h2 className="text-base font-semibold text-slate-900">연결</h2>
           <div className="mt-4 grid gap-4">
             <Field label="공급자">
               <select
@@ -240,54 +232,35 @@ export default function AIIntegrationPage() {
                 type="password"
                 value={config.apiKey}
                 onChange={handleTextField('apiKey')}
-                placeholder="키를 입력하세요"
+                placeholder="API Key"
               />
             </Field>
-            <p className="text-xs text-slate-500">
-              키는 관리자 비공개 문서에만 저장됩니다. 공개 설정에는 모델과 엔드포인트만 반영됩니다.
-            </p>
           </div>
         </section>
 
         <section className="rounded-2xl border border-slate-200 bg-white p-5">
-          <h2 className="text-base font-semibold text-slate-900">모델 라우팅</h2>
+          <h2 className="text-base font-semibold text-slate-900">모델</h2>
           <div className="mt-4 grid gap-4">
             <Field label="기본 모델">
-              <input
-                className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm"
-                value={config.model}
-                onChange={handleTextField('model')}
-              />
+              <input className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm" value={config.model} onChange={handleTextField('model')} />
             </Field>
-            <Field label="요청 분석 모델">
-              <input
-                className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm"
-                value={config.analysisModel}
-                onChange={handleTextField('analysisModel')}
-              />
+            <Field label="분석 모델">
+              <input className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm" value={config.analysisModel} onChange={handleTextField('analysisModel')} />
             </Field>
-            <Field label="가격 제안 모델">
-              <input
-                className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm"
-                value={config.pricingModel}
-                onChange={handleTextField('pricingModel')}
-              />
+            <Field label="가격 모델">
+              <input className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm" value={config.pricingModel} onChange={handleTextField('pricingModel')} />
             </Field>
-            <Field label="미션 오케스트레이션 모델">
-              <input
-                className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm"
-                value={config.missionModel}
-                onChange={handleTextField('missionModel')}
-              />
+            <Field label="미션 모델">
+              <input className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm" value={config.missionModel} onChange={handleTextField('missionModel')} />
             </Field>
           </div>
         </section>
       </div>
 
       <section className="mt-4 rounded-2xl border border-slate-200 bg-white p-5">
-        <h2 className="text-base font-semibold text-slate-900">속도 중심 가드</h2>
+        <h2 className="text-base font-semibold text-slate-900">실행 옵션</h2>
         <div className="mt-4 grid gap-4 md:grid-cols-2">
-          <Field label="신뢰도 임계값">
+          <Field label="신뢰도 기준">
             <input
               className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm"
               type="number"
@@ -304,9 +277,9 @@ export default function AIIntegrationPage() {
               value={config.fallbackMode}
               onChange={handleTextField('fallbackMode')}
             >
-              <option value="manual">수동 검토 우선</option>
+              <option value="manual">수동 검토</option>
               <option value="partial">부분 자동 제안</option>
-              <option value="block">실패 시 중단</option>
+              <option value="block">중단</option>
             </select>
           </Field>
         </div>
@@ -316,50 +289,31 @@ export default function AIIntegrationPage() {
             checked={config.disableThinking}
             onChange={(event) => updateField('disableThinking', event.target.checked)}
           />
-          빠른 응답을 위해 thinking 모드를 기본 비활성화
+          thinking 끄기
         </label>
-        <div className="mt-4 rounded-xl border border-rose-200 bg-rose-50 p-4 text-sm text-rose-900">
-          환불 확정, 보증금 차감, 패널티, 본인확인 완료, 최종 정산은 AI 단독 확정 대상이 아닙니다.
-        </div>
       </section>
 
       <section className="mt-4 rounded-2xl border border-slate-200 bg-white p-5">
-        <h2 className="text-base font-semibold text-slate-900">프롬프트 세트</h2>
+        <h2 className="text-base font-semibold text-slate-900">프롬프트</h2>
         <div className="mt-4 grid gap-4">
           <Field label="Vision Prompt">
-            <textarea
-              className="min-h-28 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm"
-              value={config.visionPrompt}
-              onChange={handleTextField('visionPrompt')}
-            />
+            <textarea className="min-h-28 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm" value={config.visionPrompt} onChange={handleTextField('visionPrompt')} />
           </Field>
           <Field label="Pricing Prompt">
-            <textarea
-              className="min-h-28 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm"
-              value={config.pricingPrompt}
-              onChange={handleTextField('pricingPrompt')}
-            />
+            <textarea className="min-h-28 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm" value={config.pricingPrompt} onChange={handleTextField('pricingPrompt')} />
           </Field>
           <Field label="Mission Prompt">
-            <textarea
-              className="min-h-28 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm"
-              value={config.missionPrompt}
-              onChange={handleTextField('missionPrompt')}
-            />
+            <textarea className="min-h-28 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm" value={config.missionPrompt} onChange={handleTextField('missionPrompt')} />
           </Field>
         </div>
       </section>
 
       <section className="mt-4 rounded-2xl border border-slate-200 bg-white p-5">
-        <h2 className="text-base font-semibold text-slate-900">자동 입력 사용 항목</h2>
+        <h2 className="text-base font-semibold text-slate-900">자동 입력 항목</h2>
         <div className="mt-4 grid gap-3 md:grid-cols-2">
           {autoFillLabels.map(({ key, label }) => (
             <label key={key} className="flex items-center gap-2 text-sm text-slate-700">
-              <input
-                type="checkbox"
-                checked={config.autoFillFields[key]}
-                onChange={(event) => updateAutoFillField(key, event.target.checked)}
-              />
+              <input type="checkbox" checked={config.autoFillFields[key]} onChange={(event) => updateAutoFillField(key, event.target.checked)} />
               {label}
             </label>
           ))}
@@ -367,10 +321,7 @@ export default function AIIntegrationPage() {
       </section>
 
       <section className="mt-4 rounded-2xl border border-slate-200 bg-slate-950 p-5 text-white">
-        <h2 className="text-base font-semibold">실시간 API 테스트</h2>
-        <p className="mt-1 text-sm text-slate-300">
-          저장된 키로 서버사이드 테스트를 실행합니다. 기본값은 `glm-4.7-flash`와 thinking 비활성입니다.
-        </p>
+        <h2 className="text-base font-semibold">API 테스트</h2>
         <div className="mt-4 grid gap-4 md:grid-cols-2">
           <Field label="테스트 모델">
             <input

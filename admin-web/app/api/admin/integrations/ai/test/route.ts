@@ -21,7 +21,7 @@ export async function POST(req: NextRequest) {
 
   const apiKey = asString(config.apiKey).trim();
   const baseUrl = asString(config.baseUrl, 'https://api.z.ai/api/paas/v4').trim();
-  const model = asString(body.model, asString(config.model, 'glm-4.7-flash')).trim();
+  const model = asString(body.model, asString(config.model, 'glm-4.7')).trim();
   const prompt = asString(body.prompt, '간단히 OK만 답해주세요.').trim();
   const disableThinking = Boolean(body.disableThinking ?? config.disableThinking ?? true);
 

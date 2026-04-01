@@ -270,13 +270,10 @@ export default function DashboardPage(): ReactElement {
     <div className="min-h-screen bg-stone-50 p-6">
       <div className="mx-auto max-w-7xl space-y-6">
         <section className="rounded-[28px] bg-[#0f172a] px-7 py-8 text-white shadow-sm">
-          <p className="text-xs font-semibold uppercase tracking-[0.25em] text-cyan-200">beta1 control tower</p>
-          <h1 className="mt-3 text-3xl font-bold">요청, 길러, 정산, 분쟁을 한 화면에서 보는 운영 관제</h1>
-          <p className="mt-3 max-w-3xl text-sm leading-6 text-slate-300">
-            즉시형과 예약형 요청, 길러 승급 병목, 분쟁과 출금 대기, AI 수동 검토를 같은 언어로 묶어서 운영자가 지금 무엇부터 봐야 하는지 바로 판단할 수 있게 정리했습니다.
-          </p>
+          <p className="text-xs font-semibold uppercase tracking-[0.25em] text-cyan-200">operations</p>
+          <h1 className="mt-3 text-3xl font-bold">운영 대시보드</h1>
           <div className="mt-5 flex flex-wrap gap-3">
-            <QuickLink href="/beta1/ai-review" label="beta1 AI 관제" />
+            <QuickLink href="/beta1/ai-review" label="AI 관제" />
             <QuickLink href="/disputes" label="분쟁 처리" />
             <QuickLink href="/deposits" label="보증금 운영" />
             <QuickLink href="/settlements" label="정산 운영" />
@@ -293,7 +290,7 @@ export default function DashboardPage(): ReactElement {
         <section className="grid gap-4 xl:grid-cols-3">
           <div className="rounded-[24px] bg-white p-6 shadow-sm xl:col-span-1">
             <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-400">warning panel</p>
-            <h2 className="mt-2 text-xl font-bold text-slate-900">즉시 확인이 필요한 운영 경고</h2>
+            <h2 className="mt-2 text-xl font-bold text-slate-900">운영 경고</h2>
             <div className="mt-5 grid gap-3 md:grid-cols-2 xl:grid-cols-1">
               {warnings.map((item) => (
                 <WarningCard key={item.title} item={item} />
@@ -303,7 +300,7 @@ export default function DashboardPage(): ReactElement {
 
           <div className="rounded-[24px] bg-white p-6 shadow-sm xl:col-span-1">
             <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-400">ops map</p>
-            <h2 className="mt-2 text-xl font-bold text-slate-900">최근 요청 구간 지도</h2>
+            <h2 className="mt-2 text-xl font-bold text-slate-900">최근 요청 지도</h2>
             {operationsMapUrl ? (
               <img
                 src={operationsMapUrl}
@@ -315,15 +312,11 @@ export default function DashboardPage(): ReactElement {
                 최근 요청 좌표가 아직 충분하지 않아 운영 지도를 표시하지 못하고 있습니다.
               </div>
             )}
-            <p className="mt-4 text-sm leading-6 text-slate-500">
-              픽업 지점은 <span className="font-semibold text-slate-700">P</span>, 도착 지점은
-              <span className="font-semibold text-slate-700"> D</span>로 표시됩니다.
-            </p>
           </div>
 
           <div className="rounded-[24px] bg-white p-6 shadow-sm xl:col-span-1">
             <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-400">integration readiness</p>
-            <h2 className="mt-2 text-xl font-bold text-slate-900">인증, 정산, AI 준비 상태</h2>
+            <h2 className="mt-2 text-xl font-bold text-slate-900">연동 상태</h2>
             <div className="mt-5 grid gap-4 md:grid-cols-2 xl:grid-cols-1">
               <IntegrationTile title="본인 확인" integration={dashboard?.integrations.identity} href="/integrations/identity" />
               <IntegrationTile title="계좌 인증" integration={dashboard?.integrations.bank} href="/integrations/bank" />
@@ -336,7 +329,7 @@ export default function DashboardPage(): ReactElement {
         <section className="grid gap-4 xl:grid-cols-[1.05fr_0.95fr]">
           <div className="rounded-[24px] bg-white p-6 shadow-sm">
             <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-400">upgrade funnel</p>
-            <h2 className="mt-2 text-xl font-bold text-slate-900">회원가입부터 길러 승급까지의 병목</h2>
+            <h2 className="mt-2 text-xl font-bold text-slate-900">승급 병목</h2>
             <div className="mt-5 grid gap-4 md:grid-cols-2">
               <MetricTile title="본인 확인 대기" value={`${dashboard?.onboarding.identityPending ?? 0}`} caption="CI/PASS 또는 테스트 우회 처리가 아직 끝나지 않은 사용자 수" />
               <MetricTile title="계좌 인증 대기" value={`${dashboard?.onboarding.identityDoneBankPending ?? 0}`} caption="본인 확인은 끝났지만 정산 계좌 준비가 남아 있는 사용자 수" />
@@ -352,7 +345,7 @@ export default function DashboardPage(): ReactElement {
 
           <div className="rounded-[24px] bg-white p-6 shadow-sm">
             <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-400">beta1 infrastructure</p>
-            <h2 className="mt-2 text-xl font-bold text-slate-900">엔진과 데이터 준비 상태</h2>
+            <h2 className="mt-2 text-xl font-bold text-slate-900">엔진 상태</h2>
             <div className="mt-5 grid gap-4 md:grid-cols-2">
               <MetricTile
                 title="역 카탈로그"
@@ -392,7 +385,7 @@ export default function DashboardPage(): ReactElement {
 
           <div className="rounded-[24px] bg-white p-6 shadow-sm">
             <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-400">next moves</p>
-            <h2 className="mt-2 text-xl font-bold text-slate-900">바로 이어 볼 운영 화면</h2>
+            <h2 className="mt-2 text-xl font-bold text-slate-900">바로가기</h2>
             <div className="mt-5 space-y-4">
               <TaskCard title="beta1 AI 관제" body="저신뢰 분석, 선택된 견적, actor 결정, 활성 미션을 한 번에 확인합니다." href="/beta1/ai-review" />
               <TaskCard title="분쟁 처리" body="책임 주체, 보상 금액, 보증금 환불·차감 판단을 바로 진행합니다." href="/disputes" />
