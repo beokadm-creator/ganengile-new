@@ -691,7 +691,7 @@ export async function getBeta1HomeSnapshot(userId: string, role: 'requester' | '
       id: String(mission.id),
       title: missionType === 'locker_dropoff' || missionType === 'locker_pickup' ? '거점 연계 미션' : '이동 구간 미션',
       status: missionStatus,
-      windowLabel: missionStatus === 'queued' ? '지금 수락 가능' : '진행 시간 조정 중',
+      windowLabel: missionStatus === 'queued' ? '지금 수락 가능' : '시간 확인 필요',
       rewardLabel: `${recommendedReward.toLocaleString()}원`,
       strategyTitle,
       strategyBody,
@@ -700,16 +700,16 @@ export async function getBeta1HomeSnapshot(userId: string, role: 'requester' | '
 
   return {
     role,
-    headline: role === 'requester' ? '?좏깮留??섎㈃ ?섎뒗 beta1 諛곗넚' : '媛??湲몄뿉 ?곌껐?섎뒗 誘몄뀡 蹂대뱶',
+    headline: role === 'requester' ? '선택만 하면 되는 배송' : '가는길에 미션 보드',
     subheadline: role === 'requester'
-      ? '?붿껌 珥덉븞, 媛寃?移대뱶, 吏꾪뻾 ETA瑜???踰덉뿉 遊낅땲??'
-      : '?꾩껜 諛곗넚???꾨땲??吏湲?媛?ν븳 援ш컙 誘몄뀡留?蹂댁뿬以띾땲??',
+      ? '요청, 가격, 진행 상태만 간단히 확인하세요.'
+      : '지금 확인할 미션만 보여드립니다.',
     activeRequestCount: activeRequests.length,
     activeMissionCount: activeMissions.length,
     pendingRewardTotal: activeMissions.reduce((sum, mission) => sum + Number(mission.currentReward ?? 0), 0),
     recommendations: role === 'requester'
-      ? ['즉시형은 빠른 재매칭과 SLA를 먼저 보고, 예약형은 시간대 적합성과 안정성을 먼저 봅니다.', '사물함 포함 옵션은 대면 실패 위험을 줄이고 예약형과도 잘 맞습니다.']
-      : ['예약형 미션은 시간 약속과 handover 안정성이 중요합니다.', '즉시형 미션은 연속 번들보다 빠른 수락과 이동 리듬이 더 중요합니다.'],
+      ? ['급하면 즉시 요청, 아니면 예약 요청이 더 잘 맞습니다.', '사물함 옵션은 대면 인계 부담을 줄여줍니다.']
+      : ['바로 받을 수 있는 미션부터 확인하세요.', '시간 조율이 필요한 제안은 아래에서 따로 확인할 수 있습니다.'],
     requestCards,
     missionCards,
     wallet,
@@ -737,7 +737,7 @@ export async function getBeta1ChatContext(chatRoomId: string): Promise<Beta1Chat
   return {
     title: roomData.requestInfo
       ? `${roomData.requestInfo.from} ??${roomData.requestInfo.to}`
-      : 'beta1 梨꾪똿',
+      : '가는길에 채팅',
     subtitle: status === 'match_pending'
       ? '媛寃⑷낵 誘몄뀡 援ъ“瑜??④퍡 ?뺤씤?섎뒗 ?묒쓽 梨꾪똿'
       : '?멸퀎? ETA 以묒떖???ㅽ뻾 梨꾪똿',

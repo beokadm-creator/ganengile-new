@@ -1,27 +1,27 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import {
-  View,
-  Text,
-  StyleSheet,
-  TouchableOpacity,
   ActivityIndicator,
   Alert,
   ScrollView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
-import { requireUserId } from '../../services/firebase';
-import { getAllStations } from '../../services/config-service';
-import { createRoute } from '../../services/route-service';
-import type { MainStackWithTabNavigationProp } from '../../types/navigation';
-import type { Station } from '../../types/config';
-import type { StationInfo } from '../../types/route';
-import { Colors, Spacing, Typography, BorderRadius } from '../../theme';
+
+import AppTopBar from '../../components/common/AppTopBar';
 import Button from '../../components/common/Button';
-import TimePicker from '../../components/common/TimePicker';
 import DaySelector, { DAY_LABELS } from '../../components/common/DaySelector';
 import StationSelectModal from '../../components/common/StationSelectModal';
-import AppTopBar from '../../components/common/AppTopBar';
-import { Shadows } from '../../theme';
+import TimePicker from '../../components/common/TimePicker';
+import { getAllStations } from '../../services/config-service';
+import { requireUserId } from '../../services/firebase';
+import { createRoute } from '../../services/route-service';
+import { BorderRadius, Colors, Shadows, Spacing, Typography } from '../../theme';
+import type { Station } from '../../types/config';
+import type { MainStackWithTabNavigationProp } from '../../types/navigation';
+import type { StationInfo } from '../../types/route';
 
 type PickTarget = 'start' | 'end' | null;
 
@@ -49,43 +49,43 @@ export default function AddRouteScreen() {
   const [selectedDays, setSelectedDays] = useState<number[]>([1, 2, 3, 4, 5]);
 
   useEffect(() => {
+    const loadStations = async () => {
+      try {
+        setLoading(true);
+        const stationList = await getAllStations();
+        setStations(stationList);
+      } catch (error) {
+        console.error('Failed to load stations', error);
+        Alert.alert('역 정보를 불러오지 못했습니다', '잠시 후 다시 시도해주세요.');
+      } finally {
+        setLoading(false);
+      }
+    };
+
     void loadStations();
   }, []);
 
   const routeSummary = useMemo(() => {
     if (!startStation || !endStation) {
-      return null;
+      return '출발역과 도착역을 선택해주세요.';
     }
 
-    return `${startStation.stationName} → ${endStation.stationName}`;
-  }, [startStation, endStation]);
-
-  const loadStations = async () => {
-    try {
-      setLoading(true);
-      const stationList = await getAllStations();
-      setStations(stationList);
-    } catch (error) {
-      console.error('역 목록 로드 실패:', error);
-      Alert.alert('역 정보를 불러오지 못했어요', '잠시 후 다시 시도해 주세요.');
-    } finally {
-      setLoading(false);
-    }
-  };
+    return `${startStation.stationName} -> ${endStation.stationName}`;
+  }, [endStation, startStation]);
 
   const handleSave = async () => {
     if (!startStation || !endStation) {
-      Alert.alert('출발역과 도착역을 선택해 주세요');
+      Alert.alert('역을 선택해주세요', '출발역과 도착역을 먼저 선택해주세요.');
       return;
     }
 
     if (startStation.stationId === endStation.stationId) {
-      Alert.alert('같은 역으로는 경로를 만들 수 없어요', '서로 다른 역을 선택해 주세요.');
+      Alert.alert('역을 다시 선택해주세요', '출발역과 도착역은 다르게 선택해야 합니다.');
       return;
     }
 
     if (selectedDays.length === 0) {
-      Alert.alert('운행 요일을 하나 이상 선택해 주세요');
+      Alert.alert('요일을 선택해주세요', '운행 요일을 하나 이상 선택해주세요.');
       return;
     }
 
@@ -100,26 +100,20 @@ export default function AddRouteScreen() {
         selectedDays,
       );
 
-      Alert.alert(
-        '경로를 등록했어요',
-        `${startStation.stationName} → ${endStation.stationName}\n${departureTime} 출발 · ${selectedDays
-          .map((day) => DAY_LABELS[day])
-          .join(', ')}`,
-        [
-          {
-            text: '확인',
-            onPress: () =>
-              navigation.navigate('Tabs', {
-                screen: 'RouteManagement',
-                params: { justAddedRouteId: createdRoute.routeId },
-              }),
-          },
-        ],
-      );
+      Alert.alert('경로를 등록했어요', `${routeSummary}\n${departureTime} 출발`, [
+        {
+          text: '확인',
+          onPress: () =>
+            navigation.navigate('Tabs', {
+              screen: 'RouteManagement',
+              params: { justAddedRouteId: createdRoute.routeId },
+            }),
+        },
+      ]);
     } catch (error) {
       Alert.alert(
         '경로 등록에 실패했어요',
-        error instanceof Error ? error.message : '잠시 후 다시 시도해 주세요.',
+        error instanceof Error ? error.message : '잠시 후 다시 시도해주세요.',
       );
     } finally {
       setSaving(false);
@@ -130,7 +124,7 @@ export default function AddRouteScreen() {
     return (
       <View style={styles.centerContainer}>
         <ActivityIndicator size="large" color={Colors.primary} />
-        <Text style={styles.loadingText}>경로에 사용할 역을 불러오는 중입니다.</Text>
+        <Text style={styles.loadingText}>경로 정보를 불러오는 중입니다.</Text>
       </View>
     );
   }
@@ -139,23 +133,23 @@ export default function AddRouteScreen() {
     <View style={styles.container}>
       <AppTopBar title="경로 등록" onBack={() => navigation.goBack()} />
 
-      <ScrollView style={styles.content} contentContainerStyle={styles.contentInner} showsVerticalScrollIndicator={false}>
-        <View style={styles.heroCard}>
-          <Text style={styles.heroKicker}>가는길에</Text>
-          <Text style={styles.heroTitle}>새 경로 등록</Text>
-          <Text style={styles.heroSubtitle}>자주 이동하는 동선을 등록해 공간을 매칭받으세요.</Text>
-        </View>
+      <ScrollView
+        style={styles.content}
+        contentContainerStyle={styles.contentInner}
+        showsVerticalScrollIndicator={false}
+      >
         <View style={styles.card}>
-          <Text style={styles.sectionTitle}>기본 경로</Text>
+          <Text style={styles.sectionTitle}>이동 구간</Text>
+
           <TouchableOpacity
             style={styles.stationButton}
             onPress={() => setPickTarget('start')}
-            activeOpacity={0.8}
+            activeOpacity={0.85}
           >
             <View>
               <Text style={styles.stationLabel}>출발역</Text>
               <Text style={styles.stationValue}>
-                {startStation?.stationName ?? '출발역을 선택해 주세요'}
+                {startStation?.stationName ?? '출발역 선택'}
               </Text>
             </View>
             <Text style={styles.stationAction}>선택</Text>
@@ -164,12 +158,12 @@ export default function AddRouteScreen() {
           <TouchableOpacity
             style={styles.stationButton}
             onPress={() => setPickTarget('end')}
-            activeOpacity={0.8}
+            activeOpacity={0.85}
           >
             <View>
               <Text style={styles.stationLabel}>도착역</Text>
               <Text style={styles.stationValue}>
-                {endStation?.stationName ?? '도착역을 선택해 주세요'}
+                {endStation?.stationName ?? '도착역 선택'}
               </Text>
             </View>
             <Text style={styles.stationAction}>선택</Text>
@@ -181,20 +175,20 @@ export default function AddRouteScreen() {
             label="출발 시간"
             value={departureTime}
             onChange={setDepartureTime}
-            placeholder="출발 시간을 선택해 주세요"
+            placeholder="출발 시간을 선택해주세요."
             minuteInterval={10}
           />
           <DaySelector
             selectedDays={selectedDays}
             onChange={setSelectedDays}
             label="운행 요일"
-            hint="선택한 요일"
+            hint="반복되는 요일만 선택하세요."
           />
         </View>
 
         <View style={styles.summaryCard}>
-          <Text style={styles.summaryTitle}>등록 예정 경로</Text>
-          <Text style={styles.summaryRoute}>{routeSummary ?? '역을 먼저 선택해 주세요'}</Text>
+          <Text style={styles.summaryTitle}>등록 내용</Text>
+          <Text style={styles.summaryRoute}>{routeSummary}</Text>
           <Text style={styles.summaryMeta}>
             {departureTime} 출발 · {selectedDays.map((day) => DAY_LABELS[day]).join(', ')}
           </Text>
@@ -219,7 +213,7 @@ export default function AddRouteScreen() {
         onStationSelect={setStartStation}
         title="출발역 선택"
         stations={stations}
-        searchPlaceholder="출발역 이름을 검색해 주세요"
+        searchPlaceholder="출발역 검색"
       />
 
       <StationSelectModal
@@ -228,7 +222,7 @@ export default function AddRouteScreen() {
         onStationSelect={setEndStation}
         title="도착역 선택"
         stations={stations}
-        searchPlaceholder="도착역 이름을 검색해 주세요"
+        searchPlaceholder="도착역 검색"
       />
     </View>
   );
@@ -236,22 +230,84 @@ export default function AddRouteScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: Colors.background },
-  centerContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: Colors.background, padding: Spacing.xl },
-  loadingText: { marginTop: Spacing.md, color: Colors.textSecondary, textAlign: 'center' },
+  centerContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: Colors.background,
+    padding: Spacing.xl,
+  },
+  loadingText: {
+    marginTop: Spacing.md,
+    color: Colors.textSecondary,
+    textAlign: 'center',
+  },
   content: { flex: 1 },
-  contentInner: { padding: Spacing.lg, gap: Spacing.md, paddingBottom: Spacing['5xl'] },
-  heroCard: { backgroundColor: Colors.primaryMint, borderRadius: BorderRadius.xl, padding: Spacing.xl, ...Shadows.sm },
-  heroKicker: { color: Colors.primary, fontSize: Typography.fontSize.sm, fontWeight: '800', textTransform: 'uppercase', letterSpacing: 0.8 },
-  heroTitle: { color: Colors.textPrimary, fontSize: Typography.fontSize['2xl'], fontWeight: '800', marginTop: 4, marginBottom: 6 },
-  heroSubtitle: { color: Colors.textSecondary, ...Typography.body },
-  card: { backgroundColor: Colors.surface, borderRadius: BorderRadius.xl, padding: Spacing.lg, gap: Spacing.md, ...Shadows.sm },
-  sectionTitle: { fontSize: Typography.fontSize.lg, fontWeight: '800', color: Colors.textPrimary },
-  stationButton: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', borderWidth: 1, borderColor: Colors.border, borderRadius: BorderRadius.md, padding: Spacing.md, backgroundColor: Colors.surface, minHeight: 58 },
-  stationLabel: { fontSize: Typography.fontSize.xs, color: Colors.textSecondary, marginBottom: 4 },
-  stationValue: { fontSize: Typography.fontSize.base, color: Colors.textPrimary, fontWeight: '700' },
-  stationAction: { fontSize: Typography.fontSize.sm, color: Colors.primary, fontWeight: '700' },
-  summaryCard: { backgroundColor: Colors.surface, borderRadius: BorderRadius.xl, padding: Spacing.lg, ...Shadows.sm, borderWidth: 1, borderColor: Colors.primary },
-  summaryTitle: { fontSize: Typography.fontSize.sm, fontWeight: '700', color: Colors.primary, marginBottom: Spacing.xs },
-  summaryRoute: { fontSize: Typography.fontSize.lg, fontWeight: '800', color: Colors.textPrimary },
-  summaryMeta: { marginTop: Spacing.xs, fontSize: Typography.fontSize.sm, color: Colors.textSecondary },
+  contentInner: {
+    padding: Spacing.lg,
+    gap: Spacing.md,
+    paddingBottom: Spacing['5xl'],
+  },
+  card: {
+    backgroundColor: Colors.surface,
+    borderRadius: BorderRadius.xl,
+    padding: Spacing.lg,
+    gap: Spacing.md,
+    ...Shadows.sm,
+  },
+  sectionTitle: {
+    fontSize: Typography.fontSize.lg,
+    fontWeight: '800',
+    color: Colors.textPrimary,
+  },
+  stationButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    borderWidth: 1,
+    borderColor: Colors.border,
+    borderRadius: BorderRadius.md,
+    padding: Spacing.md,
+    backgroundColor: Colors.surface,
+    minHeight: 58,
+  },
+  stationLabel: {
+    fontSize: Typography.fontSize.xs,
+    color: Colors.textSecondary,
+    marginBottom: 4,
+  },
+  stationValue: {
+    fontSize: Typography.fontSize.base,
+    color: Colors.textPrimary,
+    fontWeight: '700',
+  },
+  stationAction: {
+    fontSize: Typography.fontSize.sm,
+    color: Colors.primary,
+    fontWeight: '700',
+  },
+  summaryCard: {
+    backgroundColor: Colors.surface,
+    borderRadius: BorderRadius.xl,
+    padding: Spacing.lg,
+    ...Shadows.sm,
+    borderWidth: 1,
+    borderColor: Colors.primary,
+  },
+  summaryTitle: {
+    fontSize: Typography.fontSize.sm,
+    fontWeight: '700',
+    color: Colors.primary,
+    marginBottom: Spacing.xs,
+  },
+  summaryRoute: {
+    fontSize: Typography.fontSize.lg,
+    fontWeight: '800',
+    color: Colors.textPrimary,
+  },
+  summaryMeta: {
+    marginTop: Spacing.xs,
+    fontSize: Typography.fontSize.sm,
+    color: Colors.textSecondary,
+  },
 });
