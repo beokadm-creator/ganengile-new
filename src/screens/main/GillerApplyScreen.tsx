@@ -466,7 +466,7 @@ function InputField({
         value={value}
         onChangeText={onChangeText}
         placeholder={placeholder}
-        placeholderTextcolor={Colors.textTertiary}
+        placeholderTextColor={Colors.textTertiary}
         multiline={multiline}
         keyboardType={keyboardType ?? 'default'}
         textAlignVertical={multiline ? 'top' : 'center'}

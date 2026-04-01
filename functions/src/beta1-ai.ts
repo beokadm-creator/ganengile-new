@@ -185,15 +185,39 @@ interface ZaiChatResult {
   content?: string;
 }
 
+function readMessageContent(content: unknown): string | undefined {
+  if (typeof content === 'string') {
+    return content;
+  }
+  if (!Array.isArray(content)) {
+    return undefined;
+  }
+
+  return (
+    content
+      .map((part) => {
+        if (typeof part === 'string') return part;
+        if (!part || typeof part !== 'object') return '';
+        const record = part as Record<string, unknown>;
+        if (typeof record.text === 'string') return record.text;
+        if (typeof record.content === 'string') return record.content;
+        return '';
+      })
+      .filter(Boolean)
+      .join('\n')
+      .trim() || undefined
+  );
+}
+
 const DEFAULT_AI_CONFIG: Beta1AIConfig = {
   enabled: false,
   provider: 'zai',
   apiKey: '',
-  baseUrl: 'https://api.z.ai/api/paas/v4',
-  model: 'glm-4.7-flash',
-  analysisModel: 'glm-4.7-flash',
-  pricingModel: 'glm-4.7-flash',
-  missionModel: 'glm-4.7-flash',
+  baseUrl: 'https://api.z.ai/api/coding/paas/v4',
+  model: 'glm-4.7',
+  analysisModel: 'glm-4.7',
+  pricingModel: 'glm-4.7',
+  missionModel: 'glm-4.7',
   disableThinking: true,
   confidenceThreshold: 0.75,
   fallbackMode: 'manual',
@@ -216,6 +240,20 @@ function normalizeBaseUrl(baseUrl: string): string {
     return trimmed;
   }
   return `${trimmed}/chat/completions`;
+}
+
+function toCodingBaseUrl(baseUrl: string): string {
+  const normalized = normalizeBaseUrl(baseUrl);
+  return normalized.replace('/api/paas/v4/chat/completions', '/api/coding/paas/v4/chat/completions');
+}
+
+function shouldRetryWithCodingBase(config: Beta1AIConfig, responseJson: Record<string, unknown>): boolean {
+  if ((config.provider ?? 'zai') !== 'zai') return false;
+  const normalized = normalizeBaseUrl(config.baseUrl);
+  if (!normalized.includes('/api/paas/v4/chat/completions')) return false;
+  const error = responseJson.error as Record<string, unknown> | undefined;
+  const code = typeof error?.code === 'string' ? error.code : '';
+  return code === '1113';
 }
 
 function extractJsonPayload(content?: string): string | null {
@@ -279,6 +317,7 @@ async function getAIConfig(db: FirestoreDb): Promise<Beta1AIConfig> {
 }
 
 async function runZaiChatCompletion(config: Beta1AIConfig, model: string, prompt: string, maxTokens: number): Promise<ZaiChatResult> {
+  async function perform(resolvedBaseUrl: string): Promise<{ result: ZaiChatResult; json?: Record<string, unknown> }> {
   const startedAt = Date.now();
   const fetchFn = (globalThis as { fetch?: (input: string, init?: Record<string, unknown>) => Promise<{
     ok: boolean;
@@ -288,26 +327,31 @@ async function runZaiChatCompletion(config: Beta1AIConfig, model: string, prompt
     throw new Error('Fetch is not available in this runtime.');
   }
 
-  const response = await fetchFn(normalizeBaseUrl(config.baseUrl), {
+  const requestBody: Record<string, unknown> = {
+    model,
+    messages: [
+      {
+        role: 'user',
+        content: prompt,
+      },
+    ],
+    max_tokens: maxTokens,
+    temperature: 0.1,
+  };
+
+  if ((config.provider ?? 'zai') === 'zai') {
+    requestBody.thinking = {
+      type: config.disableThinking === false ? 'enabled' : 'disabled',
+    };
+  }
+
+  const response = await fetchFn(resolvedBaseUrl, {
     method: 'POST',
     headers: {
       Authorization: `Bearer ${config.apiKey}`,
       'Content-Type': 'application/json',
     },
-    body: JSON.stringify({
-      model,
-      messages: [
-        {
-          role: 'user',
-          content: prompt,
-        },
-      ],
-      max_tokens: maxTokens,
-      temperature: 0.1,
-      thinking: {
-        type: config.disableThinking === false ? 'enabled' : 'disabled',
-      },
-    }),
+    body: JSON.stringify(requestBody),
   });
 
   const latencyMs = Date.now() - startedAt;
@@ -317,14 +361,39 @@ async function runZaiChatCompletion(config: Beta1AIConfig, model: string, prompt
   const message = (firstChoice.message ?? {}) as Record<string, unknown>;
 
   if (!response.ok) {
-    throw new Error(asString((json.error as Record<string, unknown> | undefined)?.message, 'AI request failed.'));
+      return {
+        result: {
+          ok: false,
+          latencyMs,
+          content: undefined,
+        },
+        json,
+      };
   }
 
-  return {
-    ok: true,
-    latencyMs,
-    content: asString(message.content),
-  };
+    return {
+      result: {
+        ok: true,
+        latencyMs,
+        content: readMessageContent(message.content),
+      },
+      json,
+    };
+  }
+
+  const primary = await perform(normalizeBaseUrl(config.baseUrl));
+  if (!primary.result.ok && primary.json && shouldRetryWithCodingBase(config, primary.json)) {
+    const retried = await perform(toCodingBaseUrl(config.baseUrl));
+    if (retried.result.ok) {
+      return retried.result;
+    }
+  }
+
+  if (!primary.result.ok) {
+    throw new Error(asString((primary.json?.error as Record<string, unknown> | undefined)?.message, 'AI request failed.'));
+  }
+
+  return primary.result;
 }
 
 function buildAnalysisFallback(input: Beta1RequestDraftAnalysisInput, config: Beta1AIConfig): Beta1RequestDraftAnalysisResult {
@@ -384,7 +453,7 @@ function isReservationMode(value?: string): boolean {
 
 function buildPricingFallback(input: Beta1PricingQuoteInput, config: Beta1AIConfig): Beta1PricingQuoteResult {
   const base = input.basePricing;
-  const deposit = base.depositAmount || Math.round((input.packageDraft?.estimatedValue ?? 0) * 0.1);
+  const deposit = base.depositAmount || Math.round(input.packageDraft?.estimatedValue ?? 0);
   const reservationMode = isReservationMode(input.requestMode);
   const urgencyBonus = input.urgency === 'high' ? 1200 : input.urgency === 'medium' ? 400 : 0;
   const lockerPreferred = input.directParticipationMode === 'locker_assisted';
@@ -451,7 +520,7 @@ function buildPricingFallback(input: Beta1PricingQuoteInput, config: Beta1AIConf
       includesAddressDropoff: false,
       pricing: {
         publicPrice: clampCurrency(base.publicPrice - 1300),
-        depositAmount: clampCurrency(deposit * 0.85),
+        depositAmount: clampCurrency(deposit),
         baseFee: base.baseFee,
         distanceFee: clampCurrency(base.distanceFee - 200),
         weightFee: base.weightFee,
@@ -519,7 +588,7 @@ function buildPricingFallback(input: Beta1PricingQuoteInput, config: Beta1AIConf
       lowPrice.recommendationReason = '급하지 않을수록 예약 전환의 비용 절감 효과가 커집니다.';
       lowPrice.etaMinutes = 150;
       lowPrice.pricing.publicPrice = clampCurrency(base.publicPrice - 1500);
-      lowPrice.pricing.depositAmount = clampCurrency(deposit * 0.8);
+      lowPrice.pricing.depositAmount = clampCurrency(deposit);
       lowPrice.pricing.urgencySurcharge = 0;
     }
 

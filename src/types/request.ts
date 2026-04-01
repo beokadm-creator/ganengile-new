@@ -63,6 +63,12 @@ export interface StationInfo {
   lng: number;
 }
 
+export interface DetailedAddress {
+  roadAddress: string;
+  detailAddress: string;
+  fullAddress: string;
+}
+
 /**
  * 배송 요청
  */
@@ -80,6 +86,8 @@ export interface Request {
   // 역 정보
   pickupStation: StationInfo;
   deliveryStation: StationInfo;
+  pickupAddress?: DetailedAddress;
+  deliveryAddress?: DetailedAddress;
 
   // 패키지 정보
   packageInfo: PackageInfo;
@@ -171,6 +179,8 @@ export interface CreateRequestData {
   requestMode?: 'immediate' | 'reservation';
   pickupStation: StationInfo;
   deliveryStation: StationInfo;
+  pickupAddress?: DetailedAddress;
+  deliveryAddress?: DetailedAddress;
   packageInfo: PackageInfo;
   initialNegotiationFee: number;
   feeBreakdown?: {

@@ -10,6 +10,9 @@ yarn-error.log*
 .expo-shared/
 dist/
 web-build/
+.firebase/
+.playwright-cli/
+.sisyphus/evidence/
 
 # Native
 *.orig.*
@@ -51,6 +54,7 @@ Thumbs.db
 # Temp
 *.log
 *.tmp
+missing.txt
 
 # Temporary project copies (59K+ files)
 ganengile-new-temp/

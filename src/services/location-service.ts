@@ -16,6 +16,11 @@ export interface StationLocation {
   longitude: number;
 }
 
+export interface NearbyStation<T extends StationLocation = StationLocation> {
+  station: T;
+  distanceMeters: number;
+}
+
 export class LocationService {
   private locationSubscription: Location.LocationSubscription | null = null;
 
@@ -161,6 +166,25 @@ export class LocationService {
     }
 
     return nearestStation;
+  }
+
+  findNearestStations<T extends StationLocation>(
+    currentLocation: LocationData,
+    stations: T[],
+    limit: number = 3
+  ): Array<NearbyStation<T>> {
+    return stations
+      .map((station) => ({
+        station,
+        distanceMeters: this.calculateDistance(
+          currentLocation.latitude,
+          currentLocation.longitude,
+          station.latitude,
+          station.longitude
+        ),
+      }))
+      .sort((a, b) => a.distanceMeters - b.distanceMeters)
+      .slice(0, Math.max(1, limit));
   }
 
   async reverseGeocode(latitude: number, longitude: number): Promise<string> {

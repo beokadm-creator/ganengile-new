@@ -201,6 +201,31 @@ export interface SendPushNotificationResult {
   reason?: string;
 }
 
+export interface RequestPhoneOtpData {
+  phoneNumber: string;
+}
+
+export interface RequestPhoneOtpResult {
+  success: boolean;
+  sessionId: string;
+  expiresAt: string;
+  resendAvailableAt: string;
+  maskedDestination: string;
+  testCode?: string;
+}
+
+export interface ConfirmPhoneOtpData {
+  sessionId: string;
+  phoneNumber: string;
+  code: string;
+}
+
+export interface ConfirmPhoneOtpResult {
+  success: boolean;
+  verificationToken: string;
+  verifiedAt: string;
+}
+
 // ==================== Pricing Types ====================
 
 export interface PricingOptions {

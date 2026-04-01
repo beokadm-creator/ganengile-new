@@ -124,7 +124,7 @@ export interface Deposit {
 
   // 금액
   itemValue: number;          // 물건 가치 (원)
-  depositAmount: number;       // 보증금 금액 (원, 물건 가치의 80%)
+  depositAmount: number;       // 보증금 금액 (원, 물건 가치의 100%)
 
   // 결제 정보
   paymentMethod: DepositPaymentMethod;
@@ -156,7 +156,7 @@ export interface Deposit {
 /**
  * 보증금 비율
  */
-export const DEPOSIT_RATE = 0.8;  // 80%
+export const DEPOSIT_RATE = 1;  // 100%
 
 /**
  * 출금 최소 금액

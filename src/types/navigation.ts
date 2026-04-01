@@ -98,6 +98,7 @@ export type MainStackParamList = {
   GillerLevelUpgrade: undefined;
   CustomerService: undefined;
   Terms: undefined;
+  AddressBook: undefined;
   RequestConfirmation: {
     requestId: string;
     pickupStationName?: string;

@@ -37,6 +37,7 @@ import MyRatingScreen from '../screens/main/MyRatingScreen';
 import BadgeCollectionScreen from '../screens/main/BadgeCollectionScreen';
 import CustomerServiceScreen from '../screens/main/CustomerServiceScreen';
 import TermsScreen from '../screens/main/TermsScreen';
+import AddressBookScreen from '../screens/main/AddressBookScreen';
 import DepositPaymentScreen from '../screens/main/DepositPaymentScreen';
 import PointHistoryScreen from '../screens/main/PointHistoryScreen';
 import PointWithdrawScreen from '../screens/main/PointWithdrawScreen';
@@ -89,6 +90,7 @@ const SCREEN_TITLES: Record<string, string> = {
   GillerLevelUpgrade: '길러 승급',
   CustomerService: '고객센터',
   Terms: '약관 및 정책',
+  AddressBook: '주소록 관리',
   GillerPickupFromLocker: '사물함 픽업',
   GillerDropoffAtLocker: '사물함 보관',
   GillerPickupAtLocker: '사물함 회수',
@@ -351,6 +353,11 @@ export default function MainNavigator() {
         options={{ headerShown: true }}
       />
       <Stack.Screen name="Terms" component={TermsScreen} options={{ headerShown: true }} />
+      <Stack.Screen
+        name="AddressBook"
+        component={AddressBookScreen}
+        options={{ headerShown: false }}
+      />
       <Stack.Screen
         name="GillerDropoffAtLocker"
         component={GillerDropoffAtLockerScreen}

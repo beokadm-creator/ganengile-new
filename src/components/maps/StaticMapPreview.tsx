@@ -21,8 +21,8 @@ interface StaticMapPreviewProps {
 function buildMarkerParam(markers: StaticMapMarker[]): string {
   return markers
     .map((marker, index) => {
-      const label = encodeURIComponent((marker.label ?? `${index + 1}`).slice(0, 10));
-      return `${marker.longitude},${marker.latitude},${label}`;
+      const normalized = (marker.label ?? `${index + 1}`).toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 1) || `${(index + 1) % 10}`;
+      return `type:d|size:mid|color:Default|label:${normalized}|pos:${marker.longitude} ${marker.latitude}`;
     })
     .join('|');
 }

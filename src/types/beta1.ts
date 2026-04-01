@@ -139,6 +139,8 @@ export interface LocationRef {
   stationName?: string;
   lockerId?: string;
   addressText?: string;
+  roadAddress?: string;
+  detailAddress?: string;
   latitude?: number;
   longitude?: number;
 }

@@ -36,6 +36,10 @@ import {
   RejectMatchResult,
   CompleteMatchData,
   CompleteMatchResult,
+  RequestPhoneOtpData,
+  RequestPhoneOtpResult,
+  ConfirmPhoneOtpData,
+  ConfirmPhoneOtpResult,
 } from './types';
 import {
   executeMissionPlanning,
@@ -72,6 +76,15 @@ const CI_PASS_URL_PARAM = defineString('CI_PASS_URL', { default: '' });
 const CI_KAKAO_URL_PARAM = defineString('CI_KAKAO_URL', { default: '' });
 const NAVER_MAP_CLIENT_ID_PARAM = defineString('NAVER_MAP_CLIENT_ID', { default: '' });
 const NAVER_MAP_CLIENT_SECRET_PARAM = defineString('NAVER_MAP_CLIENT_SECRET', { default: '' });
+const JUSO_API_KEY_PARAM = defineString('JUSO_API_KEY', { default: '' });
+const OTP_TEST_CODE_PARAM = defineString('OTP_TEST_CODE', { default: '123456' });
+const OTP_TEST_MODE_PARAM = defineString('OTP_TEST_MODE', { default: 'true' });
+
+const OTP_SESSION_COLLECTION = 'otp_verifications';
+const OTP_LENGTH = 6;
+const OTP_TTL_MS = 1000 * 60 * 5;
+const OTP_RESEND_MS = 1000 * 45;
+const OTP_MAX_ATTEMPTS = 5;
 
 function getRequestDayOfWeek(request: DeliveryRequest): string {
   const requestDate = request.requestTime?.toDate?.() ?? new Date();
@@ -120,6 +133,37 @@ function readPositiveInteger(value: string, fallback: number, min: number, max: 
   return Math.min(max, Math.max(min, parsed));
 }
 
+function normalizePhoneNumber(phoneNumber: string): string {
+  return phoneNumber.replace(/\D/g, '');
+}
+
+function maskPhoneNumber(phoneNumber: string): string {
+  if (phoneNumber.length < 7) {
+    return phoneNumber;
+  }
+
+  return `${phoneNumber.slice(0, 3)}-${phoneNumber.slice(3, 4)}**-${phoneNumber.slice(-4)}`;
+}
+
+function isValidKoreanMobileNumber(phoneNumber: string): boolean {
+  return /^010\d{8}$/.test(phoneNumber);
+}
+
+function hashOtpCode(sessionId: string, code: string): string {
+  return createHash('sha256').update(`${sessionId}:${code}`).digest('hex');
+}
+
+function createOtpCode(): string {
+  const max = 10 ** OTP_LENGTH;
+  const code = Math.floor(Math.random() * max);
+  return String(code).padStart(OTP_LENGTH, '0');
+}
+
+function isOtpTestModeEnabled(): boolean {
+  const raw = (OTP_TEST_MODE_PARAM.value() || process.env.OTP_TEST_MODE || 'true').trim().toLowerCase();
+  return raw !== 'false';
+}
+
 function buildNaverStaticMapUrl(query: {
   center: string;
   level: string;
@@ -141,6 +185,23 @@ function buildNaverStaticMapUrl(query: {
   }
 
   return `https://maps.apigw.ntruss.com/map-static/v2/raster?${params.toString()}`;
+}
+
+function buildJusoSearchUrl(query: {
+  confmKey: string;
+  keyword: string;
+  currentPage: string;
+  countPerPage: string;
+}): string {
+  const params = new URLSearchParams({
+    confmKey: query.confmKey,
+    keyword: query.keyword,
+    currentPage: query.currentPage,
+    countPerPage: query.countPerPage,
+    resultType: 'json',
+  });
+
+  return `https://business.juso.go.kr/addrlink/addrLinkApi.do?${params.toString()}`;
 }
 
 function fetchBinary(url: string, headers: Record<string, string>): Promise<{ statusCode: number; contentType: string; body: Buffer }> {
@@ -2275,7 +2336,7 @@ export const issueKakaoCustomToken = functions.https.onCall(
   ): Promise<{ customToken: string; uid: string; isNewUser: boolean }> => {
     const accessToken = typeof data?.accessToken === 'string' ? data.accessToken.trim() : '';
     const expectedKakaoId = typeof data?.expectedKakaoId === 'string' ? data.expectedKakaoId.trim() : '';
-    const role = data?.role === 'gller' || data?.role === 'giller' || data?.role === 'both' ? data.role : 'both';
+    const role = data?.role === 'gller' || data?.role === 'giller' || data?.role === 'both' ? data.role : 'gller';
     const providedName = typeof data?.name === 'string' ? data.name.trim() : '';
     const providedPhoneNumber = typeof data?.phoneNumber === 'string' ? data.phoneNumber.trim() : '';
 
@@ -2332,14 +2393,16 @@ export const issueKakaoCustomToken = functions.https.onCall(
         email,
         name: providedName || nickname,
         phoneNumber: providedPhoneNumber || existingData.phoneNumber || '',
-        role,
-        authProvider: 'kakao',
+          role,
+          gillerApplicationStatus: existingData.gillerApplicationStatus ?? 'none',
+          authProvider: 'kakao',
         authProviderUserId: kakaoId,
         signupMethod: 'kakao',
         providerLinkedAt: now,
         profilePhoto: profileImage || existingData.profilePhoto || '',
-        updatedAt: now,
-        isActive: true,
+          updatedAt: now,
+          isActive: true,
+          isVerified: existingData.isVerified ?? false,
         hasCompletedOnboarding: existing.exists ? existingData.hasCompletedOnboarding ?? false : false,
         agreedTerms: existing.exists
           ? existingData.agreedTerms ?? { giller: false, gller: false, privacy: false, marketing: false }
@@ -2436,6 +2499,57 @@ export const naverStaticMapProxy = functions.https.onRequest(async (req, res) =>
   } catch (error) {
     console.error('naverStaticMapProxy error:', error);
     res.status(500).json({ ok: false, message: 'failed to render static map' });
+  }
+});
+
+/**
+ * HTTP: Road-name address search proxy for Juso API
+ * Keeps the confirmation key on the server while the client searches by keyword.
+ */
+export const jusoAddressSearchProxy = functions.https.onRequest(async (req, res) => {
+  try {
+    res.set('Access-Control-Allow-Origin', '*');
+    res.set('Access-Control-Allow-Methods', 'GET,OPTIONS');
+    res.set('Access-Control-Allow-Headers', 'Content-Type');
+
+    if (req.method === 'OPTIONS') {
+      res.status(204).send('');
+      return;
+    }
+
+    const apiKey = JUSO_API_KEY_PARAM.value() || process.env.JUSO_API_KEY || '';
+    if (!apiKey) {
+      res.status(503).json({ ok: false, message: 'juso api key is not configured' });
+      return;
+    }
+
+    const keyword = readFirstQueryValue(req.query.keyword).trim();
+    if (keyword.length < 2) {
+      res.status(400).json({ ok: false, message: 'keyword must be at least 2 characters' });
+      return;
+    }
+
+    const currentPage = String(readPositiveInteger(readFirstQueryValue(req.query.currentPage), 1, 1, 100));
+    const countPerPage = String(readPositiveInteger(readFirstQueryValue(req.query.countPerPage), 10, 1, 100));
+
+    const jusoUrl = buildJusoSearchUrl({
+      confmKey: apiKey,
+      keyword,
+      currentPage,
+      countPerPage,
+    });
+
+    const payload = await fetchJson(jusoUrl, {
+      headers: {
+        Accept: 'application/json',
+      },
+    });
+
+    res.set('Cache-Control', 'public, max-age=60, s-maxage=60');
+    res.status(200).json(payload);
+  } catch (error) {
+    console.error('jusoAddressSearchProxy error:', error);
+    res.status(500).json({ ok: false, message: 'failed to search road addresses' });
   }
 });
 
@@ -2562,6 +2676,154 @@ export const completeCiVerificationTest = functions.https.onCall(
     });
 
     return { ok: true, ciHash };
+  }
+);
+
+export const requestPhoneOtp = functions.https.onCall(
+  async (data: RequestPhoneOtpData): Promise<RequestPhoneOtpResult> => {
+    const phoneNumber = normalizePhoneNumber(data?.phoneNumber ?? '');
+    if (!isValidKoreanMobileNumber(phoneNumber)) {
+      throw new functions.https.HttpsError('invalid-argument', 'A valid Korean mobile number is required');
+    }
+
+    const testMode = isOtpTestModeEnabled();
+    const now = Date.now();
+    const sessionQuery = await db
+      .collection(OTP_SESSION_COLLECTION)
+      .where('phoneNumber', '==', phoneNumber)
+      .where('status', '==', 'pending')
+      .get();
+
+    if (!sessionQuery.empty) {
+      const latestPending = sessionQuery.docs
+        .sort((left, right) => {
+          const leftTime = left.get('createdAt')?.toDate?.().getTime?.() ?? 0;
+          const rightTime = right.get('createdAt')?.toDate?.().getTime?.() ?? 0;
+          return rightTime - leftTime;
+        })[0];
+      const latestData = latestPending.data() as { resendAvailableAt?: admin.firestore.Timestamp };
+      const resendAvailableAt = latestData.resendAvailableAt?.toDate().getTime() ?? 0;
+
+      if (resendAvailableAt > now) {
+        throw new functions.https.HttpsError(
+          'resource-exhausted',
+          'OTP was requested too recently. Please wait before requesting another code.'
+        );
+      }
+    }
+
+    const sessionId = randomUUID();
+    const code = testMode ? OTP_TEST_CODE_PARAM.value() || '123456' : createOtpCode();
+    const nowDate = new Date(now);
+    const expiresAt = new Date(now + OTP_TTL_MS);
+    const resendAvailableAt = new Date(now + OTP_RESEND_MS);
+
+    await db.collection(OTP_SESSION_COLLECTION).doc(sessionId).set({
+      sessionId,
+      phoneNumber,
+      maskedDestination: maskPhoneNumber(phoneNumber),
+      codeHash: hashOtpCode(sessionId, code),
+      status: 'pending',
+      attemptsRemaining: OTP_MAX_ATTEMPTS,
+      createdAt: admin.firestore.Timestamp.fromDate(nowDate),
+      updatedAt: admin.firestore.Timestamp.fromDate(nowDate),
+      expiresAt: admin.firestore.Timestamp.fromDate(expiresAt),
+      resendAvailableAt: admin.firestore.Timestamp.fromDate(resendAvailableAt),
+      deliveryProvider: testMode ? 'test' : 'manual',
+    });
+
+    console.warn(`[OTP] issued session=${sessionId} destination=${maskPhoneNumber(phoneNumber)} mode=${testMode ? 'test' : 'manual'} code=${code}`);
+
+    return {
+      success: true,
+      sessionId,
+      expiresAt: expiresAt.toISOString(),
+      resendAvailableAt: resendAvailableAt.toISOString(),
+      maskedDestination: maskPhoneNumber(phoneNumber),
+      ...(testMode ? { testCode: code } : {}),
+    };
+  }
+);
+
+export const confirmPhoneOtp = functions.https.onCall(
+  async (data: ConfirmPhoneOtpData): Promise<ConfirmPhoneOtpResult> => {
+    const sessionId = typeof data?.sessionId === 'string' ? data.sessionId.trim() : '';
+    const phoneNumber = normalizePhoneNumber(data?.phoneNumber ?? '');
+    const code = typeof data?.code === 'string' ? data.code.trim() : '';
+
+    if (!sessionId || !isValidKoreanMobileNumber(phoneNumber) || !/^\d{6}$/.test(code)) {
+      throw new functions.https.HttpsError('invalid-argument', 'sessionId, phoneNumber, and a 6-digit code are required');
+    }
+
+    const sessionRef = db.collection(OTP_SESSION_COLLECTION).doc(sessionId);
+    const sessionSnapshot = await sessionRef.get();
+    if (!sessionSnapshot.exists) {
+      throw new functions.https.HttpsError('not-found', 'OTP session was not found');
+    }
+
+    const session = sessionSnapshot.data() as {
+      phoneNumber?: string;
+      codeHash?: string;
+      status?: string;
+      expiresAt?: admin.firestore.Timestamp;
+      attemptsRemaining?: number;
+    };
+
+    if (session.phoneNumber !== phoneNumber) {
+      throw new functions.https.HttpsError('permission-denied', 'Phone number does not match this session');
+    }
+
+    if (session.status !== 'pending') {
+      throw new functions.https.HttpsError('failed-precondition', 'This OTP session is no longer active');
+    }
+
+    const expiresAt = session.expiresAt?.toDate().getTime() ?? 0;
+    if (!expiresAt || expiresAt < Date.now()) {
+      await sessionRef.set(
+        {
+          status: 'expired',
+          updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+        },
+        { merge: true }
+      );
+      throw new functions.https.HttpsError('deadline-exceeded', 'OTP code has expired');
+    }
+
+    const expectedHash = hashOtpCode(sessionId, code);
+    if (!session.codeHash || session.codeHash !== expectedHash) {
+      const nextAttempts = Math.max((session.attemptsRemaining ?? OTP_MAX_ATTEMPTS) - 1, 0);
+      await sessionRef.set(
+        {
+          attemptsRemaining: nextAttempts,
+          status: nextAttempts === 0 ? 'locked' : 'pending',
+          updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+        },
+        { merge: true }
+      );
+
+      throw new functions.https.HttpsError(
+        nextAttempts === 0 ? 'permission-denied' : 'invalid-argument',
+        nextAttempts === 0 ? 'Too many invalid OTP attempts' : 'OTP code is invalid'
+      );
+    }
+
+    const verifiedAt = new Date();
+    const verificationToken = randomUUID();
+    await sessionRef.set(
+      {
+        status: 'verified',
+        verifiedAt: admin.firestore.Timestamp.fromDate(verifiedAt),
+        verificationToken,
+        updatedAt: admin.firestore.Timestamp.fromDate(verifiedAt),
+      },
+      { merge: true }
+    );
+
+    return {
+      success: true,
+      verificationToken,
+      verifiedAt: verifiedAt.toISOString(),
+    };
   }
 );
 

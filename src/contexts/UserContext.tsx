@@ -36,12 +36,32 @@ const STORAGE_KEYS_TO_CLEAR = [
   'currentRole',
 ];
 
+function canUseGillerRole(user: User | null): boolean {
+  if (!user) {
+    return false;
+  }
+
+  return (
+    user.role === UserRole.GILLER ||
+    user.role === UserRole.BOTH ||
+    (user.gillerApplicationStatus === 'approved' && user.isVerified === true)
+  );
+}
+
 function resolveActiveRole(user: User | null): UserRole | null {
   if (!user) {
     return null;
   }
 
-  return user.role === UserRole.BOTH ? UserRole.GLER : (user.role ?? null);
+  if (user.role === UserRole.GILLER) {
+    return UserRole.GILLER;
+  }
+
+  if (canUseGillerRole(user)) {
+    return UserRole.GLER;
+  }
+
+  return user.role ?? null;
 }
 
 async function clearStoredSession(): Promise<void> {
@@ -151,7 +171,21 @@ export function UserProvider({ children }: UserProviderProps) {
   };
 
   const switchRole = (role: UserRole) => {
-    if (user?.role === UserRole.BOTH) {
+    if (!user) {
+      return;
+    }
+
+    if (role === UserRole.GILLER && canUseGillerRole(user)) {
+      setCurrentRole(UserRole.GILLER);
+      return;
+    }
+
+    if (role === UserRole.GLER) {
+      setCurrentRole(UserRole.GLER);
+      return;
+    }
+
+    if (user.role === UserRole.BOTH) {
       setCurrentRole(role);
     }
   };

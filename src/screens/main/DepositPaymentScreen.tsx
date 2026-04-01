@@ -62,7 +62,16 @@ export default function DepositPaymentScreen({ navigation, route }: { navigation
         Alert.alert('결제 실패', result.error ?? '보증금 결제 중 문제가 발생했습니다.');
         return;
       }
-      Alert.alert('보증금 결제 완료', result.deposit?.paymentMethod === DepositPaymentMethod.MIXED ? '포인트와 결제 경로를 함께 사용해 보증금 준비를 마쳤습니다. 이후 최종 이체와 차감 판단은 운영 검토를 거칩니다.' : '보증금 준비가 완료되었습니다. 이후 배송 결과와 운영 판단에 따라 이체 또는 차감으로 이어집니다.', [{ text: '정산 보기', onPress: () => navigation.navigate('Earnings') }, { text: '닫기', onPress: () => navigation.goBack() }]);
+      Alert.alert(
+        '보증금 결제 완료',
+        result.deposit?.paymentMethod === DepositPaymentMethod.MIXED
+          ? '포인트와 결제를 함께 사용해 보증금 결제가 완료되었습니다. 길러가 결제한 보증금은 배송 완료 후 반환되며, 분실이나 훼손 같은 사고가 확인된 경우에만 운영 검토 후 차감됩니다.'
+          : '보증금 결제가 완료되었습니다. 길러가 결제한 보증금은 배송 완료 후 반환되며, 분실이나 훼손 같은 사고가 확인된 경우에만 운영 검토 후 차감됩니다.',
+        [
+          { text: '정산 보기', onPress: () => navigation.navigate('Earnings') },
+          { text: '닫기', onPress: () => navigation.goBack() },
+        ]
+      );
     } catch (error) {
       Alert.alert('오류', error instanceof Error ? error.message : '보증금 결제 중 문제가 발생했습니다.');
     } finally {
@@ -75,7 +84,7 @@ export default function DepositPaymentScreen({ navigation, route }: { navigation
       <View style={styles.hero}>
         <Text style={styles.kicker}>가는길에 보증금</Text>
         <Text style={styles.title}>보증금 결제</Text>
-        <Text style={styles.subtitle}>배송 시작 전에 필요한 보증금입니다. 결제 준비 상태와 이후 정산 연결을 한 번에 확인합니다.</Text>
+        <Text style={styles.subtitle}>배송 시작 전에 물건 가치 전액 보증금이 필요합니다. 길러가 결제한 보증금은 배송 완료 후 반환됩니다.</Text>
       </View>
       <View style={styles.noticeCard}><Text style={styles.noticeTitle}>{modeTitle}</Text><Text style={styles.noticeBody}>{modeBody}</Text></View>
       <View style={styles.card}>
@@ -85,12 +94,12 @@ export default function DepositPaymentScreen({ navigation, route }: { navigation
       <View style={styles.card}>
         <Text style={styles.sectionTitle}>현재 포인트 잔액</Text>
         <Text style={styles.balanceValue}>{pointBalance.toLocaleString()}P</Text>
-        <Text style={styles.balanceHint}>포인트가 있으면 먼저 사용하고, 부족한 금액만 결제 공급자 또는 테스트 경로로 이어집니다.</Text>
+        <Text style={styles.balanceHint}>포인트가 있으면 먼저 사용하고, 부족한 금액만 추가 결제로 진행합니다. 결제된 보증금은 배송 완료 후 반환됩니다.</Text>
       </View>
       <View style={styles.policyBox}>
         <Text style={styles.policyTitle}>운영 가드레일</Text>
-        <Text style={styles.policyText}>배송 완료 후 보증금 이체 여부는 배송 상태와 운영 검토를 함께 봅니다.</Text>
-        <Text style={styles.policyText}>분실, 차감, 패널티, 최종 정산은 AI가 단독으로 확정하지 않습니다.</Text>
+        <Text style={styles.policyText}>길러가 결제한 보증금은 배송 완료 후 반환됩니다.</Text>
+        <Text style={styles.policyText}>분실, 훼손, 미인계 같은 사고가 확인된 경우에만 운영 검토 후 차감될 수 있습니다.</Text>
       </View>
       <TouchableOpacity style={[styles.primaryButton, loading && styles.primaryButtonDisabled]} onPress={() => void handlePayment()} disabled={loading} activeOpacity={0.9}>{loading ? <ActivityIndicator color={Colors.white} /> : <Text style={styles.primaryButtonText}>{depositAmount.toLocaleString()}원 결제하기</Text>}</TouchableOpacity>
       <TouchableOpacity style={styles.secondaryButton} onPress={() => navigation.navigate('PointHistory')} activeOpacity={0.9}><Text style={styles.secondaryButtonText}>지갑으로 돌아가기</Text></TouchableOpacity>

@@ -22,6 +22,7 @@ import { db } from './firebase';
 import type {
   Route,
   StationInfo,
+  DetailedAddress,
   CreateRouteParams,
   UpdateRouteParams,
   RouteValidationResult,
@@ -197,6 +198,8 @@ function convertRoute(data: any, docId: string): Route {
     userId: data.userId,
     startStation: convertStationInfo(data.startStation),
     endStation: convertStationInfo(data.endStation),
+    startAddress: data.startAddress,
+    endAddress: data.endAddress,
     departureTime: data.departureTime,
     daysOfWeek: data.daysOfWeek,
     isActive: data.isActive ?? true,
@@ -599,6 +602,8 @@ export async function createRoute(
   let userId: string;
   let start: StationInfo;
   let end: StationInfo;
+  let startAddress: DetailedAddress | undefined;
+  let endAddress: DetailedAddress | undefined;
   let time: string;
   let days: number[];
 
@@ -612,6 +617,8 @@ export async function createRoute(
     userId = args.userId;
     start = args.startStation;
     end = args.endStation;
+    startAddress = args.startAddress;
+    endAddress = args.endAddress;
     time = args.departureTime;
     days = args.daysOfWeek;
   }
@@ -629,6 +636,8 @@ export async function createRoute(
     userId,
     startStation: start,
     endStation: end,
+    startAddress,
+    endAddress,
     departureTime: time,
     daysOfWeek: days,
     isActive: true,
@@ -643,6 +652,8 @@ export async function createRoute(
       userId,
       startStation: start,
       endStation: end,
+      startAddress,
+      endAddress,
       departureTime: time,
       daysOfWeek: days,
       isActive: true,
@@ -885,6 +896,14 @@ export async function updateRoute(
 
   if (updates.endStation) {
     updatedData.endStation = updates.endStation;
+  }
+
+  if (updates.startAddress !== undefined) {
+    updatedData.startAddress = updates.startAddress;
+  }
+
+  if (updates.endAddress !== undefined) {
+    updatedData.endAddress = updates.endAddress;
   }
 
   if (updates.departureTime) {

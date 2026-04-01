@@ -1,7 +1,9 @@
-﻿import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { RefreshControl, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
+
 import { useUser } from '../../contexts/UserContext';
+import { useGillerAccess } from '../../hooks/useGillerAccess';
 import {
   getBeta1HomeSnapshot,
   type Beta1HomeSnapshot,
@@ -12,10 +14,13 @@ import { UserRole } from '../../types/user';
 
 export default function HomeScreen({ navigation }: { navigation: MainStackNavigationProp }) {
   const { user, currentRole, switchRole } = useUser();
+  const { canAccessGiller } = useGillerAccess();
   const [snapshot, setSnapshot] = useState<Beta1HomeSnapshot | null>(null);
   const [refreshing, setRefreshing] = useState(false);
 
-  const role = currentRole === UserRole.GILLER ? 'giller' : 'requester';
+  const role = canAccessGiller && currentRole === UserRole.GILLER ? 'giller' : 'requester';
+  const showRoleSwitch =
+    canAccessGiller && (user?.role === UserRole.BOTH || user?.role === UserRole.GLER);
 
   useEffect(() => {
     let mounted = true;
@@ -72,7 +77,7 @@ export default function HomeScreen({ navigation }: { navigation: MainStackNaviga
             </Text>
           </View>
 
-          {user.role === UserRole.BOTH ? (
+          {showRoleSwitch ? (
             <TouchableOpacity
               style={styles.roleChip}
               onPress={() => switchRole(role === 'requester' ? UserRole.GILLER : UserRole.GLER)}
@@ -147,6 +152,14 @@ export default function HomeScreen({ navigation }: { navigation: MainStackNaviga
               <Text style={styles.recommendationText}>{item}</Text>
             </View>
           ))}
+          {!canAccessGiller ? (
+            <View style={styles.recommendationRow}>
+              <MaterialIcons name="two-wheeler" size={18} color={Colors.primary} />
+              <Text style={styles.recommendationText}>
+                길러를 해보려면 프로필에서 본인인증 후 신청을 진행해보세요.
+              </Text>
+            </View>
+          ) : null}
         </View>
       </View>
 
@@ -180,32 +193,37 @@ export default function HomeScreen({ navigation }: { navigation: MainStackNaviga
         )}
       </View>
 
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>미션</Text>
-        {(snapshot?.missionCards ?? []).length ? (
-          snapshot?.missionCards.map((card) => (
-            <TouchableOpacity
-              key={card.id}
-              style={styles.boardCard}
-              onPress={() => navigation.navigate('Tabs', { screen: 'GillerRequests' })}
-            >
-              <View style={styles.boardHeader}>
-                <Text style={styles.boardTitle}>{card.title}</Text>
-                <StatusPill label={card.status} tone="mission" />
-              </View>
-              <Text style={styles.boardMeta}>{card.windowLabel}</Text>
-              <Text style={styles.rewardText}>{card.rewardLabel}</Text>
+      {canAccessGiller ? (
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>미션</Text>
+          {(snapshot?.missionCards ?? []).length ? (
+            snapshot?.missionCards.map((card) => (
+              <TouchableOpacity
+                key={card.id}
+                style={styles.boardCard}
+                onPress={() => navigation.navigate('Tabs', { screen: 'GillerRequests' })}
+              >
+                <View style={styles.boardHeader}>
+                  <Text style={styles.boardTitle}>{card.title}</Text>
+                  <StatusPill label={card.status} tone="mission" />
+                </View>
+                <Text style={styles.boardMeta}>{card.windowLabel}</Text>
+                <Text style={styles.rewardText}>{card.rewardLabel}</Text>
 
-              <View style={styles.strategyCard}>
-                <Text style={styles.strategyCardTitle}>{card.strategyTitle}</Text>
-                <Text style={styles.strategyCardBody}>{card.strategyBody}</Text>
-              </View>
-            </TouchableOpacity>
-          ))
-        ) : (
-          <EmptyCard title="지금 받을 수 있는 미션이 없습니다" subtitle="조건에 맞는 미션이 생기면 여기에서 바로 확인할 수 있습니다." />
-        )}
-      </View>
+                <View style={styles.strategyCard}>
+                  <Text style={styles.strategyCardTitle}>{card.strategyTitle}</Text>
+                  <Text style={styles.strategyCardBody}>{card.strategyBody}</Text>
+                </View>
+              </TouchableOpacity>
+            ))
+          ) : (
+            <EmptyCard
+              title="지금 받을 수 있는 미션이 없습니다"
+              subtitle="조건에 맞는 미션이 생기면 여기에서 바로 확인할 수 있습니다."
+            />
+          )}
+        </View>
+      ) : null}
 
       <View style={styles.walletCard}>
         <Text style={styles.sectionTitle}>지갑</Text>

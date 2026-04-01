@@ -197,7 +197,7 @@ function Field(props: {
         value={props.value}
         onChangeText={props.onChangeText}
         keyboardType={props.keyboardType}
-        placeholderTextcolor={Colors.textTertiary}
+        placeholderTextColor={Colors.textTertiary}
       />
     </View>
   );

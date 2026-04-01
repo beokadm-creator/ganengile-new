@@ -12,9 +12,15 @@ import { MaterialIcons } from '@expo/vector-icons';
 
 import { useUser } from '../../contexts/UserContext';
 import { useGillerAccess } from '../../hooks/useGillerAccess';
-import { getBankIntegrationConfig, getIdentityIntegrationConfig } from '../../services/integration-config-service';
+import {
+  getBankIntegrationConfig,
+  getIdentityIntegrationConfig,
+} from '../../services/integration-config-service';
 import { PointService } from '../../services/PointService';
-import { getUserVerification, getVerificationStatusDisplay } from '../../services/verification-service';
+import {
+  getUserVerification,
+  getVerificationStatusDisplay,
+} from '../../services/verification-service';
 import { BorderRadius, Colors, Shadows, Spacing, Typography } from '../../theme';
 import type { MainStackNavigationProp } from '../../types/navigation';
 import { UserRole } from '../../types/user';
@@ -37,13 +43,15 @@ export default function ProfileScreen({ navigation }: { navigation: MainStackNav
   const { canAccessGiller, applicationStatus } = useGillerAccess();
   const [loading, setLoading] = useState(true);
   const [profileState, setProfileState] = useState<ProfileState>({
-    verificationLabel: '본인확인 필요',
+    verificationLabel: '본인인증 필요',
     bankLabel: '계좌 상태 확인 필요',
     withdrawableBalance: 0,
   });
 
-  const activeRole = currentRole ?? user?.role ?? UserRole.GLER;
-  const showRoleSwitch = user?.role === UserRole.BOTH;
+  const activeRole =
+    canAccessGiller && currentRole === UserRole.GILLER ? UserRole.GILLER : UserRole.GLER;
+  const showRoleSwitch =
+    canAccessGiller && (user?.role === UserRole.BOTH || user?.role === UserRole.GLER);
 
   useEffect(() => {
     let mounted = true;
@@ -54,7 +62,7 @@ export default function ProfileScreen({ navigation }: { navigation: MainStackNav
       }
 
       try {
-        const [verification, identityConfig, bankConfig, pointSummary] = await Promise.all([
+        const [verificationResult, identityConfigResult, bankConfigResult, pointSummaryResult] = await Promise.allSettled([
           getUserVerification(user.uid),
           getIdentityIntegrationConfig(),
           getBankIntegrationConfig(),
@@ -65,6 +73,34 @@ export default function ProfileScreen({ navigation }: { navigation: MainStackNav
           return;
         }
 
+        const verification =
+          verificationResult.status === 'fulfilled' ? verificationResult.value : null;
+        const identityConfig =
+          identityConfigResult.status === 'fulfilled'
+            ? identityConfigResult.value
+            : { testMode: false };
+        const bankConfig =
+          bankConfigResult.status === 'fulfilled'
+            ? bankConfigResult.value
+            : { liveReady: false, statusMessage: '계좌 상태 확인 필요' };
+        const pointSummary =
+          pointSummaryResult.status === 'fulfilled'
+            ? pointSummaryResult.value
+            : { withdrawableBalance: 0 };
+
+        if (verificationResult.status === 'rejected') {
+          console.error('Failed to load verification state', verificationResult.reason);
+        }
+        if (identityConfigResult.status === 'rejected') {
+          console.error('Failed to load identity integration config', identityConfigResult.reason);
+        }
+        if (bankConfigResult.status === 'rejected') {
+          console.error('Failed to load bank integration config', bankConfigResult.reason);
+        }
+        if (pointSummaryResult.status === 'rejected') {
+          console.error('Failed to load point summary', pointSummaryResult.reason);
+        }
+
         const verificationDisplay = getVerificationStatusDisplay(verification);
         setProfileState({
           verificationLabel:
@@ -72,16 +108,18 @@ export default function ProfileScreen({ navigation }: { navigation: MainStackNav
               ? identityConfig.testMode
                 ? `${verificationDisplay.statusKo} · 테스트`
                 : verificationDisplay.statusKo
-              : '본인확인 필요',
-          bankLabel: bankConfig.liveReady ? '계좌 준비됨' : bankConfig.statusMessage || '계좌 상태 확인 필요',
+              : '본인인증 필요',
+          bankLabel: bankConfig.liveReady
+            ? '계좌 준비됨'
+            : bankConfig.statusMessage || '계좌 상태 확인 필요',
           withdrawableBalance: pointSummary.withdrawableBalance,
         });
       } catch (error) {
         console.error('Failed to load profile state', error);
         if (mounted) {
           setProfileState({
-            verificationLabel: '상태 불러오기 실패',
-            bankLabel: '상태 불러오기 실패',
+            verificationLabel: '상태 조회 실패',
+            bankLabel: '상태 조회 실패',
             withdrawableBalance: 0,
           });
         }
@@ -93,6 +131,7 @@ export default function ProfileScreen({ navigation }: { navigation: MainStackNav
     }
 
     void loadProfileState();
+
     return () => {
       mounted = false;
     };
@@ -101,8 +140,8 @@ export default function ProfileScreen({ navigation }: { navigation: MainStackNav
   const userLinks = useMemo<LinkItem[]>(
     () => [
       {
-        title: '내 요청',
-        subtitle: '요청과 배송',
+        title: '배송 요청',
+        subtitle: '요청과 배송 확인',
         icon: 'inventory-2',
         onPress: () => navigation.navigate('Tabs', { screen: 'Requests' }),
       },
@@ -114,31 +153,37 @@ export default function ProfileScreen({ navigation }: { navigation: MainStackNav
       },
       {
         title: '지갑',
-        subtitle: '잔액과 내역',
+        subtitle: '포인트와 내역',
         icon: 'account-balance-wallet',
         onPress: () => navigation.navigate('PointHistory'),
       },
       {
         title: '약관',
-        subtitle: '정책 확인',
+        subtitle: '서비스 정책 확인',
         icon: 'description',
         onPress: () => navigation.navigate('Terms'),
       },
+      {
+        title: '주소록 관리',
+        subtitle: '기본 주소와 최근 주소 관리',
+        icon: 'place',
+        onPress: () => navigation.navigate('AddressBook'),
+      },
     ],
-    [navigation],
+    [navigation]
   );
 
   const gillerLinks = useMemo<LinkItem[]>(
     () => [
       {
         title: '미션 보드',
-        subtitle: '받을 미션 보기',
+        subtitle: '받을 미션 확인',
         icon: 'two-wheeler',
         onPress: () => navigation.navigate('Tabs', { screen: 'GillerRequests' }),
       },
       {
-        title: '내 동선',
-        subtitle: '경로 관리',
+        title: '경로 관리',
+        subtitle: '등록한 경로 관리',
         icon: 'alt-route',
         onPress: () => navigation.navigate('Tabs', { screen: 'RouteManagement' }),
       },
@@ -150,12 +195,12 @@ export default function ProfileScreen({ navigation }: { navigation: MainStackNav
       },
       {
         title: '출금',
-        subtitle: '출금 준비',
+        subtitle: '출금 신청',
         icon: 'account-balance',
         onPress: () => navigation.navigate('PointWithdraw'),
       },
     ],
-    [navigation],
+    [navigation]
   );
 
   function handleRoleSwitch() {
@@ -163,23 +208,33 @@ export default function ProfileScreen({ navigation }: { navigation: MainStackNav
       return;
     }
 
-    const nextRole = activeRole === UserRole.GILLER ? UserRole.GLER : UserRole.GILLER;
-    if (nextRole === UserRole.GILLER && !canAccessGiller) {
-      Alert.alert('길러 모드 준비 중', '본인확인과 심사 후 전환할 수 있습니다.');
-      return;
-    }
-
-    switchRole(nextRole);
+    switchRole(activeRole === UserRole.GILLER ? UserRole.GLER : UserRole.GILLER);
   }
 
   function handleLogout() {
+    if (typeof window !== 'undefined') {
+      const confirmed = window.confirm('세션을 종료할까요?');
+      if (!confirmed) {
+        return;
+      }
+
+      void logout().catch((error) => {
+        console.error('Logout failed', error);
+        Alert.alert('로그아웃 실패', '잠시 후 다시 시도해 주세요.');
+      });
+      return;
+    }
+
     Alert.alert('로그아웃', '세션을 종료할까요?', [
       { text: '취소', style: 'cancel' },
       {
         text: '로그아웃',
         style: 'destructive',
         onPress: () => {
-          void logout();
+          void logout().catch((error) => {
+            console.error('Logout failed', error);
+            Alert.alert('로그아웃 실패', '잠시 후 다시 시도해 주세요.');
+          });
         },
       },
     ]);
@@ -206,15 +261,15 @@ export default function ProfileScreen({ navigation }: { navigation: MainStackNav
         <Text style={styles.subtitle}>{user.phoneNumber ?? user.email}</Text>
 
         <View style={styles.badgeRow}>
-          <Badge label={activeRole === UserRole.GILLER ? '길러 모드' : '사용자 모드'} />
+          <Badge label={activeRole === UserRole.GILLER ? '길러 모드' : '이용자 모드'} />
           <Badge label={profileState.verificationLabel} />
           <Badge
             label={
               applicationStatus === 'approved'
-                ? '승급 승인'
+                ? '길러 승인 완료'
                 : applicationStatus === 'pending'
-                  ? '심사 중'
-                  : '승급 전'
+                  ? '길러 심사 중'
+                  : '길러 미신청'
             }
           />
         </View>
@@ -222,7 +277,7 @@ export default function ProfileScreen({ navigation }: { navigation: MainStackNav
         {showRoleSwitch ? (
           <TouchableOpacity style={styles.switchButton} onPress={handleRoleSwitch} activeOpacity={0.9}>
             <Text style={styles.switchButtonText}>
-              {activeRole === UserRole.GILLER ? '사용자 모드로 전환' : '길러 모드로 전환'}
+              {activeRole === UserRole.GILLER ? '이용자 모드로 전환' : '길러 모드로 전환'}
             </Text>
             <MaterialIcons name="swap-horiz" size={20} color={Colors.textPrimary} />
           </TouchableOpacity>
@@ -230,12 +285,15 @@ export default function ProfileScreen({ navigation }: { navigation: MainStackNav
       </View>
 
       <View style={styles.statGrid}>
-        <MiniCard title="본인확인" value={profileState.verificationLabel} />
-        <MiniCard title="계좌 준비" value={profileState.bankLabel} />
-        <MiniCard title="출금 가능" value={`${profileState.withdrawableBalance.toLocaleString()}원`} />
+        <MiniCard title="본인인증" value={profileState.verificationLabel} />
+        <MiniCard title="계좌 상태" value={profileState.bankLabel} />
+        <MiniCard
+          title="출금 가능"
+          value={`${profileState.withdrawableBalance.toLocaleString()}원`}
+        />
       </View>
 
-      <MenuSection title="사용자 메뉴" items={userLinks} />
+      <MenuSection title="이용자 메뉴" items={userLinks} />
 
       {canAccessGiller ? (
         <MenuSection title="길러 메뉴" items={gillerLinks} />
@@ -244,16 +302,24 @@ export default function ProfileScreen({ navigation }: { navigation: MainStackNav
           <Text style={styles.sectionTitle}>길러 시작</Text>
           <TouchableOpacity
             style={styles.linkCard}
-            onPress={() => navigation.navigate(user.isVerified ? 'GillerApply' : 'IdentityVerification')}
+            onPress={() =>
+              navigation.navigate(
+                applicationStatus === 'pending' || user.isVerified ? 'GillerApply' : 'IdentityVerification'
+              )
+            }
             activeOpacity={0.92}
           >
             <View style={styles.linkIconWrap}>
               <MaterialIcons name="two-wheeler" size={20} color={Colors.primaryDark} />
             </View>
             <View style={styles.linkCopy}>
-              <Text style={styles.linkTitle}>길러 등록하기</Text>
+              <Text style={styles.linkTitle}>길러를 해보세요</Text>
               <Text style={styles.linkSubtitle}>
-                {user.isVerified ? '신청 진행' : '본인확인부터 시작'}
+                {applicationStatus === 'pending'
+                  ? '심사 진행 상태를 확인하세요.'
+                  : user.isVerified
+                    ? '길러 신청을 진행할 수 있어요.'
+                    : '본인인증을 마치면 신청할 수 있어요.'}
               </Text>
             </View>
             <MaterialIcons name="chevron-right" size={22} color={Colors.gray400} />
@@ -261,13 +327,17 @@ export default function ProfileScreen({ navigation }: { navigation: MainStackNav
         </View>
       )}
 
-      {!canAccessGiller ? (
+      {!canAccessGiller && applicationStatus !== 'pending' ? (
         <TouchableOpacity
           style={styles.actionButton}
-          onPress={() => navigation.navigate('IdentityVerification')}
+          onPress={() =>
+            navigation.navigate(user.isVerified ? 'GillerApply' : 'IdentityVerification')
+          }
           activeOpacity={0.9}
         >
-          <Text style={styles.actionButtonText}>본인확인 하기</Text>
+          <Text style={styles.actionButtonText}>
+            {user.isVerified ? '길러 신청하기' : '본인인증 하러 가기'}
+          </Text>
         </TouchableOpacity>
       ) : null}
 

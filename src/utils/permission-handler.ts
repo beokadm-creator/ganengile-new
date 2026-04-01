@@ -1,13 +1,5 @@
-/**
- * Permission Handler
- * 카메라, 위치, 사진 라이브러리 권한 요청 및 처리
- */
-
 import { Alert, Linking, Platform } from 'react-native';
-import {
-  Camera,
-  PermissionStatus,
-} from 'expo-camera';
+import { Camera } from 'expo-camera';
 import * as Location from 'expo-location';
 import * as ImagePicker from 'expo-image-picker';
 
@@ -26,23 +18,18 @@ export interface PermissionOptions {
   showSettingsAlert?: boolean;
 }
 
-/**
- * 권한 상태 텍스트 변환
- */
 export function getPermissionStatusText(status: string): string {
   const statusMap: Record<string, string> = {
     granted: '허용됨',
     denied: '거부됨',
-    undetermined: '결정 안 함',
-    limited: '제한적 허용',
-    blocked: '차단됨',
+    undetermined: '아직 결정되지 않음',
+    limited: '일부만 허용됨',
+    blocked: '설정에서 차단됨',
   };
+
   return statusMap[status] || status;
 }
 
-/**
- * 카메라 권한 확인
- */
 export async function checkCameraPermission(): Promise<PermissionResult> {
   try {
     const status = await Camera.getCameraPermissionsAsync();
@@ -53,17 +40,10 @@ export async function checkCameraPermission(): Promise<PermissionResult> {
     };
   } catch (error) {
     console.error('Error checking camera permission:', error);
-    return {
-      granted: false,
-      canRequest: true,
-      status: 'undetermined',
-    };
+    return { granted: false, canRequest: true, status: 'undetermined' };
   }
 }
 
-/**
- * 위치 권한 확인
- */
 export async function checkLocationPermission(): Promise<PermissionResult> {
   try {
     const status = await Location.getForegroundPermissionsAsync();
@@ -74,17 +54,10 @@ export async function checkLocationPermission(): Promise<PermissionResult> {
     };
   } catch (error) {
     console.error('Error checking location permission:', error);
-    return {
-      granted: false,
-      canRequest: true,
-      status: 'undetermined',
-    };
+    return { granted: false, canRequest: true, status: 'undetermined' };
   }
 }
 
-/**
- * 사진 라이브러리 권한 확인
- */
 export async function checkPhotosPermission(): Promise<PermissionResult> {
   try {
     const status = await ImagePicker.getMediaLibraryPermissionsAsync();
@@ -95,20 +68,11 @@ export async function checkPhotosPermission(): Promise<PermissionResult> {
     };
   } catch (error) {
     console.error('Error checking photos permission:', error);
-    return {
-      granted: false,
-      canRequest: true,
-      status: 'undetermined',
-    };
+    return { granted: false, canRequest: true, status: 'undetermined' };
   }
 }
 
-/**
- * 카메라 권한 요청
- */
-export async function requestCameraPermission(
-  options: PermissionOptions = {}
-): Promise<boolean> {
+export async function requestCameraPermission(options: PermissionOptions = {}): Promise<boolean> {
   const { onDenied, onGranted, onBlocked, showSettingsAlert = true } = options;
 
   try {
@@ -119,9 +83,7 @@ export async function requestCameraPermission(
       return true;
     }
 
-    // Permission denied
     if (!status.canAskAgain) {
-      // Permanently denied - show settings alert
       if (showSettingsAlert) {
         showOpenSettingsAlert('카메라');
       }
@@ -129,7 +91,6 @@ export async function requestCameraPermission(
       return false;
     }
 
-    // Can ask again
     onDenied?.();
     return false;
   } catch (error) {
@@ -139,12 +100,7 @@ export async function requestCameraPermission(
   }
 }
 
-/**
- * 위치 권한 요청
- */
-export async function requestLocationPermission(
-  options: PermissionOptions = {}
-): Promise<boolean> {
+export async function requestLocationPermission(options: PermissionOptions = {}): Promise<boolean> {
   const { onDenied, onGranted, onBlocked, showSettingsAlert = true } = options;
 
   try {
@@ -155,9 +111,7 @@ export async function requestLocationPermission(
       return true;
     }
 
-    // Permission denied
     if (!status.canAskAgain) {
-      // Permanently denied - show settings alert
       if (showSettingsAlert) {
         showOpenSettingsAlert('위치');
       }
@@ -165,7 +119,6 @@ export async function requestLocationPermission(
       return false;
     }
 
-    // Can ask again
     onDenied?.();
     return false;
   } catch (error) {
@@ -175,12 +128,7 @@ export async function requestLocationPermission(
   }
 }
 
-/**
- * 사진 라이브러리 권한 요청
- */
-export async function requestPhotosPermission(
-  options: PermissionOptions = {}
-): Promise<boolean> {
+export async function requestPhotosPermission(options: PermissionOptions = {}): Promise<boolean> {
   const { onDenied, onGranted, onBlocked, showSettingsAlert = true } = options;
 
   try {
@@ -191,9 +139,7 @@ export async function requestPhotosPermission(
       return true;
     }
 
-    // Permission denied
     if (!status.canAskAgain) {
-      // Permanently denied - show settings alert
       if (showSettingsAlert) {
         showOpenSettingsAlert('사진');
       }
@@ -201,7 +147,6 @@ export async function requestPhotosPermission(
       return false;
     }
 
-    // Can ask again
     onDenied?.();
     return false;
   } catch (error) {
@@ -211,106 +156,76 @@ export async function requestPhotosPermission(
   }
 }
 
-/**
- * 설정 열기 알림 표시
- */
 export function showOpenSettingsAlert(permissionName: string): void {
-  const message = `${permissionName} 권한이 필요합니다.\n\n설정에서 ${permissionName} 권한을 허용해주세요.`;
-
   Alert.alert(
-    '권한 필요',
-    message,
+    '권한이 필요합니다',
+    `${permissionName} 권한이 꺼져 있어 이 기능을 사용할 수 없습니다.\n\n설정에서 ${permissionName} 권한을 허용해 주세요.`,
     [
-      {
-        text: '취소',
-        style: 'cancel',
-      },
-      {
-        text: '설정으로 이동',
-        onPress: openAppSettings,
-      },
+      { text: '취소', style: 'cancel' },
+      { text: '설정 열기', onPress: openAppSettings },
     ],
     { cancelable: true }
   );
 }
 
-/**
- * 앱 설정 화면 열기
- */
 export async function openAppSettings(): Promise<void> {
   try {
     await Linking.openSettings();
   } catch (error) {
     console.error('Error opening settings:', error);
-    Alert.alert(
-      '오류',
-      '설정 화면을 열 수 없습니다. 수동으로 설정 > 가는길에 > 권한에서 변경해주세요.'
-    );
+    Alert.alert('설정을 열 수 없습니다', '기기 설정에서 직접 앱 권한을 확인해 주세요.');
   }
 }
 
-/**
- * 복합 권한 요청 (여러 권한 한번에 요청)
- */
 export async function requestMultiplePermissions(
   permissions: PermissionType[],
   options: PermissionOptions = {}
 ): Promise<Record<PermissionType, boolean>> {
-  const results: Record<PermissionType, boolean> = {} as any;
+  const results: Record<PermissionType, boolean> = {} as Record<PermissionType, boolean>;
 
-  const promises = permissions.map(async (permission) => {
-    switch (permission) {
-      case 'camera':
-        results.camera = await requestCameraPermission(options);
-        break;
-      case 'location':
-        results.location = await requestLocationPermission(options);
-        break;
-      case 'photos':
-        results.photos = await requestPhotosPermission(options);
-        break;
-      default:
-        results[permission] = false;
-    }
-  });
+  await Promise.all(
+    permissions.map(async (permission) => {
+      switch (permission) {
+        case 'camera':
+          results.camera = await requestCameraPermission(options);
+          break;
+        case 'location':
+          results.location = await requestLocationPermission(options);
+          break;
+        case 'photos':
+          results.photos = await requestPhotosPermission(options);
+          break;
+        default:
+          results[permission] = false;
+      }
+    })
+  );
 
-  await Promise.all(promises);
   return results;
 }
 
-/**
- * 권한이 필요한 작업 전에 체크 및 요청
- */
 export async function ensurePermission(
   permissionType: PermissionType,
   options: PermissionOptions = {}
 ): Promise<boolean> {
-  let checkResult: PermissionResult;
-
   switch (permissionType) {
-    case 'camera':
-      checkResult = await checkCameraPermission();
-      if (checkResult.granted) return true;
-      return requestCameraPermission(options);
-
-    case 'location':
-      checkResult = await checkLocationPermission();
-      if (checkResult.granted) return true;
-      return requestLocationPermission(options);
-
-    case 'photos':
-      checkResult = await checkPhotosPermission();
-      if (checkResult.granted) return true;
-      return requestPhotosPermission(options);
-
+    case 'camera': {
+      const checkResult = await checkCameraPermission();
+      return checkResult.granted ? true : requestCameraPermission(options);
+    }
+    case 'location': {
+      const checkResult = await checkLocationPermission();
+      return checkResult.granted ? true : requestLocationPermission(options);
+    }
+    case 'photos': {
+      const checkResult = await checkPhotosPermission();
+      return checkResult.granted ? true : requestPhotosPermission(options);
+    }
     default:
       return false;
   }
 }
 
-/**
- * 위치 정보 가져오기 (권한 포함)
- */
 export async function getCurrentLocation(
   options: {
     showSettingsAlert?: boolean;
@@ -319,31 +234,23 @@ export async function getCurrentLocation(
 ): Promise<Location.LocationObject | null> {
   const { showSettingsAlert = true, accuracy = Location.Accuracy.Balanced } = options;
 
-  // Check and request permission
-  const hasPermission = await ensurePermission('location', {
-    showSettingsAlert,
-  });
-
+  const hasPermission = await ensurePermission('location', { showSettingsAlert });
   if (!hasPermission) {
     return null;
   }
 
   try {
-    const location = await Location.getCurrentPositionAsync({
-      accuracy,
-    });
-    return location;
+    return await Location.getCurrentPositionAsync({ accuracy });
   } catch (error) {
     console.error('Error getting location:', error);
 
-    // Show user-friendly error
     if (String(error).includes('Location services are disabled')) {
       Alert.alert(
-        '위치 서비스 꺼짐',
-        '위치 서비스가 꺼져 있습니다. 기기 설정에서 위치 서비스를 켜주세요.',
+        '위치 서비스가 꺼져 있습니다',
+        '기기 설정에서 위치 서비스를 켠 뒤 다시 시도해 주세요.',
         [
-          { text: '확인', style: 'cancel' },
-          { text: '설정', onPress: openAppSettings },
+          { text: '닫기', style: 'cancel' },
+          { text: '설정 열기', onPress: openAppSettings },
         ]
       );
     }
@@ -352,32 +259,27 @@ export async function getCurrentLocation(
   }
 }
 
-/**
- * 권한 상태 모니터링 (iOS only)
- */
 export function subscribeToPermissionChanges(
   permissionType: PermissionType,
   callback: (status: string) => void
 ): (() => void) | null {
+  void permissionType;
+  void callback;
+
   if (Platform.OS !== 'ios') {
     return null;
   }
 
-  // Note: expo-location and expo-image-picker don't have built-in listeners
-  // This is a placeholder for future implementation
   console.warn('Permission change monitoring is not fully supported on iOS');
   return () => {};
 }
 
-/**
- * 권한 설명 텍스트 생성
- */
 export function getPermissionDescription(permissionType: PermissionType): string {
   const descriptions: Record<PermissionType, string> = {
-    camera: '사진 촬영을 위해 카메라 접근 권한이 필요합니다.',
-    location: '현재 위치 확인을 위해 위치 권한이 필요합니다.',
-    photos: '사진 선택을 위해 사진 라이브러리 접근 권한이 필요합니다.',
-    microphone: '녹음을 위해 마이크 권한이 필요합니다.',
+    camera: '사진 촬영과 인증을 위해 카메라 권한이 필요합니다.',
+    location: '현재 위치 기반 역 추천과 배송 진행 확인을 위해 위치 권한이 필요합니다.',
+    photos: '사진 선택과 업로드를 위해 사진 권한이 필요합니다.',
+    microphone: '음성 기능을 위해 마이크 권한이 필요합니다.',
   };
 
   return descriptions[permissionType] || '권한이 필요합니다.';

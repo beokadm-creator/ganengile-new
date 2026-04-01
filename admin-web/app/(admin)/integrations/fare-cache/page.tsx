@@ -1,13 +1,23 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { getFunctions, httpsCallable } from 'firebase/functions';
-import { getClientAuth } from '@/lib/firebase-client';
 
 type FareCacheStats = {
   totalCount: number;
   latestUpdatedAt: string | null;
   zeroFareCount: number;
+};
+
+type SyncResponse = {
+  ok?: boolean;
+  error?: string;
+  result?: {
+    processedRoutes?: number;
+    updatedRoutes?: number;
+    skippedRoutes?: number;
+    failedRoutes?: number;
+    missingMappingRoutes?: number;
+  };
 };
 
 function formatDateLabel(value: string | null): string {
@@ -56,37 +66,22 @@ export default function FareCachePage() {
     setMessage(null);
 
     try {
-      const auth = getClientAuth();
-      const functions = getFunctions(auth.app, 'asia-northeast3');
-      const trigger = httpsCallable(functions, 'triggerFareCacheSync');
-      const result = await trigger({});
-      const data = result.data as
-        | {
-            success?: boolean;
-            result?: {
-              processedRoutes?: number;
-              updatedRoutes?: number;
-              skippedRoutes?: number;
-              failedRoutes?: number;
-              missingMappingRoutes?: number;
-            };
-          }
-        | undefined;
+      const response = await fetch('/api/admin/fare-cache', { method: 'POST' });
+      const data = (await response.json()) as SyncResponse;
 
-      if (data?.success) {
+      if (response.ok && data.ok) {
         const summary = data.result;
         if (summary) {
           setMessage(
-            `완료 · 처리 ${summary.processedRoutes ?? 0} · 갱신 ${summary.updatedRoutes ?? 0} · 건너뜀 ${
-              summary.skippedRoutes ?? 0
-            } · 실패 ${summary.failedRoutes ?? 0} · 매핑 누락 ${summary.missingMappingRoutes ?? 0}`
+            `완료 · 처리 ${summary.processedRoutes ?? 0} · 갱신 ${summary.updatedRoutes ?? 0} · 건너뜀 ${summary.skippedRoutes ?? 0} · 실패 ${summary.failedRoutes ?? 0} · 매핑 누락 ${summary.missingMappingRoutes ?? 0}`
           );
         } else {
           setMessage('운임 캐시를 갱신했습니다.');
         }
+
         await loadStats();
       } else {
-        setMessage('운임 캐시 갱신에 실패했습니다.');
+        setMessage(data.error ?? '운임 캐시 갱신에 실패했습니다.');
       }
     } catch (error: unknown) {
       const messageText = error instanceof Error ? error.message : '알 수 없는 오류';
@@ -120,7 +115,10 @@ export default function FareCachePage() {
           label="캐시 수"
           value={loading ? '...' : `${stats?.totalCount?.toLocaleString() ?? 0}`}
         />
-        <StatCard label="마지막 갱신" value={loading ? '...' : formatDateLabel(stats?.latestUpdatedAt ?? null)} />
+        <StatCard
+          label="마지막 갱신"
+          value={loading ? '...' : formatDateLabel(stats?.latestUpdatedAt ?? null)}
+        />
         <StatCard
           label="0원 항목"
           value={loading ? '...' : `${stats?.zeroFareCount?.toLocaleString() ?? 0}`}

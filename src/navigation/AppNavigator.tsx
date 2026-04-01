@@ -4,6 +4,7 @@ import { createStackNavigator } from '@react-navigation/stack';
 import { ActivityIndicator, Platform, StyleSheet, View } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import * as Notifications from 'expo-notifications';
+import * as ExpoLinking from 'expo-linking';
 import { UserProvider, useUser } from '../contexts/UserContext';
 import { AuthProvider } from '../contexts/AuthContext';
 import type { RootStackParamList } from '../types/navigation';
@@ -14,11 +15,19 @@ import B2BNavigator from './B2BNavigator';
 import { AppDownloadBanner } from '../components/AppDownloadBanner';
 import { navigationRef } from './navigationRef';
 import { getInitialNotification, handleNotificationResponse } from './notificationHandler';
+import { useAuth } from '../contexts/AuthContext';
+import {
+  buildLinkingConfig,
+  captureChannelAttributionFromUrl,
+  syncStoredChannelAttributionToUser,
+} from '../services/channel-attribution-service';
 
 const Stack = createStackNavigator<RootStackParamList>();
+const linking = buildLinkingConfig();
 
 function AppNavigatorContent() {
   const { user, loading } = useUser();
+  const { user: authUser } = useAuth();
   const notificationResponseListener = useRef<Notifications.Subscription | undefined>(undefined);
   const notificationReceivedListener = useRef<Notifications.Subscription | undefined>(undefined);
 
@@ -44,6 +53,31 @@ function AppNavigatorContent() {
     };
   }, []);
 
+  useEffect(() => {
+    void (async () => {
+      const initialUrl = await ExpoLinking.getInitialURL();
+      if (initialUrl) {
+        await captureChannelAttributionFromUrl(initialUrl, 'initial_url');
+      }
+    })();
+
+    const subscription = ExpoLinking.addEventListener('url', ({ url }) => {
+      void captureChannelAttributionFromUrl(url, 'url_event');
+    });
+
+    return () => {
+      subscription.remove();
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!authUser?.uid) {
+      return;
+    }
+
+    void syncStoredChannelAttributionToUser(authUser.uid);
+  }, [authUser?.uid]);
+
   if (loading) {
     return (
       <View style={styles.loadingContainer}>
@@ -53,7 +87,7 @@ function AppNavigatorContent() {
   }
 
   return (
-    <NavigationContainer ref={navigationRef}>
+    <NavigationContainer ref={navigationRef} linking={linking}>
       {Platform.OS === 'web' && user?.hasCompletedOnboarding ? <AppDownloadBanner /> : null}
       <Stack.Navigator screenOptions={{ headerShown: false }}>
         {!user ? (

@@ -10,6 +10,7 @@
     "admin-web",
     "functions",
     "e2e",
+    "dist",
     "screens",
     "tests",
     "__tests__",

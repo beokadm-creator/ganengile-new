@@ -117,7 +117,7 @@ export default function LoginScreen({ navigation }: LoginScreenProps) {
           <TextInput
             style={styles.input}
             placeholder="이메일"
-            placeholderTextcolor={Colors.textTertiary}
+            placeholderTextColor={Colors.textTertiary}
             value={email}
             onChangeText={setEmail}
             autoCapitalize="none"
@@ -126,7 +126,7 @@ export default function LoginScreen({ navigation }: LoginScreenProps) {
           <TextInput
             style={styles.input}
             placeholder="비밀번호"
-            placeholderTextcolor={Colors.textTertiary}
+            placeholderTextColor={Colors.textTertiary}
             value={password}
             onChangeText={setPassword}
             secureTextEntry

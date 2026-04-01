@@ -2,7 +2,9 @@ import React, { useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
+  Image,
   KeyboardAvoidingView,
+  Modal,
   Platform,
   ScrollView,
   StyleSheet,
@@ -11,43 +13,51 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-
 import AppTopBar from '../../components/common/AppTopBar';
+import AddressSearchModal from '../../components/common/AddressSearchModal';
 import { OptimizedStationSelectModal } from '../../components/OptimizedStationSelectModal';
 import { useUser } from '../../contexts/UserContext';
-import {
-  buildBeta1QuoteCards,
-  createBeta1Request,
-  type Beta1QuoteCard,
-} from '../../services/beta1-orchestration-service';
+import { analyzeRequestDraftWithAI, type Beta1AIAnalysisResponse } from '../../services/beta1-ai-service';
+import { buildBeta1QuoteCards, createBeta1Request, type Beta1QuoteCard } from '../../services/beta1-orchestration-service';
 import { getAllStations } from '../../services/config-service';
 import { requireUserId } from '../../services/firebase';
+import { locationService } from '../../services/location-service';
+import { takePhoto, uploadPhotoWithThumbnail } from '../../services/photo-service';
+import { addRecentAddress, getRecentAddresses, getSavedAddresses } from '../../services/profile-service';
 import { BorderRadius, Colors, Shadows, Spacing, Typography } from '../../theme';
 import type { Station } from '../../types/config';
 import type { MainStackNavigationProp, MainStackParamList } from '../../types/navigation';
+import type { SavedAddress } from '../../types/profile';
 import type { StationInfo } from '../../types/request';
 
-type RequestPackageSize = 'small' | 'medium' | 'large' | 'xl';
+type LocationMode = 'station' | 'address';
+type PackageSize = 'small' | 'medium' | 'large' | 'xl';
 type PickerType = 'pickup' | 'delivery';
-
+type AddressTarget = 'pickup' | 'delivery' | null;
 type Props = {
   navigation: MainStackNavigationProp;
-  route?: {
-    params?: MainStackParamList['CreateRequest'];
-  };
+  route?: { params?: MainStackParamList['CreateRequest'] };
 };
 
-function parseEtaMinutes(etaLabel: string): number {
-  const matched = etaLabel.match(/(\d+)/);
+const sizeOptions: Array<{ value: PackageSize; label: string }> = [
+  { value: 'small', label: '소형' },
+  { value: 'medium', label: '중형' },
+  { value: 'large', label: '대형' },
+  { value: 'xl', label: '특대형' },
+];
+
+function parseEtaMinutes(label: string): number {
+  const matched = label.match(/(\d+)/);
   return matched ? Number(matched[1]) : 0;
+}
+
+function normalizeAISize(size?: string): PackageSize | null {
+  return size === 'small' || size === 'medium' || size === 'large' || size === 'xl' ? size : null;
 }
 
 function toStationInfo(station: Station): StationInfo {
   const line = station.lines?.[0];
-  const location = station.location as
-    | { lat?: number; lng?: number; latitude?: number; longitude?: number }
-    | undefined;
-
+  const location = station.location as { lat?: number; lng?: number; latitude?: number; longitude?: number } | undefined;
   return {
     id: station.stationId || station.stationName,
     stationId: station.stationId || station.stationName,
@@ -59,11 +69,26 @@ function toStationInfo(station: Station): StationInfo {
   };
 }
 
-function fromPrefillStation(station?: StationInfo): Station | null {
-  if (!station) {
-    return null;
-  }
+function toLocationRef(mode: LocationMode, station: StationInfo, addressText: string) {
+  return {
+    type: mode,
+    stationId: station.stationId,
+    stationName: station.stationName,
+    addressText: mode === 'address' ? addressText : undefined,
+    latitude: station.lat,
+    longitude: station.lng,
+  } as const;
+}
 
+function formatDetailedAddress(roadAddress: string, detailAddress: string) {
+  const road = roadAddress.trim();
+  const detail = detailAddress.trim();
+  if (!road) return '';
+  return detail ? `${road} ${detail}` : road;
+}
+
+function fromPrefillStation(station?: StationInfo): Station | null {
+  if (!station) return null;
   return {
     stationId: station.stationId,
     stationName: station.stationName,
@@ -80,15 +105,8 @@ function fromPrefillStation(station?: StationInfo): Station | null {
         lineType: 'general',
       },
     ],
-    location: {
-      latitude: station.lat,
-      longitude: station.lng,
-    },
-    facilities: {
-      hasElevator: false,
-      hasEscalator: false,
-      wheelchairAccessible: false,
-    },
+    location: { latitude: station.lat, longitude: station.lng },
+    facilities: { hasElevator: false, hasEscalator: false, wheelchairAccessible: false },
     isActive: true,
     region: '서울',
     priority: 0,
@@ -97,8 +115,8 @@ function fromPrefillStation(station?: StationInfo): Station | null {
   };
 }
 
-function getFallbackStation(type: PickerType): Station {
-  const isPickup = type === 'pickup';
+function fallbackStation(kind: PickerType): Station {
+  const isPickup = kind === 'pickup';
   return {
     stationId: isPickup ? 'preview-pickup' : 'preview-delivery',
     stationName: isPickup ? '출발역' : '도착역',
@@ -115,15 +133,8 @@ function getFallbackStation(type: PickerType): Station {
         lineType: 'general',
       },
     ],
-    location: {
-      latitude: isPickup ? 37.5665 : 37.5704,
-      longitude: isPickup ? 126.978 : 126.991,
-    },
-    facilities: {
-      hasElevator: false,
-      hasEscalator: false,
-      wheelchairAccessible: false,
-    },
+    location: { latitude: isPickup ? 37.5665 : 37.5704, longitude: isPickup ? 126.978 : 126.991 },
+    facilities: { hasElevator: false, hasEscalator: false, wheelchairAccessible: false },
     isActive: true,
     region: '서울',
     priority: 0,
@@ -132,16 +143,16 @@ function getFallbackStation(type: PickerType): Station {
   };
 }
 
-function SectionCard({ title, children }: { title: string; children: React.ReactNode }) {
+function Block({ title, children }: { title: string; children: React.ReactNode }) {
   return (
-    <View style={styles.sectionCard}>
-      <Text style={styles.sectionTitle}>{title}</Text>
+    <View style={styles.card}>
+      <Text style={styles.cardTitle}>{title}</Text>
       {children}
     </View>
   );
 }
 
-function SegmentButton({
+function Chip({
   label,
   active,
   onPress,
@@ -151,29 +162,8 @@ function SegmentButton({
   onPress: () => void;
 }) {
   return (
-    <TouchableOpacity
-      style={[styles.segmentButton, active && styles.segmentButtonActive]}
-      onPress={onPress}
-      activeOpacity={0.9}
-    >
-      <Text style={[styles.segmentButtonText, active && styles.segmentButtonTextActive]}>{label}</Text>
-    </TouchableOpacity>
-  );
-}
-
-function StationButton({
-  label,
-  value,
-  onPress,
-}: {
-  label: string;
-  value: string;
-  onPress: () => void;
-}) {
-  return (
-    <TouchableOpacity style={styles.stationButton} onPress={onPress} activeOpacity={0.92}>
-      <Text style={styles.stationLabel}>{label}</Text>
-      <Text style={styles.stationValue}>{value}</Text>
+    <TouchableOpacity style={[styles.chip, active && styles.chipActive]} onPress={onPress}>
+      <Text style={[styles.chipText, active && styles.chipTextActive]}>{label}</Text>
     </TouchableOpacity>
   );
 }
@@ -182,18 +172,38 @@ export default function CreateRequestScreen({ navigation, route }: Props) {
   const { user } = useUser();
   const params = route?.params;
   const prefill = params?.prefill;
-  const isReservationFlow = params?.mode === 'reservation';
 
   const [stations, setStations] = useState<Station[]>([]);
-  const [loadingStations, setLoadingStations] = useState(true);
-  const [saving, setSaving] = useState(false);
+  const [loading, setLoading] = useState(true);
   const [pickerVisible, setPickerVisible] = useState(false);
   const [pickerType, setPickerType] = useState<PickerType>('pickup');
+  const [addressTarget, setAddressTarget] = useState<AddressTarget>(null);
+  const [saving, setSaving] = useState(false);
+  const [aiLoading, setAiLoading] = useState(false);
+  const [resolvingLocation, setResolvingLocation] = useState<PickerType | null>(null);
 
+  const [pickupMode, setPickupMode] = useState<LocationMode>('station');
+  const [deliveryMode, setDeliveryMode] = useState<LocationMode>('station');
   const [pickupStation, setPickupStation] = useState<Station | null>(() => fromPrefillStation(prefill?.pickupStation));
   const [deliveryStation, setDeliveryStation] = useState<Station | null>(() => fromPrefillStation(prefill?.deliveryStation));
+  const [pickupRoadAddress, setPickupRoadAddress] = useState('');
+  const [pickupDetailAddress, setPickupDetailAddress] = useState('');
+  const [deliveryRoadAddress, setDeliveryRoadAddress] = useState('');
+  const [deliveryDetailAddress, setDeliveryDetailAddress] = useState('');
+  const [savedAddresses, setSavedAddresses] = useState<SavedAddress[]>([]);
+  const [recentAddresses, setRecentAddresses] = useState<SavedAddress[]>([]);
+
+  const [photoUrl, setPhotoUrl] = useState<string | null>(null);
+  const [photoRefs, setPhotoRefs] = useState<string[]>([]);
+  const [aiResult, setAiResult] = useState<Beta1AIAnalysisResponse | null>(null);
+
+  const [requestMode, setRequestMode] = useState<'immediate' | 'reservation'>(
+    params?.mode === 'reservation' ? 'reservation' : 'immediate'
+  );
+  const [packageItemName, setPackageItemName] = useState('');
+  const [packageCategory, setPackageCategory] = useState('');
   const [packageDescription, setPackageDescription] = useState(prefill?.packageDescription ?? '');
-  const [packageSize, setPackageSize] = useState<RequestPackageSize>(prefill?.packageSize ?? 'small');
+  const [packageSize, setPackageSize] = useState<PackageSize>(prefill?.packageSize ?? 'small');
   const [weightKg, setWeightKg] = useState(String(prefill?.weightKg ?? 1));
   const [itemValue, setItemValue] = useState(prefill?.itemValue ? String(prefill.itemValue) : '');
   const [recipientName, setRecipientName] = useState(prefill?.recipientName ?? '');
@@ -201,54 +211,60 @@ export default function CreateRequestScreen({ navigation, route }: Props) {
   const [directMode, setDirectMode] = useState<'none' | 'requester_to_station' | 'locker_assisted'>(
     prefill?.directParticipationMode ?? 'none'
   );
-  const [urgency, setUrgency] = useState<'normal' | 'fast' | 'urgent'>(
-    prefill?.urgency ?? (isReservationFlow ? 'normal' : 'fast')
-  );
-  const [requestMode, setRequestMode] = useState<'immediate' | 'reservation'>(
-    isReservationFlow ? 'reservation' : 'immediate'
-  );
+  const [urgency, setUrgency] = useState<'normal' | 'fast' | 'urgent'>(prefill?.urgency ?? 'fast');
   const [preferredPickupTime, setPreferredPickupTime] = useState(prefill?.preferredPickupTime ?? '');
   const [preferredArrivalTime, setPreferredArrivalTime] = useState(prefill?.preferredArrivalTime ?? '');
-  const [selectedQuoteType, setSelectedQuoteType] = useState<Beta1QuoteCard['quoteType']>(
-    isReservationFlow ? 'balanced' : 'fastest'
-  );
+  const [selectedQuoteType, setSelectedQuoteType] = useState<Beta1QuoteCard['quoteType']>('balanced');
 
   useEffect(() => {
-    const load = async () => {
+    const run = async () => {
       try {
-        const nextStations = await getAllStations();
-        setStations(nextStations);
-
-        if (prefill?.pickupStation && !pickupStation) {
-          const match = nextStations.find((station) => station.stationId === prefill.pickupStation?.stationId);
-          if (match) {
-            setPickupStation(match);
-          }
-        }
-
-        if (prefill?.deliveryStation && !deliveryStation) {
-          const match = nextStations.find((station) => station.stationId === prefill.deliveryStation?.stationId);
-          if (match) {
-            setDeliveryStation(match);
-          }
-        }
+        const list = await getAllStations();
+        setStations(list);
       } finally {
-        setLoadingStations(false);
+        setLoading(false);
       }
     };
+    void run();
+  }, []);
 
-    void load();
-  }, [deliveryStation, pickupStation, prefill?.deliveryStation, prefill?.pickupStation]);
+  useEffect(() => {
+    const run = async () => {
+      if (!user?.uid) return;
+      try {
+        const [saved, recent] = await Promise.all([
+          getSavedAddresses(user.uid),
+          getRecentAddresses(user.uid),
+        ]);
+        setSavedAddresses(saved);
+        setRecentAddresses(recent);
+      } catch (error) {
+        console.error('Failed to load address options', error);
+      }
+    };
+    void run();
+  }, [user?.uid]);
 
-  const quoteCards = useMemo<Beta1QuoteCard[]>(() => {
-    const fallbackPickup = pickupStation ?? stations[0] ?? getFallbackStation('pickup');
-    const fallbackDelivery = deliveryStation ?? stations[1] ?? getFallbackStation('delivery');
+  const quotes = useMemo(() => {
+    const origin = pickupStation ?? stations[0] ?? fallbackStation('pickup');
+    const destination = deliveryStation ?? stations[1] ?? fallbackStation('delivery');
+    const pickupAddress = formatDetailedAddress(pickupRoadAddress, pickupDetailAddress);
+    const deliveryAddress = formatDetailedAddress(deliveryRoadAddress, deliveryDetailAddress);
 
     return buildBeta1QuoteCards({
       requesterUserId: user?.uid ?? 'preview',
       requestMode,
-      pickupStation: toStationInfo(fallbackPickup),
-      deliveryStation: toStationInfo(fallbackDelivery),
+      originType: pickupMode,
+      destinationType: deliveryMode,
+      pickupStation: toStationInfo(origin),
+      deliveryStation: toStationInfo(destination),
+      pickupRoadAddress: pickupRoadAddress || undefined,
+      pickupDetailAddress: pickupDetailAddress || undefined,
+      deliveryRoadAddress: deliveryRoadAddress || undefined,
+      deliveryDetailAddress: deliveryDetailAddress || undefined,
+      selectedPhotoIds: photoRefs,
+      packageItemName: packageItemName || undefined,
+      packageCategory: packageCategory || undefined,
       packageDescription: packageDescription || '물품 설명',
       packageSize,
       weightKg: Math.max(0.1, Number(weightKg || 0)),
@@ -260,54 +276,220 @@ export default function CreateRequestScreen({ navigation, route }: Props) {
       directParticipationMode: directMode,
       preferredPickupTime,
       preferredArrivalTime,
+      aiAnalysisOverride: aiResult
+        ? {
+            provider: aiResult.provider,
+            model: aiResult.model,
+            confidence: aiResult.confidence,
+            fallbackUsed: aiResult.fallbackUsed,
+            result: aiResult.result,
+          }
+        : undefined,
     });
   }, [
+    stations,
+    user?.uid,
+    requestMode,
+    pickupMode,
+    deliveryMode,
+    pickupStation,
     deliveryStation,
-    directMode,
-    itemValue,
+    pickupRoadAddress,
+    pickupDetailAddress,
+    deliveryRoadAddress,
+    deliveryDetailAddress,
+    photoRefs,
+    packageItemName,
+    packageCategory,
     packageDescription,
     packageSize,
-    pickupStation,
-    preferredArrivalTime,
-    preferredPickupTime,
+    weightKg,
+    itemValue,
     recipientName,
     recipientPhone,
-    requestMode,
-    selectedQuoteType,
-    stations,
     urgency,
-    user?.uid,
-    weightKg,
+    selectedQuoteType,
+    directMode,
+    preferredPickupTime,
+    preferredArrivalTime,
+    aiResult,
   ]);
 
   const submitDisabled =
     !pickupStation ||
     !deliveryStation ||
+    !photoUrl ||
     !packageDescription.trim() ||
     !recipientName.trim() ||
     !recipientPhone.trim() ||
+    (pickupMode === 'address' && (!pickupRoadAddress.trim() || !pickupDetailAddress.trim())) ||
+    (deliveryMode === 'address' && (!deliveryRoadAddress.trim() || !deliveryDetailAddress.trim())) ||
     (requestMode === 'reservation' && !preferredPickupTime.trim());
 
-  async function handleSubmit() {
-    if (submitDisabled || !pickupStation || !deliveryStation) {
-      Alert.alert('입력 확인', '출발역, 도착역, 물품 정보, 수령인 정보를 확인해 주세요.');
+  async function handleUseCurrentLocation(target: PickerType) {
+    try {
+      setResolvingLocation(target);
+      const currentLocation = await locationService.getCurrentLocation();
+      if (!currentLocation) {
+        Alert.alert('위치 권한이 필요합니다', '고객 디바이스의 위치 권한을 허용한 뒤 다시 시도해 주세요.');
+        return;
+      }
+
+      const stationCandidates = stations
+        .filter((station) => station.location?.latitude != null && station.location?.longitude != null)
+        .map((station) => ({
+          station,
+          name: station.stationName,
+          line: station.lines[0]?.lineName ?? '',
+          latitude: station.location?.latitude ?? 0,
+          longitude: station.location?.longitude ?? 0,
+        }));
+
+      const nearest = locationService.findNearestStations(
+        {
+          latitude: currentLocation.latitude,
+          longitude: currentLocation.longitude,
+          accuracy: currentLocation.accuracy,
+          altitude: currentLocation.altitude,
+          speed: currentLocation.speed,
+          heading: currentLocation.heading,
+        },
+        stationCandidates,
+        1
+      )[0];
+
+      if (!nearest) {
+        Alert.alert('가까운 역을 찾지 못했습니다', '잠시 후 다시 시도해 주세요.');
+        return;
+      }
+
+      if (target === 'pickup') {
+        setPickupStation(nearest.station.station);
+      } else {
+        setDeliveryStation(nearest.station.station);
+      }
+
+      Alert.alert('가까운 역을 추천했어요', `${nearest.station.station.stationName} (${Math.round(nearest.distanceMeters)}m)`);
+    } catch (error) {
+      console.error('Failed to resolve nearest station', error);
+      Alert.alert('위치 기반 추천에 실패했습니다', '현재 위치 확인 후 다시 시도해 주세요.');
+    } finally {
+      setResolvingLocation(null);
+    }
+  }
+
+  async function handleUploadPhoto() {
+    try {
+      const requesterUserId = user?.uid ?? requireUserId();
+      const localUri = await takePhoto();
+      if (!localUri) return;
+
+      const uploaded = await uploadPhotoWithThumbnail(localUri, requesterUserId, 'request-item');
+      setPhotoUrl(uploaded.url);
+      setPhotoRefs((prev) => [uploaded.url, ...prev.filter((item) => item !== uploaded.url)]);
+      setAiResult(null);
+    } catch (error) {
+      console.error(error);
+      Alert.alert('사진 업로드 실패', '사진을 업로드하지 못했습니다. 잠시 후 다시 시도해 주세요.');
+    }
+  }
+
+  async function handleAI() {
+    if (!photoUrl) {
+      Alert.alert('사진이 필요해요', '먼저 물건 사진을 올린 뒤 AI 작성 보조를 사용할 수 있어요.');
       return;
     }
 
-    if (pickupStation.stationId === deliveryStation.stationId) {
-      Alert.alert('역 선택 확인', '출발역과 도착역은 서로 다르게 선택해 주세요.');
+    const origin = toStationInfo(pickupStation ?? stations[0] ?? fallbackStation('pickup'));
+    const destination = toStationInfo(deliveryStation ?? stations[1] ?? fallbackStation('delivery'));
+    const pickupAddress = formatDetailedAddress(pickupRoadAddress, pickupDetailAddress);
+    const deliveryAddress = formatDetailedAddress(deliveryRoadAddress, deliveryDetailAddress);
+
+    setAiLoading(true);
+    try {
+      const result = await analyzeRequestDraftWithAI({
+        requesterUserId: user?.uid ?? requireUserId(),
+        requestMode,
+        originRef: toLocationRef(pickupMode, origin, pickupAddress),
+        destinationRef: toLocationRef(deliveryMode, destination, deliveryAddress),
+        packageDraft: {
+          itemName: packageItemName || undefined,
+          category: packageCategory || undefined,
+          description: packageDescription || undefined,
+          estimatedValue: itemValue ? Number(itemValue) : undefined,
+          estimatedWeightKg: weightKg ? Number(weightKg) : undefined,
+          estimatedSize: packageSize,
+        },
+        recipient: {
+          name: recipientName || undefined,
+          phone: recipientPhone || undefined,
+        },
+        preferredSchedule: {
+          pickupTime: preferredPickupTime || undefined,
+          arrivalTime: preferredArrivalTime || undefined,
+        },
+      });
+
+      setAiResult(result);
+
+      if (result.result.itemName) setPackageItemName(result.result.itemName);
+      if (result.result.category) setPackageCategory(result.result.category);
+      if (result.result.description) setPackageDescription(result.result.description);
+      if (typeof result.result.estimatedValue === 'number' && result.result.estimatedValue > 0) {
+        setItemValue(String(Math.round(result.result.estimatedValue)));
+      }
+      if (typeof result.result.estimatedWeightKg === 'number' && result.result.estimatedWeightKg > 0) {
+        setWeightKg(String(result.result.estimatedWeightKg));
+      }
+
+      const aiSize = normalizeAISize(result.result.estimatedSize);
+      if (aiSize) setPackageSize(aiSize);
+    } catch (error) {
+      console.error(error);
+      Alert.alert('AI 작성 실패', 'AI 초안을 만들지 못했습니다. 직접 입력해서 계속 진행할 수 있어요.');
+    } finally {
+      setAiLoading(false);
+    }
+  }
+
+  async function handleSubmit() {
+    if (submitDisabled || !pickupStation || !deliveryStation) {
+      Alert.alert('입력 확인', '사진, 출발/도착 정보, 물품 정보와 수령인 정보를 모두 확인해 주세요.');
       return;
     }
 
     setSaving(true);
     try {
-      const requesterUserId = user?.uid ?? requireUserId();
+      if (pickupMode === 'address' && user?.uid) {
+        await addRecentAddress(user.uid, {
+          label: '최근 출발지',
+          roadAddress: pickupRoadAddress,
+          detailAddress: pickupDetailAddress,
+        });
+      }
+      if (deliveryMode === 'address' && user?.uid) {
+        await addRecentAddress(user.uid, {
+          label: '최근 도착지',
+          roadAddress: deliveryRoadAddress,
+          detailAddress: deliveryDetailAddress,
+        });
+      }
+
       const result = await createBeta1Request({
-        requesterUserId,
+        requesterUserId: user?.uid ?? requireUserId(),
         requestMode,
         sourceRequestId: params?.sourceRequestId,
+        originType: pickupMode,
+        destinationType: deliveryMode,
         pickupStation: toStationInfo(pickupStation),
         deliveryStation: toStationInfo(deliveryStation),
+        pickupRoadAddress: pickupRoadAddress || undefined,
+        pickupDetailAddress: pickupDetailAddress || undefined,
+        deliveryRoadAddress: deliveryRoadAddress || undefined,
+        deliveryDetailAddress: deliveryDetailAddress || undefined,
+        selectedPhotoIds: photoRefs,
+        packageItemName: packageItemName || undefined,
+        packageCategory: packageCategory || undefined,
         packageDescription,
         packageSize,
         weightKg: Math.max(0.1, Number(weightKg || 0)),
@@ -317,127 +499,245 @@ export default function CreateRequestScreen({ navigation, route }: Props) {
         urgency: requestMode === 'reservation' ? 'normal' : urgency,
         selectedQuoteType,
         directParticipationMode: directMode,
-        preferredPickupTime:
-          requestMode === 'reservation' ? preferredPickupTime : preferredPickupTime || '지금 바로',
+        preferredPickupTime: requestMode === 'reservation' ? preferredPickupTime : preferredPickupTime || '지금 바로',
         preferredArrivalTime: preferredArrivalTime || undefined,
+        aiAnalysisOverride: aiResult
+          ? {
+              provider: aiResult.provider,
+              model: aiResult.model,
+              confidence: aiResult.confidence,
+              fallbackUsed: aiResult.fallbackUsed,
+              result: aiResult.result,
+            }
+          : undefined,
       });
 
-      const selectedQuoteCard =
-        result.quoteCards.find((card) => card.quoteType === selectedQuoteType) ?? result.quoteCards[0];
+      const selected = result.quoteCards.find((card) => card.quoteType === selectedQuoteType) ?? result.quoteCards[0];
 
       navigation.replace('RequestConfirmation', {
         requestId: result.requestId,
-        pickupStationName: pickupStation.stationName,
-        deliveryStationName: deliveryStation.stationName,
-        deliveryFee: selectedQuoteCard
+        pickupStationName:
+          pickupMode === 'address'
+            ? `${formatDetailedAddress(pickupRoadAddress, pickupDetailAddress)} · ${pickupStation.stationName}`
+            : pickupStation.stationName,
+        deliveryStationName:
+          deliveryMode === 'address'
+            ? `${formatDetailedAddress(deliveryRoadAddress, deliveryDetailAddress)} · ${deliveryStation.stationName}`
+            : deliveryStation.stationName,
+        deliveryFee: selected
           ? {
-              totalFee: Number(selectedQuoteCard.pricing.publicPrice),
-              estimatedTime: parseEtaMinutes(selectedQuoteCard.etaLabel),
+              totalFee: Number(selected.pricing.publicPrice),
+              estimatedTime: parseEtaMinutes(selected.etaLabel),
             }
           : undefined,
       });
     } catch (error) {
-      console.error('Failed to create request', error);
-      const isAuthError =
-        error instanceof Error && /login|auth|로그인|세션|인증/i.test(error.message);
-
-      Alert.alert(
-        '요청 생성 실패',
-        isAuthError
-          ? '로그인 상태를 다시 확인한 뒤 요청을 생성해 주세요.'
-          : '요청을 만드는 중 문제가 발생했습니다. 잠시 후 다시 시도해 주세요.'
-      );
+      console.error(error);
+      Alert.alert('요청 생성 실패', '요청을 만드는 중 문제가 발생했습니다. 잠시 후 다시 시도해 주세요.');
     } finally {
       setSaving(false);
     }
   }
 
-  if (loadingStations) {
+  if (loading) {
     return (
-      <View style={styles.loadingWrap}>
+      <View style={styles.center}>
         <ActivityIndicator size="large" color={Colors.primary} />
-        <Text style={styles.loadingText}>요청 화면을 준비하고 있습니다.</Text>
+        <Text style={styles.muted}>요청 화면을 준비하고 있어요.</Text>
       </View>
     );
   }
 
   return (
-    <KeyboardAvoidingView
-      style={styles.container}
-      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-    >
-      <AppTopBar
-        title={requestMode === 'reservation' ? '예약 요청' : '배송 요청'}
-        onBack={() => navigation.goBack()}
-      />
+    <KeyboardAvoidingView style={styles.container} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+      <AppTopBar title={requestMode === 'reservation' ? '예약 요청' : '배송 요청'} onBack={() => navigation.goBack()} />
 
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
-        <View style={styles.heroCard}>
-          <Text style={styles.heroKicker}>가는길에</Text>
-          <Text style={styles.heroTitle}>
-            {requestMode === 'reservation' ? '예약 배송을 준비합니다.' : '배송 요청을 시작합니다.'}
-          </Text>
-          <Text style={styles.heroSubtitle}>
-            {requestMode === 'reservation'
-              ? '시간과 구간만 정하면 됩니다.'
-              : '출발역과 도착역을 먼저 선택해 주세요.'}
-          </Text>
-        </View>
-
-        <SectionCard title="요청 방식">
-          <View style={styles.segmentRow}>
-            <SegmentButton
-              label="지금 바로"
-              active={requestMode === 'immediate'}
-              onPress={() => setRequestMode('immediate')}
-            />
-            <SegmentButton
-              label="예약하기"
-              active={requestMode === 'reservation'}
-              onPress={() => setRequestMode('reservation')}
-            />
+        <Block title="요청 방식">
+          <View style={styles.row}>
+            <Chip label="지금 바로" active={requestMode === 'immediate'} onPress={() => setRequestMode('immediate')} />
+            <Chip label="예약하기" active={requestMode === 'reservation'} onPress={() => setRequestMode('reservation')} />
           </View>
-        </SectionCard>
+        </Block>
 
-        <SectionCard title="이동 구간">
-          <StationButton
-            label="출발역"
-            value={pickupStation ? pickupStation.stationName : '출발역 선택'}
+        <Block title="출발 정보">
+          <View style={styles.row}>
+            <Chip label="역에서 시작" active={pickupMode === 'station'} onPress={() => setPickupMode('station')} />
+            <Chip label="주소에서 시작" active={pickupMode === 'address'} onPress={() => setPickupMode('address')} />
+          </View>
+          {pickupMode === 'address' ? (
+            <View style={styles.column}>
+              <AddressQuickPick
+                title="저장된 주소"
+                addresses={savedAddresses}
+                onSelect={(address) => {
+                  setPickupRoadAddress(address.roadAddress);
+                  setPickupDetailAddress(address.detailAddress);
+                }}
+              />
+              <AddressQuickPick
+                title="최근 사용 주소"
+                addresses={recentAddresses}
+                onSelect={(address) => {
+                  setPickupRoadAddress(address.roadAddress);
+                  setPickupDetailAddress(address.detailAddress);
+                }}
+              />
+              <TouchableOpacity style={styles.selector} onPress={() => setAddressTarget('pickup')}>
+                <Text style={styles.selectorLabel}>도로명 주소</Text>
+                <Text style={styles.selectorValue}>{pickupRoadAddress || '주소 검색으로 선택'}</Text>
+              </TouchableOpacity>
+              <TextInput
+                style={styles.input}
+                value={pickupDetailAddress}
+                onChangeText={setPickupDetailAddress}
+                placeholder="출발지 상세주소"
+                placeholderTextColor={Colors.gray400}
+              />
+            </View>
+          ) : null}
+          <TouchableOpacity
+            style={styles.selector}
             onPress={() => {
               setPickerType('pickup');
               setPickerVisible(true);
             }}
-          />
-          <StationButton
-            label="도착역"
-            value={deliveryStation ? deliveryStation.stationName : '도착역 선택'}
+          >
+            <Text style={styles.selectorLabel}>{pickupMode === 'address' ? '가까운 출발역' : '출발역'}</Text>
+            <Text style={styles.selectorValue}>{pickupStation?.stationName ?? '출발역 선택'}</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={styles.secondaryButton}
+            onPress={() => {
+              void handleUseCurrentLocation('pickup');
+            }}
+            disabled={resolvingLocation === 'pickup'}
+          >
+            {resolvingLocation === 'pickup' ? (
+              <ActivityIndicator color={Colors.primary} />
+            ) : (
+              <Text style={styles.secondaryButtonText}>현재 위치로 가까운 출발역 추천</Text>
+            )}
+          </TouchableOpacity>
+        </Block>
+
+        <Block title="도착 정보">
+          <View style={styles.row}>
+            <Chip label="역으로 도착" active={deliveryMode === 'station'} onPress={() => setDeliveryMode('station')} />
+            <Chip label="주소로 도착" active={deliveryMode === 'address'} onPress={() => setDeliveryMode('address')} />
+          </View>
+          {deliveryMode === 'address' ? (
+            <View style={styles.column}>
+              <AddressQuickPick
+                title="저장된 주소"
+                addresses={savedAddresses}
+                onSelect={(address) => {
+                  setDeliveryRoadAddress(address.roadAddress);
+                  setDeliveryDetailAddress(address.detailAddress);
+                }}
+              />
+              <AddressQuickPick
+                title="최근 사용 주소"
+                addresses={recentAddresses}
+                onSelect={(address) => {
+                  setDeliveryRoadAddress(address.roadAddress);
+                  setDeliveryDetailAddress(address.detailAddress);
+                }}
+              />
+              <TouchableOpacity style={styles.selector} onPress={() => setAddressTarget('delivery')}>
+                <Text style={styles.selectorLabel}>도로명 주소</Text>
+                <Text style={styles.selectorValue}>{deliveryRoadAddress || '주소 검색으로 선택'}</Text>
+              </TouchableOpacity>
+              <TextInput
+                style={styles.input}
+                value={deliveryDetailAddress}
+                onChangeText={setDeliveryDetailAddress}
+                placeholder="도착지 상세주소"
+                placeholderTextColor={Colors.gray400}
+              />
+            </View>
+          ) : null}
+          <TouchableOpacity
+            style={styles.selector}
             onPress={() => {
               setPickerType('delivery');
               setPickerVisible(true);
             }}
-          />
-        </SectionCard>
+          >
+            <Text style={styles.selectorLabel}>{deliveryMode === 'address' ? '가까운 도착역' : '도착역'}</Text>
+            <Text style={styles.selectorValue}>{deliveryStation?.stationName ?? '도착역 선택'}</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={styles.secondaryButton}
+            onPress={() => {
+              void handleUseCurrentLocation('delivery');
+            }}
+            disabled={resolvingLocation === 'delivery'}
+          >
+            {resolvingLocation === 'delivery' ? (
+              <ActivityIndicator color={Colors.primary} />
+            ) : (
+              <Text style={styles.secondaryButtonText}>현재 위치로 가까운 도착역 추천</Text>
+            )}
+          </TouchableOpacity>
+        </Block>
 
-        <SectionCard title="물품 정보">
+        <Block title="물건 사진">
+          <TouchableOpacity style={styles.primaryButton} onPress={() => void handleUploadPhoto()}>
+            <Text style={styles.primaryButtonText}>{photoUrl ? '사진 다시 올리기' : '물건 사진 올리기'}</Text>
+          </TouchableOpacity>
+          <Text style={styles.muted}>배송 요청에는 물건 사진이 반드시 필요합니다.</Text>
+          {photoUrl ? <Image source={{ uri: photoUrl }} style={styles.previewImage} /> : null}
+          <TouchableOpacity
+            style={[styles.secondaryButton, !photoUrl && styles.disabled]}
+            onPress={() => void handleAI()}
+            disabled={!photoUrl}
+          >
+            <Text style={styles.secondaryButtonText}>AI에게 작성 맡기기</Text>
+          </TouchableOpacity>
+          <Text style={styles.muted}>AI 작성은 선택 기능입니다. 직접 입력해서 진행해도 됩니다.</Text>
+        </Block>
+
+        <Block title="물품 정보">
           <TextInput
-            style={styles.textInput}
+            style={styles.input}
+            value={packageItemName}
+            onChangeText={setPackageItemName}
+            placeholder="물품명"
+            placeholderTextColor={Colors.gray400}
+          />
+          <TextInput
+            style={styles.input}
+            value={packageCategory}
+            onChangeText={setPackageCategory}
+            placeholder="카테고리"
+            placeholderTextColor={Colors.gray400}
+          />
+          <TextInput
+            style={styles.input}
             value={packageDescription}
             onChangeText={setPackageDescription}
             placeholder="예: 서류 봉투, 작은 박스, 노트북 가방"
             placeholderTextColor={Colors.gray400}
           />
-          <View style={styles.segmentRow}>
-            {(['small', 'medium', 'large'] as const).map((size) => (
-              <SegmentButton
-                key={size}
-                label={size}
-                active={packageSize === size}
-                onPress={() => setPackageSize(size)}
+          {aiResult ? (
+            <View style={styles.aiBox}>
+              <Text style={styles.aiTitle}>AI 작성 결과</Text>
+              <Text style={styles.muted}>신뢰도 {Math.round(aiResult.confidence * 100)}%</Text>
+            </View>
+          ) : null}
+          <View style={styles.row}>
+            {sizeOptions.map((size) => (
+              <Chip
+                key={size.value}
+                label={size.label}
+                active={packageSize === size.value}
+                onPress={() => setPackageSize(size.value)}
               />
             ))}
           </View>
           <TextInput
-            style={styles.textInput}
+            style={styles.input}
             value={weightKg}
             onChangeText={setWeightKg}
             keyboardType="decimal-pad"
@@ -445,27 +745,27 @@ export default function CreateRequestScreen({ navigation, route }: Props) {
             placeholderTextColor={Colors.gray400}
           />
           <TextInput
-            style={styles.textInput}
+            style={styles.input}
             value={itemValue}
             onChangeText={setItemValue}
             keyboardType="number-pad"
-            placeholder="물품 가액(선택)"
+            placeholder="물품 가치(선택)"
             placeholderTextColor={Colors.gray400}
           />
-        </SectionCard>
+        </Block>
 
-        <SectionCard title="시간과 참여 방식">
+        <Block title="시간과 진행 방식">
           {requestMode === 'reservation' ? (
             <>
               <TextInput
-                style={styles.textInput}
+                style={styles.input}
                 value={preferredPickupTime}
                 onChangeText={setPreferredPickupTime}
                 placeholder="예: 오늘 19:30"
                 placeholderTextColor={Colors.gray400}
               />
               <TextInput
-                style={styles.textInput}
+                style={styles.input}
                 value={preferredArrivalTime}
                 onChangeText={setPreferredArrivalTime}
                 placeholder="도착 희망 시간(선택)"
@@ -473,90 +773,81 @@ export default function CreateRequestScreen({ navigation, route }: Props) {
               />
             </>
           ) : (
-            <View style={styles.segmentRow}>
-              {(['normal', 'fast', 'urgent'] as const).map((level) => (
-                <SegmentButton
-                  key={level}
-                  label={level}
-                  active={urgency === level}
-                  onPress={() => setUrgency(level)}
+            <View style={styles.row}>
+              {([
+                { value: 'normal', label: '일반' },
+                { value: 'fast', label: '빠름' },
+                { value: 'urgent', label: '긴급' },
+              ] as const).map((level) => (
+                <Chip
+                  key={level.value}
+                  label={level.label}
+                  active={urgency === level.value}
+                  onPress={() => setUrgency(level.value)}
                 />
               ))}
             </View>
           )}
-
-          <View style={styles.segmentColumn}>
-            <SegmentButton
-              label="전부 맡기기"
-              active={directMode === 'none'}
-              onPress={() => setDirectMode('none')}
-            />
-            <SegmentButton
+          <View style={styles.column}>
+            <Chip label="전부 맡기기" active={directMode === 'none'} onPress={() => setDirectMode('none')} />
+            <Chip
               label="출발역까지 직접 전달"
               active={directMode === 'requester_to_station'}
               onPress={() => setDirectMode('requester_to_station')}
             />
-            <SegmentButton
+            <Chip
               label="사물함 포함"
               active={directMode === 'locker_assisted'}
               onPress={() => setDirectMode('locker_assisted')}
             />
           </View>
-        </SectionCard>
+        </Block>
 
-        <SectionCard title="수령인 정보">
+        <Block title="수령인 정보">
           <TextInput
-            style={styles.textInput}
+            style={styles.input}
             value={recipientName}
             onChangeText={setRecipientName}
             placeholder="수령인 이름"
             placeholderTextColor={Colors.gray400}
           />
           <TextInput
-            style={styles.textInput}
+            style={styles.input}
             value={recipientPhone}
             onChangeText={setRecipientPhone}
             keyboardType="phone-pad"
             placeholder="수령인 연락처"
             placeholderTextColor={Colors.gray400}
           />
-        </SectionCard>
+        </Block>
 
-        <View style={styles.sectionHeader}>
-          <Text style={styles.sectionHeaderTitle}>가격 선택</Text>
-        </View>
-
-        {quoteCards.map((card) => (
+        <Text style={styles.sectionHeader}>예상 금액</Text>
+        {quotes.map((card) => (
           <TouchableOpacity
             key={card.quoteType}
             style={[styles.quoteCard, selectedQuoteType === card.quoteType && styles.quoteCardSelected]}
             onPress={() => setSelectedQuoteType(card.quoteType)}
-            activeOpacity={0.92}
           >
             <View style={styles.quoteHeader}>
-              <View style={styles.quoteHeaderText}>
+              <View style={styles.quoteTextWrap}>
                 <Text style={styles.quoteLabel}>{card.label}</Text>
                 <Text style={styles.quoteHeadline}>{card.headline}</Text>
+                <Text style={styles.muted}>{card.recommendationReason}</Text>
               </View>
               <View style={styles.quotePriceWrap}>
                 <Text style={styles.quotePrice}>{card.priceLabel}</Text>
-                <Text style={styles.quoteEta}>{card.etaLabel}</Text>
+                <Text style={styles.muted}>{card.etaLabel}</Text>
               </View>
             </View>
           </TouchableOpacity>
         ))}
 
         <TouchableOpacity
-          style={[styles.submitButton, submitDisabled && styles.submitButtonDisabled]}
+          style={[styles.primaryButton, submitDisabled && styles.disabled]}
           onPress={() => void handleSubmit()}
           disabled={submitDisabled || saving}
-          activeOpacity={0.9}
         >
-          {saving ? (
-            <ActivityIndicator color={Colors.white} />
-          ) : (
-            <Text style={styles.submitButtonText}>요청 생성</Text>
-          )}
+          {saving ? <ActivityIndicator color={Colors.white} /> : <Text style={styles.primaryButtonText}>요청 생성</Text>}
         </TouchableOpacity>
       </ScrollView>
 
@@ -572,99 +863,129 @@ export default function CreateRequestScreen({ navigation, route }: Props) {
           }
           setPickerVisible(false);
         }}
-        title={pickerType === 'pickup' ? '출발역 선택' : '도착역 선택'}
+        title="역 선택"
       />
+
+      <AddressSearchModal
+        visible={addressTarget === 'pickup'}
+        title="출발 도로명 주소 검색"
+        onClose={() => setAddressTarget(null)}
+        onSelectAddress={(item) => {
+          setPickupRoadAddress(item.roadAddress);
+        }}
+      />
+
+      <AddressSearchModal
+        visible={addressTarget === 'delivery'}
+        title="도착 도로명 주소 검색"
+        onClose={() => setAddressTarget(null)}
+        onSelectAddress={(item) => {
+          setDeliveryRoadAddress(item.roadAddress);
+        }}
+      />
+
+      <Modal visible={aiLoading} transparent animationType="fade" statusBarTranslucent>
+        <View style={styles.modalBackdrop}>
+          <View style={styles.modalCard}>
+            <ActivityIndicator size="large" color={Colors.primary} />
+            <Text style={styles.modalTitle}>AI가 작성 중입니다</Text>
+            <Text style={styles.modalBody}>
+              사진과 주소/지하철 조건을 보고 물품 설명과 예상 정보를 정리하고 있어요. 잠시만 기다려 주세요.
+            </Text>
+          </View>
+        </View>
+      </Modal>
     </KeyboardAvoidingView>
+  );
+}
+
+function AddressQuickPick({
+  title,
+  addresses,
+  onSelect,
+}: {
+  title: string;
+  addresses: SavedAddress[];
+  onSelect: (address: SavedAddress) => void;
+}) {
+  if (addresses.length === 0) return null;
+
+  return (
+    <View style={styles.quickPickWrap}>
+      <Text style={styles.quickPickTitle}>{title}</Text>
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.quickPickRow}>
+        {addresses.slice(0, 5).map((address) => (
+          <TouchableOpacity key={`${title}-${address.addressId}`} style={styles.quickPickChip} onPress={() => onSelect(address)}>
+            <Text style={styles.quickPickLabel}>{address.label}</Text>
+            <Text numberOfLines={1} style={styles.quickPickText}>{address.fullAddress}</Text>
+          </TouchableOpacity>
+        ))}
+      </ScrollView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: Colors.background },
-  content: { padding: Spacing.lg, gap: Spacing.md },
-  loadingWrap: {
+  center: {
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
+    gap: 12,
     backgroundColor: Colors.background,
   },
-  loadingText: {
-    marginTop: Spacing.md,
-    color: Colors.textSecondary,
-    ...Typography.body,
-  },
-  heroCard: {
+  content: { padding: Spacing.lg, gap: Spacing.md },
+  card: {
     backgroundColor: Colors.surface,
     borderRadius: BorderRadius.xl,
     padding: Spacing.lg,
-    gap: 8,
+    gap: 10,
     ...Shadows.sm,
   },
-  heroKicker: {
-    color: Colors.primary,
-    fontSize: Typography.fontSize.sm,
-    fontWeight: '800',
-    letterSpacing: 0.8,
-    textTransform: 'uppercase',
-  },
-  heroTitle: {
-    color: Colors.textPrimary,
-    fontSize: Typography.fontSize['2xl'],
-    fontWeight: '800',
-  },
-  heroSubtitle: {
-    color: Colors.textSecondary,
-    ...Typography.body,
-  },
-  sectionCard: {
-    backgroundColor: Colors.surface,
-    borderRadius: BorderRadius.xl,
-    padding: Spacing.lg,
-    gap: Spacing.sm,
-    ...Shadows.sm,
-  },
-  sectionTitle: {
+  cardTitle: {
     color: Colors.textPrimary,
     fontSize: Typography.fontSize.lg,
     fontWeight: '800',
   },
   sectionHeader: {
-    paddingTop: 4,
-  },
-  sectionHeaderTitle: {
     color: Colors.textPrimary,
     fontSize: Typography.fontSize.lg,
     fontWeight: '800',
+    paddingTop: 4,
   },
-  segmentRow: {
-    flexDirection: 'row',
-    gap: 8,
-    flexWrap: 'wrap',
-  },
-  segmentColumn: {
-    gap: 8,
-  },
-  segmentButton: {
-    minHeight: 44,
+  row: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+  column: { gap: 8 },
+  chip: {
+    minHeight: 42,
     borderRadius: BorderRadius.lg,
     paddingHorizontal: Spacing.md,
-    backgroundColor: Colors.gray50,
     borderWidth: 1,
     borderColor: Colors.border,
-    alignItems: 'center',
+    backgroundColor: Colors.gray50,
     justifyContent: 'center',
+    alignItems: 'center',
   },
-  segmentButtonActive: {
+  chipActive: {
     backgroundColor: Colors.primary,
     borderColor: Colors.primary,
   },
-  segmentButtonText: {
+  chipText: {
     color: Colors.textPrimary,
     fontWeight: '700',
   },
-  segmentButtonTextActive: {
+  chipTextActive: {
     color: Colors.white,
   },
-  stationButton: {
+  input: {
+    minHeight: 52,
+    borderRadius: BorderRadius.lg,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    backgroundColor: Colors.surface,
+    paddingHorizontal: Spacing.md,
+    color: Colors.textPrimary,
+  },
+  selector: {
     minHeight: 58,
     borderRadius: BorderRadius.lg,
     borderWidth: 1,
@@ -674,22 +995,75 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     gap: 4,
   },
-  stationLabel: {
+  selectorLabel: {
     color: Colors.textSecondary,
     ...Typography.caption,
   },
-  stationValue: {
+  selectorValue: {
     color: Colors.textPrimary,
     fontWeight: '700',
   },
-  textInput: {
+  primaryButton: {
     minHeight: 52,
+    borderRadius: BorderRadius.full,
+    backgroundColor: Colors.primary,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  primaryButtonText: {
+    color: Colors.white,
+    fontSize: 16,
+    fontWeight: '800',
+  },
+  secondaryButton: {
+    minHeight: 48,
+    borderRadius: BorderRadius.lg,
+    borderWidth: 1,
+    borderColor: Colors.primary,
+    backgroundColor: Colors.gray50,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  secondaryButtonText: {
+    color: Colors.primary,
+    fontWeight: '800',
+  },
+  disabled: { opacity: 0.5 },
+  muted: {
+    color: Colors.textSecondary,
+    ...Typography.caption,
+  },
+  quickPickWrap: { gap: 8 },
+  quickPickTitle: { color: Colors.textSecondary, fontSize: Typography.fontSize.sm, fontWeight: '700' },
+  quickPickRow: { gap: 8 },
+  quickPickChip: {
+    width: 180,
     borderRadius: BorderRadius.lg,
     borderWidth: 1,
     borderColor: Colors.border,
-    backgroundColor: Colors.surface,
-    paddingHorizontal: Spacing.md,
+    backgroundColor: Colors.gray50,
+    padding: Spacing.sm,
+    gap: 4,
+  },
+  quickPickLabel: { color: Colors.textPrimary, fontWeight: '800', fontSize: Typography.fontSize.sm },
+  quickPickText: { color: Colors.textSecondary, ...Typography.caption },
+  previewImage: {
+    width: '100%',
+    height: 180,
+    borderRadius: BorderRadius.lg,
+    backgroundColor: Colors.gray100,
+  },
+  aiBox: {
+    borderRadius: BorderRadius.lg,
+    padding: Spacing.md,
+    backgroundColor: Colors.gray50,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    gap: 4,
+  },
+  aiTitle: {
     color: Colors.textPrimary,
+    fontWeight: '800',
   },
   quoteCard: {
     backgroundColor: Colors.surface,
@@ -706,7 +1080,7 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     gap: 12,
   },
-  quoteHeaderText: {
+  quoteTextWrap: {
     flex: 1,
     gap: 6,
   },
@@ -726,23 +1100,31 @@ const styles = StyleSheet.create({
     color: Colors.textPrimary,
     fontWeight: '800',
   },
-  quoteEta: {
-    color: Colors.textSecondary,
-    ...Typography.caption,
-  },
-  submitButton: {
-    minHeight: 54,
-    borderRadius: BorderRadius.full,
-    backgroundColor: Colors.primary,
+  modalBackdrop: {
+    flex: 1,
+    backgroundColor: 'rgba(15, 23, 42, 0.45)',
     alignItems: 'center',
     justifyContent: 'center',
+    padding: Spacing.xl,
   },
-  submitButtonDisabled: {
-    opacity: 0.5,
+  modalCard: {
+    width: '100%',
+    borderRadius: BorderRadius.xl,
+    backgroundColor: Colors.surface,
+    padding: Spacing.xl,
+    gap: Spacing.sm,
+    alignItems: 'center',
+    ...Shadows.sm,
   },
-  submitButtonText: {
-    color: Colors.white,
-    fontSize: 16,
+  modalTitle: {
+    color: Colors.textPrimary,
+    fontSize: Typography.fontSize.lg,
     fontWeight: '800',
+    textAlign: 'center',
+  },
+  modalBody: {
+    color: Colors.textSecondary,
+    ...Typography.bodySmall,
+    textAlign: 'center',
   },
 });

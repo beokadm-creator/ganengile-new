@@ -45,8 +45,17 @@ export interface Beta1RequestCreateInput {
   requesterUserId: string;
   requestMode?: 'immediate' | 'reservation';
   sourceRequestId?: string;
+  originType?: 'station' | 'address';
+  destinationType?: 'station' | 'address';
   pickupStation: StationInfo;
   deliveryStation: StationInfo;
+  pickupRoadAddress?: string;
+  pickupDetailAddress?: string;
+  deliveryRoadAddress?: string;
+  deliveryDetailAddress?: string;
+  selectedPhotoIds?: string[];
+  packageItemName?: string;
+  packageCategory?: string;
   packageDescription: string;
   packageSize: PackageSizeType;
   weightKg: number;
@@ -58,6 +67,22 @@ export interface Beta1RequestCreateInput {
   directParticipationMode: 'none' | 'requester_to_station' | 'locker_assisted';
   preferredPickupTime?: string;
   preferredArrivalTime?: string;
+  aiAnalysisOverride?: {
+    provider: string;
+    model: string;
+    confidence: number;
+    fallbackUsed?: boolean;
+    result: {
+      itemName?: string;
+      category?: string;
+      description?: string;
+      estimatedValue?: number;
+      estimatedWeightKg?: number;
+      estimatedSize?: 'small' | 'medium' | 'large' | 'xl';
+      riskFlags: string[];
+      handlingNotes: string[];
+    };
+  };
 }
 
 export interface Beta1QuoteCard {
@@ -197,8 +222,33 @@ function toLocationRef(station: StationInfo): LocationRef {
   };
 }
 
+function toAddressLocationRef(address: string, station: StationInfo): LocationRef {
+  return {
+    type: 'address',
+    addressText: address,
+    roadAddress: address,
+    stationId: station.stationId,
+    stationName: station.stationName,
+    latitude: station.lat,
+    longitude: station.lng,
+  };
+}
+
+function formatDetailedAddress(roadAddress?: string, detailAddress?: string): string | undefined {
+  const road = (roadAddress ?? '').trim();
+  const detail = (detailAddress ?? '').trim();
+  if (!road) return undefined;
+  return detail ? `${road} ${detail}` : road;
+}
+
 export function buildBeta1QuoteCards(input: Beta1RequestCreateInput): Beta1QuoteCard[] {
   const reservationMode = input.requestMode === 'reservation';
+  const originType = input.originType ?? 'station';
+  const destinationType = input.destinationType ?? 'station';
+  const hasAddressPickup = originType === 'address';
+  const hasAddressDropoff = destinationType === 'address';
+  const addressPickupFee = hasAddressPickup ? 900 : 0;
+  const addressDropoffFee = hasAddressDropoff ? 800 : 0;
   const base = calculatePhase1DeliveryFee({
     stationCount: 5,
     weight: input.weightKg,
@@ -212,14 +262,16 @@ export function buildBeta1QuoteCards(input: Beta1RequestCreateInput): Beta1Quote
       label: reservationMode ? '예약 우선 배정' : '가장 빠르게',
       headline: reservationMode ? '예약 요청이지만 빠른 배정 가능성을 열어둡니다.' : '지금 바로 미션을 열어 가장 빠른 연결을 노립니다.',
       etaLabel: reservationMode ? '예약 시간 우선 배정' : '약 70분',
-      priceLabel: `${(base.totalFee + (reservationMode ? 900 : 2500)).toLocaleString()}원`,
-      recommendationReason: reservationMode ? '예약 시간대를 지키면서도 빠른 actor를 먼저 검토합니다.' : '시간 제약이 크고 길러 재매칭까지 함께 고려합니다.',
+      priceLabel: `${(base.totalFee + (reservationMode ? 900 : 2500) + addressPickupFee + addressDropoffFee).toLocaleString()}원`,
+      recommendationReason: reservationMode
+        ? '예약 시간대와 주소/역 혼합 조건을 함께 고려해 빠른 actor를 먼저 검토합니다.'
+        : '시간 제약과 주소/역 혼합 동선을 함께 반영해 가장 빠른 연결을 노립니다.',
       includesLocker: false,
-      includesAddressPickup: true,
-      includesAddressDropoff: true,
+      includesAddressPickup: hasAddressPickup,
+      includesAddressDropoff: hasAddressDropoff,
       pricing: {
-        publicPrice: base.totalFee + (reservationMode ? 900 : 2500),
-        depositAmount: input.itemValue ? Math.round(input.itemValue * 0.1) : 0,
+        publicPrice: base.totalFee + (reservationMode ? 900 : 2500) + addressPickupFee + addressDropoffFee,
+        depositAmount: input.itemValue ? Math.round(input.itemValue) : 0,
         baseFee: base.baseFee,
         distanceFee: base.distanceFee,
         weightFee: base.weightFee,
@@ -227,8 +279,8 @@ export function buildBeta1QuoteCards(input: Beta1RequestCreateInput): Beta1Quote
         urgencySurcharge: reservationMode ? base.urgencySurcharge : base.urgencySurcharge + 1800,
         publicFare: base.publicFare,
         lockerFee: 0,
-        addressPickupFee: 900,
-        addressDropoffFee: 800,
+        addressPickupFee,
+        addressDropoffFee,
         serviceFee: base.serviceFee,
         vat: base.vat,
       },
@@ -237,15 +289,17 @@ export function buildBeta1QuoteCards(input: Beta1RequestCreateInput): Beta1Quote
       quoteType: 'balanced',
       label: reservationMode ? '예약 균형형' : '추천 균형형',
       headline: reservationMode ? '동선 안정성과 시간대 적합성을 함께 맞춥니다.' : '미션 속도와 리스크를 균형 있게 맞춥니다.',
-      etaLabel: reservationMode ? '예약 시간대 맞춤 배정' : '약 95분',
-      priceLabel: `${(base.totalFee + (reservationMode ? -200 : 0)).toLocaleString()}원`,
-      recommendationReason: reservationMode ? '예약 요청에서는 시간대 합의와 leg 안정성이 더 중요합니다.' : '가장 안정적인 성공률과 비용 균형을 제공합니다.',
+      etaLabel: reservationMode ? '예약 시간대 맞춤 배정' : hasAddressPickup || hasAddressDropoff ? '약 105분' : '약 95분',
+      priceLabel: `${(base.totalFee + (reservationMode ? -200 : 0) + addressPickupFee + addressDropoffFee).toLocaleString()}원`,
+      recommendationReason: reservationMode
+        ? '예약 요청에서는 시간대 합의와 주소/역 인계 안정성이 더 중요합니다.'
+        : '주소 픽업이나 주소 도착이 포함돼도 가장 안정적인 균형을 제공합니다.',
       includesLocker: input.directParticipationMode === 'locker_assisted',
-      includesAddressPickup: false,
-      includesAddressDropoff: true,
+      includesAddressPickup: hasAddressPickup,
+      includesAddressDropoff: hasAddressDropoff,
       pricing: {
-        publicPrice: base.totalFee + (reservationMode ? -200 : 0),
-        depositAmount: input.itemValue ? Math.round(input.itemValue * 0.1) : 0,
+        publicPrice: base.totalFee + (reservationMode ? -200 : 0) + addressPickupFee + addressDropoffFee,
+        depositAmount: input.itemValue ? Math.round(input.itemValue) : 0,
         baseFee: base.baseFee,
         distanceFee: base.distanceFee,
         weightFee: base.weightFee,
@@ -253,8 +307,8 @@ export function buildBeta1QuoteCards(input: Beta1RequestCreateInput): Beta1Quote
         urgencySurcharge: base.urgencySurcharge,
         publicFare: base.publicFare,
         lockerFee: input.directParticipationMode === 'locker_assisted' ? 1000 : 0,
-        addressPickupFee: 0,
-        addressDropoffFee: 900,
+        addressPickupFee,
+        addressDropoffFee,
         serviceFee: base.serviceFee,
         vat: base.vat,
       },
@@ -263,15 +317,17 @@ export function buildBeta1QuoteCards(input: Beta1RequestCreateInput): Beta1Quote
       quoteType: 'lowest_price',
       label: '가장 저렴하게',
       headline: reservationMode ? '여유 시간대와 직접 참여를 활용해 비용을 낮춥니다.' : '사용자 직접 참여와 사물함 경유를 우선 적용합니다.',
-      etaLabel: reservationMode ? '여유 시간대 중심 배정' : '약 120분',
-      priceLabel: `${Math.max(3000, base.totalFee - (reservationMode ? 1600 : 1400)).toLocaleString()}원`,
-      recommendationReason: reservationMode ? '급하지 않을수록 예약 전환의 비용 절감 효과가 커집니다.' : '직접 참여 범위를 활용해 전체 가격을 낮춥니다.',
+      etaLabel: reservationMode ? '여유 시간대 중심 배정' : hasAddressPickup || hasAddressDropoff ? '약 130분' : '약 120분',
+      priceLabel: `${Math.max(3000, base.totalFee - (reservationMode ? 1600 : 1400) + Math.round(addressPickupFee * 0.6) + Math.round(addressDropoffFee * 0.6)).toLocaleString()}원`,
+      recommendationReason: reservationMode
+        ? '급하지 않을수록 주소/역 혼합 요청도 예약 전환으로 비용 절감 효과가 커집니다.'
+        : '직접 참여와 거점 활용으로 주소 구간 비용을 최대한 낮춥니다.',
       includesLocker: true,
-      includesAddressPickup: false,
-      includesAddressDropoff: false,
+      includesAddressPickup: hasAddressPickup,
+      includesAddressDropoff: hasAddressDropoff,
       pricing: {
-        publicPrice: Math.max(3000, base.totalFee - (reservationMode ? 1600 : 1400)),
-        depositAmount: input.itemValue ? Math.round(input.itemValue * (reservationMode ? 0.07 : 0.08)) : 0,
+        publicPrice: Math.max(3000, base.totalFee - (reservationMode ? 1600 : 1400) + Math.round(addressPickupFee * 0.6) + Math.round(addressDropoffFee * 0.6)),
+        depositAmount: input.itemValue ? Math.round(input.itemValue) : 0,
         baseFee: base.baseFee,
         distanceFee: Math.max(0, base.distanceFee - 300),
         weightFee: base.weightFee,
@@ -279,8 +335,8 @@ export function buildBeta1QuoteCards(input: Beta1RequestCreateInput): Beta1Quote
         urgencySurcharge: Math.max(0, base.urgencySurcharge - 200),
         publicFare: base.publicFare,
         lockerFee: 700,
-        addressPickupFee: 0,
-        addressDropoffFee: 0,
+        addressPickupFee: Math.round(addressPickupFee * 0.6),
+        addressDropoffFee: Math.round(addressDropoffFee * 0.6),
         serviceFee: Math.max(0, base.serviceFee - 150),
         vat: base.vat,
       },
@@ -289,15 +345,17 @@ export function buildBeta1QuoteCards(input: Beta1RequestCreateInput): Beta1Quote
       quoteType: 'locker_included',
       label: reservationMode ? '예약 거점형' : '사물함 우선',
       headline: reservationMode ? '사물함과 거점 중심으로 예약 실패 리스크를 줄입니다.' : '사물함과 거점 연계를 우선 적용해 매칭 리스크를 낮춥니다.',
-      etaLabel: reservationMode ? '거점 기준 예약 배정' : '약 100분',
-      priceLabel: `${(base.totalFee + (reservationMode ? 200 : 500)).toLocaleString()}원`,
-      recommendationReason: reservationMode ? '예약형에서는 거점 연계가 시간 약속 유지에 유리합니다.' : '대면 인계보다 실패율이 낮고 채팅 합의도 단순해집니다.',
+      etaLabel: reservationMode ? '거점 기준 예약 배정' : hasAddressPickup || hasAddressDropoff ? '약 110분' : '약 100분',
+      priceLabel: `${(base.totalFee + (reservationMode ? 200 : 500) + Math.round(addressPickupFee * 0.7) + Math.round(addressDropoffFee * 0.7)).toLocaleString()}원`,
+      recommendationReason: reservationMode
+        ? '예약형에서는 거점 연계가 주소/역 혼합 요청의 시간 약속 유지에 유리합니다.'
+        : '사물함과 거점 연계로 주소 인계 실패율을 낮춥니다.',
       includesLocker: true,
-      includesAddressPickup: false,
-      includesAddressDropoff: true,
+      includesAddressPickup: hasAddressPickup,
+      includesAddressDropoff: hasAddressDropoff,
       pricing: {
-        publicPrice: base.totalFee + (reservationMode ? 200 : 500),
-        depositAmount: input.itemValue ? Math.round(input.itemValue * 0.1) : 0,
+        publicPrice: base.totalFee + (reservationMode ? 200 : 500) + Math.round(addressPickupFee * 0.7) + Math.round(addressDropoffFee * 0.7),
+        depositAmount: input.itemValue ? Math.round(input.itemValue) : 0,
         baseFee: base.baseFee,
         distanceFee: base.distanceFee,
         weightFee: base.weightFee,
@@ -305,8 +363,8 @@ export function buildBeta1QuoteCards(input: Beta1RequestCreateInput): Beta1Quote
         urgencySurcharge: base.urgencySurcharge,
         publicFare: base.publicFare,
         lockerFee: 1200,
-        addressPickupFee: 0,
-        addressDropoffFee: 600,
+        addressPickupFee: Math.round(addressPickupFee * 0.7),
+        addressDropoffFee: Math.round(addressDropoffFee * 0.7),
         serviceFee: base.serviceFee,
         vat: base.vat,
       },
@@ -358,6 +416,9 @@ export async function createBeta1Request(input: Beta1RequestCreateInput): Promis
       requesterUserId: input.requesterUserId,
       pickupStation: input.pickupStation,
       deliveryStation: input.deliveryStation,
+      selectedPhotoIds: input.selectedPhotoIds,
+      itemName: input.packageItemName,
+      category: input.packageCategory,
       description: input.packageDescription,
       estimatedValue: input.itemValue,
       estimatedWeightKg: input.weightKg,
@@ -370,37 +431,67 @@ export async function createBeta1Request(input: Beta1RequestCreateInput): Promis
   await updateRequestDraft(requestDraft.requestDraftId, {
     requestMode: input.requestMode ?? 'immediate',
     sourceRequestId: input.sourceRequestId,
+    originType: input.originType ?? 'station',
+    destinationType: input.destinationType ?? 'station',
+    originRef:
+      (input.originType ?? 'station') === 'address' &&
+      formatDetailedAddress(input.pickupRoadAddress, input.pickupDetailAddress)
+        ? {
+            ...toAddressLocationRef(
+              formatDetailedAddress(input.pickupRoadAddress, input.pickupDetailAddress) ?? '',
+              input.pickupStation
+            ),
+            roadAddress: input.pickupRoadAddress?.trim(),
+            detailAddress: input.pickupDetailAddress?.trim(),
+          }
+        : toLocationRef(input.pickupStation),
+    destinationRef:
+      (input.destinationType ?? 'station') === 'address' &&
+      formatDetailedAddress(input.deliveryRoadAddress, input.deliveryDetailAddress)
+        ? {
+            ...toAddressLocationRef(
+              formatDetailedAddress(input.deliveryRoadAddress, input.deliveryDetailAddress) ?? '',
+              input.deliveryStation
+            ),
+            roadAddress: input.deliveryRoadAddress?.trim(),
+            detailAddress: input.deliveryDetailAddress?.trim(),
+          }
+        : toLocationRef(input.deliveryStation),
     preferredSchedule: {
       pickupTime: input.preferredPickupTime,
       arrivalTime: input.preferredArrivalTime,
     },
   });
 
+  const aiResult = input.aiAnalysisOverride?.result ?? {
+    itemName: input.packageItemName,
+    category: input.packageCategory,
+    description: input.packageDescription,
+    estimatedValue: input.itemValue,
+    estimatedWeightKg: input.weightKg,
+    estimatedSize: normalizePackageSize(input.packageSize),
+    handlingNotes:
+      input.requestMode === 'reservation'
+        ? [
+            input.directParticipationMode === 'locker_assisted' ? 'locker_preferred' : 'meetup_preferred',
+            'reservation_window_preferred',
+          ]
+        : [
+            input.directParticipationMode === 'locker_assisted' ? 'locker_preferred' : 'meetup_preferred',
+            'fast_match_priority',
+          ],
+    riskFlags: input.requestMode === 'reservation' ? ['reserved_window'] : ['tight_sla_candidate'],
+  };
+
   const aiAnalysis = await createAIAnalysis({
     requestDraftId: requestDraft.requestDraftId,
     requesterUserId: input.requesterUserId,
-    inputPhotoIds: [],
-    provider: aiConfig.provider,
-    model: aiConfig.analysisModel,
-    confidence: 0.72,
-    result: {
-      description: input.packageDescription,
-      estimatedValue: input.itemValue,
-      estimatedWeightKg: input.weightKg,
-      estimatedSize: normalizePackageSize(input.packageSize),
-      handlingNotes:
-        input.requestMode === 'reservation'
-          ? [
-              input.directParticipationMode === 'locker_assisted' ? 'locker_preferred' : 'meetup_preferred',
-              'reservation_window_preferred',
-            ]
-          : [
-              input.directParticipationMode === 'locker_assisted' ? 'locker_preferred' : 'meetup_preferred',
-              'fast_match_priority',
-            ],
-      riskFlags: input.requestMode === 'reservation' ? ['reserved_window'] : ['tight_sla_candidate'],
-    },
-    status: AIAnalysisStatus.COMPLETED,
+    inputPhotoIds: input.selectedPhotoIds ?? [],
+    provider: input.aiAnalysisOverride?.provider ?? aiConfig.provider,
+    model: input.aiAnalysisOverride?.model ?? aiConfig.analysisModel,
+    confidence: input.aiAnalysisOverride?.confidence ?? 0.72,
+    result: aiResult,
+    status: input.aiAnalysisOverride?.fallbackUsed ? AIAnalysisStatus.LOW_CONFIDENCE : AIAnalysisStatus.COMPLETED,
   });
 
   await updateRequestDraft(requestDraft.requestDraftId, {
@@ -437,6 +528,24 @@ export async function createBeta1Request(input: Beta1RequestCreateInput): Promis
     requesterId: input.requesterUserId,
     requesterUserId: input.requesterUserId,
     pricingQuoteId: selectedQuote.pricingQuoteId,
+    originType: input.originType ?? 'station',
+    destinationType: input.destinationType ?? 'station',
+    pickupAddress: formatDetailedAddress(input.pickupRoadAddress, input.pickupDetailAddress) ?? '',
+    deliveryAddress: formatDetailedAddress(input.deliveryRoadAddress, input.deliveryDetailAddress) ?? '',
+    pickupAddressDetail: input.pickupRoadAddress
+      ? {
+          roadAddress: input.pickupRoadAddress.trim(),
+          detailAddress: input.pickupDetailAddress?.trim() ?? '',
+          fullAddress: formatDetailedAddress(input.pickupRoadAddress, input.pickupDetailAddress) ?? '',
+        }
+      : null,
+    deliveryAddressDetail: input.deliveryRoadAddress
+      ? {
+          roadAddress: input.deliveryRoadAddress.trim(),
+          detailAddress: input.deliveryDetailAddress?.trim() ?? '',
+          fullAddress: formatDetailedAddress(input.deliveryRoadAddress, input.deliveryDetailAddress) ?? '',
+        }
+      : null,
     pickupStation: input.pickupStation,
     deliveryStation: input.deliveryStation,
     packageInfo: {
@@ -465,6 +574,7 @@ export async function createBeta1Request(input: Beta1RequestCreateInput): Promis
     },
     initialNegotiationFee: selectedCard.pricing.publicPrice,
     itemValue: input.itemValue ?? 0,
+    selectedPhotoIds: input.selectedPhotoIds ?? [],
     createdAt: serverTimestamp(),
     updatedAt: serverTimestamp(),
   };

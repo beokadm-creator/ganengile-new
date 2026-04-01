@@ -1,15 +1,21 @@
-# 데이터 폴더
+﻿# Data Notes
 
-이 폴더는 정적 참고 데이터와 리포트를 보관합니다.
+`precedence`: 65  
+`required-for`: reference-data, data-navigation  
+`optional-for`: map, pricing  
+`memory-type`: index  
+`token-estimate`: 140
 
-## 포함 항목
+@include docs/_shared/ai-doc-governance.md
+@include docs/_shared/data-shared-context.md
 
-- `stations-seoul.md`: 정적 역 참고표
-- `reports/`: 정합성/중복 점검 리포트
+## Essential (Post-Compact)
+- `data/`는 참고용 정적 문서와 리포트의 자리다.
+- 운영 소스는 이 디렉터리가 아니라 실제 데이터 저장소에 있다.
 
-## 원칙
+## [STATIC] Contents
+- `stations-seoul.md`: 서울 지하철 참고 메모
+- `reports/`: 생성 리포트가 있다면 보조 자료로 사용
 
-- 앱의 실제 소스 오브 트루스는 Firestore `config_*` 컬렉션입니다.
-- 이 폴더의 문서는 참고용이며, 변경 후에는 실제 Firestore 보정 스크립트를 같이 실행해야 합니다.
-
-관련 운영 문서는 `docs/data/station-and-fare-data.md`에서 관리합니다.
+## Changelog
+- 2026-04-02: 데이터 README를 참고용 안내 문서로 정리.

@@ -111,6 +111,14 @@ service cloud.firestore {
         
         // 삭제: 본인만
         allow delete: if isOwner(userId);
+
+        match /saved_addresses/{addressId} {
+          allow read, create, update, delete: if isOwner(userId);
+        }
+
+        match /recent_addresses/{addressId} {
+          allow read, create, update, delete: if isOwner(userId);
+        }
       }
 
       // ==================== Verification Subcollection ====================
@@ -168,6 +176,33 @@ service cloud.firestore {
         isOwner(request.resource.data.userId);
 
       allow update, delete: if isAdmin();
+    }
+
+    match /wallet_ledgers/{userId} {
+      allow read: if isAuthenticated() && (isAdmin() || isOwner(userId));
+      allow write: if false;
+    }
+
+    match /disputes/{disputeId} {
+      allow read: if isAuthenticated() &&
+        (isAdmin() ||
+         isOwner(resource.data.reporterId) ||
+         isOwner(resource.data.userId));
+
+      allow create: if isAuthenticated() &&
+        (isOwner(request.resource.data.reporterId) ||
+         isOwner(request.resource.data.userId));
+
+      allow update: if isAuthenticated() &&
+        (isAdmin() || isOwner(resource.data.reporterId) || isOwner(resource.data.userId));
+
+      allow delete: if false;
+    }
+
+    match /dispute_history/{historyId} {
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated();
+      allow update, delete: if false;
     }
 
     match /payments/{paymentId} {
@@ -537,24 +572,34 @@ service cloud.firestore {
 
     match /chatRooms/{chatRoomId} {
       // 읽기: 참여자만
-      allow read: if isChatRoomParticipant(chatRoomId);
+      allow read: if isAuthenticated() &&
+                  (resource.data.participants.user1.userId == request.auth.uid ||
+                   resource.data.participants.user2.userId == request.auth.uid);
 
       // 생성: 인증된 사용자
       allow create: if isAuthenticated();
 
       // 업데이트: 참여자만
-      allow update: if isChatRoomParticipant(chatRoomId);
+      allow update: if isAuthenticated() &&
+                    (resource.data.participants.user1.userId == request.auth.uid ||
+                     resource.data.participants.user2.userId == request.auth.uid);
 
       // 삭제: 참여자만
-      allow delete: if isChatRoomParticipant(chatRoomId);
+      allow delete: if isAuthenticated() &&
+                    (resource.data.participants.user1.userId == request.auth.uid ||
+                     resource.data.participants.user2.userId == request.auth.uid);
 
       // 메시지 하위 컬렉션
       match /messages/{messageId} {
         // 읽기: 채팅방 참여자만
-        allow read: if isChatRoomParticipant(chatRoomId);
+        allow read: if isAuthenticated() &&
+                    ((get(/databases/$(database)/documents/chatRooms/$(chatRoomId)).data.participants.user1.userId == request.auth.uid) ||
+                     (get(/databases/$(database)/documents/chatRooms/$(chatRoomId)).data.participants.user2.userId == request.auth.uid));
 
         // 생성: 참여자만
-        allow create: if isChatRoomParticipant(chatRoomId);
+        allow create: if isAuthenticated() &&
+                      ((get(/databases/$(database)/documents/chatRooms/$(chatRoomId)).data.participants.user1.userId == request.auth.uid) ||
+                       (get(/databases/$(database)/documents/chatRooms/$(chatRoomId)).data.participants.user2.userId == request.auth.uid));
 
         // 업데이트/삭제: 불가
         allow update, delete: if false;

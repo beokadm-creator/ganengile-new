@@ -186,7 +186,7 @@ export async function generatePricingQuotesWithAI(requestData: CreateRequestData
     directParticipationMode: requestData.storageLocation ? 'locker_assisted' : 'none',
     basePricing: {
       publicPrice: fee.totalFee,
-      depositAmount: requestData.itemValue ? Math.round(requestData.itemValue * 0.1) : 0,
+      depositAmount: requestData.itemValue ? Math.round(requestData.itemValue) : 0,
       baseFee: fee.baseFee,
       distanceFee: fee.distanceFee,
       weightFee: fee.weightFee,

@@ -25,6 +25,11 @@ export interface UserProfile {
   name: string;
   phoneNumber?: string;
   profilePhotoUrl?: string;
+  defaultAddress?: {
+    roadAddress: string;
+    detailAddress: string;
+    fullAddress: string;
+  };
 
   // 怨꾩쥖 ?뺣낫
   bankAccount?: {
@@ -47,6 +52,18 @@ export interface UserProfile {
   isVerified: boolean;
 
   // ??꾩뒪?ы봽
+  createdAt: Timestamp;
+  updatedAt: Timestamp;
+}
+
+export interface SavedAddress {
+  addressId: string;
+  label: string;
+  roadAddress: string;
+  detailAddress: string;
+  fullAddress: string;
+  isDefault?: boolean;
+  lastUsedAt?: Timestamp;
   createdAt: Timestamp;
   updatedAt: Timestamp;
 }
@@ -100,6 +117,11 @@ export interface ProfileFormData {
   name: string;
   phoneNumber?: string;
   profilePhotoUrl?: string;
+  defaultAddress?: {
+    roadAddress: string;
+    detailAddress: string;
+    fullAddress: string;
+  };
   bankAccount?: {
     bankName: string;
     accountNumber?: string;

@@ -2,6 +2,7 @@
   "expo": {
     "name": "ganengile-new",
     "slug": "ganengile-new",
+    "scheme": "ganengile",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
@@ -18,7 +19,14 @@
     },
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.anonymous.ganengile-new"
+      "bundleIdentifier": "com.anonymous.ganengile-new",
+      "associatedDomains": [
+        "applinks:ganengile.app",
+        "applinks:www.ganengile.app"
+      ],
+      "infoPlist": {
+        "NSLocationWhenInUseUsageDescription": "현재 위치를 기반으로 가까운 역을 추천하고 배송 진행 위치를 확인하기 위해 위치 권한이 필요합니다."
+      }
     },
     "android": {
       "adaptiveIcon": {
@@ -26,7 +34,34 @@
         "backgroundColor": "#ffffff"
       },
       "edgeToEdgeEnabled": true,
-      "predictiveBackGestureEnabled": false
+      "predictiveBackGestureEnabled": false,
+      "permissions": [
+        "ACCESS_COARSE_LOCATION",
+        "ACCESS_FINE_LOCATION"
+      ],
+      "intentFilters": [
+        {
+          "action": "VIEW",
+          "autoVerify": true,
+          "data": [
+            {
+              "scheme": "https",
+              "host": "ganengile.app"
+            },
+            {
+              "scheme": "https",
+              "host": "www.ganengile.app"
+            },
+            {
+              "scheme": "ganengile"
+            }
+          ],
+          "category": [
+            "BROWSABLE",
+            "DEFAULT"
+          ]
+        }
+      ]
     },
     "web": {
       "favicon": "./assets/favicon.png"
