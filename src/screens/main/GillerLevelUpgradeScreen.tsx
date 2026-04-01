@@ -15,7 +15,7 @@ import { getBankIntegrationConfig, getPaymentIntegrationConfig } from '../../ser
 import { useUser } from '../../contexts/UserContext';
 import type { MainStackNavigationProp } from '../../types/navigation';
 import type { GillerProfile } from '../../types/giller';
-import { BorderRadius, Shadows, Spacing, Typography } from '../../theme';
+import { BorderRadius, Shadows, Spacing, Typography, Colors } from '../../theme';
 
 type PromotionEligibility = {
   isEligible: boolean;
@@ -100,7 +100,7 @@ export default function GillerLevelUpgradeScreen({ navigation }: { navigation: M
   if (loading) {
     return (
       <View style={styles.centerState}>
-        <ActivityIndicator size="large" color="#0F766E" />
+        <ActivityIndicator size="large" color=Colors.primary />
         <Text style={styles.centerText}>승급 정보를 준비하는 중입니다.</Text>
       </View>
     );
@@ -158,25 +158,25 @@ function ActionButton({ label, onPress, primary = false, disabled = false }: { l
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#F8FAFC' },
+  container: { flex: 1, backgroundColor: Colors.background },
   content: { padding: Spacing.lg, gap: Spacing.md },
-  centerState: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: '#F8FAFC' },
-  centerText: { marginTop: Spacing.md, color: '#475569', ...Typography.body },
-  hero: { backgroundColor: '#FFFFFF', borderRadius: BorderRadius.xl, padding: Spacing.lg, gap: 6, ...Shadows.sm },
-  kicker: { fontSize: 12, fontWeight: '700', color: '#0F766E', textTransform: 'uppercase', letterSpacing: 1 },
-  title: { fontSize: 24, fontWeight: '800', color: '#0F172A' },
-  subtitle: { color: '#475569', ...Typography.body },
-  card: { backgroundColor: '#FFFFFF', borderRadius: BorderRadius.xl, padding: Spacing.lg, gap: Spacing.md, ...Shadows.sm },
-  sectionTitle: { fontSize: 18, fontWeight: '800', color: '#0F172A' },
-  metricRow: { gap: 6, paddingBottom: Spacing.sm, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: '#E2E8F0' },
+  centerState: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: Colors.background },
+  centerText: { marginTop: Spacing.md, color: Colors.textSecondary, ...Typography.body },
+  hero: { backgroundColor: Colors.surface, borderRadius: BorderRadius.xl, padding: Spacing.lg, gap: 6, ...Shadows.sm },
+  kicker: { fontSize: 12, fontWeight: '700', color: Colors.primary, textTransform: 'uppercase', letterSpacing: 1 },
+  title: { fontSize: 24, fontWeight: '800', color: Colors.textPrimary },
+  subtitle: { color: Colors.textSecondary, ...Typography.body },
+  card: { backgroundColor: Colors.surface, borderRadius: BorderRadius.xl, padding: Spacing.lg, gap: Spacing.md, ...Shadows.sm },
+  sectionTitle: { fontSize: 18, fontWeight: '800', color: Colors.textPrimary },
+  metricRow: { gap: 6, paddingBottom: Spacing.sm, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: Colors.border },
   metricMain: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  metricLabel: { color: '#64748B', ...Typography.bodySmall },
-  metricValue: { color: '#0F172A', ...Typography.bodyBold },
-  metricHelper: { color: '#94A3B8', ...Typography.caption },
+  metricLabel: { color: Colors.textSecondary, ...Typography.bodySmall },
+  metricValue: { color: Colors.textPrimary, ...Typography.bodyBold },
+  metricHelper: { color: Colors.textTertiary, ...Typography.caption },
   actionGroup: { gap: Spacing.sm },
-  actionButton: { minHeight: 52, borderRadius: BorderRadius.xl, backgroundColor: '#FFFFFF', alignItems: 'center', justifyContent: 'center', ...Shadows.sm },
-  primaryAction: { backgroundColor: '#115E59' },
+  actionButton: { minHeight: 52, borderRadius: BorderRadius.xl, backgroundColor: Colors.surface, alignItems: 'center', justifyContent: 'center', ...Shadows.sm },
+  primaryAction: { backgroundColor: Colors.primary },
   disabledAction: { opacity: 0.6 },
-  actionText: { color: '#0F172A', ...Typography.bodyBold },
-  primaryActionText: { color: '#FFFFFF' },
+  actionText: { color: Colors.textPrimary, ...Typography.bodyBold },
+  primaryActionText: { color: Colors.surface },
 });

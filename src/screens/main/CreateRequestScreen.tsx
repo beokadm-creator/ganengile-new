@@ -1,4 +1,4 @@
-﻿import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -21,7 +21,7 @@ import {
 } from '../../services/beta1-orchestration-service';
 import { getAllStations } from '../../services/config-service';
 import { requireUserId } from '../../services/firebase';
-import { BorderRadius, Shadows, Spacing, Typography } from '../../theme';
+import { BorderRadius, Colors, Shadows, Spacing, Typography } from '../../theme';
 import type { Station } from '../../types/config';
 import type { MainStackParamList, MainStackNavigationProp } from '../../types/navigation';
 import type { StationInfo } from '../../types/request';
@@ -72,7 +72,7 @@ function fromPrefillStation(station?: StationInfo): Station | null {
         lineId: station.lineCode || station.line || 'line',
         lineCode: station.lineCode,
         lineName: station.line,
-        lineColor: '#64748B',
+        lineColor: Colors.textSecondary,
         lineType: 'general',
       },
     ],
@@ -265,7 +265,7 @@ export default function CreateRequestScreen({ navigation, route }: Props) {
   if (loadingStations) {
     return (
       <View style={styles.loadingWrap}>
-        <ActivityIndicator size="large" color="#0F766E" />
+        <ActivityIndicator size="large" color={Colors.primary} />
         <Text style={styles.loadingText}>요청 화면을 준비하고 있습니다.</Text>
       </View>
     );
@@ -321,7 +321,7 @@ export default function CreateRequestScreen({ navigation, route }: Props) {
             value={packageDescription}
             onChangeText={setPackageDescription}
             placeholder="예: 노트북 파우치, 서류 봉투, 작은 박스"
-            placeholderTextColor="#94A3B8"
+            placeholderTextColor={Colors.gray400}
           />
           <View style={styles.segmentRow}>
             {(['small', 'medium', 'large'] as const).map((size) => (
@@ -334,7 +334,7 @@ export default function CreateRequestScreen({ navigation, route }: Props) {
             onChangeText={setWeightKg}
             keyboardType="decimal-pad"
             placeholder="무게(kg)"
-            placeholderTextColor="#94A3B8"
+            placeholderTextColor={Colors.gray400}
           />
           <TextInput
             style={styles.textInput}
@@ -342,7 +342,7 @@ export default function CreateRequestScreen({ navigation, route }: Props) {
             onChangeText={setItemValue}
             keyboardType="number-pad"
             placeholder="물품 가액(선택)"
-            placeholderTextColor="#94A3B8"
+            placeholderTextColor={Colors.gray400}
           />
         </SectionCard>
 
@@ -354,14 +354,14 @@ export default function CreateRequestScreen({ navigation, route }: Props) {
                 value={preferredPickupTime}
                 onChangeText={setPreferredPickupTime}
                 placeholder="희망 출발 시간 예: 오늘 19:30"
-                placeholderTextColor="#94A3B8"
+                placeholderTextColor={Colors.gray400}
               />
               <TextInput
                 style={styles.textInput}
                 value={preferredArrivalTime}
                 onChangeText={setPreferredArrivalTime}
                 placeholder="희망 도착 시간(선택)"
-                placeholderTextColor="#94A3B8"
+                placeholderTextColor={Colors.gray400}
               />
             </>
           ) : (
@@ -393,7 +393,7 @@ export default function CreateRequestScreen({ navigation, route }: Props) {
             value={recipientName}
             onChangeText={setRecipientName}
             placeholder="수령인 이름"
-            placeholderTextColor="#94A3B8"
+            placeholderTextColor={Colors.gray400}
           />
           <TextInput
             style={styles.textInput}
@@ -401,7 +401,7 @@ export default function CreateRequestScreen({ navigation, route }: Props) {
             onChangeText={setRecipientPhone}
             keyboardType="phone-pad"
             placeholder="수령인 연락처"
-            placeholderTextColor="#94A3B8"
+            placeholderTextColor={Colors.gray400}
           />
         </SectionCard>
 
@@ -444,7 +444,7 @@ export default function CreateRequestScreen({ navigation, route }: Props) {
           disabled={submitDisabled || saving}
         >
           {saving ? (
-            <ActivityIndicator color="#FFFFFF" />
+            <ActivityIndicator color={Colors.white} />
           ) : (
             <Text style={styles.submitButtonText}>
               {requestMode === 'reservation' ? '예약 요청 확정' : '요청 확정'}
@@ -486,7 +486,7 @@ function StationButton({ label, value, onPress }: { label: string; value: string
       <Text style={styles.stationLabel}>{label}</Text>
       <View style={styles.stationValueRow}>
         <Text style={styles.stationValue}>{value}</Text>
-        <MaterialIcons name="chevron-right" size={20} color="#475569" />
+        <MaterialIcons name="chevron-right" size={24} color={Colors.gray400} />
       </View>
     </TouchableOpacity>
   );
@@ -503,17 +503,17 @@ function SegmentButton({ label, active, onPress }: { label: string; active: bool
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F5F7FB',
+    backgroundColor: Colors.background,
   },
   loadingWrap: {
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
     gap: Spacing.md,
-    backgroundColor: '#F5F7FB',
+    backgroundColor: Colors.background,
   },
   loadingText: {
-    color: '#475467',
+    color: Colors.textSecondary,
     fontSize: 16,
   },
   content: {
@@ -522,59 +522,58 @@ const styles = StyleSheet.create({
     paddingBottom: 48,
   },
   heroCard: {
-    backgroundColor: '#0F172A',
+    backgroundColor: Colors.primaryMint,
     borderRadius: BorderRadius.xl,
-    padding: Spacing.lg,
+    padding: Spacing.xl,
     gap: Spacing.sm,
-    ...Shadows.md,
   },
   heroKicker: {
-    color: '#99F6E4',
+    color: Colors.primary,
     fontSize: Typography.fontSize.xs,
     fontWeight: Typography.fontWeight.bold,
     textTransform: 'uppercase',
     letterSpacing: 1,
   },
   heroTitle: {
-    color: '#FFFFFF',
-    fontSize: Typography.fontSize.xl,
-    fontWeight: Typography.fontWeight.bold,
-    lineHeight: 30,
+    color: Colors.textPrimary,
+    fontSize: Typography.fontSize['2xl'],
+    fontWeight: '800',
+    lineHeight: 32,
   },
   heroSubtitle: {
-    color: '#CBD5E1',
+    color: Colors.textSecondary,
     fontSize: Typography.fontSize.sm,
     lineHeight: 22,
   },
   sectionCard: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: Colors.surface,
     borderRadius: BorderRadius.xl,
     padding: Spacing.lg,
     gap: Spacing.md,
     ...Shadows.sm,
   },
   sectionTitle: {
-    color: '#101828',
-    fontSize: 16,
-    fontWeight: '700',
+    color: Colors.textPrimary,
+    fontSize: Typography.fontSize.lg,
+    fontWeight: '800',
   },
   sectionBody: {
     gap: Spacing.sm,
   },
   helperText: {
-    color: '#475467',
+    color: Colors.textSecondary,
     fontSize: Typography.fontSize.sm,
     lineHeight: 21,
   },
   stationButton: {
     borderRadius: BorderRadius.lg,
     borderWidth: 1,
-    borderColor: '#E2E8F0',
+    borderColor: Colors.border,
     padding: Spacing.md,
     gap: 6,
   },
   stationLabel: {
-    color: '#667085',
+    color: Colors.textTertiary,
     fontSize: Typography.fontSize.xs,
     fontWeight: Typography.fontWeight.bold,
   },
@@ -585,19 +584,19 @@ const styles = StyleSheet.create({
     gap: Spacing.md,
   },
   stationValue: {
-    color: '#101828',
-    fontSize: 16,
-    fontWeight: '500',
+    color: Colors.textPrimary,
+    fontSize: Typography.fontSize.lg,
+    fontWeight: '700',
   },
   textInput: {
     borderRadius: BorderRadius.lg,
     borderWidth: 1,
-    borderColor: '#E2E8F0',
+    borderColor: Colors.border,
     paddingHorizontal: Spacing.md,
     paddingVertical: Platform.OS === 'ios' ? 14 : 12,
-    fontSize: 16,
-    color: '#101828',
-    backgroundColor: '#FFFFFF',
+    fontSize: Typography.fontSize.base,
+    color: Colors.textPrimary,
+    backgroundColor: Colors.surface,
   },
   segmentRow: {
     flexDirection: 'row',
@@ -610,49 +609,50 @@ const styles = StyleSheet.create({
   segmentButton: {
     borderRadius: BorderRadius.lg,
     borderWidth: 1,
-    borderColor: '#D0D5DD',
+    borderColor: Colors.gray300,
     paddingVertical: 12,
     paddingHorizontal: Spacing.md,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: Colors.surface,
   },
   segmentButtonActive: {
-    borderColor: '#0F766E',
-    backgroundColor: '#CCFBF1',
+    borderColor: Colors.primary,
+    backgroundColor: Colors.primaryMint,
   },
   segmentButtonText: {
-    color: '#344054',
+    color: Colors.textSecondary,
     fontSize: Typography.fontSize.sm,
     fontWeight: Typography.fontWeight.medium,
   },
   segmentButtonTextActive: {
-    color: '#115E59',
+    color: Colors.primary,
     fontWeight: Typography.fontWeight.bold,
   },
   sectionHeader: {
     gap: 4,
+    marginTop: Spacing.sm,
   },
   sectionHeaderTitle: {
-    color: '#101828',
-    fontSize: 16,
-    fontWeight: '700',
+    color: Colors.textPrimary,
+    fontSize: Typography.fontSize.xl,
+    fontWeight: '800',
   },
   sectionHeaderText: {
-    color: '#475467',
+    color: Colors.textSecondary,
     fontSize: Typography.fontSize.sm,
     lineHeight: 21,
   },
   quoteCard: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: Colors.surface,
     borderRadius: BorderRadius.xl,
     padding: Spacing.lg,
     gap: Spacing.sm,
     borderWidth: 1,
-    borderColor: '#E5E7EB',
+    borderColor: Colors.border,
     ...Shadows.sm,
   },
   quoteCardSelected: {
-    borderColor: '#0F766E',
-    backgroundColor: '#F0FDFA',
+    borderColor: Colors.primary,
+    backgroundColor: Colors.primaryMint,
   },
   quoteHeader: {
     flexDirection: 'row',
@@ -665,25 +665,25 @@ const styles = StyleSheet.create({
     gap: 4,
   },
   quoteLabel: {
-    color: '#0F766E',
+    color: Colors.primary,
     fontSize: Typography.fontSize.xs,
     fontWeight: Typography.fontWeight.bold,
     textTransform: 'uppercase',
   },
   quoteHeadline: {
-    color: '#101828',
-    fontSize: 16,
-    fontWeight: '700',
+    color: Colors.textPrimary,
+    fontSize: Typography.fontSize.base,
+    fontWeight: '800',
     lineHeight: 22,
   },
   quoteBadge: {
-    borderRadius: 999,
-    backgroundColor: '#0F766E',
+    borderRadius: BorderRadius.full,
+    backgroundColor: Colors.primary,
     paddingHorizontal: Spacing.sm,
     paddingVertical: 6,
   },
   quoteBadgeText: {
-    color: '#FFFFFF',
+    color: Colors.white,
     fontSize: Typography.fontSize.xs,
     fontWeight: Typography.fontWeight.bold,
   },
@@ -694,34 +694,35 @@ const styles = StyleSheet.create({
     gap: Spacing.md,
   },
   quotePrice: {
-    color: '#101828',
-    fontSize: Typography.fontSize.lg,
-    fontWeight: Typography.fontWeight.bold,
+    color: Colors.textPrimary,
+    fontSize: Typography.fontSize.xl,
+    fontWeight: '800',
   },
   quoteEta: {
-    color: '#475467',
+    color: Colors.textSecondary,
     fontSize: Typography.fontSize.sm,
+    fontWeight: '600',
   },
   quoteReason: {
-    color: '#475467',
+    color: Colors.textSecondary,
     fontSize: Typography.fontSize.sm,
     lineHeight: 21,
   },
   submitButton: {
-    borderRadius: BorderRadius.lg,
-    backgroundColor: '#0F766E',
+    borderRadius: BorderRadius.full,
+    backgroundColor: Colors.primary,
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: Spacing.md,
-    marginTop: Spacing.sm,
+    paddingVertical: Spacing.lg,
+    marginTop: Spacing.md,
   },
   submitButtonDisabled: {
     opacity: 0.45,
   },
   submitButtonText: {
-    color: '#FFFFFF',
-    fontSize: 16,
-    fontWeight: '700',
+    color: Colors.white,
+    fontSize: Typography.fontSize.lg,
+    fontWeight: '800',
   },
 });
 

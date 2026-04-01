@@ -1,5 +1,7 @@
 ﻿import React from 'react';
 import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { Colors, Typography, Spacing, BorderRadius, Shadows } from '../../theme';
+
 import type { LandingScreenProps } from '../../types/navigation';
 
 export default function LandingScreen({ navigation }: LandingScreenProps) {
@@ -43,10 +45,10 @@ function StepRow({ number, title, description }: { number: string; title: string
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#F8FAFC' },
+  container: { flex: 1, backgroundColor: Colors.background },
   content: { paddingBottom: 40 },
   hero: {
-    backgroundColor: '#0F172A',
+    backgroundColor: Colors.textPrimary,
     paddingHorizontal: 24,
     paddingTop: 64,
     paddingBottom: 40,
@@ -59,14 +61,14 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
     borderRadius: 999,
     backgroundColor: 'rgba(45, 212, 191, 0.14)',
-    color: '#99F6E4',
+    color: Colors.primaryMint,
     fontSize: 12,
     fontWeight: '800',
     letterSpacing: 1,
     textTransform: 'uppercase',
     marginBottom: 20,
   },
-  title: { color: '#FFFFFF', fontSize: 34, fontWeight: '800', lineHeight: 42, marginBottom: 12 },
+  title: { color: Colors.surface, fontSize: 34, fontWeight: '800', lineHeight: 42, marginBottom: 12 },
   subtitle: { color: '#D1FAE5', fontSize: 16, lineHeight: 24, marginBottom: 24 },
   primaryButton: {
     minHeight: 54,
@@ -85,19 +87,19 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  secondaryButtonText: { color: '#FFFFFF', fontSize: 16, fontWeight: '700' },
+  secondaryButtonText: { color: Colors.surface, fontSize: 16, fontWeight: '700' },
   section: { paddingHorizontal: 24, paddingTop: 28, gap: 18 },
   stepRow: { flexDirection: 'row', alignItems: 'center', gap: 14 },
   stepCircle: {
     width: 42,
     height: 42,
     borderRadius: 21,
-    backgroundColor: '#115E59',
+    backgroundColor: Colors.primary,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  stepNumber: { color: '#FFFFFF', fontSize: 17, fontWeight: '800' },
+  stepNumber: { color: Colors.surface, fontSize: 17, fontWeight: '800' },
   stepCopy: { flex: 1, gap: 4 },
-  stepTitle: { color: '#0F172A', fontSize: 16, fontWeight: '800' },
-  stepDescription: { color: '#64748B', fontSize: 14, lineHeight: 21 },
+  stepTitle: { color: Colors.textPrimary, fontSize: 16, fontWeight: '800' },
+  stepDescription: { color: Colors.textSecondary, fontSize: 14, lineHeight: 21 },
 });

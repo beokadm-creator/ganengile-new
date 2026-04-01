@@ -1,4 +1,4 @@
-﻿import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -16,7 +16,7 @@ import { getChatRoomByRequestId } from '../../services/chat-service';
 import { cancelDeliveryFlow, confirmDeliveryByRequester, getDeliveryByRequestId } from '../../services/delivery-service';
 import { requireUserId } from '../../services/firebase';
 import { cancelRequest, getRequestById, increaseRequestBid } from '../../services/request-service';
-import { BorderRadius, Shadows, Spacing, Typography } from '../../theme';
+import { BorderRadius, Colors, Shadows, Spacing, Typography } from '../../theme';
 import type { MainStackNavigationProp, MainStackParamList } from '../../types/navigation';
 import { RequestStatus, type Request } from '../../types/request';
 
@@ -263,7 +263,7 @@ export default function RequestDetailScreen() {
   if (loading) {
     return (
       <View style={styles.centerState}>
-        <ActivityIndicator size="large" color="#0F766E" />
+        <ActivityIndicator size="large" color={Colors.primary} />
         <Text style={styles.centerText}>요청 상세를 불러오는 중입니다.</Text>
       </View>
     );
@@ -406,7 +406,7 @@ function ActionButton({
       onPress={onPress}
       disabled={disabled}
     >
-      <MaterialIcons name={icon} size={18} color={primary ? '#FFFFFF' : warning ? '#B42318' : '#115E59'} />
+      <MaterialIcons name={icon} size={20} color={primary ? Colors.white : warning ? Colors.errorDark : Colors.primary} />
       <Text style={[styles.actionText, primary && styles.primaryActionText, warning && styles.warningText]}>{label}</Text>
     </TouchableOpacity>
   );
@@ -456,7 +456,7 @@ function getStatusLabel(status: RequestStatus): string {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F8FAFC',
+    backgroundColor: Colors.background,
   },
   content: {
     padding: Spacing.lg,
@@ -467,52 +467,54 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     padding: Spacing.xl,
-    backgroundColor: '#F8FAFC',
+    backgroundColor: Colors.background,
   },
   centerText: {
     marginTop: Spacing.md,
-    color: '#475569',
+    color: Colors.textSecondary,
     ...Typography.body,
   },
   errorText: {
-    color: '#B42318',
+    color: Colors.error,
     ...Typography.body,
   },
   hero: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: Colors.primaryMint,
     borderRadius: BorderRadius.xl,
-    padding: Spacing.lg,
+    padding: Spacing.xl,
+    gap: Spacing.sm,
     ...Shadows.sm,
-    gap: 6,
   },
   kicker: {
-    fontSize: 12,
-    fontWeight: '700',
-    color: '#0F766E',
+    fontSize: Typography.fontSize.xs,
+    fontWeight: '800',
+    color: Colors.primary,
     textTransform: 'uppercase',
     letterSpacing: 1,
   },
   title: {
-    fontSize: 24,
+    fontSize: Typography.fontSize['2xl'],
     fontWeight: '800',
-    color: '#0F172A',
+    color: Colors.textPrimary,
+    lineHeight: 32,
   },
   subtitle: {
-    color: '#475569',
-    ...Typography.body,
+    color: Colors.textSecondary,
+    fontSize: Typography.fontSize.sm,
+    lineHeight: 22,
   },
   panel: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: Colors.surface,
     borderRadius: BorderRadius.xl,
     padding: Spacing.lg,
     ...Shadows.sm,
-    gap: Spacing.sm,
+    gap: Spacing.md,
   },
   panelTitle: {
-    fontSize: 16,
-    fontWeight: '700',
-    color: '#0F172A',
-    marginBottom: 4,
+    fontSize: Typography.fontSize.lg,
+    fontWeight: '800',
+    color: Colors.textPrimary,
+    marginBottom: Spacing.xs,
   },
   infoRow: {
     flexDirection: 'row',
@@ -520,23 +522,25 @@ const styles = StyleSheet.create({
     gap: Spacing.md,
   },
   infoLabel: {
-    color: '#64748B',
-    ...Typography.bodySmall,
+    color: Colors.textTertiary,
+    fontSize: Typography.fontSize.sm,
+    fontWeight: '600',
   },
   infoValue: {
     flex: 1,
     textAlign: 'right',
-    color: '#0F172A',
-    ...Typography.bodySmall,
+    color: Colors.textPrimary,
+    fontSize: Typography.fontSize.base,
+    fontWeight: '700',
   },
   actionSection: {
     gap: Spacing.sm,
   },
   actionButton: {
     minHeight: 52,
-    borderRadius: BorderRadius.lg,
+    borderRadius: BorderRadius.full,
     paddingHorizontal: Spacing.lg,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: Colors.surface,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
@@ -544,23 +548,24 @@ const styles = StyleSheet.create({
     ...Shadows.sm,
   },
   primaryAction: {
-    backgroundColor: '#115E59',
+    backgroundColor: Colors.primary,
   },
   warningAction: {
-    backgroundColor: '#FFF5F5',
+    backgroundColor: Colors.errorLight,
   },
   disabledAction: {
     opacity: 0.6,
   },
   actionText: {
-    color: '#115E59',
-    ...Typography.bodyBold,
+    color: Colors.primary,
+    fontSize: Typography.fontSize.base,
+    fontWeight: '700',
   },
   primaryActionText: {
-    color: '#FFFFFF',
+    color: Colors.white,
   },
   warningText: {
-    color: '#B42318',
+    color: Colors.error,
   },
 });
 

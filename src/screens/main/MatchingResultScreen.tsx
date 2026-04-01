@@ -1,4 +1,4 @@
-﻿import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -9,7 +9,7 @@ import {
   View,
 } from 'react-native';
 import { useNavigation, useRoute, type RouteProp } from '@react-navigation/native';
-import { Colors } from '../../theme';
+import { BorderRadius, Colors, Spacing } from '../../theme';
 import { fetchUserInfo } from '../../services/matching-service';
 import { requireUserId } from '../../services/firebase';
 import { increaseRequestBid, notifyGillers, subscribeToRequest } from '../../services/request-service';
@@ -184,24 +184,24 @@ function InfoRow({ label, value }: { label: string; value: string }) {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#F8FAFC' },
-  content: { padding: 20, gap: 16 },
-  centerState: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: '#F8FAFC' },
-  centerText: { marginTop: 12, color: '#475569' },
-  hero: { backgroundColor: '#FFFFFF', borderRadius: 20, padding: 20, gap: 6 },
-  kicker: { color: '#0F766E', fontSize: 12, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 1 },
-  title: { color: '#0F172A', fontSize: 24, fontWeight: '800' },
-  subtitle: { color: '#475569' },
-  card: { backgroundColor: '#FFFFFF', borderRadius: 20, padding: 20, gap: 10 },
-  cardTitle: { color: '#0F172A', fontSize: 18, fontWeight: '800' },
-  infoRow: { flexDirection: 'row', justifyContent: 'space-between', gap: 12 },
-  infoLabel: { color: '#64748B' },
-  infoValue: { color: '#0F172A', fontWeight: '700' },
-  actionGroup: { gap: 10 },
-  primaryButton: { minHeight: 52, borderRadius: 16, backgroundColor: '#115E59', alignItems: 'center', justifyContent: 'center' },
-  primaryButtonText: { color: '#FFFFFF', fontWeight: '800' },
-  secondaryButton: { minHeight: 52, borderRadius: 16, backgroundColor: '#FFFFFF', alignItems: 'center', justifyContent: 'center' },
-  secondaryButtonText: { color: '#0F172A', fontWeight: '700' },
-  ghostButton: { minHeight: 52, borderRadius: 16, alignItems: 'center', justifyContent: 'center' },
-  ghostButtonText: { color: '#475569', fontWeight: '700' },
+  container: { flex: 1, backgroundColor: Colors.background },
+  content: { padding: Spacing.xl, gap: Spacing.lg },
+  centerState: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: Colors.background },
+  centerText: { marginTop: Spacing.md, color: Colors.textSecondary, fontSize: 16 },
+  hero: { backgroundColor: Colors.primaryMint, borderRadius: BorderRadius.xl, padding: Spacing.xl, gap: Spacing.sm },
+  kicker: { color: Colors.primary, fontSize: 12, fontWeight: '800', textTransform: 'uppercase', letterSpacing: 1 },
+  title: { color: Colors.textPrimary, fontSize: 24, fontWeight: '800', lineHeight: 32 },
+  subtitle: { color: Colors.textSecondary, fontSize: 14, lineHeight: 22 },
+  card: { backgroundColor: Colors.surface, borderRadius: BorderRadius.xl, padding: Spacing.xl, gap: Spacing.md, borderWidth: 1, borderColor: Colors.border },
+  cardTitle: { color: Colors.textPrimary, fontSize: 18, fontWeight: '800', marginBottom: 4 },
+  infoRow: { flexDirection: 'row', justifyContent: 'space-between', gap: Spacing.md },
+  infoLabel: { color: Colors.textTertiary, fontSize: 14, fontWeight: '600' },
+  infoValue: { color: Colors.textPrimary, fontSize: 16, fontWeight: '700' },
+  actionGroup: { gap: Spacing.sm, marginTop: Spacing.sm },
+  primaryButton: { minHeight: 52, borderRadius: BorderRadius.full, backgroundColor: Colors.primary, alignItems: 'center', justifyContent: 'center' },
+  primaryButtonText: { color: Colors.white, fontSize: 16, fontWeight: '800' },
+  secondaryButton: { minHeight: 52, borderRadius: BorderRadius.full, backgroundColor: Colors.surface, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: Colors.border },
+  secondaryButtonText: { color: Colors.textPrimary, fontSize: 16, fontWeight: '700' },
+  ghostButton: { minHeight: 52, borderRadius: BorderRadius.full, alignItems: 'center', justifyContent: 'center' },
+  ghostButtonText: { color: Colors.textSecondary, fontSize: 16, fontWeight: '700' },
 });

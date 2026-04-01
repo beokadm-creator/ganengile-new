@@ -1,10 +1,11 @@
-﻿import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, Alert, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import type { RouteProp } from '@react-navigation/native';
 import { DepositService } from '../../services/DepositService';
 import { PointService } from '../../services/PointService';
 import { getPaymentIntegrationConfig } from '../../services/integration-config-service';
 import { DEPOSIT_RATE, DepositPaymentMethod } from '../../types/point';
+import { BorderRadius, Colors, Shadows, Spacing, Typography } from '../../theme';
 import type { MainStackNavigationProp, MainStackParamList } from '../../types/navigation';
 
 type DepositPaymentRouteProp = RouteProp<MainStackParamList, 'DepositPayment'>;
@@ -91,36 +92,36 @@ export default function DepositPaymentScreen({ navigation, route }: { navigation
         <Text style={styles.policyText}>배송 완료 후 보증금 이체 여부는 배송 상태와 운영 검토를 함께 봅니다.</Text>
         <Text style={styles.policyText}>분실, 차감, 패널티, 최종 정산은 AI가 단독으로 확정하지 않습니다.</Text>
       </View>
-      <TouchableOpacity style={[styles.primaryButton, loading && styles.primaryButtonDisabled]} onPress={() => void handlePayment()} disabled={loading} activeOpacity={0.9}>{loading ? <ActivityIndicator color="#FFFFFF" /> : <Text style={styles.primaryButtonText}>{depositAmount.toLocaleString()}원 결제하기</Text>}</TouchableOpacity>
+      <TouchableOpacity style={[styles.primaryButton, loading && styles.primaryButtonDisabled]} onPress={() => void handlePayment()} disabled={loading} activeOpacity={0.9}>{loading ? <ActivityIndicator color={Colors.white} /> : <Text style={styles.primaryButtonText}>{depositAmount.toLocaleString()}원 결제하기</Text>}</TouchableOpacity>
       <TouchableOpacity style={styles.secondaryButton} onPress={() => navigation.navigate('PointHistory')} activeOpacity={0.9}><Text style={styles.secondaryButtonText}>지갑으로 돌아가기</Text></TouchableOpacity>
     </ScrollView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#F8FAFC' },
-  content: { padding: 16, paddingBottom: 32, gap: 12 },
-  hero: { backgroundColor: '#FFFFFF', borderRadius: 18, padding: 18, gap: 6 },
-  kicker: { color: '#0F766E', fontSize: 12, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 1.1 },
-  title: { color: '#111827', fontSize: 26, fontWeight: '700' },
-  subtitle: { color: '#4B5563', fontSize: 14, lineHeight: 21 },
-  noticeCard: { backgroundColor: '#FEF3C7', borderRadius: 18, borderWidth: 1, borderColor: '#FDE68A', padding: 16, gap: 6 },
-  noticeTitle: { color: '#92400E', fontSize: 15, fontWeight: '700' },
-  noticeBody: { color: '#78350F', fontSize: 13, lineHeight: 19 },
-  card: { backgroundColor: '#FFFFFF', borderRadius: 18, padding: 18, gap: 10 },
-  sectionTitle: { color: '#111827', fontSize: 17, fontWeight: '700' },
-  row: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: 12 },
-  rowLabel: { color: '#667085', fontSize: 14 },
-  rowValue: { color: '#111827', fontSize: 14, fontWeight: '600' },
-  rowValueStrong: { color: '#0F766E', fontSize: 18, fontWeight: '800' },
-  balanceValue: { color: '#0F766E', fontSize: 32, fontWeight: '800', textAlign: 'center' },
-  balanceHint: { color: '#667085', fontSize: 13, lineHeight: 20, textAlign: 'center' },
-  policyBox: { backgroundColor: '#FFFFFF', borderRadius: 18, padding: 18, gap: 6 },
-  policyTitle: { color: '#111827', fontWeight: '700' },
-  policyText: { color: '#4B5563', lineHeight: 20 },
-  primaryButton: { minHeight: 54, borderRadius: 18, backgroundColor: '#115E59', alignItems: 'center', justifyContent: 'center' },
+  container: { flex: 1, backgroundColor: Colors.background },
+  content: { padding: Spacing.xl, paddingBottom: 32, gap: Spacing.md },
+  hero: { backgroundColor: Colors.surface, borderRadius: BorderRadius.xl, padding: Spacing.xl, gap: Spacing.sm, ...Shadows.sm },
+  kicker: { color: Colors.primary, fontSize: Typography.fontSize.xs, fontWeight: '800', textTransform: 'uppercase', letterSpacing: 1.1 },
+  title: { color: Colors.textPrimary, fontSize: Typography.fontSize['2xl'], fontWeight: '800' },
+  subtitle: { color: Colors.textSecondary, fontSize: Typography.fontSize.sm, lineHeight: 21 },
+  noticeCard: { backgroundColor: Colors.warningLight, borderRadius: BorderRadius.xl, borderWidth: 1, borderColor: Colors.warning, padding: Spacing.lg, gap: Spacing.sm },
+  noticeTitle: { color: Colors.warningDark, fontSize: Typography.fontSize.sm, fontWeight: '800' },
+  noticeBody: { color: Colors.warningDark, fontSize: Typography.fontSize.xs, lineHeight: 19 },
+  card: { backgroundColor: Colors.surface, borderRadius: BorderRadius.xl, padding: Spacing.lg, gap: Spacing.md, ...Shadows.sm, borderWidth: 1, borderColor: Colors.border },
+  sectionTitle: { color: Colors.textPrimary, fontSize: Typography.fontSize.lg, fontWeight: '800' },
+  row: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: Spacing.md },
+  rowLabel: { color: Colors.textSecondary, fontSize: Typography.fontSize.sm },
+  rowValue: { color: Colors.textPrimary, fontSize: Typography.fontSize.sm, fontWeight: '700' },
+  rowValueStrong: { color: Colors.primary, fontSize: Typography.fontSize.lg, fontWeight: '800' },
+  balanceValue: { color: Colors.primary, fontSize: Typography.fontSize['3xl'], fontWeight: '800', textAlign: 'center' },
+  balanceHint: { color: Colors.textSecondary, fontSize: Typography.fontSize.xs, lineHeight: 20, textAlign: 'center' },
+  policyBox: { backgroundColor: Colors.surface, borderRadius: BorderRadius.xl, padding: Spacing.lg, gap: Spacing.sm, borderWidth: 1, borderColor: Colors.border, ...Shadows.sm },
+  policyTitle: { color: Colors.textPrimary, fontWeight: '800' },
+  policyText: { color: Colors.textSecondary, lineHeight: 20 },
+  primaryButton: { minHeight: 54, borderRadius: BorderRadius.full, backgroundColor: Colors.primary, alignItems: 'center', justifyContent: 'center' },
   primaryButtonDisabled: { opacity: 0.7 },
-  primaryButtonText: { color: '#FFFFFF', fontWeight: '800', fontSize: 16 },
-  secondaryButton: { minHeight: 54, borderRadius: 18, backgroundColor: '#FFFFFF', alignItems: 'center', justifyContent: 'center' },
-  secondaryButtonText: { color: '#0F172A', fontWeight: '700' },
+  primaryButtonText: { color: Colors.white, fontWeight: '800', fontSize: Typography.fontSize.base },
+  secondaryButton: { minHeight: 54, borderRadius: BorderRadius.full, backgroundColor: Colors.surface, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: Colors.border },
+  secondaryButtonText: { color: Colors.textPrimary, fontWeight: '700', fontSize: Typography.fontSize.sm },
 });

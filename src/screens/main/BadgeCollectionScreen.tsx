@@ -92,7 +92,7 @@ export default function BadgeCollectionScreen() {
   if (loading) {
     return (
       <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color="#2563EB" />
+        <ActivityIndicator size="large" color=Colors.primary />
         <Text style={styles.loadingText}>배지 컬렉션을 불러오고 있어요.</Text>
       </View>
     );
@@ -212,41 +212,41 @@ export default function BadgeCollectionScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#F8FAFC' },
+  container: { flex: 1, backgroundColor: Colors.background },
   content: { padding: 20, gap: 16 },
   loadingContainer: {
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#F8FAFC',
+    backgroundColor: Colors.background,
   },
-  loadingText: { marginTop: 12, fontSize: 14, color: '#64748B' },
+  loadingText: { marginTop: 12, fontSize: 14, color: Colors.textSecondary },
   header: { gap: 8 },
-  title: { fontSize: 28, fontWeight: '800', color: '#0F172A' },
-  subtitle: { fontSize: 15, lineHeight: 22, color: '#64748B' },
+  title: { fontSize: 28, fontWeight: '800', color: Colors.textPrimary },
+  subtitle: { fontSize: 15, lineHeight: 22, color: Colors.textSecondary },
   summaryCard: {
-    backgroundColor: '#0F172A',
+    backgroundColor: Colors.textPrimary,
     borderRadius: 24,
     padding: 20,
     gap: 8,
   },
-  summaryLabel: { fontSize: 12, fontWeight: '700', color: '#93C5FD' },
-  summaryValue: { fontSize: 30, fontWeight: '800', color: '#FFFFFF' },
-  summaryBody: { fontSize: 14, lineHeight: 20, color: '#CBD5E1' },
-  filterCard: { backgroundColor: '#FFFFFF', borderRadius: 24, padding: 20, gap: 12 },
-  sectionTitle: { fontSize: 16, fontWeight: '800', color: '#0F172A' },
+  summaryLabel: { fontSize: 12, fontWeight: '700', color: Colors.textTertiary },
+  summaryValue: { fontSize: 30, fontWeight: '800', color: Colors.surface },
+  summaryBody: { fontSize: 14, lineHeight: 20, color: Colors.border },
+  filterCard: { backgroundColor: Colors.surface, borderRadius: 24, padding: 20, gap: 12 },
+  sectionTitle: { fontSize: 16, fontWeight: '800', color: Colors.textPrimary },
   chipRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   chip: {
     paddingHorizontal: 12,
     paddingVertical: 8,
     borderRadius: 999,
-    backgroundColor: '#E2E8F0',
+    backgroundColor: Colors.border,
   },
-  chipActive: { backgroundColor: '#DBEAFE' },
-  chipText: { fontSize: 12, fontWeight: '700', color: '#475569' },
-  chipTextActive: { color: '#1D4ED8' },
+  chipActive: { backgroundColor: Colors.primaryMint },
+  chipText: { fontSize: 12, fontWeight: '700', color: Colors.textSecondary },
+  chipTextActive: { color: Colors.primary },
   card: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: Colors.surface,
     borderRadius: 24,
     padding: 20,
     flexDirection: 'row',
@@ -255,9 +255,9 @@ const styles = StyleSheet.create({
   cardMuted: { opacity: 0.62 },
   badgeIcon: { fontSize: 30 },
   badgeCopy: { flex: 1, gap: 4 },
-  badgeTitle: { fontSize: 17, fontWeight: '800', color: '#0F172A' },
-  badgeBody: { fontSize: 14, lineHeight: 20, color: '#475569' },
-  badgeMeta: { fontSize: 12, color: '#64748B' },
+  badgeTitle: { fontSize: 17, fontWeight: '800', color: Colors.textPrimary },
+  badgeBody: { fontSize: 14, lineHeight: 20, color: Colors.textSecondary },
+  badgeMeta: { fontSize: 12, color: Colors.textSecondary },
   modalBackdrop: {
     flex: 1,
     backgroundColor: 'rgba(15,23,42,0.45)',
@@ -267,23 +267,23 @@ const styles = StyleSheet.create({
   },
   modalCard: {
     width: '100%',
-    backgroundColor: '#FFFFFF',
+    backgroundColor: Colors.surface,
     borderRadius: 24,
     padding: 24,
     gap: 12,
     alignItems: 'center',
   },
   modalIcon: { fontSize: 42 },
-  modalTitle: { fontSize: 20, fontWeight: '800', color: '#0F172A' },
-  modalBody: { fontSize: 14, lineHeight: 22, color: '#475569', textAlign: 'center' },
-  modalMeta: { fontSize: 13, color: '#64748B' },
+  modalTitle: { fontSize: 20, fontWeight: '800', color: Colors.textPrimary },
+  modalBody: { fontSize: 14, lineHeight: 22, color: Colors.textSecondary, textAlign: 'center' },
+  modalMeta: { fontSize: 13, color: Colors.textSecondary },
   primaryButton: {
     alignItems: 'center',
     justifyContent: 'center',
     paddingVertical: 14,
     paddingHorizontal: 24,
     borderRadius: 16,
-    backgroundColor: '#2563EB',
+    backgroundColor: Colors.primary,
   },
-  primaryButtonText: { fontSize: 14, fontWeight: '700', color: '#FFFFFF' },
+  primaryButtonText: { fontSize: 14, fontWeight: '700', color: Colors.surface },
 });

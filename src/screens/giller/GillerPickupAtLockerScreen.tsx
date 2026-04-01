@@ -20,7 +20,7 @@ import { getQRCodeRemainingTime, verifyQRCode } from '../../services/qrcode-serv
 import { takePhoto, uploadPhotoWithThumbnail } from '../../services/photo-service';
 import type { LockerReservation } from '../../types/locker';
 import type { MainStackNavigationProp, MainStackParamList } from '../../types/navigation';
-import { BorderRadius, Spacing, Typography } from '../../theme';
+import { BorderRadius, Colors, Shadows, Spacing, Typography } from '../../theme';
 
 type PickupRoute = RouteProp<MainStackParamList, 'GillerPickupAtLocker'>;
 type Step = 'verify' | 'pickup' | 'photo' | 'complete';
@@ -139,7 +139,7 @@ export default function GillerPickupAtLockerScreen() {
   if (loading) {
     return (
       <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color="#2563EB" />
+        <ActivityIndicator size="large" color={Colors.primary} />
         <Text style={styles.loadingText}>사물함 픽업 예약을 확인하고 있어요.</Text>
       </View>
     );
@@ -151,9 +151,9 @@ export default function GillerPickupAtLockerScreen() {
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
-      <View style={styles.header}>
-        <Text style={styles.title}>사물함 픽업</Text>
-        <Text style={styles.subtitle}>QR 확인, 물품 회수, 픽업 사진, 추적 연결 순서로 진행합니다.</Text>
+      <View style={styles.hero}>
+        <Text style={styles.kicker}>사물함 픽업</Text>
+        <Text style={styles.title}>QR 확인, 물품 회수, 픽업 사진, 추적 연결 순서로 진행합니다.</Text>
       </View>
 
       <View style={styles.card}>
@@ -177,13 +177,13 @@ export default function GillerPickupAtLockerScreen() {
 
       {step === 'photo' ? (
         <TouchableOpacity style={styles.primaryButton} onPress={() => void handleTakePhoto()} disabled={working}>
-          {working ? <ActivityIndicator size="small" color="#FFFFFF" /> : <Text style={styles.primaryButtonText}>픽업 사진 촬영</Text>}
+          {working ? <ActivityIndicator size="small" color={Colors.white} /> : <Text style={styles.primaryButtonText}>픽업 사진 촬영</Text>}
         </TouchableOpacity>
       ) : null}
 
       {step === 'complete' ? (
         <TouchableOpacity style={styles.primaryButton} onPress={() => void handleComplete()} disabled={working}>
-          {working ? <ActivityIndicator size="small" color="#FFFFFF" /> : <Text style={styles.primaryButtonText}>픽업 완료 처리</Text>}
+          {working ? <ActivityIndicator size="small" color={Colors.white} /> : <Text style={styles.primaryButtonText}>픽업 완료 처리</Text>}
         </TouchableOpacity>
       ) : null}
     </ScrollView>
@@ -191,22 +191,16 @@ export default function GillerPickupAtLockerScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#F8FAFC' },
-  content: { padding: 20, gap: 16 },
-  loadingContainer: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: '#F8FAFC' },
-  loadingText: { marginTop: 12, fontSize: 14, color: '#64748B' },
-  header: { gap: 8 },
-  title: { fontSize: 28, fontWeight: '800', color: '#0F172A' },
-  subtitle: { fontSize: 15, lineHeight: 22, color: '#64748B' },
-  card: { backgroundColor: '#FFFFFF', borderRadius: BorderRadius.xl, padding: Spacing.lg, gap: 8 },
-  sectionTitle: { fontSize: Typography.fontSize.lg, fontWeight: '800', color: '#0F172A' },
-  bodyText: { fontSize: Typography.fontSize.sm, color: '#334155' },
-  primaryButton: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 16,
-    borderRadius: 18,
-    backgroundColor: '#2563EB',
-  },
-  primaryButtonText: { fontSize: 15, fontWeight: '700', color: '#FFFFFF' },
+  container: { flex: 1, backgroundColor: Colors.background },
+  content: { padding: Spacing.xl, gap: Spacing.lg },
+  loadingContainer: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: Colors.background },
+  loadingText: { marginTop: Spacing.md, fontSize: Typography.fontSize.base, color: Colors.textSecondary },
+  hero: { backgroundColor: Colors.primaryMint, borderRadius: BorderRadius.xl, padding: Spacing.xl, gap: Spacing.sm, ...Shadows.sm },
+  kicker: { color: Colors.primary, fontSize: Typography.fontSize.xs, fontWeight: '800', textTransform: 'uppercase', letterSpacing: 1 },
+  title: { color: Colors.textPrimary, fontSize: Typography.fontSize['2xl'], fontWeight: '800', lineHeight: 32 },
+  card: { backgroundColor: Colors.surface, borderRadius: BorderRadius.xl, padding: Spacing.xl, gap: Spacing.md, borderWidth: 1, borderColor: Colors.border },
+  sectionTitle: { color: Colors.textPrimary, fontSize: Typography.fontSize.lg, fontWeight: '800', marginBottom: 4 },
+  bodyText: { color: Colors.textSecondary, fontSize: Typography.fontSize.base, fontWeight: '600' },
+  primaryButton: { minHeight: 52, borderRadius: BorderRadius.full, backgroundColor: Colors.primary, alignItems: 'center', justifyContent: 'center', marginTop: Spacing.sm },
+  primaryButtonText: { color: Colors.white, fontSize: 16, fontWeight: '800' },
 });

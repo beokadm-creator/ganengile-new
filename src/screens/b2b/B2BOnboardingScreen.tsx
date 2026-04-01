@@ -1,4 +1,4 @@
-﻿import React, { useState } from 'react';
+import React, { useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -13,6 +13,7 @@ import {
 import type { StackNavigationProp } from '@react-navigation/stack';
 import { addDoc, collection, serverTimestamp } from 'firebase/firestore';
 import { db, requireUserId } from '../../services/firebase';
+import { BorderRadius, Colors, Shadows, Spacing, Typography } from '../../theme';
 import type { B2BStackParamList } from '../../types/navigation';
 
 type NavigationProp = StackNavigationProp<B2BStackParamList, 'B2BOnboarding'>;
@@ -175,14 +176,14 @@ export default function B2BOnboardingScreen({ navigation }: Props) {
         <Switch
           value={agreed}
           onValueChange={setAgreed}
-          trackColor={{ false: '#CBD5E1', true: '#93C5FD' }}
-          thumbColor="#FFFFFF"
+          trackColor={{ false: Colors.border, true: Colors.textTertiary }}
+          thumbColor=Colors.white
         />
       </View>
 
       <TouchableOpacity style={styles.submitButton} onPress={() => void handleSubmit()} disabled={loading}>
         {loading ? (
-          <ActivityIndicator size="small" color="#FFFFFF" />
+          <ActivityIndicator size="small" color=Colors.white />
         ) : (
           <Text style={styles.submitButtonText}>계약 요청하기</Text>
         )}
@@ -194,104 +195,106 @@ export default function B2BOnboardingScreen({ navigation }: Props) {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F8FAFC',
+    backgroundColor: Colors.background,
   },
   content: {
-    padding: 20,
-    gap: 16,
+    padding: Spacing.xl,
+    gap: Spacing.lg,
   },
   header: {
-    gap: 8,
+    gap: Spacing.sm,
   },
   title: {
-    fontSize: 28,
+    fontSize: Typography.fontSize['2xl'],
     fontWeight: '800',
-    color: '#0F172A',
+    color: Colors.textPrimary,
   },
   subtitle: {
-    fontSize: 15,
+    fontSize: Typography.fontSize.sm,
     lineHeight: 22,
-    color: '#64748B',
+    color: Colors.textSecondary,
   },
   card: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 24,
-    padding: 20,
-    shadowColor: '#0F172A',
-    shadowOpacity: 0.06,
-    shadowRadius: 10,
-    shadowOffset: { width: 0, height: 4 },
-    elevation: 3,
-    gap: 12,
+    backgroundColor: Colors.surface,
+    borderRadius: BorderRadius.xl,
+    padding: Spacing.xl,
+    ...Shadows.sm,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    gap: Spacing.md,
   },
   sectionTitle: {
-    fontSize: 18,
+    fontSize: Typography.fontSize.lg,
     fontWeight: '800',
-    color: '#0F172A',
+    color: Colors.textPrimary,
   },
   input: {
     borderWidth: 1,
-    borderColor: '#CBD5E1',
-    borderRadius: 16,
-    paddingHorizontal: 16,
+    borderColor: Colors.gray200,
+    borderRadius: BorderRadius.lg,
+    paddingHorizontal: Spacing.md,
     paddingVertical: 14,
-    fontSize: 15,
-    backgroundColor: '#FFFFFF',
-    color: '#0F172A',
+    fontSize: Typography.fontSize.sm,
+    backgroundColor: Colors.surface,
+    color: Colors.textPrimary,
   },
   multilineInput: {
     minHeight: 96,
     textAlignVertical: 'top',
   },
   infoCard: {
-    backgroundColor: '#EFF6FF',
-    borderRadius: 20,
-    padding: 18,
-    gap: 8,
+    backgroundColor: Colors.warningLight,
+    borderRadius: BorderRadius.lg,
+    padding: Spacing.lg,
+    gap: Spacing.sm,
+    borderWidth: 1,
+    borderColor: Colors.warning,
   },
   infoTitle: {
-    fontSize: 15,
+    fontSize: Typography.fontSize.base,
     fontWeight: '800',
-    color: '#1D4ED8',
+    color: Colors.warningDark,
   },
   infoText: {
-    fontSize: 14,
+    fontSize: Typography.fontSize.sm,
     lineHeight: 21,
-    color: '#1E3A8A',
+    color: Colors.warningDark,
   },
   agreementRow: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 20,
-    padding: 18,
+    backgroundColor: Colors.surface,
+    borderRadius: BorderRadius.xl,
+    padding: Spacing.lg,
+    borderWidth: 1,
+    borderColor: Colors.border,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    gap: 12,
+    gap: Spacing.md,
   },
   agreementText: {
     flex: 1,
   },
   agreementTitle: {
-    fontSize: 15,
+    fontSize: Typography.fontSize.base,
     fontWeight: '700',
-    color: '#0F172A',
+    color: Colors.textPrimary,
   },
   agreementDescription: {
     marginTop: 4,
-    fontSize: 13,
+    fontSize: Typography.fontSize.xs,
     lineHeight: 19,
-    color: '#64748B',
+    color: Colors.textSecondary,
   },
   submitButton: {
     minHeight: 54,
-    borderRadius: 18,
+    borderRadius: BorderRadius.full,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#2563EB',
+    backgroundColor: Colors.primary,
   },
   submitButtonText: {
-    fontSize: 15,
+    fontSize: Typography.fontSize.base,
     fontWeight: '800',
-    color: '#FFFFFF',
+    color: Colors.white,
   },
 });

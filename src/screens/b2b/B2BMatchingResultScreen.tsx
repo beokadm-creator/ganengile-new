@@ -182,7 +182,7 @@ export default function B2BMatchingResultScreen() {
         <Text style={styles.name}>{selectedMatch?.gillerName ?? 'Giller'}</Text>
 
         <View style={styles.gradeChip}>
-          <Ionicons name="shield-checkmark" size={14} color="#fff" />
+          <Ionicons name="shield-checkmark" size={14} color=Colors.white />
           <Text style={styles.gradeChipText}>{gradeInfo.name}</Text>
         </View>
 
@@ -236,7 +236,7 @@ export default function B2BMatchingResultScreen() {
           <Text style={styles.secondaryButtonText}>Find another</Text>
         </TouchableOpacity>
         <TouchableOpacity style={styles.primaryButton} onPress={() => void handleAccept()} disabled={loading}>
-          {loading ? <ActivityIndicator color="#fff" /> : <Text style={styles.primaryButtonText}>Assign</Text>}
+          {loading ? <ActivityIndicator color=Colors.white /> : <Text style={styles.primaryButtonText}>Assign</Text>}
         </TouchableOpacity>
       </View>
     </ScrollView>
@@ -301,32 +301,36 @@ const styles = StyleSheet.create({
     gap: Spacing.xs,
   },
   title: {
-    ...Typography.h2,
-    color: Colors.text.primary,
+    fontSize: Typography.fontSize['2xl'],
+    fontWeight: '800',
+    color: Colors.textPrimary,
     textAlign: 'center',
   },
   subtitle: {
-    ...Typography.body2,
-    color: Colors.text.secondary,
+    fontSize: Typography.fontSize.sm,
+    color: Colors.textSecondary,
     textAlign: 'center',
   },
   timer: {
-    ...Typography.h1,
+    fontSize: Typography.fontSize['4xl'],
+    fontWeight: '800',
     color: Colors.primary,
   },
   card: {
-    backgroundColor: '#fff',
-    borderRadius: BorderRadius.lg,
-    padding: Spacing.lg,
+    backgroundColor: Colors.surface,
+    borderRadius: BorderRadius.xl,
+    padding: Spacing.xl,
     gap: Spacing.lg,
-    ...Shadows.md,
+    borderWidth: 1,
+    borderColor: Colors.border,
   },
   avatarWrap: {
     alignItems: 'center',
   },
   name: {
-    ...Typography.h3,
-    color: Colors.text.primary,
+    fontSize: Typography.fontSize.xl,
+    fontWeight: '800',
+    color: Colors.textPrimary,
     textAlign: 'center',
   },
   gradeChip: {
@@ -340,12 +344,13 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.primary,
   },
   gradeChipText: {
-    ...Typography.bodySmall,
-    color: '#fff',
+    fontSize: Typography.fontSize.sm,
+    fontWeight: '700',
+    color: Colors.white,
   },
   statsText: {
-    ...Typography.body2,
-    color: Colors.text.secondary,
+    fontSize: Typography.fontSize.sm,
+    color: Colors.textSecondary,
     textAlign: 'center',
   },
   summaryGrid: {
@@ -355,27 +360,27 @@ const styles = StyleSheet.create({
   },
   summaryCard: {
     width: '48%',
-    backgroundColor: Colors.gray100,
-    borderRadius: BorderRadius.md,
+    backgroundColor: Colors.gray50,
+    borderRadius: BorderRadius.lg,
     padding: Spacing.md,
     gap: 4,
   },
   summaryLabel: {
-    ...Typography.bodySmall,
-    color: Colors.text.secondary,
+    fontSize: Typography.fontSize.xs,
+    color: Colors.textTertiary,
   },
   summaryValue: {
-    ...Typography.body1,
-    color: Colors.text.primary,
+    fontSize: Typography.fontSize.base,
+    color: Colors.textPrimary,
     fontWeight: '700',
   },
   section: {
     gap: Spacing.sm,
   },
   sectionTitle: {
-    ...Typography.body1,
-    color: Colors.text.primary,
-    fontWeight: '700',
+    fontSize: Typography.fontSize.lg,
+    color: Colors.textPrimary,
+    fontWeight: '800',
   },
   row: {
     flexDirection: 'row',
@@ -383,8 +388,8 @@ const styles = StyleSheet.create({
     gap: Spacing.sm,
   },
   rowText: {
-    ...Typography.body2,
-    color: Colors.text.primary,
+    fontSize: Typography.fontSize.sm,
+    color: Colors.textSecondary,
     flex: 1,
   },
   badgesWrap: {
@@ -396,11 +401,12 @@ const styles = StyleSheet.create({
     paddingHorizontal: Spacing.sm,
     paddingVertical: 8,
     borderRadius: BorderRadius.full,
-    backgroundColor: Colors.gray100,
+    backgroundColor: Colors.gray50,
   },
   badgeText: {
-    ...Typography.bodySmall,
-    color: Colors.text.primary,
+    fontSize: Typography.fontSize.xs,
+    color: Colors.textPrimary,
+    fontWeight: '600',
   },
   actionsRow: {
     flexDirection: 'row',
@@ -410,27 +416,30 @@ const styles = StyleSheet.create({
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    borderRadius: BorderRadius.md,
-    backgroundColor: Colors.gray100,
-    paddingVertical: Spacing.md,
+    borderRadius: BorderRadius.full,
+    backgroundColor: Colors.surface,
+    paddingVertical: Spacing.lg,
     paddingHorizontal: Spacing.lg,
+    borderWidth: 1,
+    borderColor: Colors.border,
   },
   secondaryButtonText: {
-    ...Typography.body1,
-    color: Colors.text.primary,
+    fontSize: Typography.fontSize.base,
+    color: Colors.textPrimary,
+    fontWeight: '700',
   },
   primaryButton: {
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    borderRadius: BorderRadius.md,
+    borderRadius: BorderRadius.full,
     backgroundColor: Colors.primary,
-    paddingVertical: Spacing.md,
+    paddingVertical: Spacing.lg,
     paddingHorizontal: Spacing.lg,
   },
   primaryButtonText: {
-    ...Typography.body1,
-    color: '#fff',
-    fontWeight: '700',
+    fontSize: Typography.fontSize.base,
+    color: Colors.white,
+    fontWeight: '800',
   },
 });

@@ -1,4 +1,4 @@
-﻿import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -109,11 +109,11 @@ export default function SubscriptionTierSelectionScreen() {
         </View>
 
         <View style={styles.infoRow}>
-          <Ionicons name="cube-outline" size={18} color={isSelected ? Colors.primary : Colors.text.secondary} />
+          <Ionicons name="cube-outline" size={18} color={isSelected ? Colors.primary : Colors.textSecondary} />
           <Text style={[styles.infoText, isSelected && styles.selectedInfoText]}>월 {tier.deliveryLimit}건 포함</Text>
         </View>
         <View style={styles.infoRow}>
-          <Ionicons name="cash-outline" size={18} color={isSelected ? Colors.primary : Colors.text.secondary} />
+          <Ionicons name="cash-outline" size={18} color={isSelected ? Colors.primary : Colors.textSecondary} />
           <Text style={[styles.infoText, isSelected && styles.selectedInfoText]}>초과 시 건당 {formatCurrency(tier.pricePerDelivery)}</Text>
         </View>
 
@@ -147,7 +147,7 @@ export default function SubscriptionTierSelectionScreen() {
     <View style={styles.container}>
       <View style={styles.header}>
         <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
-          <Ionicons name="arrow-back" size={24} color={Colors.text.primary} />
+          <Ionicons name="arrow-back" size={24} color={Colors.textPrimary} />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>구독 플랜 선택</Text>
       </View>
@@ -167,7 +167,7 @@ export default function SubscriptionTierSelectionScreen() {
           onPress={() => void handleSubscribe()}
           disabled={!selectedTier || submitting}
         >
-          {submitting ? <ActivityIndicator color="#fff" /> : <Text style={styles.subscribeButtonText}>{selectedTier ? '구독 시작하기' : '플랜을 선택해 주세요'}</Text>}
+          {submitting ? <ActivityIndicator color=Colors.white /> : <Text style={styles.subscribeButtonText}>{selectedTier ? '구독 시작하기' : '플랜을 선택해 주세요'}</Text>}
         </TouchableOpacity>
       </View>
     </View>
@@ -196,22 +196,24 @@ const styles = StyleSheet.create({
     marginRight: Spacing.md,
   },
   headerTitle: {
-    ...Typography.h3,
-    color: Colors.text.primary,
+    fontSize: Typography.fontSize.xl,
+    fontWeight: '800',
+    color: Colors.textPrimary,
   },
   descriptionContainer: {
     padding: Spacing.xl,
     alignItems: 'center',
   },
   descriptionTitle: {
-    ...Typography.h3,
-    color: Colors.text.primary,
+    fontSize: Typography.fontSize.xl,
+    fontWeight: '800',
+    color: Colors.textPrimary,
     marginBottom: Spacing.sm,
     textAlign: 'center',
   },
   descriptionText: {
-    ...Typography.body2,
-    color: Colors.text.secondary,
+    fontSize: Typography.fontSize.sm,
+    color: Colors.textSecondary,
     textAlign: 'center',
   },
   tiersContainer: {
@@ -224,37 +226,38 @@ const styles = StyleSheet.create({
   tierCard: {
     position: 'relative',
     padding: Spacing.lg,
-    backgroundColor: '#fff',
-    borderRadius: BorderRadius.lg,
+    backgroundColor: Colors.surface,
+    borderRadius: BorderRadius.xl,
     borderWidth: 2,
     borderColor: Colors.border,
     ...Shadows.sm,
   },
   selectedTierCard: {
     borderColor: Colors.primary,
-    backgroundColor: `${Colors.primary}08`,
+    backgroundColor: Colors.primaryMint,
   },
   popularTierCard: {
-    borderColor: Colors.accent,
+    borderColor: Colors.primary,
   },
   popularBadge: {
     position: 'absolute',
     top: -1,
     right: Spacing.md,
-    backgroundColor: Colors.accent,
+    backgroundColor: Colors.primary,
     paddingHorizontal: Spacing.sm,
     paddingVertical: Spacing.xs,
-    borderTopLeftRadius: BorderRadius.sm,
-    borderTopRightRadius: BorderRadius.sm,
+    borderBottomLeftRadius: BorderRadius.sm,
+    borderBottomRightRadius: BorderRadius.sm,
   },
   popularBadgeText: {
-    ...Typography.bodySmall,
-    color: '#fff',
-    fontWeight: 'bold',
+    fontSize: Typography.fontSize.xs,
+    color: Colors.white,
+    fontWeight: '800',
   },
   tierName: {
-    ...Typography.h3,
-    color: Colors.text.primary,
+    fontSize: Typography.fontSize.xl,
+    fontWeight: '800',
+    color: Colors.textPrimary,
     marginBottom: Spacing.sm,
   },
   selectedTierName: {
@@ -266,15 +269,16 @@ const styles = StyleSheet.create({
     marginBottom: Spacing.md,
   },
   priceAmount: {
-    ...Typography.h1,
-    color: Colors.text.primary,
+    fontSize: Typography.fontSize['3xl'],
+    fontWeight: '800',
+    color: Colors.textPrimary,
   },
   selectedPriceAmount: {
     color: Colors.primary,
   },
   pricePeriod: {
-    ...Typography.body2,
-    color: Colors.text.secondary,
+    fontSize: Typography.fontSize.sm,
+    color: Colors.textSecondary,
     marginLeft: Spacing.xs,
   },
   selectedPricePeriod: {
@@ -286,8 +290,8 @@ const styles = StyleSheet.create({
     marginBottom: Spacing.sm,
   },
   infoText: {
-    ...Typography.body2,
-    color: Colors.text.secondary,
+    fontSize: Typography.fontSize.sm,
+    color: Colors.textSecondary,
     marginLeft: Spacing.sm,
   },
   selectedInfoText: {
@@ -304,8 +308,8 @@ const styles = StyleSheet.create({
     marginBottom: Spacing.sm,
   },
   featureText: {
-    ...Typography.body2,
-    color: Colors.text.primary,
+    fontSize: Typography.fontSize.sm,
+    color: Colors.textPrimary,
     marginLeft: Spacing.sm,
   },
   selectedIndicator: {
@@ -317,20 +321,20 @@ const styles = StyleSheet.create({
     padding: Spacing.md,
     borderTopWidth: 1,
     borderTopColor: Colors.border,
-    backgroundColor: '#fff',
+    backgroundColor: Colors.surface,
   },
   subscribeButton: {
     paddingVertical: Spacing.lg,
-    borderRadius: BorderRadius.md,
+    borderRadius: BorderRadius.full,
     backgroundColor: Colors.primary,
     alignItems: 'center',
   },
   disabledButton: {
-    backgroundColor: Colors.gray100,
+    backgroundColor: Colors.gray200,
   },
   subscribeButtonText: {
-    ...Typography.body1,
-    color: '#fff',
-    fontWeight: 'bold',
+    fontSize: Typography.fontSize.base,
+    color: Colors.white,
+    fontWeight: '800',
   },
 });

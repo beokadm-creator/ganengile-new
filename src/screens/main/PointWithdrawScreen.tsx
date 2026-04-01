@@ -16,7 +16,7 @@ import { getBankIntegrationConfig } from '../../services/integration-config-serv
 import { getWithdrawalEligibility } from '../../services/beta1-wallet-service';
 import { WithdrawalEligibilityStatus } from '../../types/beta1-wallet';
 import type { MainStackNavigationProp } from '../../types/navigation';
-import { BorderRadius, Spacing, Typography } from '../../theme';
+import { BorderRadius, Colors, Spacing, Typography } from '../../theme';
 
 type Props = {
   navigation: MainStackNavigationProp;
@@ -109,7 +109,7 @@ export default function PointWithdrawScreen({ navigation }: Props) {
   if (initializing) {
     return (
       <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color="#0F766E" />
+        <ActivityIndicator size="large" color={Colors.primary} />
         <Text style={styles.loadingText}>출금 가능 조건을 확인하는 중입니다.</Text>
       </View>
     );
@@ -177,7 +177,7 @@ export default function PointWithdrawScreen({ navigation }: Props) {
         }}
         disabled={loading}
       >
-        {loading ? <ActivityIndicator color="#FFFFFF" /> : <Text style={styles.submitButtonText}>출금 요청 등록</Text>}
+        {loading ? <ActivityIndicator color=Colors.white /> : <Text style={styles.submitButtonText}>출금 요청 등록</Text>}
       </TouchableOpacity>
     </ScrollView>
   );
@@ -197,7 +197,7 @@ function Field(props: {
         value={props.value}
         onChangeText={props.onChangeText}
         keyboardType={props.keyboardType}
-        placeholderTextColor="#94A3B8"
+        placeholderTextcolor={Colors.textTertiary}
       />
     </View>
   );
@@ -233,7 +233,7 @@ function getEligibilityMessage(reasons: WithdrawalEligibilityStatus[]) {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F4F7F5',
+    backgroundColor: Colors.background,
   },
   content: {
     padding: Spacing.lg,
@@ -243,22 +243,22 @@ const styles = StyleSheet.create({
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#F4F7F5',
+    backgroundColor: Colors.background,
     gap: 12,
   },
   loadingText: {
     fontSize: Typography.fontSize.sm,
-    color: '#475569',
+    color: Colors.textSecondary,
   },
   hero: {
-    backgroundColor: '#FEE2E2',
+    backgroundColor: Colors.warningLight,
     borderRadius: BorderRadius.xl,
     padding: Spacing.xl,
   },
   kicker: {
     fontSize: 11,
     fontWeight: '800',
-    color: '#B91C1C',
+    color: Colors.warning,
     textTransform: 'uppercase',
     letterSpacing: 1.2,
     marginBottom: 8,
@@ -266,32 +266,32 @@ const styles = StyleSheet.create({
   title: {
     fontSize: Typography.fontSize['2xl'],
     fontWeight: '800',
-    color: '#111827',
+    color: Colors.textPrimary,
     marginBottom: 8,
   },
   subtitle: {
     fontSize: Typography.fontSize.sm,
-    color: '#475569',
+    color: Colors.textSecondary,
     lineHeight: 20,
   },
   noticeCard: {
-    backgroundColor: '#FEF3C7',
+    backgroundColor: Colors.warningLight,
     borderRadius: BorderRadius.xl,
     padding: Spacing.lg,
   },
   noticeTitle: {
     fontSize: Typography.fontSize.base,
     fontWeight: '800',
-    color: '#92400E',
+    color: Colors.warningDark,
     marginBottom: 8,
   },
   noticeText: {
     fontSize: Typography.fontSize.sm,
-    color: '#78350F',
+    color: Colors.warningDark,
     lineHeight: 20,
   },
   guardCard: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: Colors.surface,
     borderRadius: BorderRadius.xl,
     padding: Spacing.lg,
     gap: 10,
@@ -299,7 +299,7 @@ const styles = StyleSheet.create({
   guardTitle: {
     fontSize: Typography.fontSize.base,
     fontWeight: '800',
-    color: '#0F172A',
+    color: Colors.textPrimary,
   },
   guardRow: {
     flexDirection: 'row',
@@ -312,31 +312,31 @@ const styles = StyleSheet.create({
     minWidth: 60,
   },
   guardStateOk: {
-    color: '#047857',
+    color: Colors.success,
   },
   guardStateBad: {
-    color: '#B91C1C',
+    color: Colors.error,
   },
   guardText: {
     flex: 1,
     fontSize: Typography.fontSize.sm,
-    color: '#475569',
+    color: Colors.textSecondary,
     lineHeight: 20,
   },
   balanceCard: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: Colors.surface,
     borderRadius: BorderRadius.xl,
     padding: Spacing.xl,
     gap: 12,
   },
   balanceLabel: {
     fontSize: Typography.fontSize.sm,
-    color: '#64748B',
+    color: Colors.gray500,
   },
   balanceValue: {
     fontSize: Typography.fontSize['3xl'],
     fontWeight: '800',
-    color: '#0F172A',
+    color: Colors.textPrimary,
   },
   quickActions: {
     flexDirection: 'row',
@@ -344,18 +344,18 @@ const styles = StyleSheet.create({
     gap: 10,
   },
   secondaryButton: {
-    borderRadius: BorderRadius.lg,
-    backgroundColor: '#ECFDF3',
+    borderRadius: BorderRadius.full,
+    backgroundColor: Colors.successLight,
     paddingHorizontal: 14,
     paddingVertical: 10,
   },
   secondaryButtonText: {
-    color: '#115E59',
+    color: Colors.success,
     fontSize: Typography.fontSize.sm,
     fontWeight: '800',
   },
   formCard: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: Colors.surface,
     borderRadius: BorderRadius.xl,
     padding: Spacing.lg,
     gap: Spacing.md,
@@ -366,20 +366,20 @@ const styles = StyleSheet.create({
   fieldLabel: {
     fontSize: Typography.fontSize.sm,
     fontWeight: '700',
-    color: '#334155',
+    color: Colors.gray700,
   },
   input: {
     borderWidth: 1,
-    borderColor: '#CBD5E1',
+    borderColor: Colors.gray300,
     borderRadius: BorderRadius.lg,
     paddingHorizontal: 14,
     paddingVertical: 14,
-    color: '#0F172A',
+    color: Colors.textPrimary,
     fontSize: Typography.fontSize.base,
   },
   submitButton: {
-    backgroundColor: '#0F766E',
-    borderRadius: BorderRadius.xl,
+    backgroundColor: Colors.primary,
+    borderRadius: BorderRadius.full,
     alignItems: 'center',
     justifyContent: 'center',
     paddingVertical: 18,
@@ -388,7 +388,7 @@ const styles = StyleSheet.create({
     opacity: 0.5,
   },
   submitButtonText: {
-    color: '#FFFFFF',
+    color: Colors.white,
     fontSize: Typography.fontSize.base,
     fontWeight: '800',
   },

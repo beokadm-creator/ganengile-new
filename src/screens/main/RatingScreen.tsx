@@ -142,7 +142,7 @@ export default function RatingScreen() {
 
       <TouchableOpacity style={styles.primaryButton} onPress={() => void handleSubmit()} disabled={loading}>
         {loading ? (
-          <ActivityIndicator size="small" color="#FFFFFF" />
+          <ActivityIndicator size="small" color=Colors.white />
         ) : (
           <Text style={styles.primaryButtonText}>평가 제출</Text>
         )}
@@ -154,7 +154,7 @@ export default function RatingScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F8FAFC',
+    backgroundColor: Colors.background,
   },
   content: {
     padding: 20,
@@ -166,19 +166,19 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 28,
     fontWeight: '800',
-    color: '#0F172A',
+    color: Colors.textPrimary,
   },
   subtitle: {
     fontSize: 15,
     lineHeight: 22,
-    color: '#64748B',
+    color: Colors.textSecondary,
   },
   card: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: Colors.surface,
     borderRadius: 24,
     padding: 20,
     gap: 14,
-    shadowColor: '#0F172A',
+    shadowColor: Colors.textPrimary,
     shadowOpacity: 0.06,
     shadowRadius: 10,
     shadowOffset: { width: 0, height: 4 },
@@ -187,7 +187,7 @@ const styles = StyleSheet.create({
   sectionTitle: {
     fontSize: 18,
     fontWeight: '800',
-    color: '#0F172A',
+    color: Colors.textPrimary,
   },
   starRow: {
     flexDirection: 'row',
@@ -198,10 +198,10 @@ const styles = StyleSheet.create({
   },
   starText: {
     fontSize: 38,
-    color: '#CBD5E1',
+    color: Colors.border,
   },
   starTextActive: {
-    color: '#F59E0B',
+    color: Colors.warning,
   },
   tagGrid: {
     flexDirection: 'row',
@@ -212,28 +212,28 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
     paddingVertical: 10,
     borderRadius: 999,
-    backgroundColor: '#E2E8F0',
+    backgroundColor: Colors.border,
   },
   tagButtonActive: {
-    backgroundColor: '#DBEAFE',
+    backgroundColor: Colors.primaryMint,
   },
   tagButtonText: {
     fontSize: 13,
     fontWeight: '700',
-    color: '#475569',
+    color: Colors.textSecondary,
   },
   tagButtonTextActive: {
-    color: '#1D4ED8',
+    color: Colors.primary,
   },
   input: {
     borderWidth: 1,
-    borderColor: '#CBD5E1',
+    borderColor: Colors.border,
     borderRadius: 16,
     paddingHorizontal: 16,
     paddingVertical: 14,
     fontSize: 15,
-    backgroundColor: '#FFFFFF',
-    color: '#0F172A',
+    backgroundColor: Colors.surface,
+    color: Colors.textPrimary,
   },
   commentInput: {
     minHeight: 120,
@@ -252,18 +252,18 @@ const styles = StyleSheet.create({
   helperText: {
     fontSize: 14,
     lineHeight: 20,
-    color: '#64748B',
+    color: Colors.textSecondary,
   },
   primaryButton: {
     alignItems: 'center',
     justifyContent: 'center',
     paddingVertical: 16,
     borderRadius: 18,
-    backgroundColor: '#2563EB',
+    backgroundColor: Colors.primary,
   },
   primaryButtonText: {
     fontSize: 15,
     fontWeight: '700',
-    color: '#FFFFFF',
+    color: Colors.surface,
   },
 });

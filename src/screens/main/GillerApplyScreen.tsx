@@ -30,7 +30,7 @@ import BankSelectModal from '../../components/common/BankSelectModal';
 import { createProtectedBankAccount } from '../../../shared/bank-account';
 
 const TOTAL_STEPS = 4;
-const ACCENT = '#0F766E';
+const ACCENT = Colors.primary;
 
 export default function GillerApplyScreen({ navigation }: { navigation: MainStackNavigationProp }) {
   const { user, refreshUser } = useUser();
@@ -419,7 +419,7 @@ export default function GillerApplyScreen({ navigation }: { navigation: MainStac
           activeOpacity={0.9}
         >
           {loading ? (
-            <ActivityIndicator color="#FFFFFF" />
+            <ActivityIndicator color=Colors.white />
           ) : (
             <Text style={styles.footerButtonText}>{step === TOTAL_STEPS ? '신청하기' : '다음'}</Text>
           )}
@@ -465,7 +465,7 @@ function InputField({
         value={value}
         onChangeText={onChangeText}
         placeholder={placeholder}
-        placeholderTextColor="#94A3B8"
+        placeholderTextcolor={Colors.textTertiary}
         multiline={multiline}
         keyboardType={keyboardType ?? 'default'}
         textAlignVertical={multiline ? 'top' : 'center'}
@@ -478,11 +478,11 @@ function InputField({
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F8FAFC',
+    backgroundColor: Colors.background,
   },
   progressTrack: {
     height: 6,
-    backgroundColor: '#E2E8F0',
+    backgroundColor: Colors.border,
   },
   progressFill: {
     height: 6,
@@ -491,7 +491,7 @@ const styles = StyleSheet.create({
   progressLabel: {
     paddingHorizontal: 20,
     paddingTop: 12,
-    color: '#475467',
+    color: Colors.textSecondary,
     fontSize: 13,
     fontWeight: '700',
   },
@@ -503,21 +503,21 @@ const styles = StyleSheet.create({
   stepTitle: {
     fontSize: 28,
     fontWeight: '800',
-    color: '#0F172A',
+    color: Colors.textPrimary,
     marginBottom: 8,
   },
   stepDescription: {
     fontSize: 15,
     lineHeight: 22,
-    color: '#64748B',
+    color: Colors.textSecondary,
     marginBottom: 20,
   },
   card: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: Colors.surface,
     borderRadius: 24,
     padding: 20,
     gap: 12,
-    shadowColor: '#0F172A',
+    shadowColor: Colors.textPrimary,
     shadowOpacity: 0.06,
     shadowRadius: 10,
     shadowOffset: { width: 0, height: 4 },
@@ -525,12 +525,12 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   infoCard: {
-    backgroundColor: '#F0FDFA',
+    backgroundColor: Colors.primaryMint,
   },
   cardTitle: {
     fontSize: 17,
     fontWeight: '800',
-    color: '#0F172A',
+    color: Colors.textPrimary,
   },
   field: {
     marginBottom: 16,
@@ -539,16 +539,16 @@ const styles = StyleSheet.create({
   label: {
     fontSize: 14,
     fontWeight: '700',
-    color: '#334155',
+    color: Colors.textPrimary,
   },
   input: {
     borderWidth: 1,
-    borderColor: '#CBD5E1',
+    borderColor: Colors.border,
     borderRadius: 16,
     paddingHorizontal: 16,
     paddingVertical: 14,
-    backgroundColor: '#FFFFFF',
-    color: '#0F172A',
+    backgroundColor: Colors.surface,
+    color: Colors.textPrimary,
     fontSize: 15,
   },
   textArea: {
@@ -557,7 +557,7 @@ const styles = StyleSheet.create({
   helperText: {
     fontSize: 13,
     lineHeight: 19,
-    color: '#64748B',
+    color: Colors.textSecondary,
   },
   timelineRow: {
     flexDirection: 'row',
@@ -570,35 +570,35 @@ const styles = StyleSheet.create({
     borderRadius: 15,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#DBEAFE',
+    backgroundColor: Colors.primaryMint,
   },
   timelineIndexText: {
     fontSize: 14,
     fontWeight: '800',
-    color: '#1D4ED8',
+    color: Colors.primary,
   },
   timelineText: {
     flex: 1,
     fontSize: 15,
-    color: '#334155',
+    color: Colors.textPrimary,
   },
   alertCard: {
-    backgroundColor: '#FFF7ED',
+    backgroundColor: Colors.warningLight,
   },
   alertText: {
     fontSize: 14,
     lineHeight: 20,
-    color: '#9A3412',
+    color: Colors.warningDark,
   },
   statusHeadline: {
     fontSize: 20,
     fontWeight: '800',
-    color: '#0F172A',
+    color: Colors.textPrimary,
   },
   statusBody: {
     fontSize: 14,
     lineHeight: 21,
-    color: '#475467',
+    color: Colors.textSecondary,
   },
   primaryAction: {
     minHeight: 52,
@@ -611,12 +611,12 @@ const styles = StyleSheet.create({
   primaryActionText: {
     fontSize: 15,
     fontWeight: '800',
-    color: '#FFFFFF',
+    color: Colors.surface,
   },
   secondaryAction: {
     minHeight: 52,
     borderRadius: 18,
-    backgroundColor: '#DBEAFE',
+    backgroundColor: Colors.primaryMint,
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: 12,
@@ -624,38 +624,38 @@ const styles = StyleSheet.create({
   secondaryActionText: {
     fontSize: 15,
     fontWeight: '800',
-    color: '#1D4ED8',
+    color: Colors.primary,
   },
   bankButton: {
     borderWidth: 1,
-    borderColor: '#CBD5E1',
+    borderColor: Colors.border,
     borderRadius: 16,
     paddingHorizontal: 16,
     paddingVertical: 14,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: Colors.surface,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
   },
   bankButtonText: {
     fontSize: 15,
-    color: '#0F172A',
+    color: Colors.textPrimary,
   },
   bankPlaceholder: {
-    color: '#94A3B8',
+    color: Colors.textTertiary,
   },
   bankButtonArrow: {
     fontSize: 18,
-    color: '#64748B',
+    color: Colors.textSecondary,
     fontWeight: '700',
   },
   footer: {
     paddingHorizontal: 20,
     paddingTop: 12,
     paddingBottom: Platform.OS === 'ios' ? 28 : 20,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: Colors.surface,
     borderTopWidth: 1,
-    borderTopColor: '#E5E7EB',
+    borderTopColor: Colors.border,
   },
   footerButton: {
     minHeight: 54,
@@ -670,12 +670,12 @@ const styles = StyleSheet.create({
   footerButtonText: {
     fontSize: 16,
     fontWeight: '800',
-    color: '#FFFFFF',
+    color: Colors.surface,
   },
   submitHint: {
     marginTop: 10,
     fontSize: 13,
     lineHeight: 18,
-    color: '#B42318',
+    color: Colors.error,
   },
 });

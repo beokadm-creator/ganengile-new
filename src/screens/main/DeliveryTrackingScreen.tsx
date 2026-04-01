@@ -1,4 +1,4 @@
-﻿import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import type { JSX } from 'react';
 import { ActivityIndicator, RefreshControl, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
@@ -8,7 +8,7 @@ import { getChatRoomByRequestId } from '../../services/chat-service';
 import { confirmDeliveryByRequester, getDeliveryByRequestId, subscribeToDeliveryByRequestId } from '../../services/delivery-service';
 import { requireUserId } from '../../services/firebase';
 import { getRequestById, subscribeToRequest } from '../../services/request-service';
-import { BorderRadius, Shadows, Spacing, Typography } from '../../theme';
+import { BorderRadius, Colors, Shadows, Spacing, Typography } from '../../theme';
 import type { MainStackNavigationProp, MainStackParamList } from '../../types/navigation';
 import { formatWeightDisplay } from '../../utils/package-weight';
 import { toTrackingModel, type TrackingEvent, type TrackingModel } from '../../utils/request-adapters';
@@ -103,7 +103,7 @@ export default function DeliveryTrackingScreen(): JSX.Element {
   }
 
   if (loading || !trackingData) {
-    return <View style={styles.centerState}><ActivityIndicator size="large" color="#0F766E" /><Text style={styles.centerText}>배송 추적 정보를 불러오는 중입니다.</Text></View>;
+    return <View style={styles.centerState}><ActivityIndicator size="large" color={Colors.primary} /><Text style={styles.centerText}>배송 추적 정보를 불러오는 중입니다.</Text></View>;
   }
 
   return (
@@ -138,9 +138,9 @@ export default function DeliveryTrackingScreen(): JSX.Element {
       </View>
 
       <View style={styles.actionSection}>
-        <TouchableOpacity style={styles.primaryAction} onPress={() => void openChat()}><MaterialIcons name="chat-bubble-outline" size={18} color="#FFFFFF" /><Text style={styles.primaryActionText}>채팅 열기</Text></TouchableOpacity>
-        {(trackingData.status === 'in_transit' || trackingData.status === 'arrived') && <TouchableOpacity style={styles.secondaryAction} onPress={() => navigation.navigate('RealtimeTracking', { deliveryId: trackingData.deliveryId ?? '', requesterId: '', gillerId: trackingData.gillerId ?? '', pickupStation: { name: trackingData.pickupStation.stationName, latitude: pickupLatitude, longitude: pickupLongitude }, dropoffStation: { name: trackingData.deliveryStation.stationName, latitude: deliveryLatitude, longitude: deliveryLongitude } })}><MaterialIcons name="map" size={18} color="#115E59" /><Text style={styles.secondaryActionText}>실시간 위치 보기</Text></TouchableOpacity>}
-        {(trackingData.status === 'delivered' || trackingData.status === 'at_locker') && <TouchableOpacity style={[styles.secondaryAction, confirming && styles.disabledAction]} onPress={() => void handleConfirmDelivery()} disabled={confirming}><MaterialIcons name="check-circle-outline" size={18} color="#115E59" /><Text style={styles.secondaryActionText}>{confirming ? '확인 중...' : '수령 확인'}</Text></TouchableOpacity>}
+        <TouchableOpacity style={styles.primaryAction} onPress={() => void openChat()}><MaterialIcons name="chat-bubble-outline" size={18} color={Colors.white} /><Text style={styles.primaryActionText}>채팅 열기</Text></TouchableOpacity>
+        {(trackingData.status === 'in_transit' || trackingData.status === 'arrived') && <TouchableOpacity style={styles.secondaryAction} onPress={() => navigation.navigate('RealtimeTracking', { deliveryId: trackingData.deliveryId ?? '', requesterId: '', gillerId: trackingData.gillerId ?? '', pickupStation: { name: trackingData.pickupStation.stationName, latitude: pickupLatitude, longitude: pickupLongitude }, dropoffStation: { name: trackingData.deliveryStation.stationName, latitude: deliveryLatitude, longitude: deliveryLongitude } })}><MaterialIcons name="map" size={18} color={Colors.primary} /><Text style={styles.secondaryActionText}>실시간 위치 보기</Text></TouchableOpacity>}
+        {(trackingData.status === 'delivered' || trackingData.status === 'at_locker') && <TouchableOpacity style={[styles.secondaryAction, confirming && styles.disabledAction]} onPress={() => void handleConfirmDelivery()} disabled={confirming}><MaterialIcons name="check-circle-outline" size={18} color={Colors.primary} /><Text style={styles.secondaryActionText}>{confirming ? '확인 중...' : '수령 확인'}</Text></TouchableOpacity>}
       </View>
     </ScrollView>
   );
@@ -179,31 +179,31 @@ function calculateProgress(status: string): number {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#F8FAFC' },
+  container: { flex: 1, backgroundColor: Colors.background },
   content: { padding: Spacing.lg, gap: Spacing.md },
-  centerState: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: '#F8FAFC' },
-  centerText: { marginTop: Spacing.md, color: '#475569', ...Typography.body },
-  hero: { backgroundColor: '#FFFFFF', borderRadius: BorderRadius.xl, padding: Spacing.lg, gap: 8, ...Shadows.sm },
-  heroKicker: { fontSize: 12, fontWeight: '700', color: '#0F766E', textTransform: 'uppercase', letterSpacing: 1 },
-  heroTitle: { fontSize: 24, fontWeight: '800', color: '#0F172A' },
-  heroSubtitle: { color: '#475569', ...Typography.body },
-  progressRail: { height: 8, borderRadius: 999, backgroundColor: '#E2E8F0', overflow: 'hidden' },
-  progressFill: { height: '100%', backgroundColor: '#14B8A6' },
-  progressText: { color: '#0F766E', fontWeight: '700' },
-  panel: { backgroundColor: '#FFFFFF', borderRadius: BorderRadius.xl, padding: Spacing.lg, gap: 10, ...Shadows.sm },
-  panelTitle: { color: '#0F172A', fontSize: 18, fontWeight: '800' },
+  centerState: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: Colors.background },
+  centerText: { marginTop: Spacing.md, color: Colors.textSecondary, fontSize: 16 },
+  hero: { backgroundColor: Colors.primaryMint, borderRadius: BorderRadius.xl, padding: Spacing.xl, gap: Spacing.sm },
+  heroKicker: { fontSize: 12, fontWeight: '800', color: Colors.primary, textTransform: 'uppercase', letterSpacing: 1 },
+  heroTitle: { fontSize: 24, fontWeight: '800', color: Colors.textPrimary, lineHeight: 32 },
+  heroSubtitle: { color: Colors.textSecondary, fontSize: 14, lineHeight: 22 },
+  progressRail: { height: 8, borderRadius: BorderRadius.full, backgroundColor: Colors.gray200, overflow: 'hidden', marginTop: 12 },
+  progressFill: { height: '100%', backgroundColor: Colors.primary },
+  progressText: { color: Colors.primary, fontWeight: '800', marginTop: 4, textAlign: 'right', fontSize: 12 },
+  panel: { backgroundColor: Colors.surface, borderRadius: BorderRadius.xl, padding: Spacing.lg, gap: 12, borderWidth: 1, borderColor: Colors.border },
+  panelTitle: { color: Colors.textPrimary, fontSize: 18, fontWeight: '800', marginBottom: 4 },
   infoRow: { flexDirection: 'row', justifyContent: 'space-between', gap: 12 },
-  infoLabel: { color: '#64748B', ...Typography.bodySmall },
-  infoValue: { color: '#0F172A', ...Typography.bodyBold },
-  timelineRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 10 },
-  timelineDot: { width: 10, height: 10, borderRadius: 5, backgroundColor: '#14B8A6', marginTop: 4 },
+  infoLabel: { color: Colors.textTertiary, fontSize: 14, fontWeight: '600' },
+  infoValue: { color: Colors.textPrimary, fontSize: 16, fontWeight: '700' },
+  timelineRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 12, marginBottom: 8 },
+  timelineDot: { width: 10, height: 10, borderRadius: 5, backgroundColor: Colors.primary, marginTop: 4 },
   timelineCopy: { flex: 1, gap: 2 },
-  timelineTitle: { color: '#0F172A', ...Typography.bodyBold },
-  timelineMeta: { color: '#64748B', ...Typography.caption },
-  actionSection: { gap: 10 },
-  primaryAction: { minHeight: 52, borderRadius: BorderRadius.xl, backgroundColor: '#115E59', alignItems: 'center', justifyContent: 'center', flexDirection: 'row', gap: 8 },
-  primaryActionText: { color: '#FFFFFF', fontSize: 16, fontWeight: '800' },
-  secondaryAction: { minHeight: 52, borderRadius: BorderRadius.xl, backgroundColor: '#FFFFFF', alignItems: 'center', justifyContent: 'center', flexDirection: 'row', gap: 8, ...Shadows.sm },
-  secondaryActionText: { color: '#115E59', ...Typography.bodyBold },
+  timelineTitle: { color: Colors.textPrimary, fontSize: 16, fontWeight: '700' },
+  timelineMeta: { color: Colors.textTertiary, fontSize: 12 },
+  actionSection: { gap: Spacing.sm, marginTop: Spacing.sm },
+  primaryAction: { minHeight: 52, borderRadius: BorderRadius.full, backgroundColor: Colors.primary, alignItems: 'center', justifyContent: 'center', flexDirection: 'row', gap: 8 },
+  primaryActionText: { color: Colors.white, fontSize: 16, fontWeight: '800' },
+  secondaryAction: { minHeight: 52, borderRadius: BorderRadius.full, backgroundColor: Colors.surface, alignItems: 'center', justifyContent: 'center', flexDirection: 'row', gap: 8, borderWidth: 1, borderColor: Colors.border },
+  secondaryActionText: { color: Colors.primary, fontSize: 16, fontWeight: '700' },
   disabledAction: { opacity: 0.6 },
 });

@@ -1,4 +1,4 @@
-﻿import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -14,7 +14,7 @@ import { Timestamp } from 'firebase/firestore';
 import { cancelDeliveryFlow } from '../../services/delivery-service';
 import { requireUserId } from '../../services/firebase';
 import { cancelRequest, getUserRequests, increaseRequestBid } from '../../services/request-service';
-import { BorderRadius, Shadows, Spacing, Typography } from '../../theme';
+import { BorderRadius, Colors, Shadows, Spacing, Typography } from '../../theme';
 import type { MainStackNavigationProp } from '../../types/navigation';
 import { RequestStatus, type Request } from '../../types/request';
 
@@ -207,7 +207,7 @@ export default function RequestsScreen({ navigation }: { navigation: MainStackNa
   if (loading) {
     return (
       <View style={styles.centerState}>
-        <ActivityIndicator size="large" color="#0F766E" />
+        <ActivityIndicator size="large" color={Colors.primary} />
         <Text style={styles.centerStateText}>요청 보드를 준비하는 중입니다.</Text>
       </View>
     );
@@ -236,7 +236,7 @@ export default function RequestsScreen({ navigation }: { navigation: MainStackNa
       </View>
 
       <TouchableOpacity style={styles.primaryAction} activeOpacity={0.9} onPress={() => navigation.navigate('CreateRequest')}>
-        <MaterialIcons name="add-box" size={20} color="#FFFFFF" />
+        <MaterialIcons name="add-box" size={20} color=Colors.white />
         <Text style={styles.primaryActionText}>새 요청 만들기</Text>
       </TouchableOpacity>
 
@@ -371,7 +371,7 @@ function MiniAction({
       onPress={onPress}
       disabled={disabled}
     >
-      <MaterialIcons name={icon} size={18} color={warning ? '#B42318' : '#115E59'} />
+      <MaterialIcons name={icon} size={18} color={warning ? Colors.error : Colors.primary} />
       <Text style={[styles.secondaryActionText, warning && styles.warningText]}>{label}</Text>
     </TouchableOpacity>
   );
@@ -465,7 +465,7 @@ function getStatusDescription(status: RequestStatus): string {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F8FAFC',
+    backgroundColor: Colors.background,
   },
   content: {
     padding: Spacing.lg,
@@ -476,35 +476,36 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     padding: Spacing.xl,
-    backgroundColor: '#F8FAFC',
+    backgroundColor: Colors.background,
   },
   centerStateText: {
     marginTop: Spacing.md,
-    color: '#475569',
+    color: Colors.textSecondary,
     ...Typography.body,
   },
   hero: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: Colors.primaryMint,
     borderRadius: BorderRadius.xl,
-    padding: Spacing.lg,
-    ...Shadows.sm,
-    gap: 8,
+    padding: Spacing.xl,
+    gap: Spacing.sm,
   },
   heroKicker: {
-    fontSize: 12,
-    fontWeight: '700',
-    color: '#0F766E',
+    fontSize: Typography.fontSize.xs,
+    fontWeight: '800',
+    color: Colors.primary,
     textTransform: 'uppercase',
     letterSpacing: 1,
   },
   heroTitle: {
-    fontSize: 24,
+    fontSize: Typography.fontSize['2xl'],
     fontWeight: '800',
-    color: '#0F172A',
+    color: Colors.textPrimary,
+    lineHeight: 32,
   },
   heroSubtitle: {
-    color: '#475569',
-    ...Typography.body,
+    color: Colors.textSecondary,
+    fontSize: Typography.fontSize.sm,
+    lineHeight: 22,
   },
   summaryRow: {
     flexDirection: 'row',
@@ -516,22 +517,24 @@ const styles = StyleSheet.create({
     minWidth: 72,
     borderRadius: BorderRadius.lg,
     padding: Spacing.md,
-    backgroundColor: '#F1F5F9',
+    backgroundColor: Colors.surface,
     gap: 4,
+    ...Shadows.sm,
   },
   summaryValue: {
-    fontSize: 20,
+    fontSize: Typography.fontSize.xl,
     fontWeight: '800',
-    color: '#0F172A',
+    color: Colors.textPrimary,
   },
   summaryLabel: {
-    color: '#64748B',
-    ...Typography.caption,
+    color: Colors.textTertiary,
+    fontSize: Typography.fontSize.xs,
+    fontWeight: '600',
   },
   primaryAction: {
-    minHeight: 54,
-    borderRadius: BorderRadius.xl,
-    backgroundColor: '#115E59',
+    minHeight: 52,
+    borderRadius: BorderRadius.full,
+    backgroundColor: Colors.primary,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
@@ -539,27 +542,28 @@ const styles = StyleSheet.create({
     ...Shadows.sm,
   },
   primaryActionText: {
-    color: '#FFFFFF',
-    ...Typography.bodyBold,
+    color: Colors.white,
+    fontSize: Typography.fontSize.base,
+    fontWeight: '800',
   },
   emptyCard: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: Colors.surface,
     borderRadius: BorderRadius.xl,
     padding: Spacing.xl,
     ...Shadows.sm,
-    gap: Spacing.sm,
+    gap: Spacing.md,
   },
   emptyTitle: {
-    fontSize: 18,
-    fontWeight: '700',
-    color: '#0F172A',
+    fontSize: Typography.fontSize.lg,
+    fontWeight: '800',
+    color: Colors.textPrimary,
   },
   emptySubtitle: {
-    color: '#64748B',
-    ...Typography.body,
+    color: Colors.textSecondary,
+    fontSize: Typography.fontSize.base,
   },
   requestCard: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: Colors.surface,
     borderRadius: BorderRadius.xl,
     padding: Spacing.lg,
     ...Shadows.sm,
@@ -573,20 +577,21 @@ const styles = StyleSheet.create({
   phaseLabel: {
     fontSize: 13,
     fontWeight: '700',
-    color: '#0F766E',
+    color: Colors.primary,
   },
   requestTime: {
-    color: '#94A3B8',
+    color: Colors.gray400,
     ...Typography.caption,
   },
   routeTitle: {
-    fontSize: 18,
-    fontWeight: '700',
-    color: '#0F172A',
+    fontSize: Typography.fontSize.lg,
+    fontWeight: '800',
+    color: Colors.textPrimary,
   },
   routeSubtitle: {
-    color: '#475569',
-    ...Typography.body,
+    color: Colors.textSecondary,
+    fontSize: Typography.fontSize.sm,
+    fontWeight: '600',
   },
   stepRow: {
     flexDirection: 'row',
@@ -594,30 +599,30 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   stepPill: {
-    borderRadius: 999,
+    borderRadius: BorderRadius.full,
     paddingHorizontal: 12,
     paddingVertical: 6,
   },
   stepPillActive: {
-    backgroundColor: '#CCFBF1',
+    backgroundColor: Colors.primaryMint,
   },
   stepPillIdle: {
-    backgroundColor: '#E2E8F0',
+    backgroundColor: Colors.gray200,
   },
   stepPillText: {
     fontSize: 12,
     fontWeight: '700',
   },
   stepPillTextActive: {
-    color: '#115E59',
+    color: Colors.primary,
   },
   stepPillTextIdle: {
-    color: '#64748B',
+    color: Colors.gray500,
   },
   infoPanel: {
     gap: 8,
     padding: Spacing.md,
-    backgroundColor: '#F8FAFC',
+    backgroundColor: Colors.gray50,
     borderRadius: BorderRadius.lg,
   },
   infoRow: {
@@ -626,14 +631,16 @@ const styles = StyleSheet.create({
     gap: Spacing.md,
   },
   infoLabel: {
-    color: '#64748B',
-    ...Typography.bodySmall,
+    color: Colors.textTertiary,
+    fontSize: Typography.fontSize.sm,
+    fontWeight: '600',
   },
   infoValue: {
     flex: 1,
     textAlign: 'right',
-    color: '#0F172A',
-    ...Typography.bodySmall,
+    color: Colors.textPrimary,
+    fontSize: Typography.fontSize.sm,
+    fontWeight: '700',
   },
   actionRow: {
     flexDirection: 'row',
@@ -642,26 +649,26 @@ const styles = StyleSheet.create({
   },
   secondaryAction: {
     minHeight: 44,
-    borderRadius: BorderRadius.lg,
+    borderRadius: BorderRadius.full,
     paddingHorizontal: Spacing.md,
-    backgroundColor: '#F0FDFA',
+    backgroundColor: Colors.primaryMint,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     gap: 8,
   },
   warningAction: {
-    backgroundColor: '#FFF1F2',
+    backgroundColor: Colors.errorLight,
   },
   disabledAction: {
     opacity: 0.6,
   },
   secondaryActionText: {
-    color: '#115E59',
+    color: Colors.primary,
     ...Typography.bodyBold,
   },
   warningText: {
-    color: '#B42318',
+    color: Colors.error,
   },
 });
 

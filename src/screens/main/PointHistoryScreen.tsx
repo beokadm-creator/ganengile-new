@@ -3,7 +3,7 @@ import { RefreshControl, ScrollView, StyleSheet, Text, TouchableOpacity, View } 
 import { useUser } from '../../contexts/UserContext';
 import { getBeta1HomeSnapshot } from '../../services/beta1-orchestration-service';
 import { PointService } from '../../services/PointService';
-import { BorderRadius, Shadows, Spacing, Typography } from '../../theme';
+import { BorderRadius, Colors, Shadows, Spacing, Typography } from '../../theme';
 import { WithdrawalEligibilityStatus } from '../../types/beta1-wallet';
 import type { MainStackNavigationProp } from '../../types/navigation';
 
@@ -178,14 +178,14 @@ function GuardRow({ ok, label }: { ok: boolean; label: string }) {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F4F7F5',
+    backgroundColor: Colors.background,
   },
   content: {
     padding: Spacing.lg,
     gap: Spacing.lg,
   },
   hero: {
-    backgroundColor: '#EEF2FF',
+    backgroundColor: Colors.primaryMint,
     borderRadius: BorderRadius.xl,
     padding: Spacing.xl,
     ...Shadows.sm,
@@ -193,7 +193,7 @@ const styles = StyleSheet.create({
   kicker: {
     fontSize: 11,
     fontWeight: '800',
-    color: '#4338CA',
+    color: Colors.primary,
     textTransform: 'uppercase',
     letterSpacing: 1.2,
     marginBottom: 8,
@@ -201,28 +201,28 @@ const styles = StyleSheet.create({
   title: {
     fontSize: Typography.fontSize['2xl'],
     fontWeight: '800',
-    color: '#111827',
+    color: Colors.textPrimary,
     marginBottom: 8,
   },
   subtitle: {
     fontSize: Typography.fontSize.sm,
-    color: '#475569',
+    color: Colors.textSecondary,
     lineHeight: 20,
   },
   totalCard: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: Colors.surface,
     borderRadius: BorderRadius.xl,
     padding: Spacing.xl,
     gap: 12,
   },
   totalLabel: {
     fontSize: Typography.fontSize.sm,
-    color: '#64748B',
+    color: Colors.gray500,
   },
   totalValue: {
     fontSize: Typography.fontSize['3xl'],
     fontWeight: '800',
-    color: '#0F172A',
+    color: Colors.textPrimary,
   },
   totalActions: {
     flexDirection: 'row',
@@ -231,30 +231,30 @@ const styles = StyleSheet.create({
   },
   primaryButton: {
     alignSelf: 'flex-start',
-    backgroundColor: '#0F766E',
-    borderRadius: 999,
+    backgroundColor: Colors.primary,
+    borderRadius: BorderRadius.full,
     paddingHorizontal: 18,
     paddingVertical: 12,
   },
   primaryButtonText: {
-    color: '#FFFFFF',
+    color: Colors.white,
     fontSize: Typography.fontSize.sm,
     fontWeight: '800',
   },
   secondaryButton: {
     alignSelf: 'flex-start',
-    backgroundColor: '#ECFDF3',
-    borderRadius: 999,
+    backgroundColor: Colors.successLight,
+    borderRadius: BorderRadius.full,
     paddingHorizontal: 18,
     paddingVertical: 12,
   },
   secondaryButtonText: {
-    color: '#115E59',
+    color: Colors.success,
     fontSize: Typography.fontSize.sm,
     fontWeight: '800',
   },
   guardCard: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: Colors.surface,
     borderRadius: BorderRadius.xl,
     padding: Spacing.lg,
     gap: 10,
@@ -262,7 +262,7 @@ const styles = StyleSheet.create({
   guardTitle: {
     fontSize: Typography.fontSize.base,
     fontWeight: '800',
-    color: '#111827',
+    color: Colors.textPrimary,
   },
   guardRow: {
     flexDirection: 'row',
@@ -275,19 +275,19 @@ const styles = StyleSheet.create({
     minWidth: 60,
   },
   guardStateOk: {
-    color: '#047857',
+    color: Colors.success,
   },
   guardStateBad: {
-    color: '#B91C1C',
+    color: Colors.error,
   },
   guardText: {
     flex: 1,
     fontSize: Typography.fontSize.sm,
-    color: '#475569',
+    color: Colors.textSecondary,
     lineHeight: 20,
   },
   rowCard: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: Colors.surface,
     borderRadius: BorderRadius.xl,
     padding: Spacing.lg,
     gap: 8,
@@ -300,16 +300,16 @@ const styles = StyleSheet.create({
   rowLabel: {
     fontSize: Typography.fontSize.base,
     fontWeight: '700',
-    color: '#111827',
+    color: Colors.textPrimary,
   },
   rowValue: {
     fontSize: Typography.fontSize.base,
     fontWeight: '800',
-    color: '#0F172A',
+    color: Colors.textPrimary,
   },
   rowHint: {
     fontSize: Typography.fontSize.sm,
-    color: '#64748B',
+    color: Colors.gray500,
     lineHeight: 20,
   },
 });

@@ -168,7 +168,7 @@ export default function GillerPickupFromLockerScreen({ route, navigation }: Prop
   if (loading) {
     return (
       <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color="#2563EB" />
+        <ActivityIndicator size="large" color=Colors.primary />
       </View>
     );
   }
@@ -176,7 +176,7 @@ export default function GillerPickupFromLockerScreen({ route, navigation }: Prop
   if (!reservation || !locker) {
     return (
       <View style={styles.emptyContainer}>
-        <Ionicons name="cube-outline" size={56} color="#94A3B8" />
+        <Ionicons name="cube-outline" size={56} color={Colors.textTertiary} />
         <Text style={styles.emptyTitle}>보관함 수령 정보가 없습니다</Text>
         <Text style={styles.emptyDescription}>
           요청에 연결된 보관함 예약을 찾지 못했습니다. 운영팀 또는 채팅에서 길러와 상태를 확인해주세요.
@@ -223,7 +223,7 @@ export default function GillerPickupFromLockerScreen({ route, navigation }: Prop
       {currentStep === 'open' && (
         <TouchableOpacity style={styles.primaryButton} onPress={() => void handleOpenLocker()} disabled={submitting}>
           {submitting ? (
-            <ActivityIndicator size="small" color="#FFFFFF" />
+            <ActivityIndicator size="small" color=Colors.white />
           ) : (
             <Text style={styles.primaryButtonText}>보관함 열기</Text>
           )}
@@ -237,7 +237,7 @@ export default function GillerPickupFromLockerScreen({ route, navigation }: Prop
           disabled={submitting}
         >
           {submitting ? (
-            <ActivityIndicator size="small" color="#FFFFFF" />
+            <ActivityIndicator size="small" color=Colors.white />
           ) : (
             <Text style={styles.primaryButtonText}>수령 완료 확인</Text>
           )}
@@ -246,7 +246,7 @@ export default function GillerPickupFromLockerScreen({ route, navigation }: Prop
 
       {currentStep === 'complete' && (
         <View style={styles.completeCard}>
-          <Ionicons name="checkmark-circle" size={28} color="#16A34A" />
+          <Ionicons name="checkmark-circle" size={28} color={Colors.success} />
           <Text style={styles.completeTitle}>수령이 완료되었습니다</Text>
           <Text style={styles.completeDescription}>
             요청 상세와 채팅에서 이후 정산 및 배송 완료 상태를 계속 확인할 수 있습니다.
@@ -292,7 +292,7 @@ function TimelineRow({
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F8FAFC',
+    backgroundColor: Colors.background,
   },
   content: {
     padding: 20,
@@ -302,33 +302,33 @@ const styles = StyleSheet.create({
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#F8FAFC',
+    backgroundColor: Colors.background,
   },
   emptyContainer: {
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
     padding: 24,
-    backgroundColor: '#F8FAFC',
+    backgroundColor: Colors.background,
   },
   emptyTitle: {
     marginTop: 12,
     fontSize: 20,
     fontWeight: '700',
-    color: '#0F172A',
+    color: Colors.textPrimary,
   },
   emptyDescription: {
     marginTop: 8,
     fontSize: 14,
     lineHeight: 20,
     textAlign: 'center',
-    color: '#64748B',
+    color: Colors.textSecondary,
   },
   heroCard: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: Colors.surface,
     borderRadius: 24,
     padding: 20,
-    shadowColor: '#0F172A',
+    shadowColor: Colors.textPrimary,
     shadowOpacity: 0.08,
     shadowRadius: 12,
     shadowOffset: { width: 0, height: 6 },
@@ -339,8 +339,8 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10,
     paddingVertical: 6,
     borderRadius: 999,
-    backgroundColor: '#DBEAFE',
-    color: '#2563EB',
+    backgroundColor: Colors.primaryMint,
+    color: Colors.primary,
     fontSize: 12,
     fontWeight: '700',
   },
@@ -348,19 +348,19 @@ const styles = StyleSheet.create({
     marginTop: 14,
     fontSize: 24,
     fontWeight: '800',
-    color: '#0F172A',
+    color: Colors.textPrimary,
   },
   heroSubtitle: {
     marginTop: 8,
     fontSize: 14,
     lineHeight: 21,
-    color: '#64748B',
+    color: Colors.textSecondary,
   },
   card: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: Colors.surface,
     borderRadius: 24,
     padding: 20,
-    shadowColor: '#0F172A',
+    shadowColor: Colors.textPrimary,
     shadowOpacity: 0.05,
     shadowRadius: 10,
     shadowOffset: { width: 0, height: 4 },
@@ -369,7 +369,7 @@ const styles = StyleSheet.create({
   sectionTitle: {
     fontSize: 18,
     fontWeight: '800',
-    color: '#0F172A',
+    color: Colors.textPrimary,
     marginBottom: 16,
   },
   infoRow: {
@@ -378,13 +378,13 @@ const styles = StyleSheet.create({
   infoLabel: {
     fontSize: 13,
     fontWeight: '700',
-    color: '#64748B',
+    color: Colors.textSecondary,
     marginBottom: 6,
   },
   infoValue: {
     fontSize: 15,
     lineHeight: 22,
-    color: '#0F172A',
+    color: Colors.textPrimary,
   },
   timelineRow: {
     flexDirection: 'row',
@@ -395,12 +395,12 @@ const styles = StyleSheet.create({
     width: 10,
     height: 10,
     borderRadius: 999,
-    backgroundColor: '#CBD5E1',
+    backgroundColor: Colors.border,
     marginTop: 6,
     marginRight: 12,
   },
   timelineDotActive: {
-    backgroundColor: '#2563EB',
+    backgroundColor: Colors.primary,
   },
   timelineText: {
     flex: 1,
@@ -408,29 +408,29 @@ const styles = StyleSheet.create({
   timelineTitle: {
     fontSize: 15,
     fontWeight: '700',
-    color: '#0F172A',
+    color: Colors.textPrimary,
   },
   timelineDescription: {
     marginTop: 4,
     fontSize: 14,
     lineHeight: 20,
-    color: '#64748B',
+    color: Colors.textSecondary,
   },
   primaryButton: {
     alignItems: 'center',
     justifyContent: 'center',
     paddingVertical: 16,
     borderRadius: 18,
-    backgroundColor: '#2563EB',
+    backgroundColor: Colors.primary,
     marginBottom: 8,
   },
   primaryButtonText: {
     fontSize: 15,
     fontWeight: '700',
-    color: '#FFFFFF',
+    color: Colors.surface,
   },
   completeCard: {
-    backgroundColor: '#ECFDF5',
+    backgroundColor: Colors.primaryMint,
     borderRadius: 24,
     padding: 20,
     alignItems: 'flex-start',
@@ -439,13 +439,13 @@ const styles = StyleSheet.create({
     marginTop: 10,
     fontSize: 20,
     fontWeight: '800',
-    color: '#166534',
+    color: Colors.primary,
   },
   completeDescription: {
     marginTop: 8,
     fontSize: 14,
     lineHeight: 21,
-    color: '#166534',
+    color: Colors.primary,
   },
   secondaryButton: {
     marginTop: 16,
@@ -454,11 +454,11 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 12,
     borderRadius: 14,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: Colors.surface,
   },
   secondaryButtonText: {
     fontSize: 14,
     fontWeight: '700',
-    color: '#166534',
+    color: Colors.primary,
   },
 });

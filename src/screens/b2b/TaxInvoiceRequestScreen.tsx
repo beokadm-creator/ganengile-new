@@ -1,4 +1,4 @@
-﻿import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -160,7 +160,7 @@ export default function TaxInvoiceRequestScreen() {
     <View style={styles.container}>
       <View style={styles.header}>
         <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
-          <Ionicons name="arrow-back" size={24} color={Colors.text.primary} />
+          <Ionicons name="arrow-back" size={24} color={Colors.textPrimary} />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>세금계산서 발행</Text>
       </View>
@@ -206,7 +206,7 @@ export default function TaxInvoiceRequestScreen() {
               value={businessNumber}
               onChangeText={(text) => setBusinessNumber(formatBusinessNumber(text))}
               placeholder="123-45-67890"
-              placeholderTextColor={Colors.text.tertiary}
+              placeholderTextColor={Colors.textTertiary}
               maxLength={12}
             />
           </View>
@@ -218,7 +218,7 @@ export default function TaxInvoiceRequestScreen() {
               value={companyName}
               onChangeText={setCompanyName}
               placeholder="회사명을 입력해 주세요"
-              placeholderTextColor={Colors.text.tertiary}
+              placeholderTextColor={Colors.textTertiary}
             />
           </View>
 
@@ -229,7 +229,7 @@ export default function TaxInvoiceRequestScreen() {
               value={ceoName}
               onChangeText={setCeoName}
               placeholder="대표자명을 입력해 주세요"
-              placeholderTextColor={Colors.text.tertiary}
+              placeholderTextColor={Colors.textTertiary}
             />
           </View>
 
@@ -240,7 +240,7 @@ export default function TaxInvoiceRequestScreen() {
               value={address}
               onChangeText={setAddress}
               placeholder="세금계산서에 표시할 주소를 입력해 주세요"
-              placeholderTextColor={Colors.text.tertiary}
+              placeholderTextColor={Colors.textTertiary}
               multiline
             />
           </View>
@@ -252,7 +252,7 @@ export default function TaxInvoiceRequestScreen() {
               value={contact}
               onChangeText={setContact}
               placeholder="010-1234-5678"
-              placeholderTextColor={Colors.text.tertiary}
+              placeholderTextColor={Colors.textTertiary}
               keyboardType="phone-pad"
             />
           </View>
@@ -279,7 +279,7 @@ export default function TaxInvoiceRequestScreen() {
             void handleSubmit();
           }}
         >
-          {submitting ? <ActivityIndicator color="#fff" /> : <Text style={styles.submitButtonText}>발행 요청하기</Text>}
+          {submitting ? <ActivityIndicator color=Colors.white /> : <Text style={styles.submitButtonText}>발행 요청하기</Text>}
         </TouchableOpacity>
       </View>
     </View>
@@ -304,14 +304,15 @@ const styles = StyleSheet.create({
     paddingVertical: Spacing.lg,
     borderBottomWidth: 1,
     borderBottomColor: Colors.border,
-    backgroundColor: '#fff',
+    backgroundColor: Colors.surface,
   },
   backButton: {
     marginRight: Spacing.md,
   },
   headerTitle: {
-    ...Typography.h3,
-    color: Colors.text.primary,
+    fontSize: Typography.fontSize.xl,
+    fontWeight: '800',
+    color: Colors.textPrimary,
   },
   content: {
     flex: 1,
@@ -319,35 +320,40 @@ const styles = StyleSheet.create({
   periodCard: {
     margin: Spacing.md,
     padding: Spacing.lg,
-    backgroundColor: Colors.primary + '10',
-    borderRadius: BorderRadius.lg,
+    backgroundColor: Colors.primaryMint,
+    borderRadius: BorderRadius.xl,
     alignItems: 'center',
+    ...Shadows.sm,
   },
   periodTitle: {
-    ...Typography.body2,
-    color: Colors.text.secondary,
+    fontSize: Typography.fontSize.sm,
+    color: Colors.textSecondary,
     marginBottom: Spacing.xs,
   },
   periodMonth: {
-    ...Typography.h2,
+    fontSize: Typography.fontSize['2xl'],
+    fontWeight: '800',
     color: Colors.primary,
     marginBottom: Spacing.xs,
   },
   periodRange: {
-    ...Typography.body2,
-    color: Colors.text.secondary,
+    fontSize: Typography.fontSize.sm,
+    color: Colors.textSecondary,
   },
   summaryCard: {
     marginHorizontal: Spacing.md,
     marginBottom: Spacing.md,
     padding: Spacing.lg,
-    backgroundColor: '#fff',
-    borderRadius: BorderRadius.lg,
+    backgroundColor: Colors.surface,
+    borderRadius: BorderRadius.xl,
     ...Shadows.sm,
+    borderWidth: 1,
+    borderColor: Colors.border,
   },
   cardTitle: {
-    ...Typography.h3,
-    color: Colors.text.primary,
+    fontSize: Typography.fontSize.lg,
+    fontWeight: '800',
+    color: Colors.textPrimary,
     marginBottom: Spacing.md,
   },
   summaryRow: {
@@ -357,12 +363,12 @@ const styles = StyleSheet.create({
     marginBottom: Spacing.sm,
   },
   summaryLabel: {
-    ...Typography.body2,
-    color: Colors.text.secondary,
+    fontSize: Typography.fontSize.sm,
+    color: Colors.textSecondary,
   },
   summaryValue: {
-    ...Typography.body1,
-    color: Colors.text.primary,
+    fontSize: Typography.fontSize.base,
+    color: Colors.textPrimary,
     fontWeight: '600',
   },
   divider: {
@@ -371,40 +377,45 @@ const styles = StyleSheet.create({
     marginVertical: Spacing.sm,
   },
   totalLabel: {
-    ...Typography.h3,
+    fontSize: Typography.fontSize.lg,
+    fontWeight: '800',
     color: Colors.primary,
   },
   totalValue: {
-    ...Typography.h2,
+    fontSize: Typography.fontSize.xl,
+    fontWeight: '800',
     color: Colors.primary,
   },
   deliveryCount: {
-    ...Typography.bodySmall,
-    color: Colors.text.tertiary,
+    fontSize: Typography.fontSize.xs,
+    color: Colors.textTertiary,
     marginTop: Spacing.sm,
   },
   formCard: {
     marginHorizontal: Spacing.md,
     marginBottom: Spacing.md,
     padding: Spacing.lg,
-    backgroundColor: '#fff',
-    borderRadius: BorderRadius.lg,
+    backgroundColor: Colors.surface,
+    borderRadius: BorderRadius.xl,
     ...Shadows.sm,
+    borderWidth: 1,
+    borderColor: Colors.border,
   },
   inputGroup: {
     marginBottom: Spacing.lg,
   },
   inputLabel: {
-    ...Typography.body2,
-    color: Colors.text.primary,
+    fontSize: Typography.fontSize.sm,
+    fontWeight: '700',
+    color: Colors.textPrimary,
     marginBottom: Spacing.sm,
   },
   input: {
-    ...Typography.body1,
-    color: Colors.text.primary,
+    fontSize: Typography.fontSize.base,
+    color: Colors.textPrimary,
     borderWidth: 1,
     borderColor: Colors.border,
-    borderRadius: BorderRadius.md,
+    borderRadius: BorderRadius.lg,
     paddingHorizontal: Spacing.md,
     paddingVertical: Spacing.sm,
     backgroundColor: Colors.background,
@@ -416,10 +427,10 @@ const styles = StyleSheet.create({
   noticeCard: {
     marginHorizontal: Spacing.md,
     padding: Spacing.lg,
-    backgroundColor: Colors.warning + '10',
-    borderRadius: BorderRadius.lg,
+    backgroundColor: Colors.warningLight,
+    borderRadius: BorderRadius.xl,
     borderWidth: 1,
-    borderColor: Colors.warning + '30',
+    borderColor: Colors.warning,
   },
   noticeHeader: {
     flexDirection: 'row',
@@ -427,14 +438,14 @@ const styles = StyleSheet.create({
     marginBottom: Spacing.sm,
   },
   noticeTitle: {
-    ...Typography.body1,
-    color: Colors.warning,
-    fontWeight: '700',
+    fontSize: Typography.fontSize.sm,
+    color: Colors.warningDark,
+    fontWeight: '800',
     marginLeft: Spacing.xs,
   },
   noticeText: {
-    ...Typography.body2,
-    color: Colors.text.secondary,
+    fontSize: Typography.fontSize.xs,
+    color: Colors.warningDark,
     lineHeight: 20,
   },
   bottomSpacer: {
@@ -444,20 +455,20 @@ const styles = StyleSheet.create({
     padding: Spacing.md,
     borderTopWidth: 1,
     borderTopColor: Colors.border,
-    backgroundColor: '#fff',
+    backgroundColor: Colors.surface,
   },
   submitButton: {
     backgroundColor: Colors.primary,
-    borderRadius: BorderRadius.md,
+    borderRadius: BorderRadius.full,
     alignItems: 'center',
     paddingVertical: Spacing.lg,
   },
   submitButtonDisabled: {
-    backgroundColor: Colors.gray100,
+    backgroundColor: Colors.gray200,
   },
   submitButtonText: {
-    ...Typography.body1,
-    color: '#fff',
-    fontWeight: '700',
+    fontSize: Typography.fontSize.base,
+    color: Colors.white,
+    fontWeight: '800',
   },
 });

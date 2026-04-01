@@ -1,4 +1,4 @@
-﻿import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -14,6 +14,7 @@ import { useNavigation } from '@react-navigation/native';
 import { doc, updateDoc } from 'firebase/firestore';
 import { b2bFirestoreService } from '../../services/b2b-firestore-service';
 import { db, requireUserId } from '../../services/firebase';
+import { BorderRadius, Colors, Shadows, Spacing, Typography } from '../../theme';
 import type { B2BStackNavigationProp } from '../../types/navigation';
 
 type SubscriptionStatus = 'active' | 'suspended' | 'cancelled';
@@ -79,11 +80,11 @@ function getTierLabel(tier: string): string {
 function getTierColor(tier: string): string {
   switch (tier) {
     case 'premium':
-      return '#7C3AED';
+      return Colors.accent;
     case 'standard':
-      return '#2563EB';
+      return Colors.primary;
     default:
-      return '#64748B';
+      return Colors.textSecondary;
   }
 }
 
@@ -103,13 +104,13 @@ function getStatusLabel(status: SubscriptionStatus): string {
 function getStatusColor(status: SubscriptionStatus): string {
   switch (status) {
     case 'active':
-      return '#16A34A';
+      return Colors.success;
     case 'suspended':
-      return '#D97706';
+      return Colors.warning;
     case 'cancelled':
-      return '#DC2626';
+      return Colors.error;
     default:
-      return '#64748B';
+      return Colors.textSecondary;
   }
 }
 
@@ -199,7 +200,7 @@ export default function BusinessProfileScreen() {
   if (loading) {
     return (
       <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color="#2563EB" />
+        <ActivityIndicator size="large" color=Colors.primary />
       </View>
     );
   }
@@ -207,7 +208,7 @@ export default function BusinessProfileScreen() {
   if (!profile) {
     return (
       <View style={styles.emptyContainer}>
-        <Ionicons name="business-outline" size={56} color="#94A3B8" />
+        <Ionicons name="business-outline" size={56} color={Colors.textTertiary} />
         <Text style={styles.emptyTitle}>기업 정보를 찾지 못했습니다.</Text>
         <Text style={styles.emptyDescription}>B2B 계약 또는 사업자 정보가 아직 연결되지 않았습니다. 운영팀과 연결 상태를 확인해 주세요.</Text>
       </View>
@@ -222,7 +223,7 @@ export default function BusinessProfileScreen() {
       <View style={styles.heroCard}>
         <View style={styles.heroHeader}>
           <View style={styles.heroIcon}>
-            <Ionicons name="business" size={28} color="#2563EB" />
+            <Ionicons name="business" size={28} color=Colors.primary />
           </View>
           <View style={styles.heroText}>
             <Text style={styles.heroTitle}>{profile.companyName || '기업 프로필'}</Text>
@@ -230,7 +231,7 @@ export default function BusinessProfileScreen() {
           </View>
           {!editing && (
             <TouchableOpacity style={styles.editPill} onPress={() => setEditing(true)}>
-              <Ionicons name="create-outline" size={16} color="#2563EB" />
+              <Ionicons name="create-outline" size={16} color=Colors.primary />
               <Text style={styles.editPillText}>수정</Text>
             </TouchableOpacity>
           )}
@@ -267,7 +268,7 @@ export default function BusinessProfileScreen() {
         </View>
         <Text style={styles.progressHint}>현재 플랜은 {getTierLabel(profile.subscriptionTier)}이며, 사용량이 늘어나면 상위 플랜 전환을 검토할 수 있습니다.</Text>
         <TouchableOpacity style={styles.secondaryButton} onPress={() => navigation.navigate('SubscriptionTierSelection')}>
-          <Ionicons name="sparkles-outline" size={18} color="#2563EB" />
+          <Ionicons name="sparkles-outline" size={18} color=Colors.primary />
           <Text style={styles.secondaryButtonText}>구독 플랜 보기</Text>
         </TouchableOpacity>
       </View>
@@ -284,7 +285,7 @@ export default function BusinessProfileScreen() {
             <Text style={styles.cancelButtonText}>취소</Text>
           </TouchableOpacity>
           <TouchableOpacity style={styles.saveButton} onPress={() => void handleSave()} disabled={saving}>
-            {saving ? <ActivityIndicator color="#fff" /> : <Text style={styles.saveButtonText}>저장</Text>}
+            {saving ? <ActivityIndicator color=Colors.white /> : <Text style={styles.saveButtonText}>저장</Text>}
           </TouchableOpacity>
         </View>
       ) : null}
@@ -343,13 +344,13 @@ function ActionRow({ icon, title, description, onPress }: { icon: keyof typeof I
   return (
     <TouchableOpacity style={styles.actionRow} onPress={onPress}>
       <View style={styles.actionIcon}>
-        <Ionicons name={icon} size={20} color="#2563EB" />
+        <Ionicons name={icon} size={20} color=Colors.primary />
       </View>
       <View style={styles.actionText}>
         <Text style={styles.actionTitle}>{title}</Text>
         <Text style={styles.actionDescription}>{description}</Text>
       </View>
-      <Ionicons name="chevron-forward" size={18} color="#94A3B8" />
+      <Ionicons name="chevron-forward" size={18} color={Colors.textTertiary} />
     </TouchableOpacity>
   );
 }
@@ -357,47 +358,45 @@ function ActionRow({ icon, title, description, onPress }: { icon: keyof typeof I
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F8FAFC',
+    backgroundColor: Colors.background,
   },
   content: {
-    padding: 20,
-    gap: 16,
+    padding: Spacing.xl,
+    gap: Spacing.lg,
   },
   loadingContainer: {
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#F8FAFC',
+    backgroundColor: Colors.background,
   },
   emptyContainer: {
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    padding: 24,
-    backgroundColor: '#F8FAFC',
+    padding: Spacing.xl,
+    backgroundColor: Colors.background,
   },
   emptyTitle: {
-    marginTop: 12,
-    fontSize: 20,
-    fontWeight: '700',
-    color: '#0F172A',
+    marginTop: Spacing.sm,
+    fontSize: Typography.fontSize.xl,
+    fontWeight: '800',
+    color: Colors.textPrimary,
   },
   emptyDescription: {
-    marginTop: 8,
-    fontSize: 14,
+    marginTop: Spacing.xs,
+    fontSize: Typography.fontSize.sm,
     lineHeight: 20,
     textAlign: 'center',
-    color: '#64748B',
+    color: Colors.textSecondary,
   },
   heroCard: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 24,
-    padding: 20,
-    shadowColor: '#0F172A',
-    shadowOpacity: 0.08,
-    shadowRadius: 12,
-    shadowOffset: { width: 0, height: 6 },
-    elevation: 4,
+    backgroundColor: Colors.surface,
+    borderRadius: BorderRadius.xl,
+    padding: Spacing.xl,
+    ...Shadows.sm,
+    borderWidth: 1,
+    borderColor: Colors.border,
   },
   heroHeader: {
     flexDirection: 'row',
@@ -406,8 +405,8 @@ const styles = StyleSheet.create({
   heroIcon: {
     width: 56,
     height: 56,
-    borderRadius: 18,
-    backgroundColor: '#DBEAFE',
+    borderRadius: BorderRadius.lg,
+    backgroundColor: Colors.gray100,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -416,14 +415,14 @@ const styles = StyleSheet.create({
     marginLeft: 14,
   },
   heroTitle: {
-    fontSize: 22,
+    fontSize: Typography.fontSize.xl,
     fontWeight: '800',
-    color: '#0F172A',
+    color: Colors.textPrimary,
   },
   heroSubtitle: {
     marginTop: 4,
-    fontSize: 14,
-    color: '#64748B',
+    fontSize: Typography.fontSize.sm,
+    color: Colors.textSecondary,
   },
   editPill: {
     flexDirection: 'row',
@@ -431,13 +430,13 @@ const styles = StyleSheet.create({
     gap: 6,
     paddingHorizontal: 12,
     paddingVertical: 8,
-    borderRadius: 999,
-    backgroundColor: '#EFF6FF',
+    borderRadius: BorderRadius.full,
+    backgroundColor: Colors.gray100,
   },
   editPillText: {
-    fontSize: 13,
+    fontSize: Typography.fontSize.xs,
     fontWeight: '700',
-    color: '#2563EB',
+    color: Colors.primary,
   },
   badgeRow: {
     flexDirection: 'row',
@@ -447,51 +446,50 @@ const styles = StyleSheet.create({
   badge: {
     paddingHorizontal: 12,
     paddingVertical: 8,
-    borderRadius: 999,
+    borderRadius: BorderRadius.full,
   },
   badgeText: {
-    fontSize: 12,
+    fontSize: Typography.fontSize.xs,
     fontWeight: '700',
   },
   card: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 24,
-    padding: 20,
-    shadowColor: '#0F172A',
-    shadowOpacity: 0.05,
-    shadowRadius: 10,
-    shadowOffset: { width: 0, height: 4 },
-    elevation: 3,
+    backgroundColor: Colors.surface,
+    borderRadius: BorderRadius.xl,
+    padding: Spacing.xl,
+    ...Shadows.sm,
+    borderWidth: 1,
+    borderColor: Colors.border,
   },
   sectionTitle: {
-    fontSize: 18,
+    fontSize: Typography.fontSize.lg,
     fontWeight: '800',
-    color: '#0F172A',
-    marginBottom: 16,
+    color: Colors.textPrimary,
+    marginBottom: Spacing.sm,
   },
   row: {
-    marginBottom: 16,
+    marginBottom: Spacing.sm,
   },
   label: {
-    fontSize: 13,
+    fontSize: Typography.fontSize.xs,
     fontWeight: '700',
-    color: '#64748B',
+    color: Colors.textSecondary,
     marginBottom: 8,
   },
   value: {
-    fontSize: 15,
+    fontSize: Typography.fontSize.sm,
     lineHeight: 22,
-    color: '#0F172A',
+    color: Colors.textPrimary,
+    fontWeight: '600',
   },
   input: {
     borderWidth: 1,
-    borderColor: '#CBD5E1',
-    borderRadius: 14,
-    paddingHorizontal: 14,
+    borderColor: Colors.border,
+    borderRadius: BorderRadius.lg,
+    paddingHorizontal: Spacing.md,
     paddingVertical: 12,
-    fontSize: 15,
-    color: '#0F172A',
-    backgroundColor: '#FFFFFF',
+    fontSize: Typography.fontSize.sm,
+    color: Colors.textPrimary,
+    backgroundColor: Colors.surface,
   },
   multilineInput: {
     minHeight: 88,
@@ -503,31 +501,31 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   progressLabel: {
-    fontSize: 14,
+    fontSize: Typography.fontSize.sm,
     fontWeight: '700',
-    color: '#0F172A',
+    color: Colors.textPrimary,
   },
   progressValue: {
-    fontSize: 14,
-    color: '#475569',
+    fontSize: Typography.fontSize.sm,
+    color: Colors.textSecondary,
   },
   progressTrack: {
     marginTop: 12,
     height: 10,
-    borderRadius: 999,
-    backgroundColor: '#E2E8F0',
+    borderRadius: BorderRadius.full,
+    backgroundColor: Colors.gray200,
     overflow: 'hidden',
   },
   progressFill: {
     height: '100%',
-    borderRadius: 999,
-    backgroundColor: '#2563EB',
+    borderRadius: BorderRadius.full,
+    backgroundColor: Colors.primary,
   },
   progressHint: {
     marginTop: 12,
-    fontSize: 13,
+    fontSize: Typography.fontSize.xs,
     lineHeight: 20,
-    color: '#64748B',
+    color: Colors.textSecondary,
   },
   secondaryButton: {
     marginTop: 16,
@@ -536,26 +534,26 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     gap: 8,
     paddingVertical: 14,
-    borderRadius: 16,
-    backgroundColor: '#EFF6FF',
+    borderRadius: BorderRadius.lg,
+    backgroundColor: Colors.gray100,
   },
   secondaryButtonText: {
-    fontSize: 15,
+    fontSize: Typography.fontSize.sm,
     fontWeight: '700',
-    color: '#2563EB',
+    color: Colors.primary,
   },
   actionRow: {
     flexDirection: 'row',
     alignItems: 'center',
     paddingVertical: 14,
     borderTopWidth: 1,
-    borderTopColor: '#E2E8F0',
+    borderTopColor: Colors.border,
   },
   actionIcon: {
     width: 40,
     height: 40,
-    borderRadius: 14,
-    backgroundColor: '#EFF6FF',
+    borderRadius: BorderRadius.md,
+    backgroundColor: Colors.gray100,
     alignItems: 'center',
     justifyContent: 'center',
     marginRight: 12,
@@ -564,15 +562,15 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   actionTitle: {
-    fontSize: 15,
+    fontSize: Typography.fontSize.sm,
     fontWeight: '700',
-    color: '#0F172A',
+    color: Colors.textPrimary,
   },
   actionDescription: {
     marginTop: 4,
-    fontSize: 13,
+    fontSize: Typography.fontSize.xs,
     lineHeight: 18,
-    color: '#64748B',
+    color: Colors.textSecondary,
   },
   footerActions: {
     flexDirection: 'row',
@@ -584,25 +582,25 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     paddingVertical: 15,
-    borderRadius: 16,
-    backgroundColor: '#E2E8F0',
+    borderRadius: BorderRadius.lg,
+    backgroundColor: Colors.gray200,
   },
   cancelButtonText: {
-    fontSize: 15,
+    fontSize: Typography.fontSize.sm,
     fontWeight: '700',
-    color: '#334155',
+    color: Colors.textSecondary,
   },
   saveButton: {
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
     paddingVertical: 15,
-    borderRadius: 16,
-    backgroundColor: '#2563EB',
+    borderRadius: BorderRadius.lg,
+    backgroundColor: Colors.primary,
   },
   saveButtonText: {
-    fontSize: 15,
+    fontSize: Typography.fontSize.sm,
     fontWeight: '700',
-    color: '#FFFFFF',
+    color: Colors.white,
   },
 });

@@ -166,7 +166,7 @@ export default function DeliveryCompletionScreen() {
   if (loadingDelivery) {
     return (
       <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color="#2563EB" />
+        <ActivityIndicator size="large" color=Colors.primary />
         <Text style={styles.loadingText}>배송 상태를 확인하고 있어요.</Text>
       </View>
     );
@@ -190,7 +190,7 @@ export default function DeliveryCompletionScreen() {
           disabled={markingArrived}
         >
           {markingArrived ? (
-            <ActivityIndicator size="small" color="#1D4ED8" />
+            <ActivityIndicator size="small" color=Colors.primary />
           ) : (
             <Text style={styles.secondaryButtonText}>도착 처리하기</Text>
           )}
@@ -225,7 +225,7 @@ export default function DeliveryCompletionScreen() {
           {photoUri ? <Image source={{ uri: photoUri }} style={styles.previewImage} /> : null}
           <TouchableOpacity style={styles.photoButton} onPress={() => void handleCapturePhoto()} disabled={photoLoading}>
             {photoLoading ? (
-              <ActivityIndicator size="small" color="#1D4ED8" />
+              <ActivityIndicator size="small" color=Colors.primary />
             ) : (
               <Text style={styles.photoButtonText}>{photoUri ? '사진 다시 촬영하기' : '완료 사진 촬영하기'}</Text>
             )}
@@ -246,7 +246,7 @@ export default function DeliveryCompletionScreen() {
 
       <TouchableOpacity style={styles.primaryButton} onPress={() => void handleComplete()} disabled={loading}>
         {loading ? (
-          <ActivityIndicator size="small" color="#FFFFFF" />
+          <ActivityIndicator size="small" color=Colors.white />
         ) : (
           <Text style={styles.primaryButtonText}>배송 완료 기록</Text>
         )}
@@ -258,7 +258,7 @@ export default function DeliveryCompletionScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F8FAFC',
+    backgroundColor: Colors.background,
   },
   content: {
     padding: 20,
@@ -268,12 +268,12 @@ const styles = StyleSheet.create({
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#F8FAFC',
+    backgroundColor: Colors.background,
   },
   loadingText: {
     marginTop: 12,
     fontSize: 14,
-    color: '#64748B',
+    color: Colors.textSecondary,
   },
   header: {
     gap: 8,
@@ -281,19 +281,19 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 28,
     fontWeight: '800',
-    color: '#0F172A',
+    color: Colors.textPrimary,
   },
   subtitle: {
     fontSize: 15,
     lineHeight: 22,
-    color: '#64748B',
+    color: Colors.textSecondary,
   },
   card: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: Colors.surface,
     borderRadius: 24,
     padding: 20,
     gap: 14,
-    shadowColor: '#0F172A',
+    shadowColor: Colors.textPrimary,
     shadowOpacity: 0.06,
     shadowRadius: 10,
     shadowOffset: { width: 0, height: 4 },
@@ -302,24 +302,24 @@ const styles = StyleSheet.create({
   sectionTitle: {
     fontSize: 18,
     fontWeight: '800',
-    color: '#0F172A',
+    color: Colors.textPrimary,
   },
   statusText: {
     fontSize: 15,
-    color: '#334155',
+    color: Colors.textPrimary,
   },
   codeBox: {
     borderWidth: 1,
-    borderColor: '#CBD5E1',
+    borderColor: Colors.border,
     borderRadius: 18,
     padding: 16,
     gap: 12,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: Colors.surface,
   },
   codeLabel: {
     fontSize: 14,
     fontWeight: '700',
-    color: '#334155',
+    color: Colors.textPrimary,
   },
   codeRow: {
     flexDirection: 'row',
@@ -331,36 +331,36 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     borderRadius: 14,
-    backgroundColor: '#EFF6FF',
+    backgroundColor: Colors.primaryMint,
     borderWidth: 1,
-    borderColor: '#BFDBFE',
+    borderColor: Colors.border,
   },
   codeChipText: {
     fontSize: 15,
     fontWeight: '800',
-    color: '#1D4ED8',
+    color: Colors.primary,
   },
   input: {
     borderWidth: 1,
-    borderColor: '#CBD5E1',
+    borderColor: Colors.border,
     borderRadius: 14,
     paddingHorizontal: 14,
     paddingVertical: 12,
     fontSize: 15,
-    color: '#0F172A',
-    backgroundColor: '#FFFFFF',
+    color: Colors.textPrimary,
+    backgroundColor: Colors.surface,
   },
   secondaryAction: {
     minHeight: 46,
     borderRadius: 14,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#E2E8F0',
+    backgroundColor: Colors.border,
   },
   secondaryActionText: {
     fontSize: 14,
     fontWeight: '700',
-    color: '#334155',
+    color: Colors.textPrimary,
   },
   block: {
     gap: 12,
@@ -368,38 +368,38 @@ const styles = StyleSheet.create({
   helperText: {
     fontSize: 14,
     lineHeight: 20,
-    color: '#64748B',
+    color: Colors.textSecondary,
   },
   previewImage: {
     width: '100%',
     height: 220,
     borderRadius: 18,
-    backgroundColor: '#E2E8F0',
+    backgroundColor: Colors.border,
   },
   photoButton: {
     minHeight: 48,
     borderRadius: 16,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#DBEAFE',
+    backgroundColor: Colors.primaryMint,
   },
   photoButtonText: {
     fontSize: 14,
     fontWeight: '700',
-    color: '#1D4ED8',
+    color: Colors.primary,
   },
   notesCard: {
     borderWidth: 1,
-    borderColor: '#CBD5E1',
+    borderColor: Colors.border,
     borderRadius: 18,
     padding: 16,
     gap: 10,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: Colors.surface,
   },
   notesText: {
     fontSize: 14,
     lineHeight: 20,
-    color: '#64748B',
+    color: Colors.textSecondary,
   },
   notesInput: {
     minHeight: 110,
@@ -410,23 +410,23 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     paddingVertical: 16,
     borderRadius: 18,
-    backgroundColor: '#2563EB',
+    backgroundColor: Colors.primary,
   },
   primaryButtonText: {
     fontSize: 15,
     fontWeight: '700',
-    color: '#FFFFFF',
+    color: Colors.surface,
   },
   secondaryButton: {
     alignItems: 'center',
     justifyContent: 'center',
     paddingVertical: 14,
     borderRadius: 16,
-    backgroundColor: '#DBEAFE',
+    backgroundColor: Colors.primaryMint,
   },
   secondaryButtonText: {
     fontSize: 14,
     fontWeight: '700',
-    color: '#1D4ED8',
+    color: Colors.primary,
   },
 });

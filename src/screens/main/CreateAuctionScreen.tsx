@@ -125,7 +125,7 @@ export default function CreateAuctionScreen() {
   if (loadingStations) {
     return (
       <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color="#2563EB" />
+        <ActivityIndicator size="large" color=Colors.primary />
         <Text style={styles.loadingText}>역 정보를 불러오고 있습니다.</Text>
       </View>
     );
@@ -197,7 +197,7 @@ export default function CreateAuctionScreen() {
         onPress={() => void handleSubmit()}
         disabled={saving || submitDisabled}
       >
-        {saving ? <ActivityIndicator size="small" color="#FFFFFF" /> : <Text style={styles.primaryButtonText}>경매 요청 생성</Text>}
+        {saving ? <ActivityIndicator size="small" color=Colors.white /> : <Text style={styles.primaryButtonText}>경매 요청 생성</Text>}
       </TouchableOpacity>
 
       <OptimizedStationSelectModal
@@ -235,19 +235,19 @@ function SelectorRow({ label, value, onPress }: { label: string; value: string; 
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#F8FAFC' },
+  container: { flex: 1, backgroundColor: Colors.background },
   content: { padding: 20, gap: 16 },
-  loadingContainer: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: '#F8FAFC' },
-  loadingText: { marginTop: 12, fontSize: 14, color: '#64748B' },
+  loadingContainer: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: Colors.background },
+  loadingText: { marginTop: 12, fontSize: 14, color: Colors.textSecondary },
   header: { gap: 8 },
-  title: { fontSize: 28, fontWeight: '800', color: '#0F172A' },
-  subtitle: { fontSize: 15, lineHeight: 22, color: '#64748B' },
-  card: { backgroundColor: '#FFFFFF', borderRadius: 24, padding: 20, gap: 12 },
-  sectionTitle: { fontSize: 18, fontWeight: '800', color: '#0F172A' },
-  bodyText: { fontSize: 15, color: '#334155' },
+  title: { fontSize: 28, fontWeight: '800', color: Colors.textPrimary },
+  subtitle: { fontSize: 15, lineHeight: 22, color: Colors.textSecondary },
+  card: { backgroundColor: Colors.surface, borderRadius: 24, padding: 20, gap: 12 },
+  sectionTitle: { fontSize: 18, fontWeight: '800', color: Colors.textPrimary },
+  bodyText: { fontSize: 15, color: Colors.textPrimary },
   selectorRow: {
     alignItems: 'center',
-    borderColor: '#E2E8F0',
+    borderColor: Colors.border,
     borderRadius: 18,
     borderWidth: 1,
     flexDirection: 'row',
@@ -255,38 +255,38 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 14,
   },
-  selectorLabel: { fontSize: 14, fontWeight: '700', color: '#334155' },
-  selectorValue: { fontSize: 14, color: '#0F172A' },
+  selectorLabel: { fontSize: 14, fontWeight: '700', color: Colors.textPrimary },
+  selectorValue: { fontSize: 14, color: Colors.textPrimary },
   input: {
     borderWidth: 1,
-    borderColor: '#CBD5E1',
+    borderColor: Colors.border,
     borderRadius: 16,
     paddingHorizontal: 16,
     paddingVertical: 14,
     fontSize: 15,
-    color: '#0F172A',
-    backgroundColor: '#FFFFFF',
+    color: Colors.textPrimary,
+    backgroundColor: Colors.surface,
   },
   descriptionInput: { minHeight: 96, textAlignVertical: 'top' },
   chipRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   chip: {
     borderWidth: 1,
-    borderColor: '#CBD5E1',
+    borderColor: Colors.border,
     borderRadius: 999,
     paddingHorizontal: 14,
     paddingVertical: 10,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: Colors.surface,
   },
-  chipActive: { backgroundColor: '#0F766E', borderColor: '#0F766E' },
-  chipText: { color: '#334155', fontWeight: '700' },
-  chipTextActive: { color: '#FFFFFF' },
+  chipActive: { backgroundColor: Colors.primary, borderColor: Colors.primary },
+  chipText: { color: Colors.textPrimary, fontWeight: '700' },
+  chipTextActive: { color: Colors.surface },
   primaryButton: {
     borderRadius: 18,
-    backgroundColor: '#0F766E',
+    backgroundColor: Colors.primary,
     alignItems: 'center',
     justifyContent: 'center',
     minHeight: 56,
   },
-  primaryButtonDisabled: { backgroundColor: '#94A3B8' },
-  primaryButtonText: { color: '#FFFFFF', fontSize: 16, fontWeight: '800' },
+  primaryButtonDisabled: { backgroundColor: Colors.textTertiary },
+  primaryButtonText: { color: Colors.surface, fontSize: 16, fontWeight: '800' },
 });

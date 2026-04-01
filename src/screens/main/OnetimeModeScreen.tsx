@@ -13,6 +13,7 @@ import { doc, serverTimestamp, updateDoc } from 'firebase/firestore';
 import { useNavigation } from '@react-navigation/native';
 import { db, requireUserId } from '../../services/firebase';
 import type { MainStackNavigationProp } from '../../types/navigation';
+import { Colors, Spacing, Typography, BorderRadius } from '../../theme';
 
 export default function OnetimeModeScreen() {
   const navigation = useNavigation<MainStackNavigationProp>();
@@ -56,7 +57,7 @@ export default function OnetimeModeScreen() {
             <Text style={styles.sectionTitle}>모드 활성화</Text>
             <Text style={styles.helper}>켜면 즉시성 요청을 더 적극적으로 받습니다.</Text>
           </View>
-          <Switch value={enabled} onValueChange={setEnabled} />
+          <Switch value={enabled} onValueChange={setEnabled} trackColor={{ false: Colors.border, true: Colors.primaryLight }} thumbColor={Colors.surface} />
         </View>
 
         <View style={styles.row}>
@@ -64,7 +65,7 @@ export default function OnetimeModeScreen() {
             <Text style={styles.sectionTitle}>환승 허용</Text>
             <Text style={styles.helper}>환승이 포함된 일회성 요청도 받을지 정합니다.</Text>
           </View>
-          <Switch value={allowTransfer} onValueChange={setAllowTransfer} />
+          <Switch value={allowTransfer} onValueChange={setAllowTransfer} trackColor={{ false: Colors.border, true: Colors.primaryLight }} thumbColor={Colors.surface} />
         </View>
       </View>
 
@@ -87,28 +88,28 @@ export default function OnetimeModeScreen() {
       </View>
 
       <TouchableOpacity style={styles.primaryButton} onPress={() => void handleSave()} disabled={saving}>
-        {saving ? <ActivityIndicator size="small" color="#FFFFFF" /> : <Text style={styles.primaryButtonText}>설정 저장</Text>}
+        {saving ? <ActivityIndicator size="small" color={Colors.surface} /> : <Text style={styles.primaryButtonText}>설정 저장</Text>}
       </TouchableOpacity>
     </ScrollView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#F8FAFC' },
-  content: { padding: 20, gap: 16 },
-  header: { gap: 8 },
-  title: { fontSize: 28, fontWeight: '800', color: '#0F172A' },
-  subtitle: { fontSize: 15, lineHeight: 22, color: '#64748B' },
-  card: { backgroundColor: '#FFFFFF', borderRadius: 24, padding: 20, gap: 16 },
-  row: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: 12 },
-  copy: { flex: 1, gap: 4 },
-  sectionTitle: { fontSize: 18, fontWeight: '800', color: '#0F172A' },
-  helper: { fontSize: 14, lineHeight: 20, color: '#64748B' },
-  chipRow: { flexDirection: 'row', gap: 10 },
-  chip: { paddingHorizontal: 14, paddingVertical: 10, borderRadius: 999, backgroundColor: '#E2E8F0' },
-  chipActive: { backgroundColor: '#DBEAFE' },
-  chipText: { fontSize: 13, fontWeight: '700', color: '#475569' },
-  chipTextActive: { color: '#1D4ED8' },
-  primaryButton: { alignItems: 'center', justifyContent: 'center', paddingVertical: 16, borderRadius: 18, backgroundColor: '#2563EB' },
-  primaryButtonText: { fontSize: 15, fontWeight: '700', color: '#FFFFFF' },
+  container: { flex: 1, backgroundColor: Colors.background },
+  content: { padding: Spacing.xl, gap: Spacing.lg },
+  header: { gap: Spacing.sm },
+  title: { fontSize: Typography.fontSize['3xl'], fontWeight: '800', color: Colors.textPrimary },
+  subtitle: { fontSize: Typography.fontSize.base, lineHeight: 22, color: Colors.textSecondary },
+  card: { backgroundColor: Colors.surface, borderRadius: BorderRadius.xl, padding: Spacing.xl, gap: Spacing.lg },
+  row: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: Spacing.md },
+  copy: { flex: 1, gap: Spacing.xs },
+  sectionTitle: { fontSize: Typography.fontSize.xl, fontWeight: '800', color: Colors.textPrimary },
+  helper: { fontSize: Typography.fontSize.base, lineHeight: 20, color: Colors.textSecondary },
+  chipRow: { flexDirection: 'row', gap: Spacing.sm },
+  chip: { paddingHorizontal: Spacing.lg, paddingVertical: Spacing.sm, borderRadius: BorderRadius.full, backgroundColor: Colors.border },
+  chipActive: { backgroundColor: Colors.primaryMint },
+  chipText: { fontSize: Typography.fontSize.sm, fontWeight: '700', color: Colors.textSecondary },
+  chipTextActive: { color: Colors.primary },
+  primaryButton: { alignItems: 'center', justifyContent: 'center', paddingVertical: Spacing.lg, borderRadius: BorderRadius.lg, backgroundColor: Colors.primary },
+  primaryButtonText: { fontSize: Typography.fontSize.base, fontWeight: '700', color: Colors.surface },
 });

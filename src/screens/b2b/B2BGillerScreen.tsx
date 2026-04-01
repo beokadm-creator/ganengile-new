@@ -11,6 +11,7 @@ import {
   type B2BGillerTierLevel,
 } from '../../types/b2b-giller-tier';
 import type { B2BStackParamList } from '../../types/navigation';
+import { BorderRadius, Colors, Shadows, Spacing, Typography } from '../../theme';
 
 type NavigationProp = StackNavigationProp<B2BStackParamList, 'B2BGiller'>;
 
@@ -63,13 +64,13 @@ function formatCurrency(amount: number): string {
 function getStatusColor(status: DeliveryStatus): string {
   switch (status) {
     case 'pending':
-      return '#64748B';
+      return Colors.textSecondary;
     case 'matched':
-      return '#2563EB';
+      return Colors.primary;
     case 'in_progress':
-      return '#D97706';
+      return Colors.warning;
     case 'completed':
-      return '#16A34A';
+      return Colors.success;
   }
 }
 
@@ -202,12 +203,12 @@ export default function B2BGillerScreen({ navigation: _navigation }: Props) {
   const tierInfo = B2B_TIER_DETAILS[earnings.currentTier];
   const progressWidth = `${earnings.progressToNext ?? 100}%` as DimensionValue;
   const tierCardColor =
-    tierInfo.benefits.priorityLevel >= 10 ? '#7C3AED' : tierInfo.benefits.priorityLevel >= 7 ? '#D97706' : '#475569';
+    tierInfo.benefits.priorityLevel >= 10 ? Colors.accent : tierInfo.benefits.priorityLevel >= 7 ? Colors.warning : Colors.textSecondary;
 
   if (loading) {
     return (
       <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color="#2563EB" />
+        <ActivityIndicator size="large" color=Colors.primary />
       </View>
     );
   }
@@ -288,114 +289,120 @@ function EarningRow({ label, value, emphasize }: { label: string; value: string;
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F8FAFC',
+    backgroundColor: Colors.background,
   },
   content: {
-    padding: 20,
-    gap: 16,
+    padding: Spacing.xl,
+    gap: Spacing.lg,
   },
   loadingContainer: {
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#F8FAFC',
+    backgroundColor: Colors.background,
   },
   header: {
-    gap: 8,
+    backgroundColor: Colors.primaryMint,
+    borderRadius: BorderRadius.xl,
+    padding: Spacing.xl,
+    gap: Spacing.sm,
+    ...Shadows.sm,
   },
   title: {
-    fontSize: 28,
+    fontSize: Typography.fontSize['2xl'],
     fontWeight: '800',
-    color: '#0F172A',
+    color: Colors.textPrimary,
+    lineHeight: 32,
   },
   subtitle: {
-    fontSize: 15,
+    fontSize: Typography.fontSize.sm,
     lineHeight: 22,
-    color: '#64748B',
+    color: Colors.textSecondary,
   },
   tierCard: {
-    borderRadius: 24,
-    padding: 20,
-    gap: 8,
+    borderRadius: BorderRadius.xl,
+    padding: Spacing.xl,
+    gap: Spacing.sm,
   },
   tierName: {
-    fontSize: 24,
+    fontSize: Typography.fontSize['2xl'],
     fontWeight: '800',
-    color: '#FFFFFF',
+    color: Colors.white,
   },
   tierBonus: {
-    fontSize: 15,
-    color: '#F8FAFC',
+    fontSize: Typography.fontSize.base,
+    color: Colors.white,
+    opacity: 0.9,
   },
   tierDescription: {
-    fontSize: 14,
+    fontSize: Typography.fontSize.sm,
     lineHeight: 20,
-    color: '#E2E8F0',
+    color: Colors.white,
+    opacity: 0.8,
   },
   card: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 24,
-    padding: 20,
-    shadowColor: '#0F172A',
-    shadowOpacity: 0.06,
-    shadowRadius: 10,
-    shadowOffset: { width: 0, height: 4 },
-    elevation: 3,
+    backgroundColor: Colors.surface,
+    borderRadius: BorderRadius.xl,
+    padding: Spacing.xl,
+    gap: Spacing.sm,
+    borderWidth: 1,
+    borderColor: Colors.border,
   },
   sectionTitle: {
-    fontSize: 18,
+    fontSize: Typography.fontSize.lg,
     fontWeight: '800',
-    color: '#0F172A',
-    marginBottom: 16,
+    color: Colors.textPrimary,
+    marginBottom: Spacing.sm,
   },
   row: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    marginBottom: 12,
+    marginBottom: Spacing.sm,
   },
   rowLabel: {
-    fontSize: 14,
-    color: '#64748B',
+    fontSize: Typography.fontSize.sm,
+    color: Colors.textSecondary,
   },
   rowValue: {
-    fontSize: 15,
+    fontSize: Typography.fontSize.base,
     fontWeight: '700',
-    color: '#0F172A',
+    color: Colors.textPrimary,
   },
   emphasizeLabel: {
-    color: '#1D4ED8',
+    color: Colors.primary,
     fontWeight: '700',
   },
   emphasizeValue: {
-    color: '#1D4ED8',
-    fontSize: 18,
+    color: Colors.primary,
+    fontSize: Typography.fontSize.lg,
+    fontWeight: '800',
   },
   progressLabel: {
-    fontSize: 14,
-    color: '#475569',
-    marginBottom: 12,
+    fontSize: Typography.fontSize.sm,
+    color: Colors.textSecondary,
+    marginBottom: Spacing.sm,
   },
   progressTrack: {
     height: 10,
-    borderRadius: 999,
-    backgroundColor: '#E2E8F0',
+    borderRadius: BorderRadius.full,
+    backgroundColor: Colors.gray200,
     overflow: 'hidden',
   },
   progressFill: {
     height: '100%',
-    borderRadius: 999,
-    backgroundColor: '#2563EB',
+    borderRadius: BorderRadius.full,
+    backgroundColor: Colors.primary,
   },
   criteriaText: {
-    marginTop: 12,
-    fontSize: 13,
+    marginTop: Spacing.sm,
+    fontSize: Typography.fontSize.sm,
     lineHeight: 20,
-    color: '#64748B',
+    color: Colors.textSecondary,
   },
   deliveryItem: {
-    paddingVertical: 12,
+    paddingVertical: Spacing.sm,
     borderTopWidth: 1,
-    borderTopColor: '#E2E8F0',
+    borderTopColor: Colors.border,
   },
   deliveryHeader: {
     flexDirection: 'row',
@@ -403,30 +410,30 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   deliveryRoute: {
-    fontSize: 15,
+    fontSize: Typography.fontSize.base,
     fontWeight: '700',
-    color: '#0F172A',
+    color: Colors.textPrimary,
     flex: 1,
-    marginRight: 12,
+    marginRight: Spacing.sm,
   },
   deliveryStatus: {
-    fontSize: 13,
+    fontSize: Typography.fontSize.sm,
     fontWeight: '700',
   },
   deliveryMeta: {
     marginTop: 6,
-    fontSize: 13,
-    color: '#64748B',
+    fontSize: Typography.fontSize.sm,
+    color: Colors.textSecondary,
   },
   deliveryFee: {
     marginTop: 8,
-    fontSize: 16,
+    fontSize: Typography.fontSize.lg,
     fontWeight: '800',
-    color: '#0F172A',
+    color: Colors.textPrimary,
   },
   emptyText: {
-    fontSize: 14,
+    fontSize: Typography.fontSize.sm,
     lineHeight: 21,
-    color: '#64748B',
+    color: Colors.textTertiary,
   },
 });

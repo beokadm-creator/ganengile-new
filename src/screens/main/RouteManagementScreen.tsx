@@ -280,12 +280,12 @@ const styles = StyleSheet.create({
     fontWeight: Typography.fontWeight.semibold,
   },
   deleteActionButton: {
-    backgroundColor: '#ffebee',
-    borderColor: '#f44336',
+    backgroundColor: Colors.error + '1A',
+    borderColor: Colors.error,
     borderWidth: 1,
   },
   deleteActionButtonText: {
-    color: '#f44336',
+    color: Colors.error,
     fontSize: Typography.fontSize.sm,
     fontWeight: Typography.fontWeight.semibold,
   },

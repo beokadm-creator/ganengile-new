@@ -21,7 +21,7 @@ import { takePhoto, uploadPhotoWithThumbnail } from '../../services/photo-servic
 import QRCodeService from '../../services/qrcode-service';
 import type { LockerSummary } from '../../types/locker';
 import type { MainStackNavigationProp, MainStackParamList } from '../../types/navigation';
-import { BorderRadius, Spacing, Typography } from '../../theme';
+import { BorderRadius, Colors, Shadows, Spacing, Typography } from '../../theme';
 import LockerLocator from '../../components/delivery/LockerLocator';
 
 type DropoffRoute = RouteProp<MainStackParamList, 'GillerDropoffAtLocker'>;
@@ -154,9 +154,9 @@ export default function GillerDropoffAtLockerScreen() {
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
-      <View style={styles.header}>
-        <Text style={styles.title}>사물함 보관</Text>
-        <Text style={styles.subtitle}>선택한 사물함 예약, 보관 사진, 배송 상태 업데이트 순서로 진행합니다.</Text>
+      <View style={styles.hero}>
+        <Text style={styles.kicker}>사물함 보관</Text>
+        <Text style={styles.title}>선택한 사물함 예약, 보관 사진, 배송 상태 업데이트 순서로 진행합니다.</Text>
       </View>
 
       <View style={styles.card}>
@@ -167,19 +167,19 @@ export default function GillerDropoffAtLockerScreen() {
 
       {step === 'reserve' ? (
         <TouchableOpacity style={styles.primaryButton} onPress={() => { void handleReserve(); }} disabled={working}>
-          {working ? <ActivityIndicator size="small" color="#FFFFFF" /> : <Text style={styles.primaryButtonText}>사물함 예약 생성</Text>}
+          {working ? <ActivityIndicator size="small" color={Colors.white} /> : <Text style={styles.primaryButtonText}>사물함 예약 생성</Text>}
         </TouchableOpacity>
       ) : null}
 
       {step === 'photo' ? (
         <TouchableOpacity style={styles.primaryButton} onPress={() => void handleTakePhoto()} disabled={working}>
-          {working ? <ActivityIndicator size="small" color="#FFFFFF" /> : <Text style={styles.primaryButtonText}>보관 사진 촬영</Text>}
+          {working ? <ActivityIndicator size="small" color={Colors.white} /> : <Text style={styles.primaryButtonText}>보관 사진 촬영</Text>}
         </TouchableOpacity>
       ) : null}
 
       {step === 'complete' ? (
         <TouchableOpacity style={styles.primaryButton} onPress={() => void handleComplete()} disabled={working}>
-          {working ? <ActivityIndicator size="small" color="#FFFFFF" /> : <Text style={styles.primaryButtonText}>보관 완료 처리</Text>}
+          {working ? <ActivityIndicator size="small" color={Colors.white} /> : <Text style={styles.primaryButtonText}>보관 완료 처리</Text>}
         </TouchableOpacity>
       ) : null}
     </ScrollView>
@@ -187,20 +187,14 @@ export default function GillerDropoffAtLockerScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#F8FAFC' },
-  content: { padding: 20, gap: 16 },
-  header: { gap: 8 },
-  title: { fontSize: 28, fontWeight: '800', color: '#0F172A' },
-  subtitle: { fontSize: 15, lineHeight: 22, color: '#64748B' },
-  card: { backgroundColor: '#FFFFFF', borderRadius: BorderRadius.xl, padding: Spacing.lg, gap: 8 },
-  sectionTitle: { fontSize: Typography.fontSize.lg, fontWeight: '800', color: '#0F172A' },
-  bodyText: { fontSize: Typography.fontSize.sm, color: '#334155' },
-  primaryButton: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 16,
-    borderRadius: 18,
-    backgroundColor: '#2563EB',
-  },
-  primaryButtonText: { fontSize: 15, fontWeight: '700', color: '#FFFFFF' },
+  container: { flex: 1, backgroundColor: Colors.background },
+  content: { padding: Spacing.xl, gap: Spacing.lg },
+  hero: { backgroundColor: Colors.primaryMint, borderRadius: BorderRadius.xl, padding: Spacing.xl, gap: Spacing.sm, ...Shadows.sm },
+  kicker: { color: Colors.primary, fontSize: Typography.fontSize.xs, fontWeight: '800', textTransform: 'uppercase', letterSpacing: 1 },
+  title: { color: Colors.textPrimary, fontSize: Typography.fontSize['2xl'], fontWeight: '800', lineHeight: 32 },
+  card: { backgroundColor: Colors.surface, borderRadius: BorderRadius.xl, padding: Spacing.xl, gap: Spacing.md, borderWidth: 1, borderColor: Colors.border },
+  sectionTitle: { color: Colors.textPrimary, fontSize: Typography.fontSize.lg, fontWeight: '800', marginBottom: 4 },
+  bodyText: { color: Colors.textSecondary, fontSize: Typography.fontSize.base, fontWeight: '600' },
+  primaryButton: { minHeight: 52, borderRadius: BorderRadius.full, backgroundColor: Colors.primary, alignItems: 'center', justifyContent: 'center', marginTop: Spacing.sm },
+  primaryButtonText: { color: Colors.white, fontSize: 16, fontWeight: '800' },
 });

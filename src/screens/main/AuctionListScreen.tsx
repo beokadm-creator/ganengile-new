@@ -245,10 +245,10 @@ const styles = StyleSheet.create({
   },
   stationName: {
     ...Typography.bodyBold,
-    color: Colors.text.primary,
+    color: Colors.textPrimary,
   },
   arrow: {
-    color: Colors.text.secondary,
+    color: Colors.textSecondary,
     marginHorizontal: 8,
   },
   statusBadge: {
@@ -271,11 +271,11 @@ const styles = StyleSheet.create({
   },
   infoLabel: {
     ...Typography.body1,
-    color: Colors.text.secondary,
+    color: Colors.textSecondary,
   },
   infoValue: {
     ...Typography.bodyBold,
-    color: Colors.text.primary,
+    color: Colors.textPrimary,
   },
   emptyState: {
     alignItems: 'center',
@@ -284,19 +284,19 @@ const styles = StyleSheet.create({
     padding: Spacing.xxl,
   },
   emptyIcon: {
-    color: Colors.text.secondary,
+    color: Colors.textSecondary,
     fontSize: 28,
     fontWeight: '700',
     marginBottom: 16,
   },
   emptyTitle: {
     ...Typography.h3,
-    color: Colors.text.primary,
+    color: Colors.textPrimary,
     marginBottom: 8,
   },
   emptyDesc: {
     ...Typography.body1,
-    color: Colors.text.secondary,
+    color: Colors.textSecondary,
     textAlign: 'center',
   },
   loadingContainer: {
@@ -307,7 +307,7 @@ const styles = StyleSheet.create({
   },
   loadingText: {
     ...Typography.body1,
-    color: Colors.text.secondary,
+    color: Colors.textSecondary,
     marginTop: 12,
   },
   createButton: {

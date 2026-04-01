@@ -15,7 +15,7 @@ import { RouteProp, useRoute } from '@react-navigation/native';
 import { createChatService } from '../../services/chat-service';
 import { getBeta1ChatContext, type Beta1ChatContext } from '../../services/beta1-orchestration-service';
 import { useUser } from '../../contexts/UserContext';
-import { BorderRadius, Spacing, Typography } from '../../theme';
+import { BorderRadius, Colors, Spacing, Typography } from '../../theme';
 import { MessageType, type ChatMessage } from '../../types/chat';
 import type { MainStackParamList } from '../../types/navigation';
 
@@ -76,7 +76,7 @@ export default function ChatScreen() {
 
         <View style={styles.contextCard}>
           <View style={styles.contextHeader}>
-            <MaterialIcons name="shield" size={18} color="#0F766E" />
+            <MaterialIcons name="shield" size={18} color={Colors.primary} />
             <Text style={styles.contextLabel}>{context?.actionLabel ?? '채팅 안내'}</Text>
           </View>
 
@@ -88,7 +88,7 @@ export default function ChatScreen() {
           <Text style={styles.contextRecipient}>{context?.recipientSummary ?? '수령인 정보는 아직 제한 공개 상태입니다.'}</Text>
           {(context?.trustSummary ?? []).map((item) => (
             <View key={item} style={styles.trustRow}>
-              <MaterialIcons name="check-circle" size={16} color="#15803D" />
+              <MaterialIcons name="check-circle" size={16} color={Colors.successDark} />
               <Text style={styles.trustText}>{item}</Text>
             </View>
           ))}
@@ -97,7 +97,7 @@ export default function ChatScreen() {
 
       {loading ? (
         <View style={styles.loaderWrap}>
-          <ActivityIndicator size="large" color="#0F766E" />
+          <ActivityIndicator size="large" color={Colors.primary} />
         </View>
       ) : (
         <FlatList
@@ -131,7 +131,7 @@ export default function ChatScreen() {
           value={input}
           onChangeText={setInput}
           placeholder="인계 방식, 위치, 사진 요청을 간단히 남겨보세요"
-          placeholderTextColor="#94A3B8"
+          placeholderTextcolor={Colors.textTertiary}
           multiline
         />
         <TouchableOpacity
@@ -141,7 +141,7 @@ export default function ChatScreen() {
           }}
           disabled={sending || !input.trim()}
         >
-          <MaterialIcons name="north-east" size={18} color="#FFFFFF" />
+          <MaterialIcons name="north-east" size={18} color=Colors.white />
         </TouchableOpacity>
       </View>
     </KeyboardAvoidingView>
@@ -167,26 +167,26 @@ function formatMessageTime(timestamp: ChatMessage['createdAt']) {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F8FAFC',
+    backgroundColor: Colors.background,
   },
   topPanel: {
     paddingHorizontal: Spacing.lg,
     paddingTop: Spacing.lg,
     paddingBottom: Spacing.md,
     gap: Spacing.sm,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: Colors.surface,
   },
   chatTitle: {
     fontSize: Typography.fontSize.xl,
     fontWeight: '800',
-    color: '#0F172A',
+    color: Colors.textPrimary,
   },
   chatSubtitle: {
     fontSize: Typography.fontSize.sm,
-    color: '#64748B',
+    color: Colors.textTertiary,
   },
   contextCard: {
-    backgroundColor: '#ECFDF5',
+    backgroundColor: Colors.primaryMint,
     borderRadius: BorderRadius.xl,
     padding: Spacing.md,
     gap: 8,
@@ -197,9 +197,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   contextLabel: {
-    fontSize: 12,
+    fontSize: Typography.fontSize.sm,
     fontWeight: '800',
-    color: '#0F766E',
+    color: Colors.primary,
     textTransform: 'uppercase',
   },
   metaRow: {
@@ -208,19 +208,19 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   badge: {
-    backgroundColor: '#D1FAE5',
-    borderRadius: 999,
+    backgroundColor: Colors.successLight,
+    borderRadius: BorderRadius.full,
     paddingHorizontal: 10,
     paddingVertical: 6,
   },
   badgeText: {
     fontSize: Typography.fontSize.xs,
     fontWeight: '700',
-    color: '#065F46',
+    color: Colors.successDark,
   },
   contextRecipient: {
     fontSize: Typography.fontSize.sm,
-    color: '#0F172A',
+    color: Colors.textPrimary,
   },
   trustRow: {
     flexDirection: 'row',
@@ -229,7 +229,7 @@ const styles = StyleSheet.create({
   },
   trustText: {
     flex: 1,
-    color: '#334155',
+    color: Colors.gray700,
     fontSize: Typography.fontSize.sm,
     lineHeight: 19,
   },
@@ -249,43 +249,43 @@ const styles = StyleSheet.create({
   },
   bubble: {
     maxWidth: '78%',
-    borderRadius: 18,
+    borderRadius: BorderRadius.xl,
     paddingHorizontal: 14,
     paddingTop: 12,
     paddingBottom: 10,
     gap: 6,
   },
   myBubble: {
-    backgroundColor: '#0F766E',
+    backgroundColor: Colors.primary,
   },
   otherBubble: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: Colors.surface,
   },
   messageText: {
-    color: '#0F172A',
+    color: Colors.textPrimary,
     fontSize: Typography.fontSize.base,
     lineHeight: 21,
   },
   myMessageText: {
-    color: '#FFFFFF',
+    color: Colors.textWhite,
   },
   messageMeta: {
-    color: '#64748B',
+    color: Colors.textTertiary,
     fontSize: Typography.fontSize.xs,
     textAlign: 'right',
   },
   myMessageMeta: {
-    color: '#CCFBF1',
+    color: Colors.primaryMint,
   },
   systemRow: {
     alignItems: 'center',
     marginVertical: 8,
   },
   systemText: {
-    fontSize: 12,
-    color: '#64748B',
-    backgroundColor: '#E2E8F0',
-    borderRadius: 999,
+    fontSize: Typography.fontSize.sm,
+    color: Colors.textTertiary,
+    backgroundColor: Colors.border,
+    borderRadius: BorderRadius.full,
     paddingHorizontal: 12,
     paddingVertical: 8,
   },
@@ -294,25 +294,25 @@ const styles = StyleSheet.create({
     gap: 10,
     alignItems: 'flex-end',
     padding: Spacing.md,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: Colors.surface,
     borderTopWidth: 1,
-    borderTopColor: '#E2E8F0',
+    borderTopColor: Colors.border,
   },
   input: {
     flex: 1,
     minHeight: 48,
     maxHeight: 120,
-    backgroundColor: '#F1F5F9',
-    borderRadius: 20,
+    backgroundColor: Colors.gray100,
+    borderRadius: BorderRadius.xl,
     paddingHorizontal: 14,
     paddingVertical: 12,
-    color: '#0F172A',
+    color: Colors.textPrimary,
   },
   sendButton: {
     width: 44,
     height: 44,
-    borderRadius: 22,
-    backgroundColor: '#0F766E',
+    borderRadius: BorderRadius.full,
+    backgroundColor: Colors.primary,
     alignItems: 'center',
     justifyContent: 'center',
   },

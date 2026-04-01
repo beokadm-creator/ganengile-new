@@ -1,4 +1,4 @@
-﻿import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -124,7 +124,7 @@ export default function MonthlySettlementScreen() {
     <View style={styles.container}>
       <View style={styles.header}>
         <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
-          <Ionicons name="arrow-back" size={24} color={Colors.text.primary} />
+          <Ionicons name="arrow-back" size={24} color={Colors.textPrimary} />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>월 정산</Text>
       </View>
@@ -164,7 +164,7 @@ export default function MonthlySettlementScreen() {
 
         {settlements.length === 0 ? (
           <View style={styles.emptyCard}>
-            <Ionicons name="document-text-outline" size={28} color={Colors.text.tertiary} />
+            <Ionicons name="document-text-outline" size={28} color={Colors.textTertiary} />
             <Text style={styles.emptyTitle}>아직 생성된 정산이 없습니다.</Text>
             <Text style={styles.emptyText}>월 정산이 생성되면 이 화면에서 운영 검토 상태와 리포트를 확인할 수 있습니다.</Text>
           </View>
@@ -210,13 +210,13 @@ export default function MonthlySettlementScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F8FAFC',
+    backgroundColor: Colors.background,
   },
   loadingContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: '#F8FAFC',
+    backgroundColor: Colors.background,
   },
   header: {
     flexDirection: 'row',
@@ -225,14 +225,15 @@ const styles = StyleSheet.create({
     paddingVertical: Spacing.lg,
     borderBottomWidth: 1,
     borderBottomColor: Colors.border,
-    backgroundColor: '#fff',
+    backgroundColor: Colors.surface,
   },
   backButton: {
     marginRight: Spacing.md,
   },
   headerTitle: {
-    ...Typography.h3,
-    color: Colors.text.primary,
+    fontSize: Typography.fontSize.xl,
+    fontWeight: '800',
+    color: Colors.textPrimary,
   },
   content: {
     flex: 1,
@@ -240,13 +241,16 @@ const styles = StyleSheet.create({
   summaryCard: {
     margin: Spacing.md,
     padding: Spacing.lg,
-    backgroundColor: '#fff',
-    borderRadius: BorderRadius.lg,
+    backgroundColor: Colors.surface,
+    borderRadius: BorderRadius.xl,
     ...Shadows.sm,
+    borderWidth: 1,
+    borderColor: Colors.border,
   },
   cardTitle: {
-    ...Typography.h3,
-    color: Colors.text.primary,
+    fontSize: Typography.fontSize.lg,
+    fontWeight: '800',
+    color: Colors.textPrimary,
     marginBottom: Spacing.md,
   },
   summaryRow: {
@@ -255,60 +259,65 @@ const styles = StyleSheet.create({
     marginBottom: Spacing.sm,
   },
   summaryLabel: {
-    ...Typography.body2,
-    color: Colors.text.secondary,
+    fontSize: Typography.fontSize.sm,
+    color: Colors.textSecondary,
   },
   summaryValue: {
-    ...Typography.body1,
-    color: Colors.text.primary,
+    fontSize: Typography.fontSize.base,
+    color: Colors.textPrimary,
     fontWeight: '700',
   },
   noticeCard: {
     marginHorizontal: Spacing.md,
     marginBottom: Spacing.md,
     padding: Spacing.lg,
-    backgroundColor: Colors.warning + '10',
+    backgroundColor: Colors.warningLight,
     borderRadius: BorderRadius.lg,
     borderWidth: 1,
-    borderColor: Colors.warning + '30',
+    borderColor: Colors.warning,
   },
   noticeTitle: {
-    ...Typography.body1,
-    color: Colors.warning,
-    fontWeight: '700',
+    fontSize: Typography.fontSize.sm,
+    color: Colors.warningDark,
+    fontWeight: '800',
     marginBottom: Spacing.sm,
   },
   noticeText: {
-    ...Typography.body2,
-    color: Colors.text.secondary,
+    fontSize: Typography.fontSize.xs,
+    color: Colors.warningDark,
     lineHeight: 20,
   },
   emptyCard: {
     marginHorizontal: Spacing.md,
     padding: Spacing.xl,
-    borderRadius: BorderRadius.lg,
-    backgroundColor: '#fff',
+    borderRadius: BorderRadius.xl,
+    backgroundColor: Colors.surface,
     alignItems: 'center',
     ...Shadows.sm,
+    borderWidth: 1,
+    borderColor: Colors.border,
   },
   emptyTitle: {
-    ...Typography.h3,
-    color: Colors.text.primary,
+    fontSize: Typography.fontSize.lg,
+    fontWeight: '800',
+    color: Colors.textPrimary,
     marginTop: Spacing.md,
     marginBottom: Spacing.xs,
   },
   emptyText: {
-    ...Typography.body2,
-    color: Colors.text.secondary,
+    fontSize: Typography.fontSize.sm,
+    color: Colors.textSecondary,
     textAlign: 'center',
   },
   settlementCard: {
     marginHorizontal: Spacing.md,
     marginBottom: Spacing.md,
     padding: Spacing.lg,
-    backgroundColor: '#fff',
-    borderRadius: BorderRadius.lg,
+    backgroundColor: Colors.surface,
+    borderRadius: BorderRadius.xl,
     ...Shadows.sm,
+    borderWidth: 1,
+    borderColor: Colors.border,
   },
   settlementHeader: {
     flexDirection: 'row',
@@ -317,13 +326,13 @@ const styles = StyleSheet.create({
     gap: Spacing.sm,
   },
   settlementPeriod: {
-    ...Typography.body1,
-    color: Colors.text.primary,
+    fontSize: Typography.fontSize.base,
+    color: Colors.textPrimary,
     fontWeight: '700',
   },
   settlementMeta: {
-    ...Typography.bodySmall,
-    color: Colors.text.tertiary,
+    fontSize: Typography.fontSize.xs,
+    color: Colors.textTertiary,
     marginTop: Spacing.xs,
   },
   statusBadge: {
@@ -332,17 +341,18 @@ const styles = StyleSheet.create({
     borderRadius: BorderRadius.full,
   },
   statusText: {
-    ...Typography.caption,
+    fontSize: Typography.fontSize.xs,
     fontWeight: '700',
   },
   settlementAmount: {
-    ...Typography.h2,
+    fontSize: Typography.fontSize['2xl'],
+    fontWeight: '800',
     color: Colors.primary,
     marginTop: Spacing.md,
   },
   reviewNote: {
-    ...Typography.body2,
-    color: Colors.text.secondary,
+    fontSize: Typography.fontSize.sm,
+    color: Colors.textSecondary,
     marginTop: Spacing.sm,
     lineHeight: 20,
   },
@@ -353,8 +363,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   transferHint: {
-    ...Typography.bodySmall,
-    color: Colors.text.tertiary,
+    fontSize: Typography.fontSize.xs,
+    color: Colors.textTertiary,
     flex: 1,
     marginRight: Spacing.sm,
   },
@@ -364,7 +374,7 @@ const styles = StyleSheet.create({
     gap: 6,
   },
   exportText: {
-    ...Typography.body2,
+    fontSize: Typography.fontSize.sm,
     color: Colors.primary,
     fontWeight: '700',
   },

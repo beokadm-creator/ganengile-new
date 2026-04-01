@@ -12,6 +12,7 @@ import { RouteProp, useRoute } from '@react-navigation/native';
 import { collection, doc, getDoc, getDocs, query, where } from 'firebase/firestore';
 import { db } from '../../services/firebase';
 import type { MainStackParamList } from '../../types/navigation';
+import { Colors, Spacing, Typography, BorderRadius } from '../../theme';
 
 type DisputeResolutionRoute = RouteProp<MainStackParamList, 'DisputeResolution'>;
 type DisputeType = 'damage' | 'loss' | 'delay' | 'other' | 'quality';
@@ -133,24 +134,24 @@ function getUrgencyLabel(urgency: DisputeUrgency): string {
 function getUrgencyColor(urgency: DisputeUrgency): string {
   switch (urgency) {
     case 'normal':
-      return '#475569';
+      return Colors.textSecondary;
     case 'urgent':
-      return '#D97706';
+      return Colors.warning;
     case 'critical':
-      return '#DC2626';
+      return Colors.error;
   }
 }
 
 function getStatusMeta(status: DisputeStatus): { label: string; color: string } {
   switch (status) {
     case 'pending':
-      return { label: '접수 대기', color: '#D97706' };
+      return { label: '접수 대기', color: Colors.warning };
     case 'investigating':
-      return { label: '조사 중', color: '#2563EB' };
+      return { label: '조사 중', color: Colors.primary };
     case 'resolved':
-      return { label: '해결 완료', color: '#16A34A' };
+      return { label: '해결 완료', color: Colors.success };
     case 'rejected':
-      return { label: '반려', color: '#64748B' };
+      return { label: '반려', color: Colors.textSecondary };
   }
 }
 
@@ -269,7 +270,7 @@ export default function DisputeResolutionScreen() {
   if (loading) {
     return (
       <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color="#2563EB" />
+        <ActivityIndicator size="large" color={Colors.primary} />
         <Text style={styles.loadingText}>분쟁 처리 정보를 확인하고 있습니다.</Text>
       </View>
     );
@@ -291,7 +292,7 @@ export default function DisputeResolutionScreen() {
       <View style={styles.heroCard}>
         <View style={styles.heroRow}>
           <View style={styles.iconBadge}>
-            <Ionicons name={getTypeIcon(dispute.type)} size={22} color="#1D4ED8" />
+            <Ionicons name={getTypeIcon(dispute.type)} size={22} color={Colors.primary} />
           </View>
           <View style={styles.heroText}>
             <Text style={styles.title}>{getTypeLabel(dispute.type)} 분쟁</Text>
@@ -371,55 +372,50 @@ export default function DisputeResolutionScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F8FAFC',
+    backgroundColor: Colors.background,
   },
   content: {
-    padding: 20,
-    gap: 16,
+    padding: Spacing.xl,
+    gap: Spacing.lg,
   },
   loadingContainer: {
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 12,
-    backgroundColor: '#F8FAFC',
+    gap: Spacing.md,
+    backgroundColor: Colors.background,
   },
   loadingText: {
-    fontSize: 15,
-    color: '#64748B',
+    fontSize: Typography.fontSize.base,
+    color: Colors.textSecondary,
   },
   emptyContainer: {
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    padding: 24,
-    gap: 8,
-    backgroundColor: '#F8FAFC',
+    padding: Spacing['2xl'],
+    gap: Spacing.sm,
+    backgroundColor: Colors.background,
   },
   emptyTitle: {
-    fontSize: 18,
+    fontSize: Typography.fontSize.xl,
     fontWeight: '700',
-    color: '#0F172A',
+    color: Colors.textPrimary,
   },
   emptyDescription: {
-    fontSize: 14,
-    color: '#64748B',
+    fontSize: Typography.fontSize.base,
+    color: Colors.textSecondary,
     textAlign: 'center',
   },
   heroCard: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 24,
-    padding: 20,
-    gap: 16,
-    shadowColor: '#0F172A',
-    shadowOpacity: 0.08,
-    shadowRadius: 14,
-    shadowOffset: { width: 0, height: 6 },
-    elevation: 4,
+    backgroundColor: Colors.surface,
+    borderRadius: BorderRadius.xl,
+    padding: Spacing.xl,
+    gap: Spacing.lg,
   },
   heroRow: {
     flexDirection: 'row',
-    gap: 14,
+    gap: Spacing.md,
     alignItems: 'center',
   },
   iconBadge: {
@@ -428,74 +424,69 @@ const styles = StyleSheet.create({
     borderRadius: 24,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#DBEAFE',
+    backgroundColor: Colors.primaryMint,
   },
   heroText: {
     flex: 1,
-    gap: 4,
+    gap: Spacing.xs,
   },
   title: {
-    fontSize: 22,
+    fontSize: Typography.fontSize['2xl'],
     fontWeight: '800',
-    color: '#0F172A',
+    color: Colors.textPrimary,
   },
   subtitle: {
-    fontSize: 14,
-    color: '#64748B',
+    fontSize: Typography.fontSize.base,
+    color: Colors.textSecondary,
   },
   urgencyText: {
     fontWeight: '700',
   },
   statusBadge: {
     alignSelf: 'flex-start',
-    borderRadius: 999,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
+    borderRadius: BorderRadius.full,
+    paddingHorizontal: Spacing.md,
+    paddingVertical: Spacing.sm,
   },
   statusText: {
-    fontSize: 13,
+    fontSize: Typography.fontSize.sm,
     fontWeight: '700',
   },
   card: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 24,
-    padding: 20,
-    gap: 10,
-    shadowColor: '#0F172A',
-    shadowOpacity: 0.06,
-    shadowRadius: 10,
-    shadowOffset: { width: 0, height: 4 },
-    elevation: 3,
+    backgroundColor: Colors.surface,
+    borderRadius: BorderRadius.xl,
+    padding: Spacing.xl,
+    gap: Spacing.sm,
   },
   sectionTitle: {
-    fontSize: 18,
+    fontSize: Typography.fontSize.xl,
     fontWeight: '800',
-    color: '#0F172A',
+    color: Colors.textPrimary,
   },
   description: {
-    fontSize: 15,
+    fontSize: Typography.fontSize.base,
     lineHeight: 22,
-    color: '#1E293B',
+    color: Colors.textPrimary,
   },
   metaText: {
-    fontSize: 14,
+    fontSize: Typography.fontSize.base,
     lineHeight: 20,
-    color: '#64748B',
+    color: Colors.textSecondary,
   },
   historyItem: {
     borderWidth: 1,
-    borderColor: '#E2E8F0',
-    borderRadius: 16,
-    padding: 14,
-    gap: 6,
+    borderColor: Colors.border,
+    borderRadius: BorderRadius.lg,
+    padding: Spacing.md,
+    gap: Spacing.xs,
   },
   historyTitle: {
-    fontSize: 15,
+    fontSize: Typography.fontSize.base,
     fontWeight: '700',
-    color: '#0F172A',
+    color: Colors.textPrimary,
   },
   historyMeta: {
-    fontSize: 12,
-    color: '#94A3B8',
+    fontSize: Typography.fontSize.xs,
+    color: Colors.textSecondary,
   },
 });

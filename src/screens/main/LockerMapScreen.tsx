@@ -17,6 +17,7 @@ import { getAvailableLockers } from '../../services/locker-service';
 import type { Station } from '../../types/config';
 import type { Locker } from '../../types/locker';
 import type { MainStackNavigationProp } from '../../types/navigation';
+import { Colors, Spacing, Typography, BorderRadius } from '../../theme';
 
 type LockerMapItem = {
   locker: Locker;
@@ -116,7 +117,7 @@ export default function LockerMapScreen(): JSX.Element {
   if (loading) {
     return (
       <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color="#2563EB" />
+        <ActivityIndicator size="large" color={Colors.primary} />
         <Text style={styles.loadingText}>보관함 위치를 불러오고 있어요.</Text>
       </View>
     );
@@ -170,57 +171,57 @@ export default function LockerMapScreen(): JSX.Element {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F8FAFC',
+    backgroundColor: Colors.background,
   },
   content: {
-    gap: 16,
-    padding: 20,
+    gap: Spacing.lg,
+    padding: Spacing.xl,
   },
   loadingContainer: {
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#F8FAFC',
+    backgroundColor: Colors.background,
   },
   loadingText: {
-    marginTop: 12,
-    fontSize: 14,
-    color: '#64748B',
+    marginTop: Spacing.md,
+    fontSize: Typography.fontSize.base,
+    color: Colors.textSecondary,
   },
   hero: {
-    gap: 8,
+    gap: Spacing.sm,
   },
   title: {
-    fontSize: 28,
+    fontSize: Typography.fontSize['3xl'],
     fontWeight: '800',
-    color: '#0F172A',
+    color: Colors.textPrimary,
   },
   subtitle: {
-    fontSize: 15,
+    fontSize: Typography.fontSize.base,
     lineHeight: 22,
-    color: '#64748B',
+    color: Colors.textSecondary,
   },
   emptyCard: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 24,
-    gap: 8,
-    padding: 20,
+    backgroundColor: Colors.surface,
+    borderRadius: BorderRadius.xl,
+    gap: Spacing.sm,
+    padding: Spacing.xl,
   },
   emptyTitle: {
-    color: '#0F172A',
-    fontSize: 18,
+    color: Colors.textPrimary,
+    fontSize: Typography.fontSize.xl,
     fontWeight: '800',
   },
   emptyBody: {
-    color: '#64748B',
-    fontSize: 14,
+    color: Colors.textSecondary,
+    fontSize: Typography.fontSize.base,
     lineHeight: 20,
   },
   card: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 24,
-    gap: 8,
-    padding: 20,
+    backgroundColor: Colors.surface,
+    borderRadius: BorderRadius.xl,
+    gap: Spacing.sm,
+    padding: Spacing.xl,
   },
   cardHeader: {
     alignItems: 'center',
@@ -228,27 +229,27 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
   },
   cardTitle: {
-    fontSize: 18,
+    fontSize: Typography.fontSize.xl,
     fontWeight: '800',
-    color: '#0F172A',
+    color: Colors.textPrimary,
   },
   badge: {
-    borderRadius: 999,
-    backgroundColor: '#DBEAFE',
-    color: '#1D4ED8',
-    fontSize: 12,
+    borderRadius: BorderRadius.full,
+    backgroundColor: Colors.primaryMint,
+    color: Colors.primary,
+    fontSize: Typography.fontSize.xs,
     fontWeight: '700',
     overflow: 'hidden',
-    paddingHorizontal: 10,
-    paddingVertical: 6,
+    paddingHorizontal: Spacing.sm,
+    paddingVertical: Spacing.xs,
   },
   cardBody: {
-    color: '#334155',
-    fontSize: 14,
+    color: Colors.textPrimary,
+    fontSize: Typography.fontSize.base,
     lineHeight: 20,
   },
   cardMeta: {
-    color: '#64748B',
-    fontSize: 13,
+    color: Colors.textSecondary,
+    fontSize: Typography.fontSize.sm,
   },
 });

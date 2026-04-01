@@ -9,6 +9,8 @@ import {
   View,
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { Colors, Typography, Spacing, BorderRadius, Shadows } from '../../theme';
+
 import { signInWithEmailAndPassword } from 'firebase/auth';
 import { auth } from '../../services/firebase';
 import { handleGoogleSignIn } from '../../services/google-auth';
@@ -115,7 +117,7 @@ export default function LoginScreen({ navigation }: LoginScreenProps) {
           <TextInput
             style={styles.input}
             placeholder="이메일"
-            placeholderTextColor="#94A3B8"
+            placeholderTextcolor={Colors.textTertiary}
             value={email}
             onChangeText={setEmail}
             autoCapitalize="none"
@@ -124,7 +126,7 @@ export default function LoginScreen({ navigation }: LoginScreenProps) {
           <TextInput
             style={styles.input}
             placeholder="비밀번호"
-            placeholderTextColor="#94A3B8"
+            placeholderTextcolor={Colors.textTertiary}
             value={password}
             onChangeText={setPassword}
             secureTextEntry
@@ -136,7 +138,7 @@ export default function LoginScreen({ navigation }: LoginScreenProps) {
           </TouchableOpacity>
 
           <TouchableOpacity style={styles.primaryButton} onPress={() => void handleEmailLogin()} disabled={emailLoading}>
-            {emailLoading ? <ActivityIndicator color="#FFFFFF" /> : <Text style={styles.primaryButtonText}>이메일로 로그인</Text>}
+            {emailLoading ? <ActivityIndicator color=Colors.white /> : <Text style={styles.primaryButtonText}>이메일로 로그인</Text>}
           </TouchableOpacity>
 
           <TouchableOpacity style={styles.kakaoButton} onPress={() => void handleKakaoLoginPress()} disabled={kakaoLoading}>
@@ -144,7 +146,7 @@ export default function LoginScreen({ navigation }: LoginScreenProps) {
           </TouchableOpacity>
 
           <TouchableOpacity style={styles.secondaryButton} onPress={() => void handleGoogleLoginPress()} disabled={googleLoading}>
-            {googleLoading ? <ActivityIndicator color="#0F172A" /> : <Text style={styles.secondaryButtonText}>Google로 계속하기</Text>}
+            {googleLoading ? <ActivityIndicator color=Colors.textPrimary /> : <Text style={styles.secondaryButtonText}>Google로 계속하기</Text>}
           </TouchableOpacity>
         </View>
 
@@ -157,19 +159,19 @@ export default function LoginScreen({ navigation }: LoginScreenProps) {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#F8FAFC' },
+  container: { flex: 1, backgroundColor: Colors.background },
   content: { flex: 1, justifyContent: 'center', padding: 24 },
-  title: { color: '#0F172A', fontSize: 32, fontWeight: '800', textAlign: 'center', marginBottom: 12 },
-  subtitle: { color: '#64748B', fontSize: 15, lineHeight: 22, textAlign: 'center', marginBottom: 28 },
+  title: { color: Colors.textPrimary, fontSize: 32, fontWeight: '800', textAlign: 'center', marginBottom: 12 },
+  subtitle: { color: Colors.textSecondary, fontSize: 15, lineHeight: 22, textAlign: 'center', marginBottom: 28 },
   form: { gap: 12 },
   input: {
     minHeight: 54,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: Colors.surface,
     borderWidth: 1,
-    borderColor: '#E2E8F0',
+    borderColor: Colors.border,
     borderRadius: 16,
     paddingHorizontal: 16,
-    color: '#0F172A',
+    color: Colors.textPrimary,
   },
   inlineRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 4 },
   checkbox: {
@@ -177,39 +179,39 @@ const styles = StyleSheet.create({
     height: 22,
     borderRadius: 6,
     borderWidth: 1.5,
-    borderColor: '#CBD5E1',
+    borderColor: Colors.border,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#FFFFFF',
+    backgroundColor: Colors.surface,
   },
-  checkboxActive: { backgroundColor: '#0F766E', borderColor: '#0F766E' },
-  checkmark: { color: '#FFFFFF', fontWeight: '800' },
-  inlineLabel: { color: '#475569', fontSize: 14 },
+  checkboxActive: { backgroundColor: Colors.primary, borderColor: Colors.primary },
+  checkmark: { color: Colors.surface, fontWeight: '800' },
+  inlineLabel: { color: Colors.textSecondary, fontSize: 14 },
   primaryButton: {
     minHeight: 54,
     borderRadius: 16,
-    backgroundColor: '#0F172A',
+    backgroundColor: Colors.textPrimary,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  primaryButtonText: { color: '#FFFFFF', fontSize: 16, fontWeight: '800' },
+  primaryButtonText: { color: Colors.surface, fontSize: 16, fontWeight: '800' },
   kakaoButton: {
     minHeight: 54,
     borderRadius: 16,
-    backgroundColor: '#FEE500',
+    backgroundColor: Colors.warning,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  kakaoButtonText: { color: '#191600', fontSize: 16, fontWeight: '800' },
+  kakaoButtonText: { color: Colors.textPrimary, fontSize: 16, fontWeight: '800' },
   secondaryButton: {
     minHeight: 54,
     borderRadius: 16,
     borderWidth: 1,
-    borderColor: '#CBD5E1',
-    backgroundColor: '#FFFFFF',
+    borderColor: Colors.border,
+    backgroundColor: Colors.surface,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  secondaryButtonText: { color: '#0F172A', fontSize: 16, fontWeight: '700' },
-  footerLink: { color: '#0F766E', fontWeight: '700', textAlign: 'center', marginTop: 20 },
+  secondaryButtonText: { color: Colors.textPrimary, fontSize: 16, fontWeight: '700' },
+  footerLink: { color: Colors.primary, fontWeight: '700', textAlign: 'center', marginTop: 20 },
 });

@@ -281,7 +281,7 @@ export default function NewSignUpScreen({ navigation }: Props) {
                 <Text style={styles.switchTitle}>테스트 모드</Text>
                 <Text style={styles.switchBody}>지금은 테스트 모드로 이어가고, 실서비스 전에는 인증 설정만 바꾸면 됩니다.</Text>
               </View>
-              <Switch value={testMode} onValueChange={setTestMode} trackColor={{ false: '#CBD5E1', true: '#99F6E4' }} thumbColor={testMode ? '#0F766E' : '#FFFFFF'} />
+              <Switch value={testMode} onValueChange={setTestMode} trackColor={{ false: Colors.border, true: Colors.primaryMint }} thumbColor={testMode ? Colors.primary : Colors.surface} />
             </View>
           </View>
         ) : null}
@@ -311,7 +311,7 @@ export default function NewSignUpScreen({ navigation }: Props) {
           <Text style={styles.backButtonText}>이전</Text>
         </TouchableOpacity>
         <TouchableOpacity style={[styles.nextButton, loading && styles.nextButtonDisabled]} onPress={handleNext} disabled={loading}>
-          {loading ? <ActivityIndicator color="#FFFFFF" /> : <Text style={styles.nextButtonText}>{step === 3 ? '가입 완료' : '다음'}</Text>}
+          {loading ? <ActivityIndicator color=Colors.white /> : <Text style={styles.nextButtonText}>{step === 3 ? '가입 완료' : '다음'}</Text>}
         </TouchableOpacity>
       </View>
     </KeyboardAvoidingView>
@@ -322,7 +322,7 @@ function Field({ label, ...props }: React.ComponentProps<typeof TextInput> & { l
   return (
     <View style={styles.fieldWrap}>
       <Text style={styles.fieldLabel}>{label}</Text>
-      <TextInput {...props} style={styles.input} placeholderTextColor="#94A3B8" />
+      <TextInput {...props} style={styles.input} placeholderTextcolor={Colors.textTertiary} />
     </View>
   );
 }
@@ -344,55 +344,55 @@ function AgreementRow({
         <Text style={styles.switchTitle}>{title}</Text>
         <Text style={styles.switchBody}>{required ? '필수' : '선택'}</Text>
       </View>
-      <Switch value={value} onValueChange={onValueChange} trackColor={{ false: '#CBD5E1', true: '#99F6E4' }} thumbColor={value ? '#0F766E' : '#FFFFFF'} />
+      <Switch value={value} onValueChange={onValueChange} trackColor={{ false: Colors.border, true: Colors.primaryMint }} thumbColor={value ? Colors.primary : Colors.surface} />
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#F8FAFC' },
+  container: { flex: 1, backgroundColor: Colors.background },
   content: { padding: 20, gap: 16, paddingBottom: 120 },
   header: { gap: 10 },
-  title: { color: '#0F172A', fontSize: 30, fontWeight: '800' },
-  subtitle: { color: '#64748B', lineHeight: 22 },
-  progressTrack: { height: 8, backgroundColor: '#E2E8F0', borderRadius: 999, overflow: 'hidden' },
-  progressFill: { height: '100%', backgroundColor: '#0F766E', borderRadius: 999 },
-  card: { backgroundColor: '#FFFFFF', borderRadius: 20, padding: 20, gap: 14 },
-  socialCard: { backgroundColor: '#FFFFFF', borderRadius: 20, padding: 20, gap: 12 },
-  sectionTitle: { color: '#0F172A', fontSize: 18, fontWeight: '800' },
+  title: { color: Colors.textPrimary, fontSize: 30, fontWeight: '800' },
+  subtitle: { color: Colors.textSecondary, lineHeight: 22 },
+  progressTrack: { height: 8, backgroundColor: Colors.border, borderRadius: 999, overflow: 'hidden' },
+  progressFill: { height: '100%', backgroundColor: Colors.primary, borderRadius: 999 },
+  card: { backgroundColor: Colors.surface, borderRadius: 20, padding: 20, gap: 14 },
+  socialCard: { backgroundColor: Colors.surface, borderRadius: 20, padding: 20, gap: 12 },
+  sectionTitle: { color: Colors.textPrimary, fontSize: 18, fontWeight: '800' },
   fieldWrap: { gap: 6 },
-  fieldLabel: { color: '#334155', fontWeight: '700' },
+  fieldLabel: { color: Colors.textPrimary, fontWeight: '700' },
   input: {
     minHeight: 52,
     borderRadius: 16,
-    backgroundColor: '#F8FAFC',
+    backgroundColor: Colors.background,
     borderWidth: 1,
-    borderColor: '#E2E8F0',
+    borderColor: Colors.border,
     paddingHorizontal: 16,
-    color: '#0F172A',
+    color: Colors.textPrimary,
   },
   switchRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12 },
   switchCopy: { flex: 1, gap: 4 },
-  switchTitle: { color: '#0F172A', fontWeight: '700' },
-  switchBody: { color: '#64748B', fontSize: 13, lineHeight: 19 },
+  switchTitle: { color: Colors.textPrimary, fontWeight: '700' },
+  switchBody: { color: Colors.textSecondary, fontSize: 13, lineHeight: 19 },
   kakaoButton: {
     minHeight: 52,
     borderRadius: 16,
-    backgroundColor: '#FEE500',
+    backgroundColor: Colors.warning,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  kakaoButtonText: { color: '#191600', fontWeight: '800', fontSize: 15 },
+  kakaoButtonText: { color: Colors.textPrimary, fontWeight: '800', fontSize: 15 },
   secondaryButton: {
     minHeight: 52,
     borderRadius: 16,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: Colors.surface,
     borderWidth: 1,
-    borderColor: '#E2E8F0',
+    borderColor: Colors.border,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  secondaryButtonText: { color: '#0F172A', fontWeight: '700', fontSize: 15 },
+  secondaryButtonText: { color: Colors.textPrimary, fontWeight: '700', fontSize: 15 },
   footer: {
     position: 'absolute',
     left: 20,
@@ -405,21 +405,21 @@ const styles = StyleSheet.create({
     flex: 1,
     minHeight: 54,
     borderRadius: 16,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: Colors.surface,
     borderWidth: 1,
-    borderColor: '#E2E8F0',
+    borderColor: Colors.border,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  backButtonText: { color: '#334155', fontWeight: '700' },
+  backButtonText: { color: Colors.textPrimary, fontWeight: '700' },
   nextButton: {
     flex: 1.4,
     minHeight: 54,
     borderRadius: 16,
-    backgroundColor: '#115E59',
+    backgroundColor: Colors.primary,
     alignItems: 'center',
     justifyContent: 'center',
   },
   nextButtonDisabled: { opacity: 0.7 },
-  nextButtonText: { color: '#FFFFFF', fontWeight: '800', fontSize: 15 },
+  nextButtonText: { color: Colors.surface, fontWeight: '800', fontSize: 15 },
 });

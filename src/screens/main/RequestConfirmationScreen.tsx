@@ -20,7 +20,7 @@ export default function RequestConfirmationScreen() {
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
         <View style={styles.heroCard}>
           <View style={styles.heroIcon}>
-            <MaterialIcons name="check-circle" size={56} color="#027A48" />
+            <MaterialIcons name="check-circle" size={56} color=Colors.success />
           </View>
           <Text style={styles.heroTitle}>요청이 접수됐습니다.</Text>
           <Text style={styles.heroBody}>매칭을 시작합니다.</Text>
@@ -108,7 +108,7 @@ const styles = StyleSheet.create({
     gap: Spacing.md,
   },
   heroCard: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: Colors.surface,
     borderRadius: BorderRadius.xl,
     padding: Spacing.xl,
     alignItems: 'center',
@@ -118,7 +118,7 @@ const styles = StyleSheet.create({
     width: 88,
     height: 88,
     borderRadius: 44,
-    backgroundColor: '#ECFDF3',
+    backgroundColor: Colors.successLight,
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: Spacing.md,
@@ -126,17 +126,17 @@ const styles = StyleSheet.create({
   heroTitle: {
     fontSize: 24,
     fontWeight: '800',
-    color: '#0F172A',
+    color: Colors.textPrimary,
     marginBottom: 8,
     textAlign: 'center',
   },
   heroBody: {
-    color: '#475569',
+    color: Colors.textSecondary,
     textAlign: 'center',
     ...Typography.body,
   },
   card: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: Colors.surface,
     borderRadius: BorderRadius.xl,
     padding: Spacing.lg,
     gap: Spacing.sm,
@@ -145,7 +145,7 @@ const styles = StyleSheet.create({
   cardTitle: {
     fontSize: 18,
     fontWeight: '800',
-    color: '#0F172A',
+    color: Colors.textPrimary,
   },
   stepList: {
     gap: Spacing.md,
@@ -156,10 +156,10 @@ const styles = StyleSheet.create({
   stepLabel: {
     fontSize: 14,
     fontWeight: '700',
-    color: '#115E59',
+    color: Colors.primary,
   },
   stepBody: {
-    color: '#475569',
+    color: Colors.textSecondary,
     ...Typography.bodySmall,
   },
   infoRow: {
@@ -168,20 +168,20 @@ const styles = StyleSheet.create({
     gap: Spacing.md,
   },
   infoLabel: {
-    color: '#64748B',
+    color: Colors.gray500,
     ...Typography.bodySmall,
   },
   infoValue: {
     flex: 1,
     textAlign: 'right',
-    color: '#0F172A',
+    color: Colors.textPrimary,
     ...Typography.bodySmall,
   },
   mono: {
     fontFamily: 'monospace',
   },
   noticeCard: {
-    backgroundColor: '#F8FAFC',
+    backgroundColor: Colors.gray50,
     borderRadius: BorderRadius.xl,
     padding: Spacing.lg,
     gap: 6,
@@ -189,48 +189,48 @@ const styles = StyleSheet.create({
   noticeTitle: {
     fontSize: 16,
     fontWeight: '700',
-    color: '#0F172A',
+    color: Colors.textPrimary,
   },
   noticeBody: {
-    color: '#475569',
+    color: Colors.textSecondary,
     ...Typography.bodySmall,
   },
   buttonGroup: {
     gap: Spacing.sm,
   },
   button: {
-    borderRadius: BorderRadius.xl,
+    borderRadius: BorderRadius.full,
     paddingHorizontal: Spacing.lg,
     paddingVertical: Spacing.md,
     alignItems: 'center',
     justifyContent: 'center',
   },
   primaryButton: {
-    backgroundColor: '#115E59',
+    backgroundColor: Colors.primary,
   },
   secondaryButton: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: Colors.surface,
     ...Shadows.sm,
   },
   ghostButton: {
     backgroundColor: 'transparent',
   },
   primaryButtonText: {
-    color: '#FFFFFF',
+    color: Colors.white,
     fontSize: 16,
     fontWeight: '800',
   },
   primaryButtonSubtext: {
     marginTop: 4,
-    color: '#CCFBF1',
+    color: Colors.primaryMint,
     fontSize: 12,
   },
   secondaryButtonText: {
-    color: '#0F172A',
+    color: Colors.textPrimary,
     ...Typography.bodyBold,
   },
   ghostButtonText: {
-    color: '#475569',
+    color: Colors.textSecondary,
     ...Typography.bodyBold,
   },
 });

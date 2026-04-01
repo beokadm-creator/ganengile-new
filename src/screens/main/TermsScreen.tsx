@@ -128,7 +128,7 @@ export default function TermsScreen({ navigation: _navigation }: Props) {
   if (loading) {
     return (
       <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color="#0f766e" />
+        <ActivityIndicator size="large" color=Colors.primary />
         <Text style={styles.loadingText}>정책 문서를 불러오는 중입니다.</Text>
       </View>
     );
@@ -215,21 +215,21 @@ export default function TermsScreen({ navigation: _navigation }: Props) {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f3f4f6',
+    backgroundColor: Colors.background,
   },
   loadingContainer: {
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#f3f4f6',
+    backgroundColor: Colors.background,
   },
   loadingText: {
     marginTop: 12,
-    color: '#64748b',
+    color: Colors.textSecondary,
     fontSize: 14,
   },
   header: {
-    backgroundColor: '#0f172a',
+    backgroundColor: Colors.textPrimary,
     paddingHorizontal: 20,
     paddingTop: 60,
     paddingBottom: 24,
@@ -237,7 +237,7 @@ const styles = StyleSheet.create({
     borderBottomRightRadius: 24,
   },
   headerKicker: {
-    color: '#67e8f9',
+    color: Colors.accent,
     fontSize: 11,
     fontWeight: '700',
     textTransform: 'uppercase',
@@ -245,13 +245,13 @@ const styles = StyleSheet.create({
   },
   headerTitle: {
     marginTop: 8,
-    color: '#ffffff',
+    color: Colors.surface,
     fontSize: 26,
     fontWeight: '700',
   },
   headerSubtitle: {
     marginTop: 8,
-    color: '#cbd5e1',
+    color: Colors.border,
     fontSize: 14,
     lineHeight: 20,
   },
@@ -269,30 +269,30 @@ const styles = StyleSheet.create({
     paddingBottom: 16,
   },
   sidebarItem: {
-    backgroundColor: '#ffffff',
+    backgroundColor: Colors.surface,
     borderRadius: 12,
     padding: 12,
     marginBottom: 8,
     borderWidth: 1,
-    borderColor: '#e2e8f0',
+    borderColor: Colors.border,
   },
   sidebarItemActive: {
-    backgroundColor: '#0f766e',
-    borderColor: '#0f766e',
+    backgroundColor: Colors.primary,
+    borderColor: Colors.primary,
   },
   sidebarItemText: {
     fontSize: 13,
-    color: '#475569',
+    color: Colors.textSecondary,
     fontWeight: '600',
   },
   sidebarItemTextActive: {
-    color: '#ffffff',
+    color: Colors.surface,
   },
   policyContent: {
     flex: 1,
   },
   policyCard: {
-    backgroundColor: '#ffffff',
+    backgroundColor: Colors.surface,
     borderRadius: 20,
     padding: 20,
     marginBottom: 16,
@@ -301,24 +301,24 @@ const styles = StyleSheet.create({
     marginBottom: 16,
     paddingBottom: 12,
     borderBottomWidth: 1,
-    borderBottomColor: '#e2e8f0',
+    borderBottomColor: Colors.border,
   },
   policyTitle: {
     fontSize: 22,
     fontWeight: '700',
-    color: '#0f172a',
+    color: Colors.textPrimary,
   },
   policyDate: {
     marginTop: 6,
     fontSize: 12,
-    color: '#64748b',
+    color: Colors.textSecondary,
   },
   policyBody: {
     paddingBottom: 12,
   },
   policyParagraph: {
     fontSize: 14,
-    color: '#334155',
+    color: Colors.textPrimary,
     lineHeight: 22,
     marginBottom: 8,
   },
@@ -327,7 +327,7 @@ const styles = StyleSheet.create({
     marginVertical: 4,
   },
   infoBox: {
-    backgroundColor: '#ecfeff',
+    backgroundColor: Colors.primaryMint,
     borderRadius: 16,
     padding: 16,
     marginBottom: 12,
@@ -335,12 +335,12 @@ const styles = StyleSheet.create({
   infoTitle: {
     fontSize: 14,
     fontWeight: '700',
-    color: '#155e75',
+    color: Colors.primary,
   },
   infoText: {
     marginTop: 6,
     fontSize: 13,
     lineHeight: 20,
-    color: '#155e75',
+    color: Colors.primary,
   },
 });

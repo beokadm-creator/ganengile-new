@@ -14,6 +14,7 @@ import { requireUserId } from '../../services/firebase';
 import { QRCodeService } from '../../services/qrcode-service';
 import type { Locker } from '../../types/locker';
 import type { MainStackNavigationProp, MainStackParamList } from '../../types/navigation';
+import { Colors, Spacing, Typography, BorderRadius } from '../../theme';
 
 type LockerSelectionRoute = RouteProp<MainStackParamList, 'LockerSelection'>;
 
@@ -101,7 +102,7 @@ export default function LockerSelectionScreen() {
   if (loading) {
     return (
       <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color="#2563EB" />
+        <ActivityIndicator size="large" color={Colors.primary} />
         <Text style={styles.loadingText}>역 사물함을 불러오고 있어요.</Text>
       </View>
     );
@@ -147,7 +148,7 @@ export default function LockerSelectionScreen() {
 
       <TouchableOpacity style={styles.primaryButton} onPress={() => void handleReserve()} disabled={reserving}>
         {reserving ? (
-          <ActivityIndicator size="small" color="#FFFFFF" />
+          <ActivityIndicator size="small" color={Colors.surface} />
         ) : (
           <Text style={styles.primaryButtonText}>선택한 사물함으로 예약</Text>
         )}
@@ -159,104 +160,104 @@ export default function LockerSelectionScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F8FAFC',
+    backgroundColor: Colors.background,
   },
   content: {
-    padding: 20,
-    gap: 16,
+    padding: Spacing.xl,
+    gap: Spacing.lg,
   },
   loadingContainer: {
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#F8FAFC',
+    backgroundColor: Colors.background,
   },
   loadingText: {
-    marginTop: 12,
-    fontSize: 14,
-    color: '#64748B',
+    marginTop: Spacing.md,
+    fontSize: Typography.fontSize.base,
+    color: Colors.textSecondary,
   },
   header: {
-    gap: 8,
+    gap: Spacing.sm,
   },
   title: {
-    fontSize: 28,
+    fontSize: Typography.fontSize['3xl'],
     fontWeight: '800',
-    color: '#0F172A',
+    color: Colors.textPrimary,
   },
   subtitle: {
-    fontSize: 15,
+    fontSize: Typography.fontSize.base,
     lineHeight: 22,
-    color: '#64748B',
+    color: Colors.textSecondary,
   },
   emptyCard: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 24,
-    padding: 20,
-    gap: 8,
+    backgroundColor: Colors.surface,
+    borderRadius: BorderRadius.xl,
+    padding: Spacing.xl,
+    gap: Spacing.sm,
   },
   emptyTitle: {
-    fontSize: 18,
+    fontSize: Typography.fontSize.xl,
     fontWeight: '800',
-    color: '#0F172A',
+    color: Colors.textPrimary,
   },
   emptyBody: {
-    fontSize: 14,
+    fontSize: Typography.fontSize.base,
     lineHeight: 20,
-    color: '#64748B',
+    color: Colors.textSecondary,
   },
   card: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 24,
-    padding: 20,
-    gap: 8,
+    backgroundColor: Colors.surface,
+    borderRadius: BorderRadius.xl,
+    padding: Spacing.xl,
+    gap: Spacing.sm,
     borderWidth: 1,
-    borderColor: '#E2E8F0',
+    borderColor: Colors.border,
   },
   cardActive: {
-    borderColor: '#2563EB',
-    backgroundColor: '#EFF6FF',
+    borderColor: Colors.primary,
+    backgroundColor: Colors.primaryMint,
   },
   cardHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    gap: 12,
+    gap: Spacing.md,
   },
   cardTitle: {
     flex: 1,
-    fontSize: 17,
+    fontSize: Typography.fontSize.lg,
     fontWeight: '800',
-    color: '#0F172A',
+    color: Colors.textPrimary,
   },
   badge: {
-    fontSize: 12,
+    fontSize: Typography.fontSize.xs,
     fontWeight: '700',
-    color: '#1D4ED8',
-    backgroundColor: '#DBEAFE',
-    borderRadius: 999,
-    paddingHorizontal: 10,
-    paddingVertical: 6,
+    color: Colors.primary,
+    backgroundColor: Colors.primaryMint,
+    borderRadius: BorderRadius.full,
+    paddingHorizontal: Spacing.sm,
+    paddingVertical: Spacing.xs,
     overflow: 'hidden',
   },
   cardBody: {
-    fontSize: 14,
-    color: '#334155',
+    fontSize: Typography.fontSize.base,
+    color: Colors.textPrimary,
   },
   cardMeta: {
-    fontSize: 13,
-    color: '#64748B',
+    fontSize: Typography.fontSize.sm,
+    color: Colors.textSecondary,
   },
   primaryButton: {
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 16,
-    borderRadius: 18,
-    backgroundColor: '#2563EB',
+    paddingVertical: Spacing.lg,
+    borderRadius: BorderRadius.lg,
+    backgroundColor: Colors.primary,
   },
   primaryButtonText: {
-    fontSize: 15,
+    fontSize: Typography.fontSize.base,
     fontWeight: '700',
-    color: '#FFFFFF',
+    color: Colors.surface,
   },
 });

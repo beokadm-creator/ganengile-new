@@ -203,7 +203,7 @@ export default function UnlockLockerScreen() {
       {step === 'photo' ? (
         <TouchableOpacity style={styles.primaryButton} onPress={() => void handleTakePhoto()} disabled={working}>
           {working ? (
-            <ActivityIndicator size="small" color="#FFFFFF" />
+            <ActivityIndicator size="small" color=Colors.white />
           ) : (
             <Text style={styles.primaryButtonText}>Capture pickup photo</Text>
           )}
@@ -213,7 +213,7 @@ export default function UnlockLockerScreen() {
       {step === 'complete' ? (
         <TouchableOpacity style={styles.primaryButton} onPress={() => void handleComplete()} disabled={working}>
           {working ? (
-            <ActivityIndicator size="small" color="#FFFFFF" />
+            <ActivityIndicator size="small" color=Colors.white />
           ) : (
             <Text style={styles.primaryButtonText}>Finish pickup</Text>
           )}
@@ -232,7 +232,7 @@ function StepRow({ active, done, label }: { active: boolean; done: boolean; labe
           done ? styles.stepDotDone : active ? styles.stepDotActive : styles.stepDotIdle,
         ]}
       >
-        {done ? <Ionicons name="checkmark" size={14} color="#FFFFFF" /> : null}
+        {done ? <Ionicons name="checkmark" size={14} color=Colors.white /> : null}
       </View>
       <Text style={styles.stepLabel}>{label}</Text>
     </View>
@@ -242,7 +242,7 @@ function StepRow({ active, done, label }: { active: boolean; done: boolean; labe
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F8FAFC',
+    backgroundColor: Colors.background,
   },
   content: {
     padding: 20,
@@ -252,12 +252,12 @@ const styles = StyleSheet.create({
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#F8FAFC',
+    backgroundColor: Colors.background,
   },
   loadingText: {
     marginTop: 12,
     fontSize: 14,
-    color: '#64748B',
+    color: Colors.textSecondary,
   },
   header: {
     gap: 8,
@@ -265,15 +265,15 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 28,
     fontWeight: '800',
-    color: '#0F172A',
+    color: Colors.textPrimary,
   },
   subtitle: {
     fontSize: 15,
     lineHeight: 22,
-    color: '#64748B',
+    color: Colors.textSecondary,
   },
   card: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: Colors.surface,
     borderRadius: BorderRadius.xl,
     padding: Spacing.lg,
     gap: 12,
@@ -281,11 +281,11 @@ const styles = StyleSheet.create({
   sectionTitle: {
     fontSize: Typography.fontSize.lg,
     fontWeight: '800',
-    color: '#0F172A',
+    color: Colors.textPrimary,
   },
   infoText: {
     fontSize: Typography.fontSize.sm,
-    color: '#334155',
+    color: Colors.textPrimary,
   },
   stepRow: {
     flexDirection: 'row',
@@ -300,17 +300,17 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   stepDotDone: {
-    backgroundColor: '#16A34A',
+    backgroundColor: Colors.success,
   },
   stepDotActive: {
-    backgroundColor: '#2563EB',
+    backgroundColor: Colors.primary,
   },
   stepDotIdle: {
-    backgroundColor: '#CBD5E1',
+    backgroundColor: Colors.border,
   },
   stepLabel: {
     fontSize: Typography.fontSize.sm,
-    color: '#0F172A',
+    color: Colors.textPrimary,
     fontWeight: '700',
   },
   primaryButton: {
@@ -318,11 +318,11 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     paddingVertical: 16,
     borderRadius: 18,
-    backgroundColor: '#2563EB',
+    backgroundColor: Colors.primary,
   },
   primaryButtonText: {
     fontSize: 15,
     fontWeight: '700',
-    color: '#FFFFFF',
+    color: Colors.surface,
   },
 });

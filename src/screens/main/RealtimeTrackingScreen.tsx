@@ -5,7 +5,7 @@ import { MaterialIcons } from '@expo/vector-icons';
 import { RouteProp, useNavigation, useRoute } from '@react-navigation/native';
 import AppTopBar from '../../components/common/AppTopBar';
 import { NaverMapCard } from '../../components/maps/NaverMapCard';
-import { BorderRadius, Shadows, Spacing, Typography } from '../../theme';
+import { BorderRadius, Colors, Shadows, Spacing, Typography } from '../../theme';
 import type { MainStackNavigationProp, MainStackParamList } from '../../types/navigation';
 
 type RealtimeTrackingRoute = RouteProp<MainStackParamList, 'RealtimeTracking'>;
@@ -62,7 +62,7 @@ export default function RealtimeTrackingScreen(): JSX.Element {
         <View style={styles.routeCard}>
           <View style={styles.routeHeader}>
             <Text style={styles.routeTitle}>{pickupStation.name}</Text>
-            <MaterialIcons name="east" size={20} color="#0F766E" />
+            <MaterialIcons name="east" size={20} color={Colors.primary} />
             <Text style={styles.routeTitle}>{dropoffStation.name}</Text>
           </View>
           <View style={styles.metricRow}>
@@ -92,7 +92,7 @@ export default function RealtimeTrackingScreen(): JSX.Element {
         </View>
 
         <TouchableOpacity style={styles.linkButton} onPress={() => navigation.navigate('DeliveryTracking', { requestId: deliveryId })}>
-          <MaterialIcons name="local-shipping" size={18} color="#115E59" />
+          <MaterialIcons name="local-shipping" size={18} color=Colors.primary />
           <Text style={styles.linkButtonText}>배송 상세 보기</Text>
         </TouchableOpacity>
       </ScrollView>
@@ -119,7 +119,7 @@ function TimelineRow({
   tone: 'done' | 'active' | 'pending';
 }) {
   const icon = tone === 'done' ? 'check-circle' : tone === 'active' ? 'radio-button-checked' : 'schedule';
-  const color = tone === 'done' ? '#027A48' : tone === 'active' ? '#0F766E' : '#98A2B3';
+  const color = tone === 'done' ? Colors.success : tone === 'active' ? Colors.primary : Colors.gray400;
 
   return (
     <View style={styles.timelineRow}>
@@ -144,37 +144,37 @@ function LocationRow({ label, value }: { label: string; value: string }) {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F8FAFC',
+    backgroundColor: Colors.background,
   },
   content: {
     padding: Spacing.lg,
     gap: Spacing.md,
   },
   heroCard: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: Colors.surface,
     borderRadius: BorderRadius.xl,
     padding: Spacing.lg,
     gap: 6,
     ...Shadows.sm,
   },
   heroKicker: {
-    color: '#0F766E',
+    color: Colors.primary,
     fontSize: 12,
     fontWeight: '700',
     letterSpacing: 1,
     textTransform: 'uppercase',
   },
   heroTitle: {
-    color: '#0F172A',
+    color: Colors.textPrimary,
     fontSize: 22,
     fontWeight: '800',
   },
   heroSubtitle: {
-    color: '#475569',
+    color: Colors.textSecondary,
     ...Typography.body,
   },
   routeCard: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: Colors.surface,
     borderRadius: BorderRadius.xl,
     padding: Spacing.lg,
     gap: Spacing.md,
@@ -187,7 +187,7 @@ const styles = StyleSheet.create({
     gap: Spacing.sm,
   },
   routeTitle: {
-    color: '#0F172A',
+    color: Colors.textPrimary,
     fontSize: 18,
     fontWeight: '700',
   },
@@ -197,36 +197,36 @@ const styles = StyleSheet.create({
     flexWrap: 'wrap',
   },
   metricPill: {
-    backgroundColor: '#F1F5F9',
+    backgroundColor: Colors.gray100,
     borderRadius: BorderRadius.lg,
     paddingHorizontal: Spacing.md,
     paddingVertical: Spacing.sm,
     gap: 4,
   },
   metricLabel: {
-    color: '#64748B',
+    color: Colors.gray500,
     fontSize: 11,
     fontWeight: '700',
   },
   metricValue: {
-    color: '#0F172A',
+    color: Colors.textPrimary,
     fontSize: 14,
     fontWeight: '800',
   },
   routeHint: {
-    color: '#475569',
+    color: Colors.textSecondary,
     ...Typography.bodySmall,
   },
   section: {
     gap: Spacing.sm,
   },
   sectionTitle: {
-    color: '#0F172A',
+    color: Colors.textPrimary,
     fontSize: 18,
     fontWeight: '800',
   },
   timelineCard: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: Colors.surface,
     borderRadius: BorderRadius.xl,
     padding: Spacing.lg,
     gap: Spacing.md,
@@ -242,15 +242,15 @@ const styles = StyleSheet.create({
     gap: 4,
   },
   timelineTitle: {
-    color: '#0F172A',
+    color: Colors.textPrimary,
     ...Typography.bodyBold,
   },
   timelineBody: {
-    color: '#475569',
+    color: Colors.textSecondary,
     ...Typography.bodySmall,
   },
   locationCard: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: Colors.surface,
     borderRadius: BorderRadius.xl,
     padding: Spacing.lg,
     gap: Spacing.sm,
@@ -262,19 +262,19 @@ const styles = StyleSheet.create({
     gap: Spacing.md,
   },
   locationLabel: {
-    color: '#64748B',
+    color: Colors.gray500,
     ...Typography.bodySmall,
   },
   locationValue: {
     flex: 1,
     textAlign: 'right',
-    color: '#0F172A',
+    color: Colors.textPrimary,
     ...Typography.bodySmall,
   },
   linkButton: {
     minHeight: 52,
-    borderRadius: BorderRadius.xl,
-    backgroundColor: '#FFFFFF',
+    borderRadius: BorderRadius.full,
+    backgroundColor: Colors.surface,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
@@ -282,7 +282,7 @@ const styles = StyleSheet.create({
     ...Shadows.sm,
   },
   linkButtonText: {
-    color: '#115E59',
+    color: Colors.primary,
     ...Typography.bodyBold,
   },
 });

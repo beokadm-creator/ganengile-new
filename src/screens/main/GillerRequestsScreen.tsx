@@ -10,7 +10,7 @@ import {
 import { MaterialIcons } from '@expo/vector-icons';
 import { useUser } from '../../contexts/UserContext';
 import { getBeta1HomeSnapshot, type Beta1HomeSnapshot } from '../../services/beta1-orchestration-service';
-import { BorderRadius, Shadows, Spacing, Typography } from '../../theme';
+import { BorderRadius, Colors, Shadows, Spacing, Typography } from '../../theme';
 
 type MissionCard = Beta1HomeSnapshot['missionCards'][number];
 
@@ -121,7 +121,7 @@ export default function GillerRequestsScreen() {
 function RuleRow({ text }: { text: string }) {
   return (
     <View style={styles.ruleRow}>
-      <MaterialIcons name="check-circle" size={18} color="#0F766E" />
+      <MaterialIcons name="check-circle" size={18} color={Colors.primary} />
       <Text style={styles.ruleText}>{text}</Text>
     </View>
   );
@@ -130,7 +130,7 @@ function RuleRow({ text }: { text: string }) {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F4F7F5',
+    backgroundColor: Colors.background,
   },
   content: {
     gap: Spacing.lg,
@@ -138,28 +138,28 @@ const styles = StyleSheet.create({
     paddingBottom: Spacing['4xl'],
   },
   hero: {
-    backgroundColor: '#E0F2FE',
+    backgroundColor: Colors.primaryMint,
     borderRadius: BorderRadius.xl,
     padding: Spacing.xl,
     ...Shadows.sm,
   },
   kicker: {
-    color: '#0369A1',
-    fontSize: 12,
+    color: Colors.primary,
+    fontSize: Typography.fontSize.sm,
     fontWeight: '800',
     letterSpacing: 1.2,
     marginBottom: 8,
     textTransform: 'uppercase',
   },
   title: {
-    color: '#0F172A',
+    color: Colors.textPrimary,
     fontSize: Typography.fontSize['2xl'],
     fontWeight: '800',
     marginBottom: 8,
     lineHeight: 32,
   },
   subtitle: {
-    color: '#475569',
+    color: Colors.textSecondary,
     fontSize: Typography.fontSize.sm,
     lineHeight: 21,
   },
@@ -167,15 +167,17 @@ const styles = StyleSheet.create({
     gap: Spacing.md,
   },
   sectionTitle: {
-    color: '#111827',
+    color: Colors.textPrimary,
     fontSize: Typography.fontSize.xl,
     fontWeight: '800',
   },
   missionCard: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: Colors.surface,
     borderRadius: BorderRadius.xl,
     gap: 8,
     padding: Spacing.lg,
+    borderLeftWidth: 4,
+    borderLeftColor: Colors.primary,
   },
   headerRow: {
     flexDirection: 'row',
@@ -183,66 +185,66 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
   },
   missionTitle: {
-    color: '#0F172A',
+    color: Colors.textPrimary,
     flex: 1,
     fontSize: Typography.fontSize.base,
     fontWeight: '700',
   },
   metaText: {
-    color: '#64748B',
+    color: Colors.textTertiary,
     fontSize: Typography.fontSize.sm,
   },
   rewardText: {
-    color: '#0F766E',
+    color: Colors.primary,
     fontSize: Typography.fontSize.lg,
     fontWeight: '800',
   },
   statusPill: {
     alignSelf: 'flex-start',
-    backgroundColor: '#DCFCE7',
-    borderRadius: 999,
+    backgroundColor: Colors.successLight,
+    borderRadius: BorderRadius.full,
     paddingHorizontal: 10,
     paddingVertical: 6,
   },
   statusPillText: {
-    color: '#15803D',
-    fontSize: 11,
+    color: Colors.successDark,
+    fontSize: Typography.fontSize.xs,
     fontWeight: '800',
   },
   strategyCard: {
-    backgroundColor: '#F8FAFC',
+    backgroundColor: Colors.gray50,
     borderRadius: BorderRadius.lg,
     padding: Spacing.md,
     gap: 4,
   },
   strategyTitle: {
-    color: '#0F172A',
+    color: Colors.textPrimary,
     fontSize: Typography.fontSize.sm,
     fontWeight: '800',
   },
   strategyBody: {
-    color: '#475569',
+    color: Colors.textSecondary,
     fontSize: Typography.fontSize.sm,
     lineHeight: 20,
   },
   emptyState: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: Colors.surface,
     borderRadius: BorderRadius.xl,
     padding: Spacing.xl,
   },
   emptyTitle: {
-    color: '#111827',
+    color: Colors.textPrimary,
     fontSize: Typography.fontSize.base,
     fontWeight: '700',
     marginBottom: 6,
   },
   emptySubtitle: {
-    color: '#64748B',
+    color: Colors.textTertiary,
     fontSize: Typography.fontSize.sm,
     lineHeight: 20,
   },
   ruleCard: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: Colors.surface,
     borderRadius: BorderRadius.xl,
     gap: 12,
     padding: Spacing.lg,
@@ -253,7 +255,7 @@ const styles = StyleSheet.create({
     gap: 10,
   },
   ruleText: {
-    color: '#475569',
+    color: Colors.textSecondary,
     flex: 1,
     fontSize: Typography.fontSize.sm,
     lineHeight: 20,

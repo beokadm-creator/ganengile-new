@@ -17,6 +17,7 @@ import { B2BDeliveryService } from '../../services/b2b-delivery-service';
 import { requireUserId } from '../../services/firebase';
 import type { Station } from '../../types/config';
 import type { B2BStackParamList } from '../../types/navigation';
+import { BorderRadius, Colors, Shadows, Spacing, Typography } from '../../theme';
 
 type NavigationProp = StackNavigationProp<B2BStackParamList, 'B2BRequest'>;
 type RequestType = 'immediate' | 'reserved';
@@ -186,7 +187,7 @@ export default function B2BRequestScreen({ navigation }: { navigation: Navigatio
       </View>
 
       <TouchableOpacity style={styles.submitButton} onPress={() => void handleSubmit()} disabled={loading}>
-        {loading ? <ActivityIndicator size="small" color="#FFFFFF" /> : <Text style={styles.submitButtonText}>요청 생성</Text>}
+        {loading ? <ActivityIndicator size="small" color=Colors.white /> : <Text style={styles.submitButtonText}>요청 생성</Text>}
       </TouchableOpacity>
 
       <OptimizedStationSelectModal
@@ -232,40 +233,40 @@ function ModeButton({ active, title, onPress }: { active: boolean; title: string
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#F8FAFC' },
-  content: { gap: 16, padding: 20 },
-  header: { gap: 8 },
-  title: { fontSize: 28, fontWeight: '800', color: '#0F172A' },
-  subtitle: { fontSize: 14, lineHeight: 21, color: '#64748B' },
-  card: { backgroundColor: '#FFFFFF', borderRadius: 24, padding: 20, gap: 12 },
-  sectionTitle: { fontSize: 18, fontWeight: '800', color: '#0F172A' },
+  container: { flex: 1, backgroundColor: Colors.background },
+  content: { gap: Spacing.lg, padding: Spacing.xl },
+  header: { gap: Spacing.sm },
+  title: { fontSize: Typography.fontSize['2xl'], fontWeight: '800', color: Colors.textPrimary },
+  subtitle: { fontSize: Typography.fontSize.sm, lineHeight: 21, color: Colors.textSecondary },
+  card: { backgroundColor: Colors.surface, borderRadius: BorderRadius.xl, padding: Spacing.xl, gap: Spacing.md, borderWidth: 1, borderColor: Colors.border, ...Shadows.sm },
+  sectionTitle: { fontSize: Typography.fontSize.lg, fontWeight: '800', color: Colors.textPrimary },
   selectorRow: {
     alignItems: 'center',
-    borderColor: '#E2E8F0',
-    borderRadius: 18,
+    borderColor: Colors.border,
+    borderRadius: BorderRadius.lg,
     borderWidth: 1,
     flexDirection: 'row',
     justifyContent: 'space-between',
-    paddingHorizontal: 16,
+    paddingHorizontal: Spacing.md,
     paddingVertical: 14,
   },
-  selectorLabel: { fontSize: 14, fontWeight: '700', color: '#334155' },
-  selectorValue: { fontSize: 14, color: '#0F172A' },
-  toggleRow: { flexDirection: 'row', gap: 12 },
-  modeButton: { alignItems: 'center', backgroundColor: '#E2E8F0', borderRadius: 16, flex: 1, paddingVertical: 14 },
-  modeButtonActive: { backgroundColor: '#2563EB' },
-  modeButtonText: { fontSize: 14, fontWeight: '700', color: '#475569' },
-  modeButtonTextActive: { color: '#FFFFFF' },
+  selectorLabel: { fontSize: Typography.fontSize.sm, fontWeight: '700', color: Colors.textSecondary },
+  selectorValue: { fontSize: Typography.fontSize.sm, color: Colors.textPrimary, fontWeight: '500' },
+  toggleRow: { flexDirection: 'row', gap: Spacing.sm },
+  modeButton: { alignItems: 'center', backgroundColor: Colors.gray100, borderRadius: BorderRadius.lg, flex: 1, paddingVertical: 14 },
+  modeButtonActive: { backgroundColor: Colors.primary },
+  modeButtonText: { fontSize: Typography.fontSize.sm, fontWeight: '700', color: Colors.textSecondary },
+  modeButtonTextActive: { color: Colors.white },
   input: {
-    borderColor: '#E2E8F0',
-    borderRadius: 18,
+    borderColor: Colors.border,
+    borderRadius: BorderRadius.lg,
     borderWidth: 1,
-    color: '#0F172A',
-    fontSize: 15,
-    paddingHorizontal: 16,
+    color: Colors.textPrimary,
+    fontSize: Typography.fontSize.sm,
+    paddingHorizontal: Spacing.md,
     paddingVertical: 14,
   },
   multilineInput: { minHeight: 100, textAlignVertical: 'top' },
-  submitButton: { alignItems: 'center', backgroundColor: '#0F172A', borderRadius: 24, justifyContent: 'center', minHeight: 56 },
-  submitButtonText: { fontSize: 16, fontWeight: '800', color: '#FFFFFF' },
+  submitButton: { alignItems: 'center', backgroundColor: Colors.primary, borderRadius: BorderRadius.full, justifyContent: 'center', minHeight: 56 },
+  submitButtonText: { fontSize: Typography.fontSize.base, fontWeight: '800', color: Colors.white },
 });

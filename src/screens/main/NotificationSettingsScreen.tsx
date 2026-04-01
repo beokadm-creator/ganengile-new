@@ -17,6 +17,7 @@ import type { MainStackNavigationProp } from '../../types/navigation';
 import { createNotificationService } from '../../services/notification-service';
 import { NotificationType } from '../../types/chat';
 import type { NotificationSettings } from '../../types/chat';
+import { Colors, Spacing, Typography, BorderRadius } from '../../theme';
 
 type Props = {
   navigation: MainStackNavigationProp;
@@ -106,7 +107,7 @@ export default function NotificationSettingsScreen({ navigation: _navigation }: 
   if (loading) {
     return (
       <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color="#4CAF50" />
+        <ActivityIndicator size="large" color={Colors.primary} />
       </View>
     );
   }
@@ -124,8 +125,8 @@ export default function NotificationSettingsScreen({ navigation: _navigation }: 
           <Switch
             value={settings?.enabled ?? false}
             onValueChange={handleToggleEnabled}
-            trackColor={{ false: '#e0e0e0', true: '#4CAF50' }}
-            thumbColor="#fff"
+            trackColor={{ false: Colors.border, true: Colors.primaryLight }}
+            thumbColor={Colors.surface}
           />
         </View>
       </View>
@@ -148,8 +149,8 @@ export default function NotificationSettingsScreen({ navigation: _navigation }: 
                 <Switch
                   value={settings?.settings[type] ?? false}
                   onValueChange={() => handleToggleType(type)}
-                  trackColor={{ false: '#e0e0e0', true: '#4CAF50' }}
-                  thumbColor="#fff"
+                  trackColor={{ false: Colors.border, true: Colors.primaryLight }}
+                  thumbColor={Colors.surface}
                 />
               </View>
             ))}
@@ -168,8 +169,8 @@ export default function NotificationSettingsScreen({ navigation: _navigation }: 
               <Switch
                 value={settings?.quietHours?.enabled ?? false}
                 onValueChange={handleToggleQuietHours}
-                trackColor={{ false: '#e0e0e0', true: '#4CAF50' }}
-                thumbColor="#fff"
+                trackColor={{ false: Colors.border, true: Colors.primaryLight }}
+                thumbColor={Colors.surface}
               />
             </View>
 
@@ -209,7 +210,7 @@ export default function NotificationSettingsScreen({ navigation: _navigation }: 
 
 const styles = StyleSheet.create({
   container: {
-    backgroundColor: '#f5f5f5',
+    backgroundColor: Colors.background,
     flex: 1,
   },
   loadingContainer: {
@@ -218,59 +219,59 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   section: {
-    backgroundColor: '#fff',
-    marginTop: 16,
-    paddingHorizontal: 16,
-    paddingVertical: 8,
+    backgroundColor: Colors.surface,
+    marginTop: Spacing.lg,
+    paddingHorizontal: Spacing.lg,
+    paddingVertical: Spacing.sm,
   },
   sectionTitle: {
-    color: '#666',
-    fontSize: 14,
-    fontWeight: 'bold',
-    marginBottom: 8,
-    marginTop: 8,
+    color: Colors.textSecondary,
+    fontSize: Typography.fontSize.base,
+    fontWeight: '700',
+    marginBottom: Spacing.sm,
+    marginTop: Spacing.sm,
   },
   settingDescription: {
-    color: '#666',
-    fontSize: 13,
+    color: Colors.textSecondary,
+    fontSize: Typography.fontSize.sm,
     lineHeight: 18,
   },
   settingInfo: {
     flex: 1,
-    marginRight: 16,
+    marginRight: Spacing.lg,
   },
   settingItem: {
     alignItems: 'center',
-    borderBottomColor: '#f0f0f0',
+    borderBottomColor: Colors.border,
     borderBottomWidth: 1,
     flexDirection: 'row',
     justifyContent: 'space-between',
-    paddingVertical: 12,
+    paddingVertical: Spacing.md,
   },
   settingTitle: {
-    color: '#333',
-    fontSize: 16,
+    color: Colors.textPrimary,
+    fontSize: Typography.fontSize.lg,
     fontWeight: '500',
-    marginBottom: 4,
+    marginBottom: Spacing.xs,
   },
   timeButton: {
     alignItems: 'center',
   },
   timeLabel: {
-    color: '#666',
-    fontSize: 13,
-    marginBottom: 8,
+    color: Colors.textSecondary,
+    fontSize: Typography.fontSize.sm,
+    marginBottom: Spacing.sm,
   },
   timePickerContainer: {
-    borderTopColor: '#f0f0f0',
+    borderTopColor: Colors.border,
     borderTopWidth: 1,
     flexDirection: 'row',
     justifyContent: 'space-around',
-    paddingVertical: 16,
+    paddingVertical: Spacing.lg,
   },
   timeValue: {
-    color: '#4CAF50',
-    fontSize: 24,
-    fontWeight: 'bold',
+    color: Colors.primary,
+    fontSize: Typography.fontSize['3xl'],
+    fontWeight: '700',
   },
 });

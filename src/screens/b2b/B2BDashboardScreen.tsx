@@ -1,9 +1,10 @@
-﻿import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import type { StackNavigationProp } from '@react-navigation/stack';
 import { NaverMapCard } from '../../components/maps/NaverMapCard';
 import { auth } from '../../services/firebase';
 import { b2bFirestoreService, type MonthlyStats, type Settlement, type TaxInvoice } from '../../services/b2b-firestore-service';
+import { BorderRadius, Colors, Shadows, Spacing, Typography } from '../../theme';
 import type { B2BStackParamList } from '../../types/navigation';
 
 type NavigationProp = StackNavigationProp<B2BStackParamList, 'B2BDashboard'>;
@@ -11,7 +12,7 @@ type Props = { navigation: NavigationProp };
 type RecentDeliveryMap = { id: string; pickup?: { latitude?: number; longitude?: number; station?: string }; dropoff?: { latitude?: number; longitude?: number; station?: string } };
 
 function formatCurrency(amount: number): string { return `${amount.toLocaleString('ko-KR')}원`; }
-function getStatusColor(status: string): string { switch (status) { case 'issued': case 'pending': return '#D97706'; case 'paid': case 'completed': return '#16A34A'; case 'overdue': return '#DC2626'; default: return '#64748B'; } }
+function getStatusColor(status: string): string { switch (status) { case 'issued': case 'pending': return Colors.warning; case 'paid': case 'completed': return Colors.success; case 'overdue': return Colors.error; default: return Colors.textSecondary; } }
 function getStatusText(status: string): string { switch (status) { case 'issued': return '발행 완료'; case 'paid': return '지급 완료'; case 'pending': return '검토 대기'; case 'completed': return '정산 완료'; case 'overdue': return '추가 확인'; default: return '상태 확인'; } }
 
 export default function B2BDashboardScreen({ navigation }: Props) {
@@ -57,7 +58,7 @@ export default function B2BDashboardScreen({ navigation }: Props) {
   }), [recentDeliveries]);
   const mapCenter = mapMarkers[0] ?? { latitude: 37.5665, longitude: 126.978, label: 'Seoul' };
 
-  if (loading) return <View style={styles.loadingContainer}><ActivityIndicator size="large" color="#2563EB" /></View>;
+  if (loading) return <View style={styles.loadingContainer}><ActivityIndicator size="large" color=Colors.primary /></View>;
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
@@ -77,5 +78,36 @@ function StatCard({ label, value }: { label: string; value: string }) { return <
 function ActionButton({ title, subtitle, onPress }: { title: string; subtitle: string; onPress: () => void }) { return <TouchableOpacity style={styles.actionCard} onPress={onPress}><Text style={styles.actionTitle}>{title}</Text><Text style={styles.actionSubtitle}>{subtitle}</Text></TouchableOpacity>; }
 function EmptyText({ text }: { text: string }) { return <Text style={styles.emptyText}>{text}</Text>; }
 
-const styles = StyleSheet.create({ container: { flex: 1, backgroundColor: '#F8FAFC' }, content: { gap: 16, padding: 20 }, loadingContainer: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: '#F8FAFC' }, hero: { backgroundColor: '#FFFFFF', borderRadius: 20, padding: 20, gap: 6 }, kicker: { color: '#0F766E', fontSize: 12, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 1 }, title: { color: '#0F172A', fontSize: 28, fontWeight: '800' }, subtitle: { color: '#475569', lineHeight: 22 }, noticeCard: { backgroundColor: '#FEF3C7', borderRadius: 20, borderWidth: 1, borderColor: '#FDE68A', padding: 16, gap: 4 }, noticeTitle: { color: '#92400E', fontWeight: '800' }, noticeBody: { color: '#78350F', lineHeight: 20 }, card: { backgroundColor: '#FFFFFF', borderRadius: 20, padding: 20, gap: 12 }, sectionHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }, sectionTitle: { color: '#0F172A', fontSize: 18, fontWeight: '800' }, sectionMeta: { color: '#64748B' }, statsRow: { flexDirection: 'row', gap: 10 }, statCard: { flex: 1, backgroundColor: '#F8FAFC', borderRadius: 16, padding: 14, gap: 6 }, statLabel: { color: '#64748B', fontSize: 12 }, statValue: { color: '#0F172A', fontWeight: '800' }, actionsRow: { flexDirection: 'row', gap: 12 }, actionCard: { flex: 1, backgroundColor: '#FFFFFF', borderRadius: 20, padding: 18, gap: 6 }, actionTitle: { color: '#0F172A', fontWeight: '800' }, actionSubtitle: { color: '#64748B', fontSize: 13, lineHeight: 19 }, linkText: { color: '#0F766E', fontWeight: '700' }, listItem: { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: '#E2E8F0', paddingTop: 12, gap: 4 }, listRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }, listTitle: { color: '#0F172A', fontWeight: '700' }, listMeta: { color: '#64748B', fontSize: 13 }, listAmount: { color: '#111827', fontWeight: '800' }, statusText: { fontWeight: '700' }, emptyText: { color: '#94A3B8' } });
+const styles = StyleSheet.create({
+  container: { flex: 1, backgroundColor: Colors.background },
+  content: { gap: Spacing.lg, padding: Spacing.xl },
+  loadingContainer: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: Colors.background },
+  hero: { backgroundColor: Colors.primaryMint, borderRadius: BorderRadius.xl, padding: Spacing.xl, gap: Spacing.sm, ...Shadows.sm },
+  kicker: { color: Colors.primary, fontSize: Typography.fontSize.xs, fontWeight: '800', textTransform: 'uppercase', letterSpacing: 1 },
+  title: { color: Colors.textPrimary, fontSize: Typography.fontSize['2xl'], fontWeight: '800', lineHeight: 32 },
+  subtitle: { color: Colors.textSecondary, fontSize: Typography.fontSize.sm, lineHeight: 22 },
+  noticeCard: { backgroundColor: Colors.warningLight, borderRadius: BorderRadius.xl, borderWidth: 1, borderColor: Colors.warning, padding: Spacing.lg, gap: 4 },
+  noticeTitle: { color: Colors.warningDark, fontWeight: '800' },
+  noticeBody: { color: Colors.warningDark, lineHeight: 20 },
+  card: { backgroundColor: Colors.surface, borderRadius: BorderRadius.xl, padding: Spacing.xl, gap: Spacing.md, borderWidth: 1, borderColor: Colors.border },
+  sectionHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  sectionTitle: { color: Colors.textPrimary, fontSize: Typography.fontSize.lg, fontWeight: '800' },
+  sectionMeta: { color: Colors.textSecondary },
+  statsRow: { flexDirection: 'row', gap: Spacing.sm },
+  statCard: { flex: 1, backgroundColor: Colors.background, borderRadius: BorderRadius.lg, padding: Spacing.md, gap: 6 },
+  statLabel: { color: Colors.textSecondary, fontSize: Typography.fontSize.xs },
+  statValue: { color: Colors.textPrimary, fontWeight: '800' },
+  actionsRow: { flexDirection: 'row', gap: Spacing.sm },
+  actionCard: { flex: 1, backgroundColor: Colors.surface, borderRadius: BorderRadius.xl, padding: Spacing.lg, gap: 6, borderWidth: 1, borderColor: Colors.border },
+  actionTitle: { color: Colors.textPrimary, fontWeight: '800' },
+  actionSubtitle: { color: Colors.textSecondary, fontSize: Typography.fontSize.sm, lineHeight: 19 },
+  linkText: { color: Colors.primary, fontWeight: '700' },
+  listItem: { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: Colors.border, paddingTop: Spacing.sm, gap: 4 },
+  listRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  listTitle: { color: Colors.textPrimary, fontWeight: '700' },
+  listMeta: { color: Colors.textSecondary, fontSize: Typography.fontSize.sm },
+  listAmount: { color: Colors.textPrimary, fontWeight: '800' },
+  statusText: { fontWeight: '700' },
+  emptyText: { color: Colors.textTertiary, fontSize: Typography.fontSize.sm },
+});
 

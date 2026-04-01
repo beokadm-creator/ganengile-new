@@ -6,7 +6,7 @@ import {
   getBeta1HomeSnapshot,
   type Beta1HomeSnapshot,
 } from '../../services/beta1-orchestration-service';
-import { BorderRadius, Shadows, Spacing, Typography } from '../../theme';
+import { BorderRadius, Colors, Shadows, Spacing, Typography } from '../../theme';
 import type { MainStackNavigationProp } from '../../types/navigation';
 import { UserRole } from '../../types/user';
 
@@ -77,7 +77,7 @@ export default function HomeScreen({ navigation }: { navigation: MainStackNaviga
               style={styles.roleChip}
               onPress={() => switchRole(role === 'requester' ? UserRole.GILLER : UserRole.GLER)}
             >
-              <MaterialIcons name="swap-horiz" size={18} color="#0F172A" />
+              <MaterialIcons name="swap-horiz" size={18} color=Colors.textPrimary />
               <Text style={styles.roleChipText}>{role === 'requester' ? '길러 모드' : '요청자 모드'}</Text>
             </TouchableOpacity>
           ) : null}
@@ -143,7 +143,7 @@ export default function HomeScreen({ navigation }: { navigation: MainStackNaviga
         <View style={styles.panel}>
           {(snapshot?.recommendations ?? []).map((item) => (
             <View key={item} style={styles.recommendationRow}>
-              <MaterialIcons name="auto-awesome" size={18} color="#0F766E" />
+              <MaterialIcons name="auto-awesome" size={18} color={Colors.primary} />
               <Text style={styles.recommendationText}>{item}</Text>
             </View>
           ))}
@@ -243,7 +243,7 @@ function ActionCard({
   return (
     <TouchableOpacity style={styles.actionCard} onPress={onPress} activeOpacity={0.88}>
       <View style={styles.actionIconWrap}>
-        <MaterialIcons name={icon} size={22} color="#115E59" />
+        <MaterialIcons name={icon} size={22} color={Colors.primaryDark} />
       </View>
       <Text style={styles.actionTitle}>{title}</Text>
       <Text style={styles.actionSubtitle}>{subtitle}</Text>
@@ -295,7 +295,7 @@ function WalletRow({ label, value, strong }: { label: string; value: number; str
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F4F7F5',
+    backgroundColor: Colors.background,
   },
   content: {
     gap: Spacing.xl,
@@ -306,15 +306,15 @@ const styles = StyleSheet.create({
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#F4F7F5',
+    backgroundColor: Colors.background,
   },
   emptyTitle: {
-    color: '#111827',
+    color: Colors.textPrimary,
     fontSize: Typography.fontSize.base,
     fontWeight: '700',
   },
   hero: {
-    backgroundColor: '#D7F2EC',
+    backgroundColor: Colors.primaryMint,
     borderRadius: BorderRadius.xl,
     padding: Spacing.xl,
     ...Shadows.md,
@@ -329,21 +329,21 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   heroKicker: {
-    color: '#0F766E',
-    fontSize: 12,
+    color: Colors.primary,
+    fontSize: Typography.fontSize.sm,
     fontWeight: '700',
     letterSpacing: 1.2,
     marginBottom: Spacing.xs,
     textTransform: 'uppercase',
   },
   heroTitle: {
-    color: '#0F172A',
+    color: Colors.textPrimary,
     fontSize: Typography.fontSize['3xl'],
     fontWeight: '800',
     marginBottom: Spacing.xs,
   },
   heroSubtitle: {
-    color: '#334155',
+    color: Colors.gray700,
     fontSize: Typography.fontSize.base,
     lineHeight: 22,
     maxWidth: 280,
@@ -351,16 +351,16 @@ const styles = StyleSheet.create({
   roleChip: {
     alignItems: 'center',
     alignSelf: 'flex-start',
-    backgroundColor: '#FFFFFF',
-    borderRadius: 999,
+    backgroundColor: Colors.surface,
+    borderRadius: BorderRadius.full,
     flexDirection: 'row',
     gap: 6,
     paddingHorizontal: 12,
     paddingVertical: 10,
   },
   roleChipText: {
-    color: '#0F172A',
-    fontSize: 13,
+    color: Colors.textPrimary,
+    fontSize: Typography.fontSize.sm,
     fontWeight: '700',
   },
   metricRow: {
@@ -369,41 +369,41 @@ const styles = StyleSheet.create({
     marginBottom: Spacing.md,
   },
   metricCard: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: Colors.surface,
     borderRadius: BorderRadius.lg,
     flex: 1,
     padding: Spacing.md,
   },
   metricLabel: {
-    color: '#64748B',
-    fontSize: 12,
+    color: Colors.textTertiary,
+    fontSize: Typography.fontSize.sm,
     marginBottom: 6,
   },
   metricValue: {
-    color: '#0F172A',
-    fontSize: 22,
+    color: Colors.textPrimary,
+    fontSize: Typography.fontSize['2xl'],
     fontWeight: '800',
   },
   strategyPanel: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: Colors.surface,
     borderRadius: BorderRadius.xl,
     padding: Spacing.lg,
     gap: 6,
   },
   strategyKicker: {
-    color: '#0F766E',
-    fontSize: 12,
+    color: Colors.primary,
+    fontSize: Typography.fontSize.sm,
     fontWeight: '700',
     textTransform: 'uppercase',
   },
   strategyTitle: {
-    color: '#0F172A',
+    color: Colors.textPrimary,
     fontSize: Typography.fontSize.lg,
     fontWeight: '800',
     lineHeight: 24,
   },
   strategyBody: {
-    color: '#475569',
+    color: Colors.textSecondary,
     fontSize: Typography.fontSize.sm,
     lineHeight: 21,
   },
@@ -411,7 +411,7 @@ const styles = StyleSheet.create({
     gap: Spacing.md,
   },
   sectionTitle: {
-    color: '#0F172A',
+    color: Colors.textPrimary,
     fontSize: Typography.fontSize.xl,
     fontWeight: '800',
   },
@@ -419,14 +419,14 @@ const styles = StyleSheet.create({
     gap: Spacing.md,
   },
   actionCard: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: Colors.surface,
     borderRadius: BorderRadius.xl,
     padding: Spacing.lg,
     ...Shadows.sm,
   },
   actionIconWrap: {
     alignItems: 'center',
-    backgroundColor: '#DCFCE7',
+    backgroundColor: Colors.secondaryLight,
     borderRadius: 14,
     height: 42,
     justifyContent: 'center',
@@ -434,18 +434,18 @@ const styles = StyleSheet.create({
     width: 42,
   },
   actionTitle: {
-    color: '#0F172A',
+    color: Colors.textPrimary,
     fontSize: Typography.fontSize.lg,
     fontWeight: '700',
     marginBottom: 4,
   },
   actionSubtitle: {
-    color: '#475569',
+    color: Colors.textSecondary,
     fontSize: Typography.fontSize.sm,
     lineHeight: 20,
   },
   panel: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: Colors.surface,
     borderRadius: BorderRadius.xl,
     gap: Spacing.sm,
     padding: Spacing.lg,
@@ -456,13 +456,13 @@ const styles = StyleSheet.create({
     gap: Spacing.sm,
   },
   recommendationText: {
-    color: '#334155',
+    color: Colors.gray700,
     flex: 1,
     fontSize: Typography.fontSize.sm,
     lineHeight: 20,
   },
   boardCard: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: Colors.surface,
     borderRadius: BorderRadius.xl,
     gap: 8,
     padding: Spacing.lg,
@@ -479,91 +479,91 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   boardTitle: {
-    color: '#0F172A',
+    color: Colors.textPrimary,
     flex: 1,
     fontSize: Typography.fontSize.base,
     fontWeight: '700',
   },
   modeBadge: {
-    backgroundColor: '#E0E7FF',
-    borderRadius: 999,
+    backgroundColor: Colors.infoLight,
+    borderRadius: BorderRadius.full,
     paddingHorizontal: 10,
     paddingVertical: 6,
   },
   modeBadgeText: {
-    color: '#4338CA',
-    fontSize: 11,
+    color: Colors.infoDark,
+    fontSize: Typography.fontSize.xs,
     fontWeight: '800',
   },
   statusPill: {
-    borderRadius: 999,
+    borderRadius: BorderRadius.full,
     paddingHorizontal: 10,
     paddingVertical: 6,
   },
   requestPill: {
-    backgroundColor: '#ECFDF3',
+    backgroundColor: Colors.successLight,
   },
   missionPill: {
-    backgroundColor: '#EFF6FF',
+    backgroundColor: Colors.infoLight,
   },
   statusPillText: {
-    fontSize: 11,
+    fontSize: Typography.fontSize.xs,
     fontWeight: '800',
   },
   requestPillText: {
-    color: '#15803D',
+    color: Colors.successDark,
   },
   missionPillText: {
-    color: '#2563EB',
+    color: Colors.info,
   },
   boardBody: {
-    color: '#334155',
+    color: Colors.gray700,
     fontSize: Typography.fontSize.sm,
     lineHeight: 20,
   },
   boardMeta: {
-    color: '#64748B',
+    color: Colors.textTertiary,
     fontSize: Typography.fontSize.sm,
   },
   rewardText: {
-    color: '#0F766E',
+    color: Colors.primary,
     fontSize: Typography.fontSize.lg,
     fontWeight: '800',
   },
   strategyCard: {
-    backgroundColor: '#F8FAFC',
+    backgroundColor: Colors.gray50,
     borderRadius: BorderRadius.lg,
     padding: Spacing.md,
     gap: 4,
   },
   strategyCardTitle: {
-    color: '#0F172A',
+    color: Colors.textPrimary,
     fontSize: Typography.fontSize.sm,
     fontWeight: '800',
   },
   strategyCardBody: {
-    color: '#475569',
+    color: Colors.textSecondary,
     fontSize: Typography.fontSize.sm,
     lineHeight: 20,
   },
   emptyCard: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: Colors.surface,
     borderRadius: BorderRadius.xl,
     padding: Spacing.xl,
     gap: 6,
   },
   emptyCardTitle: {
-    color: '#111827',
+    color: Colors.textPrimary,
     fontSize: Typography.fontSize.base,
     fontWeight: '700',
   },
   emptyCardSubtitle: {
-    color: '#64748B',
+    color: Colors.textTertiary,
     fontSize: Typography.fontSize.sm,
     lineHeight: 20,
   },
   walletCard: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: Colors.surface,
     borderRadius: BorderRadius.xl,
     gap: Spacing.sm,
     padding: Spacing.xl,
@@ -574,24 +574,24 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   walletLabel: {
-    color: '#64748B',
+    color: Colors.textTertiary,
     fontSize: Typography.fontSize.sm,
   },
   walletLabelStrong: {
-    color: '#0F172A',
+    color: Colors.textPrimary,
     fontWeight: '700',
   },
   walletValue: {
-    color: '#111827',
+    color: Colors.textPrimary,
     fontSize: Typography.fontSize.base,
     fontWeight: '700',
   },
   walletValueStrong: {
-    color: '#0F766E',
+    color: Colors.primary,
   },
   walletDivider: {
     height: 1,
-    backgroundColor: '#E5E7EB',
+    backgroundColor: Colors.border,
     marginVertical: 4,
   },
 });

@@ -73,7 +73,7 @@ export default function MyRatingScreen() {
   if (loading) {
     return (
       <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color="#2563EB" />
+        <ActivityIndicator size="large" color=Colors.primary />
         <Text style={styles.loadingText}>평점 요약을 불러오고 있어요.</Text>
       </View>
     );
@@ -137,39 +137,39 @@ export default function MyRatingScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#F8FAFC' },
+  container: { flex: 1, backgroundColor: Colors.background },
   content: { padding: 20, gap: 16 },
   loadingContainer: {
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#F8FAFC',
+    backgroundColor: Colors.background,
   },
-  loadingText: { marginTop: 12, fontSize: 14, color: '#64748B' },
+  loadingText: { marginTop: 12, fontSize: 14, color: Colors.textSecondary },
   header: { gap: 8 },
-  title: { fontSize: 28, fontWeight: '800', color: '#0F172A' },
-  subtitle: { fontSize: 15, lineHeight: 22, color: '#64748B' },
-  card: { backgroundColor: '#FFFFFF', borderRadius: 24, padding: 20, gap: 12 },
-  score: { fontSize: 42, fontWeight: '800', color: '#0F172A' },
-  scoreMeta: { fontSize: 14, color: '#64748B' },
+  title: { fontSize: 28, fontWeight: '800', color: Colors.textPrimary },
+  subtitle: { fontSize: 15, lineHeight: 22, color: Colors.textSecondary },
+  card: { backgroundColor: Colors.surface, borderRadius: 24, padding: 20, gap: 12 },
+  score: { fontSize: 42, fontWeight: '800', color: Colors.textPrimary },
+  scoreMeta: { fontSize: 14, color: Colors.textSecondary },
   distributionRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
-  distributionLabel: { width: 32, fontSize: 13, color: '#475569' },
+  distributionLabel: { width: 32, fontSize: 13, color: Colors.textSecondary },
   barTrack: {
     flex: 1,
     height: 10,
     borderRadius: 999,
-    backgroundColor: '#E2E8F0',
+    backgroundColor: Colors.border,
     overflow: 'hidden',
   },
-  barFill: { height: '100%', backgroundColor: '#2563EB' },
-  distributionCount: { width: 24, fontSize: 12, textAlign: 'right', color: '#64748B' },
-  sectionTitle: { fontSize: 18, fontWeight: '800', color: '#0F172A' },
+  barFill: { height: '100%', backgroundColor: Colors.primary },
+  distributionCount: { width: 24, fontSize: 12, textAlign: 'right', color: Colors.textSecondary },
+  sectionTitle: { fontSize: 18, fontWeight: '800', color: Colors.textPrimary },
   tagRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  tagLabel: { fontSize: 14, color: '#334155' },
-  tagValue: { fontSize: 14, fontWeight: '700', color: '#0F172A' },
-  reviewCard: { borderTopWidth: 1, borderTopColor: '#E2E8F0', paddingTop: 12, gap: 4 },
-  reviewTitle: { fontSize: 15, fontWeight: '700', color: '#0F172A' },
-  reviewMeta: { fontSize: 12, color: '#64748B' },
-  reviewBody: { fontSize: 14, lineHeight: 20, color: '#475569' },
-  emptyText: { fontSize: 14, color: '#64748B' },
+  tagLabel: { fontSize: 14, color: Colors.textPrimary },
+  tagValue: { fontSize: 14, fontWeight: '700', color: Colors.textPrimary },
+  reviewCard: { borderTopWidth: 1, borderTopColor: Colors.border, paddingTop: 12, gap: 4 },
+  reviewTitle: { fontSize: 15, fontWeight: '700', color: Colors.textPrimary },
+  reviewMeta: { fontSize: 12, color: Colors.textSecondary },
+  reviewBody: { fontSize: 14, lineHeight: 20, color: Colors.textSecondary },
+  emptyText: { fontSize: 14, color: Colors.textSecondary },
 });

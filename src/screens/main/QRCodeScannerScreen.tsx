@@ -92,7 +92,7 @@ export default function QRCodeScannerScreen() {
 
       <TouchableOpacity style={styles.primaryButton} onPress={() => void handleUnlock()} disabled={unlocking}>
         {unlocking ? (
-          <ActivityIndicator size="small" color="#FFFFFF" />
+          <ActivityIndicator size="small" color=Colors.white />
         ) : (
           <Text style={styles.primaryButtonText}>사물함 열기 요청</Text>
         )}
@@ -104,7 +104,7 @@ export default function QRCodeScannerScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F8FAFC',
+    backgroundColor: Colors.background,
   },
   content: {
     padding: 20,
@@ -116,19 +116,19 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 28,
     fontWeight: '800',
-    color: '#0F172A',
+    color: Colors.textPrimary,
   },
   subtitle: {
     fontSize: 15,
     lineHeight: 22,
-    color: '#64748B',
+    color: Colors.textSecondary,
   },
   card: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: Colors.surface,
     borderRadius: 24,
     padding: 20,
     gap: 12,
-    shadowColor: '#0F172A',
+    shadowColor: Colors.textPrimary,
     shadowOpacity: 0.06,
     shadowRadius: 10,
     shadowOffset: { width: 0, height: 4 },
@@ -137,17 +137,17 @@ const styles = StyleSheet.create({
   sectionTitle: {
     fontSize: 18,
     fontWeight: '800',
-    color: '#0F172A',
+    color: Colors.textPrimary,
   },
   input: {
     borderWidth: 1,
-    borderColor: '#CBD5E1',
+    borderColor: Colors.border,
     borderRadius: 16,
     paddingHorizontal: 16,
     paddingVertical: 14,
     fontSize: 15,
-    backgroundColor: '#FFFFFF',
-    color: '#0F172A',
+    backgroundColor: Colors.surface,
+    color: Colors.textPrimary,
   },
   multilineInput: {
     minHeight: 120,
@@ -155,22 +155,22 @@ const styles = StyleSheet.create({
   },
   resultText: {
     fontSize: 14,
-    color: '#334155',
+    color: Colors.textPrimary,
   },
   errorText: {
     fontSize: 14,
-    color: '#DC2626',
+    color: Colors.error,
   },
   primaryButton: {
     alignItems: 'center',
     justifyContent: 'center',
     paddingVertical: 16,
     borderRadius: 18,
-    backgroundColor: '#2563EB',
+    backgroundColor: Colors.primary,
   },
   primaryButtonText: {
     fontSize: 15,
     fontWeight: '700',
-    color: '#FFFFFF',
+    color: Colors.surface,
   },
 });

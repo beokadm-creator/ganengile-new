@@ -161,7 +161,7 @@ export default function PickupVerificationScreen() {
         {photoUri ? <Image source={{ uri: photoUri }} style={styles.previewImage} /> : null}
         <TouchableOpacity style={styles.photoButton} onPress={() => void handleCapturePhoto()} disabled={photoLoading}>
           {photoLoading ? (
-            <ActivityIndicator size="small" color="#1D4ED8" />
+            <ActivityIndicator size="small" color=Colors.primary />
           ) : (
             <Text style={styles.photoButtonText}>{photoUri ? '사진 다시 촬영하기' : '사진 촬영하기'}</Text>
           )}
@@ -169,7 +169,7 @@ export default function PickupVerificationScreen() {
       </View>
 
       <TouchableOpacity style={styles.primaryButton} onPress={() => void handleVerifyPickup()} disabled={loading}>
-        {loading ? <ActivityIndicator size="small" color="#FFFFFF" /> : <Text style={styles.primaryButtonText}>인수 확인하기</Text>}
+        {loading ? <ActivityIndicator size="small" color=Colors.white /> : <Text style={styles.primaryButtonText}>인수 확인하기</Text>}
       </TouchableOpacity>
     </ScrollView>
   );
@@ -186,7 +186,7 @@ function MethodButton({ active, title, onPress }: { active: boolean; title: stri
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F8FAFC',
+    backgroundColor: Colors.background,
   },
   content: {
     padding: 20,
@@ -198,19 +198,19 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 28,
     fontWeight: '800',
-    color: '#0F172A',
+    color: Colors.textPrimary,
   },
   subtitle: {
     fontSize: 15,
     lineHeight: 22,
-    color: '#64748B',
+    color: Colors.textSecondary,
   },
   card: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: Colors.surface,
     borderRadius: 24,
     padding: 20,
     gap: 12,
-    shadowColor: '#0F172A',
+    shadowColor: Colors.textPrimary,
     shadowOpacity: 0.06,
     shadowRadius: 10,
     shadowOffset: { width: 0, height: 4 },
@@ -219,7 +219,7 @@ const styles = StyleSheet.create({
   sectionTitle: {
     fontSize: 18,
     fontWeight: '800',
-    color: '#0F172A',
+    color: Colors.textPrimary,
   },
   toggleRow: {
     flexDirection: 'row',
@@ -231,31 +231,31 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     paddingVertical: 14,
     borderRadius: 16,
-    backgroundColor: '#E2E8F0',
+    backgroundColor: Colors.border,
   },
   methodButtonActive: {
-    backgroundColor: '#DBEAFE',
+    backgroundColor: Colors.primaryMint,
   },
   methodButtonText: {
     fontSize: 14,
     fontWeight: '700',
-    color: '#475569',
+    color: Colors.textSecondary,
   },
   methodButtonTextActive: {
-    color: '#1D4ED8',
+    color: Colors.primary,
   },
   codeBox: {
     borderWidth: 1,
-    borderColor: '#CBD5E1',
+    borderColor: Colors.border,
     borderRadius: 18,
     padding: 16,
     gap: 12,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: Colors.surface,
   },
   codeLabel: {
     fontSize: 14,
     fontWeight: '700',
-    color: '#334155',
+    color: Colors.textPrimary,
   },
   codeRow: {
     flexDirection: 'row',
@@ -267,38 +267,38 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     borderRadius: 14,
-    backgroundColor: '#EFF6FF',
+    backgroundColor: Colors.primaryMint,
     borderWidth: 1,
-    borderColor: '#BFDBFE',
+    borderColor: Colors.border,
   },
   codeChipText: {
     fontSize: 16,
     fontWeight: '800',
-    color: '#1D4ED8',
+    color: Colors.primary,
   },
   qrBox: {
     minHeight: 72,
     borderRadius: 14,
-    backgroundColor: '#EFF6FF',
+    backgroundColor: Colors.primaryMint,
     borderWidth: 1,
-    borderColor: '#BFDBFE',
+    borderColor: Colors.border,
     padding: 14,
     justifyContent: 'center',
   },
   qrText: {
     fontSize: 14,
     lineHeight: 20,
-    color: '#1D4ED8',
+    color: Colors.primary,
   },
   input: {
     borderWidth: 1,
-    borderColor: '#CBD5E1',
+    borderColor: Colors.border,
     borderRadius: 14,
     paddingHorizontal: 14,
     paddingVertical: 12,
     fontSize: 15,
-    color: '#0F172A',
-    backgroundColor: '#FFFFFF',
+    color: Colors.textPrimary,
+    backgroundColor: Colors.surface,
   },
   inputMultiline: {
     minHeight: 92,
@@ -309,47 +309,47 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     borderRadius: 14,
-    backgroundColor: '#E2E8F0',
+    backgroundColor: Colors.border,
   },
   secondaryButtonText: {
     fontSize: 14,
     fontWeight: '700',
-    color: '#334155',
+    color: Colors.textPrimary,
   },
   helperText: {
     fontSize: 14,
     lineHeight: 20,
-    color: '#64748B',
+    color: Colors.textSecondary,
   },
   previewImage: {
     width: '100%',
     height: 220,
     borderRadius: 18,
-    backgroundColor: '#E2E8F0',
+    backgroundColor: Colors.border,
   },
   photoButton: {
     minHeight: 48,
     alignItems: 'center',
     justifyContent: 'center',
     borderRadius: 16,
-    backgroundColor: '#DBEAFE',
+    backgroundColor: Colors.primaryMint,
   },
   photoButtonText: {
     fontSize: 14,
     fontWeight: '700',
-    color: '#1D4ED8',
+    color: Colors.primary,
   },
   primaryButton: {
     alignItems: 'center',
     justifyContent: 'center',
     paddingVertical: 16,
     borderRadius: 18,
-    backgroundColor: '#2563EB',
+    backgroundColor: Colors.primary,
     marginBottom: 8,
   },
   primaryButtonText: {
     fontSize: 15,
     fontWeight: '700',
-    color: '#FFFFFF',
+    color: Colors.surface,
   },
 });

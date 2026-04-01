@@ -14,7 +14,7 @@ import { Timestamp } from 'firebase/firestore';
 import { useUser } from '../../contexts/UserContext';
 import { createChatService } from '../../services/chat-service';
 import { getBeta1ChatContext, type Beta1ChatContext } from '../../services/beta1-orchestration-service';
-import { BorderRadius, Shadows, Spacing, Typography } from '../../theme';
+import { BorderRadius, Colors, Shadows, Spacing, Typography } from '../../theme';
 import type { MainStackNavigationProp } from '../../types/navigation';
 import { ChatRoomStatus, type ChatParticipant, type ChatRoom } from '../../types/chat';
 
@@ -114,7 +114,7 @@ export default function ChatListScreen({ navigation }: { navigation: MainStackNa
   if (loading) {
     return (
       <View style={styles.centerState}>
-        <ActivityIndicator size="large" color="#0F766E" />
+        <ActivityIndicator size="large" color={Colors.primary} />
         <Text style={styles.centerText}>채팅을 불러오는 중입니다.</Text>
       </View>
     );
@@ -140,17 +140,17 @@ export default function ChatListScreen({ navigation }: { navigation: MainStackNa
       </View>
 
       <View style={styles.searchBox}>
-        <MaterialIcons name="search" size={18} color="#667085" />
+        <MaterialIcons name="search" size={18} color={Colors.textTertiary} />
         <TextInput
           style={styles.searchInput}
           value={searchQuery}
           onChangeText={setSearchQuery}
           placeholder="상대 이름, 역 이름, 최근 메시지로 검색"
-          placeholderTextColor="#98A2B3"
+          placeholderTextColor={Colors.textDisabled}
         />
         {searchQuery.length > 0 ? (
           <TouchableOpacity onPress={() => setSearchQuery('')}>
-            <MaterialIcons name="close" size={18} color="#667085" />
+            <MaterialIcons name="close" size={18} color={Colors.textTertiary} />
           </TouchableOpacity>
         ) : null}
       </View>
@@ -213,28 +213,28 @@ function MetricCard({ label, value }: { label: string; value: number }) {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#F8FAFC' },
+  container: { flex: 1, backgroundColor: Colors.background },
   content: { padding: Spacing.lg, gap: Spacing.md },
-  centerState: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: '#F8FAFC' },
-  centerText: { marginTop: Spacing.md, color: '#475569', ...Typography.body },
-  hero: { backgroundColor: '#FFFFFF', borderRadius: BorderRadius.xl, padding: Spacing.lg, gap: 8, ...Shadows.sm },
-  heroKicker: { fontSize: 12, fontWeight: '700', color: '#0F766E', textTransform: 'uppercase', letterSpacing: 1 },
-  heroTitle: { fontSize: 24, fontWeight: '800', color: '#0F172A' },
-  heroSubtitle: { color: '#475569', ...Typography.body },
+  centerState: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: Colors.background },
+  centerText: { marginTop: Spacing.md, color: Colors.textSecondary, ...Typography.body },
+  hero: { backgroundColor: Colors.surface, borderRadius: BorderRadius.xl, padding: Spacing.lg, gap: 8, ...Shadows.sm },
+  heroKicker: { fontSize: Typography.fontSize.sm, fontWeight: '700', color: Colors.primary, textTransform: 'uppercase', letterSpacing: 1 },
+  heroTitle: { fontSize: Typography.fontSize['2xl'], fontWeight: '800', color: Colors.textPrimary },
+  heroSubtitle: { color: Colors.textSecondary, ...Typography.body },
   heroMetrics: { flexDirection: 'row', gap: Spacing.sm },
-  metricCard: { flex: 1, backgroundColor: '#F1F5F9', borderRadius: BorderRadius.lg, padding: Spacing.md, gap: 4 },
-  metricValue: { fontSize: 20, fontWeight: '800', color: '#0F172A' },
-  metricLabel: { color: '#64748B', ...Typography.caption },
-  searchBox: { flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: '#FFFFFF', borderRadius: BorderRadius.xl, paddingHorizontal: Spacing.md, minHeight: 52, ...Shadows.sm },
-  searchInput: { flex: 1, color: '#0F172A', ...Typography.body },
-  emptyCard: { backgroundColor: '#FFFFFF', borderRadius: BorderRadius.xl, padding: Spacing.xl, gap: 6, ...Shadows.sm },
-  emptyTitle: { color: '#0F172A', fontSize: 18, fontWeight: '700' },
-  emptyBody: { color: '#64748B', ...Typography.body },
-  roomCard: { backgroundColor: '#FFFFFF', borderRadius: BorderRadius.xl, padding: Spacing.lg, gap: 6, ...Shadows.sm },
+  metricCard: { flex: 1, backgroundColor: Colors.gray100, borderRadius: BorderRadius.lg, padding: Spacing.md, gap: 4 },
+  metricValue: { fontSize: Typography.fontSize['2xl'], fontWeight: '800', color: Colors.textPrimary },
+  metricLabel: { color: Colors.textTertiary, ...Typography.caption },
+  searchBox: { flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: Colors.surface, borderRadius: BorderRadius.xl, paddingHorizontal: Spacing.md, minHeight: 52, ...Shadows.sm },
+  searchInput: { flex: 1, color: Colors.textPrimary, ...Typography.body },
+  emptyCard: { backgroundColor: Colors.surface, borderRadius: BorderRadius.xl, padding: Spacing.xl, gap: 6, ...Shadows.sm },
+  emptyTitle: { color: Colors.textPrimary, fontSize: Typography.fontSize.xl, fontWeight: '700' },
+  emptyBody: { color: Colors.textTertiary, ...Typography.body },
+  roomCard: { backgroundColor: Colors.surface, borderRadius: BorderRadius.xl, padding: Spacing.lg, gap: 6, ...Shadows.sm },
   roomHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  roomTitle: { color: '#0F172A', fontSize: 16, fontWeight: '700' },
-  roomTime: { color: '#94A3B8', ...Typography.caption },
-  roomMeta: { color: '#0F766E', ...Typography.bodySmall },
-  roomMessage: { color: '#334155', ...Typography.bodySmall },
-  roomTrust: { color: '#64748B', ...Typography.caption },
+  roomTitle: { color: Colors.textPrimary, fontSize: Typography.fontSize.lg, fontWeight: '700' },
+  roomTime: { color: Colors.textDisabled, ...Typography.caption },
+  roomMeta: { color: Colors.primary, ...Typography.bodySmall },
+  roomMessage: { color: Colors.gray700, ...Typography.bodySmall },
+  roomTrust: { color: Colors.textTertiary, ...Typography.caption },
 });

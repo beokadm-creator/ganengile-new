@@ -48,7 +48,7 @@ function toStationCandidate(stationInfo: StationInfo): Station {
         lineId: stationInfo.line,
         lineCode: stationInfo.lineCode,
         lineName: stationInfo.lineCode || stationInfo.line,
-        lineColor: '#64748B',
+        lineColor: Colors.textSecondary,
         lineType: 'general',
       },
     ],

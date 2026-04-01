@@ -13,6 +13,7 @@ import { RouteProp, useNavigation, useRoute } from '@react-navigation/native';
 import { requireUserId } from '../../services/firebase';
 import { createPhotoService, takePhoto, uploadPhotoWithThumbnail } from '../../services/photo-service';
 import type { MainStackNavigationProp, MainStackParamList } from '../../types/navigation';
+import { Colors, Spacing, Typography, BorderRadius } from '../../theme';
 
 type DisputeRoute = RouteProp<MainStackParamList, 'DisputeReport'>;
 type DisputeType = 'damage' | 'loss' | 'delay' | 'other';
@@ -173,7 +174,7 @@ export default function DisputeReportScreen() {
         </Text>
         <TouchableOpacity style={styles.secondaryButton} onPress={() => void handleAddEvidence()} disabled={uploadingPhoto}>
           {uploadingPhoto ? (
-            <ActivityIndicator size="small" color="#2563EB" />
+            <ActivityIndicator size="small" color={Colors.primary} />
           ) : (
             <Text style={styles.secondaryButtonText}>증빙 사진 추가</Text>
           )}
@@ -186,7 +187,7 @@ export default function DisputeReportScreen() {
       </View>
 
       <TouchableOpacity style={styles.primaryButton} onPress={() => void handleSubmit()} disabled={submitting}>
-        {submitting ? <ActivityIndicator size="small" color="#FFFFFF" /> : <Text style={styles.primaryButtonText}>분쟁 접수하기</Text>}
+        {submitting ? <ActivityIndicator size="small" color={Colors.surface} /> : <Text style={styles.primaryButtonText}>분쟁 접수하기</Text>}
       </TouchableOpacity>
     </ScrollView>
   );
@@ -195,77 +196,72 @@ export default function DisputeReportScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F8FAFC',
+    backgroundColor: Colors.background,
   },
   content: {
-    padding: 20,
-    gap: 16,
+    padding: Spacing.xl,
+    gap: Spacing.lg,
   },
   header: {
-    gap: 8,
+    gap: Spacing.sm,
   },
   title: {
-    fontSize: 28,
+    fontSize: Typography.fontSize['3xl'],
     fontWeight: '800',
-    color: '#0F172A',
+    color: Colors.textPrimary,
   },
   subtitle: {
-    fontSize: 15,
+    fontSize: Typography.fontSize.base,
     lineHeight: 22,
-    color: '#64748B',
+    color: Colors.textSecondary,
   },
   card: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 24,
-    padding: 20,
-    gap: 12,
-    shadowColor: '#0F172A',
-    shadowOpacity: 0.06,
-    shadowRadius: 10,
-    shadowOffset: { width: 0, height: 4 },
-    elevation: 3,
+    backgroundColor: Colors.surface,
+    borderRadius: BorderRadius.xl,
+    padding: Spacing.xl,
+    gap: Spacing.md,
   },
   sectionTitle: {
-    fontSize: 18,
+    fontSize: Typography.fontSize.xl,
     fontWeight: '800',
-    color: '#0F172A',
+    color: Colors.textPrimary,
   },
   chipGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: 10,
+    gap: Spacing.sm,
   },
   chip: {
-    paddingHorizontal: 14,
-    paddingVertical: 10,
-    borderRadius: 999,
-    backgroundColor: '#E2E8F0',
+    paddingHorizontal: Spacing.md,
+    paddingVertical: Spacing.sm,
+    borderRadius: BorderRadius.full,
+    backgroundColor: Colors.border,
   },
   chipActive: {
-    backgroundColor: '#DBEAFE',
+    backgroundColor: Colors.primaryMint,
   },
   chipText: {
-    fontSize: 13,
+    fontSize: Typography.fontSize.sm,
     fontWeight: '700',
-    color: '#475569',
+    color: Colors.textSecondary,
   },
   chipTextActive: {
-    color: '#1D4ED8',
+    color: Colors.primary,
   },
   helperText: {
-    fontSize: 14,
+    fontSize: Typography.fontSize.base,
     lineHeight: 20,
-    color: '#64748B',
+    color: Colors.textSecondary,
   },
   input: {
     borderWidth: 1,
-    borderColor: '#CBD5E1',
-    borderRadius: 16,
-    paddingHorizontal: 16,
-    paddingVertical: 14,
-    fontSize: 15,
-    backgroundColor: '#FFFFFF',
-    color: '#0F172A',
+    borderColor: Colors.border,
+    borderRadius: BorderRadius.lg,
+    paddingHorizontal: Spacing.lg,
+    paddingVertical: Spacing.md,
+    fontSize: Typography.fontSize.base,
+    backgroundColor: Colors.gray100,
+    color: Colors.textPrimary,
   },
   descriptionInput: {
     minHeight: 120,
@@ -273,30 +269,30 @@ const styles = StyleSheet.create({
   secondaryButton: {
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 14,
-    borderRadius: 16,
-    backgroundColor: '#EFF6FF',
+    paddingVertical: Spacing.md,
+    borderRadius: BorderRadius.lg,
+    backgroundColor: Colors.primaryMint,
   },
   secondaryButtonText: {
-    fontSize: 14,
+    fontSize: Typography.fontSize.base,
     fontWeight: '700',
-    color: '#2563EB',
+    color: Colors.primary,
   },
   evidenceItem: {
-    fontSize: 12,
+    fontSize: Typography.fontSize.xs,
     lineHeight: 18,
-    color: '#475569',
+    color: Colors.textSecondary,
   },
   primaryButton: {
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 16,
-    borderRadius: 18,
-    backgroundColor: '#2563EB',
+    paddingVertical: Spacing.lg,
+    borderRadius: BorderRadius.lg,
+    backgroundColor: Colors.primary,
   },
   primaryButtonText: {
-    fontSize: 15,
+    fontSize: Typography.fontSize.base,
     fontWeight: '700',
-    color: '#FFFFFF',
+    color: Colors.surface,
   },
 });

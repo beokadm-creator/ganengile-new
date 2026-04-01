@@ -1,4 +1,4 @@
-﻿import React, { useMemo, useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import {
   Alert,
   KeyboardAvoidingView,
@@ -15,6 +15,7 @@ import { doc, serverTimestamp, setDoc } from 'firebase/firestore';
 import { db } from '../../services/firebase';
 import { useUser } from '../../contexts/UserContext';
 import { UserRole } from '../../types/user';
+import { BorderRadius, Colors, Shadows, Spacing, Typography } from '../../theme';
 
 export default function BasicInfoOnboarding() {
   const { user, completeOnboarding } = useUser();
@@ -130,7 +131,7 @@ function Field({ label, helper, ...props }: React.ComponentProps<typeof TextInpu
   return (
     <View style={styles.fieldWrap}>
       <Text style={styles.fieldLabel}>{label}</Text>
-      <TextInput {...props} style={styles.input} placeholderTextColor="#94A3B8" />
+      <TextInput {...props} style={styles.input} placeholderTextColor={Colors.gray400} />
       {helper ? <Text style={styles.helper}>{helper}</Text> : null}
     </View>
   );
@@ -143,33 +144,33 @@ function AgreementRow({ title, subtitle, value, onValueChange }: { title: string
         <Text style={styles.agreementTitle}>{title}</Text>
         <Text style={styles.agreementSubtitle}>{subtitle}</Text>
       </View>
-      <Switch value={value} onValueChange={onValueChange} trackColor={{ false: '#CBD5E1', true: '#99F6E4' }} thumbColor={value ? '#0F766E' : '#FFFFFF'} />
+      <Switch value={value} onValueChange={onValueChange} trackColor={{ false: Colors.gray300, true: Colors.primaryMint }} thumbColor={value ? Colors.primary : Colors.white} />
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#F8FAFC' },
-  content: { padding: 20, gap: 16, paddingBottom: 120 },
-  hero: { gap: 6 },
-  eyebrow: { color: '#0F766E', fontSize: 12, fontWeight: '700', letterSpacing: 1, textTransform: 'uppercase' },
-  title: { color: '#0F172A', fontSize: 28, fontWeight: '800' },
-  description: { color: '#475569', fontSize: 15, lineHeight: 22 },
-  card: { backgroundColor: '#FFFFFF', borderRadius: 20, padding: 20, gap: 16 },
-  sectionTitle: { color: '#0F172A', fontSize: 18, fontWeight: '800' },
-  fieldWrap: { gap: 6 },
-  fieldLabel: { color: '#334155', fontWeight: '700' },
-  input: { minHeight: 52, borderRadius: 16, backgroundColor: '#F8FAFC', paddingHorizontal: 16, color: '#0F172A' },
-  helper: { color: '#64748B', fontSize: 12 },
-  agreementRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12 },
+  container: { flex: 1, backgroundColor: Colors.background },
+  content: { padding: Spacing.xl, gap: Spacing.lg, paddingBottom: 120 },
+  hero: { backgroundColor: Colors.primaryMint, borderRadius: BorderRadius.xl, padding: Spacing.xl, gap: Spacing.sm, ...Shadows.sm },
+  eyebrow: { color: Colors.primary, fontSize: Typography.fontSize.xs, fontWeight: '800', letterSpacing: 1, textTransform: 'uppercase' },
+  title: { color: Colors.textPrimary, fontSize: Typography.fontSize['2xl'], fontWeight: '800', lineHeight: 32 },
+  description: { color: Colors.textSecondary, fontSize: Typography.fontSize.sm, lineHeight: 22 },
+  card: { backgroundColor: Colors.surface, borderRadius: BorderRadius.xl, padding: Spacing.xl, gap: Spacing.lg, borderWidth: 1, borderColor: Colors.border },
+  sectionTitle: { color: Colors.textPrimary, fontSize: Typography.fontSize.lg, fontWeight: '800' },
+  fieldWrap: { gap: Spacing.xs },
+  fieldLabel: { color: Colors.textTertiary, fontWeight: '700', fontSize: Typography.fontSize.sm },
+  input: { minHeight: 52, borderRadius: BorderRadius.md, backgroundColor: Colors.gray50, paddingHorizontal: Spacing.md, color: Colors.textPrimary, borderWidth: 1, borderColor: Colors.border },
+  helper: { color: Colors.gray500, fontSize: Typography.fontSize.xs, marginTop: Spacing.xs },
+  agreementRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: Spacing.md },
   agreementCopy: { flex: 1, gap: 2 },
-  agreementTitle: { color: '#0F172A', fontWeight: '700' },
-  agreementSubtitle: { color: '#64748B', fontSize: 12 },
-  notice: { backgroundColor: '#FFFFFF', borderRadius: 20, padding: 20, gap: 6 },
-  noticeTitle: { color: '#0F172A', fontWeight: '800' },
-  noticeBody: { color: '#475569', lineHeight: 20 },
-  footer: { position: 'absolute', left: 20, right: 20, bottom: 20 },
-  submitButton: { minHeight: 56, borderRadius: 18, backgroundColor: '#115E59', alignItems: 'center', justifyContent: 'center' },
+  agreementTitle: { color: Colors.textPrimary, fontWeight: '700', fontSize: Typography.fontSize.base },
+  agreementSubtitle: { color: Colors.textTertiary, fontSize: Typography.fontSize.xs },
+  notice: { backgroundColor: Colors.warningLight, borderRadius: BorderRadius.xl, padding: Spacing.lg, gap: Spacing.sm },
+  noticeTitle: { color: Colors.warningDark, fontWeight: '800', fontSize: Typography.fontSize.sm },
+  noticeBody: { color: Colors.warningDark, lineHeight: 20, fontSize: Typography.fontSize.sm },
+  footer: { position: 'absolute', left: Spacing.xl, right: Spacing.xl, bottom: Spacing.xl, backgroundColor: 'transparent' },
+  submitButton: { minHeight: 56, borderRadius: BorderRadius.full, backgroundColor: Colors.primary, alignItems: 'center', justifyContent: 'center', ...Shadows.sm },
   submitButtonDisabled: { opacity: 0.6 },
-  submitButtonText: { color: '#FFFFFF', fontSize: 16, fontWeight: '800' },
+  submitButtonText: { color: Colors.white, fontSize: 16, fontWeight: '800' },
 });
