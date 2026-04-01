@@ -177,7 +177,7 @@ export default function PointWithdrawScreen({ navigation }: Props) {
         }}
         disabled={loading}
       >
-        {loading ? <ActivityIndicator color=Colors.white /> : <Text style={styles.submitButtonText}>출금 요청 등록</Text>}
+        {loading ? <ActivityIndicator color={Colors.white} /> : <Text style={styles.submitButtonText}>출금 요청 등록</Text>}
       </TouchableOpacity>
     </ScrollView>
   );

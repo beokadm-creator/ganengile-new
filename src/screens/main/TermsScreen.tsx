@@ -128,7 +128,7 @@ export default function TermsScreen({ navigation: _navigation }: Props) {
   if (loading) {
     return (
       <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color=Colors.primary />
+        <ActivityIndicator size="large" color={Colors.primary} />
         <Text style={styles.loadingText}>정책 문서를 불러오는 중입니다.</Text>
       </View>
     );

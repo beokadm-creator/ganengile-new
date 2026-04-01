@@ -141,7 +141,7 @@ export default function ChatScreen() {
           }}
           disabled={sending || !input.trim()}
         >
-          <MaterialIcons name="north-east" size={18} color=Colors.white />
+          <MaterialIcons name="north-east" size={18} color={Colors.white} />
         </TouchableOpacity>
       </View>
     </KeyboardAvoidingView>

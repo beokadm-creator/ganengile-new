@@ -183,7 +183,7 @@ export default function B2BOnboardingScreen({ navigation }: Props) {
 
       <TouchableOpacity style={styles.submitButton} onPress={() => void handleSubmit()} disabled={loading}>
         {loading ? (
-          <ActivityIndicator size="small" color=Colors.white />
+          <ActivityIndicator size="small" color={Colors.white} />
         ) : (
           <Text style={styles.submitButtonText}>계약 요청하기</Text>
         )}

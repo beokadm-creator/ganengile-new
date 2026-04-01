@@ -73,7 +73,7 @@ export default function MyRatingScreen() {
   if (loading) {
     return (
       <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color=Colors.primary />
+        <ActivityIndicator size="large" color={Colors.primary} />
         <Text style={styles.loadingText}>평점 요약을 불러오고 있어요.</Text>
       </View>
     );

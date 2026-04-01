@@ -208,7 +208,7 @@ export default function B2BGillerScreen({ navigation: _navigation }: Props) {
   if (loading) {
     return (
       <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color=Colors.primary />
+        <ActivityIndicator size="large" color={Colors.primary} />
       </View>
     );
   }

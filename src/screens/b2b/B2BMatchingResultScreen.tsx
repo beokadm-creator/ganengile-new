@@ -182,7 +182,7 @@ export default function B2BMatchingResultScreen() {
         <Text style={styles.name}>{selectedMatch?.gillerName ?? 'Giller'}</Text>
 
         <View style={styles.gradeChip}>
-          <Ionicons name="shield-checkmark" size={14} color=Colors.white />
+          <Ionicons name="shield-checkmark" size={14} color={Colors.white} />
           <Text style={styles.gradeChipText}>{gradeInfo.name}</Text>
         </View>
 
@@ -236,7 +236,7 @@ export default function B2BMatchingResultScreen() {
           <Text style={styles.secondaryButtonText}>Find another</Text>
         </TouchableOpacity>
         <TouchableOpacity style={styles.primaryButton} onPress={() => void handleAccept()} disabled={loading}>
-          {loading ? <ActivityIndicator color=Colors.white /> : <Text style={styles.primaryButtonText}>Assign</Text>}
+          {loading ? <ActivityIndicator color={Colors.white} /> : <Text style={styles.primaryButtonText}>Assign</Text>}
         </TouchableOpacity>
       </View>
     </ScrollView>

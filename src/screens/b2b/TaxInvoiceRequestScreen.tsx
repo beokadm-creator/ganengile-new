@@ -279,7 +279,7 @@ export default function TaxInvoiceRequestScreen() {
             void handleSubmit();
           }}
         >
-          {submitting ? <ActivityIndicator color=Colors.white /> : <Text style={styles.submitButtonText}>발행 요청하기</Text>}
+          {submitting ? <ActivityIndicator color={Colors.white} /> : <Text style={styles.submitButtonText}>발행 요청하기</Text>}
         </TouchableOpacity>
       </View>
     </View>

@@ -187,7 +187,7 @@ export default function B2BRequestScreen({ navigation }: { navigation: Navigatio
       </View>
 
       <TouchableOpacity style={styles.submitButton} onPress={() => void handleSubmit()} disabled={loading}>
-        {loading ? <ActivityIndicator size="small" color=Colors.white /> : <Text style={styles.submitButtonText}>요청 생성</Text>}
+        {loading ? <ActivityIndicator size="small" color={Colors.white} /> : <Text style={styles.submitButtonText}>요청 생성</Text>}
       </TouchableOpacity>
 
       <OptimizedStationSelectModal

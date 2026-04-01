@@ -100,7 +100,7 @@ export default function GillerLevelUpgradeScreen({ navigation }: { navigation: M
   if (loading) {
     return (
       <View style={styles.centerState}>
-        <ActivityIndicator size="large" color=Colors.primary />
+        <ActivityIndicator size="large" color={Colors.primary} />
         <Text style={styles.centerText}>승급 정보를 준비하는 중입니다.</Text>
       </View>
     );

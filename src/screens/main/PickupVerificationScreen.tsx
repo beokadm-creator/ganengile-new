@@ -161,7 +161,7 @@ export default function PickupVerificationScreen() {
         {photoUri ? <Image source={{ uri: photoUri }} style={styles.previewImage} /> : null}
         <TouchableOpacity style={styles.photoButton} onPress={() => void handleCapturePhoto()} disabled={photoLoading}>
           {photoLoading ? (
-            <ActivityIndicator size="small" color=Colors.primary />
+            <ActivityIndicator size="small" color={Colors.primary} />
           ) : (
             <Text style={styles.photoButtonText}>{photoUri ? '사진 다시 촬영하기' : '사진 촬영하기'}</Text>
           )}
@@ -169,7 +169,7 @@ export default function PickupVerificationScreen() {
       </View>
 
       <TouchableOpacity style={styles.primaryButton} onPress={() => void handleVerifyPickup()} disabled={loading}>
-        {loading ? <ActivityIndicator size="small" color=Colors.white /> : <Text style={styles.primaryButtonText}>인수 확인하기</Text>}
+        {loading ? <ActivityIndicator size="small" color={Colors.white} /> : <Text style={styles.primaryButtonText}>인수 확인하기</Text>}
       </TouchableOpacity>
     </ScrollView>
   );

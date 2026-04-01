@@ -311,7 +311,7 @@ export default function NewSignUpScreen({ navigation }: Props) {
           <Text style={styles.backButtonText}>이전</Text>
         </TouchableOpacity>
         <TouchableOpacity style={[styles.nextButton, loading && styles.nextButtonDisabled]} onPress={handleNext} disabled={loading}>
-          {loading ? <ActivityIndicator color=Colors.white /> : <Text style={styles.nextButtonText}>{step === 3 ? '가입 완료' : '다음'}</Text>}
+          {loading ? <ActivityIndicator color={Colors.white} /> : <Text style={styles.nextButtonText}>{step === 3 ? '가입 완료' : '다음'}</Text>}
         </TouchableOpacity>
       </View>
     </KeyboardAvoidingView>

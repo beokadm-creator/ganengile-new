@@ -77,7 +77,7 @@ export default function HomeScreen({ navigation }: { navigation: MainStackNaviga
               style={styles.roleChip}
               onPress={() => switchRole(role === 'requester' ? UserRole.GILLER : UserRole.GLER)}
             >
-              <MaterialIcons name="swap-horiz" size={18} color=Colors.textPrimary />
+              <MaterialIcons name="swap-horiz" size={18} color={Colors.textPrimary} />
               <Text style={styles.roleChipText}>{role === 'requester' ? '길러 모드' : '요청자 모드'}</Text>
             </TouchableOpacity>
           ) : null}

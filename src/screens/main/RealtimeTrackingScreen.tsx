@@ -92,7 +92,7 @@ export default function RealtimeTrackingScreen(): JSX.Element {
         </View>
 
         <TouchableOpacity style={styles.linkButton} onPress={() => navigation.navigate('DeliveryTracking', { requestId: deliveryId })}>
-          <MaterialIcons name="local-shipping" size={18} color=Colors.primary />
+          <MaterialIcons name="local-shipping" size={18} color={Colors.primary} />
           <Text style={styles.linkButtonText}>배송 상세 보기</Text>
         </TouchableOpacity>
       </ScrollView>

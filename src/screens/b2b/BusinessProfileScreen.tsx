@@ -200,7 +200,7 @@ export default function BusinessProfileScreen() {
   if (loading) {
     return (
       <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color=Colors.primary />
+        <ActivityIndicator size="large" color={Colors.primary} />
       </View>
     );
   }
@@ -223,7 +223,7 @@ export default function BusinessProfileScreen() {
       <View style={styles.heroCard}>
         <View style={styles.heroHeader}>
           <View style={styles.heroIcon}>
-            <Ionicons name="business" size={28} color=Colors.primary />
+            <Ionicons name="business" size={28} color={Colors.primary} />
           </View>
           <View style={styles.heroText}>
             <Text style={styles.heroTitle}>{profile.companyName || '기업 프로필'}</Text>
@@ -231,7 +231,7 @@ export default function BusinessProfileScreen() {
           </View>
           {!editing && (
             <TouchableOpacity style={styles.editPill} onPress={() => setEditing(true)}>
-              <Ionicons name="create-outline" size={16} color=Colors.primary />
+              <Ionicons name="create-outline" size={16} color={Colors.primary} />
               <Text style={styles.editPillText}>수정</Text>
             </TouchableOpacity>
           )}
@@ -268,7 +268,7 @@ export default function BusinessProfileScreen() {
         </View>
         <Text style={styles.progressHint}>현재 플랜은 {getTierLabel(profile.subscriptionTier)}이며, 사용량이 늘어나면 상위 플랜 전환을 검토할 수 있습니다.</Text>
         <TouchableOpacity style={styles.secondaryButton} onPress={() => navigation.navigate('SubscriptionTierSelection')}>
-          <Ionicons name="sparkles-outline" size={18} color=Colors.primary />
+          <Ionicons name="sparkles-outline" size={18} color={Colors.primary} />
           <Text style={styles.secondaryButtonText}>구독 플랜 보기</Text>
         </TouchableOpacity>
       </View>
@@ -285,7 +285,7 @@ export default function BusinessProfileScreen() {
             <Text style={styles.cancelButtonText}>취소</Text>
           </TouchableOpacity>
           <TouchableOpacity style={styles.saveButton} onPress={() => void handleSave()} disabled={saving}>
-            {saving ? <ActivityIndicator color=Colors.white /> : <Text style={styles.saveButtonText}>저장</Text>}
+            {saving ? <ActivityIndicator color={Colors.white} /> : <Text style={styles.saveButtonText}>저장</Text>}
           </TouchableOpacity>
         </View>
       ) : null}
@@ -344,7 +344,7 @@ function ActionRow({ icon, title, description, onPress }: { icon: keyof typeof I
   return (
     <TouchableOpacity style={styles.actionRow} onPress={onPress}>
       <View style={styles.actionIcon}>
-        <Ionicons name={icon} size={20} color=Colors.primary />
+        <Ionicons name={icon} size={20} color={Colors.primary} />
       </View>
       <View style={styles.actionText}>
         <Text style={styles.actionTitle}>{title}</Text>

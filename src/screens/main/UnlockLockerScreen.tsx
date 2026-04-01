@@ -203,7 +203,7 @@ export default function UnlockLockerScreen() {
       {step === 'photo' ? (
         <TouchableOpacity style={styles.primaryButton} onPress={() => void handleTakePhoto()} disabled={working}>
           {working ? (
-            <ActivityIndicator size="small" color=Colors.white />
+            <ActivityIndicator size="small" color={Colors.white} />
           ) : (
             <Text style={styles.primaryButtonText}>Capture pickup photo</Text>
           )}
@@ -213,7 +213,7 @@ export default function UnlockLockerScreen() {
       {step === 'complete' ? (
         <TouchableOpacity style={styles.primaryButton} onPress={() => void handleComplete()} disabled={working}>
           {working ? (
-            <ActivityIndicator size="small" color=Colors.white />
+            <ActivityIndicator size="small" color={Colors.white} />
           ) : (
             <Text style={styles.primaryButtonText}>Finish pickup</Text>
           )}
@@ -232,7 +232,7 @@ function StepRow({ active, done, label }: { active: boolean; done: boolean; labe
           done ? styles.stepDotDone : active ? styles.stepDotActive : styles.stepDotIdle,
         ]}
       >
-        {done ? <Ionicons name="checkmark" size={14} color=Colors.white /> : null}
+        {done ? <Ionicons name="checkmark" size={14} color={Colors.white} /> : null}
       </View>
       <Text style={styles.stepLabel}>{label}</Text>
     </View>

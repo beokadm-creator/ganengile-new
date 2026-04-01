@@ -236,7 +236,7 @@ export default function RequestsScreen({ navigation }: { navigation: MainStackNa
       </View>
 
       <TouchableOpacity style={styles.primaryAction} activeOpacity={0.9} onPress={() => navigation.navigate('CreateRequest')}>
-        <MaterialIcons name="add-box" size={20} color=Colors.white />
+        <MaterialIcons name="add-box" size={20} color={Colors.white} />
         <Text style={styles.primaryActionText}>새 요청 만들기</Text>
       </TouchableOpacity>
 

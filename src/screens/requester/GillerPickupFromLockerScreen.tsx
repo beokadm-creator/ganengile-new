@@ -168,7 +168,7 @@ export default function GillerPickupFromLockerScreen({ route, navigation }: Prop
   if (loading) {
     return (
       <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color=Colors.primary />
+        <ActivityIndicator size="large" color={Colors.primary} />
       </View>
     );
   }
@@ -223,7 +223,7 @@ export default function GillerPickupFromLockerScreen({ route, navigation }: Prop
       {currentStep === 'open' && (
         <TouchableOpacity style={styles.primaryButton} onPress={() => void handleOpenLocker()} disabled={submitting}>
           {submitting ? (
-            <ActivityIndicator size="small" color=Colors.white />
+            <ActivityIndicator size="small" color={Colors.white} />
           ) : (
             <Text style={styles.primaryButtonText}>보관함 열기</Text>
           )}
@@ -237,7 +237,7 @@ export default function GillerPickupFromLockerScreen({ route, navigation }: Prop
           disabled={submitting}
         >
           {submitting ? (
-            <ActivityIndicator size="small" color=Colors.white />
+            <ActivityIndicator size="small" color={Colors.white} />
           ) : (
             <Text style={styles.primaryButtonText}>수령 완료 확인</Text>
           )}

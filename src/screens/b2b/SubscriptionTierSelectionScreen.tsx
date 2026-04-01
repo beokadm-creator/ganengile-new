@@ -167,7 +167,7 @@ export default function SubscriptionTierSelectionScreen() {
           onPress={() => void handleSubscribe()}
           disabled={!selectedTier || submitting}
         >
-          {submitting ? <ActivityIndicator color=Colors.white /> : <Text style={styles.subscribeButtonText}>{selectedTier ? '구독 시작하기' : '플랜을 선택해 주세요'}</Text>}
+          {submitting ? <ActivityIndicator color={Colors.white} /> : <Text style={styles.subscribeButtonText}>{selectedTier ? '구독 시작하기' : '플랜을 선택해 주세요'}</Text>}
         </TouchableOpacity>
       </View>
     </View>

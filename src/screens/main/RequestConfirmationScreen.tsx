@@ -20,7 +20,7 @@ export default function RequestConfirmationScreen() {
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
         <View style={styles.heroCard}>
           <View style={styles.heroIcon}>
-            <MaterialIcons name="check-circle" size={56} color=Colors.success />
+            <MaterialIcons name="check-circle" size={56} color={Colors.success} />
           </View>
           <Text style={styles.heroTitle}>요청이 접수됐습니다.</Text>
           <Text style={styles.heroBody}>매칭을 시작합니다.</Text>

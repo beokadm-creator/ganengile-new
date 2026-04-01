@@ -138,7 +138,7 @@ export default function LoginScreen({ navigation }: LoginScreenProps) {
           </TouchableOpacity>
 
           <TouchableOpacity style={styles.primaryButton} onPress={() => void handleEmailLogin()} disabled={emailLoading}>
-            {emailLoading ? <ActivityIndicator color=Colors.white /> : <Text style={styles.primaryButtonText}>이메일로 로그인</Text>}
+            {emailLoading ? <ActivityIndicator color={Colors.white} /> : <Text style={styles.primaryButtonText}>이메일로 로그인</Text>}
           </TouchableOpacity>
 
           <TouchableOpacity style={styles.kakaoButton} onPress={() => void handleKakaoLoginPress()} disabled={kakaoLoading}>
@@ -146,7 +146,7 @@ export default function LoginScreen({ navigation }: LoginScreenProps) {
           </TouchableOpacity>
 
           <TouchableOpacity style={styles.secondaryButton} onPress={() => void handleGoogleLoginPress()} disabled={googleLoading}>
-            {googleLoading ? <ActivityIndicator color=Colors.textPrimary /> : <Text style={styles.secondaryButtonText}>Google로 계속하기</Text>}
+            {googleLoading ? <ActivityIndicator color={Colors.textPrimary} /> : <Text style={styles.secondaryButtonText}>Google로 계속하기</Text>}
           </TouchableOpacity>
         </View>
 

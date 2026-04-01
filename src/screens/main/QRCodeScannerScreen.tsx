@@ -92,7 +92,7 @@ export default function QRCodeScannerScreen() {
 
       <TouchableOpacity style={styles.primaryButton} onPress={() => void handleUnlock()} disabled={unlocking}>
         {unlocking ? (
-          <ActivityIndicator size="small" color=Colors.white />
+          <ActivityIndicator size="small" color={Colors.white} />
         ) : (
           <Text style={styles.primaryButtonText}>사물함 열기 요청</Text>
         )}

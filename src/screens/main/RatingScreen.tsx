@@ -142,7 +142,7 @@ export default function RatingScreen() {
 
       <TouchableOpacity style={styles.primaryButton} onPress={() => void handleSubmit()} disabled={loading}>
         {loading ? (
-          <ActivityIndicator size="small" color=Colors.white />
+          <ActivityIndicator size="small" color={Colors.white} />
         ) : (
           <Text style={styles.primaryButtonText}>평가 제출</Text>
         )}

@@ -419,7 +419,7 @@ export default function GillerApplyScreen({ navigation }: { navigation: MainStac
           activeOpacity={0.9}
         >
           {loading ? (
-            <ActivityIndicator color=Colors.white />
+            <ActivityIndicator color={Colors.white} />
           ) : (
             <Text style={styles.footerButtonText}>{step === TOTAL_STEPS ? '신청하기' : '다음'}</Text>
           )}

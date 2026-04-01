@@ -125,7 +125,7 @@ export default function CreateAuctionScreen() {
   if (loadingStations) {
     return (
       <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color=Colors.primary />
+        <ActivityIndicator size="large" color={Colors.primary} />
         <Text style={styles.loadingText}>역 정보를 불러오고 있습니다.</Text>
       </View>
     );
@@ -197,7 +197,7 @@ export default function CreateAuctionScreen() {
         onPress={() => void handleSubmit()}
         disabled={saving || submitDisabled}
       >
-        {saving ? <ActivityIndicator size="small" color=Colors.white /> : <Text style={styles.primaryButtonText}>경매 요청 생성</Text>}
+        {saving ? <ActivityIndicator size="small" color={Colors.white} /> : <Text style={styles.primaryButtonText}>경매 요청 생성</Text>}
       </TouchableOpacity>
 
       <OptimizedStationSelectModal

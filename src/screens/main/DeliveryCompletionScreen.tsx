@@ -166,7 +166,7 @@ export default function DeliveryCompletionScreen() {
   if (loadingDelivery) {
     return (
       <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color=Colors.primary />
+        <ActivityIndicator size="large" color={Colors.primary} />
         <Text style={styles.loadingText}>배송 상태를 확인하고 있어요.</Text>
       </View>
     );
@@ -190,7 +190,7 @@ export default function DeliveryCompletionScreen() {
           disabled={markingArrived}
         >
           {markingArrived ? (
-            <ActivityIndicator size="small" color=Colors.primary />
+            <ActivityIndicator size="small" color={Colors.primary} />
           ) : (
             <Text style={styles.secondaryButtonText}>도착 처리하기</Text>
           )}
@@ -225,7 +225,7 @@ export default function DeliveryCompletionScreen() {
           {photoUri ? <Image source={{ uri: photoUri }} style={styles.previewImage} /> : null}
           <TouchableOpacity style={styles.photoButton} onPress={() => void handleCapturePhoto()} disabled={photoLoading}>
             {photoLoading ? (
-              <ActivityIndicator size="small" color=Colors.primary />
+              <ActivityIndicator size="small" color={Colors.primary} />
             ) : (
               <Text style={styles.photoButtonText}>{photoUri ? '사진 다시 촬영하기' : '완료 사진 촬영하기'}</Text>
             )}
@@ -246,7 +246,7 @@ export default function DeliveryCompletionScreen() {
 
       <TouchableOpacity style={styles.primaryButton} onPress={() => void handleComplete()} disabled={loading}>
         {loading ? (
-          <ActivityIndicator size="small" color=Colors.white />
+          <ActivityIndicator size="small" color={Colors.white} />
         ) : (
           <Text style={styles.primaryButtonText}>배송 완료 기록</Text>
         )}

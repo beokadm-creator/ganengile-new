@@ -58,7 +58,7 @@ export default function B2BDashboardScreen({ navigation }: Props) {
   }), [recentDeliveries]);
   const mapCenter = mapMarkers[0] ?? { latitude: 37.5665, longitude: 126.978, label: 'Seoul' };
 
-  if (loading) return <View style={styles.loadingContainer}><ActivityIndicator size="large" color=Colors.primary /></View>;
+  if (loading) return <View style={styles.loadingContainer}><ActivityIndicator size="large" color={Colors.primary} /></View>;
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
