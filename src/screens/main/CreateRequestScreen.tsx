@@ -13,6 +13,7 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
+import { doc, serverTimestamp, setDoc } from 'firebase/firestore';
 import AppTopBar from '../../components/common/AppTopBar';
 import AddressSearchModal from '../../components/common/AddressSearchModal';
 import NearbyStationRecommendationsModal, {
@@ -23,8 +24,9 @@ import { useUser } from '../../contexts/UserContext';
 import { analyzeRequestDraftWithAI, type Beta1AIAnalysisResponse } from '../../services/beta1-ai-service';
 import { buildBeta1QuoteCards, createBeta1Request, type Beta1QuoteCard } from '../../services/beta1-orchestration-service';
 import { getAllStations } from '../../services/config-service';
-import { requireUserId } from '../../services/firebase';
+import { db, requireUserId } from '../../services/firebase';
 import { locationService } from '../../services/location-service';
+import { confirmPhoneOtp, requestPhoneOtp } from '../../services/otp-service';
 import { takePhoto, uploadPhotoWithThumbnail } from '../../services/photo-service';
 import { addRecentAddress, getRecentAddresses, getSavedAddresses } from '../../services/profile-service';
 import { BorderRadius, Colors, Shadows, Spacing, Typography } from '../../theme';
@@ -65,6 +67,37 @@ const sizeOptions: Array<{ value: PackageSize; label: string }> = [
 function parseEtaMinutes(label: string): number {
   const matched = label.match(/(\d+)/);
   return matched ? Number(matched[1]) : 0;
+}
+
+function normalizePhoneNumber(phoneNumber: string): string {
+  return phoneNumber.replace(/\D/g, '');
+}
+
+function formatPhoneDigits(value: string): string {
+  const digits = value.replace(/\D/g, '').slice(0, 11);
+  if (digits.length <= 3) return digits;
+  if (digits.length <= 7) return `${digits.slice(0, 3)}-${digits.slice(3)}`;
+  return `${digits.slice(0, 3)}-${digits.slice(3, 7)}-${digits.slice(7)}`;
+}
+
+function splitReservationSchedule(value?: string) {
+  const trimmed = (value ?? '').trim();
+  const matched = trimmed.match(/^(\d{4}-\d{2}-\d{2})\s+(\d{2}:\d{2})$/);
+  if (!matched) {
+    return { date: '', time: trimmed };
+  }
+
+  return { date: matched[1], time: matched[2] };
+}
+
+function combineReservationSchedule(date: string, time: string) {
+  const trimmedDate = date.trim();
+  const trimmedTime = time.trim();
+
+  if (!trimmedDate && !trimmedTime) return '';
+  if (!trimmedDate) return trimmedTime;
+  if (!trimmedTime) return trimmedDate;
+  return `${trimmedDate} ${trimmedTime}`;
 }
 
 function normalizeAISize(size?: string): PackageSize | null {
@@ -225,9 +258,10 @@ function Chip({
 }
 
 export default function CreateRequestScreen({ navigation, route }: Props) {
-  const { user } = useUser();
+  const { user, refreshUser } = useUser();
   const params = route?.params;
   const prefill = params?.prefill;
+  const prefilledReservation = splitReservationSchedule(prefill?.preferredPickupTime);
 
   const [stations, setStations] = useState<Station[]>([]);
   const [loading, setLoading] = useState(true);
@@ -269,9 +303,20 @@ export default function CreateRequestScreen({ navigation, route }: Props) {
     prefill?.directParticipationMode ?? 'none'
   );
   const [urgency, setUrgency] = useState<'normal' | 'fast' | 'urgent'>(prefill?.urgency ?? 'fast');
-  const [preferredPickupTime, setPreferredPickupTime] = useState(prefill?.preferredPickupTime ?? '');
+  const [preferredPickupDate, setPreferredPickupDate] = useState(prefilledReservation.date);
+  const [preferredPickupTime, setPreferredPickupTime] = useState(prefilledReservation.time);
   const [preferredArrivalTime, setPreferredArrivalTime] = useState(prefill?.preferredArrivalTime ?? '');
   const [selectedQuoteType, setSelectedQuoteType] = useState<Beta1QuoteCard['quoteType']>('balanced');
+  const [contactPhoneNumber, setContactPhoneNumber] = useState(
+    formatPhoneDigits(user?.phoneVerification?.phoneNumber ?? user?.phoneNumber ?? '')
+  );
+  const [contactOtpSessionId, setContactOtpSessionId] = useState<string | null>(null);
+  const [contactOtpCode, setContactOtpCode] = useState('');
+  const [contactOtpHintCode, setContactOtpHintCode] = useState<string | null>(null);
+  const [contactOtpDestination, setContactOtpDestination] = useState('');
+  const [contactOtpExpiresAt, setContactOtpExpiresAt] = useState<string | null>(null);
+  const [contactOtpSending, setContactOtpSending] = useState(false);
+  const [contactOtpVerifying, setContactOtpVerifying] = useState(false);
 
   useEffect(() => {
     const run = async () => {
@@ -302,11 +347,19 @@ export default function CreateRequestScreen({ navigation, route }: Props) {
     void run();
   }, [user?.uid]);
 
+  useEffect(() => {
+    setContactPhoneNumber(formatPhoneDigits(user?.phoneVerification?.phoneNumber ?? user?.phoneNumber ?? ''));
+  }, [user?.phoneNumber, user?.phoneVerification?.phoneNumber]);
+
+  const isPhoneVerified = user?.phoneVerification?.verified === true;
+  const resolvedPreferredPickupTime =
+    requestMode === 'reservation'
+      ? combineReservationSchedule(preferredPickupDate, preferredPickupTime)
+      : preferredPickupTime || 'now';
+
   const quotes = useMemo(() => {
     const origin = pickupStation ?? stations[0] ?? fallbackStation('pickup');
     const destination = deliveryStation ?? stations[1] ?? fallbackStation('delivery');
-    const pickupAddress = formatDetailedAddress(pickupRoadAddress, pickupDetailAddress);
-    const deliveryAddress = formatDetailedAddress(deliveryRoadAddress, deliveryDetailAddress);
 
     return buildBeta1QuoteCards({
       requesterUserId: user?.uid ?? 'preview',
@@ -331,7 +384,7 @@ export default function CreateRequestScreen({ navigation, route }: Props) {
       urgency: requestMode === 'reservation' ? 'normal' : urgency,
       selectedQuoteType,
       directParticipationMode: directMode,
-      preferredPickupTime,
+      preferredPickupTime: resolvedPreferredPickupTime,
       preferredArrivalTime,
       aiAnalysisOverride: aiResult
         ? {
@@ -367,7 +420,7 @@ export default function CreateRequestScreen({ navigation, route }: Props) {
     urgency,
     selectedQuoteType,
     directMode,
-    preferredPickupTime,
+    resolvedPreferredPickupTime,
     preferredArrivalTime,
     aiResult,
   ]);
@@ -381,7 +434,8 @@ export default function CreateRequestScreen({ navigation, route }: Props) {
     !recipientPhone.trim() ||
     (pickupMode === 'address' && (!pickupRoadAddress.trim() || !pickupDetailAddress.trim())) ||
     (deliveryMode === 'address' && (!deliveryRoadAddress.trim() || !deliveryDetailAddress.trim())) ||
-    (requestMode === 'reservation' && !preferredPickupTime.trim());
+    !isPhoneVerified ||
+    (requestMode === 'reservation' && (!preferredPickupDate.trim() || !preferredPickupTime.trim()));
 
   function buildNearbyRecommendations(latitude: number, longitude: number): NearbyStationRecommendation[] {
     return locationService
@@ -483,7 +537,7 @@ export default function CreateRequestScreen({ navigation, route }: Props) {
           phone: recipientPhone || undefined,
         },
         preferredSchedule: {
-          pickupTime: preferredPickupTime || undefined,
+          pickupTime: resolvedPreferredPickupTime || undefined,
           arrivalTime: preferredArrivalTime || undefined,
         },
       });
@@ -510,9 +564,81 @@ export default function CreateRequestScreen({ navigation, route }: Props) {
     }
   }
 
+  async function handleRequestContactOtp() {
+    const normalized = normalizePhoneNumber(contactPhoneNumber);
+    if (!/^010\d{8}$/.test(normalized)) {
+      Alert.alert('Phone number', 'Enter a valid 010 phone number first.');
+      return;
+    }
+
+    setContactOtpSending(true);
+    try {
+      const result = await requestPhoneOtp(normalized);
+      setContactOtpSessionId(result.sessionId);
+      setContactOtpCode('');
+      setContactOtpHintCode(result.testCode ?? null);
+      setContactOtpDestination(result.maskedDestination);
+      setContactOtpExpiresAt(result.expiresAt);
+      Alert.alert('Code sent', result.testCode ? `Dev code: ${result.testCode}` : `Sent to ${result.maskedDestination}`);
+    } catch (error) {
+      Alert.alert('OTP failed', error instanceof Error ? error.message : 'Could not send verification code.');
+    } finally {
+      setContactOtpSending(false);
+    }
+  }
+
+  async function handleVerifyContactOtp() {
+    if (!user?.uid) {
+      Alert.alert('Login required', 'Please log in again and try phone verification.');
+      return;
+    }
+
+    if (!contactOtpSessionId) {
+      Alert.alert('Request code first', 'Send a verification code before trying to verify.');
+      return;
+    }
+
+    if (!/^\d{6}$/.test(contactOtpCode.trim())) {
+      Alert.alert('Verification code', 'Enter the 6-digit code.');
+      return;
+    }
+
+    setContactOtpVerifying(true);
+    try {
+      const normalized = normalizePhoneNumber(contactPhoneNumber);
+      const result = await confirmPhoneOtp({
+        sessionId: contactOtpSessionId,
+        phoneNumber: normalized,
+        code: contactOtpCode,
+      });
+
+      await setDoc(
+        doc(db, 'users', user.uid),
+        {
+          phoneNumber: normalized,
+          phoneVerification: {
+            verified: true,
+            phoneNumber: normalized,
+            verificationToken: result.verificationToken,
+            verifiedAt: result.verifiedAt,
+          },
+          updatedAt: serverTimestamp(),
+        },
+        { merge: true }
+      );
+
+      await refreshUser();
+      Alert.alert('Phone verified', 'You can now continue with the delivery request.');
+    } catch (error) {
+      Alert.alert('Verification failed', error instanceof Error ? error.message : 'Could not verify the phone number.');
+    } finally {
+      setContactOtpVerifying(false);
+    }
+  }
+
   async function handleSubmit() {
     if (submitDisabled || !pickupStation || !deliveryStation) {
-      Alert.alert('입력 확인', '사진, 출발/도착 정보, 물품 정보와 수령인 정보를 모두 확인해 주세요.');
+      Alert.alert('입력 확인', '사진, 출발/도착 정보, 물품 정보, 수령인 정보와 휴대폰 확인 상태를 모두 확인해 주세요.');
       return;
     }
 
@@ -557,7 +683,7 @@ export default function CreateRequestScreen({ navigation, route }: Props) {
         urgency: requestMode === 'reservation' ? 'normal' : urgency,
         selectedQuoteType,
         directParticipationMode: directMode,
-        preferredPickupTime: requestMode === 'reservation' ? preferredPickupTime : preferredPickupTime || '지금 바로',
+        preferredPickupTime: resolvedPreferredPickupTime,
         preferredArrivalTime: preferredArrivalTime || undefined,
         aiAnalysisOverride: aiResult
           ? {
@@ -817,6 +943,13 @@ export default function CreateRequestScreen({ navigation, route }: Props) {
             <>
               <TextInput
                 style={styles.input}
+                value={preferredPickupDate}
+                onChangeText={setPreferredPickupDate}
+                placeholder="Reservation date (YYYY-MM-DD)"
+                placeholderTextColor={Colors.gray400}
+              />
+              <TextInput
+                style={styles.input}
                 value={preferredPickupTime}
                 onChangeText={setPreferredPickupTime}
                 placeholder="예: 오늘 19:30"
@@ -829,6 +962,7 @@ export default function CreateRequestScreen({ navigation, route }: Props) {
                 placeholder="도착 희망 시간(선택)"
                 placeholderTextColor={Colors.gray400}
               />
+              <Text style={styles.muted}>Add both a reservation date and time.</Text>
             </>
           ) : (
             <View style={styles.row}>
@@ -877,6 +1011,64 @@ export default function CreateRequestScreen({ navigation, route }: Props) {
             placeholder="수령인 연락처"
             placeholderTextColor={Colors.gray400}
           />
+        </Block>
+
+        <Block title="Contact Verification">
+          <Text style={styles.muted}>
+            Sign-up stays lightweight. We confirm a reachable phone number right before the first request.
+          </Text>
+          <TextInput
+            style={styles.input}
+            value={contactPhoneNumber}
+            onChangeText={(value) => setContactPhoneNumber(formatPhoneDigits(value))}
+            keyboardType="phone-pad"
+            placeholder="010-1234-5678"
+            placeholderTextColor={Colors.gray400}
+            editable={!isPhoneVerified}
+          />
+          {isPhoneVerified ? (
+            <Text style={styles.selectorValue}>Phone verification complete.</Text>
+          ) : (
+            <>
+              <View style={styles.row}>
+                <TextInput
+                  style={[styles.input, styles.flexInput]}
+                  value={contactOtpCode}
+                  onChangeText={setContactOtpCode}
+                  keyboardType="number-pad"
+                  placeholder="6-digit code"
+                  placeholderTextColor={Colors.gray400}
+                />
+                <TouchableOpacity
+                  style={[styles.secondaryButton, styles.otpInlineButton]}
+                  onPress={() => void handleRequestContactOtp()}
+                  disabled={contactOtpSending}
+                >
+                  {contactOtpSending ? (
+                    <ActivityIndicator color={Colors.primary} />
+                  ) : (
+                    <Text style={styles.secondaryButtonText}>{contactOtpSessionId ? 'Resend' : 'Send code'}</Text>
+                  )}
+                </TouchableOpacity>
+              </View>
+              <TouchableOpacity
+                style={styles.secondaryButton}
+                onPress={() => void handleVerifyContactOtp()}
+                disabled={contactOtpVerifying || !contactOtpSessionId}
+              >
+                {contactOtpVerifying ? (
+                  <ActivityIndicator color={Colors.primary} />
+                ) : (
+                  <Text style={styles.secondaryButtonText}>Verify phone</Text>
+                )}
+              </TouchableOpacity>
+              {contactOtpDestination ? <Text style={styles.muted}>Sent to: {contactOtpDestination}</Text> : null}
+              {contactOtpExpiresAt ? (
+                <Text style={styles.muted}>Expires: {new Date(contactOtpExpiresAt).toLocaleTimeString()}</Text>
+              ) : null}
+              {contactOtpHintCode ? <Text style={styles.muted}>Dev code: {contactOtpHintCode}</Text> : null}
+            </>
+          )}
         </Block>
 
         <Text style={styles.sectionHeader}>예상 금액</Text>
@@ -1092,6 +1284,9 @@ const styles = StyleSheet.create({
     paddingHorizontal: Spacing.md,
     color: Colors.textPrimary,
   },
+  flexInput: {
+    flex: 1,
+  },
   selector: {
     minHeight: 58,
     borderRadius: BorderRadius.lg,
@@ -1134,6 +1329,10 @@ const styles = StyleSheet.create({
   secondaryButtonText: {
     color: Colors.primary,
     fontWeight: '800',
+  },
+  otpInlineButton: {
+    minWidth: 110,
+    paddingHorizontal: 16,
   },
   disabled: { opacity: 0.5 },
   muted: {

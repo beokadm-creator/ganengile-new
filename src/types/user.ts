@@ -52,6 +52,17 @@ export interface User {
   email: string;
   name: string;
   phoneNumber?: string;
+  phoneVerification?: {
+    verified: boolean;
+    verificationToken?: string;
+    verifiedAt?: Timestamp | string;
+    phoneNumber?: string;
+  };
+  emailVerification?: {
+    verified: boolean;
+    sentAt?: Timestamp | string;
+    email?: string;
+  };
   authProvider?: AuthProviderType;
   authProviderUserId?: string;
   signupMethod?: 'email' | 'google' | 'kakao' | 'unknown';

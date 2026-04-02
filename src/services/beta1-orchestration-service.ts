@@ -36,7 +36,7 @@ import {
   PricingQuoteStatus,
   RequestDraftStatus,
 } from '../types/beta1';
-import { calculatePhase1DeliveryFee, type PackageSizeType } from './pricing-service';
+import { calculatePhase1DeliveryFee, estimateStationCountFromCoords, type PackageSizeType } from './pricing-service';
 import { getAIIntegrationConfig } from './integration-config-service';
 import { buildRequestDraftFromLegacyInput } from '../utils/request-draft-adapters';
 import { getWalletLedger } from './beta1-wallet-service';
@@ -295,6 +295,28 @@ function buildQuotePricing(
   return pricing;
 }
 
+function hasUsableCoords(station: StationInfo) {
+  return (
+    Number.isFinite(station.lat) &&
+    Number.isFinite(station.lng) &&
+    station.lat !== 0 &&
+    station.lng !== 0
+  );
+}
+
+function resolveEstimatedStationCount(input: Beta1RequestCreateInput) {
+  if (hasUsableCoords(input.pickupStation) && hasUsableCoords(input.deliveryStation)) {
+    return estimateStationCountFromCoords(
+      input.pickupStation.lat,
+      input.pickupStation.lng,
+      input.deliveryStation.lat,
+      input.deliveryStation.lng
+    );
+  }
+
+  return 5;
+}
+
 export function buildBeta1QuoteCards(input: Beta1RequestCreateInput): Beta1QuoteCard[] {
   const reservationMode = input.requestMode === 'reservation';
   const originType = input.originType ?? 'station';
@@ -303,8 +325,9 @@ export function buildBeta1QuoteCards(input: Beta1RequestCreateInput): Beta1Quote
   const hasAddressDropoff = destinationType === 'address';
   const addressPickupFee = hasAddressPickup ? 900 : 0;
   const addressDropoffFee = hasAddressDropoff ? 800 : 0;
+  const stationCount = resolveEstimatedStationCount(input);
   const base = calculatePhase1DeliveryFee({
-    stationCount: 5,
+    stationCount,
     weight: input.weightKg,
     packageSize: normalizePackageSize(input.packageSize),
     urgency: input.urgency ?? 'normal',

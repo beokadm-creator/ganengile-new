@@ -22,7 +22,6 @@ import { Colors } from '../../theme';
 import { auth, db } from '../../services/firebase';
 import { handleGoogleSignIn } from '../../services/google-auth';
 import { getKakaoLoginErrorMessage, signUpWithKakao } from '../../services/kakao-auth';
-import { confirmPhoneOtp, requestPhoneOtp } from '../../services/otp-service';
 import type { AuthNavigationProp } from '../../types/navigation';
 import { UserRole } from '../../types/user';
 
@@ -30,12 +29,11 @@ type Props = {
   navigation: AuthNavigationProp;
 };
 
-type Step = 'name' | 'email' | 'phone' | 'password' | 'terms';
+type Step = 'name' | 'email' | 'password' | 'terms';
 
 type SignUpForm = {
   name: string;
   email: string;
-  phoneNumber: string;
   password: string;
   confirmPassword: string;
 };
@@ -46,63 +44,30 @@ type TermsAgreement = {
   marketing: boolean;
 };
 
-type PhoneVerificationState = {
-  sessionId: string | null;
-  code: string;
-  hintCode: string | null;
-  destination: string;
-  expiresAt: string | null;
-  verificationToken: string | null;
-  verifiedAt: string | null;
-};
+const STEP_ORDER: Step[] = ['name', 'email', 'password', 'terms'];
 
-const STEP_ORDER: Step[] = ['name', 'email', 'phone', 'password', 'terms'];
-
-const STEP_COPY: Record<
-  Step,
-  {
-    title: string;
-    subtitle: string;
-    cta: string;
-  }
-> = {
+const STEP_COPY: Record<Step, { title: string; subtitle: string; cta: string }> = {
   name: {
-    title: '이름을 알려주세요',
-    subtitle: '처음에는 가장 쉬운 정보부터 받을게요. 가입 후 화면에서도 그대로 보여집니다.',
+    title: '이름만 먼저 알려주세요',
+    subtitle: '처음 가입은 가볍게 끝내고, 실제 배송 요청 전에 필요한 인증만 이어서 받겠습니다.',
     cta: '다음',
   },
   email: {
-    title: '이메일을 입력해주세요',
-    subtitle: '로그인과 안내 메일에 사용됩니다. 가입 완료 후 인증 메일도 함께 보냅니다.',
+    title: '로그인할 이메일을 입력해주세요',
+    subtitle: '계정 확인용 메일을 보내드리고, 이후 로그인 계정으로 그대로 사용됩니다.',
     cta: '다음',
-  },
-  phone: {
-    title: '휴대폰 번호를 확인할게요',
-    subtitle: '이 단계는 본인 인증이 아니라 연락 가능한 번호 확인입니다. 신원 확인은 가입 후 별도로 진행됩니다.',
-    cta: '번호 확인 완료',
   },
   password: {
     title: '비밀번호를 설정해주세요',
-    subtitle: '이메일 로그인용 비밀번호입니다. 너무 복잡하게 느껴지지 않도록 여기서만 한 번 정리합니다.',
+    subtitle: '가입 자체는 여기서 마무리됩니다. 휴대폰 확인은 배송 요청 직전에만 진행됩니다.',
     cta: '다음',
   },
   terms: {
-    title: '약관 동의를 마치면 끝입니다',
-    subtitle: '필수 약관만 먼저 받고, 마케팅 수신은 선택으로 남겨둡니다.',
+    title: '필수 동의만 마치면 끝입니다',
+    subtitle: '지금은 최소 정보만 받고, 연락처와 인증은 실제 기능 사용 시점에 확인합니다.',
     cta: '가입 완료',
   },
 };
-
-function normalizePhoneNumber(phoneNumber: string): string {
-  return phoneNumber.replace(/\D/g, '');
-}
-
-function formatPhoneDigits(value: string): string {
-  const digits = value.replace(/\D/g, '').slice(0, 11);
-  if (digits.length <= 3) return digits;
-  if (digits.length <= 7) return `${digits.slice(0, 3)}-${digits.slice(3)}`;
-  return `${digits.slice(0, 3)}-${digits.slice(3, 7)}-${digits.slice(7)}`;
-}
 
 function getErrorMessage(error: unknown, fallback: string): string {
   if (error instanceof Error && error.message) {
@@ -140,12 +105,9 @@ export default function NewSignUpScreen({ navigation }: Props) {
   const insets = useSafeAreaInsets();
   const [stepIndex, setStepIndex] = useState(0);
   const [loading, setLoading] = useState(false);
-  const [otpSending, setOtpSending] = useState(false);
-  const [otpVerifying, setOtpVerifying] = useState(false);
   const [form, setForm] = useState<SignUpForm>({
     name: '',
     email: '',
-    phoneNumber: '',
     password: '',
     confirmPassword: '',
   });
@@ -154,128 +116,59 @@ export default function NewSignUpScreen({ navigation }: Props) {
     privacy: false,
     marketing: false,
   });
-  const [phoneVerification, setPhoneVerification] = useState<PhoneVerificationState>({
-    sessionId: null,
-    code: '',
-    hintCode: null,
-    destination: '',
-    expiresAt: null,
-    verificationToken: null,
-    verifiedAt: null,
-  });
 
   const step = STEP_ORDER[stepIndex];
+  const copy = STEP_COPY[step];
   const progressWidth = useMemo<DimensionValue>(
     () => `${((stepIndex + 1) / STEP_ORDER.length) * 100}%`,
-    [stepIndex],
+    [stepIndex]
   );
   const footerPaddingBottom = Math.max(insets.bottom, 12);
 
-  function resetPhoneVerification() {
-    setPhoneVerification({
-      sessionId: null,
-      code: '',
-      hintCode: null,
-      destination: '',
-      expiresAt: null,
-      verificationToken: null,
-      verifiedAt: null,
-    });
-  }
-
   function updateForm(key: keyof SignUpForm, value: string) {
-    setForm((current) => ({
-      ...current,
-      [key]: key === 'phoneNumber' ? formatPhoneDigits(value) : value,
-    }));
-
-    if (key === 'phoneNumber') {
-      resetPhoneVerification();
-    }
+    setForm((current) => ({ ...current, [key]: value }));
   }
 
   function setAgreement(key: keyof TermsAgreement, value: boolean) {
-    setTermsAgreed((current) => ({
-      ...current,
-      [key]: value,
-    }));
+    setTermsAgreed((current) => ({ ...current, [key]: value }));
   }
 
-  function validateNameStep(): boolean {
-    if (!form.name.trim()) {
+  function validateCurrentStep() {
+    if (step === 'name' && !form.name.trim()) {
       Alert.alert('이름이 필요합니다', '이름을 입력해주세요.');
       return false;
     }
 
-    return true;
-  }
+    if (step === 'email') {
+      if (!form.email.trim()) {
+        Alert.alert('이메일이 필요합니다', '이메일을 입력해주세요.');
+        return false;
+      }
 
-  function validateEmailStep(): boolean {
-    if (!form.email.trim()) {
-      Alert.alert('이메일이 필요합니다', '이메일을 입력해주세요.');
-      return false;
+      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email.trim())) {
+        Alert.alert('이메일 형식 확인', '올바른 이메일 형식으로 입력해주세요.');
+        return false;
+      }
     }
 
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email.trim())) {
-      Alert.alert('이메일 형식 확인', '올바른 이메일 형식으로 입력해주세요.');
-      return false;
+    if (step === 'password') {
+      if (!form.password || form.password.length < 6) {
+        Alert.alert('비밀번호 확인', '비밀번호는 6자 이상이어야 합니다.');
+        return false;
+      }
+
+      if (form.password !== form.confirmPassword) {
+        Alert.alert('비밀번호 불일치', '비밀번호 확인 값이 일치하지 않습니다.');
+        return false;
+      }
     }
 
-    return true;
-  }
-
-  function validatePhoneStep(): boolean {
-    if (!/^010\d{8}$/.test(normalizePhoneNumber(form.phoneNumber))) {
-      Alert.alert('휴대폰 번호 확인', '010으로 시작하는 번호를 입력해주세요.');
-      return false;
-    }
-
-    if (!phoneVerification.verificationToken || !phoneVerification.verifiedAt) {
-      Alert.alert('번호 확인 필요', '문자로 받은 인증번호를 먼저 확인해주세요.');
-      return false;
-    }
-
-    return true;
-  }
-
-  function validatePasswordStep(): boolean {
-    if (!form.password || form.password.length < 6) {
-      Alert.alert('비밀번호 확인', '비밀번호는 6자 이상이어야 합니다.');
-      return false;
-    }
-
-    if (form.password !== form.confirmPassword) {
-      Alert.alert('비밀번호 불일치', '비밀번호 확인 값이 일치하지 않습니다.');
-      return false;
-    }
-
-    return true;
-  }
-
-  function validateTermsStep(): boolean {
-    if (!termsAgreed.service || !termsAgreed.privacy) {
+    if (step === 'terms' && (!termsAgreed.service || !termsAgreed.privacy)) {
       Alert.alert('필수 약관 동의 필요', '서비스 이용약관과 개인정보 처리방침에 동의해주세요.');
       return false;
     }
 
     return true;
-  }
-
-  function validateCurrentStep(): boolean {
-    switch (step) {
-      case 'name':
-        return validateNameStep();
-      case 'email':
-        return validateEmailStep();
-      case 'phone':
-        return validatePhoneStep();
-      case 'password':
-        return validatePasswordStep();
-      case 'terms':
-        return validateTermsStep();
-      default:
-        return false;
-    }
   }
 
   function handleNext() {
@@ -300,80 +193,8 @@ export default function NewSignUpScreen({ navigation }: Props) {
     navigation.goBack();
   }
 
-  async function handleRequestOtpPress() {
-    const phoneNumber = normalizePhoneNumber(form.phoneNumber);
-
-    if (!/^010\d{8}$/.test(phoneNumber)) {
-      Alert.alert('휴대폰 번호 확인', '010으로 시작하는 번호를 먼저 입력해주세요.');
-      return;
-    }
-
-    setOtpSending(true);
-    try {
-      const result = await requestPhoneOtp(phoneNumber);
-      setPhoneVerification({
-        sessionId: result.sessionId,
-        code: '',
-        hintCode: result.testCode ?? null,
-        destination: result.maskedDestination,
-        expiresAt: result.expiresAt,
-        verificationToken: null,
-        verifiedAt: null,
-      });
-
-      Alert.alert(
-        '인증번호 전송 완료',
-        result.testCode
-          ? `개발용 테스트 코드 ${result.testCode}가 준비되었습니다.`
-          : `${result.maskedDestination} 번호로 인증번호를 전송했습니다.`,
-      );
-    } catch (error) {
-      Alert.alert('인증번호 전송 실패', getErrorMessage(error, '인증번호를 전송하지 못했습니다.'));
-    } finally {
-      setOtpSending(false);
-    }
-  }
-
-  async function handleVerifyOtpPress() {
-    if (!phoneVerification.sessionId) {
-      Alert.alert('인증번호 요청 필요', '먼저 인증번호를 요청해주세요.');
-      return;
-    }
-
-    if (!/^\d{6}$/.test(phoneVerification.code.trim())) {
-      Alert.alert('인증번호 확인', '6자리 인증번호를 입력해주세요.');
-      return;
-    }
-
-    setOtpVerifying(true);
-    try {
-      const result = await confirmPhoneOtp({
-        sessionId: phoneVerification.sessionId,
-        phoneNumber: normalizePhoneNumber(form.phoneNumber),
-        code: phoneVerification.code,
-      });
-
-      setPhoneVerification((current) => ({
-        ...current,
-        verificationToken: result.verificationToken,
-        verifiedAt: result.verifiedAt,
-      }));
-      Alert.alert('휴대폰 번호 확인 완료', '이제 다음 단계로 진행할 수 있습니다.');
-    } catch (error) {
-      Alert.alert('인증 실패', getErrorMessage(error, '인증번호를 확인하지 못했습니다.'));
-    } finally {
-      setOtpVerifying(false);
-    }
-  }
-
   async function handleEmailSignUp() {
-    if (
-      !validateNameStep() ||
-      !validateEmailStep() ||
-      !validatePhoneStep() ||
-      !validatePasswordStep() ||
-      !validateTermsStep()
-    ) {
+    if (!form.name.trim() || !form.email.trim() || !form.password || form.password !== form.confirmPassword) {
       return;
     }
 
@@ -388,17 +209,13 @@ export default function NewSignUpScreen({ navigation }: Props) {
           uid: userCredential.user.uid,
           email: form.email.trim(),
           name: form.name.trim(),
-          phoneNumber: normalizePhoneNumber(form.phoneNumber),
           role: UserRole.GLER,
           signupMethod: 'email',
           authProvider: 'email',
           hasCompletedOnboarding: false,
           isActive: true,
           phoneVerification: {
-            verified: true,
-            verificationToken: phoneVerification.verificationToken,
-            verifiedAt: phoneVerification.verifiedAt,
-            phoneNumber: normalizePhoneNumber(form.phoneNumber),
+            verified: false,
           },
           emailVerification: {
             verified: false,
@@ -416,12 +233,12 @@ export default function NewSignUpScreen({ navigation }: Props) {
           createdAt: serverTimestamp(),
           updatedAt: serverTimestamp(),
         },
-        { merge: true },
+        { merge: true }
       );
 
       Alert.alert(
         '가입이 완료되었습니다',
-        '이메일 인증 메일을 보냈습니다. 메일 확인 후 로그인하면 온보딩과 본인 확인을 이어서 진행할 수 있습니다.',
+        '가입은 바로 완료됐습니다. 이메일 인증 메일을 보냈고, 배송 요청 전에 휴대폰 확인만 진행하면 됩니다.'
       );
       navigation.navigate('Login');
     } catch (error) {
@@ -452,7 +269,6 @@ export default function NewSignUpScreen({ navigation }: Props) {
     try {
       await signUpWithKakao({
         name: form.name.trim(),
-        phoneNumber: normalizePhoneNumber(form.phoneNumber),
         role: UserRole.GLER,
       });
     } catch (error) {
@@ -461,8 +277,6 @@ export default function NewSignUpScreen({ navigation }: Props) {
       setLoading(false);
     }
   }
-
-  const copy = STEP_COPY[step];
 
   return (
     <KeyboardAvoidingView
@@ -488,29 +302,21 @@ export default function NewSignUpScreen({ navigation }: Props) {
           </Text>
         </View>
 
-        <View style={styles.card}>{renderStepContent(step, form, phoneVerification, termsAgreed, updateForm, setAgreement, setPhoneVerification, otpSending, otpVerifying, handleRequestOtpPress, handleVerifyOtpPress)}</View>
+        <View style={styles.card}>{renderStepContent(step, form, termsAgreed, updateForm, setAgreement)}</View>
 
         <View style={styles.contextCard}>
-          <Text style={styles.contextTitle}>가입 구조 안내</Text>
-          <Text style={styles.contextBody}>휴대폰 인증은 연락 가능한 번호를 확인하는 단계입니다.</Text>
-          <Text style={styles.contextBody}>실제 본인 확인은 가입 후 별도의 PASS/카카오 본인확인 화면에서 진행됩니다.</Text>
+          <Text style={styles.contextTitle}>인증 흐름 안내</Text>
+          <Text style={styles.contextBody}>가입은 가볍게 끝내고, 배송 요청 전에 휴대폰 번호 확인을 진행합니다.</Text>
+          <Text style={styles.contextBody}>길러 승급이나 정산 단계의 본인확인은 기존 PASS/카카오 본인확인 흐름을 그대로 사용합니다.</Text>
         </View>
 
         {step === 'name' ? (
           <View style={styles.socialCard}>
             <Text style={styles.sectionTitle}>간편 가입도 가능합니다</Text>
-            <TouchableOpacity
-              style={styles.kakaoButton}
-              onPress={() => void handleKakaoSignUpPress()}
-              disabled={loading}
-            >
+            <TouchableOpacity style={styles.kakaoButton} onPress={() => void handleKakaoSignUpPress()} disabled={loading}>
               <Text style={styles.kakaoButtonText}>카카오로 가입</Text>
             </TouchableOpacity>
-            <TouchableOpacity
-              style={styles.secondaryButton}
-              onPress={() => void handleGoogleSignUpPress()}
-              disabled={loading}
-            >
+            <TouchableOpacity style={styles.secondaryButton} onPress={() => void handleGoogleSignUpPress()} disabled={loading}>
               <Text style={styles.secondaryButtonText}>Google로 가입</Text>
             </TouchableOpacity>
           </View>
@@ -521,11 +327,7 @@ export default function NewSignUpScreen({ navigation }: Props) {
         <TouchableOpacity style={styles.backButton} onPress={handleBack} disabled={loading}>
           <Text style={styles.backButtonText}>{stepIndex === 0 ? '돌아가기' : '이전'}</Text>
         </TouchableOpacity>
-        <TouchableOpacity
-          style={[styles.nextButton, loading && styles.nextButtonDisabled]}
-          onPress={handleNext}
-          disabled={loading}
-        >
+        <TouchableOpacity style={[styles.nextButton, loading && styles.nextButtonDisabled]} onPress={handleNext} disabled={loading}>
           {loading ? <ActivityIndicator color={Colors.white} /> : <Text style={styles.nextButtonText}>{copy.cta}</Text>}
         </TouchableOpacity>
       </View>
@@ -536,15 +338,9 @@ export default function NewSignUpScreen({ navigation }: Props) {
 function renderStepContent(
   step: Step,
   form: SignUpForm,
-  phoneVerification: PhoneVerificationState,
   termsAgreed: TermsAgreement,
   updateForm: (key: keyof SignUpForm, value: string) => void,
-  setAgreement: (key: keyof TermsAgreement, value: boolean) => void,
-  setPhoneVerification: React.Dispatch<React.SetStateAction<PhoneVerificationState>>,
-  otpSending: boolean,
-  otpVerifying: boolean,
-  handleRequestOtpPress: () => Promise<void>,
-  handleVerifyOtpPress: () => Promise<void>,
+  setAgreement: (key: keyof TermsAgreement, value: boolean) => void
 ) {
   switch (step) {
     case 'name':
@@ -558,7 +354,7 @@ function renderStepContent(
             autoCapitalize="words"
             autoFocus
           />
-          <Text style={styles.helperText}>길러 신청과 사용자 프로필에서 사용됩니다.</Text>
+          <Text style={styles.helperText}>요청자 화면과 프로필에서 사용됩니다.</Text>
         </>
       );
     case 'email':
@@ -573,73 +369,7 @@ function renderStepContent(
             keyboardType="email-address"
             autoFocus
           />
-          <Text style={styles.helperText}>로그인 계정으로 사용되며 가입 후 인증 메일을 발송합니다.</Text>
-        </>
-      );
-    case 'phone':
-      return (
-        <>
-          <Field
-            label="휴대폰 번호"
-            value={form.phoneNumber}
-            onChangeText={(value) => updateForm('phoneNumber', value)}
-            placeholder="010-1234-5678"
-            keyboardType="number-pad"
-            autoFocus
-          />
-          <View style={styles.otpRow}>
-            <TextInput
-              style={[styles.input, styles.otpInput]}
-              placeholder="문자로 받은 6자리 숫자"
-              placeholderTextColor={Colors.textTertiary}
-              value={phoneVerification.code}
-              onChangeText={(value) =>
-                setPhoneVerification((current) => ({
-                  ...current,
-                  code: value.replace(/\D/g, '').slice(0, 6),
-                }))
-              }
-              keyboardType="number-pad"
-            />
-            <TouchableOpacity
-              style={styles.inlineActionButton}
-              onPress={() => void handleRequestOtpPress()}
-              disabled={otpSending}
-            >
-              {otpSending ? (
-                <ActivityIndicator color={Colors.surface} />
-              ) : (
-                <Text style={styles.inlineActionButtonText}>
-                  {phoneVerification.sessionId ? '재전송' : '번호 전송'}
-                </Text>
-              )}
-            </TouchableOpacity>
-          </View>
-          <TouchableOpacity
-            style={styles.secondaryButton}
-            onPress={() => void handleVerifyOtpPress()}
-            disabled={otpVerifying || !phoneVerification.sessionId}
-          >
-            {otpVerifying ? (
-              <ActivityIndicator color={Colors.textPrimary} />
-            ) : (
-              <Text style={styles.secondaryButtonText}>휴대폰 번호 확인</Text>
-            )}
-          </TouchableOpacity>
-          {phoneVerification.destination ? (
-            <Text style={styles.helperText}>전송 대상: {phoneVerification.destination}</Text>
-          ) : null}
-          {phoneVerification.expiresAt ? (
-            <Text style={styles.helperText}>
-              만료 시각: {new Date(phoneVerification.expiresAt).toLocaleTimeString()}
-            </Text>
-          ) : null}
-          {phoneVerification.hintCode ? (
-            <Text style={styles.helperText}>개발 테스트 코드: {phoneVerification.hintCode}</Text>
-          ) : null}
-          {phoneVerification.verifiedAt ? (
-            <Text style={styles.successText}>번호 확인이 완료되었습니다.</Text>
-          ) : null}
+          <Text style={styles.helperText}>로그인 계정으로 사용되며, 가입 직후 인증 메일을 보냅니다.</Text>
         </>
       );
     case 'password':
@@ -660,7 +390,7 @@ function renderStepContent(
             placeholder="같은 비밀번호를 다시 입력"
             secureTextEntry
           />
-          <Text style={styles.helperText}>문자와 숫자를 섞어두면 더 안전합니다.</Text>
+          <Text style={styles.helperText}>배송 요청 전 연락처 확인은 따로 진행되니, 가입 단계에서는 여기까지만 받습니다.</Text>
         </>
       );
     case 'terms':
@@ -737,23 +467,10 @@ function AgreementRow({
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: Colors.background,
-  },
-  scroll: {
-    flex: 1,
-  },
-  content: {
-    flexGrow: 1,
-    paddingHorizontal: 20,
-    paddingTop: 24,
-    paddingBottom: 32,
-    gap: 16,
-  },
-  header: {
-    gap: 10,
-  },
+  container: { flex: 1, backgroundColor: Colors.background },
+  scroll: { flex: 1 },
+  content: { flexGrow: 1, paddingHorizontal: 20, paddingTop: 24, paddingBottom: 32, gap: 16 },
+  header: { gap: 10 },
   eyebrow: {
     alignSelf: 'flex-start',
     paddingHorizontal: 12,
@@ -764,73 +481,19 @@ const styles = StyleSheet.create({
     fontWeight: '800',
     fontSize: 12,
   },
-  title: {
-    color: Colors.textPrimary,
-    fontSize: 30,
-    fontWeight: '800',
-    lineHeight: 38,
-  },
-  subtitle: {
-    color: Colors.textSecondary,
-    fontSize: 15,
-    lineHeight: 24,
-  },
-  progressTrack: {
-    height: 8,
-    backgroundColor: Colors.border,
-    borderRadius: 999,
-    overflow: 'hidden',
-  },
-  progressFill: {
-    height: '100%',
-    backgroundColor: Colors.primary,
-    borderRadius: 999,
-  },
-  progressCaption: {
-    color: Colors.textTertiary,
-    fontSize: 12,
-    fontWeight: '700',
-  },
-  card: {
-    backgroundColor: Colors.surface,
-    borderRadius: 24,
-    padding: 22,
-    gap: 14,
-  },
-  contextCard: {
-    backgroundColor: Colors.primaryMint,
-    borderRadius: 20,
-    padding: 18,
-    gap: 6,
-  },
-  contextTitle: {
-    color: Colors.textPrimary,
-    fontSize: 15,
-    fontWeight: '800',
-  },
-  contextBody: {
-    color: Colors.textSecondary,
-    fontSize: 13,
-    lineHeight: 20,
-  },
-  socialCard: {
-    backgroundColor: Colors.surface,
-    borderRadius: 20,
-    padding: 20,
-    gap: 12,
-  },
-  sectionTitle: {
-    color: Colors.textPrimary,
-    fontSize: 17,
-    fontWeight: '800',
-  },
-  fieldWrap: {
-    gap: 6,
-  },
-  fieldLabel: {
-    color: Colors.textPrimary,
-    fontWeight: '700',
-  },
+  title: { color: Colors.textPrimary, fontSize: 30, fontWeight: '800', lineHeight: 38 },
+  subtitle: { color: Colors.textSecondary, fontSize: 15, lineHeight: 24 },
+  progressTrack: { height: 8, backgroundColor: Colors.border, borderRadius: 999, overflow: 'hidden' },
+  progressFill: { height: '100%', backgroundColor: Colors.primary, borderRadius: 999 },
+  progressCaption: { color: Colors.textTertiary, fontSize: 12, fontWeight: '700' },
+  card: { backgroundColor: Colors.surface, borderRadius: 24, padding: 22, gap: 14 },
+  contextCard: { backgroundColor: Colors.primaryMint, borderRadius: 20, padding: 18, gap: 6 },
+  contextTitle: { color: Colors.textPrimary, fontSize: 15, fontWeight: '800' },
+  contextBody: { color: Colors.textSecondary, fontSize: 13, lineHeight: 20 },
+  socialCard: { backgroundColor: Colors.surface, borderRadius: 20, padding: 20, gap: 12 },
+  sectionTitle: { color: Colors.textPrimary, fontSize: 17, fontWeight: '800' },
+  fieldWrap: { gap: 6 },
+  fieldLabel: { color: Colors.textPrimary, fontWeight: '700' },
   input: {
     minHeight: 54,
     borderRadius: 18,
@@ -841,37 +504,7 @@ const styles = StyleSheet.create({
     color: Colors.textPrimary,
     fontSize: 16,
   },
-  helperText: {
-    color: Colors.textSecondary,
-    fontSize: 13,
-    lineHeight: 19,
-  },
-  successText: {
-    color: Colors.primary,
-    fontWeight: '800',
-    fontSize: 13,
-  },
-  otpRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-  },
-  otpInput: {
-    flex: 1,
-  },
-  inlineActionButton: {
-    minHeight: 54,
-    minWidth: 104,
-    borderRadius: 18,
-    backgroundColor: Colors.primary,
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingHorizontal: 14,
-  },
-  inlineActionButtonText: {
-    color: Colors.surface,
-    fontWeight: '800',
-  },
+  helperText: { color: Colors.textSecondary, fontSize: 13, lineHeight: 19 },
   secondaryButton: {
     minHeight: 54,
     borderRadius: 18,
@@ -881,11 +514,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  secondaryButtonText: {
-    color: Colors.textPrimary,
-    fontWeight: '700',
-    fontSize: 15,
-  },
+  secondaryButtonText: { color: Colors.textPrimary, fontWeight: '700', fontSize: 15 },
   kakaoButton: {
     minHeight: 54,
     borderRadius: 18,
@@ -893,52 +522,15 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  kakaoButtonText: {
-    color: Colors.textPrimary,
-    fontWeight: '800',
-    fontSize: 15,
-  },
-  switchRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    gap: 12,
-    paddingVertical: 4,
-  },
-  switchCopy: {
-    flex: 1,
-    gap: 6,
-  },
-  switchTitleRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    flexWrap: 'wrap',
-  },
-  switchTitle: {
-    color: Colors.textPrimary,
-    fontWeight: '700',
-  },
-  switchBody: {
-    color: Colors.textSecondary,
-    fontSize: 13,
-    lineHeight: 19,
-  },
-  badge: {
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: 999,
-    fontSize: 11,
-    fontWeight: '800',
-  },
-  badgeRequired: {
-    backgroundColor: Colors.errorLight,
-    color: Colors.error,
-  },
-  badgeOptional: {
-    backgroundColor: Colors.gray100,
-    color: Colors.textSecondary,
-  },
+  kakaoButtonText: { color: Colors.textPrimary, fontWeight: '800', fontSize: 15 },
+  switchRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12, paddingVertical: 4 },
+  switchCopy: { flex: 1, gap: 6 },
+  switchTitleRow: { flexDirection: 'row', alignItems: 'center', gap: 8, flexWrap: 'wrap' },
+  switchTitle: { color: Colors.textPrimary, fontWeight: '700' },
+  switchBody: { color: Colors.textSecondary, fontSize: 13, lineHeight: 19 },
+  badge: { paddingHorizontal: 8, paddingVertical: 3, borderRadius: 999, fontSize: 11, fontWeight: '800' },
+  badgeRequired: { backgroundColor: Colors.errorBackground, color: Colors.error },
+  badgeOptional: { backgroundColor: Colors.gray100, color: Colors.textSecondary },
   footer: {
     flexDirection: 'row',
     gap: 12,
@@ -958,11 +550,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     backgroundColor: Colors.surface,
   },
-  backButtonText: {
-    color: Colors.textPrimary,
-    fontWeight: '700',
-    fontSize: 15,
-  },
+  backButtonText: { color: Colors.textPrimary, fontWeight: '700', fontSize: 15 },
   nextButton: {
     flex: 1.35,
     minHeight: 56,
@@ -971,12 +559,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  nextButtonDisabled: {
-    opacity: 0.7,
-  },
-  nextButtonText: {
-    color: Colors.white,
-    fontWeight: '800',
-    fontSize: 16,
-  },
+  nextButtonDisabled: { opacity: 0.7 },
+  nextButtonText: { color: Colors.white, fontWeight: '800', fontSize: 16 },
 });

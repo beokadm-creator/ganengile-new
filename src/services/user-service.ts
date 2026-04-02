@@ -29,6 +29,8 @@ interface UserDoc extends DocumentData {
   email?: string;
   name?: string;
   phoneNumber?: string;
+  phoneVerification?: User['phoneVerification'];
+  emailVerification?: User['emailVerification'];
   authProvider?: AuthProviderType;
   authProviderUserId?: string;
   signupMethod?: 'email' | 'google' | 'kakao' | 'unknown';
@@ -142,6 +144,8 @@ function mapUser(docId: string, data: UserDoc): User {
     email: data.email ?? '',
     name: data.name ?? '',
     phoneNumber: data.phoneNumber,
+    phoneVerification: data.phoneVerification,
+    emailVerification: data.emailVerification,
     authProvider: data.authProvider ?? AuthProviderType.UNKNOWN,
     authProviderUserId: data.authProviderUserId,
     signupMethod: data.signupMethod ?? 'unknown',
