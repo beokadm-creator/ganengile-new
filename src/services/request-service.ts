@@ -11,6 +11,7 @@ import {
   addDoc,
   updateDoc,
   deleteDoc,
+  deleteField,
   query,
   where,
   orderBy,
@@ -363,6 +364,10 @@ export async function updateRequestStatus(
       updateData.cancelledAt = serverTimestamp();
       updateData.cancellationReason = extras?.cancellationReason;
       updateData.cancelledBy = extras?.cancelledBy;
+      updateData.matchedGillerId = deleteField();
+      updateData.matchedAt = deleteField();
+      updateData.acceptedAt = deleteField();
+      updateData.primaryDeliveryId = deleteField();
     }
 
     await updateDoc(docRef, updateData);

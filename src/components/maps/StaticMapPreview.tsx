@@ -36,6 +36,7 @@ export default function StaticMapPreview({
   title = '?? ????',
   subtitle = '??? ?? ??? ???? ????.',
 }: StaticMapPreviewProps) {
+  const [loading, setLoading] = useState(true);
   const [loadFailed, setLoadFailed] = useState(false);
   const uri = useMemo(() => {
     if (!isMapEnabled()) {
@@ -86,11 +87,19 @@ export default function StaticMapPreview({
         style={styles.image}
         resizeMode="cover"
         accessibilityLabel={title}
-        onError={() => setLoadFailed(true)}
+        onLoadStart={() => {
+          setLoading(true);
+          setLoadFailed(false);
+        }}
+        onLoadEnd={() => setLoading(false)}
+        onError={() => {
+          setLoading(false);
+          setLoadFailed(true);
+        }}
       />
       <View style={styles.badge}>
-        <ActivityIndicator size="small" color="#0F766E" />
-        <Text style={styles.badgeText}>Naver Static Map</Text>
+        {loading ? <ActivityIndicator size="small" color="#0F766E" /> : null}
+        <Text style={styles.badgeText}>{loading ? '지도를 불러오는 중' : 'Naver Static Map'}</Text>
       </View>
     </View>
   );

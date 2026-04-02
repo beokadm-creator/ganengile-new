@@ -423,6 +423,10 @@ export async function cancelDeliveryFlow(args: {
     if (!delivery) {
       await updateDoc(requestRef, {
         status: 'cancelled',
+        matchedGillerId: deleteField(),
+        matchedAt: deleteField(),
+        acceptedAt: deleteField(),
+        primaryDeliveryId: deleteField(),
         cancellationReason: args.reason,
         cancelledBy: args.actorType,
         cancelledAt: serverTimestamp(),
@@ -466,6 +470,10 @@ export async function cancelDeliveryFlow(args: {
 
       await updateDoc(requestRef, {
         status: 'cancelled',
+        matchedGillerId: deleteField(),
+        matchedAt: deleteField(),
+        acceptedAt: deleteField(),
+        primaryDeliveryId: deleteField(),
         cancellationReason: args.reason,
         cancelledBy: args.actorType,
         cancelledAt: serverTimestamp(),
@@ -536,6 +544,10 @@ export async function cancelDeliveryFlow(args: {
 
         await updateDoc(requestRef, {
           status: 'cancelled',
+          matchedGillerId: deleteField(),
+          matchedAt: deleteField(),
+          acceptedAt: deleteField(),
+          primaryDeliveryId: deleteField(),
           cancellationReason: args.reason,
           cancelledBy: args.actorType,
           cancelledAt: serverTimestamp(),
@@ -562,6 +574,10 @@ export async function cancelDeliveryFlow(args: {
 
     await updateDoc(requestRef, {
       status: 'cancelled',
+      matchedGillerId: deleteField(),
+      matchedAt: deleteField(),
+      acceptedAt: deleteField(),
+      primaryDeliveryId: deleteField(),
       cancellationReason: args.reason,
       cancelledBy: args.actorType,
       cancelledAt: serverTimestamp(),

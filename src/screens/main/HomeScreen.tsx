@@ -76,12 +76,6 @@ export default function HomeScreen({ navigation }: { navigation: MainStackNaviga
             <Text style={styles.heroTitle}>
               {snapshot?.headline ?? (isRequesterView ? '배송 요청을 간단하게' : '지금 받을 미션만 빠르게')}
             </Text>
-            <Text style={styles.heroSubtitle}>
-              {snapshot?.subheadline ??
-                (isRequesterView
-                  ? '이용자에게 필요한 요청과 진행 상태만 보여드립니다.'
-                  : '길러에게 필요한 미션과 이동 동선만 보여드립니다.')}
-            </Text>
           </View>
 
           {showRoleSwitch ? (
@@ -122,16 +116,6 @@ export default function HomeScreen({ navigation }: { navigation: MainStackNaviga
           )}
         </View>
 
-        <View style={styles.strategyPanel}>
-          <Text style={styles.strategyKicker}>
-            {isRequesterView ? '이용자 홈' : '길러 홈'}
-          </Text>
-          <Text style={styles.strategyTitle}>
-            {isRequesterView
-              ? '요청, 예약, 진행 상태만 보이도록 정리했습니다.'
-              : '미션, 보상, 이동 동선만 보이도록 정리했습니다.'}
-          </Text>
-        </View>
       </View>
 
       <View style={styles.section}>
@@ -408,12 +392,6 @@ const styles = StyleSheet.create({
     fontWeight: '800',
     marginBottom: Spacing.xs,
   },
-  heroSubtitle: {
-    color: Colors.gray700,
-    fontSize: Typography.fontSize.base,
-    lineHeight: 22,
-    maxWidth: 280,
-  },
   roleChip: {
     alignItems: 'center',
     alignSelf: 'flex-start',
@@ -449,24 +427,6 @@ const styles = StyleSheet.create({
     color: Colors.textPrimary,
     fontSize: Typography.fontSize.lg,
     fontWeight: '800',
-  },
-  strategyPanel: {
-    backgroundColor: Colors.surface,
-    borderRadius: BorderRadius.xl,
-    padding: Spacing.lg,
-    gap: 6,
-  },
-  strategyKicker: {
-    color: Colors.primary,
-    fontSize: Typography.fontSize.sm,
-    fontWeight: '700',
-    textTransform: 'uppercase',
-  },
-  strategyTitle: {
-    color: Colors.textPrimary,
-    fontSize: Typography.fontSize.lg,
-    fontWeight: '800',
-    lineHeight: 24,
   },
   section: {
     gap: Spacing.md,

@@ -12,6 +12,7 @@ import {
 import { MaterialIcons } from '@expo/vector-icons';
 import { RouteProp, useNavigation, useRoute } from '@react-navigation/native';
 import { Timestamp } from 'firebase/firestore';
+import AppTopBar from '../../components/common/AppTopBar';
 import { ensureChatRoomForRequest, getChatRoomByRequestId } from '../../services/chat-service';
 import { cancelDeliveryFlow, confirmDeliveryByRequester, getDeliveryByRequestId } from '../../services/delivery-service';
 import { requireUserId } from '../../services/firebase';
@@ -283,17 +284,23 @@ export default function RequestDetailScreen() {
 
   if (loading) {
     return (
-      <View style={styles.centerState}>
-        <ActivityIndicator size="large" color={Colors.primary} />
-        <Text style={styles.centerText}>요청 상세를 불러오는 중입니다.</Text>
+      <View style={styles.container}>
+        <AppTopBar title="요청 상세" onBack={() => navigation.goBack()} />
+        <View style={styles.centerState}>
+          <ActivityIndicator size="large" color={Colors.primary} />
+          <Text style={styles.centerText}>요청 상세를 불러오는 중입니다.</Text>
+        </View>
       </View>
     );
   }
 
   if (!request) {
     return (
-      <View style={styles.centerState}>
-        <Text style={styles.errorText}>요청 정보를 찾을 수 없습니다.</Text>
+      <View style={styles.container}>
+        <AppTopBar title="요청 상세" onBack={() => navigation.goBack()} />
+        <View style={styles.centerState}>
+          <Text style={styles.errorText}>요청 정보를 찾을 수 없습니다.</Text>
+        </View>
       </View>
     );
   }
@@ -309,12 +316,13 @@ export default function RequestDetailScreen() {
   const canConfirm = request.status === RequestStatus.DELIVERED || request.status === RequestStatus.AT_LOCKER;
 
   return (
-    <ScrollView
-      style={styles.container}
-      contentContainerStyle={styles.content}
-      showsVerticalScrollIndicator={false}
-      refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => void onRefresh()} />}
-    >
+    <View style={styles.container}>
+      <AppTopBar title="요청 상세" onBack={() => navigation.goBack()} />
+      <ScrollView
+        contentContainerStyle={styles.content}
+        showsVerticalScrollIndicator={false}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => void onRefresh()} />}
+      >
       <View style={styles.hero}>
         <Text style={styles.kicker}>가는길에</Text>
         <Text style={styles.title}>
@@ -340,7 +348,7 @@ export default function RequestDetailScreen() {
         <InfoRow label="물품 가치" value={typeof request.itemValue === 'number' ? `${request.itemValue.toLocaleString()}원` : '미입력'} />
       </Panel>
 
-      <View style={styles.actionSection}>
+        <View style={styles.actionSection}>
         <ActionButton primary icon="chat-bubble-outline" label="채팅 열기" onPress={() => void openChat()} />
 
         {Boolean(request.matchedGillerId) && (request.itemValue ?? 0) > 0 ? (
@@ -377,9 +385,10 @@ export default function RequestDetailScreen() {
           />
         ) : null}
 
-        <ActionButton icon="local-shipping" label="배송 추적" onPress={() => navigation.navigate('DeliveryTracking', { requestId })} />
-      </View>
-    </ScrollView>
+          <ActionButton icon="local-shipping" label="배송 추적" onPress={() => navigation.navigate('DeliveryTracking', { requestId })} />
+        </View>
+      </ScrollView>
+    </View>
   );
 }
 

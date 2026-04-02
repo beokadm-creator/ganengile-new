@@ -3,7 +3,7 @@ import { RefreshControl, ScrollView, StyleSheet, Text, TouchableOpacity, View } 
 import { useUser } from '../../contexts/UserContext';
 import { getBeta1HomeSnapshot } from '../../services/beta1-orchestration-service';
 import { PointService } from '../../services/PointService';
-import { BorderRadius, Colors, Shadows, Spacing, Typography } from '../../theme';
+import { BorderRadius, Colors, Spacing, Typography } from '../../theme';
 import { WithdrawalEligibilityStatus } from '../../types/beta1-wallet';
 import type { MainStackNavigationProp } from '../../types/navigation';
 
@@ -110,14 +110,6 @@ export default function PointHistoryScreen({ navigation }: Props) {
         />
       }
     >
-      <View style={styles.hero}>
-        <Text style={styles.kicker}>wallet ledger</Text>
-        <Text style={styles.title}>지갑은 하나지만 성격은 나눠서 봅니다</Text>
-        <Text style={styles.subtitle}>
-          충전금, 정산금, 프로모션, 출금 대기를 분리해서 보고 출금 가능 조건도 바로 확인할 수 있습니다.
-        </Text>
-      </View>
-
       <View style={styles.totalCard}>
         <Text style={styles.totalLabel}>출금 가능한 정산금</Text>
         <Text style={styles.totalValue}>{wallet.withdrawableBalance.toLocaleString()}원</Text>
@@ -157,7 +149,6 @@ export default function PointHistoryScreen({ navigation }: Props) {
             <Text style={styles.rowLabel}>{row.label}</Text>
             <Text style={styles.rowValue}>{row.value.toLocaleString()}원</Text>
           </View>
-          <Text style={styles.rowHint}>{row.hint}</Text>
         </View>
       ))}
     </ScrollView>
@@ -183,31 +174,6 @@ const styles = StyleSheet.create({
   content: {
     padding: Spacing.lg,
     gap: Spacing.lg,
-  },
-  hero: {
-    backgroundColor: Colors.primaryMint,
-    borderRadius: BorderRadius.xl,
-    padding: Spacing.xl,
-    ...Shadows.sm,
-  },
-  kicker: {
-    fontSize: 11,
-    fontWeight: '800',
-    color: Colors.primary,
-    textTransform: 'uppercase',
-    letterSpacing: 1.2,
-    marginBottom: 8,
-  },
-  title: {
-    fontSize: Typography.fontSize['2xl'],
-    fontWeight: '800',
-    color: Colors.textPrimary,
-    marginBottom: 8,
-  },
-  subtitle: {
-    fontSize: Typography.fontSize.sm,
-    color: Colors.textSecondary,
-    lineHeight: 20,
   },
   totalCard: {
     backgroundColor: Colors.surface,
@@ -306,10 +272,5 @@ const styles = StyleSheet.create({
     fontSize: Typography.fontSize.base,
     fontWeight: '800',
     color: Colors.textPrimary,
-  },
-  rowHint: {
-    fontSize: Typography.fontSize.sm,
-    color: Colors.gray500,
-    lineHeight: 20,
   },
 });
