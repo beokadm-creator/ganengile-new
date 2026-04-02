@@ -349,6 +349,67 @@ describe('LocationService', () => {
     });
   });
 
+  describe('findNearestStations', () => {
+    const mockCurrentLocation: LocationData = {
+      latitude: 37.5665,
+      longitude: 126.978,
+      accuracy: 10,
+      altitude: 50,
+      speed: 0,
+      heading: null,
+    };
+
+    const mockStations: StationLocation[] = [
+      {
+        name: 'A',
+        line: '1호선',
+        latitude: 37.5665,
+        longitude: 126.978,
+      },
+      {
+        name: 'B',
+        line: '2호선',
+        latitude: 37.5674,
+        longitude: 126.978,
+      },
+      {
+        name: 'C',
+        line: '3호선',
+        latitude: 37.5683,
+        longitude: 126.978,
+      },
+      {
+        name: 'D',
+        line: '4호선',
+        latitude: 37.5692,
+        longitude: 126.978,
+      },
+      {
+        name: 'E',
+        line: '5호선',
+        latitude: 37.5701,
+        longitude: 126.978,
+      },
+    ];
+
+    it('가까운 역들을 거리순으로 정렬해서 limit 만큼 반환해야 한다', () => {
+      const result = locationService.findNearestStations(mockCurrentLocation, mockStations, 4);
+
+      expect(result).toHaveLength(4);
+      expect(result.map((item) => item.station.name)).toEqual(['A', 'B', 'C', 'D']);
+      expect(result[0].distanceMeters).toBeLessThanOrEqual(result[1].distanceMeters);
+      expect(result[1].distanceMeters).toBeLessThanOrEqual(result[2].distanceMeters);
+      expect(result[2].distanceMeters).toBeLessThanOrEqual(result[3].distanceMeters);
+    });
+
+    it('limit가 0 이하라도 최소 1개는 반환해야 한다', () => {
+      const result = locationService.findNearestStations(mockCurrentLocation, mockStations, 0);
+
+      expect(result).toHaveLength(1);
+      expect(result[0].station.name).toBe('A');
+    });
+  });
+
   describe('startLocationTracking', () => {
     it('위치 추적을 시작하고 콜백을 호출해야 한다', async () => {
       // Given

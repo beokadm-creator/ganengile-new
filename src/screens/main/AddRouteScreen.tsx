@@ -12,6 +12,9 @@ import {
 import { useNavigation } from '@react-navigation/native';
 import Button from '../../components/common/Button';
 import AddressSearchModal from '../../components/common/AddressSearchModal';
+import NearbyStationRecommendationsModal, {
+  type NearbyStationRecommendation,
+} from '../../components/common/NearbyStationRecommendationsModal';
 import DaySelector, { DAY_LABELS } from '../../components/common/DaySelector';
 import StationSelectModal from '../../components/common/StationSelectModal';
 import TimePicker from '../../components/common/TimePicker';
@@ -27,6 +30,18 @@ import type { DetailedAddress, StationInfo } from '../../types/route';
 type PickTarget = 'start' | 'end' | null;
 type AddressTarget = 'start' | 'end' | null;
 type RouteEndpointMode = 'station' | 'address';
+type RecommendationTarget = 'start' | 'end';
+
+type StationCandidate = ReturnType<typeof buildStationLocation> & {
+  station: Station;
+};
+
+type NearbyPickerState = {
+  target: RecommendationTarget;
+  title: string;
+  description: string;
+  recommendations: NearbyStationRecommendation[];
+};
 
 function toStationInfo(station: Station): StationInfo {
   return {
@@ -88,6 +103,7 @@ export default function AddRouteScreen() {
   const [pickTarget, setPickTarget] = useState<PickTarget>(null);
   const [addressTarget, setAddressTarget] = useState<AddressTarget>(null);
   const [resolvingLocation, setResolvingLocation] = useState<PickTarget>(null);
+  const [nearbyPicker, setNearbyPicker] = useState<NearbyPickerState | null>(null);
 
   const [startMode, setStartMode] = useState<RouteEndpointMode>('station');
   const [endMode, setEndMode] = useState<RouteEndpointMode>('station');
@@ -134,6 +150,38 @@ export default function AddRouteScreen() {
     return `${startLabel} → ${endLabel}`;
   }, [endAddress?.fullAddress, endMode, endStation?.stationName, startAddress?.fullAddress, startMode, startStation?.stationName]);
 
+  function getStationCandidates(): StationCandidate[] {
+    return stations
+      .filter((station) => {
+        const { latitude, longitude } = buildStationLocation(station);
+        return latitude != null && longitude != null;
+      })
+      .map((station) => ({
+        station,
+        ...buildStationLocation(station),
+      }));
+  }
+
+  function buildNearbyRecommendations(latitude: number, longitude: number): NearbyStationRecommendation[] {
+    return locationService
+      .findNearestStations(
+        {
+          latitude,
+          longitude,
+          accuracy: 0,
+          altitude: null,
+          speed: null,
+          heading: null,
+        },
+        getStationCandidates(),
+        4
+      )
+      .map((item) => ({
+        station: item.station.station,
+        distanceMeters: item.distanceMeters,
+      }));
+  }
+
   async function handleUseCurrentLocation(target: PickTarget) {
     if (!target) {
       return;
@@ -147,41 +195,22 @@ export default function AddRouteScreen() {
         return;
       }
 
-      const stationCandidates = stations
-        .filter((station) => station.location?.latitude != null && station.location?.longitude != null)
-        .map((station) => ({
-          station,
-          ...buildStationLocation(station),
-        }));
+      const recommendations = buildNearbyRecommendations(
+        currentLocation.latitude,
+        currentLocation.longitude
+      );
 
-      const nearest = locationService.findNearestStations(
-        {
-          latitude: currentLocation.latitude,
-          longitude: currentLocation.longitude,
-          accuracy: currentLocation.accuracy,
-          altitude: currentLocation.altitude,
-          speed: currentLocation.speed,
-          heading: currentLocation.heading,
-        },
-        stationCandidates,
-        1
-      )[0];
-
-      if (!nearest) {
+      if (recommendations.length === 0) {
         Alert.alert('가까운 역을 찾지 못했습니다', '잠시 후 다시 시도해 주세요.');
         return;
       }
 
-      if (target === 'start') {
-        setStartStation(nearest.station.station);
-      } else {
-        setEndStation(nearest.station.station);
-      }
-
-      Alert.alert(
-        '가까운 역을 추천했어요',
-        `${nearest.station.station.stationName} (${Math.round(nearest.distanceMeters)}m)`
-      );
+      setNearbyPicker({
+        target,
+        title: target === 'start' ? '출발역 후보를 선택해 주세요' : '도착역 후보를 선택해 주세요',
+        description: '현재 위치 기준으로 가까운 역 최대 4개를 보여드려요.',
+        recommendations,
+      });
     } catch (error) {
       console.error('Failed to resolve nearest station', error);
       Alert.alert('위치 확인에 실패했습니다', '현재 위치를 확인한 뒤 다시 시도해 주세요.');
@@ -407,6 +436,22 @@ export default function AddRouteScreen() {
         onClose={() => setAddressTarget(null)}
         onSelectAddress={(item) => {
           setEndRoadAddress(item.roadAddress);
+        }}
+      />
+
+      <NearbyStationRecommendationsModal
+        visible={nearbyPicker !== null}
+        title={nearbyPicker?.title ?? ''}
+        description={nearbyPicker?.description}
+        recommendations={nearbyPicker?.recommendations ?? []}
+        onClose={() => setNearbyPicker(null)}
+        onSelectStation={(station) => {
+          if (nearbyPicker?.target === 'start') {
+            setStartStation(station);
+          } else if (nearbyPicker?.target === 'end') {
+            setEndStation(station);
+          }
+          setNearbyPicker(null);
         }}
       />
     </View>

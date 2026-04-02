@@ -15,6 +15,9 @@ import {
 } from 'react-native';
 import AppTopBar from '../../components/common/AppTopBar';
 import AddressSearchModal from '../../components/common/AddressSearchModal';
+import NearbyStationRecommendationsModal, {
+  type NearbyStationRecommendation,
+} from '../../components/common/NearbyStationRecommendationsModal';
 import { OptimizedStationSelectModal } from '../../components/OptimizedStationSelectModal';
 import { useUser } from '../../contexts/UserContext';
 import { analyzeRequestDraftWithAI, type Beta1AIAnalysisResponse } from '../../services/beta1-ai-service';
@@ -34,6 +37,19 @@ type LocationMode = 'station' | 'address';
 type PackageSize = 'small' | 'medium' | 'large' | 'xl';
 type PickerType = 'pickup' | 'delivery';
 type AddressTarget = 'pickup' | 'delivery' | null;
+type StationCandidate = {
+  station: Station;
+  name: string;
+  line: string;
+  latitude: number;
+  longitude: number;
+};
+type NearbyPickerState = {
+  target: PickerType;
+  title: string;
+  description: string;
+  recommendations: NearbyStationRecommendation[];
+};
 type Props = {
   navigation: MainStackNavigationProp;
   route?: { params?: MainStackParamList['CreateRequest'] };
@@ -67,6 +83,35 @@ function toStationInfo(station: Station): StationInfo {
     lat: location?.lat ?? location?.latitude ?? 37.5665,
     lng: location?.lng ?? location?.longitude ?? 126.978,
   };
+}
+
+function getStationCoordinates(station: Station) {
+  const location = station.location as
+    | { lat?: number; lng?: number; latitude?: number; longitude?: number }
+    | undefined;
+
+  return {
+    latitude: location?.latitude ?? location?.lat ?? null,
+    longitude: location?.longitude ?? location?.lng ?? null,
+  };
+}
+
+function getStationCandidates(stations: Station[]): StationCandidate[] {
+  return stations
+    .filter((station) => {
+      const { latitude, longitude } = getStationCoordinates(station);
+      return latitude != null && longitude != null;
+    })
+    .map((station) => {
+      const { latitude, longitude } = getStationCoordinates(station);
+      return {
+        station,
+        name: station.stationName,
+        line: station.lines[0]?.lineName ?? '',
+        latitude: latitude ?? 0,
+        longitude: longitude ?? 0,
+      };
+    });
 }
 
 function toLocationRef(mode: LocationMode, station: StationInfo, addressText: string) {
@@ -177,6 +222,7 @@ export default function CreateRequestScreen({ navigation, route }: Props) {
   const [loading, setLoading] = useState(true);
   const [pickerVisible, setPickerVisible] = useState(false);
   const [pickerType, setPickerType] = useState<PickerType>('pickup');
+  const [nearbyPicker, setNearbyPicker] = useState<NearbyPickerState | null>(null);
   const [addressTarget, setAddressTarget] = useState<AddressTarget>(null);
   const [saving, setSaving] = useState(false);
   const [aiLoading, setAiLoading] = useState(false);
@@ -326,6 +372,26 @@ export default function CreateRequestScreen({ navigation, route }: Props) {
     (deliveryMode === 'address' && (!deliveryRoadAddress.trim() || !deliveryDetailAddress.trim())) ||
     (requestMode === 'reservation' && !preferredPickupTime.trim());
 
+  function buildNearbyRecommendations(latitude: number, longitude: number): NearbyStationRecommendation[] {
+    return locationService
+      .findNearestStations(
+        {
+          latitude,
+          longitude,
+          accuracy: 0,
+          altitude: null,
+          speed: null,
+          heading: null,
+        },
+        getStationCandidates(stations),
+        4
+      )
+      .map((item) => ({
+        station: item.station.station,
+        distanceMeters: item.distanceMeters,
+      }));
+  }
+
   async function handleUseCurrentLocation(target: PickerType) {
     try {
       setResolvingLocation(target);
@@ -335,41 +401,22 @@ export default function CreateRequestScreen({ navigation, route }: Props) {
         return;
       }
 
-      const stationCandidates = stations
-        .filter((station) => station.location?.latitude != null && station.location?.longitude != null)
-        .map((station) => ({
-          station,
-          name: station.stationName,
-          line: station.lines[0]?.lineName ?? '',
-          latitude: station.location?.latitude ?? 0,
-          longitude: station.location?.longitude ?? 0,
-        }));
+      const recommendations = buildNearbyRecommendations(
+        currentLocation.latitude,
+        currentLocation.longitude
+      );
 
-      const nearest = locationService.findNearestStations(
-        {
-          latitude: currentLocation.latitude,
-          longitude: currentLocation.longitude,
-          accuracy: currentLocation.accuracy,
-          altitude: currentLocation.altitude,
-          speed: currentLocation.speed,
-          heading: currentLocation.heading,
-        },
-        stationCandidates,
-        1
-      )[0];
-
-      if (!nearest) {
+      if (recommendations.length === 0) {
         Alert.alert('가까운 역을 찾지 못했습니다', '잠시 후 다시 시도해 주세요.');
         return;
       }
 
-      if (target === 'pickup') {
-        setPickupStation(nearest.station.station);
-      } else {
-        setDeliveryStation(nearest.station.station);
-      }
-
-      Alert.alert('가까운 역을 추천했어요', `${nearest.station.station.stationName} (${Math.round(nearest.distanceMeters)}m)`);
+      setNearbyPicker({
+        target,
+        title: target === 'pickup' ? '출발역 후보를 선택해 주세요' : '도착역 후보를 선택해 주세요',
+        description: '현재 위치 기준으로 가까운 역 최대 4개를 보여드려요.',
+        recommendations,
+      });
     } catch (error) {
       console.error('Failed to resolve nearest station', error);
       Alert.alert('위치 기반 추천에 실패했습니다', '현재 위치 확인 후 다시 시도해 주세요.');
@@ -881,6 +928,22 @@ export default function CreateRequestScreen({ navigation, route }: Props) {
         onClose={() => setAddressTarget(null)}
         onSelectAddress={(item) => {
           setDeliveryRoadAddress(item.roadAddress);
+        }}
+      />
+
+      <NearbyStationRecommendationsModal
+        visible={nearbyPicker !== null}
+        title={nearbyPicker?.title ?? ''}
+        description={nearbyPicker?.description}
+        recommendations={nearbyPicker?.recommendations ?? []}
+        onClose={() => setNearbyPicker(null)}
+        onSelectStation={(station) => {
+          if (nearbyPicker?.target === 'pickup') {
+            setPickupStation(station);
+          } else if (nearbyPicker?.target === 'delivery') {
+            setDeliveryStation(station);
+          }
+          setNearbyPicker(null);
         }}
       />
 
