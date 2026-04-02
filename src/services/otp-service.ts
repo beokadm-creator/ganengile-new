@@ -20,6 +20,7 @@ export interface ConfirmOtpResult {
 }
 
 const fallbackSessions = new Map<string, OtpSessionFallback>();
+const isDevelopmentOtpFallbackEnabled = process.env.NODE_ENV !== 'production';
 
 function normalizePhoneNumber(phoneNumber: string): string {
   return phoneNumber.replace(/\D/g, '');
@@ -47,6 +48,10 @@ export async function requestPhoneOtp(phoneNumber: string): Promise<RequestOtpRe
     return response.data;
   } catch (error) {
     console.warn('requestPhoneOtp fallback:', error);
+
+    if (!isDevelopmentOtpFallbackEnabled) {
+      throw new Error('휴대폰 인증 서비스를 지금 사용할 수 없습니다. 운영 환경에서는 개발용 OTP를 사용할 수 없습니다.');
+    }
 
     const sessionId = `local-${Date.now()}`;
     const now = Date.now();
@@ -89,14 +94,18 @@ export async function confirmPhoneOtp(params: {
   } catch (error) {
     console.warn('confirmPhoneOtp fallback:', error);
 
+    if (!isDevelopmentOtpFallbackEnabled) {
+      throw new Error('휴대폰 인증 확인을 완료하지 못했습니다. 운영 환경에서는 개발용 OTP를 사용할 수 없습니다.');
+    }
+
     const session = fallbackSessions.get(payload.sessionId);
-    if (!session || session.phoneNumber !== payload.phoneNumber) {
-      throw new Error('인증 세션을 찾지 못했습니다. 인증번호를 다시 요청해 주세요.');
+    if (session?.phoneNumber !== payload.phoneNumber) {
+      throw new Error('인증 세션을 찾지 못했습니다. 인증번호를 다시 요청해주세요.');
     }
 
     if (new Date(session.expiresAt).getTime() < Date.now()) {
       fallbackSessions.delete(payload.sessionId);
-      throw new Error('인증번호가 만료되었습니다. 다시 요청해 주세요.');
+      throw new Error('인증번호가 만료되었습니다. 다시 요청해주세요.');
     }
 
     if (session.code !== payload.code) {
