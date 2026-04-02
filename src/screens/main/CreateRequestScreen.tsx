@@ -220,7 +220,7 @@ function fromPrefillStation(station?: StationInfo): Station | null {
     location: { latitude: station.lat, longitude: station.lng },
     facilities: { hasElevator: false, hasEscalator: false, wheelchairAccessible: false },
     isActive: true,
-    region: '?쒖슱',
+    region: '수도권',
     priority: 0,
     createdAt: new Date(),
     updatedAt: new Date(),
@@ -240,7 +240,7 @@ function fallbackStation(kind: PickerType): Station {
       {
         lineId: isPickup ? '2' : '3',
         lineCode: isPickup ? '2' : '3',
-        lineName: isPickup ? '2?몄꽑' : '3?몄꽑',
+        lineName: isPickup ? '2호선' : '3호선',
         lineColor: Colors.primary,
         lineType: 'general',
       },
@@ -248,7 +248,7 @@ function fallbackStation(kind: PickerType): Station {
     location: { latitude: isPickup ? 37.5665 : 37.5704, longitude: isPickup ? 126.978 : 126.991 },
     facilities: { hasElevator: false, hasEscalator: false, wheelchairAccessible: false },
     isActive: true,
-    region: '?쒖슱',
+    region: '수도권',
     priority: 0,
     createdAt: new Date(),
     updatedAt: new Date(),
@@ -421,7 +421,7 @@ export default function CreateRequestScreen({ navigation, route }: Props) {
       selectedPhotoIds: photoRefs,
       packageItemName: packageItemName || undefined,
       packageCategory: packageCategory || undefined,
-      packageDescription: packageDescription || '臾쇳뭹 ?ㅻ챸',
+      packageDescription: packageDescription || '물품 설명',
       packageSize,
       weightKg: Math.max(0.1, Number(weightKg || 0)),
       itemValue: Number(itemValue || 0),
@@ -531,7 +531,7 @@ export default function CreateRequestScreen({ navigation, route }: Props) {
       });
     } catch (error) {
       console.error('Failed to resolve nearest station', error);
-      Alert.alert('?꾩튂 湲곕컲 異붿쿇???ㅽ뙣?덉뒿?덈떎', '?꾩옱 ?꾩튂 ?뺤씤 ???ㅼ떆 ?쒕룄??二쇱꽭??');
+      Alert.alert('위치 기반 추천 실패', '현재 위치를 확인한 뒤 다시 시도해 주세요.');
     } finally {
       setResolvingLocation(null);
     }
@@ -549,13 +549,13 @@ export default function CreateRequestScreen({ navigation, route }: Props) {
       setAiResult(null);
     } catch (error) {
       console.error(error);
-      Alert.alert('?ъ쭊 ?낅줈???ㅽ뙣', '?ъ쭊???낅줈?쒗븯吏 紐삵뻽?듬땲?? ?좎떆 ???ㅼ떆 ?쒕룄??二쇱꽭??');
+      Alert.alert('사진 업로드 실패', '사진을 업로드하지 못했습니다. 잠시 후 다시 시도해 주세요.');
     }
   }
 
   async function handleAI() {
     if (!photoUrl) {
-      Alert.alert('?ъ쭊???꾩슂?댁슂', '癒쇱? 臾쇨굔 ?ъ쭊???щ┛ ??AI ?묒꽦 蹂댁“瑜??ъ슜?????덉뼱??');
+      Alert.alert('사진이 필요해요', '먼저 물건 사진을 올린 뒤 AI 작성 도움을 사용할 수 있어요.');
       return;
     }
 
@@ -603,7 +603,7 @@ export default function CreateRequestScreen({ navigation, route }: Props) {
       if (aiSize) setPackageSize(aiSize);
     } catch (error) {
       console.error(error);
-      Alert.alert('AI ?묒꽦 ?ㅽ뙣', 'AI 珥덉븞??留뚮뱾吏 紐삵뻽?듬땲?? 吏곸젒 ?낅젰?댁꽌 怨꾩냽 吏꾪뻾?????덉뼱??');
+      Alert.alert('AI 작성 실패', 'AI 초안을 만들지 못했습니다. 직접 입력해서 계속 진행할 수 있어요.');
     } finally {
       setAiLoading(false);
     }
@@ -686,7 +686,7 @@ export default function CreateRequestScreen({ navigation, route }: Props) {
 
   async function handleSubmit() {
     if (submitDisabled || !pickupStation || !deliveryStation) {
-      Alert.alert('?낅젰 ?뺤씤', '?ъ쭊, 異쒕컻/?꾩갑 ?뺣낫, 臾쇳뭹 ?뺣낫, ?섎졊???뺣낫? ?대????뺤씤 ?곹깭瑜?紐⑤몢 ?뺤씤??二쇱꽭??');
+      Alert.alert('입력 확인', '사진, 출발·도착 정보, 물품 정보, 수령인 정보와 휴대폰 인증 상태를 모두 확인해 주세요.');
       return;
     }
 
@@ -694,14 +694,14 @@ export default function CreateRequestScreen({ navigation, route }: Props) {
     try {
       if (pickupMode === 'address' && user?.uid) {
         await addRecentAddress(user.uid, {
-          label: '理쒓렐 異쒕컻吏',
+          label: '최근 출발지',
           roadAddress: pickupRoadAddress,
           detailAddress: pickupDetailAddress,
         });
       }
       if (deliveryMode === 'address' && user?.uid) {
         await addRecentAddress(user.uid, {
-          label: '理쒓렐 ?꾩갑吏',
+          label: '최근 도착지',
           roadAddress: deliveryRoadAddress,
           detailAddress: deliveryDetailAddress,
         });
@@ -765,7 +765,7 @@ export default function CreateRequestScreen({ navigation, route }: Props) {
       });
     } catch (error) {
       console.error(error);
-      Alert.alert('?붿껌 ?앹꽦 ?ㅽ뙣', '?붿껌??留뚮뱶??以?臾몄젣媛 諛쒖깮?덉뒿?덈떎. ?좎떆 ???ㅼ떆 ?쒕룄??二쇱꽭??');
+      Alert.alert('요청 생성 실패', '요청을 만드는 중 문제가 발생했습니다. 잠시 후 다시 시도해 주세요.');
     } finally {
       setSaving(false);
     }
@@ -775,32 +775,32 @@ export default function CreateRequestScreen({ navigation, route }: Props) {
     return (
       <View style={styles.center}>
         <ActivityIndicator size="large" color={Colors.primary} />
-        <Text style={styles.muted}>?붿껌 ?붾㈃??以鍮꾪븯怨??덉뼱??</Text>
+        <Text style={styles.muted}>요청 화면을 준비하고 있어요.</Text>
       </View>
     );
   }
 
   return (
     <KeyboardAvoidingView style={styles.container} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-      <AppTopBar title={requestMode === 'reservation' ? '?덉빟 ?붿껌' : '諛곗넚 ?붿껌'} onBack={() => navigation.goBack()} />
+      <AppTopBar title={requestMode === 'reservation' ? '예약 요청' : '배송 요청'} onBack={() => navigation.goBack()} />
 
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
-        <Block title="?붿껌 諛⑹떇">
+        <Block title="요청 방식">
           <View style={styles.row}>
-            <Chip label="吏湲?諛붾줈" active={requestMode === 'immediate'} onPress={() => setRequestMode('immediate')} />
-            <Chip label="?덉빟?섍린" active={requestMode === 'reservation'} onPress={() => setRequestMode('reservation')} />
+            <Chip label="지금 바로" active={requestMode === 'immediate'} onPress={() => setRequestMode('immediate')} />
+            <Chip label="예약하기" active={requestMode === 'reservation'} onPress={() => setRequestMode('reservation')} />
           </View>
         </Block>
 
-        <Block title="異쒕컻 ?뺣낫">
+        <Block title="출발 정보">
           <View style={styles.row}>
-            <Chip label="??뿉???쒖옉" active={pickupMode === 'station'} onPress={() => setPickupMode('station')} />
-            <Chip label="二쇱냼?먯꽌 ?쒖옉" active={pickupMode === 'address'} onPress={() => setPickupMode('address')} />
+            <Chip label="역에서 시작" active={pickupMode === 'station'} onPress={() => setPickupMode('station')} />
+            <Chip label="주소에서 시작" active={pickupMode === 'address'} onPress={() => setPickupMode('address')} />
           </View>
           {pickupMode === 'address' ? (
             <View style={styles.column}>
               <AddressQuickPick
-                title="??λ맂 二쇱냼"
+                title="저장한 주소"
                 addresses={savedAddresses}
                 onSelect={(address) => {
                   setPickupRoadAddress(address.roadAddress);
@@ -808,7 +808,7 @@ export default function CreateRequestScreen({ navigation, route }: Props) {
                 }}
               />
               <AddressQuickPick
-                title="理쒓렐 ?ъ슜 二쇱냼"
+                title="최근 사용 주소"
                 addresses={recentAddresses}
                 onSelect={(address) => {
                   setPickupRoadAddress(address.roadAddress);
@@ -816,14 +816,14 @@ export default function CreateRequestScreen({ navigation, route }: Props) {
                 }}
               />
               <TouchableOpacity style={styles.selector} onPress={() => setAddressTarget('pickup')}>
-                <Text style={styles.selectorLabel}>?꾨줈紐?二쇱냼</Text>
-                <Text style={styles.selectorValue}>{pickupRoadAddress || '二쇱냼 寃?됱쑝濡??좏깮'}</Text>
+                <Text style={styles.selectorLabel}>도로명 주소</Text>
+                <Text style={styles.selectorValue}>{pickupRoadAddress || '주소 검색으로 선택'}</Text>
               </TouchableOpacity>
               <TextInput
                 style={styles.input}
                 value={pickupDetailAddress}
                 onChangeText={setPickupDetailAddress}
-                placeholder="異쒕컻吏 ?곸꽭二쇱냼"
+                placeholder="출발지 상세 주소"
                 placeholderTextColor={Colors.gray400}
               />
             </View>
@@ -848,20 +848,20 @@ export default function CreateRequestScreen({ navigation, route }: Props) {
             {resolvingLocation === 'pickup' ? (
               <ActivityIndicator color={Colors.primary} />
             ) : (
-              <Text style={styles.secondaryButtonText}>?꾩옱 ?꾩튂濡?媛源뚯슫 異쒕컻??異붿쿇</Text>
+              <Text style={styles.secondaryButtonText}>현재 위치로 가까운 출발역 추천</Text>
             )}
           </TouchableOpacity>
         </Block>
 
-        <Block title="?꾩갑 ?뺣낫">
+        <Block title="도착 정보">
           <View style={styles.row}>
-            <Chip label="??쑝濡??꾩갑" active={deliveryMode === 'station'} onPress={() => setDeliveryMode('station')} />
-            <Chip label="二쇱냼濡??꾩갑" active={deliveryMode === 'address'} onPress={() => setDeliveryMode('address')} />
+            <Chip label="역으로 도착" active={deliveryMode === 'station'} onPress={() => setDeliveryMode('station')} />
+            <Chip label="주소로 도착" active={deliveryMode === 'address'} onPress={() => setDeliveryMode('address')} />
           </View>
           {deliveryMode === 'address' ? (
             <View style={styles.column}>
               <AddressQuickPick
-                title="??λ맂 二쇱냼"
+                title="저장한 주소"
                 addresses={savedAddresses}
                 onSelect={(address) => {
                   setDeliveryRoadAddress(address.roadAddress);
@@ -869,7 +869,7 @@ export default function CreateRequestScreen({ navigation, route }: Props) {
                 }}
               />
               <AddressQuickPick
-                title="理쒓렐 ?ъ슜 二쇱냼"
+                title="최근 사용 주소"
                 addresses={recentAddresses}
                 onSelect={(address) => {
                   setDeliveryRoadAddress(address.roadAddress);
@@ -877,14 +877,14 @@ export default function CreateRequestScreen({ navigation, route }: Props) {
                 }}
               />
               <TouchableOpacity style={styles.selector} onPress={() => setAddressTarget('delivery')}>
-                <Text style={styles.selectorLabel}>?꾨줈紐?二쇱냼</Text>
-                <Text style={styles.selectorValue}>{deliveryRoadAddress || '二쇱냼 寃?됱쑝濡??좏깮'}</Text>
+                <Text style={styles.selectorLabel}>도로명 주소</Text>
+                <Text style={styles.selectorValue}>{deliveryRoadAddress || '주소 검색으로 선택'}</Text>
               </TouchableOpacity>
               <TextInput
                 style={styles.input}
                 value={deliveryDetailAddress}
                 onChangeText={setDeliveryDetailAddress}
-                placeholder="?꾩갑吏 ?곸꽭二쇱냼"
+                placeholder="도착지 상세 주소"
                 placeholderTextColor={Colors.gray400}
               />
             </View>
@@ -909,7 +909,7 @@ export default function CreateRequestScreen({ navigation, route }: Props) {
             {resolvingLocation === 'delivery' ? (
               <ActivityIndicator color={Colors.primary} />
             ) : (
-              <Text style={styles.secondaryButtonText}>?꾩옱 ?꾩튂濡?媛源뚯슫 ?꾩갑??異붿쿇</Text>
+              <Text style={styles.secondaryButtonText}>현재 위치로 가까운 도착역 추천</Text>
             )}
           </TouchableOpacity>
         </Block>

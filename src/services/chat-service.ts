@@ -1,6 +1,6 @@
-/**
+﻿/**
  * Chat Service
- * Firestore 기반 실시간 채팅 서비스
+ * Firestore 湲곕컲 ?ㅼ떆媛?梨꾪똿 ?쒕퉬??
  */
 
 import {
@@ -43,7 +43,7 @@ export class ChatService {
   }
 
   /**
-   * 사용자별 채팅방 목록 실시간 구독
+   * ?ъ슜?먮퀎 梨꾪똿諛?紐⑸줉 ?ㅼ떆媛?援щ룆
    */
   subscribeToUserChatRooms(listener: ChatRoomListener): () => void {
     const qUser1 = query(
@@ -104,7 +104,7 @@ export class ChatService {
   }
 
   /**
-   * 특정 채팅방의 메시지 실시간 구독
+   * ?뱀젙 梨꾪똿諛⑹쓽 硫붿떆吏 ?ㅼ떆媛?援щ룆
    */
   subscribeToChatMessages(chatRoomId: string, listener: MessageListener): () => void {
     const q = query(
@@ -127,10 +127,10 @@ export class ChatService {
   }
 
   /**
-   * 두 사용자 간의 채팅방 찾기 또는 생성
+   * ???ъ슜??媛꾩쓽 梨꾪똿諛?李얘린 ?먮뒗 ?앹꽦
    */
   async findOrCreateChatRoom(otherUserId: string, data?: CreateChatRoomData): Promise<ChatRoom> {
-    // 정방향 검색 (내가 user1)
+    // ?뺣갑??寃??(?닿? user1)
     const q1 = query(
       collection(db, CHAT_ROOMS_COLLECTION),
       where('participants.user1.userId', '==', this.userId),
@@ -142,7 +142,7 @@ export class ChatService {
       return { chatRoomId: d.id, ...d.data() } as ChatRoom;
     }
 
-    // 역방향 검색 (상대가 user1)
+    // ??갑??寃??(?곷?媛 user1)
     const q2 = query(
       collection(db, CHAT_ROOMS_COLLECTION),
       where('participants.user1.userId', '==', otherUserId),
@@ -162,7 +162,7 @@ export class ChatService {
   }
 
   /**
-   * 새 채팅방 생성
+   * ??梨꾪똿諛??앹꽦
    */
   async createChatRoom(data: CreateChatRoomData, status: 'pending' | 'active' = 'pending'): Promise<ChatRoom> {
     const chatRoomData = {
@@ -186,7 +186,7 @@ export class ChatService {
         user2: 0,
       },
       status,
-      isActive: status === 'active',  // pending면 false, active면 true
+      isActive: status === 'active',  // pending硫?false, active硫?true
       createdAt: serverTimestamp(),
       updatedAt: serverTimestamp(),
     };
@@ -200,7 +200,7 @@ export class ChatService {
   }
 
   /**
-   * 채팅방에서 사용자 위치 조회 (Firestore에서 직접 조회)
+   * 梨꾪똿諛⑹뿉???ъ슜???꾩튂 議고쉶 (Firestore?먯꽌 吏곸젒 議고쉶)
    */
   private async fetchUserPosition(chatRoomId: string): Promise<1 | 2> {
     const chatRoomDoc = await getDoc(doc(db, CHAT_ROOMS_COLLECTION, chatRoomId));
@@ -210,7 +210,7 @@ export class ChatService {
   }
 
   /**
-   * 메시지 전송
+   * 硫붿떆吏 ?꾩넚
    */
   async sendMessage(data: CreateMessageData): Promise<ChatMessage> {
     const messageData = {
@@ -229,7 +229,7 @@ export class ChatService {
       messageData
     );
 
-    // 수신자(상대방)의 미읽음 카운트 증가
+    // ?섏떊???곷?諛???誘몄씫??移댁슫??利앷?
     const senderPosition = await this.fetchUserPosition(data.chatRoomId);
     const receiverPosition = senderPosition === 1 ? 2 : 1;
 
@@ -251,7 +251,7 @@ export class ChatService {
   }
 
   /**
-   * 메시지 읽음 처리
+   * 硫붿떆吏 ?쎌쓬 泥섎━
    */
   async markMessagesAsRead(chatRoomId: string): Promise<void> {
     const chatRoomRef = doc(db, CHAT_ROOMS_COLLECTION, chatRoomId);
@@ -264,7 +264,7 @@ export class ChatService {
   }
 
   /**
-   * 채팅방 비활성화 (배송 완료 등)
+   * 梨꾪똿諛?鍮꾪솢?깊솕 (諛곗넚 ?꾨즺 ??
    */
   async deactivateChatRoom(chatRoomId: string): Promise<void> {
     const chatRoomRef = doc(db, CHAT_ROOMS_COLLECTION, chatRoomId);
@@ -277,7 +277,7 @@ export class ChatService {
   }
 
   /**
-   * 채팅방 나가기
+   * 梨꾪똿諛??섍?湲?
    */
   async leaveChatRoom(chatRoomId: string): Promise<void> {
     const chatRoomRef = doc(db, CHAT_ROOMS_COLLECTION, chatRoomId);
@@ -289,7 +289,7 @@ export class ChatService {
   }
 
   /**
-   * 매칭 완료 시 채팅방 상태를 active로 변경
+   * 留ㅼ묶 ?꾨즺 ??梨꾪똿諛??곹깭瑜?active濡?蹂寃?
    */
   async activateChatRoom(chatRoomId: string): Promise<void> {
     const chatRoomRef = doc(db, CHAT_ROOMS_COLLECTION, chatRoomId);
@@ -302,7 +302,7 @@ export class ChatService {
   }
 
   /**
-   * 채팅방 정보 가져오기
+   * 梨꾪똿諛??뺣낫 媛?몄삤湲?
    */
   async getChatRoom(chatRoomId: string): Promise<ChatRoom | null> {
     const docRef = doc(db, CHAT_ROOMS_COLLECTION, chatRoomId);
@@ -319,7 +319,7 @@ export class ChatService {
   }
 
   /**
-   * 시스템 메시지 전송 (매칭, 배송 상태 변경 등)
+   * ?쒖뒪??硫붿떆吏 ?꾩넚 (留ㅼ묶, 諛곗넚 ?곹깭 蹂寃???
    */
   async sendSystemMessage(
     chatRoomId: string,
@@ -342,14 +342,14 @@ export class ChatService {
 }
 
 /**
- * 채팅 서비스 인스턴스 생성
+ * 梨꾪똿 ?쒕퉬???몄뒪?댁뒪 ?앹꽦
  */
 export function createChatService(): ChatService {
   return new ChatService();
 }
 
 /**
- * 특정 요청/매칭에 대한 채팅방 가져오기
+ * ?뱀젙 ?붿껌/留ㅼ묶?????梨꾪똿諛?媛?몄삤湲?
  */
 export async function getChatRoomByRequestId(requestId: string): Promise<ChatRoom | null> {
   const q = query(
@@ -371,7 +371,7 @@ export async function getChatRoomByRequestId(requestId: string): Promise<ChatRoo
 }
 
 /**
- * 특정 요청/매칭에 대한 채팅방 가져오기 (matchId)
+ * ?뱀젙 ?붿껌/留ㅼ묶?????梨꾪똿諛?媛?몄삤湲?(matchId)
  */
 export async function getChatRoomByMatchId(matchId: string): Promise<ChatRoom | null> {
   const q = query(
@@ -413,7 +413,7 @@ export async function ensureChatRoomForRequest(args: {
     {
       user1: {
         userId: args.requesterId,
-        name: requester?.name ?? '요청자',
+        name: requester?.name ?? '이용자',
         profileImage: requester?.profilePhoto,
       },
       user2: {

@@ -1,5 +1,6 @@
 import React, { useMemo, useState } from 'react';
 import { ActivityIndicator, Image, StyleSheet, Text, View } from 'react-native';
+
 import { getStaticMapProxyUrl, isMapEnabled } from '../../config/map-config';
 
 export type StaticMapMarker = {
@@ -21,7 +22,11 @@ interface StaticMapPreviewProps {
 function buildMarkerParam(markers: StaticMapMarker[]): string {
   return markers
     .map((marker, index) => {
-      const normalized = (marker.label ?? `${index + 1}`).toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 1) || `${(index + 1) % 10}`;
+      const normalized =
+        (marker.label ?? `${index + 1}`)
+          .toUpperCase()
+          .replace(/[^A-Z0-9]/g, '')
+          .slice(0, 1) || `${(index + 1) % 10}`;
       return `type:d|size:mid|color:Default|label:${normalized}|pos:${marker.longitude} ${marker.latitude}`;
     })
     .join('|');
@@ -33,11 +38,12 @@ export default function StaticMapPreview({
   width = 640,
   height = 320,
   zoom = 14,
-  title = '?? ????',
-  subtitle = '??? ?? ??? ???? ????.',
+  title = '배송 구간 지도',
+  subtitle = '출발역과 도착역 위치를 기준으로 구간을 요약해서 보여줍니다.',
 }: StaticMapPreviewProps) {
   const [loading, setLoading] = useState(true);
   const [loadFailed, setLoadFailed] = useState(false);
+
   const uri = useMemo(() => {
     if (!isMapEnabled()) {
       return '';
@@ -70,7 +76,7 @@ export default function StaticMapPreview({
         <Text style={styles.emptyBody}>
           {!uri
             ? '지도 기능 또는 프록시 URL이 아직 설정되지 않았습니다.'
-            : '지도 이미지를 불러오지 못했습니다. 지도 인증 정보 또는 프록시 설정을 확인해 주세요.'}
+            : '지도를 불러오지 못했습니다. 지도 프록시 설정과 네트워크 상태를 확인해 주세요.'}
         </Text>
       </View>
     );

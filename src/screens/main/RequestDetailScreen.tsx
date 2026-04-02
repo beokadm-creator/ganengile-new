@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -12,384 +12,80 @@ import {
 import { MaterialIcons } from '@expo/vector-icons';
 import { RouteProp, useNavigation, useRoute } from '@react-navigation/native';
 import { Timestamp } from 'firebase/firestore';
+
 import AppTopBar from '../../components/common/AppTopBar';
 import { ensureChatRoomForRequest, getChatRoomByRequestId } from '../../services/chat-service';
-import { cancelDeliveryFlow, confirmDeliveryByRequester, getDeliveryByRequestId } from '../../services/delivery-service';
+import {
+  cancelDeliveryFlow,
+  confirmDeliveryByRequester,
+  getDeliveryByRequestId,
+} from '../../services/delivery-service';
 import { requireUserId } from '../../services/firebase';
 import { cancelRequest, getRequestById, increaseRequestBid } from '../../services/request-service';
-import { BorderRadius, Colors, Shadows, Spacing, Typography } from '../../theme';
+import { BorderRadius, Colors, Shadows, Spacing } from '../../theme';
 import type { MainStackNavigationProp, MainStackParamList } from '../../types/navigation';
 import { RequestStatus, type Request } from '../../types/request';
 
 type RequestDetailRoute = RouteProp<MainStackParamList, 'RequestDetail'>;
 
-export default function RequestDetailScreen() {
-  const navigation = useNavigation<MainStackNavigationProp>();
-  const route = useRoute<RequestDetailRoute>();
-  const { requestId } = route.params;
+type WorkingState = 'cancel' | 'rematch' | 'confirm' | null;
 
-  const [request, setRequest] = useState<Request | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
-  const [working, setWorking] = useState<'cancel' | 'rematch' | 'confirm' | null>(null);
+function toDate(value?: Timestamp | Date | null): Date | null {
+  if (!value) return null;
+  return value instanceof Timestamp ? value.toDate() : value;
+}
 
-  const loadRequest = useCallback(async () => {
-    try {
-      const nextRequest = await getRequestById(requestId);
-      setRequest(nextRequest);
-    } catch (error) {
-      console.error('Failed to load request detail', error);
-      Alert.alert('요청을 불러오지 못했습니다', '잠시 후 다시 시도해 주세요.');
-    } finally {
-      setLoading(false);
-      setRefreshing(false);
-    }
-  }, [requestId]);
+function formatDateTime(value?: Timestamp | Date | null): string {
+  const resolved = toDate(value);
+  if (!resolved || Number.isNaN(resolved.getTime())) return '-';
+  return resolved.toLocaleString('ko-KR', {
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+  });
+}
 
-  useEffect(() => {
-    void loadRequest();
-  }, [loadRequest]);
+function getRequestAmount(request: Request): number {
+  const candidates = [
+    request.fee?.totalFee,
+    request.feeBreakdown?.totalFee,
+    request.initialNegotiationFee,
+  ];
 
-  async function onRefresh() {
-    setRefreshing(true);
-    await loadRequest();
-  }
-
-  async function openChat() {
-    try {
-      let room = await getChatRoomByRequestId(requestId);
-      if (!room && request?.matchedGillerId && request.requesterId) {
-        room = await ensureChatRoomForRequest({
-          requestId,
-          requesterId: request.requesterId,
-          gillerId: request.matchedGillerId,
-          requestInfo: {
-            from: request.pickupStation.stationName,
-            to: request.deliveryStation.stationName,
-            urgency: request.urgency ?? 'normal',
-          },
-        });
-      }
-
-      if (!room) {
-        Alert.alert('아직 채팅이 열리지 않았습니다', '매칭이나 미션 확정 뒤에 채팅이 열립니다.');
-        return;
-      }
-
-      const me = requireUserId();
-      const otherParticipant = room.participants.user1.userId === me ? room.participants.user2 : room.participants.user1;
-      navigation.navigate('Chat', {
-        chatRoomId: room.chatRoomId,
-        otherUserId: otherParticipant.userId,
-        otherUserName: otherParticipant.name,
-      });
-    } catch (error) {
-      console.error('Failed to open chat', error);
-      Alert.alert('채팅 연결에 실패했습니다', '잠시 후 다시 시도해 주세요.');
+  for (const value of candidates) {
+    if (typeof value === 'number' && Number.isFinite(value)) {
+      return value;
     }
   }
 
-  async function handleIncreaseBid(amount: number) {
-    if (!request) return;
+  return 0;
+}
 
-    setWorking('rematch');
-    try {
-      const result = await increaseRequestBid(request.requestId, requireUserId(), amount);
-      if (!result.success) {
-        Alert.alert('금액 조정 실패', result.message ?? '지금은 금액을 조정할 수 없습니다.');
-        return;
-      }
-
-      Alert.alert('제안 금액을 올렸습니다', `현재 제안 금액은 ${(result.newFee ?? 0).toLocaleString()}원입니다.`);
-      await loadRequest();
-    } catch (error) {
-      console.error('Failed to increase bid', error);
-      Alert.alert('금액 조정 실패', '잠시 후 다시 시도해 주세요.');
-    } finally {
-      setWorking(null);
-    }
+function getStatusLabel(status: RequestStatus): string {
+  switch (status) {
+    case RequestStatus.PENDING:
+      return '매칭 대기';
+    case RequestStatus.MATCHED:
+      return '길러 매칭 완료';
+    case RequestStatus.ACCEPTED:
+      return '배송 수락 완료';
+    case RequestStatus.IN_TRANSIT:
+      return '배송 이동 중';
+    case RequestStatus.ARRIVED:
+      return '도착 확인';
+    case RequestStatus.AT_LOCKER:
+      return '사물함 보관';
+    case RequestStatus.DELIVERED:
+      return '수령 확인 대기';
+    case RequestStatus.COMPLETED:
+      return '배송 완료';
+    case RequestStatus.CANCELLED:
+      return '요청 취소';
+    default:
+      return '상태 확인 필요';
   }
-
-  function handleRematchAction() {
-    if (!request) return;
-
-    Alert.alert(
-      '다시 연결할까요?',
-      '급하면 금액을 올려 더 빨리 연결하고, 급하지 않다면 예약 요청으로 전환할 수 있습니다.',
-      [
-        { text: 'AI 추천 금액 올리기', onPress: () => void handleIncreaseBid(1000) },
-        {
-          text: '예약으로 전환하기',
-          onPress: () =>
-            navigation.navigate('CreateRequest', {
-              mode: 'reservation',
-              sourceRequestId: request.requestId,
-              prefill: {
-                pickupStation: request.pickupStation,
-                deliveryStation: request.deliveryStation,
-                packageDescription: request.packageInfo.description,
-                packageSize: request.packageInfo.size as 'small' | 'medium' | 'large' | 'xl',
-                weightKg:
-                  typeof request.packageInfo.weightKg === 'number'
-                    ? request.packageInfo.weightKg
-                    : typeof request.packageInfo.weight === 'number'
-                      ? request.packageInfo.weight
-                      : 1,
-                itemValue: request.itemValue,
-                urgency: 'normal',
-                directParticipationMode: 'none',
-                preferredPickupTime: request.preferredTime?.departureTime,
-                preferredArrivalTime: request.preferredTime?.arrivalTime,
-              },
-            }),
-        },
-        { text: '그대로 둘게요', style: 'cancel' },
-      ]
-    );
-  }
-
-  function openDispute() {
-    navigation.navigate('DisputeReport', { deliveryId: request?.primaryDeliveryId });
-  }
-
-  function handleCancel() {
-    if (!request) return;
-
-    const isAccepted = request.status === RequestStatus.ACCEPTED;
-    Alert.alert(
-      isAccepted ? '수락된 배송을 취소할까요?' : '요청을 취소할까요?',
-      isAccepted
-        ? '픽업 전 취소라면 보증금 환불과 배송 취소를 함께 처리합니다. 진행 중이면 분쟁 접수로 이어집니다.'
-        : '지금 취소해도 기본 정보는 다음 요청에 참고할 수 있습니다.',
-      [
-        { text: '유지하기', style: 'cancel' },
-        {
-          text: '취소하기',
-          style: 'destructive',
-          onPress: () => {
-            void (async () => {
-              try {
-                setWorking('cancel');
-                const userId = requireUserId();
-
-                if (isAccepted) {
-                  const result = await cancelDeliveryFlow({
-                    requestId: request.requestId,
-                    actorId: userId,
-                    actorType: 'requester',
-                    reason: 'requester_cancelled_before_pickup_from_request_detail',
-                  });
-
-                  if (!result.success) {
-                    Alert.alert('취소를 진행할 수 없습니다', result.message, [
-                      { text: '분쟁 접수', onPress: openDispute },
-                      { text: '닫기', style: 'cancel' },
-                    ]);
-                    return;
-                  }
-
-                  const completionMessage =
-                    result.depositStatus === 'refunded'
-                      ? '배송 취소와 보증금 환불까지 처리했습니다.'
-                      : result.depositStatus === 'failed'
-                        ? '배송 취소는 처리했지만 보증금 환불은 운영 확인이 필요합니다.'
-                        : result.message;
-
-                  Alert.alert('배송 취소 완료', completionMessage);
-                } else {
-                  const cancelled = await cancelRequest(
-                    request.requestId,
-                    userId,
-                    'requester cancelled from request detail'
-                  );
-                  if (!cancelled) {
-                    Alert.alert('취소를 진행할 수 없습니다', '요청자 정보가 일치하는지 다시 확인해 주세요.');
-                    return;
-                  }
-                  Alert.alert('요청 취소 완료', '요청을 취소했습니다.');
-                }
-
-                await loadRequest();
-              } catch (error) {
-                console.error('Failed to cancel request', error);
-                Alert.alert('취소에 실패했습니다', '잠시 후 다시 시도해 주세요.');
-              } finally {
-                setWorking(null);
-              }
-            })();
-          },
-        },
-      ]
-    );
-  }
-
-  async function handleConfirmDelivery() {
-    if (!request) return;
-
-    try {
-      setWorking('confirm');
-      const delivery = (await getDeliveryByRequestId(request.requestId)) as { deliveryId?: string; gillerId?: string | null } | null;
-      const deliveryId = typeof delivery?.deliveryId === 'string' ? delivery.deliveryId : null;
-      const deliveryGillerId = typeof delivery?.gillerId === 'string' ? delivery.gillerId : '';
-
-      if (!deliveryId) {
-        Alert.alert('배송 정보를 찾지 못했습니다', '배송 생성 뒤 다시 시도해 주세요.');
-        return;
-      }
-
-      const result = await confirmDeliveryByRequester({
-        deliveryId,
-        requesterId: requireUserId(),
-      });
-
-      if (!result.success) {
-        Alert.alert('수령 확인 실패', result.message);
-        return;
-      }
-
-      Alert.alert('수령 확인 완료', '배송을 완료 처리했습니다. 평가와 최종 정산으로 이어집니다.', [
-        {
-          text: '평가 남기기',
-          onPress: () =>
-            navigation.navigate('Rating', {
-              deliveryId,
-              gillerId: deliveryGillerId,
-              gllerId: deliveryGillerId,
-            }),
-        },
-        { text: '닫기', style: 'cancel' },
-      ]);
-      await loadRequest();
-    } catch (error) {
-      console.error('Failed to confirm delivery', error);
-      Alert.alert('수령 확인 실패', '잠시 후 다시 시도해 주세요.');
-    } finally {
-      setWorking(null);
-    }
-  }
-
-  function handleDepositPayment() {
-    if (!request?.matchedGillerId || !request.itemValue || request.itemValue <= 0) {
-      Alert.alert('보증금 준비 중', '길러 매칭과 물품 가치를 확인하면 보증금 결제로 이어집니다.');
-      return;
-    }
-
-    navigation.navigate('DepositPayment', {
-      gillerId: request.matchedGillerId,
-      gllerId: request.requesterId,
-      requestId: request.requestId,
-      itemValue: request.itemValue,
-    });
-  }
-
-  if (loading) {
-    return (
-      <View style={styles.container}>
-        <AppTopBar title="요청 상세" onBack={() => navigation.goBack()} />
-        <View style={styles.centerState}>
-          <ActivityIndicator size="large" color={Colors.primary} />
-          <Text style={styles.centerText}>요청 상세를 불러오는 중입니다.</Text>
-        </View>
-      </View>
-    );
-  }
-
-  if (!request) {
-    return (
-      <View style={styles.container}>
-        <AppTopBar title="요청 상세" onBack={() => navigation.goBack()} />
-        <View style={styles.centerState}>
-          <Text style={styles.errorText}>요청 정보를 찾을 수 없습니다.</Text>
-        </View>
-      </View>
-    );
-  }
-
-  const amount = getRequestAmount(request);
-  const canRematch = request.status === RequestStatus.PENDING || request.status === RequestStatus.MATCHED;
-  const canCancel = canRematch || request.status === RequestStatus.ACCEPTED;
-  const canDispute =
-    request.status === RequestStatus.IN_TRANSIT ||
-    request.status === RequestStatus.ARRIVED ||
-    request.status === RequestStatus.AT_LOCKER ||
-    request.status === RequestStatus.DELIVERED;
-  const canConfirm = request.status === RequestStatus.DELIVERED || request.status === RequestStatus.AT_LOCKER;
-
-  return (
-    <View style={styles.container}>
-      <AppTopBar title="요청 상세" onBack={() => navigation.goBack()} />
-      <ScrollView
-        contentContainerStyle={styles.content}
-        showsVerticalScrollIndicator={false}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => void onRefresh()} />}
-      >
-      <View style={styles.hero}>
-        <Text style={styles.kicker}>가는길에</Text>
-        <Text style={styles.title}>
-          {request.pickupStation.stationName} {'->'} {request.deliveryStation.stationName}
-        </Text>
-        <Text style={styles.subtitle}>{request.packageInfo.description || '물품 설명 없음'}</Text>
-      </View>
-
-      <Panel title="현재 상태">
-        <InfoRow label="상태" value={getStatusLabel(request.status)} />
-        <InfoRow label="요청 방식" value={request.requestMode === 'reservation' ? '예약' : '즉시'} />
-        <InfoRow label="제안 금액" value={`${amount.toLocaleString()}원`} />
-        <InfoRow label="마감" value={formatDateTime(request.deadline)} />
-      </Panel>
-
-      <Panel title="배송 정보">
-        <InfoRow label="출발" value={`${request.pickupStation.stationName} · ${request.pickupStation.line}`} />
-        <InfoRow label="도착" value={`${request.deliveryStation.stationName} · ${request.deliveryStation.line}`} />
-        <InfoRow
-          label="희망 시간"
-          value={request.preferredTime ? `${request.preferredTime.departureTime} 출발 · ${request.preferredTime.arrivalTime ?? '-'} 도착` : '미설정'}
-        />
-        <InfoRow label="물품 가치" value={typeof request.itemValue === 'number' ? `${request.itemValue.toLocaleString()}원` : '미입력'} />
-      </Panel>
-
-        <View style={styles.actionSection}>
-        <ActionButton primary icon="chat-bubble-outline" label="채팅 열기" onPress={() => void openChat()} />
-
-        {Boolean(request.matchedGillerId) && (request.itemValue ?? 0) > 0 ? (
-          <ActionButton icon="lock" label="보증금 결제" onPress={handleDepositPayment} />
-        ) : null}
-
-        {canRematch ? (
-          <ActionButton
-            icon="trending-up"
-            label={working === 'rematch' ? '조정 중...' : '다시 잡기'}
-            onPress={handleRematchAction}
-            disabled={working !== null}
-          />
-        ) : null}
-
-        {canCancel ? (
-          <ActionButton
-            icon="close"
-            label={working === 'cancel' ? '취소 중...' : request.status === RequestStatus.ACCEPTED ? '배송 취소' : '요청 취소'}
-            onPress={handleCancel}
-            disabled={working !== null}
-            warning
-          />
-        ) : null}
-
-        {canDispute ? <ActionButton icon="report-problem" label="분쟁 접수" onPress={openDispute} /> : null}
-
-        {canConfirm ? (
-          <ActionButton
-            icon="verified"
-            label={working === 'confirm' ? '확인 중...' : '수령 확인'}
-            onPress={() => void handleConfirmDelivery()}
-            disabled={working !== null}
-          />
-        ) : null}
-
-          <ActionButton icon="local-shipping" label="배송 추적" onPress={() => navigation.navigate('DeliveryTracking', { requestId })} />
-        </View>
-      </ScrollView>
-    </View>
-  );
 }
 
 function Panel({ title, children }: { title: string; children: React.ReactNode }) {
@@ -411,76 +107,427 @@ function InfoRow({ label, value }: { label: string; value: string }) {
 }
 
 function ActionButton({
-  icon,
   label,
+  icon,
+  primary,
+  destructive,
+  disabled,
   onPress,
-  primary = false,
-  warning = false,
-  disabled = false,
 }: {
-  icon: React.ComponentProps<typeof MaterialIcons>['name'];
   label: string;
-  onPress: () => void;
+  icon: keyof typeof MaterialIcons.glyphMap;
   primary?: boolean;
-  warning?: boolean;
+  destructive?: boolean;
   disabled?: boolean;
+  onPress: () => void;
 }) {
   return (
     <TouchableOpacity
       style={[
         styles.actionButton,
-        primary && styles.primaryAction,
-        warning && styles.warningAction,
-        disabled && styles.disabledAction,
+        primary && styles.actionButtonPrimary,
+        destructive && styles.actionButtonDanger,
+        disabled && styles.actionButtonDisabled,
       ]}
       onPress={onPress}
       disabled={disabled}
+      activeOpacity={0.85}
     >
-      <MaterialIcons name={icon} size={20} color={primary ? Colors.white : warning ? Colors.errorDark : Colors.primary} />
-      <Text style={[styles.actionText, primary && styles.primaryActionText, warning && styles.warningText]}>{label}</Text>
+      <MaterialIcons
+        name={icon}
+        size={18}
+        color={primary ? Colors.white : destructive ? Colors.error : Colors.primary}
+      />
+      <Text
+        style={[
+          styles.actionButtonText,
+          primary && styles.actionButtonTextPrimary,
+          destructive && styles.actionButtonTextDanger,
+        ]}
+      >
+        {label}
+      </Text>
     </TouchableOpacity>
   );
 }
 
-function formatDateTime(value?: Timestamp | null): string {
-  if (!value) return '-';
-  const date = value instanceof Timestamp ? value.toDate() : null;
-  if (!(date instanceof Date) || Number.isNaN(date.getTime())) return '-';
-  return date.toLocaleString('ko-KR', {
-    month: 'numeric',
-    day: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-  });
-}
+export default function RequestDetailScreen() {
+  const navigation = useNavigation<MainStackNavigationProp>();
+  const route = useRoute<RequestDetailRoute>();
+  const { requestId } = route.params;
 
-function getRequestAmount(request: Request): number {
-  return request.fee?.totalFee ?? request.feeBreakdown?.totalFee ?? request.initialNegotiationFee ?? 0;
-}
+  const [request, setRequest] = useState<Request | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  const [working, setWorking] = useState<WorkingState>(null);
 
-function getStatusLabel(status: RequestStatus): string {
-  switch (status) {
-    case RequestStatus.PENDING:
-      return '매칭 대기';
-    case RequestStatus.MATCHED:
-      return '견적 도착';
-    case RequestStatus.ACCEPTED:
-      return '길러 수락';
-    case RequestStatus.IN_TRANSIT:
-      return '배송 중';
-    case RequestStatus.ARRIVED:
-      return '도착 확인';
-    case RequestStatus.AT_LOCKER:
-      return '사물함 보관';
-    case RequestStatus.DELIVERED:
-      return '수령 확인 대기';
-    case RequestStatus.COMPLETED:
-      return '완료';
-    case RequestStatus.CANCELLED:
-      return '취소';
-    default:
-      return status;
+  const loadRequest = useCallback(async () => {
+    try {
+      const nextRequest = await getRequestById(requestId);
+      setRequest(nextRequest);
+    } catch (error) {
+      console.error('Failed to load request detail', error);
+      Alert.alert('요청 정보를 불러오지 못했습니다', '잠시 후 다시 시도해 주세요.');
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
+  }, [requestId]);
+
+  useEffect(() => {
+    void loadRequest();
+  }, [loadRequest]);
+
+  async function onRefresh() {
+    setRefreshing(true);
+    await loadRequest();
   }
+
+  async function openChat() {
+    if (!request) return;
+
+    try {
+      let room = await getChatRoomByRequestId(request.requestId);
+
+      if (!room && request.requesterId && request.matchedGillerId) {
+        room = await ensureChatRoomForRequest({
+          requestId: request.requestId,
+          requesterId: request.requesterId,
+          gillerId: request.matchedGillerId,
+          requestInfo: {
+            from: request.pickupStation.stationName,
+            to: request.deliveryStation.stationName,
+            urgency: request.urgency ?? 'normal',
+          },
+        });
+      }
+
+      if (!room) {
+        Alert.alert('채팅방을 아직 열 수 없습니다', '매칭이 완료된 뒤 다시 시도해 주세요.');
+        return;
+      }
+
+      const me = requireUserId();
+      const other =
+        room.participants.user1.userId === me ? room.participants.user2 : room.participants.user1;
+
+      navigation.navigate('Chat', {
+        chatRoomId: room.chatRoomId,
+        otherUserId: other.userId,
+        otherUserName: other.name,
+      });
+    } catch (error) {
+      console.error('Failed to open chat', error);
+      Alert.alert('채팅방을 열지 못했습니다', '잠시 후 다시 시도해 주세요.');
+    }
+  }
+
+  async function handleIncreaseBid(amount: number) {
+    if (!request) return;
+
+    try {
+      setWorking('rematch');
+      const result = await increaseRequestBid(request.requestId, requireUserId(), amount);
+
+      if (!result.success) {
+        Alert.alert('재매칭 금액 조정 실패', result.message ?? '요청 금액을 조정하지 못했습니다.');
+        return;
+      }
+
+      Alert.alert('요청 금액을 올렸습니다', `현재 예상 금액은 ${(result.newFee ?? 0).toLocaleString()}원입니다.`);
+      await loadRequest();
+    } catch (error) {
+      console.error('Failed to increase bid', error);
+      Alert.alert('재매칭 금액 조정 실패', '잠시 후 다시 시도해 주세요.');
+    } finally {
+      setWorking(null);
+    }
+  }
+
+  function handleRematchAction() {
+    if (!request) return;
+
+    Alert.alert('다시 매칭하시겠어요?', '요청 금액을 조금 올리거나 예약 요청으로 다시 등록할 수 있습니다.', [
+      {
+        text: '금액 1,000원 올리기',
+        onPress: () => void handleIncreaseBid(1000),
+      },
+      {
+        text: '예약 요청으로 전환',
+        onPress: () =>
+          navigation.navigate('CreateRequest', {
+            mode: 'reservation',
+            sourceRequestId: request.requestId,
+            prefill: {
+              pickupStation: request.pickupStation,
+              deliveryStation: request.deliveryStation,
+              packageDescription: request.packageInfo.description,
+              packageSize: request.packageInfo.size as 'small' | 'medium' | 'large' | 'xl',
+              weightKg:
+                typeof request.packageInfo.weightKg === 'number'
+                  ? request.packageInfo.weightKg
+                  : typeof request.packageInfo.weight === 'number'
+                    ? request.packageInfo.weight
+                    : 1,
+              itemValue: request.itemValue,
+              recipientName: undefined,
+              recipientPhone: undefined,
+              urgency: 'normal',
+              directParticipationMode: 'none',
+              preferredPickupTime: request.preferredTime?.departureTime,
+              preferredArrivalTime: request.preferredTime?.arrivalTime,
+            },
+          }),
+      },
+      { text: '닫기', style: 'cancel' },
+    ]);
+  }
+
+  function openDispute() {
+    navigation.navigate('DisputeReport', { deliveryId: request?.primaryDeliveryId });
+  }
+
+  function handleDepositPayment() {
+    if (!request?.matchedGillerId) {
+      Alert.alert('보증금 결제를 진행할 수 없습니다', '길러가 매칭된 뒤 다시 시도해 주세요.');
+      return;
+    }
+
+    navigation.navigate('DepositPayment', {
+      gillerId: request.matchedGillerId,
+      gllerId: request.matchedGillerId,
+      requestId: request.requestId,
+      itemValue: Number(request.itemValue ?? 0),
+    });
+  }
+
+  function handleCancel() {
+    if (!request) return;
+
+    const isAccepted =
+      request.status === RequestStatus.ACCEPTED ||
+      request.status === RequestStatus.IN_TRANSIT ||
+      request.status === RequestStatus.ARRIVED ||
+      request.status === RequestStatus.AT_LOCKER ||
+      request.status === RequestStatus.DELIVERED;
+
+    Alert.alert(
+      isAccepted ? '배송을 취소하시겠어요?' : '요청을 취소하시겠어요?',
+      isAccepted
+        ? '수락된 배송은 진행 상태에 따라 바로 취소되지 않을 수 있습니다.'
+        : '취소하면 현재 요청은 더 이상 매칭되지 않습니다.',
+      [
+        { text: '돌아가기', style: 'cancel' },
+        {
+          text: '취소하기',
+          style: 'destructive',
+          onPress: () => {
+            void (async () => {
+              try {
+                setWorking('cancel');
+                const userId = requireUserId();
+
+                if (isAccepted) {
+                  const result = await cancelDeliveryFlow({
+                    requestId: request.requestId,
+                    actorId: userId,
+                    actorType: 'requester',
+                    reason: 'requester_cancelled_from_request_detail',
+                  });
+
+                  if (!result.success) {
+                    Alert.alert('취소를 진행할 수 없습니다', result.message, [
+                      { text: '분쟁 접수', onPress: openDispute },
+                      { text: '닫기', style: 'cancel' },
+                    ]);
+                    return;
+                  }
+
+                  Alert.alert('배송 취소 완료', result.message);
+                } else {
+                  const cancelled = await cancelRequest(
+                    request.requestId,
+                    userId,
+                    'requester cancelled from request detail'
+                  );
+
+                  if (!cancelled) {
+                    Alert.alert('요청 취소 실패', '요청 정보를 다시 확인한 뒤 시도해 주세요.');
+                    return;
+                  }
+
+                  Alert.alert('요청 취소 완료', '요청을 취소했습니다.');
+                }
+
+                await loadRequest();
+              } catch (error) {
+                console.error('Failed to cancel request', error);
+                Alert.alert('취소 처리 실패', '잠시 후 다시 시도해 주세요.');
+              } finally {
+                setWorking(null);
+              }
+            })();
+          },
+        },
+      ]
+    );
+  }
+
+  async function handleConfirmDelivery() {
+    if (!request) return;
+
+    try {
+      setWorking('confirm');
+      const delivery = (await getDeliveryByRequestId(request.requestId)) as
+        | { deliveryId?: string }
+        | null;
+
+      if (!delivery?.deliveryId) {
+        Alert.alert('배송 정보를 찾지 못했습니다', '배송 생성 상태를 다시 확인해 주세요.');
+        return;
+      }
+
+      const result = await confirmDeliveryByRequester({
+        deliveryId: delivery.deliveryId,
+        requesterId: requireUserId(),
+      });
+
+      if (!result.success) {
+        Alert.alert('수령 확인 실패', result.message);
+        return;
+      }
+
+      Alert.alert('수령 확인 완료', '배송을 완료 처리했습니다.');
+      await loadRequest();
+    } catch (error) {
+      console.error('Failed to confirm delivery', error);
+      Alert.alert('수령 확인 실패', '잠시 후 다시 시도해 주세요.');
+    } finally {
+      setWorking(null);
+    }
+  }
+
+  const amount = useMemo(() => (request ? getRequestAmount(request) : 0), [request]);
+
+  if (loading) {
+    return (
+      <View style={styles.container}>
+        <AppTopBar title="요청 상세" onBack={() => navigation.goBack()} />
+        <View style={styles.centerState}>
+          <ActivityIndicator size="large" color={Colors.primary} />
+          <Text style={styles.centerText}>요청 정보를 불러오는 중입니다.</Text>
+        </View>
+      </View>
+    );
+  }
+
+  if (!request) {
+    return (
+      <View style={styles.container}>
+        <AppTopBar title="요청 상세" onBack={() => navigation.goBack()} />
+        <View style={styles.centerState}>
+          <Text style={styles.errorText}>요청 정보를 찾을 수 없습니다.</Text>
+        </View>
+      </View>
+    );
+  }
+
+  const canRematch = request.status === RequestStatus.PENDING || request.status === RequestStatus.MATCHED;
+  const canCancel =
+    request.status !== RequestStatus.CANCELLED && request.status !== RequestStatus.COMPLETED;
+  const canDispute =
+    request.status === RequestStatus.IN_TRANSIT ||
+    request.status === RequestStatus.ARRIVED ||
+    request.status === RequestStatus.AT_LOCKER ||
+    request.status === RequestStatus.DELIVERED;
+  const canConfirm =
+    request.status === RequestStatus.DELIVERED || request.status === RequestStatus.AT_LOCKER;
+  const routeLabel = `${request.pickupStation.stationName} -> ${request.deliveryStation.stationName}`;
+  const preferredTimeLabel = request.preferredTime
+    ? `${request.preferredTime.departureTime ?? '-'}${
+        request.preferredTime.arrivalTime ? ` / ${request.preferredTime.arrivalTime}` : ''
+      }`
+    : '-';
+
+  return (
+    <View style={styles.container}>
+      <AppTopBar title="요청 상세" onBack={() => navigation.goBack()} />
+      <ScrollView
+        contentContainerStyle={styles.content}
+        showsVerticalScrollIndicator={false}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => void onRefresh()} />}
+      >
+        <View style={styles.hero}>
+          <Text style={styles.kicker}>가방까지 배송</Text>
+          <Text style={styles.title}>{routeLabel}</Text>
+          <Text style={styles.subtitle}>{request.packageInfo.description || '물품 설명이 아직 없습니다.'}</Text>
+        </View>
+
+        <Panel title="현재 상태">
+          <InfoRow label="상태" value={getStatusLabel(request.status)} />
+          <InfoRow label="요청 방식" value={request.requestMode === 'reservation' ? '예약' : '즉시'} />
+          <InfoRow label="예상 금액" value={`${amount.toLocaleString()}원`} />
+          <InfoRow label="마감 시간" value={formatDateTime(request.deadline)} />
+        </Panel>
+
+        <Panel title="배송 정보">
+          <InfoRow label="출발역" value={`${request.pickupStation.stationName} / ${request.pickupStation.line}`} />
+          <InfoRow label="도착역" value={`${request.deliveryStation.stationName} / ${request.deliveryStation.line}`} />
+          <InfoRow label="희망 시간" value={preferredTimeLabel} />
+          <InfoRow
+            label="물품 가치"
+            value={typeof request.itemValue === 'number' ? `${request.itemValue.toLocaleString()}원` : '-'}
+          />
+        </Panel>
+
+        <View style={styles.actionSection}>
+          <ActionButton primary icon="chat-bubble-outline" label="채팅 열기" onPress={() => void openChat()} />
+
+          {Boolean(request.matchedGillerId) && (request.itemValue ?? 0) > 0 ? (
+            <ActionButton icon="lock" label="보증금 결제" onPress={handleDepositPayment} />
+          ) : null}
+
+          {canRematch ? (
+            <ActionButton
+              icon="trending-up"
+              label={working === 'rematch' ? '조정 중...' : '다시 매칭하기'}
+              onPress={handleRematchAction}
+              disabled={working !== null}
+            />
+          ) : null}
+
+          {canCancel ? (
+            <ActionButton
+              icon="cancel"
+              label={working === 'cancel' ? '처리 중...' : '배송 취소'}
+              onPress={handleCancel}
+              disabled={working !== null}
+              destructive
+            />
+          ) : null}
+
+          {canDispute ? (
+            <ActionButton icon="report-problem" label="분쟁 접수" onPress={openDispute} />
+          ) : null}
+
+          {canConfirm ? (
+            <ActionButton
+              icon="check-circle-outline"
+              label={working === 'confirm' ? '확인 중...' : '수령 확인'}
+              onPress={() => void handleConfirmDelivery()}
+              disabled={working !== null}
+            />
+          ) : null}
+
+          <ActionButton
+            icon="map"
+            label="배송 추적으로 이동"
+            onPress={() => navigation.navigate('DeliveryTracking', { requestId: request.requestId })}
+          />
+        </View>
+      </ScrollView>
+    </View>
+  );
 }
 
 const styles = StyleSheet.create({
@@ -496,106 +543,111 @@ const styles = StyleSheet.create({
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    padding: Spacing.xl,
     backgroundColor: Colors.background,
+    paddingHorizontal: Spacing.xl,
   },
   centerText: {
     marginTop: Spacing.md,
     color: Colors.textSecondary,
-    ...Typography.body,
+    fontSize: 16,
   },
   errorText: {
     color: Colors.error,
-    ...Typography.body,
+    fontSize: 16,
+    fontWeight: '700',
   },
   hero: {
     backgroundColor: Colors.primaryMint,
     borderRadius: BorderRadius.xl,
     padding: Spacing.xl,
     gap: Spacing.sm,
-    ...Shadows.sm,
   },
   kicker: {
-    fontSize: Typography.fontSize.xs,
-    fontWeight: '800',
     color: Colors.primary,
-    textTransform: 'uppercase',
+    fontSize: 12,
+    fontWeight: '800',
     letterSpacing: 1,
+    textTransform: 'uppercase',
   },
   title: {
-    fontSize: Typography.fontSize['2xl'],
-    fontWeight: '800',
     color: Colors.textPrimary,
+    fontSize: 24,
+    fontWeight: '800',
     lineHeight: 32,
   },
   subtitle: {
     color: Colors.textSecondary,
-    fontSize: Typography.fontSize.sm,
+    fontSize: 15,
     lineHeight: 22,
   },
   panel: {
     backgroundColor: Colors.surface,
     borderRadius: BorderRadius.xl,
     padding: Spacing.lg,
+    gap: 12,
+    borderWidth: 1,
+    borderColor: Colors.border,
     ...Shadows.sm,
-    gap: Spacing.md,
   },
   panelTitle: {
-    fontSize: Typography.fontSize.lg,
-    fontWeight: '800',
     color: Colors.textPrimary,
-    marginBottom: Spacing.xs,
+    fontSize: 18,
+    fontWeight: '800',
+    marginBottom: 4,
   },
   infoRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    gap: Spacing.md,
+    gap: 12,
   },
   infoLabel: {
     color: Colors.textTertiary,
-    fontSize: Typography.fontSize.sm,
+    fontSize: 14,
     fontWeight: '600',
   },
   infoValue: {
     flex: 1,
     textAlign: 'right',
     color: Colors.textPrimary,
-    fontSize: Typography.fontSize.base,
+    fontSize: 15,
     fontWeight: '700',
   },
   actionSection: {
-    gap: Spacing.sm,
+    gap: 10,
+    paddingBottom: Spacing.xl,
   },
   actionButton: {
-    minHeight: 52,
-    borderRadius: BorderRadius.full,
-    paddingHorizontal: Spacing.lg,
-    backgroundColor: Colors.surface,
+    minHeight: 54,
+    borderRadius: BorderRadius.lg,
+    borderWidth: 1,
+    borderColor: Colors.primary,
+    backgroundColor: Colors.white,
+    paddingHorizontal: 16,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: Spacing.sm,
-    ...Shadows.sm,
+    gap: 8,
   },
-  primaryAction: {
+  actionButtonPrimary: {
     backgroundColor: Colors.primary,
+    borderColor: Colors.primary,
   },
-  warningAction: {
+  actionButtonDanger: {
+    borderColor: Colors.error,
     backgroundColor: Colors.errorLight,
   },
-  disabledAction: {
-    opacity: 0.6,
+  actionButtonDisabled: {
+    opacity: 0.55,
   },
-  actionText: {
+  actionButtonText: {
     color: Colors.primary,
-    fontSize: Typography.fontSize.base,
-    fontWeight: '700',
+    fontSize: 15,
+    fontWeight: '800',
   },
-  primaryActionText: {
+  actionButtonTextPrimary: {
     color: Colors.white,
   },
-  warningText: {
+  actionButtonTextDanger: {
     color: Colors.error,
   },
 });
-

@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import type { JSX } from 'react';
 import {
   ActivityIndicator,
+  Alert,
   RefreshControl,
   ScrollView,
   StyleSheet,
@@ -14,7 +15,7 @@ import { RouteProp, useNavigation, useRoute } from '@react-navigation/native';
 
 import AppTopBar from '../../components/common/AppTopBar';
 import { NaverMapCard } from '../../components/maps/NaverMapCard';
-import { getChatRoomByRequestId } from '../../services/chat-service';
+import { ensureChatRoomForRequest, getChatRoomByRequestId } from '../../services/chat-service';
 import {
   confirmDeliveryByRequester,
   getDeliveryByRequestId,
@@ -22,12 +23,12 @@ import {
 } from '../../services/delivery-service';
 import { requireUserId } from '../../services/firebase';
 import { getRequestById, subscribeToRequest } from '../../services/request-service';
-import { BorderRadius, Colors, Spacing, Typography } from '../../theme';
+import { BorderRadius, Colors, Shadows, Spacing } from '../../theme';
 import type { MainStackNavigationProp, MainStackParamList } from '../../types/navigation';
 import { formatWeightDisplay } from '../../utils/package-weight';
 import { toTrackingModel, type TrackingEvent, type TrackingModel } from '../../utils/request-adapters';
 
-type DeliveryLookup = { deliveryId: string; gillerId?: string };
+type DeliveryLookup = Record<string, unknown> & { deliveryId?: string; gillerId?: string };
 type DeliveryTrackingRoute = RouteProp<MainStackParamList, 'DeliveryTracking'>;
 type StepState = 'completed' | 'current' | 'upcoming';
 type TrackingStep = {
@@ -40,7 +41,7 @@ type TrackingStep = {
 
 const STEP_ORDER = ['created', 'matched', 'picked_up', 'in_transit', 'arrived', 'completed'] as const;
 
-function formatDateLabel(value: Date | string | undefined): string {
+function formatDateLabel(value?: Date | string): string {
   if (!value) return '-';
   const resolved = value instanceof Date ? value : new Date(value);
   if (Number.isNaN(resolved.getTime())) return '-';
@@ -69,8 +70,8 @@ function getCurrentStepKey(status: string): (typeof STEP_ORDER)[number] {
       return 'in_transit';
     case 'arrived':
     case 'at_locker':
-      return 'arrived';
     case 'delivered':
+      return 'arrived';
     case 'completed':
       return 'completed';
     default:
@@ -80,7 +81,7 @@ function getCurrentStepKey(status: string): (typeof STEP_ORDER)[number] {
 
 function getStepLabel(key: (typeof STEP_ORDER)[number], status: string): string {
   if (key === 'arrived' && status === 'at_locker') {
-    return '사물함 보관';
+    return '사물함 도착';
   }
 
   switch (key) {
@@ -103,22 +104,22 @@ function getStepLabel(key: (typeof STEP_ORDER)[number], status: string): string 
 
 function getStepDescription(key: (typeof STEP_ORDER)[number], status: string): string {
   if (key === 'arrived' && status === 'at_locker') {
-    return '물품이 사물함에 안전하게 보관되었습니다.';
+    return '물건이 사물함에 안전하게 보관되었습니다.';
   }
 
   switch (key) {
     case 'created':
-      return '배송 요청이 등록되었습니다.';
+      return '배송 요청이 정상적으로 등록되었습니다.';
     case 'matched':
-      return '길러 배정과 연결이 끝났습니다.';
+      return '길러와 연결되어 배송 준비가 진행 중입니다.';
     case 'picked_up':
-      return '출발지에서 물품 인계를 마쳤습니다.';
+      return '출발지에서 물건 인수가 끝났습니다.';
     case 'in_transit':
-      return '목적지로 이동하고 있습니다.';
+      return '도착역 또는 도착지 방향으로 이동 중입니다.';
     case 'arrived':
-      return '도착 후 전달 준비 단계입니다.';
+      return '도착지 인근까지 이동했거나 전달 준비가 완료되었습니다.';
     case 'completed':
-      return '수령 확인과 완료 처리가 끝났습니다.';
+      return '수령 확인까지 끝나 배송이 완료되었습니다.';
     default:
       return '';
   }
@@ -148,16 +149,16 @@ function buildTrackingSteps(model: TrackingModel): TrackingStep[] {
   }
 
   return STEP_ORDER.map((key, index) => {
-    const matchedEvent = eventMap.get(key);
+    const event = eventMap.get(key);
     const state: StepState =
       index < currentIndex ? 'completed' : index === currentIndex ? 'current' : 'upcoming';
 
     return {
       key,
       label: getStepLabel(key, model.status),
-      description: matchedEvent?.description ?? getStepDescription(key, model.status),
+      description: event?.description ?? getStepDescription(key, model.status),
       state,
-      timestamp: matchedEvent?.timestamp ?? (state !== 'upcoming' ? model.updatedAt ?? model.createdAt : undefined),
+      timestamp: event?.timestamp ?? (state !== 'upcoming' ? model.updatedAt ?? model.createdAt : undefined),
     };
   });
 }
@@ -166,15 +167,15 @@ function getStatusLabel(status: string): string {
   switch (status) {
     case 'matched':
     case 'accepted':
-      return '길러가 연결되었습니다.';
+      return '길러가 배정되어 배송 준비 중입니다.';
     case 'in_transit':
-      return '배송이 이동 중입니다.';
+      return '현재 배송 이동 중입니다.';
     case 'arrived':
-      return '도착 후 전달을 준비하고 있습니다.';
+      return '도착지 인근까지 이동했습니다.';
     case 'at_locker':
-      return '사물함 인계가 진행 중입니다.';
+      return '사물함 보관 또는 인계가 진행 중입니다.';
     case 'delivered':
-      return '수령 확인을 기다리고 있습니다.';
+      return '수령 확인만 남았습니다.';
     case 'completed':
       return '배송이 완료되었습니다.';
     case 'cancelled':
@@ -192,11 +193,11 @@ function calculateProgress(status: string): number {
     case 'in_transit':
       return 60;
     case 'arrived':
-      return 80;
+      return 82;
     case 'at_locker':
-      return 85;
+      return 88;
     case 'delivered':
-      return 92;
+      return 94;
     case 'completed':
       return 100;
     case 'cancelled':
@@ -256,6 +257,7 @@ export default function DeliveryTrackingScreen(): JSX.Element {
   const navigation = useNavigation<MainStackNavigationProp>();
   const route = useRoute<DeliveryTrackingRoute>();
   const requestId = route.params.requestId ?? route.params.matchId ?? '';
+
   const [trackingData, setTrackingData] = useState<TrackingModel | null>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -263,6 +265,7 @@ export default function DeliveryTrackingScreen(): JSX.Element {
 
   useEffect(() => {
     let fallbackUnsubscribe: (() => void) | null = null;
+
     const unsubscribeDelivery = subscribeToDeliveryByRequestId(requestId, (delivery) => {
       if (delivery) {
         setTrackingData(toTrackingModel(delivery));
@@ -287,11 +290,7 @@ export default function DeliveryTrackingScreen(): JSX.Element {
 
   async function loadTracking() {
     try {
-      const delivery = (await getDeliveryByRequestId(requestId)) as
-        | DeliveryLookup
-        | Record<string, unknown>
-        | null;
-
+      const delivery = (await getDeliveryByRequestId(requestId)) as DeliveryLookup | null;
       if (delivery) {
         setTrackingData(toTrackingModel(delivery));
         return;
@@ -311,14 +310,32 @@ export default function DeliveryTrackingScreen(): JSX.Element {
 
   async function openChat() {
     try {
-      const room = await getChatRoomByRequestId(requestId);
-      if (!room) return;
+      let room = await getChatRoomByRequestId(requestId);
+
+      if (!room) {
+        const request = await getRequestById(requestId);
+        if (request?.requesterId && request?.matchedGillerId) {
+          room = await ensureChatRoomForRequest({
+            requestId,
+            requesterId: request.requesterId,
+            gillerId: request.matchedGillerId,
+            requestInfo: {
+              from: request.pickupStation.stationName,
+              to: request.deliveryStation.stationName,
+              urgency: request.urgency ?? 'normal',
+            },
+          });
+        }
+      }
+
+      if (!room) {
+        Alert.alert('채팅방을 찾지 못했습니다', '배송 매칭이 완료된 뒤 다시 시도해 주세요.');
+        return;
+      }
 
       const viewerId = requireUserId();
       const other =
-        room.participants.user1.userId === viewerId
-          ? room.participants.user2
-          : room.participants.user1;
+        room.participants.user1.userId === viewerId ? room.participants.user2 : room.participants.user1;
 
       navigation.navigate('Chat', {
         chatRoomId: room.chatRoomId,
@@ -327,6 +344,7 @@ export default function DeliveryTrackingScreen(): JSX.Element {
       });
     } catch (error) {
       console.error('Failed to open chat', error);
+      Alert.alert('채팅 열기 실패', '잠시 후 다시 시도해 주세요.');
     }
   }
 
@@ -334,35 +352,37 @@ export default function DeliveryTrackingScreen(): JSX.Element {
     try {
       setConfirming(true);
       const delivery = (await getDeliveryByRequestId(requestId)) as DeliveryLookup | null;
-      if (!delivery?.deliveryId) return;
+      if (!delivery?.deliveryId) {
+        Alert.alert('배송 정보를 찾지 못했습니다', '배송 상태를 다시 확인해 주세요.');
+        return;
+      }
 
       const result = await confirmDeliveryByRequester({
         deliveryId: delivery.deliveryId,
         requesterId: requireUserId(),
       });
 
-      if (result.success) {
-        await loadTracking();
+      if (!result.success) {
+        Alert.alert('수령 확인 실패', result.message);
+        return;
       }
+
+      Alert.alert('수령 확인 완료', '배송을 완료 처리했습니다.');
+      await loadTracking();
     } catch (error) {
       console.error('Failed to confirm delivery', error);
+      Alert.alert('수령 확인 실패', '잠시 후 다시 시도해 주세요.');
     } finally {
       setConfirming(false);
     }
   }
 
-  const progress = useMemo(
-    () => calculateProgress(trackingData?.status ?? 'pending'),
-    [trackingData?.status],
-  );
-  const steps = useMemo(
-    () => (trackingData ? buildTrackingSteps(trackingData) : []),
-    [trackingData],
-  );
+  const progress = useMemo(() => calculateProgress(trackingData?.status ?? 'pending'), [trackingData?.status]);
+  const steps = useMemo(() => (trackingData ? buildTrackingSteps(trackingData) : []), [trackingData]);
   const hasMapCoordinates = Boolean(
     trackingData &&
       hasValidStationCoords(trackingData.pickupStation) &&
-      hasValidStationCoords(trackingData.deliveryStation),
+      hasValidStationCoords(trackingData.deliveryStation)
   );
 
   const pickupLatitude = trackingData?.pickupStation.lat ?? 0;
@@ -393,9 +413,7 @@ export default function DeliveryTrackingScreen(): JSX.Element {
       <ScrollView
         contentContainerStyle={styles.content}
         showsVerticalScrollIndicator={false}
-        refreshControl={
-          <RefreshControl refreshing={refreshing} onRefresh={() => void loadTracking()} />
-        }
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => void loadTracking()} />}
       >
         <View style={styles.hero}>
           <Text style={styles.heroKicker}>실시간 배송 상태</Text>
@@ -410,20 +428,29 @@ export default function DeliveryTrackingScreen(): JSX.Element {
           <NaverMapCard
             center={mapCenter}
             markers={[
-              { latitude: pickupLatitude, longitude: pickupLongitude, label: '출발' },
-              { latitude: deliveryLatitude, longitude: deliveryLongitude, label: '도착' },
+              { latitude: pickupLatitude, longitude: pickupLongitude, label: '출' },
+              { latitude: deliveryLatitude, longitude: deliveryLongitude, label: '도' },
             ]}
             title="배송 구간 지도"
-            subtitle="실제 역 좌표를 기준으로 현재 배송 구간을 보여드립니다."
+            subtitle="현재 지도는 출발역과 도착역 좌표를 기준으로 배송 구간을 요약해서 보여줍니다. 실제 이동 경로선은 아직 연결되어 있지 않습니다."
           />
         ) : (
           <View style={styles.panel}>
             <Text style={styles.panelTitle}>배송 구간 지도</Text>
             <Text style={styles.panelBody}>
-              역 좌표가 아직 준비되지 않아 지도 미리보기를 표시하지 않습니다.
+              출발역 또는 도착역 좌표가 아직 준비되지 않아 지도 미리보기를 표시하지 못했습니다.
             </Text>
           </View>
         )}
+
+        <View style={styles.panel}>
+          <Text style={styles.panelTitle}>지도 표시 방식</Text>
+          <Text style={styles.panelBody}>
+            현재 설계는 출발역과 도착역 두 지점을 기준으로 배송 구간을 요약하는 방식입니다. 실시간 동선이나
+            폴리라인 경로선은 아직 데이터가 연결되지 않아, 이 화면에서는 구간 개요와 진행 단계 중심으로
+            보여줍니다.
+          </Text>
+        </View>
 
         <View style={styles.panel}>
           <Text style={styles.panelTitle}>진행 단계</Text>
@@ -434,42 +461,29 @@ export default function DeliveryTrackingScreen(): JSX.Element {
 
         <View style={styles.panel}>
           <Text style={styles.panelTitle}>경로 요약</Text>
+          <InfoRow label="출발" value={`${trackingData.pickupStation.stationName} / ${trackingData.pickupStation.line}`} />
+          <InfoRow label="도착" value={`${trackingData.deliveryStation.stationName} / ${trackingData.deliveryStation.line}`} />
           <InfoRow
-            label="출발"
-            value={`${trackingData.pickupStation.stationName} / ${trackingData.pickupStation.line}`}
-          />
-          <InfoRow
-            label="도착"
-            value={`${trackingData.deliveryStation.stationName} / ${trackingData.deliveryStation.line}`}
-          />
-          <InfoRow
-            label="예상 시간"
-            value={
-              trackingData.estimatedMinutes
-                ? `약 ${trackingData.estimatedMinutes}분`
-                : '조정 중'
-            }
+            label="예상 소요"
+            value={trackingData.estimatedMinutes ? `약 ${trackingData.estimatedMinutes}분` : '조정 중'}
           />
         </View>
 
         <View style={styles.panel}>
           <Text style={styles.panelTitle}>물품 정보</Text>
-          <InfoRow label="물품" value={trackingData.packageInfo.description ?? '설명 없음'} />
+          <InfoRow label="물품" value={trackingData.packageInfo.description ?? '설명이 아직 없습니다.'} />
           <InfoRow
             label="무게"
-            value={formatWeightDisplay(
-              trackingData.packageInfo.weight,
-              trackingData.packageInfo.weightKg,
-            )}
+            value={formatWeightDisplay(trackingData.packageInfo.weight, trackingData.packageInfo.weightKg)}
           />
           <InfoRow label="수령인" value={trackingData.recipientName ?? '수령 단계에서 확인'} />
         </View>
 
         {(trackingData.trackingEvents ?? []).length ? (
           <View style={styles.panel}>
-            <Text style={styles.panelTitle}>세부 이력</Text>
-            {(trackingData.trackingEvents ?? []).map((event) => (
-              <TimelineRow key={`${event.type}-${event.title}`} event={event} />
+            <Text style={styles.panelTitle}>변경 이력</Text>
+            {(trackingData.trackingEvents ?? []).map((event, index) => (
+              <TimelineRow key={`${event.type}-${index}`} event={event} />
             ))}
           </View>
         ) : null}
@@ -480,8 +494,7 @@ export default function DeliveryTrackingScreen(): JSX.Element {
             <Text style={styles.primaryActionText}>채팅 열기</Text>
           </TouchableOpacity>
 
-          {(trackingData.status === 'in_transit' || trackingData.status === 'arrived') &&
-          hasMapCoordinates ? (
+          {(trackingData.status === 'in_transit' || trackingData.status === 'arrived') && hasMapCoordinates ? (
             <TouchableOpacity
               style={styles.secondaryAction}
               onPress={() =>
@@ -514,9 +527,7 @@ export default function DeliveryTrackingScreen(): JSX.Element {
               disabled={confirming}
             >
               <MaterialIcons name="check-circle-outline" size={18} color={Colors.primary} />
-              <Text style={styles.secondaryActionText}>
-                {confirming ? '확인 중...' : '수령 확인'}
-              </Text>
+              <Text style={styles.secondaryActionText}>{confirming ? '확인 중...' : '수령 확인'}</Text>
             </TouchableOpacity>
           ) : null}
         </View>
@@ -539,6 +550,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: Colors.background,
+    paddingHorizontal: Spacing.xl,
   },
   centerText: {
     marginTop: Spacing.md,
@@ -589,6 +601,7 @@ const styles = StyleSheet.create({
     gap: 12,
     borderWidth: 1,
     borderColor: Colors.border,
+    ...Shadows.sm,
   },
   panelTitle: {
     color: Colors.textPrimary,
@@ -615,26 +628,25 @@ const styles = StyleSheet.create({
     flex: 1,
     textAlign: 'right',
     color: Colors.textPrimary,
-    fontSize: 16,
+    fontSize: 15,
     fontWeight: '700',
   },
   stepRow: {
     flexDirection: 'row',
     gap: 12,
-    alignItems: 'flex-start',
   },
   stepDot: {
-    width: 12,
-    height: 12,
+    width: 14,
+    height: 14,
     marginTop: 5,
-    borderRadius: 6,
+    borderRadius: BorderRadius.full,
     backgroundColor: Colors.gray300,
   },
   stepDotCompleted: {
     backgroundColor: Colors.primary,
   },
   stepDotCurrent: {
-    backgroundColor: Colors.primaryDark,
+    backgroundColor: Colors.warning,
   },
   stepCopy: {
     flex: 1,
@@ -648,60 +660,59 @@ const styles = StyleSheet.create({
   },
   stepLabel: {
     color: Colors.textPrimary,
-    fontSize: Typography.fontSize.base,
+    fontSize: 15,
     fontWeight: '800',
   },
   stepState: {
-    color: Colors.primary,
-    fontSize: Typography.fontSize.xs,
-    fontWeight: '800',
+    color: Colors.textTertiary,
+    fontSize: 12,
+    fontWeight: '700',
   },
   stepDescription: {
     color: Colors.textSecondary,
-    fontSize: Typography.fontSize.sm,
+    fontSize: 14,
     lineHeight: 20,
   },
   stepTimestamp: {
     color: Colors.textTertiary,
-    fontSize: Typography.fontSize.xs,
+    fontSize: 12,
   },
   timelineRow: {
     flexDirection: 'row',
-    alignItems: 'flex-start',
     gap: 12,
   },
   timelineDot: {
     width: 10,
     height: 10,
-    borderRadius: 5,
+    marginTop: 6,
+    borderRadius: BorderRadius.full,
     backgroundColor: Colors.primary,
-    marginTop: 5,
   },
   timelineCopy: {
     flex: 1,
-    gap: 2,
+    gap: 4,
   },
   timelineTitle: {
     color: Colors.textPrimary,
-    fontSize: Typography.fontSize.base,
+    fontSize: 15,
     fontWeight: '700',
   },
   timelineDescription: {
     color: Colors.textSecondary,
-    fontSize: Typography.fontSize.sm,
+    fontSize: 14,
     lineHeight: 20,
   },
   timelineMeta: {
     color: Colors.textTertiary,
-    fontSize: Typography.fontSize.xs,
+    fontSize: 12,
   },
   actionSection: {
-    gap: Spacing.sm,
-    marginTop: Spacing.sm,
+    gap: 10,
+    paddingBottom: Spacing.xl,
   },
   primaryAction: {
-    minHeight: 52,
-    borderRadius: BorderRadius.full,
+    minHeight: 54,
+    borderRadius: BorderRadius.lg,
     backgroundColor: Colors.primary,
     alignItems: 'center',
     justifyContent: 'center',
@@ -710,26 +721,26 @@ const styles = StyleSheet.create({
   },
   primaryActionText: {
     color: Colors.white,
-    fontSize: 16,
+    fontSize: 15,
     fontWeight: '800',
   },
   secondaryAction: {
     minHeight: 52,
-    borderRadius: BorderRadius.full,
-    backgroundColor: Colors.surface,
+    borderRadius: BorderRadius.lg,
+    borderWidth: 1,
+    borderColor: Colors.primary,
+    backgroundColor: Colors.white,
     alignItems: 'center',
     justifyContent: 'center',
     flexDirection: 'row',
     gap: 8,
-    borderWidth: 1,
-    borderColor: Colors.border,
   },
   secondaryActionText: {
     color: Colors.primary,
-    fontSize: 16,
-    fontWeight: '700',
+    fontSize: 15,
+    fontWeight: '800',
   },
   disabledAction: {
-    opacity: 0.6,
+    opacity: 0.55,
   },
 });
