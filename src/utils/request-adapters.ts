@@ -14,6 +14,20 @@ export interface TrackingModel {
   status: string;
   pickupStation: { stationName: string; line: string; lat?: number; lng?: number };
   deliveryStation: { stationName: string; line: string; lat?: number; lng?: number };
+  courierLocation?: {
+    latitude: number;
+    longitude: number;
+    accuracy?: number;
+    timestamp?: Date;
+  };
+  locationHistory?: Array<{
+    latitude: number;
+    longitude: number;
+    accuracy?: number;
+    speed?: number | null;
+    heading?: number | null;
+    timestamp?: Date;
+  }>;
   packageInfo: { size: string; weight: string | number; weightKg?: number; description?: string };
   recipientName?: string;
   recipientVerificationCode?: string;
@@ -83,6 +97,22 @@ interface TrackingInput {
   updatedAt?: Date | Timestamp | null;
   tracking?: {
     events?: TrackingEventInput[];
+    courierLocation?: {
+      location?: {
+        latitude?: number;
+        longitude?: number;
+      };
+      accuracy?: number;
+      timestamp?: Date | Timestamp | null;
+    };
+    locationHistory?: Array<{
+      latitude?: number;
+      longitude?: number;
+      accuracy?: number;
+      speed?: number | null;
+      heading?: number | null;
+      timestamp?: Date | Timestamp | null;
+    }>;
   };
   deliveryId?: string;
   gillerId?: string;
@@ -231,6 +261,34 @@ export function toTrackingModel(data: TrackingInput): TrackingModel {
       lat: typeof data.deliveryStation?.lat === 'number' ? data.deliveryStation.lat : undefined,
       lng: typeof data.deliveryStation?.lng === 'number' ? data.deliveryStation.lng : undefined,
     },
+    courierLocation:
+      typeof data.tracking?.courierLocation?.location?.latitude === 'number' &&
+      typeof data.tracking?.courierLocation?.location?.longitude === 'number'
+        ? {
+            latitude: data.tracking.courierLocation.location.latitude,
+            longitude: data.tracking.courierLocation.location.longitude,
+            accuracy: data.tracking.courierLocation.accuracy,
+            timestamp: toDateOrUndefined(data.tracking.courierLocation.timestamp),
+          }
+        : undefined,
+    locationHistory: Array.isArray(data.tracking?.locationHistory)
+      ? data.tracking.locationHistory.reduce<NonNullable<TrackingModel['locationHistory']>>((acc, item) => {
+          if (typeof item?.latitude !== 'number' || typeof item?.longitude !== 'number') {
+            return acc;
+          }
+
+          acc.push({
+            latitude: item.latitude,
+            longitude: item.longitude,
+            accuracy: item.accuracy,
+            speed: item.speed,
+            heading: item.heading,
+            timestamp: toDateOrUndefined(item.timestamp),
+          });
+
+          return acc;
+        }, [])
+      : undefined,
     packageInfo: {
       size: data.packageInfo?.size ?? '-',
       weight: data.packageInfo?.weight ?? '-',

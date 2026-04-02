@@ -1,3 +1,5 @@
+import { getApps } from 'firebase/app';
+
 export type SupportedMapProvider = 'naver-static' | 'naver-web' | 'none';
 
 function readEnv(value: string | undefined): string {
@@ -29,7 +31,14 @@ export function canUseDynamicWebMap(): boolean {
 }
 
 export function getDefaultFunctionsBaseUrl(): string {
-  const projectId = readEnv(env.EXPO_PUBLIC_FIREBASE_PROJECT_ID);
+  const firebaseProjectId =
+    getApps()[0]?.options.projectId && typeof getApps()[0]?.options.projectId === 'string'
+      ? getApps()[0]?.options.projectId
+      : '';
+  const projectId =
+    readEnv(env.EXPO_PUBLIC_FIREBASE_PROJECT_ID) ||
+    readEnv(env.FIREBASE_PROJECT_ID) ||
+    readEnv(firebaseProjectId);
   const region = readEnv(env.EXPO_PUBLIC_FIREBASE_FUNCTIONS_REGION) || 'us-central1';
   if (!projectId) {
     return '';
@@ -46,6 +55,16 @@ export function getStaticMapProxyUrl(): string {
 
   const fallback = getDefaultFunctionsBaseUrl();
   return fallback ? `${fallback}/naverStaticMapProxy` : '';
+}
+
+export function getNaverGeocodeProxyUrl(): string {
+  const fallback = getDefaultFunctionsBaseUrl();
+  return fallback ? `${fallback}/naverGeocodeProxy` : '';
+}
+
+export function getNaverDirectionsProxyUrl(): string {
+  const fallback = getDefaultFunctionsBaseUrl();
+  return fallback ? `${fallback}/naverDirectionsProxy` : '';
 }
 
 export function getNaverWebSdkUrl(): string {

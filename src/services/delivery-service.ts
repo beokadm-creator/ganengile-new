@@ -10,6 +10,7 @@ import {
   getDocs,
   addDoc,
   updateDoc,
+  arrayUnion,
   deleteField,
   query,
   where,
@@ -678,17 +679,31 @@ export async function verifyPickup(data: PickupVerificationData): Promise<{ succ
  */
 export async function updateGillerLocation(
   deliveryId: string,
-  location: { latitude: number; longitude: number }
+  location: { latitude: number; longitude: number; accuracy?: number | null; speed?: number | null; heading?: number | null }
 ): Promise<void> {
   try {
     const deliveryRef = doc(db, 'deliveries', deliveryId);
+    const snapshotPoint = {
+      latitude: location.latitude,
+      longitude: location.longitude,
+      accuracy: typeof location.accuracy === 'number' ? location.accuracy : 0,
+      speed: typeof location.speed === 'number' ? location.speed : null,
+      heading: typeof location.heading === 'number' ? location.heading : null,
+      timestamp: new Date(),
+    };
 
     await updateDoc(deliveryRef, {
       'tracking.courierLocation': {
-        location,
-        timestamp: new Date(),
-        accuracy: 10, // meters
+        location: {
+          latitude: location.latitude,
+          longitude: location.longitude,
+        },
+        timestamp: snapshotPoint.timestamp,
+        accuracy: snapshotPoint.accuracy,
+        speed: snapshotPoint.speed,
+        heading: snapshotPoint.heading,
       },
+      'tracking.locationHistory': arrayUnion(snapshotPoint),
       updatedAt: serverTimestamp(),
     });
   } catch (error) {

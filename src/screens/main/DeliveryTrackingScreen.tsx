@@ -22,6 +22,12 @@ import {
   subscribeToDeliveryByRequestId,
 } from '../../services/delivery-service';
 import { requireUserId } from '../../services/firebase';
+import {
+  formatRouteDistance,
+  formatRouteDuration,
+  getDrivingRoute,
+  type RouteCoordinate,
+} from '../../services/naver-route-service';
 import { getRequestById, subscribeToRequest } from '../../services/request-service';
 import { BorderRadius, Colors, Shadows, Spacing } from '../../theme';
 import type { MainStackNavigationProp, MainStackParamList } from '../../types/navigation';
@@ -262,6 +268,8 @@ export default function DeliveryTrackingScreen(): JSX.Element {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [confirming, setConfirming] = useState(false);
+  const [routeLoading, setRouteLoading] = useState(false);
+  const [routeData, setRouteData] = useState<Awaited<ReturnType<typeof getDrivingRoute>>>(null);
 
   useEffect(() => {
     let fallbackUnsubscribe: (() => void) | null = null;
@@ -377,6 +385,64 @@ export default function DeliveryTrackingScreen(): JSX.Element {
     }
   }
 
+  useEffect(() => {
+    if (!trackingData || !hasValidStationCoords(trackingData.deliveryStation)) {
+      setRouteData(null);
+      return;
+    }
+
+    const startPoint: RouteCoordinate | null =
+      trackingData.courierLocation &&
+      hasValidCoordinate(trackingData.courierLocation.latitude) &&
+      hasValidCoordinate(trackingData.courierLocation.longitude)
+        ? {
+            latitude: trackingData.courierLocation.latitude,
+            longitude: trackingData.courierLocation.longitude,
+          }
+        : hasValidStationCoords(trackingData.pickupStation)
+          ? {
+              latitude: trackingData.pickupStation.lat!,
+              longitude: trackingData.pickupStation.lng!,
+            }
+          : null;
+
+    if (!startPoint) {
+      setRouteData(null);
+      return;
+    }
+
+    let cancelled = false;
+    setRouteLoading(true);
+
+    void getDrivingRoute({
+      start: startPoint,
+      goal: {
+        latitude: trackingData.deliveryStation.lat!,
+        longitude: trackingData.deliveryStation.lng!,
+      },
+    })
+      .then((result) => {
+        if (!cancelled) {
+          setRouteData(result);
+        }
+      })
+      .catch((error) => {
+        console.error('Failed to load driving route', error);
+        if (!cancelled) {
+          setRouteData(null);
+        }
+      })
+      .finally(() => {
+        if (!cancelled) {
+          setRouteLoading(false);
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [trackingData]);
+
   const progress = useMemo(() => calculateProgress(trackingData?.status ?? 'pending'), [trackingData?.status]);
   const steps = useMemo(() => (trackingData ? buildTrackingSteps(trackingData) : []), [trackingData]);
   const hasMapCoordinates = Boolean(
@@ -393,6 +459,27 @@ export default function DeliveryTrackingScreen(): JSX.Element {
     latitude: (pickupLatitude + deliveryLatitude) / 2,
     longitude: (pickupLongitude + deliveryLongitude) / 2,
   };
+  const courierLocation = trackingData?.courierLocation;
+  const courierMarker =
+    courierLocation &&
+    hasValidCoordinate(courierLocation.latitude) &&
+    hasValidCoordinate(courierLocation.longitude)
+      ? {
+          latitude: courierLocation.latitude,
+          longitude: courierLocation.longitude,
+          label: '현',
+        }
+      : null;
+  const mapMarkers = [
+    { latitude: pickupLatitude, longitude: pickupLongitude, label: '출' },
+    ...(courierMarker ? [courierMarker] : []),
+    { latitude: deliveryLatitude, longitude: deliveryLongitude, label: '도' },
+  ];
+  const routePath =
+    routeData?.coordinates?.map((point) => ({
+      latitude: point.latitude,
+      longitude: point.longitude,
+    })) ?? [];
 
   if (loading || !trackingData) {
     return (
@@ -427,12 +514,14 @@ export default function DeliveryTrackingScreen(): JSX.Element {
         {hasMapCoordinates ? (
           <NaverMapCard
             center={mapCenter}
-            markers={[
-              { latitude: pickupLatitude, longitude: pickupLongitude, label: '출' },
-              { latitude: deliveryLatitude, longitude: deliveryLongitude, label: '도' },
-            ]}
+            markers={mapMarkers}
+            path={routePath}
             title="배송 구간 지도"
-            subtitle="현재 지도는 출발역과 도착역 좌표를 기준으로 배송 구간을 요약해서 보여줍니다. 실제 이동 경로선은 아직 연결되어 있지 않습니다."
+            subtitle={
+              routeData
+                ? '실제 GPS 위치와 도착역 좌표를 기준으로 경로 좌표를 불러와 동선을 표시합니다.'
+                : '출발역과 도착역 또는 현재 GPS 좌표를 기준으로 배송 구간을 보여줍니다.'
+            }
           />
         ) : (
           <View style={styles.panel}>
@@ -446,10 +535,33 @@ export default function DeliveryTrackingScreen(): JSX.Element {
         <View style={styles.panel}>
           <Text style={styles.panelTitle}>지도 표시 방식</Text>
           <Text style={styles.panelBody}>
-            현재 설계는 출발역과 도착역 두 지점을 기준으로 배송 구간을 요약하는 방식입니다. 실시간 동선이나
-            폴리라인 경로선은 아직 데이터가 연결되지 않아, 이 화면에서는 구간 개요와 진행 단계 중심으로
-            보여줍니다.
+            현재는 길러 GPS가 들어오면 현재 위치를 시작점으로, 아직 GPS가 없으면 출발역을 시작점으로 사용합니다.
+            그리고 경로 좌표 API에서 받은 좌표열을 웹 지도에서는 선으로 표시합니다.
           </Text>
+        </View>
+
+        <View style={styles.panel}>
+          <Text style={styles.panelTitle}>실제 동선</Text>
+          <InfoRow
+            label="현재 GPS"
+            value={
+              courierMarker
+                ? `${trackingData.courierLocation?.latitude.toFixed(5)}, ${trackingData.courierLocation?.longitude.toFixed(5)}`
+                : '아직 위치 수신 전'
+            }
+          />
+          <InfoRow
+            label="경로 길이"
+            value={routeLoading ? '불러오는 중' : formatRouteDistance(routeData?.summary.distanceMeters ?? 0)}
+          />
+          <InfoRow
+            label="예상 소요"
+            value={routeLoading ? '불러오는 중' : formatRouteDuration(routeData?.summary.durationMs ?? 0)}
+          />
+          <InfoRow
+            label="좌표 개수"
+            value={routeData?.coordinates?.length ? `${routeData.coordinates.length}개` : '없음'}
+          />
         </View>
 
         <View style={styles.panel}>

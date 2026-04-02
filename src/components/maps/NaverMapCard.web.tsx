@@ -18,6 +18,7 @@ declare global {
         LatLng: new (lat: number, lng: number) => unknown;
         Map: new (element: HTMLElement, options: { center: unknown; zoom: number }) => unknown;
         Marker: new (options: { position: unknown; map: unknown; title?: string }) => unknown;
+        Polyline: new (options: { map: unknown; path: unknown[]; strokeColor?: string; strokeWeight?: number; strokeOpacity?: number }) => unknown;
       };
     };
   }
@@ -28,6 +29,7 @@ interface NaverMapCardProps {
   subtitle?: string;
   center: Marker;
   markers: Marker[];
+  path?: Marker[];
   height?: number;
 }
 
@@ -72,6 +74,7 @@ export function NaverMapCard({
   subtitle,
   center,
   markers,
+  path = [],
   height = 240,
 }: NaverMapCardProps): ReactElement {
   const mapId = useId().replace(/:/g, '_');
@@ -108,6 +111,16 @@ export function NaverMapCard({
           });
         });
 
+        if (path.length > 1) {
+          new mapApi.Polyline({
+            map,
+            path: path.map((point) => new mapApi.LatLng(point.latitude, point.longitude)),
+            strokeColor: '#0F766E',
+            strokeWeight: 5,
+            strokeOpacity: 0.85,
+          });
+        }
+
         setDynamicReady(true);
       })
       .catch(() => {
@@ -117,7 +130,7 @@ export function NaverMapCard({
     return () => {
       cancelled = true;
     };
-  }, [center.latitude, center.longitude, mapId, markers]);
+  }, [center.latitude, center.longitude, mapId, markers, path]);
 
   const markerSummary = useMemo(
     () =>
@@ -142,6 +155,7 @@ export function NaverMapCard({
               subtitle={subtitle}
               center={center}
               markers={markerSummary}
+              path={path}
               height={height}
             />
           </View>
@@ -156,6 +170,7 @@ export function NaverMapCard({
       subtitle={subtitle}
       center={center}
       markers={markerSummary}
+      path={path}
       height={height}
     />
   );

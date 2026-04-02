@@ -12,6 +12,7 @@ interface NaverMapCardProps {
   subtitle?: string;
   center: Marker;
   markers: Marker[];
+  path?: Marker[];
   height?: number;
 }
 
@@ -20,6 +21,7 @@ export function NaverMapCard({
   subtitle,
   center,
   markers,
+  path,
   height = 240,
 }: NaverMapCardProps): ReactElement {
   return (
@@ -28,6 +30,7 @@ export function NaverMapCard({
       subtitle={subtitle}
       center={center}
       markers={markers}
+      path={path}
       height={height}
     />
   );

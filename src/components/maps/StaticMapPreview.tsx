@@ -12,6 +12,7 @@ export type StaticMapMarker = {
 interface StaticMapPreviewProps {
   center: { latitude: number; longitude: number };
   markers?: StaticMapMarker[];
+  path?: StaticMapMarker[];
   width?: number;
   height?: number;
   zoom?: number;
@@ -35,6 +36,7 @@ function buildMarkerParam(markers: StaticMapMarker[]): string {
 export default function StaticMapPreview({
   center,
   markers = [],
+  path,
   width = 640,
   height = 320,
   zoom = 14,
@@ -67,7 +69,7 @@ export default function StaticMapPreview({
     }
 
     return `${baseUrl}?${query.toString()}`;
-  }, [center.latitude, center.longitude, height, markers, width, zoom]);
+  }, [center.latitude, center.longitude, height, markers, path, width, zoom]);
 
   if (!uri || loadFailed) {
     return (

@@ -188,6 +188,28 @@ function buildNaverStaticMapUrl(query: {
   return `https://maps.apigw.ntruss.com/map-static/v2/raster?${params.toString()}`;
 }
 
+function buildNaverGeocodeUrl(query: { address: string }): string {
+  const params = new URLSearchParams({
+    query: query.address,
+  });
+
+  return `https://maps.apigw.ntruss.com/map-geocode/v2/geocode?${params.toString()}`;
+}
+
+function buildNaverDirectionsUrl(query: {
+  start: string;
+  goal: string;
+  option?: string;
+}): string {
+  const params = new URLSearchParams({
+    start: query.start,
+    goal: query.goal,
+    option: query.option || 'trafast',
+  });
+
+  return `https://maps.apigw.ntruss.com/map-direction/v1/driving?${params.toString()}`;
+}
+
 function buildJusoSearchUrl(query: {
   confmKey: string;
   keyword: string;
@@ -2504,6 +2526,189 @@ export const naverStaticMapProxy = functions.https.onRequest(async (req, res) =>
 });
 
 /**
+ * HTTP: Naver geocode proxy
+ * Converts a selected road address into latitude/longitude on the server side.
+ */
+export const naverGeocodeProxy = functions.https.onRequest(async (req, res) => {
+  try {
+    res.set('Access-Control-Allow-Origin', '*');
+    res.set('Access-Control-Allow-Methods', 'GET,OPTIONS');
+    res.set('Access-Control-Allow-Headers', 'Content-Type');
+
+    if (req.method === 'OPTIONS') {
+      res.status(204).send('');
+      return;
+    }
+
+    const clientId = NAVER_MAP_CLIENT_ID_PARAM.value() || process.env.NAVER_MAP_CLIENT_ID || '';
+    const clientSecret = NAVER_MAP_CLIENT_SECRET_PARAM.value() || process.env.NAVER_MAP_CLIENT_SECRET || '';
+
+    if (!clientId || !clientSecret) {
+      res.status(503).json({ ok: false, message: 'naver map credentials are not configured' });
+      return;
+    }
+
+    const address = readFirstQueryValue(req.query.query).trim();
+    if (address.length < 2) {
+      res.status(400).json({ ok: false, message: 'query is required' });
+      return;
+    }
+
+    const naverUrl = buildNaverGeocodeUrl({ address });
+    const payload = (await fetchJson(naverUrl, {
+      headers: {
+        Accept: 'application/json',
+        'X-NCP-APIGW-API-KEY-ID': clientId,
+        'X-NCP-APIGW-API-KEY': clientSecret,
+      },
+    })) as {
+      status?: string;
+      addresses?: Array<{
+        roadAddress?: string;
+        jibunAddress?: string;
+        x?: string;
+        y?: string;
+      }>;
+      errorMessage?: string;
+    };
+
+    if (payload.status !== 'OK') {
+      res.status(502).json({ ok: false, message: payload.errorMessage || 'failed to geocode address' });
+      return;
+    }
+
+    const first = payload.addresses?.[0];
+    const longitude = Number(first?.x ?? 0);
+    const latitude = Number(first?.y ?? 0);
+
+    if (!first || !Number.isFinite(latitude) || !Number.isFinite(longitude) || latitude === 0 || longitude === 0) {
+      res.status(404).json({ ok: false, message: 'address coordinates not found' });
+      return;
+    }
+
+    res.set('Cache-Control', 'public, max-age=300, s-maxage=300');
+    res.status(200).json({
+      ok: true,
+      address: {
+        roadAddress: first.roadAddress || address,
+        jibunAddress: first.jibunAddress || '',
+        latitude,
+        longitude,
+      },
+    });
+  } catch (error) {
+    console.error('naverGeocodeProxy error:', error);
+    res.status(500).json({ ok: false, message: 'failed to geocode address' });
+  }
+});
+
+/**
+ * HTTP: Naver directions proxy
+ * Returns route coordinates between two points so the client can render an actual route line.
+ */
+export const naverDirectionsProxy = functions.https.onRequest(async (req, res) => {
+  try {
+    res.set('Access-Control-Allow-Origin', '*');
+    res.set('Access-Control-Allow-Methods', 'GET,OPTIONS');
+    res.set('Access-Control-Allow-Headers', 'Content-Type');
+
+    if (req.method === 'OPTIONS') {
+      res.status(204).send('');
+      return;
+    }
+
+    const clientId = NAVER_MAP_CLIENT_ID_PARAM.value() || process.env.NAVER_MAP_CLIENT_ID || '';
+    const clientSecret = NAVER_MAP_CLIENT_SECRET_PARAM.value() || process.env.NAVER_MAP_CLIENT_SECRET || '';
+
+    if (!clientId || !clientSecret) {
+      res.status(503).json({ ok: false, message: 'naver map credentials are not configured' });
+      return;
+    }
+
+    const start = readFirstQueryValue(req.query.start).trim();
+    const goal = readFirstQueryValue(req.query.goal).trim();
+    const option = readFirstQueryValue(req.query.option).trim() || 'trafast';
+
+    if (!start || !goal) {
+      res.status(400).json({ ok: false, message: 'start and goal are required' });
+      return;
+    }
+
+    const directionsUrl = buildNaverDirectionsUrl({ start, goal, option });
+    const payload = (await fetchJson(directionsUrl, {
+      headers: {
+        Accept: 'application/json',
+        'X-NCP-APIGW-API-KEY-ID': clientId,
+        'X-NCP-APIGW-API-KEY': clientSecret,
+      },
+    })) as {
+      code?: number;
+      message?: string;
+      route?: Record<
+        string,
+        Array<{
+          summary?: {
+            distance?: number;
+            duration?: number;
+            tollFare?: number;
+            taxiFare?: number;
+            fuelPrice?: number;
+          };
+          path?: Array<[number, number]>;
+        }>
+      >;
+    };
+
+    const routeGroups = payload.route ?? {};
+    const routeEntry = Object.values(routeGroups).find((items) => Array.isArray(items) && items.length > 0)?.[0];
+
+    if (!routeEntry?.path || routeEntry.path.length === 0) {
+      res.status(404).json({ ok: false, message: payload.message || 'route coordinates not found' });
+      return;
+    }
+
+    const coordinates = routeEntry.path
+      .map((point) => {
+        const longitude = Number(point?.[0]);
+        const latitude = Number(point?.[1]);
+        if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) {
+          return null;
+        }
+
+        return {
+          latitude,
+          longitude,
+        };
+      })
+      .filter((point): point is { latitude: number; longitude: number } => point !== null);
+
+    if (coordinates.length === 0) {
+      res.status(404).json({ ok: false, message: 'route coordinates not found' });
+      return;
+    }
+
+    res.set('Cache-Control', 'public, max-age=120, s-maxage=120');
+    res.status(200).json({
+      ok: true,
+      route: {
+        option,
+        summary: {
+          distanceMeters: Number(routeEntry.summary?.distance ?? 0),
+          durationMs: Number(routeEntry.summary?.duration ?? 0),
+          tollFare: Number(routeEntry.summary?.tollFare ?? 0),
+          taxiFare: Number(routeEntry.summary?.taxiFare ?? 0),
+          fuelPrice: Number(routeEntry.summary?.fuelPrice ?? 0),
+        },
+        coordinates,
+      },
+    });
+  } catch (error) {
+    console.error('naverDirectionsProxy error:', error);
+    res.status(500).json({ ok: false, message: 'failed to fetch directions' });
+  }
+});
+
+/**
  * HTTP: Road-name address search proxy for Juso API
  * Keeps the confirmation key on the server while the client searches by keyword.
  */
@@ -2828,6 +3033,6 @@ export const confirmPhoneOtp = functions.https.onCall(
   }
 );
 
-
 export { syncConfigStationsFromSeoulApi };
+
 
