@@ -225,6 +225,17 @@ type Beta1MissionDoc = {
   assignedGillerUserId?: string;
 };
 
+type Beta1DeliveryDoc = {
+  id: string;
+  requestId?: string;
+  gillerId?: string;
+  status?: string;
+  beta1DeliveryStatus?: string;
+  pickupStation?: { stationName?: string };
+  deliveryStation?: { stationName?: string };
+  fee?: { breakdown?: { gillerFee?: number }; totalFee?: number };
+};
+
 function normalizePackageSize(packageSize: PackageSizeType): SupportedPackageSize {
   return packageSize === 'extra_large' ? 'xl' : packageSize;
 }
@@ -772,9 +783,10 @@ async function getUserWalletSummary(userId: string): Promise<Beta1HomeSnapshot['
 }
 
 export async function getBeta1HomeSnapshot(userId: string, role: 'requester' | 'giller'): Promise<Beta1HomeSnapshot> {
-  const [requestSnapshot, missionSnapshot, wallet] = await Promise.all([
+  const [requestSnapshot, missionSnapshot, deliverySnapshot, wallet] = await Promise.all([
     getDocs(collection(db, 'requests')),
     getDocs(collection(db, 'missions')),
+    getDocs(collection(db, 'deliveries')),
     getUserWalletSummary(userId),
   ]);
 
@@ -786,11 +798,20 @@ export async function getBeta1HomeSnapshot(userId: string, role: 'requester' | '
     .map((docItem) => ({ id: docItem.id, ...(docItem.data() as Record<string, unknown>) }) as Beta1MissionDoc)
     .filter((mission) => mission.assignedGillerUserId === userId);
 
+  const deliveries = deliverySnapshot.docs
+    .map((docItem) => ({ id: docItem.id, ...(docItem.data() as Record<string, unknown>) }) as Beta1DeliveryDoc)
+    .filter((delivery) => delivery.gillerId === userId);
+
   const activeRequests = requests.filter((request) =>
     ['pending', 'accepted', 'in_transit', 'delivered'].includes(String(request.status ?? ''))
   );
   const activeMissions = missions.filter((mission) =>
     ['queued', 'offered', 'accepted', 'arrival_pending', 'handover_pending', 'in_progress'].includes(String(mission.status ?? ''))
+  );
+  const activeDeliveries = deliveries.filter((delivery) =>
+    ['accepted', 'pickup_pending', 'picked_up', 'in_transit', 'arrival_pending', 'handover_pending'].includes(
+      String(delivery.beta1DeliveryStatus ?? delivery.status ?? '')
+    )
   );
 
   const requestCards = activeRequests.slice(0, 3).map((request) => {
@@ -830,7 +851,7 @@ export async function getBeta1HomeSnapshot(userId: string, role: 'requester' | '
     };
   });
 
-  const missionCards = activeMissions.slice(0, 3).map((mission) => {
+  const missionCardsFromMissions = activeMissions.map((mission) => {
     const missionType = String(mission.missionType ?? 'mission');
     const missionStatus = String(mission.status ?? 'queued');
     const recommendedReward = Number(mission.currentReward ?? 0);
@@ -858,6 +879,30 @@ export async function getBeta1HomeSnapshot(userId: string, role: 'requester' | '
     };
   });
 
+  const deliveryFallbackCards = activeDeliveries
+    .filter((delivery) => !activeMissions.some((mission) => mission.deliveryId === delivery.id))
+    .map((delivery) => {
+      const deliveryStatus = String(delivery.beta1DeliveryStatus ?? delivery.status ?? 'accepted');
+      const pickupName = String(delivery.pickupStation?.stationName ?? '출발역');
+      const deliveryName = String(delivery.deliveryStation?.stationName ?? '도착역');
+      const reward = Number(delivery.fee?.breakdown?.gillerFee ?? delivery.fee?.totalFee ?? 0);
+      return {
+        id: `delivery-${delivery.id}`,
+        title: `${pickupName} -> ${deliveryName}`,
+        status: deliveryStatus,
+        windowLabel: deliveryStatus === 'accepted' ? '지금 진행 중' : '인계 일정 확인',
+        rewardLabel: `${reward.toLocaleString()}원`,
+        strategyTitle: '수락한 배송 유지',
+        strategyBody: '미션 문서가 늦게 생성되더라도 수락한 배송이 홈 목록에서 사라지지 않도록 배송 문서를 함께 기준으로 보여줍니다.',
+      };
+    });
+
+  const missionCards = [...missionCardsFromMissions, ...deliveryFallbackCards].slice(0, 3);
+  const activeMissionLikeCount = activeMissions.length + deliveryFallbackCards.length;
+  const pendingRewardTotal =
+    activeMissions.reduce((sum, mission) => sum + Number(mission.currentReward ?? 0), 0) +
+    deliveryFallbackCards.reduce((sum, card) => sum + Number(card.rewardLabel.replace(/[^\d]/g, '') || 0), 0);
+
   return {
     role,
     headline: role === 'requester' ? '선택만 하면 되는 배송' : '가는길에 미션 보드',
@@ -865,8 +910,8 @@ export async function getBeta1HomeSnapshot(userId: string, role: 'requester' | '
       ? '요청, 가격, 진행 상태만 간단히 확인하세요.'
       : '지금 확인할 미션만 보여드립니다.',
     activeRequestCount: activeRequests.length,
-    activeMissionCount: activeMissions.length,
-    pendingRewardTotal: activeMissions.reduce((sum, mission) => sum + Number(mission.currentReward ?? 0), 0),
+    activeMissionCount: activeMissionLikeCount,
+    pendingRewardTotal,
     recommendations: role === 'requester'
       ? ['급하면 즉시 요청, 아니면 예약 요청이 더 잘 맞습니다.', '사물함 옵션은 대면 인계 부담을 줄여줍니다.']
       : ['바로 받을 수 있는 미션부터 확인하세요.', '시간 조율이 필요한 제안은 아래에서 따로 확인할 수 있습니다.'],

@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+﻿import React, { useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -16,14 +16,20 @@ import {
 import { doc, serverTimestamp, setDoc } from 'firebase/firestore';
 import AppTopBar from '../../components/common/AppTopBar';
 import AddressSearchModal from '../../components/common/AddressSearchModal';
+import DatePickerModal from '../../components/common/DatePickerModal';
 import NearbyStationRecommendationsModal, {
   type NearbyStationRecommendation,
 } from '../../components/common/NearbyStationRecommendationsModal';
+import TimePicker from '../../components/common/TimePicker';
 import { OptimizedStationSelectModal } from '../../components/OptimizedStationSelectModal';
 import { useUser } from '../../contexts/UserContext';
 import { analyzeRequestDraftWithAI, type Beta1AIAnalysisResponse } from '../../services/beta1-ai-service';
 import { buildBeta1QuoteCards, createBeta1Request, type Beta1QuoteCard } from '../../services/beta1-orchestration-service';
-import { getAllStations } from '../../services/config-service';
+import {
+  getAllStations,
+  getRecipientContactPrivacyConfig,
+  type RecipientContactPrivacyConfig,
+} from '../../services/config-service';
 import { db, requireUserId } from '../../services/firebase';
 import { locationService } from '../../services/location-service';
 import { confirmPhoneOtp, requestPhoneOtp } from '../../services/otp-service';
@@ -68,6 +74,23 @@ function parseEtaMinutes(label: string): number {
   const matched = label.match(/(\d+)/);
   return matched ? Number(matched[1]) : 0;
 }
+
+const CLEAN_SIZE_OPTIONS: Array<{ value: PackageSize; label: string }> = [
+  { value: 'small', label: '소형' },
+  { value: 'medium', label: '중형' },
+  { value: 'large', label: '대형' },
+  { value: 'xl', label: '특대형' },
+];
+
+const FALLBACK_RECIPIENT_PRIVACY_CONFIG: RecipientContactPrivacyConfig = {
+  safeNumberEnabled: true,
+  providerName: '관리자 설정 예정',
+  policyTitle: '수령인 개인정보 제공 동의',
+  policyEffectiveDate: '2026-04-03',
+  thirdPartyConsentRequired: true,
+  guidance:
+    '수령인 연락처는 안심번호로 전환되어 전달되며, 실제 번호는 관리자 설정 API를 통해 안전하게 관리됩니다.',
+};
 
 function normalizePhoneNumber(phoneNumber: string): string {
   return phoneNumber.replace(/\D/g, '');
@@ -197,7 +220,7 @@ function fromPrefillStation(station?: StationInfo): Station | null {
     location: { latitude: station.lat, longitude: station.lng },
     facilities: { hasElevator: false, hasEscalator: false, wheelchairAccessible: false },
     isActive: true,
-    region: '서울',
+    region: '?쒖슱',
     priority: 0,
     createdAt: new Date(),
     updatedAt: new Date(),
@@ -217,7 +240,7 @@ function fallbackStation(kind: PickerType): Station {
       {
         lineId: isPickup ? '2' : '3',
         lineCode: isPickup ? '2' : '3',
-        lineName: isPickup ? '2호선' : '3호선',
+        lineName: isPickup ? '2?몄꽑' : '3?몄꽑',
         lineColor: Colors.primary,
         lineType: 'general',
       },
@@ -225,7 +248,7 @@ function fallbackStation(kind: PickerType): Station {
     location: { latitude: isPickup ? 37.5665 : 37.5704, longitude: isPickup ? 126.978 : 126.991 },
     facilities: { hasElevator: false, hasEscalator: false, wheelchairAccessible: false },
     isActive: true,
-    region: '서울',
+    region: '?쒖슱',
     priority: 0,
     createdAt: new Date(),
     updatedAt: new Date(),
@@ -306,6 +329,7 @@ export default function CreateRequestScreen({ navigation, route }: Props) {
   const [preferredPickupDate, setPreferredPickupDate] = useState(prefilledReservation.date);
   const [preferredPickupTime, setPreferredPickupTime] = useState(prefilledReservation.time);
   const [preferredArrivalTime, setPreferredArrivalTime] = useState(prefill?.preferredArrivalTime ?? '');
+  const [reservationCalendarVisible, setReservationCalendarVisible] = useState(false);
   const [selectedQuoteType, setSelectedQuoteType] = useState<Beta1QuoteCard['quoteType']>('balanced');
   const [contactPhoneNumber, setContactPhoneNumber] = useState(
     formatPhoneDigits(user?.phoneVerification?.phoneNumber ?? user?.phoneNumber ?? '')
@@ -317,6 +341,10 @@ export default function CreateRequestScreen({ navigation, route }: Props) {
   const [contactOtpExpiresAt, setContactOtpExpiresAt] = useState<string | null>(null);
   const [contactOtpSending, setContactOtpSending] = useState(false);
   const [contactOtpVerifying, setContactOtpVerifying] = useState(false);
+  const [recipientPrivacyConfig, setRecipientPrivacyConfig] = useState<RecipientContactPrivacyConfig>(
+    FALLBACK_RECIPIENT_PRIVACY_CONFIG
+  );
+  const [recipientConsentChecked, setRecipientConsentChecked] = useState(false);
 
   useEffect(() => {
     const run = async () => {
@@ -327,6 +355,20 @@ export default function CreateRequestScreen({ navigation, route }: Props) {
         setLoading(false);
       }
     };
+    void run();
+  }, []);
+
+  useEffect(() => {
+    const run = async () => {
+      try {
+        const config = await getRecipientContactPrivacyConfig();
+        setRecipientPrivacyConfig(config);
+        setRecipientConsentChecked(config.thirdPartyConsentRequired === false);
+      } catch (error) {
+        console.error('Failed to load recipient privacy config', error);
+      }
+    };
+
     void run();
   }, []);
 
@@ -352,6 +394,10 @@ export default function CreateRequestScreen({ navigation, route }: Props) {
   }, [user?.phoneNumber, user?.phoneVerification?.phoneNumber]);
 
   const isPhoneVerified = user?.phoneVerification?.verified === true;
+  const desiredArrivalSchedule =
+    requestMode === 'reservation'
+      ? combineReservationSchedule(preferredPickupDate, preferredPickupTime)
+      : preferredArrivalTime;
   const resolvedPreferredPickupTime =
     requestMode === 'reservation'
       ? combineReservationSchedule(preferredPickupDate, preferredPickupTime)
@@ -375,7 +421,7 @@ export default function CreateRequestScreen({ navigation, route }: Props) {
       selectedPhotoIds: photoRefs,
       packageItemName: packageItemName || undefined,
       packageCategory: packageCategory || undefined,
-      packageDescription: packageDescription || '물품 설명',
+      packageDescription: packageDescription || '臾쇳뭹 ?ㅻ챸',
       packageSize,
       weightKg: Math.max(0.1, Number(weightKg || 0)),
       itemValue: Number(itemValue || 0),
@@ -385,7 +431,7 @@ export default function CreateRequestScreen({ navigation, route }: Props) {
       selectedQuoteType,
       directParticipationMode: directMode,
       preferredPickupTime: resolvedPreferredPickupTime,
-      preferredArrivalTime,
+      preferredArrivalTime: desiredArrivalSchedule,
       aiAnalysisOverride: aiResult
         ? {
             provider: aiResult.provider,
@@ -421,7 +467,7 @@ export default function CreateRequestScreen({ navigation, route }: Props) {
     selectedQuoteType,
     directMode,
     resolvedPreferredPickupTime,
-    preferredArrivalTime,
+    desiredArrivalSchedule,
     aiResult,
   ]);
 
@@ -435,6 +481,7 @@ export default function CreateRequestScreen({ navigation, route }: Props) {
     (pickupMode === 'address' && (!pickupRoadAddress.trim() || !pickupDetailAddress.trim())) ||
     (deliveryMode === 'address' && (!deliveryRoadAddress.trim() || !deliveryDetailAddress.trim())) ||
     !isPhoneVerified ||
+    (recipientPrivacyConfig.thirdPartyConsentRequired && !recipientConsentChecked) ||
     (requestMode === 'reservation' && (!preferredPickupDate.trim() || !preferredPickupTime.trim()));
 
   function buildNearbyRecommendations(latitude: number, longitude: number): NearbyStationRecommendation[] {
@@ -462,7 +509,7 @@ export default function CreateRequestScreen({ navigation, route }: Props) {
       setResolvingLocation(target);
       const currentLocation = await locationService.getCurrentLocation();
       if (!currentLocation) {
-        Alert.alert('위치 권한이 필요합니다', '고객 디바이스의 위치 권한을 허용한 뒤 다시 시도해 주세요.');
+        Alert.alert('위치 권한이 필요합니다', '기기의 위치 권한을 허용한 뒤 다시 시도해 주세요.');
         return;
       }
 
@@ -478,13 +525,13 @@ export default function CreateRequestScreen({ navigation, route }: Props) {
 
       setNearbyPicker({
         target,
-        title: target === 'pickup' ? '출발역 후보를 선택해 주세요' : '도착역 후보를 선택해 주세요',
-        description: '현재 위치 기준으로 가까운 역 최대 4개를 보여드려요.',
+        title: target === 'pickup' ? '출발역을 선택해 주세요' : '도착역을 선택해 주세요',
+        description: '현재 위치 기준으로 가까운 역 4곳을 추천해 드립니다.',
         recommendations,
       });
     } catch (error) {
       console.error('Failed to resolve nearest station', error);
-      Alert.alert('위치 기반 추천에 실패했습니다', '현재 위치 확인 후 다시 시도해 주세요.');
+      Alert.alert('?꾩튂 湲곕컲 異붿쿇???ㅽ뙣?덉뒿?덈떎', '?꾩옱 ?꾩튂 ?뺤씤 ???ㅼ떆 ?쒕룄??二쇱꽭??');
     } finally {
       setResolvingLocation(null);
     }
@@ -502,13 +549,13 @@ export default function CreateRequestScreen({ navigation, route }: Props) {
       setAiResult(null);
     } catch (error) {
       console.error(error);
-      Alert.alert('사진 업로드 실패', '사진을 업로드하지 못했습니다. 잠시 후 다시 시도해 주세요.');
+      Alert.alert('?ъ쭊 ?낅줈???ㅽ뙣', '?ъ쭊???낅줈?쒗븯吏 紐삵뻽?듬땲?? ?좎떆 ???ㅼ떆 ?쒕룄??二쇱꽭??');
     }
   }
 
   async function handleAI() {
     if (!photoUrl) {
-      Alert.alert('사진이 필요해요', '먼저 물건 사진을 올린 뒤 AI 작성 보조를 사용할 수 있어요.');
+      Alert.alert('?ъ쭊???꾩슂?댁슂', '癒쇱? 臾쇨굔 ?ъ쭊???щ┛ ??AI ?묒꽦 蹂댁“瑜??ъ슜?????덉뼱??');
       return;
     }
 
@@ -526,7 +573,6 @@ export default function CreateRequestScreen({ navigation, route }: Props) {
         destinationRef: toLocationRef(deliveryMode, destination, deliveryAddress),
         packageDraft: {
           itemName: packageItemName || undefined,
-          category: packageCategory || undefined,
           description: packageDescription || undefined,
           estimatedValue: itemValue ? Number(itemValue) : undefined,
           estimatedWeightKg: weightKg ? Number(weightKg) : undefined,
@@ -545,7 +591,6 @@ export default function CreateRequestScreen({ navigation, route }: Props) {
       setAiResult(result);
 
       if (result.result.itemName) setPackageItemName(result.result.itemName);
-      if (result.result.category) setPackageCategory(result.result.category);
       if (result.result.description) setPackageDescription(result.result.description);
       if (typeof result.result.estimatedValue === 'number' && result.result.estimatedValue > 0) {
         setItemValue(String(Math.round(result.result.estimatedValue)));
@@ -558,7 +603,7 @@ export default function CreateRequestScreen({ navigation, route }: Props) {
       if (aiSize) setPackageSize(aiSize);
     } catch (error) {
       console.error(error);
-      Alert.alert('AI 작성 실패', 'AI 초안을 만들지 못했습니다. 직접 입력해서 계속 진행할 수 있어요.');
+      Alert.alert('AI ?묒꽦 ?ㅽ뙣', 'AI 珥덉븞??留뚮뱾吏 紐삵뻽?듬땲?? 吏곸젒 ?낅젰?댁꽌 怨꾩냽 吏꾪뻾?????덉뼱??');
     } finally {
       setAiLoading(false);
     }
@@ -567,7 +612,7 @@ export default function CreateRequestScreen({ navigation, route }: Props) {
   async function handleRequestContactOtp() {
     const normalized = normalizePhoneNumber(contactPhoneNumber);
     if (!/^010\d{8}$/.test(normalized)) {
-      Alert.alert('Phone number', 'Enter a valid 010 phone number first.');
+      Alert.alert('휴대폰 번호', '010으로 시작하는 올바른 휴대폰 번호를 먼저 입력해 주세요.');
       return;
     }
 
@@ -579,9 +624,12 @@ export default function CreateRequestScreen({ navigation, route }: Props) {
       setContactOtpHintCode(result.testCode ?? null);
       setContactOtpDestination(result.maskedDestination);
       setContactOtpExpiresAt(result.expiresAt);
-      Alert.alert('Code sent', result.testCode ? `Dev code: ${result.testCode}` : `Sent to ${result.maskedDestination}`);
+      Alert.alert(
+        '인증번호를 보냈습니다',
+        result.testCode ? `개발용 코드: ${result.testCode}` : `${result.maskedDestination} 번호로 전송했습니다.`
+      );
     } catch (error) {
-      Alert.alert('OTP failed', error instanceof Error ? error.message : 'Could not send verification code.');
+      Alert.alert('인증번호 전송 실패', error instanceof Error ? error.message : '인증번호를 보내지 못했습니다.');
     } finally {
       setContactOtpSending(false);
     }
@@ -589,17 +637,17 @@ export default function CreateRequestScreen({ navigation, route }: Props) {
 
   async function handleVerifyContactOtp() {
     if (!user?.uid) {
-      Alert.alert('Login required', 'Please log in again and try phone verification.');
+      Alert.alert('로그인이 필요합니다', '다시 로그인한 뒤 휴대폰 인증을 진행해 주세요.');
       return;
     }
 
     if (!contactOtpSessionId) {
-      Alert.alert('Request code first', 'Send a verification code before trying to verify.');
+      Alert.alert('인증번호를 먼저 받아주세요', '휴대폰 인증 전 인증번호를 먼저 요청해 주세요.');
       return;
     }
 
     if (!/^\d{6}$/.test(contactOtpCode.trim())) {
-      Alert.alert('Verification code', 'Enter the 6-digit code.');
+      Alert.alert('인증번호', '인증번호 6자리를 입력해 주세요.');
       return;
     }
 
@@ -628,9 +676,9 @@ export default function CreateRequestScreen({ navigation, route }: Props) {
       );
 
       await refreshUser();
-      Alert.alert('Phone verified', 'You can now continue with the delivery request.');
+      Alert.alert('휴대폰 인증 완료', '이제 배송 요청을 계속 진행할 수 있습니다.');
     } catch (error) {
-      Alert.alert('Verification failed', error instanceof Error ? error.message : 'Could not verify the phone number.');
+      Alert.alert('휴대폰 인증 실패', error instanceof Error ? error.message : '휴대폰 번호를 인증하지 못했습니다.');
     } finally {
       setContactOtpVerifying(false);
     }
@@ -638,7 +686,7 @@ export default function CreateRequestScreen({ navigation, route }: Props) {
 
   async function handleSubmit() {
     if (submitDisabled || !pickupStation || !deliveryStation) {
-      Alert.alert('입력 확인', '사진, 출발/도착 정보, 물품 정보, 수령인 정보와 휴대폰 확인 상태를 모두 확인해 주세요.');
+      Alert.alert('?낅젰 ?뺤씤', '?ъ쭊, 異쒕컻/?꾩갑 ?뺣낫, 臾쇳뭹 ?뺣낫, ?섎졊???뺣낫? ?대????뺤씤 ?곹깭瑜?紐⑤몢 ?뺤씤??二쇱꽭??');
       return;
     }
 
@@ -646,14 +694,14 @@ export default function CreateRequestScreen({ navigation, route }: Props) {
     try {
       if (pickupMode === 'address' && user?.uid) {
         await addRecentAddress(user.uid, {
-          label: '최근 출발지',
+          label: '理쒓렐 異쒕컻吏',
           roadAddress: pickupRoadAddress,
           detailAddress: pickupDetailAddress,
         });
       }
       if (deliveryMode === 'address' && user?.uid) {
         await addRecentAddress(user.uid, {
-          label: '최근 도착지',
+          label: '理쒓렐 ?꾩갑吏',
           roadAddress: deliveryRoadAddress,
           detailAddress: deliveryDetailAddress,
         });
@@ -702,11 +750,11 @@ export default function CreateRequestScreen({ navigation, route }: Props) {
         requestId: result.requestId,
         pickupStationName:
           pickupMode === 'address'
-            ? `${formatDetailedAddress(pickupRoadAddress, pickupDetailAddress)} · ${pickupStation.stationName}`
+            ? `${formatDetailedAddress(pickupRoadAddress, pickupDetailAddress)} 쨌 ${pickupStation.stationName}`
             : pickupStation.stationName,
         deliveryStationName:
           deliveryMode === 'address'
-            ? `${formatDetailedAddress(deliveryRoadAddress, deliveryDetailAddress)} · ${deliveryStation.stationName}`
+            ? `${formatDetailedAddress(deliveryRoadAddress, deliveryDetailAddress)} 쨌 ${deliveryStation.stationName}`
             : deliveryStation.stationName,
         deliveryFee: selected
           ? {
@@ -717,7 +765,7 @@ export default function CreateRequestScreen({ navigation, route }: Props) {
       });
     } catch (error) {
       console.error(error);
-      Alert.alert('요청 생성 실패', '요청을 만드는 중 문제가 발생했습니다. 잠시 후 다시 시도해 주세요.');
+      Alert.alert('?붿껌 ?앹꽦 ?ㅽ뙣', '?붿껌??留뚮뱶??以?臾몄젣媛 諛쒖깮?덉뒿?덈떎. ?좎떆 ???ㅼ떆 ?쒕룄??二쇱꽭??');
     } finally {
       setSaving(false);
     }
@@ -727,32 +775,32 @@ export default function CreateRequestScreen({ navigation, route }: Props) {
     return (
       <View style={styles.center}>
         <ActivityIndicator size="large" color={Colors.primary} />
-        <Text style={styles.muted}>요청 화면을 준비하고 있어요.</Text>
+        <Text style={styles.muted}>?붿껌 ?붾㈃??以鍮꾪븯怨??덉뼱??</Text>
       </View>
     );
   }
 
   return (
     <KeyboardAvoidingView style={styles.container} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-      <AppTopBar title={requestMode === 'reservation' ? '예약 요청' : '배송 요청'} onBack={() => navigation.goBack()} />
+      <AppTopBar title={requestMode === 'reservation' ? '?덉빟 ?붿껌' : '諛곗넚 ?붿껌'} onBack={() => navigation.goBack()} />
 
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
-        <Block title="요청 방식">
+        <Block title="?붿껌 諛⑹떇">
           <View style={styles.row}>
-            <Chip label="지금 바로" active={requestMode === 'immediate'} onPress={() => setRequestMode('immediate')} />
-            <Chip label="예약하기" active={requestMode === 'reservation'} onPress={() => setRequestMode('reservation')} />
+            <Chip label="吏湲?諛붾줈" active={requestMode === 'immediate'} onPress={() => setRequestMode('immediate')} />
+            <Chip label="?덉빟?섍린" active={requestMode === 'reservation'} onPress={() => setRequestMode('reservation')} />
           </View>
         </Block>
 
-        <Block title="출발 정보">
+        <Block title="異쒕컻 ?뺣낫">
           <View style={styles.row}>
-            <Chip label="역에서 시작" active={pickupMode === 'station'} onPress={() => setPickupMode('station')} />
-            <Chip label="주소에서 시작" active={pickupMode === 'address'} onPress={() => setPickupMode('address')} />
+            <Chip label="??뿉???쒖옉" active={pickupMode === 'station'} onPress={() => setPickupMode('station')} />
+            <Chip label="二쇱냼?먯꽌 ?쒖옉" active={pickupMode === 'address'} onPress={() => setPickupMode('address')} />
           </View>
           {pickupMode === 'address' ? (
             <View style={styles.column}>
               <AddressQuickPick
-                title="저장된 주소"
+                title="??λ맂 二쇱냼"
                 addresses={savedAddresses}
                 onSelect={(address) => {
                   setPickupRoadAddress(address.roadAddress);
@@ -760,7 +808,7 @@ export default function CreateRequestScreen({ navigation, route }: Props) {
                 }}
               />
               <AddressQuickPick
-                title="최근 사용 주소"
+                title="理쒓렐 ?ъ슜 二쇱냼"
                 addresses={recentAddresses}
                 onSelect={(address) => {
                   setPickupRoadAddress(address.roadAddress);
@@ -768,14 +816,14 @@ export default function CreateRequestScreen({ navigation, route }: Props) {
                 }}
               />
               <TouchableOpacity style={styles.selector} onPress={() => setAddressTarget('pickup')}>
-                <Text style={styles.selectorLabel}>도로명 주소</Text>
-                <Text style={styles.selectorValue}>{pickupRoadAddress || '주소 검색으로 선택'}</Text>
+                <Text style={styles.selectorLabel}>?꾨줈紐?二쇱냼</Text>
+                <Text style={styles.selectorValue}>{pickupRoadAddress || '二쇱냼 寃?됱쑝濡??좏깮'}</Text>
               </TouchableOpacity>
               <TextInput
                 style={styles.input}
                 value={pickupDetailAddress}
                 onChangeText={setPickupDetailAddress}
-                placeholder="출발지 상세주소"
+                placeholder="異쒕컻吏 ?곸꽭二쇱냼"
                 placeholderTextColor={Colors.gray400}
               />
             </View>
@@ -800,20 +848,20 @@ export default function CreateRequestScreen({ navigation, route }: Props) {
             {resolvingLocation === 'pickup' ? (
               <ActivityIndicator color={Colors.primary} />
             ) : (
-              <Text style={styles.secondaryButtonText}>현재 위치로 가까운 출발역 추천</Text>
+              <Text style={styles.secondaryButtonText}>?꾩옱 ?꾩튂濡?媛源뚯슫 異쒕컻??異붿쿇</Text>
             )}
           </TouchableOpacity>
         </Block>
 
-        <Block title="도착 정보">
+        <Block title="?꾩갑 ?뺣낫">
           <View style={styles.row}>
-            <Chip label="역으로 도착" active={deliveryMode === 'station'} onPress={() => setDeliveryMode('station')} />
-            <Chip label="주소로 도착" active={deliveryMode === 'address'} onPress={() => setDeliveryMode('address')} />
+            <Chip label="??쑝濡??꾩갑" active={deliveryMode === 'station'} onPress={() => setDeliveryMode('station')} />
+            <Chip label="二쇱냼濡??꾩갑" active={deliveryMode === 'address'} onPress={() => setDeliveryMode('address')} />
           </View>
           {deliveryMode === 'address' ? (
             <View style={styles.column}>
               <AddressQuickPick
-                title="저장된 주소"
+                title="??λ맂 二쇱냼"
                 addresses={savedAddresses}
                 onSelect={(address) => {
                   setDeliveryRoadAddress(address.roadAddress);
@@ -821,7 +869,7 @@ export default function CreateRequestScreen({ navigation, route }: Props) {
                 }}
               />
               <AddressQuickPick
-                title="최근 사용 주소"
+                title="理쒓렐 ?ъ슜 二쇱냼"
                 addresses={recentAddresses}
                 onSelect={(address) => {
                   setDeliveryRoadAddress(address.roadAddress);
@@ -829,14 +877,14 @@ export default function CreateRequestScreen({ navigation, route }: Props) {
                 }}
               />
               <TouchableOpacity style={styles.selector} onPress={() => setAddressTarget('delivery')}>
-                <Text style={styles.selectorLabel}>도로명 주소</Text>
-                <Text style={styles.selectorValue}>{deliveryRoadAddress || '주소 검색으로 선택'}</Text>
+                <Text style={styles.selectorLabel}>?꾨줈紐?二쇱냼</Text>
+                <Text style={styles.selectorValue}>{deliveryRoadAddress || '二쇱냼 寃?됱쑝濡??좏깮'}</Text>
               </TouchableOpacity>
               <TextInput
                 style={styles.input}
                 value={deliveryDetailAddress}
                 onChangeText={setDeliveryDetailAddress}
-                placeholder="도착지 상세주소"
+                placeholder="?꾩갑吏 ?곸꽭二쇱냼"
                 placeholderTextColor={Colors.gray400}
               />
             </View>
@@ -861,7 +909,7 @@ export default function CreateRequestScreen({ navigation, route }: Props) {
             {resolvingLocation === 'delivery' ? (
               <ActivityIndicator color={Colors.primary} />
             ) : (
-              <Text style={styles.secondaryButtonText}>현재 위치로 가까운 도착역 추천</Text>
+              <Text style={styles.secondaryButtonText}>?꾩옱 ?꾩튂濡?媛源뚯슫 ?꾩갑??異붿쿇</Text>
             )}
           </TouchableOpacity>
         </Block>
@@ -870,16 +918,16 @@ export default function CreateRequestScreen({ navigation, route }: Props) {
           <TouchableOpacity style={styles.primaryButton} onPress={() => void handleUploadPhoto()}>
             <Text style={styles.primaryButtonText}>{photoUrl ? '사진 다시 올리기' : '물건 사진 올리기'}</Text>
           </TouchableOpacity>
-          <Text style={styles.muted}>배송 요청에는 물건 사진이 반드시 필요합니다.</Text>
+          <Text style={styles.muted}>배송 요청에는 물건 사진이 필요합니다.</Text>
           {photoUrl ? <Image source={{ uri: photoUrl }} style={styles.previewImage} /> : null}
           <TouchableOpacity
             style={[styles.secondaryButton, !photoUrl && styles.disabled]}
             onPress={() => void handleAI()}
             disabled={!photoUrl}
           >
-            <Text style={styles.secondaryButtonText}>AI에게 작성 맡기기</Text>
+            <Text style={styles.secondaryButtonText}>AI에게 설명 맡기기</Text>
           </TouchableOpacity>
-          <Text style={styles.muted}>AI 작성은 선택 기능입니다. 직접 입력해서 진행해도 됩니다.</Text>
+          <Text style={styles.muted}>AI 분석은 선택 기능이며 직접 입력해서 진행할 수도 있습니다.</Text>
         </Block>
 
         <Block title="물품 정보">
@@ -892,13 +940,6 @@ export default function CreateRequestScreen({ navigation, route }: Props) {
           />
           <TextInput
             style={styles.input}
-            value={packageCategory}
-            onChangeText={setPackageCategory}
-            placeholder="카테고리"
-            placeholderTextColor={Colors.gray400}
-          />
-          <TextInput
-            style={styles.input}
             value={packageDescription}
             onChangeText={setPackageDescription}
             placeholder="예: 서류 봉투, 작은 박스, 노트북 가방"
@@ -906,12 +947,12 @@ export default function CreateRequestScreen({ navigation, route }: Props) {
           />
           {aiResult ? (
             <View style={styles.aiBox}>
-              <Text style={styles.aiTitle}>AI 작성 결과</Text>
+              <Text style={styles.aiTitle}>AI 분석 결과</Text>
               <Text style={styles.muted}>신뢰도 {Math.round(aiResult.confidence * 100)}%</Text>
             </View>
           ) : null}
           <View style={styles.row}>
-            {sizeOptions.map((size) => (
+            {CLEAN_SIZE_OPTIONS.map((size) => (
               <Chip
                 key={size.value}
                 label={size.label}
@@ -941,28 +982,20 @@ export default function CreateRequestScreen({ navigation, route }: Props) {
         <Block title="시간과 진행 방식">
           {requestMode === 'reservation' ? (
             <>
-              <TextInput
-                style={styles.input}
-                value={preferredPickupDate}
-                onChangeText={setPreferredPickupDate}
-                placeholder="Reservation date (YYYY-MM-DD)"
-                placeholderTextColor={Colors.gray400}
-              />
-              <TextInput
-                style={styles.input}
+              <TouchableOpacity style={styles.selector} onPress={() => setReservationCalendarVisible(true)}>
+                <Text style={styles.selectorLabel}>물건 희망 도착 날짜</Text>
+                <Text style={styles.selectorValue}>{preferredPickupDate || '날짜 선택'}</Text>
+              </TouchableOpacity>
+              <TimePicker
+                label="물건 희망 도착 시간"
                 value={preferredPickupTime}
-                onChangeText={setPreferredPickupTime}
-                placeholder="예: 오늘 19:30"
-                placeholderTextColor={Colors.gray400}
+                onChange={setPreferredPickupTime}
+                placeholder="시간 선택"
+                minuteInterval={10}
               />
-              <TextInput
-                style={styles.input}
-                value={preferredArrivalTime}
-                onChangeText={setPreferredArrivalTime}
-                placeholder="도착 희망 시간(선택)"
-                placeholderTextColor={Colors.gray400}
-              />
-              <Text style={styles.muted}>Add both a reservation date and time.</Text>
+              <Text style={styles.muted}>
+                희망 도착 날짜와 시간만 선택하면 됩니다. 세부 조율은 매칭 후 안내됩니다.
+              </Text>
             </>
           ) : (
             <View style={styles.row}>
@@ -981,7 +1014,7 @@ export default function CreateRequestScreen({ navigation, route }: Props) {
             </View>
           )}
           <View style={styles.column}>
-            <Chip label="전부 맡기기" active={directMode === 'none'} onPress={() => setDirectMode('none')} />
+            <Chip label="길러에게 맡기기" active={directMode === 'none'} onPress={() => setDirectMode('none')} />
             <Chip
               label="출발역까지 직접 전달"
               active={directMode === 'requester_to_station'}
@@ -1011,11 +1044,33 @@ export default function CreateRequestScreen({ navigation, route }: Props) {
             placeholder="수령인 연락처"
             placeholderTextColor={Colors.gray400}
           />
+          <View style={styles.noticeBox}>
+            <Text style={styles.noticeTitle}>안심번호 안내</Text>
+            <Text style={styles.noticeBody}>{recipientPrivacyConfig.guidance}</Text>
+            <Text style={styles.noticeMeta}>
+              제공 방식: {recipientPrivacyConfig.safeNumberEnabled ? '안심번호 전환' : '관리자 설정 확인 필요'} · 운영 설정: {recipientPrivacyConfig.providerName}
+            </Text>
+            <Text style={styles.noticeMeta}>
+              적용 약관: {recipientPrivacyConfig.policyTitle} ({recipientPrivacyConfig.policyEffectiveDate})
+            </Text>
+          </View>
+          <TouchableOpacity
+            style={styles.checkboxRow}
+            onPress={() => setRecipientConsentChecked((current) => !current)}
+            activeOpacity={0.8}
+          >
+            <View style={[styles.checkbox, recipientConsentChecked && styles.checkboxChecked]}>
+              <Text style={styles.checkboxMark}>{recipientConsentChecked ? '✓' : ''}</Text>
+            </View>
+            <Text style={styles.checkboxLabel}>
+              수령인 정보의 안심번호 전환 및 제3자 정보 제공에 동의합니다.
+            </Text>
+          </TouchableOpacity>
         </Block>
 
-        <Block title="Contact Verification">
+        <Block title="휴대폰 인증">
           <Text style={styles.muted}>
-            Sign-up stays lightweight. We confirm a reachable phone number right before the first request.
+            가입은 가볍게 유지하고, 실제 배송 요청 전에 연락 가능한 휴대폰만 확인합니다.
           </Text>
           <TextInput
             style={styles.input}
@@ -1027,7 +1082,7 @@ export default function CreateRequestScreen({ navigation, route }: Props) {
             editable={!isPhoneVerified}
           />
           {isPhoneVerified ? (
-            <Text style={styles.selectorValue}>Phone verification complete.</Text>
+            <Text style={styles.selectorValue}>이미 인증된 휴대폰입니다.</Text>
           ) : (
             <>
               <View style={styles.row}>
@@ -1036,7 +1091,7 @@ export default function CreateRequestScreen({ navigation, route }: Props) {
                   value={contactOtpCode}
                   onChangeText={setContactOtpCode}
                   keyboardType="number-pad"
-                  placeholder="6-digit code"
+                  placeholder="인증번호 6자리"
                   placeholderTextColor={Colors.gray400}
                 />
                 <TouchableOpacity
@@ -1047,7 +1102,7 @@ export default function CreateRequestScreen({ navigation, route }: Props) {
                   {contactOtpSending ? (
                     <ActivityIndicator color={Colors.primary} />
                   ) : (
-                    <Text style={styles.secondaryButtonText}>{contactOtpSessionId ? 'Resend' : 'Send code'}</Text>
+                    <Text style={styles.secondaryButtonText}>{contactOtpSessionId ? '재전송' : '인증번호 받기'}</Text>
                   )}
                 </TouchableOpacity>
               </View>
@@ -1059,14 +1114,14 @@ export default function CreateRequestScreen({ navigation, route }: Props) {
                 {contactOtpVerifying ? (
                   <ActivityIndicator color={Colors.primary} />
                 ) : (
-                  <Text style={styles.secondaryButtonText}>Verify phone</Text>
+                  <Text style={styles.secondaryButtonText}>휴대폰 인증 완료</Text>
                 )}
               </TouchableOpacity>
-              {contactOtpDestination ? <Text style={styles.muted}>Sent to: {contactOtpDestination}</Text> : null}
+              {contactOtpDestination ? <Text style={styles.muted}>전송 대상: {contactOtpDestination}</Text> : null}
               {contactOtpExpiresAt ? (
-                <Text style={styles.muted}>Expires: {new Date(contactOtpExpiresAt).toLocaleTimeString()}</Text>
+                <Text style={styles.muted}>만료 시간: {new Date(contactOtpExpiresAt).toLocaleTimeString()}</Text>
               ) : null}
-              {contactOtpHintCode ? <Text style={styles.muted}>Dev code: {contactOtpHintCode}</Text> : null}
+              {contactOtpHintCode ? <Text style={styles.muted}>개발용 코드: {contactOtpHintCode}</Text> : null}
             </>
           )}
         </Block>
@@ -1111,7 +1166,7 @@ export default function CreateRequestScreen({ navigation, route }: Props) {
           onPress={() => void handleSubmit()}
           disabled={submitDisabled || saving}
         >
-          {saving ? <ActivityIndicator color={Colors.white} /> : <Text style={styles.primaryButtonText}>요청 생성</Text>}
+          {saving ? <ActivityIndicator color={Colors.white} /> : <Text style={styles.primaryButtonText}>배송 요청하기</Text>}
         </TouchableOpacity>
       </ScrollView>
 
@@ -1132,7 +1187,7 @@ export default function CreateRequestScreen({ navigation, route }: Props) {
 
       <AddressSearchModal
         visible={addressTarget === 'pickup'}
-        title="출발 도로명 주소 검색"
+        title="출발지 도로명 주소 검색"
         onClose={() => setAddressTarget(null)}
         onSelectAddress={(item) => {
           setPickupRoadAddress(item.roadAddress);
@@ -1141,7 +1196,7 @@ export default function CreateRequestScreen({ navigation, route }: Props) {
 
       <AddressSearchModal
         visible={addressTarget === 'delivery'}
-        title="도착 도로명 주소 검색"
+        title="도착지 도로명 주소 검색"
         onClose={() => setAddressTarget(null)}
         onSelectAddress={(item) => {
           setDeliveryRoadAddress(item.roadAddress);
@@ -1164,13 +1219,21 @@ export default function CreateRequestScreen({ navigation, route }: Props) {
         }}
       />
 
+      <DatePickerModal
+        visible={reservationCalendarVisible}
+        value={preferredPickupDate}
+        title="물건 희망 도착 날짜"
+        onClose={() => setReservationCalendarVisible(false)}
+        onSelect={setPreferredPickupDate}
+      />
+
       <Modal visible={aiLoading} transparent animationType="fade" statusBarTranslucent>
         <View style={styles.modalBackdrop}>
           <View style={styles.modalCard}>
             <ActivityIndicator size="large" color={Colors.primary} />
             <Text style={styles.modalTitle}>AI가 작성 중입니다</Text>
             <Text style={styles.modalBody}>
-              사진과 주소/지하철 조건을 보고 물품 설명과 예상 정보를 정리하고 있어요. 잠시만 기다려 주세요.
+              사진과 주소, 지하철 조건을 바탕으로 물품 설명과 예상 정보를 정리하고 있습니다. 잠시만 기다려 주세요.
             </Text>
           </View>
         </View>
@@ -1338,6 +1401,56 @@ const styles = StyleSheet.create({
   muted: {
     color: Colors.textSecondary,
     ...Typography.caption,
+  },
+  noticeBox: {
+    gap: 6,
+    borderRadius: BorderRadius.lg,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    backgroundColor: Colors.gray50,
+    padding: Spacing.md,
+  },
+  noticeTitle: {
+    color: Colors.textPrimary,
+    fontWeight: '800',
+  },
+  noticeBody: {
+    color: Colors.textSecondary,
+    ...Typography.bodySmall,
+  },
+  noticeMeta: {
+    color: Colors.textSecondary,
+    fontSize: Typography.fontSize.xs,
+  },
+  checkboxRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 10,
+  },
+  checkbox: {
+    width: 22,
+    height: 22,
+    borderRadius: 6,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    backgroundColor: Colors.surface,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 2,
+  },
+  checkboxChecked: {
+    backgroundColor: Colors.primary,
+    borderColor: Colors.primary,
+  },
+  checkboxMark: {
+    color: Colors.white,
+    fontSize: Typography.fontSize.sm,
+    fontWeight: '800',
+  },
+  checkboxLabel: {
+    flex: 1,
+    color: Colors.textPrimary,
+    ...Typography.bodySmall,
   },
   quickPickWrap: { gap: 8 },
   quickPickTitle: { color: Colors.textSecondary, fontSize: Typography.fontSize.sm, fontWeight: '700' },

@@ -1,4 +1,3 @@
-import { Colors } from '../../theme';
 import React, { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
@@ -10,8 +9,8 @@ import {
 } from 'react-native';
 import { ParamListBase } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
-import { getPolicyConfigs } from '../../services/config-service';
-import { SETTLEMENT_POLICY, SETTLEMENT_POLICY_LABELS } from '../../constants/settlementPolicy';
+import { getPolicyHistoryConfigs } from '../../services/config-service';
+import { Colors } from '../../theme';
 
 type NavigationProp = StackNavigationProp<ParamListBase>;
 
@@ -28,72 +27,10 @@ interface Policy {
 
 const defaultPolicies: Policy[] = [
   {
-    id: 'terms',
-    title: '이용약관',
-    effectiveDate: '2026-03-29',
-    content: [
-      '제1조(목적)',
-      '이 약관은 가는길에가 제공하는 미션형 생활 배송 서비스의 이용 조건과 운영 기준을 설명합니다.',
-      '',
-      '제2조(역할)',
-      '이용자는 배송 요청을 만들고, 길러는 승인된 미션을 수행합니다.',
-      '회원가입만으로 바로 길러가 되는 것이 아니라 본인확인, 정산 계좌 준비, 운영 승급 심사를 거쳐야 합니다.',
-      '',
-      '제3조(배송 구조)',
-      '서비스는 RequestDraft, AI 분석, 견적, Delivery, Mission 구조를 기준으로 운영됩니다.',
-      '즉시형 요청과 예약형 요청은 같은 엔진을 쓰더라도 매칭과 가격 전략이 다르게 적용될 수 있습니다.',
-      '',
-      '제4조(운영 개입)',
-      'AI는 입력 보조, 가격 제안, 미션 분해, actor 선택, 재매칭에 개입할 수 있습니다.',
-      '환불, 보증금 차감, 패널티, 본인확인, 최종 정산은 AI가 단독 확정하지 않으며 운영자가 마지막으로 검토합니다.',
-    ],
-  },
-  {
-    id: 'deposit',
-    title: '보증금과 패널티',
-    effectiveDate: '2026-03-29',
-    content: [
-      '보증금은 사고, 환불, 패널티 대응을 위한 안전 장치입니다.',
-      '보증금 차감이나 환불은 자동으로 끝나지 않고 운영 검토를 거친 뒤 확정될 수 있습니다.',
-      '',
-      '지연, 미수령, 임의 취소, 손상 신고는 미션과 채팅 로그, 사진, 수령 확인, 운영 판단을 함께 반영합니다.',
-      '테스트 모드에서는 결제·인증 API 없이도 흐름이 이어지지만 최종 마감은 운영 책임으로 남습니다.',
-    ],
-  },
-  {
-    id: 'settlement',
-    title: '정산 정책',
-    effectiveDate: '2026-03-29',
-    content: [
-      '정산은 고객 결제 금액 전체를 길러 지급액으로 보지 않습니다.',
-      `${SETTLEMENT_POLICY_LABELS.platformFee}가 먼저 반영되고, 그 다음 길러 세전 수익을 기준으로 ${SETTLEMENT_POLICY_LABELS.combinedWithholding}가 계산됩니다.`,
-      '',
-      '운영 화면과 길러 수익 화면에는 세전 수익, 플랫폼 수수료, 원천징수, 실수령액이 분리되어 표시됩니다.',
-      '계좌 인증, 본인확인, 환불 이슈, 패널티, 수동 검토 상태가 남아 있으면 정산은 보류될 수 있습니다.',
-      '',
-      `원천세 신고·납부는 일반적으로 지급일이 속한 달의 다음 달 10일까지 진행하는 흐름을 기준으로 준비합니다.`,
-      `사업소득 간이지급명세서는 지급월의 다음 달 말일까지 제출하는 흐름을 기준으로 준비합니다.`,
-    ],
-  },
-  {
-    id: 'tax',
-    title: '세금 안내',
-    effectiveDate: '2026-03-29',
-    content: [
-      `${SETTLEMENT_POLICY_LABELS.businessIncomeTax}와 ${SETTLEMENT_POLICY_LABELS.localIncomeTax}를 합산한 ${SETTLEMENT_POLICY_LABELS.combinedWithholding}를 원천징수 기준으로 사용합니다.`,
-      '길러 지급 로그에는 누적 원천징수 금액과 실수령 내역이 남습니다.',
-      '',
-      `연간 지급 내역은 ${SETTLEMENT_POLICY.annualFilingWindowLabel} 종합소득세 신고 시 참고해야 합니다.`,
-      '최종 세무 판단과 실제 신고 의무는 개인의 사업 형태와 소득 구조에 따라 달라질 수 있습니다.',
-      '',
-      '예시',
-      '세전 수익 5,000원',
-      `플랫폼 수수료 10%: -500원`,
-      '원천징수 3.3%: -149원',
-      '실수령액: 4,351원',
-      '',
-      SETTLEMENT_POLICY.caution,
-    ],
+    id: 'policy-fallback',
+    title: '약관 문서',
+    effectiveDate: '2026-04-03',
+    content: ['관리자에서 등록한 최신 약관을 불러오지 못했습니다.', '잠시 후 다시 시도해 주세요.'],
   },
 ];
 
@@ -105,11 +42,11 @@ export default function TermsScreen({ navigation: _navigation }: Props) {
   useEffect(() => {
     const loadPolicies = async () => {
       try {
-        const configs = await getPolicyConfigs();
+        const configs = await getPolicyHistoryConfigs();
         if (configs.length > 0) {
           const loaded = configs.map((item) => ({
             id: item.policyId,
-            title: item.title,
+            title: item.version ? `${item.title} · ${item.version}` : item.title,
             content: item.content,
             effectiveDate: item.effectiveDate,
           }));
@@ -117,7 +54,7 @@ export default function TermsScreen({ navigation: _navigation }: Props) {
           setSelectedPolicy(loaded[0]);
         }
       } catch (error) {
-        console.error('정책 설정을 불러오지 못해 기본 문구를 사용합니다:', error);
+        console.error('약관 문서를 불러오지 못했습니다.', error);
       } finally {
         setLoading(false);
       }
@@ -130,7 +67,7 @@ export default function TermsScreen({ navigation: _navigation }: Props) {
     return (
       <View style={styles.loadingContainer}>
         <ActivityIndicator size="large" color={Colors.primary} />
-        <Text style={styles.loadingText}>정책 문서를 불러오는 중입니다.</Text>
+        <Text style={styles.loadingText}>약관 문서를 불러오는 중입니다.</Text>
       </View>
     );
   }
@@ -138,10 +75,10 @@ export default function TermsScreen({ navigation: _navigation }: Props) {
   return (
     <View style={styles.container}>
       <View style={styles.header}>
-        <Text style={styles.headerKicker}>policy center</Text>
-        <Text style={styles.headerTitle}>이용약관과 정산 기준</Text>
+        <Text style={styles.headerKicker}>POLICY CENTER</Text>
+        <Text style={styles.headerTitle}>약관 및 동의 이력</Text>
         <Text style={styles.headerSubtitle}>
-          결제, 보증금, 패널티, 세금, 정산 책임 범위를 서비스 기준에 맞춰 확인할 수 있습니다.
+          관리자에 등록된 약관과 동의 문서를 버전 및 시행일 기준으로 확인할 수 있습니다.
         </Text>
       </View>
 
@@ -195,16 +132,9 @@ export default function TermsScreen({ navigation: _navigation }: Props) {
           </View>
 
           <View style={styles.infoBox}>
-            <Text style={styles.infoTitle}>정산 주의</Text>
+            <Text style={styles.infoTitle}>안내</Text>
             <Text style={styles.infoText}>
-              실서비스 키가 준비되기 전에는 테스트 모드와 운영 수동 검토를 병행할 수 있으며, 이 경우에도 정산 로그와 승인 책임은 남습니다.
-            </Text>
-          </View>
-
-          <View style={styles.infoBox}>
-            <Text style={styles.infoTitle}>문의</Text>
-            <Text style={styles.infoText}>
-              정책과 정산 기준에 대한 문의는 고객센터 또는 운영 채널로 연결됩니다.
+              현재 화면은 활성 약관뿐 아니라 이전 버전까지 함께 보여주도록 정리되어 있습니다.
             </Text>
           </View>
         </ScrollView>
@@ -241,7 +171,6 @@ const styles = StyleSheet.create({
     color: Colors.accent,
     fontSize: 11,
     fontWeight: '700',
-    textTransform: 'uppercase',
     letterSpacing: 1.2,
   },
   headerTitle: {
@@ -259,31 +188,27 @@ const styles = StyleSheet.create({
   contentContainer: {
     flex: 1,
     flexDirection: 'row',
-    paddingHorizontal: 16,
-    paddingTop: 16,
+    padding: 20,
+    gap: 16,
   },
   sidebar: {
-    width: 126,
-    marginRight: 12,
+    width: 160,
   },
   sidebarContent: {
-    paddingBottom: 16,
+    gap: 10,
   },
   sidebarItem: {
     backgroundColor: Colors.surface,
-    borderRadius: 12,
-    padding: 12,
-    marginBottom: 8,
-    borderWidth: 1,
-    borderColor: Colors.border,
+    borderRadius: 14,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
   },
   sidebarItemActive: {
     backgroundColor: Colors.primary,
-    borderColor: Colors.primary,
   },
   sidebarItemText: {
-    fontSize: 13,
-    color: Colors.textSecondary,
+    color: Colors.textPrimary,
+    fontSize: 14,
     fontWeight: '600',
   },
   sidebarItemTextActive: {
@@ -296,52 +221,49 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.surface,
     borderRadius: 20,
     padding: 20,
-    marginBottom: 16,
   },
   policyHeader: {
-    marginBottom: 16,
-    paddingBottom: 12,
     borderBottomWidth: 1,
     borderBottomColor: Colors.border,
+    paddingBottom: 12,
+    marginBottom: 16,
   },
   policyTitle: {
+    color: Colors.textPrimary,
     fontSize: 22,
     fontWeight: '700',
-    color: Colors.textPrimary,
   },
   policyDate: {
     marginTop: 6,
-    fontSize: 12,
     color: Colors.textSecondary,
+    fontSize: 13,
   },
   policyBody: {
-    paddingBottom: 12,
+    gap: 10,
   },
   policyParagraph: {
-    fontSize: 14,
     color: Colors.textPrimary,
-    lineHeight: 22,
-    marginBottom: 8,
+    fontSize: 15,
+    lineHeight: 24,
   },
   policyParagraphSpacing: {
-    height: 10,
-    marginVertical: 4,
+    minHeight: 8,
   },
   infoBox: {
-    backgroundColor: Colors.primaryMint,
+    marginTop: 14,
+    backgroundColor: Colors.gray50,
     borderRadius: 16,
     padding: 16,
-    marginBottom: 12,
   },
   infoTitle: {
-    fontSize: 14,
+    color: Colors.textPrimary,
+    fontSize: 15,
     fontWeight: '700',
-    color: Colors.primary,
   },
   infoText: {
     marginTop: 6,
+    color: Colors.textSecondary,
     fontSize: 13,
     lineHeight: 20,
-    color: Colors.primary,
   },
 });

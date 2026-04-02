@@ -10,6 +10,7 @@ import {
   View,
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
+import AppTopBar from '../../components/common/AppTopBar';
 import Button from '../../components/common/Button';
 import AddressSearchModal from '../../components/common/AddressSearchModal';
 import NearbyStationRecommendationsModal, {
@@ -18,6 +19,7 @@ import NearbyStationRecommendationsModal, {
 import DaySelector, { DAY_LABELS } from '../../components/common/DaySelector';
 import StationSelectModal from '../../components/common/StationSelectModal';
 import TimePicker from '../../components/common/TimePicker';
+import { geocodeRoadAddress } from '../../services/address-geocode-service';
 import { getAllStations } from '../../services/config-service';
 import { requireUserId } from '../../services/firebase';
 import { locationService } from '../../services/location-service';
@@ -107,6 +109,7 @@ export default function AddRouteScreen() {
   const [pickTarget, setPickTarget] = useState<PickTarget>(null);
   const [addressTarget, setAddressTarget] = useState<AddressTarget>(null);
   const [resolvingLocation, setResolvingLocation] = useState<PickTarget>(null);
+  const [resolvingAddressStation, setResolvingAddressStation] = useState<PickTarget>(null);
   const [nearbyPicker, setNearbyPicker] = useState<NearbyPickerState | null>(null);
 
   const [startMode, setStartMode] = useState<RouteEndpointMode>('station');
@@ -148,10 +151,14 @@ export default function AddRouteScreen() {
 
   const routeSummary = useMemo(() => {
     const startLabel =
-      startMode === 'address' ? startAddress?.fullAddress ?? '출발 주소를 입력해 주세요.' : startStation?.stationName ?? '출발역을 선택해 주세요.';
+      startMode === 'address'
+        ? startAddress?.fullAddress ?? '출발지 주소를 입력해 주세요'
+        : startStation?.stationName ?? '출발역을 선택해 주세요';
     const endLabel =
-      endMode === 'address' ? endAddress?.fullAddress ?? '도착 주소를 입력해 주세요.' : endStation?.stationName ?? '도착역을 선택해 주세요.';
-    return `${startLabel} → ${endLabel}`;
+      endMode === 'address'
+        ? endAddress?.fullAddress ?? '도착지 주소를 입력해 주세요'
+        : endStation?.stationName ?? '도착역을 선택해 주세요';
+    return `${startLabel} -> ${endLabel}`;
   }, [endAddress?.fullAddress, endMode, endStation?.stationName, startAddress?.fullAddress, startMode, startStation?.stationName]);
 
   function getStationCandidates(): StationCandidate[] {
@@ -195,7 +202,7 @@ export default function AddRouteScreen() {
       setResolvingLocation(target);
       const currentLocation = await locationService.getCurrentLocation();
       if (!currentLocation) {
-        Alert.alert('위치 권한이 필요합니다', '기기 위치 권한을 허용한 뒤 다시 시도해 주세요.');
+        Alert.alert('위치 권한이 필요합니다', '기기의 위치 권한을 허용한 뒤 다시 시도해 주세요.');
         return;
       }
 
@@ -211,15 +218,78 @@ export default function AddRouteScreen() {
 
       setNearbyPicker({
         target,
-        title: target === 'start' ? '출발역 후보를 선택해 주세요' : '도착역 후보를 선택해 주세요',
-        description: '현재 위치 기준으로 가까운 역 최대 4개를 보여드려요.',
+        title: target === 'start' ? '출발역을 선택해 주세요' : '도착역을 선택해 주세요',
+        description: '현재 위치 기준으로 가까운 역 4곳을 추천해 드립니다.',
         recommendations,
       });
     } catch (error) {
       console.error('Failed to resolve nearest station', error);
-      Alert.alert('위치 확인에 실패했습니다', '현재 위치를 확인한 뒤 다시 시도해 주세요.');
+      Alert.alert('현재 위치를 확인하지 못했습니다', '잠시 후 다시 시도해 주세요.');
     } finally {
       setResolvingLocation(null);
+    }
+  }
+
+  function switchStartMode(mode: RouteEndpointMode) {
+    setStartMode(mode);
+    setPickTarget(null);
+    setAddressTarget((current) => (current === 'start' ? null : current));
+    setNearbyPicker((current) => (current?.target === 'start' ? null : current));
+    if (mode === 'station') {
+      setStartRoadAddress('');
+      setStartDetailAddress('');
+    } else {
+      setStartStation(null);
+    }
+  }
+
+  function switchEndMode(mode: RouteEndpointMode) {
+    setEndMode(mode);
+    setPickTarget(null);
+    setAddressTarget((current) => (current === 'end' ? null : current));
+    setNearbyPicker((current) => (current?.target === 'end' ? null : current));
+    if (mode === 'station') {
+      setEndRoadAddress('');
+      setEndDetailAddress('');
+    } else {
+      setEndStation(null);
+    }
+  }
+
+  async function handleRecommendStationFromAddress(target: RecommendationTarget, roadAddress: string) {
+    const trimmedAddress = roadAddress.trim();
+    if (!trimmedAddress) {
+      return;
+    }
+
+    try {
+      setResolvingAddressStation(target);
+      const geocoded = await geocodeRoadAddress(trimmedAddress);
+      if (!geocoded) {
+        Alert.alert('주소 좌표를 찾지 못했습니다', '다른 주소로 다시 시도해 주세요.');
+        return;
+      }
+
+      const recommendations = buildNearbyRecommendations(geocoded.latitude, geocoded.longitude);
+      if (recommendations.length === 0) {
+        Alert.alert('가까운 역을 찾지 못했습니다', '주소를 다시 확인해 주세요.');
+        return;
+      }
+
+      setNearbyPicker({
+        target,
+        title: target === 'start' ? '출발역을 선택해 주세요' : '도착역을 선택해 주세요',
+        description: '입력한 주소 기준으로 가까운 역 4곳을 추천해 드립니다.',
+        recommendations,
+      });
+    } catch (error) {
+      console.error('Failed to resolve nearest station from address', error);
+      Alert.alert(
+        '주소 기준 역 추천에 실패했습니다',
+        error instanceof Error ? error.message : '잠시 후 다시 시도해 주세요.'
+      );
+    } finally {
+      setResolvingAddressStation(null);
     }
   }
 
@@ -235,17 +305,17 @@ export default function AddRouteScreen() {
     }
 
     if (startMode === 'address' && !startAddress) {
-      Alert.alert('출발 주소를 확인해 주세요', '도로명 주소를 검색하고 상세주소를 입력해 주세요.');
+      Alert.alert('출발지 주소를 확인해 주세요', '도로명 주소를 검색하고 상세 주소를 입력해 주세요.');
       return;
     }
 
     if (endMode === 'address' && !endAddress) {
-      Alert.alert('도착 주소를 확인해 주세요', '도로명 주소를 검색하고 상세주소를 입력해 주세요.');
+      Alert.alert('도착지 주소를 확인해 주세요', '도로명 주소를 검색하고 상세 주소를 입력해 주세요.');
       return;
     }
 
     if (selectedDays.length === 0) {
-      Alert.alert('요일 선택이 필요합니다', '최소 한 개 이상의 요일을 선택해 주세요.');
+      Alert.alert('요일 선택이 필요합니다', '최소 1개 이상의 요일을 선택해 주세요.');
       return;
     }
 
@@ -284,19 +354,21 @@ export default function AddRouteScreen() {
     return (
       <View style={styles.centerContainer}>
         <ActivityIndicator size="large" color={Colors.primary} />
-        <Text style={styles.loadingText}>동선 화면을 준비하고 있습니다.</Text>
+        <Text style={styles.loadingText}>동선 등록 화면을 준비하고 있습니다.</Text>
       </View>
     );
   }
 
   return (
     <View style={styles.container}>
+      <AppTopBar title="길러 동선 등록" onBack={() => navigation.goBack()} />
+
       <ScrollView style={styles.content} contentContainerStyle={styles.contentInner} showsVerticalScrollIndicator={false}>
         <View style={styles.card}>
           <Text style={styles.sectionTitle}>출발 정보</Text>
           <View style={styles.row}>
-            <ModeChip label="역 기준" active={startMode === 'station'} onPress={() => setStartMode('station')} />
-            <ModeChip label="주소 기준" active={startMode === 'address'} onPress={() => setStartMode('address')} />
+            <ModeChip label="역 기준" active={startMode === 'station'} onPress={() => switchStartMode('station')} />
+            <ModeChip label="주소 기준" active={startMode === 'address'} onPress={() => switchStartMode('address')} />
           </View>
 
           {startMode === 'address' ? (
@@ -309,33 +381,54 @@ export default function AddRouteScreen() {
                 style={styles.input}
                 value={startDetailAddress}
                 onChangeText={setStartDetailAddress}
-                placeholder="상세주소"
+                placeholder="상세 주소"
                 placeholderTextColor={Colors.gray400}
+              />
+              <View style={styles.selector}>
+                <Text style={styles.selectorLabel}>연결 출발역</Text>
+                <Text style={styles.selectorValue}>{startStation?.stationName ?? '주소 기준으로 선택'}</Text>
+              </View>
+              <Button
+                title={
+                  resolvingAddressStation === 'start'
+                    ? '주소 기준으로 가까운 역을 찾는 중...'
+                    : '주소 기준 출발역 추천'
+                }
+                onPress={() => {
+                  void handleRecommendStationFromAddress('start', startRoadAddress);
+                }}
+                variant="outline"
+                fullWidth
+                loading={resolvingAddressStation === 'start'}
               />
             </View>
           ) : null}
 
-          <TouchableOpacity style={styles.selector} onPress={() => setPickTarget('start')}>
-            <Text style={styles.selectorLabel}>{startMode === 'address' ? '가까운 출발역' : '출발역'}</Text>
-            <Text style={styles.selectorValue}>{startStation?.stationName ?? '역 선택'}</Text>
-          </TouchableOpacity>
+          {startMode === 'station' ? (
+            <>
+              <TouchableOpacity style={styles.selector} onPress={() => setPickTarget('start')}>
+                <Text style={styles.selectorLabel}>출발역</Text>
+                <Text style={styles.selectorValue}>{startStation?.stationName ?? '역 선택'}</Text>
+              </TouchableOpacity>
 
-          <Button
-            title={resolvingLocation === 'start' ? '현재 위치 확인 중...' : '현재 위치로 가까운 출발역 추천'}
-            onPress={() => {
-              void handleUseCurrentLocation('start');
-            }}
-            variant="outline"
-            fullWidth
-            loading={resolvingLocation === 'start'}
-          />
+              <Button
+                title={resolvingLocation === 'start' ? '현재 위치 확인 중...' : '현재 위치로 가까운 출발역 추천'}
+                onPress={() => {
+                  void handleUseCurrentLocation('start');
+                }}
+                variant="outline"
+                fullWidth
+                loading={resolvingLocation === 'start'}
+              />
+            </>
+          ) : null}
         </View>
 
         <View style={styles.card}>
           <Text style={styles.sectionTitle}>도착 정보</Text>
           <View style={styles.row}>
-            <ModeChip label="역 기준" active={endMode === 'station'} onPress={() => setEndMode('station')} />
-            <ModeChip label="주소 기준" active={endMode === 'address'} onPress={() => setEndMode('address')} />
+            <ModeChip label="역 기준" active={endMode === 'station'} onPress={() => switchEndMode('station')} />
+            <ModeChip label="주소 기준" active={endMode === 'address'} onPress={() => switchEndMode('address')} />
           </View>
 
           {endMode === 'address' ? (
@@ -348,26 +441,47 @@ export default function AddRouteScreen() {
                 style={styles.input}
                 value={endDetailAddress}
                 onChangeText={setEndDetailAddress}
-                placeholder="상세주소"
+                placeholder="상세 주소"
                 placeholderTextColor={Colors.gray400}
+              />
+              <View style={styles.selector}>
+                <Text style={styles.selectorLabel}>연결 도착역</Text>
+                <Text style={styles.selectorValue}>{endStation?.stationName ?? '주소 기준으로 선택'}</Text>
+              </View>
+              <Button
+                title={
+                  resolvingAddressStation === 'end'
+                    ? '주소 기준으로 가까운 역을 찾는 중...'
+                    : '주소 기준 도착역 추천'
+                }
+                onPress={() => {
+                  void handleRecommendStationFromAddress('end', endRoadAddress);
+                }}
+                variant="outline"
+                fullWidth
+                loading={resolvingAddressStation === 'end'}
               />
             </View>
           ) : null}
 
-          <TouchableOpacity style={styles.selector} onPress={() => setPickTarget('end')}>
-            <Text style={styles.selectorLabel}>{endMode === 'address' ? '가까운 도착역' : '도착역'}</Text>
-            <Text style={styles.selectorValue}>{endStation?.stationName ?? '역 선택'}</Text>
-          </TouchableOpacity>
+          {endMode === 'station' ? (
+            <>
+              <TouchableOpacity style={styles.selector} onPress={() => setPickTarget('end')}>
+                <Text style={styles.selectorLabel}>도착역</Text>
+                <Text style={styles.selectorValue}>{endStation?.stationName ?? '역 선택'}</Text>
+              </TouchableOpacity>
 
-          <Button
-            title={resolvingLocation === 'end' ? '현재 위치 확인 중...' : '현재 위치로 가까운 도착역 추천'}
-            onPress={() => {
-              void handleUseCurrentLocation('end');
-            }}
-            variant="outline"
-            fullWidth
-            loading={resolvingLocation === 'end'}
-          />
+              <Button
+                title={resolvingLocation === 'end' ? '현재 위치 확인 중...' : '현재 위치로 가까운 도착역 추천'}
+                onPress={() => {
+                  void handleUseCurrentLocation('end');
+                }}
+                variant="outline"
+                fullWidth
+                loading={resolvingLocation === 'end'}
+              />
+            </>
+          ) : null}
         </View>
 
         <View style={styles.card}>
@@ -375,19 +489,19 @@ export default function AddRouteScreen() {
             label="출발 시간"
             value={departureTime}
             onChange={setDepartureTime}
-            placeholder="출발 시간을 선택해 주세요."
+            placeholder="출발 시간을 선택해 주세요"
             minuteInterval={10}
           />
           <DaySelector
             selectedDays={selectedDays}
             onChange={setSelectedDays}
             label="운행 요일"
-            hint="반복되는 요일만 선택해 주세요."
+            hint="선택한 운행 요일"
           />
         </View>
 
         <View style={styles.summaryCard}>
-          <Text style={styles.summaryTitle}>등록 요약</Text>
+          <Text style={styles.summaryTitle}>등록 예정 동선</Text>
           <Text style={styles.summaryRoute}>{routeSummary}</Text>
           <Text style={styles.summaryMeta}>
             {departureTime} 출발 · {selectedDays.map((day) => DAY_LABELS[day]).join(', ')}
@@ -395,7 +509,7 @@ export default function AddRouteScreen() {
         </View>
 
         <Button
-          title={saving ? '동선 등록 중...' : '동선 등록'}
+          title={saving ? '동선을 등록하는 중...' : '동선 등록'}
           onPress={() => {
             void handleSave();
           }}
@@ -427,19 +541,21 @@ export default function AddRouteScreen() {
 
       <AddressSearchModal
         visible={addressTarget === 'start'}
-        title="출발 도로명 주소 검색"
+        title="출발지 도로명 주소 검색"
         onClose={() => setAddressTarget(null)}
         onSelectAddress={(item) => {
           setStartRoadAddress(item.roadAddress);
+          void handleRecommendStationFromAddress('start', item.roadAddress);
         }}
       />
 
       <AddressSearchModal
         visible={addressTarget === 'end'}
-        title="도착 도로명 주소 검색"
+        title="도착지 도로명 주소 검색"
         onClose={() => setAddressTarget(null)}
         onSelectAddress={(item) => {
           setEndRoadAddress(item.roadAddress);
+          void handleRecommendStationFromAddress('end', item.roadAddress);
         }}
       />
 

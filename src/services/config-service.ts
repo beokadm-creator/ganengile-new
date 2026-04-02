@@ -41,6 +41,20 @@ export interface PolicyConfig {
   effectiveDate: string;
   isActive: boolean;
   priority?: number;
+  version?: string;
+  category?: string;
+  summary?: string;
+  required?: boolean;
+  targetFlow?: string;
+}
+
+export interface RecipientContactPrivacyConfig {
+  safeNumberEnabled: boolean;
+  providerName: string;
+  policyTitle: string;
+  policyEffectiveDate: string;
+  thirdPartyConsentRequired: boolean;
+  guidance: string;
 }
 
 class ConfigCache {
@@ -1036,7 +1050,29 @@ function convertPolicyConfig(data: any, docId?: string): PolicyConfig {
     effectiveDate: data.effectiveDate || '',
     isActive: data.isActive !== false,
     priority: typeof data.priority === 'number' ? data.priority : 999,
+    version: typeof data.version === 'string' ? data.version : undefined,
+    category: typeof data.category === 'string' ? data.category : undefined,
+    summary: typeof data.summary === 'string' ? data.summary : undefined,
+    required: typeof data.required === 'boolean' ? data.required : undefined,
+    targetFlow: typeof data.targetFlow === 'string' ? data.targetFlow : undefined,
   };
+}
+
+function comparePolicyOrder(a: PolicyConfig, b: PolicyConfig): number {
+  const dateA = Date.parse(a.effectiveDate || '');
+  const dateB = Date.parse(b.effectiveDate || '');
+  const hasDateA = Number.isFinite(dateA);
+  const hasDateB = Number.isFinite(dateB);
+
+  if (hasDateA && hasDateB && dateA !== dateB) {
+    return dateB - dateA;
+  }
+
+  if (hasDateA !== hasDateB) {
+    return hasDateA ? -1 : 1;
+  }
+
+  return (a.priority || 999) - (b.priority || 999);
 }
 
 export async function getPolicyConfigs(): Promise<PolicyConfig[]> {
@@ -1059,11 +1095,83 @@ export async function getPolicyConfigs(): Promise<PolicyConfig[]> {
       policies.push(convertDocument(docSnapshot, convertPolicyConfig));
     });
 
-    policies.sort((a, b) => (a.priority || 999) - (b.priority || 999));
+    policies.sort(comparePolicyOrder);
     cache.set(cacheKey, policies);
     return policies;
   } catch (error) {
     console.error('Error fetching policy configs:', error);
     throw error;
+  }
+}
+
+export async function getPolicyHistoryConfigs(): Promise<PolicyConfig[]> {
+  const cacheKey = 'policies:history';
+  const cached = cache.get<PolicyConfig[]>(cacheKey);
+  if (cached) {
+    return cached;
+  }
+
+  try {
+    const snapshot = await getDocs(collection(db, 'config_policies'));
+    const policies = snapshot.docs.map((docSnapshot) =>
+      convertDocument(docSnapshot, convertPolicyConfig)
+    );
+
+    policies.sort(comparePolicyOrder);
+    cache.set(cacheKey, policies);
+    return policies;
+  } catch (error) {
+    console.error('Error fetching policy history configs:', error);
+    throw error;
+  }
+}
+
+export async function getRecipientContactPrivacyConfig(): Promise<RecipientContactPrivacyConfig> {
+  const cacheKey = 'config:recipient-contact-privacy';
+  const cached = cache.get<RecipientContactPrivacyConfig>(cacheKey);
+  if (cached) {
+    return cached;
+  }
+
+  try {
+    const configSnapshot = await getDoc(doc(db, 'config_operational', 'recipient_contact_privacy'));
+    const data = configSnapshot.data() as Record<string, unknown> | undefined;
+
+    const resolved: RecipientContactPrivacyConfig = {
+      safeNumberEnabled: data?.safeNumberEnabled === true,
+      providerName:
+        typeof data?.providerName === 'string' && data.providerName.trim().length > 0
+          ? data.providerName
+          : '관리자 설정 대기',
+      policyTitle:
+        typeof data?.policyTitle === 'string' && data.policyTitle.trim().length > 0
+          ? data.policyTitle
+          : '수령인 연락처 보호 정책',
+      policyEffectiveDate:
+        typeof data?.policyEffectiveDate === 'string' && data.policyEffectiveDate.trim().length > 0
+          ? data.policyEffectiveDate
+          : '',
+      thirdPartyConsentRequired: data?.thirdPartyConsentRequired !== false,
+      guidance:
+        typeof data?.guidance === 'string' && data.guidance.trim().length > 0
+          ? data.guidance
+          : '수령인 연락처는 관리자 정책에 따라 안심번호로 전환되어 전달되며, 제3자 정보 제공 동의가 함께 기록됩니다.',
+    };
+
+    cache.set(cacheKey, resolved);
+    return resolved;
+  } catch (error) {
+    console.warn('Using fallback recipient contact privacy config:', error);
+    const fallback: RecipientContactPrivacyConfig = {
+      safeNumberEnabled: false,
+      providerName: '관리자 설정 대기',
+      policyTitle: '수령인 연락처 보호 정책',
+      policyEffectiveDate: '',
+      thirdPartyConsentRequired: true,
+      guidance:
+        '수령인 연락처는 관리자 정책에 따라 안심번호로 전환되어 전달되며, 제3자 정보 제공 동의가 함께 기록됩니다.',
+    };
+    cache.set(cacheKey, fallback);
+    return fallback;
   }
 }
