@@ -91,6 +91,31 @@ function toFallbackDate(): Date {
   return new Date('2026-01-01T00:00:00.000Z');
 }
 
+function readCoordinateValue(value: unknown): number | null {
+  if (typeof value === 'number' && Number.isFinite(value)) {
+    return value;
+  }
+
+  if (typeof value === 'string' && value.trim().length > 0) {
+    const parsed = Number(value);
+    return Number.isFinite(parsed) ? parsed : null;
+  }
+
+  return null;
+}
+
+function hasValidStationCoordinates(latitude: number | null, longitude: number | null): boolean {
+  if (latitude == null || longitude == null) {
+    return false;
+  }
+
+  if (latitude === 0 || longitude === 0) {
+    return false;
+  }
+
+  return Math.abs(latitude) <= 90 && Math.abs(longitude) <= 180;
+}
+
 function convertDocument<T>(
   docSnapshot: DocumentSnapshot,
   converter: (data: any, docId: string) => T
@@ -126,8 +151,186 @@ function convertLocalStation(station: LocalStation): Station {
   };
 }
 
+function normalizeStationLines(lines: unknown): Station['lines'] {
+  if (!Array.isArray(lines)) {
+    return [];
+  }
+
+  return lines
+    .map((line) => {
+      if (typeof line !== 'object' || line == null) {
+        return null;
+      }
+
+      const source = line as Record<string, unknown>;
+      const lineId = typeof source.lineId === 'string' ? source.lineId : '';
+      const lineName = typeof source.lineName === 'string' ? source.lineName : lineId;
+
+      if (!lineId && !lineName) {
+        return null;
+      }
+
+      return {
+        lineId: lineId || lineName,
+        lineName: lineName || lineId,
+        lineCode: typeof source.lineCode === 'string' ? source.lineCode : lineId || lineName,
+        lineColor: typeof source.lineColor === 'string' ? source.lineColor : '#000000',
+        lineType:
+          source.lineType === 'express' || source.lineType === 'special' || source.lineType === 'general'
+            ? source.lineType
+            : 'general',
+      };
+    })
+    .filter((line): line is Station['lines'][number] => line !== null);
+}
+
+function resolveFallbackStation(stationId: string, stationName: string): LocalStation | null {
+  return (
+    MAJOR_STATIONS.find((station) => station.stationId === stationId) ??
+    MAJOR_STATIONS.find((station) => station.stationName === stationName) ??
+    null
+  );
+}
+
+function normalizeStationLocation(
+  location: unknown,
+  stationId: string,
+  stationName: string
+): Station['location'] {
+  const source = typeof location === 'object' && location != null ? (location as Record<string, unknown>) : {};
+  const latitude = readCoordinateValue(source.latitude) ?? readCoordinateValue(source.lat);
+  const longitude = readCoordinateValue(source.longitude) ?? readCoordinateValue(source.lng);
+
+  if (hasValidStationCoordinates(latitude, longitude)) {
+    return {
+      latitude: latitude!,
+      longitude: longitude!,
+    };
+  }
+
+  const fallbackStation = resolveFallbackStation(stationId, stationName);
+  if (fallbackStation) {
+    return {
+      latitude: fallbackStation.location.latitude,
+      longitude: fallbackStation.location.longitude,
+    };
+  }
+
+  return {
+    latitude: 0,
+    longitude: 0,
+  };
+}
+
+function mergeStationLists(target: Station['lines'], source: Station['lines']): Station['lines'] {
+  const merged = new Map<string, Station['lines'][number]>();
+
+  for (const line of [...target, ...source]) {
+    const key = line.lineId || line.lineName;
+    if (!key) {
+      continue;
+    }
+
+    if (!merged.has(key)) {
+      merged.set(key, line);
+    }
+  }
+
+  return Array.from(merged.values());
+}
+
+function deduplicateStations(stations: Station[]): Station[] {
+  const stationMap = new Map<string, Station>();
+
+  for (const station of stations) {
+    const existing = stationMap.get(station.stationName);
+
+    if (!existing) {
+      stationMap.set(station.stationName, station);
+      continue;
+    }
+
+    const existingHasCoords = hasValidStationCoordinates(
+      existing.location.latitude,
+      existing.location.longitude
+    );
+    const nextHasCoords = hasValidStationCoordinates(
+      station.location.latitude,
+      station.location.longitude
+    );
+
+    const primary = !existingHasCoords && nextHasCoords ? station : existing;
+    const secondary = primary === existing ? station : existing;
+
+    stationMap.set(station.stationName, {
+      ...primary,
+      lines: mergeStationLists(primary.lines, secondary.lines),
+      isTransferStation:
+        primary.isTransferStation ||
+        secondary.isTransferStation ||
+        mergeStationLists(primary.lines, secondary.lines).length > 1,
+      isExpressStop: primary.isExpressStop || secondary.isExpressStop,
+      isTerminus: primary.isTerminus || secondary.isTerminus,
+      priority: Math.min(primary.priority ?? 999, secondary.priority ?? 999),
+      region: primary.region || secondary.region,
+      kric: primary.kric ?? secondary.kric,
+      fare: primary.fare ?? secondary.fare,
+      updatedAt: primary.updatedAt > secondary.updatedAt ? primary.updatedAt : secondary.updatedAt,
+      createdAt: primary.createdAt < secondary.createdAt ? primary.createdAt : secondary.createdAt,
+    });
+  }
+
+  return Array.from(stationMap.values());
+}
+
+function buildSupplementalFallbackStations(): Station[] {
+  return [
+    {
+      stationId: '818',
+      stationName: '문정역',
+      stationNameEnglish: 'Munjeong',
+      lines: [
+        {
+          lineId: '8',
+          lineName: '8호선',
+          lineCode: '818',
+          lineColor: '#EC5C37',
+          lineType: 'general',
+        },
+      ],
+      location: {
+        latitude: 37.486,
+        longitude: 127.1225,
+      },
+      isTransferStation: false,
+      isExpressStop: false,
+      isTerminus: false,
+      facilities: {
+        hasElevator: true,
+        hasEscalator: true,
+        wheelchairAccessible: true,
+      },
+      isActive: true,
+      region: 'seoul',
+      priority: 100,
+      createdAt: toFallbackDate(),
+      updatedAt: toFallbackDate(),
+    },
+  ];
+}
+
 function getFallbackStations(): Station[] {
-  return MAJOR_STATIONS.map(convertLocalStation);
+  const baseStations = MAJOR_STATIONS.map(convertLocalStation);
+  return mergeSupplementalStations(baseStations);
+}
+
+function mergeSupplementalStations(stations: Station[]): Station[] {
+  const existingStationIds = new Set(stations.map((station) => station.stationId));
+  const supplementalStations = buildSupplementalFallbackStations().filter(
+    (station) => !existingStationIds.has(station.stationId)
+  );
+
+  return [...stations, ...supplementalStations];
 }
 
 function getFallbackTravelTimes(): TravelTime[] {
@@ -200,23 +403,30 @@ function getFallbackCongestionConfigs(): CongestionData[] {
 // ==================== Station Config ====================
 
 function convertStation(data: any, docId?: string): Station {
+  const stationId = data.stationId || data.id || docId || '';
+  const stationName = data.stationName || data.name || '';
+
   return {
-    stationId: data.stationId || docId || '',
-    stationName: data.stationName || data.name || '',
+    stationId,
+    stationName,
     stationNameEnglish: data.stationNameEnglish || data.nameEnglish || '',
-    lines: data.lines || [],
-    location: data.location,
-    isTransferStation: data.isTransferStation,
+    lines: normalizeStationLines(data.lines),
+    location: normalizeStationLocation(data.location, stationId, stationName),
+    isTransferStation: Boolean(data.isTransferStation),
     isExpressStop: data.isExpressStop ?? false,
     isTerminus: data.isTerminus ?? false,
-    facilities: data.facilities,
-    isActive: data.isActive,
-    region: data.region,
-    priority: data.priority,
+    facilities: {
+      hasElevator: Boolean(data.facilities?.hasElevator),
+      hasEscalator: Boolean(data.facilities?.hasEscalator),
+      wheelchairAccessible: Boolean(data.facilities?.wheelchairAccessible),
+    },
+    isActive: data.isActive !== false,
+    region: data.region || 'seoul',
+    priority: typeof data.priority === 'number' ? data.priority : 999,
     kric: data.kric,
     fare: data.fare,
-    createdAt: convertTimestampToDate(data.createdAt),
-    updatedAt: convertTimestampToDate(data.updatedAt),
+    createdAt: data.createdAt ? convertTimestampToDate(data.createdAt) : toFallbackDate(),
+    updatedAt: data.updatedAt ? convertTimestampToDate(data.updatedAt) : toFallbackDate(),
   };
 }
 
@@ -264,12 +474,15 @@ export async function getAllStations(): Promise<Station[]> {
       stations.push(convertDocument(docSnapshot, convertStation));
     });
 
-    const finalStations = stations.length > 0 ? stations : getFallbackStations();
+    const finalStations =
+      stations.length > 0
+        ? deduplicateStations(mergeSupplementalStations(stations))
+        : deduplicateStations(getFallbackStations());
     cache.set(cacheKey, finalStations);
     return finalStations;
   } catch (error) {
     console.error('Error fetching all stations, using fallback dataset:', error);
-    const fallbackStations = getFallbackStations();
+    const fallbackStations = deduplicateStations(getFallbackStations());
     cache.set(cacheKey, fallbackStations);
     return fallbackStations;
   }
@@ -296,8 +509,9 @@ export async function getStationsByRegion(region: string): Promise<Station[]> {
       stations.push(convertDocument(docSnapshot, convertStation));
     });
 
-    cache.set(cacheKey, stations);
-    return stations;
+    const finalStations = deduplicateStations(mergeSupplementalStations(stations));
+    cache.set(cacheKey, finalStations);
+    return finalStations;
   } catch (error) {
     console.error(`Error fetching stations for region ${region}:`, error);
     throw error;

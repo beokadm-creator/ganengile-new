@@ -52,6 +52,7 @@ import {
 import { taxInvoiceScheduler } from './scheduled/tax-invoice-scheduler';
 import { gillerSettlementScheduler } from './scheduled/settlement-scheduler';
 import { fareCacheScheduler } from './scheduled/fare-cache-scheduler';
+import { syncConfigStationsFromSeoulApi } from './station-sync';
 import {
   SHARED_PRICING_POLICY,
   calculateSharedDeliveryFee,
@@ -2827,4 +2828,6 @@ export const confirmPhoneOtp = functions.https.onCall(
   }
 );
 
+
+export { syncConfigStationsFromSeoulApi };
 

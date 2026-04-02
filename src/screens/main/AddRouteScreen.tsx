@@ -79,6 +79,10 @@ function buildStationLocation(station: Station) {
   };
 }
 
+function hasUsableCoordinates(latitude: number, longitude: number) {
+  return Number.isFinite(latitude) && Number.isFinite(longitude) && latitude !== 0 && longitude !== 0;
+}
+
 function ModeChip({
   label,
   active,
@@ -154,7 +158,7 @@ export default function AddRouteScreen() {
     return stations
       .filter((station) => {
         const { latitude, longitude } = buildStationLocation(station);
-        return latitude != null && longitude != null;
+        return hasUsableCoordinates(latitude, longitude);
       })
       .map((station) => ({
         station,

@@ -96,11 +96,22 @@ function getStationCoordinates(station: Station) {
   };
 }
 
+function hasUsableCoordinates(latitude: number | null, longitude: number | null) {
+  return (
+    typeof latitude === 'number' &&
+    typeof longitude === 'number' &&
+    Number.isFinite(latitude) &&
+    Number.isFinite(longitude) &&
+    latitude !== 0 &&
+    longitude !== 0
+  );
+}
+
 function getStationCandidates(stations: Station[]): StationCandidate[] {
   return stations
     .filter((station) => {
       const { latitude, longitude } = getStationCoordinates(station);
-      return latitude != null && longitude != null;
+      return hasUsableCoordinates(latitude, longitude);
     })
     .map((station) => {
       const { latitude, longitude } = getStationCoordinates(station);
