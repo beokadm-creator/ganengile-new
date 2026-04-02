@@ -11,6 +11,7 @@ import {
 } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { Timestamp } from 'firebase/firestore';
+
 import { cancelDeliveryFlow } from '../../services/delivery-service';
 import { requireUserId } from '../../services/firebase';
 import { cancelRequest, getUserRequests, increaseRequestBid } from '../../services/request-service';
@@ -72,22 +73,30 @@ export default function RequestsScreen({ navigation }: { navigation: MainStackNa
     });
   }
 
+  function openRequestDetail(request: Request) {
+    navigation.navigate('RequestDetail', { requestId: request.requestId });
+  }
+
   function handleCancel(request: Request) {
     const canCancelDraft = [RequestStatus.PENDING, RequestStatus.MATCHED].includes(request.status);
     const canCancelAccepted = request.status === RequestStatus.ACCEPTED;
 
     if (!canCancelDraft && !canCancelAccepted) {
-      Alert.alert('지금은 취소할 수 없습니다', '배송이 진행 중이면 채팅이나 분쟁 접수로 먼저 상황을 정리해 주세요.', [
-        { text: '분쟁 접수', onPress: () => openDispute(request) },
-        { text: '닫기', style: 'cancel' },
-      ]);
+      Alert.alert(
+        '지금은 취소할 수 없습니다',
+        '배송이 진행 중이면 채팅이나 분쟁 접수로 먼저 상황을 정리해 주세요.',
+        [
+          { text: '분쟁 접수', onPress: () => openDispute(request) },
+          { text: '닫기', style: 'cancel' },
+        ]
+      );
       return;
     }
 
     const title = canCancelAccepted ? '수락된 배송을 취소할까요?' : '요청을 취소할까요?';
     const message = canCancelAccepted
       ? '픽업 전 취소라면 보증금 환불과 배송 취소를 함께 처리합니다.'
-      : '지금 취소해도 요청 정보는 다음 요청에 참고할 수 있습니다.';
+      : '지금 취소해도 요청 정보는 다음 요청의 참고값으로만 남습니다.';
 
     Alert.alert(title, message, [
       { text: '계속 유지', style: 'cancel' },
@@ -125,7 +134,20 @@ export default function RequestsScreen({ navigation }: { navigation: MainStackNa
 
                 Alert.alert('배송 취소 완료', completionMessage);
               } else {
-                await cancelRequest(request.requestId, userId, 'requester cancelled from 가는길에');
+                const cancelled = await cancelRequest(
+                  request.requestId,
+                  userId,
+                  'requester cancelled from request board'
+                );
+
+                if (!cancelled) {
+                  Alert.alert(
+                    '취소를 진행할 수 없습니다',
+                    '요청 소유자 정보가 맞는지 다시 확인해 주세요.'
+                  );
+                  return;
+                }
+
                 Alert.alert('요청 취소 완료', '요청을 취소했습니다.');
               }
 
@@ -164,8 +186,8 @@ export default function RequestsScreen({ navigation }: { navigation: MainStackNa
 
   function handleRematchAction(request: Request) {
     Alert.alert(
-      '지금 바로 보내야 하나요?',
-      '급하면 금액을 올려 더 빨리 다시 잡고, 급하지 않다면 예약으로 전환해 안정적으로 연결할 수 있습니다.',
+      '지금 바로 다시 보낼까요?',
+      '급하면 금액을 조금 올려 빠르게 다시 찾고, 급하지 않으면 예약형으로 전환해 안정적으로 연결할 수 있습니다.',
       [
         {
           text: 'AI 추천 금액 올리기',
@@ -174,7 +196,7 @@ export default function RequestsScreen({ navigation }: { navigation: MainStackNa
           },
         },
         {
-          text: '예약으로 전환하기',
+          text: '예약형으로 전환',
           onPress: () => {
             navigation.navigate('CreateRequest', {
               mode: 'reservation',
@@ -221,10 +243,10 @@ export default function RequestsScreen({ navigation }: { navigation: MainStackNa
       refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => void onRefresh()} />}
     >
       <View style={styles.hero}>
-        <Text style={styles.heroKicker}>가는길에</Text>
-        <Text style={styles.heroTitle}>요청 상태를 한눈에 확인하세요.</Text>
+        <Text style={styles.heroKicker}>가는길에 요청</Text>
+        <Text style={styles.heroTitle}>요청 상태를 한눈에 확인하세요</Text>
         <Text style={styles.heroSubtitle}>
-          초안, 견적, 배송 연결 상태만 간단하게 보여주고 필요한 행동만 바로 실행할 수 있게 정리했습니다.
+          초안, 견적, 배송 연결 상태를 바로 확인하고 필요한 동작을 이어갈 수 있습니다.
         </Text>
 
         <View style={styles.summaryRow}>
@@ -235,7 +257,11 @@ export default function RequestsScreen({ navigation }: { navigation: MainStackNa
         </View>
       </View>
 
-      <TouchableOpacity style={styles.primaryAction} activeOpacity={0.9} onPress={() => navigation.navigate('CreateRequest')}>
+      <TouchableOpacity
+        style={styles.primaryAction}
+        activeOpacity={0.9}
+        onPress={() => navigation.navigate('CreateRequest')}
+      >
         <MaterialIcons name="add-box" size={20} color={Colors.white} />
         <Text style={styles.primaryActionText}>새 요청 만들기</Text>
       </TouchableOpacity>
@@ -243,13 +269,14 @@ export default function RequestsScreen({ navigation }: { navigation: MainStackNa
       {requests.length === 0 ? (
         <View style={styles.emptyCard}>
           <Text style={styles.emptyTitle}>아직 요청이 없습니다</Text>
-          <Text style={styles.emptySubtitle}>지금 필요한 배송이 있다면 새 요청부터 시작해 보세요.</Text>
+          <Text style={styles.emptySubtitle}>필요한 배송이 있다면 새 요청부터 시작해 보세요.</Text>
         </View>
       ) : (
         requests.map((request) => {
           const isWorking = workingRequestId === request.requestId;
           const amount = getRequestAmount(request);
-          const canRematch = request.status === RequestStatus.PENDING || request.status === RequestStatus.MATCHED;
+          const canRematch =
+            request.status === RequestStatus.PENDING || request.status === RequestStatus.MATCHED;
           const canCancel =
             request.status === RequestStatus.PENDING ||
             request.status === RequestStatus.MATCHED ||
@@ -261,47 +288,49 @@ export default function RequestsScreen({ navigation }: { navigation: MainStackNa
             request.status === RequestStatus.DELIVERED;
 
           return (
-            <TouchableOpacity
-              key={request.requestId}
-              style={styles.requestCard}
-              activeOpacity={0.95}
-              onPress={() => navigation.navigate('RequestDetail', { requestId: request.requestId })}
-            >
-              <View style={styles.requestHeader}>
-                <Text style={styles.phaseLabel}>{getStatusLabel(request.status)}</Text>
-                <Text style={styles.requestTime}>{formatRelativeTime(request.createdAt)}</Text>
-              </View>
+            <View key={request.requestId} style={styles.requestCard}>
+              <TouchableOpacity activeOpacity={0.95} onPress={() => openRequestDetail(request)}>
+                <View style={styles.requestHeader}>
+                  <Text style={styles.phaseLabel}>{getStatusLabel(request.status)}</Text>
+                  <Text style={styles.requestTime}>{formatRelativeTime(request.createdAt)}</Text>
+                </View>
 
-              <Text style={styles.routeTitle}>
-                {request.pickupStation.stationName} {'->'} {request.deliveryStation.stationName}
-              </Text>
-              <Text style={styles.routeSubtitle}>
-                {request.packageInfo.description || '물품 설명 없음'} · {amount.toLocaleString()}원
-              </Text>
+                <Text style={styles.routeTitle}>
+                  {request.pickupStation.stationName} {'->'} {request.deliveryStation.stationName}
+                </Text>
+                <Text style={styles.routeSubtitle}>
+                  {request.packageInfo.description || '물품 설명 없음'} · {amount.toLocaleString()}원
+                </Text>
 
-              <View style={styles.stepRow}>
-                <StepPill label="초안" active />
-                <StepPill label="분석" active={Boolean(request.requestDraftId)} />
-                <StepPill label="견적" active={Boolean(request.pricingQuoteId)} />
-                <StepPill label="배송" active={Boolean(request.primaryDeliveryId)} />
-              </View>
+                <View style={styles.stepRow}>
+                  <StepPill label="초안" active />
+                  <StepPill label="분석" active={Boolean(request.requestDraftId)} />
+                  <StepPill label="견적" active={Boolean(request.pricingQuoteId)} />
+                  <StepPill label="배송" active={Boolean(request.primaryDeliveryId)} />
+                </View>
 
-              <View style={styles.infoPanel}>
-                <InfoRow label="현재 상태" value={getStatusDescription(request.status)} />
-                <InfoRow label="희망 시간" value={formatPreferredTime(request)} />
-                <InfoRow label="마감" value={formatDateTime(request.deadline)} />
-              </View>
+                <View style={styles.infoPanel}>
+                  <InfoRow label="현재 상태" value={getStatusDescription(request.status)} />
+                  <InfoRow label="희망 시간" value={formatPreferredTime(request)} />
+                  <InfoRow label="마감" value={formatDateTime(request.deadline)} />
+                </View>
+              </TouchableOpacity>
 
               <View style={styles.actionRow}>
                 <MiniAction
                   icon="chat-bubble-outline"
-                  label="채팅 보기"
-                  onPress={() => navigation.navigate('ChatList')}
+                  label="상세/채팅"
+                  onPress={() => openRequestDetail(request)}
                   disabled={isWorking}
                 />
 
                 {canRematch ? (
-                  <MiniAction icon="trending-up" label="다시 잡기" onPress={() => handleRematchAction(request)} disabled={isWorking} />
+                  <MiniAction
+                    icon="trending-up"
+                    label="다시 찾기"
+                    onPress={() => handleRematchAction(request)}
+                    disabled={isWorking}
+                  />
                 ) : null}
 
                 {canCancel ? (
@@ -315,10 +344,15 @@ export default function RequestsScreen({ navigation }: { navigation: MainStackNa
                 ) : null}
 
                 {canDispute ? (
-                  <MiniAction icon="report-problem" label="분쟁 접수" onPress={() => openDispute(request)} disabled={isWorking} />
+                  <MiniAction
+                    icon="report-problem"
+                    label="분쟁 접수"
+                    onPress={() => openDispute(request)}
+                    disabled={isWorking}
+                  />
                 ) : null}
               </View>
-            </TouchableOpacity>
+            </View>
           );
         })
       )}
@@ -338,7 +372,14 @@ function SummaryCard({ label, value }: { label: string; value: number }) {
 function StepPill({ label, active }: { label: string; active: boolean }) {
   return (
     <View style={[styles.stepPill, active ? styles.stepPillActive : styles.stepPillIdle]}>
-      <Text style={[styles.stepPillText, active ? styles.stepPillTextActive : styles.stepPillTextIdle]}>{label}</Text>
+      <Text
+        style={[
+          styles.stepPillText,
+          active ? styles.stepPillTextActive : styles.stepPillTextIdle,
+        ]}
+      >
+        {label}
+      </Text>
     </View>
   );
 }
@@ -378,13 +419,30 @@ function MiniAction({
 }
 
 function getRequestAmount(request: Request): number {
-  return request.fee?.totalFee ?? request.feeBreakdown?.totalFee ?? request.initialNegotiationFee ?? 0;
+  return (
+    request.fee?.totalFee ?? request.feeBreakdown?.totalFee ?? request.initialNegotiationFee ?? 0
+  );
+}
+
+function toDate(value?: Timestamp | { toDate?: () => Date } | null): Date | null {
+  if (!value) {
+    return null;
+  }
+  if (value instanceof Timestamp) {
+    return value.toDate();
+  }
+  if (typeof value.toDate === 'function') {
+    return value.toDate();
+  }
+  return null;
 }
 
 function formatDateTime(value?: Timestamp | null): string {
-  if (!value) return '-';
-  const date = value instanceof Timestamp ? value.toDate() : null;
-  if (!(date instanceof Date) || Number.isNaN(date.getTime())) return '-';
+  const date = toDate(value);
+  if (!(date instanceof Date) || Number.isNaN(date.getTime())) {
+    return '-';
+  }
+
   return date.toLocaleString('ko-KR', {
     month: 'numeric',
     day: 'numeric',
@@ -394,14 +452,18 @@ function formatDateTime(value?: Timestamp | null): string {
 }
 
 function formatPreferredTime(request: Request): string {
-  if (!request.preferredTime) return '미설정';
+  if (!request.preferredTime) {
+    return '미설정';
+  }
+
   return `${request.preferredTime.departureTime} 출발 · ${request.preferredTime.arrivalTime ?? '-'} 도착`;
 }
 
 function formatRelativeTime(value?: Timestamp | null): string {
-  if (!value) return '-';
-  const date = value instanceof Timestamp ? value.toDate() : null;
-  if (!(date instanceof Date) || Number.isNaN(date.getTime())) return '-';
+  const date = toDate(value);
+  if (!(date instanceof Date) || Number.isNaN(date.getTime())) {
+    return '-';
+  }
 
   const diffMs = Date.now() - date.getTime();
   const diffMinutes = Math.floor(diffMs / 60000);
@@ -417,7 +479,7 @@ function getStatusLabel(status: RequestStatus): string {
     case RequestStatus.PENDING:
       return '매칭 대기';
     case RequestStatus.MATCHED:
-      return '견적 도착';
+      return '견적 확인';
     case RequestStatus.ACCEPTED:
       return '길러 수락';
     case RequestStatus.IN_TRANSIT:
@@ -425,7 +487,7 @@ function getStatusLabel(status: RequestStatus): string {
     case RequestStatus.ARRIVED:
       return '도착 확인';
     case RequestStatus.AT_LOCKER:
-      return '사물함 보관';
+      return '보관 완료';
     case RequestStatus.DELIVERED:
       return '수령 확인 대기';
     case RequestStatus.COMPLETED:
@@ -440,23 +502,23 @@ function getStatusLabel(status: RequestStatus): string {
 function getStatusDescription(status: RequestStatus): string {
   switch (status) {
     case RequestStatus.PENDING:
-      return '길러와 파트너 연결을 기다리는 중입니다.';
+      return '길러를 찾고 있습니다.';
     case RequestStatus.MATCHED:
       return '견적과 매칭 제안을 확인할 수 있습니다.';
     case RequestStatus.ACCEPTED:
-      return '길러가 수락했습니다. 픽업 전까지 취소를 처리할 수 있습니다.';
+      return '길러가 수락했습니다. 픽업 전까지 취소할 수 있습니다.';
     case RequestStatus.IN_TRANSIT:
       return '배송이 진행 중입니다.';
     case RequestStatus.ARRIVED:
-      return '도착 확인 후 다음 인계나 수령을 기다립니다.';
+      return '도착 확인 후 인계가 진행됩니다.';
     case RequestStatus.AT_LOCKER:
       return '사물함 보관 상태입니다.';
     case RequestStatus.DELIVERED:
       return '최종 수령 확인을 기다리고 있습니다.';
     case RequestStatus.COMPLETED:
-      return '배송과 정산 흐름이 모두 마무리됐습니다.';
+      return '배송과 정산이 모두 완료되었습니다.';
     case RequestStatus.CANCELLED:
-      return '취소와 후속 정리가 완료된 상태입니다.';
+      return '취소 처리된 요청입니다.';
     default:
       return status;
   }
@@ -470,6 +532,7 @@ const styles = StyleSheet.create({
   content: {
     padding: Spacing.lg,
     gap: Spacing.md,
+    paddingBottom: Spacing['4xl'],
   },
   centerState: {
     flex: 1,
@@ -518,8 +581,6 @@ const styles = StyleSheet.create({
     borderRadius: BorderRadius.lg,
     padding: Spacing.md,
     backgroundColor: Colors.surface,
-    gap: 4,
-    ...Shadows.sm,
   },
   summaryValue: {
     fontSize: Typography.fontSize.xl,
@@ -527,18 +588,18 @@ const styles = StyleSheet.create({
     color: Colors.textPrimary,
   },
   summaryLabel: {
+    marginTop: 4,
     color: Colors.textTertiary,
     fontSize: Typography.fontSize.xs,
-    fontWeight: '600',
   },
   primaryAction: {
-    minHeight: 52,
+    minHeight: 54,
     borderRadius: BorderRadius.full,
     backgroundColor: Colors.primary,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: Spacing.sm,
+    gap: 8,
     ...Shadows.sm,
   },
   primaryActionText: {
@@ -550,24 +611,24 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.surface,
     borderRadius: BorderRadius.xl,
     padding: Spacing.xl,
+    gap: 6,
     ...Shadows.sm,
-    gap: Spacing.md,
   },
   emptyTitle: {
-    fontSize: Typography.fontSize.lg,
-    fontWeight: '800',
     color: Colors.textPrimary,
+    fontSize: Typography.fontSize.xl,
+    fontWeight: '700',
   },
   emptySubtitle: {
-    color: Colors.textSecondary,
-    fontSize: Typography.fontSize.base,
+    color: Colors.textTertiary,
+    ...Typography.body,
   },
   requestCard: {
-    backgroundColor: Colors.surface,
     borderRadius: BorderRadius.xl,
+    backgroundColor: Colors.surface,
     padding: Spacing.lg,
+    gap: Spacing.md,
     ...Shadows.sm,
-    gap: Spacing.sm,
   },
   requestHeader: {
     flexDirection: 'row',
@@ -575,23 +636,22 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   phaseLabel: {
-    fontSize: 13,
-    fontWeight: '700',
     color: Colors.primary,
+    fontWeight: '800',
+    fontSize: Typography.fontSize.sm,
   },
   requestTime: {
-    color: Colors.gray400,
-    ...Typography.caption,
+    color: Colors.textDisabled,
+    fontSize: Typography.fontSize.xs,
   },
   routeTitle: {
-    fontSize: Typography.fontSize.lg,
-    fontWeight: '800',
     color: Colors.textPrimary,
+    fontSize: Typography.fontSize.xl,
+    fontWeight: '800',
   },
   routeSubtitle: {
     color: Colors.textSecondary,
-    fontSize: Typography.fontSize.sm,
-    fontWeight: '600',
+    ...Typography.bodySmall,
   },
   stepRow: {
     flexDirection: 'row',
@@ -607,23 +667,23 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.primaryMint,
   },
   stepPillIdle: {
-    backgroundColor: Colors.gray200,
+    backgroundColor: Colors.gray100,
   },
   stepPillText: {
-    fontSize: 12,
+    fontSize: Typography.fontSize.xs,
     fontWeight: '700',
   },
   stepPillTextActive: {
     color: Colors.primary,
   },
   stepPillTextIdle: {
-    color: Colors.gray500,
+    color: Colors.textTertiary,
   },
   infoPanel: {
     gap: 8,
-    padding: Spacing.md,
     backgroundColor: Colors.gray50,
     borderRadius: BorderRadius.lg,
+    padding: Spacing.md,
   },
   infoRow: {
     flexDirection: 'row',
@@ -631,44 +691,43 @@ const styles = StyleSheet.create({
     gap: Spacing.md,
   },
   infoLabel: {
+    flex: 1,
     color: Colors.textTertiary,
-    fontSize: Typography.fontSize.sm,
-    fontWeight: '600',
+    ...Typography.bodySmall,
   },
   infoValue: {
-    flex: 1,
+    flex: 1.4,
     textAlign: 'right',
     color: Colors.textPrimary,
-    fontSize: Typography.fontSize.sm,
-    fontWeight: '700',
+    ...Typography.bodySmall,
   },
   actionRow: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: Spacing.sm,
+    gap: 8,
   },
   secondaryAction: {
-    minHeight: 44,
+    minHeight: 40,
     borderRadius: BorderRadius.full,
-    paddingHorizontal: Spacing.md,
-    backgroundColor: Colors.primaryMint,
+    paddingHorizontal: 14,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 8,
-  },
-  warningAction: {
-    backgroundColor: Colors.errorLight,
-  },
-  disabledAction: {
-    opacity: 0.6,
+    gap: 6,
+    backgroundColor: Colors.primaryMint,
   },
   secondaryActionText: {
     color: Colors.primary,
-    ...Typography.bodyBold,
+    fontSize: Typography.fontSize.sm,
+    fontWeight: '700',
+  },
+  warningAction: {
+    backgroundColor: '#FEE2E2',
   },
   warningText: {
     color: Colors.error,
   },
+  disabledAction: {
+    opacity: 0.5,
+  },
 });
-

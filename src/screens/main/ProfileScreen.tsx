@@ -32,6 +32,7 @@ type ProfileState = {
 };
 
 type LinkItem = {
+  key: string;
   title: string;
   subtitle: string;
   icon: keyof typeof MaterialIcons.glyphMap;
@@ -43,7 +44,7 @@ export default function ProfileScreen({ navigation }: { navigation: MainStackNav
   const { canAccessGiller, applicationStatus } = useGillerAccess();
   const [loading, setLoading] = useState(true);
   const [profileState, setProfileState] = useState<ProfileState>({
-    verificationLabel: '본인인증 필요',
+    verificationLabel: '본인확인 필요',
     bankLabel: '계좌 상태 확인 필요',
     withdrawableBalance: 0,
   });
@@ -62,7 +63,12 @@ export default function ProfileScreen({ navigation }: { navigation: MainStackNav
       }
 
       try {
-        const [verificationResult, identityConfigResult, bankConfigResult, pointSummaryResult] = await Promise.allSettled([
+        const [
+          verificationResult,
+          identityConfigResult,
+          bankConfigResult,
+          pointSummaryResult,
+        ] = await Promise.allSettled([
           getUserVerification(user.uid),
           getIdentityIntegrationConfig(),
           getBankIntegrationConfig(),
@@ -88,29 +94,17 @@ export default function ProfileScreen({ navigation }: { navigation: MainStackNav
             ? pointSummaryResult.value
             : { withdrawableBalance: 0 };
 
-        if (verificationResult.status === 'rejected') {
-          console.error('Failed to load verification state', verificationResult.reason);
-        }
-        if (identityConfigResult.status === 'rejected') {
-          console.error('Failed to load identity integration config', identityConfigResult.reason);
-        }
-        if (bankConfigResult.status === 'rejected') {
-          console.error('Failed to load bank integration config', bankConfigResult.reason);
-        }
-        if (pointSummaryResult.status === 'rejected') {
-          console.error('Failed to load point summary', pointSummaryResult.reason);
-        }
-
         const verificationDisplay = getVerificationStatusDisplay(verification);
+
         setProfileState({
           verificationLabel:
             user.isVerified === true
               ? identityConfig.testMode
                 ? `${verificationDisplay.statusKo} · 테스트`
                 : verificationDisplay.statusKo
-              : '본인인증 필요',
+              : '본인확인 필요',
           bankLabel: bankConfig.liveReady
-            ? '계좌 준비됨'
+            ? '계좌 준비 완료'
             : bankConfig.statusMessage || '계좌 상태 확인 필요',
           withdrawableBalance: pointSummary.withdrawableBalance,
         });
@@ -137,37 +131,21 @@ export default function ProfileScreen({ navigation }: { navigation: MainStackNav
     };
   }, [user]);
 
-  const userLinks = useMemo<LinkItem[]>(
+  const requesterLinks = useMemo<LinkItem[]>(
     () => [
       {
+        key: 'requests',
         title: '배송 요청',
-        subtitle: '요청과 배송 확인',
+        subtitle: '요청과 진행 상태를 확인합니다.',
         icon: 'inventory-2',
         onPress: () => navigation.navigate('Tabs', { screen: 'Requests' }),
       },
       {
-        title: '채팅',
-        subtitle: '대화 확인',
-        icon: 'chat',
-        onPress: () => navigation.navigate('ChatList'),
-      },
-      {
-        title: '지갑',
-        subtitle: '포인트와 내역',
+        key: 'points',
+        title: '포인트 내역',
+        subtitle: '결제와 적립 내역을 확인합니다.',
         icon: 'account-balance-wallet',
         onPress: () => navigation.navigate('PointHistory'),
-      },
-      {
-        title: '약관',
-        subtitle: '서비스 정책 확인',
-        icon: 'description',
-        onPress: () => navigation.navigate('Terms'),
-      },
-      {
-        title: '주소록 관리',
-        subtitle: '기본 주소와 최근 주소 관리',
-        icon: 'place',
-        onPress: () => navigation.navigate('AddressBook'),
       },
     ],
     [navigation]
@@ -176,28 +154,59 @@ export default function ProfileScreen({ navigation }: { navigation: MainStackNav
   const gillerLinks = useMemo<LinkItem[]>(
     () => [
       {
+        key: 'missions',
         title: '미션 보드',
-        subtitle: '받을 미션 확인',
+        subtitle: '수행 가능한 요청을 확인합니다.',
         icon: 'two-wheeler',
         onPress: () => navigation.navigate('Tabs', { screen: 'GillerRequests' }),
       },
       {
+        key: 'routes',
         title: '경로 관리',
-        subtitle: '등록한 경로 관리',
+        subtitle: '등록한 동선을 관리합니다.',
         icon: 'alt-route',
         onPress: () => navigation.navigate('Tabs', { screen: 'RouteManagement' }),
       },
       {
-        title: '수익',
-        subtitle: '정산 확인',
+        key: 'earnings',
+        title: '수익 확인',
+        subtitle: '정산 현황을 확인합니다.',
         icon: 'payments',
         onPress: () => navigation.navigate('Earnings'),
       },
       {
-        title: '출금',
-        subtitle: '출금 신청',
+        key: 'withdraw',
+        title: '출금 요청',
+        subtitle: '출금 가능한 금액을 정산합니다.',
         icon: 'account-balance',
         onPress: () => navigation.navigate('PointWithdraw'),
+      },
+    ],
+    [navigation]
+  );
+
+  const commonLinks = useMemo<LinkItem[]>(
+    () => [
+      {
+        key: 'chat',
+        title: '채팅',
+        subtitle: '대화와 진행 상황을 확인합니다.',
+        icon: 'chat',
+        onPress: () => navigation.navigate('ChatList'),
+      },
+      {
+        key: 'terms',
+        title: '약관',
+        subtitle: '서비스 정책을 확인합니다.',
+        icon: 'description',
+        onPress: () => navigation.navigate('Terms'),
+      },
+      {
+        key: 'address-book',
+        title: '주소록',
+        subtitle: '자주 쓰는 주소를 관리합니다.',
+        icon: 'place',
+        onPress: () => navigation.navigate('AddressBook'),
       },
     ],
     [navigation]
@@ -213,7 +222,7 @@ export default function ProfileScreen({ navigation }: { navigation: MainStackNav
 
   function handleLogout() {
     if (typeof window !== 'undefined') {
-      const confirmed = window.confirm('세션을 종료할까요?');
+      const confirmed = window.confirm('로그아웃하시겠습니까?');
       if (!confirmed) {
         return;
       }
@@ -225,7 +234,7 @@ export default function ProfileScreen({ navigation }: { navigation: MainStackNav
       return;
     }
 
-    Alert.alert('로그아웃', '세션을 종료할까요?', [
+    Alert.alert('로그아웃', '로그아웃하시겠습니까?', [
       { text: '취소', style: 'cancel' },
       {
         text: '로그아웃',
@@ -256,7 +265,7 @@ export default function ProfileScreen({ navigation }: { navigation: MainStackNav
       showsVerticalScrollIndicator={false}
     >
       <View style={styles.hero}>
-        <Text style={styles.kicker}>가는길에</Text>
+        <Text style={styles.kicker}>가는길에 프로필</Text>
         <Text style={styles.name}>{user.name ?? '사용자'}</Text>
         <Text style={styles.subtitle}>{user.phoneNumber ?? user.email}</Text>
 
@@ -285,7 +294,7 @@ export default function ProfileScreen({ navigation }: { navigation: MainStackNav
       </View>
 
       <View style={styles.statGrid}>
-        <MiniCard title="본인인증" value={profileState.verificationLabel} />
+        <MiniCard title="본인확인" value={profileState.verificationLabel} />
         <MiniCard title="계좌 상태" value={profileState.bankLabel} />
         <MiniCard
           title="출금 가능"
@@ -293,18 +302,24 @@ export default function ProfileScreen({ navigation }: { navigation: MainStackNav
         />
       </View>
 
-      <MenuSection title="이용자 메뉴" items={userLinks} />
-
-      {canAccessGiller ? (
+      {activeRole === UserRole.GILLER && canAccessGiller ? (
         <MenuSection title="길러 메뉴" items={gillerLinks} />
       ) : (
+        <MenuSection title="이용자 메뉴" items={requesterLinks} />
+      )}
+
+      <MenuSection title="공통 메뉴" items={commonLinks} />
+
+      {!canAccessGiller ? (
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>길러 시작</Text>
           <TouchableOpacity
             style={styles.linkCard}
             onPress={() =>
               navigation.navigate(
-                applicationStatus === 'pending' || user.isVerified ? 'GillerApply' : 'IdentityVerification'
+                applicationStatus === 'pending' || user.isVerified
+                  ? 'GillerApply'
+                  : 'IdentityVerification'
               )
             }
             activeOpacity={0.92}
@@ -313,19 +328,19 @@ export default function ProfileScreen({ navigation }: { navigation: MainStackNav
               <MaterialIcons name="two-wheeler" size={20} color={Colors.primaryDark} />
             </View>
             <View style={styles.linkCopy}>
-              <Text style={styles.linkTitle}>길러를 해보세요</Text>
+              <Text style={styles.linkTitle}>길러를 시작해 보세요</Text>
               <Text style={styles.linkSubtitle}>
                 {applicationStatus === 'pending'
-                  ? '심사 진행 상태를 확인하세요.'
+                  ? '현재 심사 상태를 확인할 수 있습니다.'
                   : user.isVerified
-                    ? '길러 신청을 진행할 수 있어요.'
-                    : '본인인증을 마치면 신청할 수 있어요.'}
+                    ? '길러 신청 단계로 바로 이동합니다.'
+                    : '본인확인 후 길러 신청을 진행할 수 있습니다.'}
               </Text>
             </View>
             <MaterialIcons name="chevron-right" size={22} color={Colors.gray400} />
           </TouchableOpacity>
         </View>
-      )}
+      ) : null}
 
       {!canAccessGiller && applicationStatus !== 'pending' ? (
         <TouchableOpacity
@@ -336,7 +351,7 @@ export default function ProfileScreen({ navigation }: { navigation: MainStackNav
           activeOpacity={0.9}
         >
           <Text style={styles.actionButtonText}>
-            {user.isVerified ? '길러 신청하기' : '본인인증 하러 가기'}
+            {user.isVerified ? '길러 신청하기' : '본인확인 하러 가기'}
           </Text>
         </TouchableOpacity>
       ) : null}
@@ -353,7 +368,12 @@ function MenuSection({ title, items }: { title: string; items: LinkItem[] }) {
     <View style={styles.section}>
       <Text style={styles.sectionTitle}>{title}</Text>
       {items.map((item) => (
-        <TouchableOpacity key={item.title} style={styles.linkCard} onPress={item.onPress} activeOpacity={0.92}>
+        <TouchableOpacity
+          key={item.key}
+          style={styles.linkCard}
+          onPress={item.onPress}
+          activeOpacity={0.92}
+        >
           <View style={styles.linkIconWrap}>
             <MaterialIcons name={item.icon} size={20} color={Colors.primaryDark} />
           </View>
@@ -418,81 +438,112 @@ const styles = StyleSheet.create({
   badgeRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   badge: {
     borderRadius: BorderRadius.full,
-    backgroundColor: Colors.gray50,
-    paddingHorizontal: 10,
-    paddingVertical: 6,
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+    backgroundColor: Colors.primaryMint,
   },
   badgeText: {
-    color: Colors.textSecondary,
-    fontSize: Typography.fontSize.sm,
+    color: Colors.primary,
+    fontSize: Typography.fontSize.xs,
     fontWeight: '700',
   },
   switchButton: {
-    minHeight: 48,
-    borderRadius: BorderRadius.xl,
-    backgroundColor: Colors.gray50,
-    paddingHorizontal: Spacing.md,
+    marginTop: Spacing.xs,
+    borderRadius: BorderRadius.full,
+    paddingHorizontal: Spacing.lg,
+    paddingVertical: Spacing.md,
+    backgroundColor: Colors.gray100,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
   },
-  switchButtonText: { color: Colors.textPrimary, fontWeight: '700' },
-  statGrid: { flexDirection: 'row', gap: Spacing.sm },
+  switchButtonText: {
+    color: Colors.textPrimary,
+    fontWeight: '700',
+    fontSize: Typography.fontSize.base,
+  },
+  statGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: Spacing.sm,
+  },
   miniCard: {
     flex: 1,
+    minWidth: 100,
+    borderRadius: BorderRadius.xl,
     backgroundColor: Colors.surface,
-    borderRadius: BorderRadius.lg,
-    padding: Spacing.md,
+    padding: Spacing.lg,
+    gap: 6,
     ...Shadows.sm,
   },
   miniTitle: {
     color: Colors.textTertiary,
     fontSize: Typography.fontSize.xs,
-    marginBottom: 6,
+    fontWeight: '700',
   },
   miniValue: {
     color: Colors.textPrimary,
-    fontWeight: '800',
     fontSize: Typography.fontSize.base,
+    fontWeight: '800',
   },
-  section: { gap: 10 },
-  sectionTitle: { color: Colors.textPrimary, fontSize: Typography.fontSize.xl, fontWeight: '800' },
+  section: {
+    gap: Spacing.sm,
+  },
+  sectionTitle: {
+    color: Colors.textPrimary,
+    fontSize: Typography.fontSize.lg,
+    fontWeight: '800',
+  },
   linkCard: {
     backgroundColor: Colors.surface,
     borderRadius: BorderRadius.xl,
     padding: Spacing.lg,
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 12,
+    gap: Spacing.md,
     ...Shadows.sm,
   },
   linkIconWrap: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
+    width: 42,
+    height: 42,
+    borderRadius: BorderRadius.lg,
     backgroundColor: Colors.primaryMint,
     alignItems: 'center',
     justifyContent: 'center',
   },
   linkCopy: { flex: 1, gap: 4 },
-  linkTitle: { color: Colors.textPrimary, fontWeight: '800' },
-  linkSubtitle: { color: Colors.textTertiary, ...Typography.caption },
+  linkTitle: {
+    color: Colors.textPrimary,
+    fontSize: Typography.fontSize.base,
+    fontWeight: '700',
+  },
+  linkSubtitle: {
+    color: Colors.textTertiary,
+    ...Typography.bodySmall,
+  },
   actionButton: {
-    minHeight: 48,
-    borderRadius: BorderRadius.xl,
-    backgroundColor: Colors.surface,
+    minHeight: 54,
+    borderRadius: BorderRadius.full,
     alignItems: 'center',
     justifyContent: 'center',
+    backgroundColor: Colors.primary,
     ...Shadows.sm,
   },
-  actionButtonText: { color: Colors.primary, fontWeight: '800' },
+  actionButtonText: {
+    color: Colors.white,
+    fontSize: Typography.fontSize.base,
+    fontWeight: '800',
+  },
   logoutButton: {
     minHeight: 52,
-    borderRadius: BorderRadius.xl,
-    backgroundColor: Colors.surface,
+    borderRadius: BorderRadius.full,
     alignItems: 'center',
     justifyContent: 'center',
-    ...Shadows.sm,
+    backgroundColor: Colors.gray100,
   },
-  logoutText: { color: Colors.error, fontWeight: '800' },
+  logoutText: {
+    color: Colors.textPrimary,
+    fontWeight: '700',
+    fontSize: Typography.fontSize.base,
+  },
 });

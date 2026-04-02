@@ -713,6 +713,14 @@ export async function getUserRequests(userId: string): Promise<Request[]> {
   return getRequestsByRequester(userId);
 }
 
+function isRequestOwnedByUser(request: Request, userId: string): boolean {
+  return (
+    request.requesterId === userId ||
+    (request as Request & { requesterUserId?: string }).requesterUserId === userId ||
+    (request as Request & { gllerId?: string }).gllerId === userId
+  );
+}
+
 export async function updateRequest(
   requestId: string,
   userId: string,
@@ -732,7 +740,7 @@ export async function updateRequest(
   if (typeof userIdOrUpdateData === 'string') {
     const request = await getRequestById(requestId);
     if (!request) return null;
-    if (request.requesterId !== userIdOrUpdateData) return null;
+    if (!isRequestOwnedByUser(request, userIdOrUpdateData)) return null;
     return await updateRequestInternal(requestId, updateData!);
   } else {
     return await updateRequestInternal(requestId, userIdOrUpdateData);
@@ -760,7 +768,7 @@ export async function cancelRequest(
   if (typeof reasonOrCancelledBy === 'string') {
     const request = await getRequestById(requestId);
     if (!request) return null;
-    if (request.requesterId !== userIdOrReason) return null;
+    if (!isRequestOwnedByUser(request, userIdOrReason)) return null;
     return await cancelRequestInternal(requestId, reasonOrCancelledBy, 'requester');
   } else {
     const resolvedCancelledBy: 'requester' | 'giller' | 'system' = cancelledBy ?? 'requester';

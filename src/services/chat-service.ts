@@ -19,6 +19,7 @@ import {
 } from 'firebase/firestore';
 import { db } from './firebase';
 import { requireUserId } from './firebase';
+import { getUserById } from './user-service';
 import type {
   ChatRoom,
   ChatMessage,
@@ -389,4 +390,42 @@ export async function getChatRoomByMatchId(matchId: string): Promise<ChatRoom | 
     chatRoomId: doc.id,
     ...doc.data(),
   } as ChatRoom;
+}
+
+export async function ensureChatRoomForRequest(args: {
+  requestId: string;
+  requesterId: string;
+  gillerId: string;
+  requestInfo?: CreateChatRoomData['requestInfo'];
+}): Promise<ChatRoom> {
+  const existingRoom = await getChatRoomByRequestId(args.requestId);
+  if (existingRoom) {
+    return existingRoom;
+  }
+
+  const [requester, giller] = await Promise.all([
+    getUserById(args.requesterId),
+    getUserById(args.gillerId),
+  ]);
+
+  const chatService = createChatService();
+  const createdRoom = await chatService.createChatRoom(
+    {
+      user1: {
+        userId: args.requesterId,
+        name: requester?.name ?? '요청자',
+        profileImage: requester?.profilePhoto,
+      },
+      user2: {
+        userId: args.gillerId,
+        name: giller?.name ?? '길러',
+        profileImage: giller?.profilePhoto,
+      },
+      requestId: args.requestId,
+      requestInfo: args.requestInfo,
+    },
+    'active'
+  );
+
+  return createdRoom;
 }

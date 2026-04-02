@@ -12,7 +12,7 @@ import {
 import { MaterialIcons } from '@expo/vector-icons';
 import { RouteProp, useNavigation, useRoute } from '@react-navigation/native';
 import { Timestamp } from 'firebase/firestore';
-import { getChatRoomByRequestId } from '../../services/chat-service';
+import { ensureChatRoomForRequest, getChatRoomByRequestId } from '../../services/chat-service';
 import { cancelDeliveryFlow, confirmDeliveryByRequester, getDeliveryByRequestId } from '../../services/delivery-service';
 import { requireUserId } from '../../services/firebase';
 import { cancelRequest, getRequestById, increaseRequestBid } from '../../services/request-service';
@@ -56,7 +56,20 @@ export default function RequestDetailScreen() {
 
   async function openChat() {
     try {
-      const room = await getChatRoomByRequestId(requestId);
+      let room = await getChatRoomByRequestId(requestId);
+      if (!room && request?.matchedGillerId && request.requesterId) {
+        room = await ensureChatRoomForRequest({
+          requestId,
+          requesterId: request.requesterId,
+          gillerId: request.matchedGillerId,
+          requestInfo: {
+            from: request.pickupStation.stationName,
+            to: request.deliveryStation.stationName,
+            urgency: request.urgency ?? 'normal',
+          },
+        });
+      }
+
       if (!room) {
         Alert.alert('아직 채팅이 열리지 않았습니다', '매칭이나 미션 확정 뒤에 채팅이 열립니다.');
         return;
@@ -183,7 +196,15 @@ export default function RequestDetailScreen() {
 
                   Alert.alert('배송 취소 완료', completionMessage);
                 } else {
-                  await cancelRequest(request.requestId, userId, 'requester cancelled from 가는길에');
+                  const cancelled = await cancelRequest(
+                    request.requestId,
+                    userId,
+                    'requester cancelled from request detail'
+                  );
+                  if (!cancelled) {
+                    Alert.alert('취소를 진행할 수 없습니다', '요청자 정보가 일치하는지 다시 확인해 주세요.');
+                    return;
+                  }
                   Alert.alert('요청 취소 완료', '요청을 취소했습니다.');
                 }
 
