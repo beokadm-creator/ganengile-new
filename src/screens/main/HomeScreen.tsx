@@ -19,6 +19,8 @@ export default function HomeScreen({ navigation }: { navigation: MainStackNaviga
   const [refreshing, setRefreshing] = useState(false);
 
   const role = canAccessGiller && currentRole === UserRole.GILLER ? 'giller' : 'requester';
+  const isRequesterView = role === 'requester';
+  const isGillerView = role === 'giller';
   const showRoleSwitch =
     canAccessGiller && (user?.role === UserRole.BOTH || user?.role === UserRole.GLER);
 
@@ -71,35 +73,63 @@ export default function HomeScreen({ navigation }: { navigation: MainStackNaviga
         <View style={styles.heroTop}>
           <View style={styles.heroCopy}>
             <Text style={styles.heroKicker}>가는길에</Text>
-            <Text style={styles.heroTitle}>{snapshot?.headline ?? '결정만 하면 되는 배송'}</Text>
+            <Text style={styles.heroTitle}>
+              {snapshot?.headline ?? (isRequesterView ? '배송 요청을 간단하게' : '지금 받을 미션만 빠르게')}
+            </Text>
             <Text style={styles.heroSubtitle}>
-              {snapshot?.subheadline ?? '지금 필요한 흐름만 바로 확인하세요.'}
+              {snapshot?.subheadline ??
+                (isRequesterView
+                  ? '이용자에게 필요한 요청과 진행 상태만 보여드립니다.'
+                  : '길러에게 필요한 미션과 이동 동선만 보여드립니다.')}
             </Text>
           </View>
 
           {showRoleSwitch ? (
             <TouchableOpacity
               style={styles.roleChip}
-              onPress={() => switchRole(role === 'requester' ? UserRole.GILLER : UserRole.GLER)}
+              onPress={() => switchRole(isRequesterView ? UserRole.GILLER : UserRole.GLER)}
             >
               <MaterialIcons name="swap-horiz" size={18} color={Colors.textPrimary} />
-              <Text style={styles.roleChipText}>{role === 'requester' ? '길러 모드' : '요청자 모드'}</Text>
+              <Text style={styles.roleChipText}>
+                {isRequesterView ? '길러 모드' : '이용자 모드'}
+              </Text>
             </TouchableOpacity>
           ) : null}
         </View>
 
         <View style={styles.metricRow}>
-          <MetricCard label="진행 요청" value={`${snapshot?.activeRequestCount ?? 0}`} />
-          <MetricCard label="진행 미션" value={`${snapshot?.activeMissionCount ?? 0}`} />
-          <MetricCard label="정산 예정" value={`${(snapshot?.pendingRewardTotal ?? 0).toLocaleString()}원`} />
+          {isRequesterView ? (
+            <>
+              <MetricCard label="진행 요청" value={`${snapshot?.activeRequestCount ?? 0}`} />
+              <MetricCard label="빠른 실행" value={`${snapshot?.requestCards.length ?? 0}`} />
+              <MetricCard
+                label="사용 가능"
+                value={`${(snapshot?.wallet.withdrawableBalance ?? 0).toLocaleString()}원`}
+              />
+            </>
+          ) : (
+            <>
+              <MetricCard label="진행 미션" value={`${snapshot?.activeMissionCount ?? 0}`} />
+              <MetricCard
+                label="예상 보상"
+                value={`${(snapshot?.pendingRewardTotal ?? 0).toLocaleString()}원`}
+              />
+              <MetricCard
+                label="출금 가능"
+                value={`${(snapshot?.wallet.withdrawableBalance ?? 0).toLocaleString()}원`}
+              />
+            </>
+          )}
         </View>
 
         <View style={styles.strategyPanel}>
-          <Text style={styles.strategyKicker}>{role === 'requester' ? '지금 필요한 선택' : '지금 확인할 미션'}</Text>
+          <Text style={styles.strategyKicker}>
+            {isRequesterView ? '이용자 홈' : '길러 홈'}
+          </Text>
           <Text style={styles.strategyTitle}>
-            {role === 'requester'
-              ? '급하면 바로, 아니면 예약으로.'
-              : '받을 미션만 빠르게 확인하세요.'}
+            {isRequesterView
+              ? '요청, 예약, 진행 상태만 보이도록 정리했습니다.'
+              : '미션, 보상, 이동 동선만 보이도록 정리했습니다.'}
           </Text>
         </View>
       </View>
@@ -107,12 +137,38 @@ export default function HomeScreen({ navigation }: { navigation: MainStackNaviga
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>빠른 실행</Text>
         <View style={styles.actionGrid}>
-          <ActionCard
-            icon="add-box"
-            title="배송 요청 만들기"
-            subtitle="바로 요청"
-            onPress={() => navigation.navigate('CreateRequest')}
-          />
+          {isRequesterView ? (
+            <>
+              <ActionCard
+                icon="add-box"
+                title="배송 요청 만들기"
+                subtitle="즉시 요청"
+                onPress={() => navigation.navigate('CreateRequest')}
+              />
+              <ActionCard
+                icon="schedule-send"
+                title="예약 요청 만들기"
+                subtitle="예약 접수"
+                onPress={() => navigation.navigate('CreateRequest', { mode: 'reservation' })}
+              />
+            </>
+          ) : (
+            <>
+              <ActionCard
+                icon="pedal-bike"
+                title="미션 보드 보기"
+                subtitle="받을 미션 확인"
+                onPress={() => navigation.navigate('Tabs', { screen: 'GillerRequests' })}
+              />
+              <ActionCard
+                icon="alt-route"
+                title="경로 관리"
+                subtitle="이동 동선 설정"
+                onPress={() => navigation.navigate('Tabs', { screen: 'RouteManagement' })}
+              />
+            </>
+          )}
+
           <ActionCard
             icon="chat"
             title="채팅 보기"
@@ -122,24 +178,9 @@ export default function HomeScreen({ navigation }: { navigation: MainStackNaviga
           <ActionCard
             icon="account-balance-wallet"
             title="지갑 보기"
-            subtitle="잔액 확인"
+            subtitle="포인트 확인"
             onPress={() => navigation.navigate('PointHistory')}
           />
-          {role === 'giller' ? (
-            <ActionCard
-              icon="alt-route"
-              title="미션 보드 열기"
-              subtitle="미션 확인"
-              onPress={() => navigation.navigate('Tabs', { screen: 'GillerRequests' })}
-            />
-          ) : (
-            <ActionCard
-              icon="schedule-send"
-              title="예약 요청 만들기"
-              subtitle="예약 접수"
-              onPress={() => navigation.navigate('CreateRequest', { mode: 'reservation' })}
-            />
-          )}
         </View>
       </View>
 
@@ -156,46 +197,51 @@ export default function HomeScreen({ navigation }: { navigation: MainStackNaviga
             <View style={styles.recommendationRow}>
               <MaterialIcons name="two-wheeler" size={18} color={Colors.primary} />
               <Text style={styles.recommendationText}>
-                길러를 해보려면 프로필에서 본인인증 후 신청을 진행해보세요.
+                길러 활동을 원하시면 프로필에서 본인인증과 승인 상태를 먼저 확인해 주세요.
               </Text>
             </View>
           ) : null}
         </View>
       </View>
 
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>요청</Text>
-        {(snapshot?.requestCards ?? []).length ? (
-          snapshot?.requestCards.map((card) => (
-            <TouchableOpacity
-              key={card.id}
-              style={styles.boardCard}
-              onPress={() => navigation.navigate('RequestDetail', { requestId: card.id })}
-            >
-              <View style={styles.boardHeader}>
-                <Text style={styles.boardTitle}>{card.title}</Text>
-                <View style={styles.boardHeaderRight}>
-                  <ModeBadge label={card.modeLabel} />
-                  <StatusPill label={card.status} tone="request" />
-                </View>
-              </View>
-              <Text style={styles.boardBody}>{card.detail}</Text>
-              <Text style={styles.boardMeta}>{card.etaLabel}</Text>
-
-              <View style={styles.strategyCard}>
-                <Text style={styles.strategyCardTitle}>{card.strategyTitle}</Text>
-                <Text style={styles.strategyCardBody}>{card.strategyBody}</Text>
-              </View>
-            </TouchableOpacity>
-          ))
-        ) : (
-          <EmptyCard title="진행 중인 요청이 없습니다" subtitle="필요한 배송이 생기면 새 요청부터 시작하세요." />
-        )}
-      </View>
-
-      {canAccessGiller ? (
+      {isRequesterView ? (
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>미션</Text>
+          <Text style={styles.sectionTitle}>내 요청</Text>
+          {(snapshot?.requestCards ?? []).length ? (
+            snapshot?.requestCards.map((card) => (
+              <TouchableOpacity
+                key={card.id}
+                style={styles.boardCard}
+                onPress={() => navigation.navigate('RequestDetail', { requestId: card.id })}
+              >
+                <View style={styles.boardHeader}>
+                  <Text style={styles.boardTitle}>{card.title}</Text>
+                  <View style={styles.boardHeaderRight}>
+                    <ModeBadge label={card.modeLabel} />
+                    <StatusPill label={card.status} tone="request" />
+                  </View>
+                </View>
+                <Text style={styles.boardBody}>{card.detail}</Text>
+                <Text style={styles.boardMeta}>{card.etaLabel}</Text>
+
+                <View style={styles.strategyCard}>
+                  <Text style={styles.strategyCardTitle}>{card.strategyTitle}</Text>
+                  <Text style={styles.strategyCardBody}>{card.strategyBody}</Text>
+                </View>
+              </TouchableOpacity>
+            ))
+          ) : (
+            <EmptyCard
+              title="진행 중인 요청이 없습니다"
+              subtitle="필요한 배송이 생기면 새 요청으로 바로 시작할 수 있습니다."
+            />
+          )}
+        </View>
+      ) : null}
+
+      {isGillerView ? (
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>내 미션</Text>
           {(snapshot?.missionCards ?? []).length ? (
             snapshot?.missionCards.map((card) => (
               <TouchableOpacity
@@ -218,8 +264,8 @@ export default function HomeScreen({ navigation }: { navigation: MainStackNaviga
             ))
           ) : (
             <EmptyCard
-              title="지금 받을 수 있는 미션이 없습니다"
-              subtitle="조건에 맞는 미션이 생기면 여기에서 바로 확인할 수 있습니다."
+              title="지금 바로 받을 수 있는 미션이 없습니다"
+              subtitle="조건에 맞는 미션이 올라오면 여기에서 바로 확인할 수 있습니다."
             />
           )}
         </View>
@@ -305,7 +351,9 @@ function WalletRow({ label, value, strong }: { label: string; value: number; str
   return (
     <View style={styles.walletRow}>
       <Text style={[styles.walletLabel, strong && styles.walletLabelStrong]}>{label}</Text>
-      <Text style={[styles.walletValue, strong && styles.walletValueStrong]}>{value.toLocaleString()}원</Text>
+      <Text style={[styles.walletValue, strong && styles.walletValueStrong]}>
+        {value.toLocaleString()}원
+      </Text>
     </View>
   );
 }
@@ -399,7 +447,7 @@ const styles = StyleSheet.create({
   },
   metricValue: {
     color: Colors.textPrimary,
-    fontSize: Typography.fontSize['2xl'],
+    fontSize: Typography.fontSize.lg,
     fontWeight: '800',
   },
   strategyPanel: {
@@ -419,11 +467,6 @@ const styles = StyleSheet.create({
     fontSize: Typography.fontSize.lg,
     fontWeight: '800',
     lineHeight: 24,
-  },
-  strategyBody: {
-    color: Colors.textSecondary,
-    fontSize: Typography.fontSize.sm,
-    lineHeight: 21,
   },
   section: {
     gap: Spacing.md,

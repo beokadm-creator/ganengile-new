@@ -12,6 +12,7 @@ import {
 } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { RouteProp, useRoute } from '@react-navigation/native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { createChatService } from '../../services/chat-service';
 import { getBeta1ChatContext, type Beta1ChatContext } from '../../services/beta1-orchestration-service';
@@ -25,6 +26,7 @@ type ChatRoute = RouteProp<MainStackParamList, 'Chat'>;
 export default function ChatScreen() {
   const route = useRoute<ChatRoute>();
   const { user, loading: userLoading } = useUser();
+  const insets = useSafeAreaInsets();
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [context, setContext] = useState<Beta1ChatContext | null>(null);
   const [loading, setLoading] = useState(true);
@@ -106,7 +108,11 @@ export default function ChatScreen() {
   }
 
   return (
-    <KeyboardAvoidingView style={styles.container} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+    <KeyboardAvoidingView
+      style={styles.container}
+      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      keyboardVerticalOffset={Platform.OS === 'ios' ? 88 : 0}
+    >
       <View style={styles.topPanel}>
         <Text style={styles.chatTitle}>{context?.title ?? route.params.otherUserName}</Text>
         <Text style={styles.chatSubtitle}>
@@ -120,14 +126,14 @@ export default function ChatScreen() {
           </View>
 
           <View style={styles.metaRow}>
-            <StatusBadge label={`공개 수준 ${context?.recipientRevealLevel ?? 'minimal'}`} />
+            <StatusBadge label={`공개 범위 ${context?.recipientRevealLevel ?? 'minimal'}`} />
             {context?.currentDeliveryStatus ? (
               <StatusBadge label={`상태 ${context.currentDeliveryStatus}`} />
             ) : null}
           </View>
 
           <Text style={styles.contextRecipient}>
-            {context?.recipientSummary ?? '수령인 정보는 필요한 범위까지만 공개됩니다.'}
+            {context?.recipientSummary ?? '수령인 정보는 필요한 시점에만 최소 범위로 공개됩니다.'}
           </Text>
 
           {(context?.trustSummary ?? []).map((item) => (
@@ -165,24 +171,29 @@ export default function ChatScreen() {
         onContentSizeChange={() => flatListRef.current?.scrollToEnd({ animated: false })}
       />
 
-      <View style={styles.inputBar}>
-        <TextInput
-          style={styles.input}
-          value={input}
-          onChangeText={setInput}
-          placeholder="메시지를 입력해 주세요"
-          placeholderTextColor={Colors.textTertiary}
-          multiline
-        />
-        <TouchableOpacity
-          style={[styles.sendButton, (!input.trim() || sending) && styles.sendButtonDisabled]}
-          onPress={() => {
-            void sendMessage();
-          }}
-          disabled={sending || !input.trim()}
-        >
-          <MaterialIcons name="north-east" size={18} color={Colors.white} />
-        </TouchableOpacity>
+      <View style={[styles.inputBar, { paddingBottom: Math.max(insets.bottom, Spacing.md) }]}>
+        <View style={styles.composer}>
+          <TextInput
+            style={styles.input}
+            value={input}
+            onChangeText={setInput}
+            placeholder="메시지를 입력해 주세요"
+            placeholderTextColor={Colors.textTertiary}
+            multiline
+            textAlignVertical="top"
+          />
+          <TouchableOpacity
+            style={[styles.sendButton, (!input.trim() || sending) && styles.sendButtonDisabled]}
+            onPress={() => {
+              void sendMessage();
+            }}
+            disabled={sending || !input.trim()}
+            activeOpacity={0.85}
+          >
+            <MaterialIcons name="send" size={18} color={Colors.white} />
+            <Text style={styles.sendButtonText}>보내기</Text>
+          </TouchableOpacity>
+        </View>
       </View>
     </KeyboardAvoidingView>
   );
@@ -330,34 +341,50 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
   },
   inputBar: {
-    flexDirection: 'row',
-    gap: 10,
-    alignItems: 'flex-end',
-    padding: Spacing.md,
+    paddingHorizontal: Spacing.md,
+    paddingTop: Spacing.sm,
     backgroundColor: Colors.surface,
     borderTopWidth: 1,
     borderTopColor: Colors.border,
   },
+  composer: {
+    flexDirection: 'row',
+    alignItems: 'flex-end',
+    gap: 8,
+    backgroundColor: Colors.gray100,
+    borderRadius: BorderRadius.xl,
+    paddingLeft: 6,
+    paddingRight: 6,
+    paddingTop: 6,
+    paddingBottom: 6,
+  },
   input: {
     flex: 1,
     minHeight: 48,
-    maxHeight: 120,
-    backgroundColor: Colors.gray100,
-    borderRadius: BorderRadius.xl,
+    maxHeight: 132,
     paddingHorizontal: 14,
-    paddingVertical: 12,
+    paddingTop: 12,
+    paddingBottom: 12,
     color: Colors.textPrimary,
   },
   sendButton: {
-    width: 44,
+    minWidth: 72,
     height: 44,
     borderRadius: BorderRadius.full,
     backgroundColor: Colors.primary,
     alignItems: 'center',
     justifyContent: 'center',
+    flexDirection: 'row',
+    gap: 4,
+    paddingHorizontal: 14,
   },
   sendButtonDisabled: {
     opacity: 0.45,
+  },
+  sendButtonText: {
+    color: Colors.white,
+    fontSize: Typography.fontSize.sm,
+    fontWeight: '800',
   },
   loaderWrap: {
     flex: 1,
