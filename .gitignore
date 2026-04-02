@@ -9,10 +9,15 @@ yarn-error.log*
 .expo/
 .expo-shared/
 dist/
+dist-web/
 web-build/
 .firebase/
 .playwright-cli/
 .sisyphus/evidence/
+
+# Generated artifacts
+coverage/
+startup_err.txt
 
 # Native
 *.orig.*
