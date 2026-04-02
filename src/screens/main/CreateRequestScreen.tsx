@@ -897,6 +897,20 @@ export default function CreateRequestScreen({ navigation, route }: Props) {
                 <Text style={styles.muted}>{card.etaLabel}</Text>
               </View>
             </View>
+            <View style={styles.quoteBreakdown}>
+              <QuoteBreakdownRow label="기본요금" value={card.pricing.baseFee} />
+              <QuoteBreakdownRow label="거리요금" value={card.pricing.distanceFee} />
+              <QuoteBreakdownRow label="무게요금" value={card.pricing.weightFee} />
+              <QuoteBreakdownRow label="크기요금" value={card.pricing.sizeFee} />
+              <QuoteBreakdownRow label="긴급가산" value={card.pricing.urgencySurcharge} />
+              <QuoteBreakdownRow label="주소픽업" value={card.pricing.addressPickupFee} />
+              <QuoteBreakdownRow label="주소도착" value={card.pricing.addressDropoffFee} />
+              <QuoteBreakdownRow label="사물함" value={card.pricing.lockerFee} />
+              <QuoteBreakdownRow label="서비스수수료" value={card.pricing.serviceFee} />
+              <QuoteBreakdownRow label="부가세" value={card.pricing.vat} />
+              <View style={styles.quoteDivider} />
+              <QuoteBreakdownRow label="예상금액 합계" value={card.pricing.publicPrice} strong />
+            </View>
           </TouchableOpacity>
         ))}
 
@@ -995,6 +1009,25 @@ function AddressQuickPick({
           </TouchableOpacity>
         ))}
       </ScrollView>
+    </View>
+  );
+}
+
+function QuoteBreakdownRow({
+  label,
+  value,
+  strong,
+}: {
+  label: string;
+  value: number;
+  strong?: boolean;
+}) {
+  return (
+    <View style={styles.quoteBreakdownRow}>
+      <Text style={[styles.quoteBreakdownLabel, strong && styles.quoteBreakdownLabelStrong]}>{label}</Text>
+      <Text style={[styles.quoteBreakdownValue, strong && styles.quoteBreakdownValueStrong]}>
+        {value.toLocaleString()}원
+      </Text>
     </View>
   );
 }
@@ -1173,6 +1206,41 @@ const styles = StyleSheet.create({
   quotePrice: {
     color: Colors.textPrimary,
     fontWeight: '800',
+  },
+  quoteBreakdown: {
+    marginTop: Spacing.md,
+    paddingTop: Spacing.md,
+    borderTopWidth: 1,
+    borderTopColor: Colors.border,
+    gap: 6,
+  },
+  quoteBreakdownRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 12,
+  },
+  quoteBreakdownLabel: {
+    color: Colors.textSecondary,
+    fontSize: Typography.fontSize.sm,
+  },
+  quoteBreakdownLabelStrong: {
+    color: Colors.textPrimary,
+    fontWeight: '800',
+  },
+  quoteBreakdownValue: {
+    color: Colors.textPrimary,
+    fontSize: Typography.fontSize.sm,
+    fontWeight: '700',
+  },
+  quoteBreakdownValueStrong: {
+    color: Colors.primary,
+    fontSize: Typography.fontSize.base,
+  },
+  quoteDivider: {
+    height: 1,
+    backgroundColor: Colors.border,
+    marginVertical: 4,
   },
   modalBackdrop: {
     flex: 1,
