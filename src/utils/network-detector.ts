@@ -321,8 +321,8 @@ export function getNetworkStatusText(state: NetworkState): string {
 /**
  * 네트워크 품질 확인
  */
-export async function getNetworkQuality(): Promise<'good' | 'poor' | 'offline'> {
-  const state = await getNetworkState();
+export function getNetworkQuality(): 'good' | 'poor' | 'offline' {
+  const state = getNetworkState();
 
   if (!state.isOnline) return 'offline';
   if (state.strength === 'good') return 'good';

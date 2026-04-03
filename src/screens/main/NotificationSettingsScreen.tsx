@@ -17,7 +17,7 @@ import type { MainStackNavigationProp } from '../../types/navigation';
 import { createNotificationService } from '../../services/notification-service';
 import { NotificationType } from '../../types/chat';
 import type { NotificationSettings } from '../../types/chat';
-import { Colors, Spacing, Typography, BorderRadius } from '../../theme';
+import { Colors, Spacing, Typography } from '../../theme';
 
 type Props = {
   navigation: MainStackNavigationProp;

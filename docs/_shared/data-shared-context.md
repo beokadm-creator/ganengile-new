@@ -1,4 +1,4 @@
-﻿# Data Shared Context
+# Data Shared Context
 
 `precedence`: 84  
 `required-for`: reference-data, station-data  

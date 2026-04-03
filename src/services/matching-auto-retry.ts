@@ -5,7 +5,7 @@
 
 import { updateDoc, doc } from 'firebase/firestore';
 import { db } from './firebase';
-import { findMatchesForRequest, createMatchDocument } from './matching-service';
+import { findMatchesForRequest } from './matching-service';
 
 /**
  * 매칭 자동 재시도 함수
@@ -19,7 +19,7 @@ export async function retryMatchingWithBackoff(
   maxRetries: number = 3,
   baseDelay: number = 2000
 ): Promise<{ success: boolean; attempts: number; foundMatches: number }> {
-  let lastError: Error | null = null;
+  let _lastError: Error | null = null;
 
   for (let attempt = 0; attempt < maxRetries; attempt++) {
     try {
@@ -53,7 +53,7 @@ export async function retryMatchingWithBackoff(
       await new Promise(resolve => setTimeout(resolve, baseDelay * Math.pow(2, attempt)));
 
     } catch (error: any) {
-      lastError = error;
+      _lastError = error;
       console.error(`❌ 매칭 재시도 ${attempt + 1} 실패:`, error.message);
 
       // 마지막 시도가 아니면 계속
@@ -130,7 +130,7 @@ export function cancelAutoRetry(timeoutId: NodeJS.Timeout): void {
 export function startMatchingStatusMonitor(intervalMs: number = 60000): NodeJS.Timeout {
   console.log(`🔍 매칭 상태 모니터링 시작 (${intervalMs}ms 간격)`);
 
-  const intervalId = setInterval(async () => {
+  const intervalId = setInterval(() => {
     try {
       // TODO: Firestore에서 매칭되지 않은 요청 조회
       // const q = query(

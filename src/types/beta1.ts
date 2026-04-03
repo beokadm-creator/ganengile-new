@@ -329,6 +329,18 @@ export interface MissionBundle {
   missionIds: string[];
   status: MissionBundleStatus;
   strategy: 'single_actor' | 'multi_actor' | 'locker_assisted' | 'partner_fallback';
+  bundleType?: 'single_leg' | 'contiguous_range';
+  startSequence?: number;
+  endSequence?: number;
+  title?: string;
+  summary?: string;
+  windowLabel?: string;
+  rewardTotal?: number;
+  recommendedActorType?: ActorSelectionActorType;
+  candidateGillerUserIds?: string[];
+  selectedGillerUserId?: string;
+  requiresExternalPartner?: boolean;
+  fallbackDeliveryIds?: string[];
   createdAt: Timestamp;
   updatedAt: Timestamp;
 }

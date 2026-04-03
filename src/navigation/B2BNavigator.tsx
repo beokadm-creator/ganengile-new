@@ -1,7 +1,8 @@
-﻿/**
+/**
  * B2B Navigator
  * Stack navigator for B2B (business) screens
- * 湲곗뾽 怨좉컼 ?꾩슜 ?ㅻ퉬寃뚯씠?? */
+ * 기업 고객 전용 네비게이터
+ */
 
 import React from 'react';
 import { createStackNavigator } from '@react-navigation/stack';
@@ -9,7 +10,7 @@ import { View, StyleSheet } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import type { B2BStackParamList } from '../types/navigation';
 
-// B2B Screens
+// B2B screens
 import B2BDashboardScreen from '../screens/b2b/B2BDashboardScreen';
 import B2BRequestScreen from '../screens/b2b/B2BRequestScreen';
 import B2BGillerScreen from '../screens/b2b/B2BGillerScreen';

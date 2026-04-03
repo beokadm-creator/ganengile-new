@@ -1,5 +1,4 @@
 import { Timestamp } from 'firebase/firestore';
-import type { StationInfo } from '../types/request';
 import type {
   LocationRef,
   PricingQuote,
@@ -11,10 +10,32 @@ import {
   RequestDraftStatus,
 } from '../types/beta1';
 
+export interface LegacyStationInfo {
+  id?: string;
+  stationId: string;
+  stationName: string;
+  line?: string;
+  lineCode?: string;
+  lat: number;
+  lng: number;
+}
+
+type LegacyFeeBreakdown = {
+  baseFee: number;
+  distanceFee: number;
+  weightFee: number;
+  sizeFee: number;
+  urgencySurcharge: number;
+  publicFare?: number;
+  serviceFee: number;
+  vat: number;
+  totalFee: number;
+};
+
 export interface LegacyCreateRequestDraftInput {
   requesterUserId: string;
-  pickupStation?: StationInfo | null;
-  deliveryStation?: StationInfo | null;
+  pickupStation?: LegacyStationInfo | null;
+  deliveryStation?: LegacyStationInfo | null;
   selectedPhotoIds?: string[];
   itemName?: string;
   category?: string;
@@ -26,6 +47,13 @@ export interface LegacyCreateRequestDraftInput {
   isPerishable?: boolean;
   recipientName?: string;
   recipientPhone?: string;
+}
+
+export interface LegacyRequestPricingInput {
+  requesterId: string;
+  itemValue?: number;
+  feeBreakdown?: LegacyFeeBreakdown;
+  fee?: LegacyFeeBreakdown;
 }
 
 export interface LegacyFeePreviewInput {
@@ -51,7 +79,7 @@ export interface LegacyFeePreviewInput {
   includesAddressDropoff?: boolean;
 }
 
-function mapStationToLocationRef(station?: StationInfo | null): LocationRef {
+export function mapLegacyStationToLocationRef(station?: LegacyStationInfo | null): LocationRef {
   if (!station) {
     return { type: 'station' };
   }
@@ -71,8 +99,8 @@ export function buildRequestDraftFromLegacyInput(
     requesterUserId: input.requesterUserId,
     originType: 'station',
     destinationType: 'station',
-    originRef: mapStationToLocationRef(input.pickupStation),
-    destinationRef: mapStationToLocationRef(input.deliveryStation),
+    originRef: mapLegacyStationToLocationRef(input.pickupStation),
+    destinationRef: mapLegacyStationToLocationRef(input.deliveryStation),
     selectedPhotoIds: input.selectedPhotoIds ?? [],
     packageDraft: {
       itemName: input.itemName,
@@ -127,4 +155,32 @@ export function buildPricingQuoteFromLegacyFee(
     createdAt: Timestamp.now(),
     updatedAt: Timestamp.now(),
   };
+}
+
+export function buildPricingQuoteFromLegacyRequest(
+  input: LegacyRequestPricingInput,
+  requestDraftId: string
+): Omit<PricingQuote, 'pricingQuoteId'> {
+  const fee = input.fee ?? input.feeBreakdown;
+
+  if (!fee) {
+    throw new Error('Fee is required to create a pricing quote.');
+  }
+
+  return buildPricingQuoteFromLegacyFee({
+    requestDraftId,
+    requesterUserId: input.requesterId,
+    publicPrice: fee.totalFee,
+    depositAmount: input.itemValue ? Math.round(input.itemValue) : 0,
+    baseFee: fee.baseFee,
+    distanceFee: fee.distanceFee,
+    weightFee: fee.weightFee,
+    sizeFee: fee.sizeFee,
+    urgencySurcharge: fee.urgencySurcharge,
+    publicFare: fee.publicFare,
+    serviceFee: fee.serviceFee,
+    vat: fee.vat,
+    speedLabel: 'Balanced',
+    includesAddressDropoff: true,
+  });
 }

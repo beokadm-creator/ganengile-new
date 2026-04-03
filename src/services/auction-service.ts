@@ -50,8 +50,10 @@ export async function createAuction(data: CreateAuctionData): Promise<Auction> {
   const auctionData: Omit<Auction, 'auctionId'> = {
     auctionType: AuctionType.REVERSE_AUCTION,
     requestId: data.requestId,
-    gllerId: data.gllerId,
-    gllerName: data.gllerName,
+    requesterId: data.requesterId,
+    requesterName: data.requesterName,
+    gllerId: data.requesterId,
+    gllerName: data.requesterName,
     pickupStation: data.pickupStation,
     deliveryStation: data.deliveryStation,
     packageSize: data.packageSize,
@@ -90,7 +92,7 @@ export async function createAuction(data: CreateAuctionData): Promise<Auction> {
 }
 
 export async function placeBid(data: CreateBidData): Promise<Bid> {
-  const { auctionId, gllerId, gllerName, bidAmount, message } = data;
+  const { auctionId, bidderId, bidderName, bidAmount, message } = data;
 
   return await runTransaction(db, async (transaction) => {
     const auctionRef = doc(db, AUCTION_COLLECTIONS.AUCTIONS, auctionId);
@@ -106,7 +108,7 @@ export async function placeBid(data: CreateBidData): Promise<Bid> {
       throw new Error('진행 중인 경매에만 입찰할 수 있습니다.');
     }
 
-    if (auction.gllerId === gllerId) {
+    if ((auction.requesterId ?? auction.gllerId) === bidderId) {
       throw new Error('자신의 경매에 입찰할 수 없습니다.');
     }
 
@@ -124,8 +126,10 @@ export async function placeBid(data: CreateBidData): Promise<Bid> {
 
     const bidData: Omit<Bid, 'bidId'> = {
       auctionId,
-      gllerId,
-      gllerName,
+      bidderId,
+      bidderName,
+      gllerId: bidderId,
+      gllerName: bidderName,
       bidAmount,
       message,
       status: BidStatus.PENDING,
@@ -147,8 +151,8 @@ export async function placeBid(data: CreateBidData): Promise<Bid> {
 
     const updateData: Partial<Auction> = {
       currentHighestBid: bidAmount,
-      currentHighestBidderId: gllerId,
-      currentHighestBidderName: gllerName,
+      currentHighestBidderId: bidderId,
+      currentHighestBidderName: bidderName,
       totalBids: auction.totalBids + 1,
       endsAt: newEndsAt,
       updatedAt: serverTimestamp() as Timestamp,
@@ -202,7 +206,7 @@ export async function closeAuction(auctionId: string): Promise<Auction> {
 
       bidsSnapshot.forEach((bidDoc) => {
         const bidData = bidDoc.data();
-        const newStatus = bidData.gllerId === auction.currentHighestBidderId
+        const newStatus = (bidData.bidderId ?? bidData.gllerId) === auction.currentHighestBidderId
           ? BidStatus.WON
           : BidStatus.LOST;
 
@@ -220,7 +224,7 @@ export async function closeAuction(auctionId: string): Promise<Auction> {
   });
 }
 
-export async function cancelAuction(auctionId: string, reason?: string): Promise<Auction> {
+export async function cancelAuction(auctionId: string, _reason?: string): Promise<Auction> {
   const auctionRef = doc(db, AUCTION_COLLECTIONS.AUCTIONS, auctionId);
   const auctionDoc = await getDoc(auctionRef);
 
@@ -335,10 +339,10 @@ export async function getActiveAuctions(options?: AuctionFilterOptions): Promise
   return auctions;
 }
 
-export async function getAuctionsByGller(gllerId: string): Promise<Auction[]> {
+export async function getAuctionsByRequester(requesterId: string): Promise<Auction[]> {
   const q = query(
     collection(db, AUCTION_COLLECTIONS.AUCTIONS),
-    where('gllerId', '==', gllerId),
+    where('requesterId', '==', requesterId),
     orderBy('createdAt', 'desc')
   );
 
@@ -355,10 +359,10 @@ export async function getAuctionsByGller(gllerId: string): Promise<Auction[]> {
   return auctions;
 }
 
-export async function getBidsByGller(gllerId: string): Promise<(Bid & { auction?: Auction })[]> {
+export async function getBidsByBidder(bidderId: string): Promise<(Bid & { auction?: Auction })[]> {
   const q = query(
     collection(db, AUCTION_COLLECTIONS.BIDS),
-    where('gllerId', '==', gllerId),
+    where('bidderId', '==', bidderId),
     orderBy('createdAt', 'desc')
   );
 
@@ -398,7 +402,7 @@ export async function getAuctionBids(auctionId: string): Promise<Bid[]> {
   return bids;
 }
 
-export function toAuctionListItem(auction: Auction, userId?: string): AuctionListItem {
+export function toAuctionListItem(auction: Auction, _userId?: string): AuctionListItem {
   const now = new Date();
   const endsAt = auction.endsAt.toDate();
   const remainingMs = Math.max(0, endsAt.getTime() - now.getTime());
@@ -414,14 +418,14 @@ export function toAuctionListItem(auction: Auction, userId?: string): AuctionLis
     totalBids: auction.totalBids,
     status: auction.status,
     packageSize: auction.packageSize,
-    gllerName: auction.gllerName,
+    requesterName: auction.requesterName ?? auction.gllerName ?? '',
     createdAt: auction.createdAt,
     endsAt: auction.endsAt,
   };
 }
 
 function validateAuctionData(data: CreateAuctionData): void {
-  if (!data.gllerId) {
+  if (!data.requesterId) {
     throw new Error('요청자 ID가 필요합니다.');
   }
 
@@ -442,7 +446,7 @@ function validateAuctionData(data: CreateAuctionData): void {
   }
 }
 
-export async function getAuctionStatistics(gllerId?: string): Promise<{
+export async function getAuctionStatistics(requesterId?: string): Promise<{
   totalAuctions: number;
   activeAuctions: number;
   completedAuctions: number;
@@ -452,8 +456,8 @@ export async function getAuctionStatistics(gllerId?: string): Promise<{
 }> {
   let q = query(collection(db, AUCTION_COLLECTIONS.AUCTIONS));
 
-  if (gllerId) {
-    q = query(q, where('gllerId', '==', gllerId));
+  if (requesterId) {
+    q = query(q, where('requesterId', '==', requesterId));
   }
 
   const snapshot = await getDocs(q);
@@ -496,8 +500,8 @@ const auctionService = {
   subscribeToAuctionBids,
   getAuctionById,
   getActiveAuctions,
-  getAuctionsByGller,
-  getBidsByGller,
+  getAuctionsByRequester,
+  getBidsByBidder,
   getAuctionBids,
   toAuctionListItem,
   getAuctionStatistics,

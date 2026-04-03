@@ -81,7 +81,9 @@ export interface TransferRoute {
 export interface DeliveryRequestP1 {
   // 기존 필드
   requestId: string;
-  gllerId: string;
+  requesterId: string;
+  /** @deprecated Use requesterId */
+  gllerId?: string;
   pickupStation: StationInfo;
   deliveryStation: StationInfo;
   status: string;

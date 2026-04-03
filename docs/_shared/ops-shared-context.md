@@ -1,4 +1,4 @@
-﻿# Ops Shared Context
+# Ops Shared Context
 
 `precedence`: 86  
 `required-for`: deploy, env, ops-check  

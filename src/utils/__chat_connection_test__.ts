@@ -78,7 +78,7 @@ export async function testNetworkConnection(): Promise<boolean> {
     console.log('📡 네트워크 타입:', state.type);
     
     return state.isConnected === true;
-  } catch (_error) {
+  } catch {
     console.warn('⚠️ NetInfo를 사용할 수 없음');
     return true; // NetInfo가 없으면 연결된 것으로 가정
   }

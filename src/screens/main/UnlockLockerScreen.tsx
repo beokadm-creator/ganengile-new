@@ -139,6 +139,7 @@ export default function UnlockLockerScreen() {
             navigation.navigate('Rating', {
               deliveryId,
               gillerId: reservation.userId,
+              requesterId: reservation.userId,
               gllerId: reservation.userId,
             }),
         },

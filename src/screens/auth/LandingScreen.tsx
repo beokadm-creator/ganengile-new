@@ -1,6 +1,6 @@
-﻿import React from 'react';
+import React from 'react';
 import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
-import { Colors, Typography, Spacing, BorderRadius, Shadows } from '../../theme';
+import { Colors } from '../../theme';
 
 import type { LandingScreenProps } from '../../types/navigation';
 

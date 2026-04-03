@@ -19,7 +19,7 @@ const DEPOSITS_COLLECTION = 'deposits';
 export class DepositService {
   static async payDeposit(
     gillerId: string,
-    gllerId: string,
+    requesterId: string,
     requestId: string,
     itemValue: number
   ): Promise<{
@@ -63,7 +63,7 @@ export class DepositService {
       const depositPayload: Deposit = {
         depositId: '',
         userId: gillerId,
-        gllerId,
+        gllerId: requesterId,
         requestId,
         itemValue,
         depositAmount,

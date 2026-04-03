@@ -19,8 +19,7 @@ import {
   onSnapshot,
 } from 'firebase/firestore';
 import { db } from './firebase';
-import { bootstrapAcceptedDeliveryPlan } from './beta1-engine-service';
-import { bundleMissionsForDelivery, persistActorSelectionDecision } from './beta1-orchestration-service';
+import { persistActorSelectionDecision, syncDeliveryToBeta1Execution } from './beta1-orchestration-service';
 import { planMissionExecutionWithAI } from './beta1-ai-service';
 import { uploadPickupPhoto, uploadDeliveryPhoto } from './storage-service';
 import { DepositService } from './DepositService';
@@ -278,16 +277,7 @@ export async function gillerAcceptRequest(
     };
 
     const deliveryRef = await addDoc(collection(db, 'deliveries'), deliveryData);
-    await bootstrapAcceptedDeliveryPlan({
-      deliveryId: deliveryRef.id,
-      requestId,
-      requesterUserId: request.requesterId || request.gllerId,
-      assignedGillerUserId: gillerId,
-      pickupStation: request.pickupStation,
-      deliveryStation: request.deliveryStation,
-      deadline: request.deadline?.toDate?.() || request.deadline,
-      currentReward: confirmedFee?.breakdown?.gillerFee || confirmedFee?.totalFee,
-    });
+    await syncDeliveryToBeta1Execution(deliveryRef.id);
     const missionPlan = await planMissionExecutionWithAI({
       requestId,
       deliveryId: deliveryRef.id,
@@ -315,8 +305,6 @@ export async function gillerAcceptRequest(
       manualReviewRequired: missionPlan?.actorSelection.manualReviewRequired ?? false,
       riskFlags: missionPlan?.actorSelection.riskFlags ?? [],
     });
-    await bundleMissionsForDelivery(deliveryRef.id).catch(() => []);
-
     // Update request status + fee snapshot (delivery 생성 성공 후 반영)
     await updateDoc(requestRef, {
       status: 'accepted',
@@ -1266,7 +1254,16 @@ export function subscribeToDeliveryByRequestId(
       }
     },
     (error) => {
-      console.error('Error subscribing to delivery:', error);
+      const code =
+        typeof error === 'object' && error != null && 'code' in error
+          ? String((error as { code?: unknown }).code ?? '')
+          : '';
+
+      if (code === 'permission-denied' || code === 'firestore/permission-denied') {
+        console.warn('Delivery subscription denied by Firestore rules.');
+      } else {
+        console.error('Error subscribing to delivery:', error);
+      }
       callback(null);
     }
   );

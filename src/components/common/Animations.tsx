@@ -3,7 +3,7 @@
  * 재사용 가능한 애니메이션 컴포넌트
  */
 
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   View,
   StyleSheet,
@@ -27,7 +27,7 @@ export function FadeIn({
   delay = 0,
   style,
 }: FadeInProps) {
-  const fadeAnim = useRef(new Animated.Value(0)).current;
+  const [fadeAnim] = useState(new Animated.Value(0));
 
   useEffect(() => {
     Animated.timing(fadeAnim, {
@@ -62,7 +62,7 @@ export function SlideUp({
   delay = 0,
   style,
 }: SlideUpProps) {
-  const slideAnim = useRef(new Animated.Value(distance)).current;
+  const [slideAnim] = useState(new Animated.Value(distance));
 
   useEffect(() => {
     Animated.timing(slideAnim, {
@@ -85,19 +85,15 @@ export function SlideUp({
 interface ScaleInProps {
   children: React.ReactNode;
   initialScale?: number;
-  duration?: number;
-  delay?: number;
   style?: StyleProp<ViewStyle>;
 }
 
 export function ScaleIn({
   children,
   initialScale = 0.9,
-  duration = 300,
-  delay = 0,
   style,
 }: ScaleInProps) {
-  const scaleAnim = useRef(new Animated.Value(initialScale)).current;
+  const [scaleAnim] = useState(new Animated.Value(initialScale));
 
   useEffect(() => {
     Animated.spring(scaleAnim, {
@@ -132,12 +128,12 @@ export function StaggerChildren({
   slideUp = false,
   style,
 }: StaggerChildrenProps) {
-  const animations = useRef(
-    children.map(() => ({
+  const [animations] = useState(
+    () => children.map(() => ({
       opacity: new Animated.Value(0),
       translateY: new Animated.Value(slideUp ? 20 : 0),
     }))
-  ).current;
+  );
 
   useEffect(() => {
     const staggerAnimations = children.map((_, index) => {
@@ -201,7 +197,7 @@ export function Pulse({
   duration = 1000,
   style,
 }: PulseProps) {
-  const pulseAnim = useRef(new Animated.Value(1)).current;
+  const [pulseAnim] = useState(new Animated.Value(1));
 
   useEffect(() => {
     const pulse = Animated.loop(
@@ -240,7 +236,7 @@ interface ShimmerProps {
 }
 
 export function Shimmer({ width = '100%', height = 20, style }: ShimmerProps) {
-  const shimmerAnim = useRef(new Animated.Value(-1)).current;
+  const [shimmerAnim] = useState(new Animated.Value(-1));
 
   useEffect(() => {
     Animated.loop(

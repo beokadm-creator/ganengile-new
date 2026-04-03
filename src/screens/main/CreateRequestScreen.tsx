@@ -1,4 +1,4 @@
-﻿import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -24,6 +24,7 @@ import TimePicker from '../../components/common/TimePicker';
 import { OptimizedStationSelectModal } from '../../components/OptimizedStationSelectModal';
 import { useUser } from '../../contexts/UserContext';
 import { analyzeRequestDraftWithAI, type Beta1AIAnalysisResponse } from '../../services/beta1-ai-service';
+import { geocodeRoadAddress } from '../../services/address-geocode-service';
 import { buildBeta1QuoteCards, createBeta1Request, type Beta1QuoteCard } from '../../services/beta1-orchestration-service';
 import {
   getAllStations,
@@ -62,13 +63,6 @@ type Props = {
   navigation: MainStackNavigationProp;
   route?: { params?: MainStackParamList['CreateRequest'] };
 };
-
-const sizeOptions: Array<{ value: PackageSize; label: string }> = [
-  { value: 'small', label: '소형' },
-  { value: 'medium', label: '중형' },
-  { value: 'large', label: '대형' },
-  { value: 'xl', label: '특대형' },
-];
 
 function parseEtaMinutes(label: string): number {
   const matched = label.match(/(\d+)/);
@@ -295,6 +289,7 @@ export default function CreateRequestScreen({ navigation, route }: Props) {
   const [saving, setSaving] = useState(false);
   const [aiLoading, setAiLoading] = useState(false);
   const [resolvingLocation, setResolvingLocation] = useState<PickerType | null>(null);
+  const [resolvingAddressStation, setResolvingAddressStation] = useState<PickerType | null>(null);
 
   const [pickupMode, setPickupMode] = useState<LocationMode>('station');
   const [deliveryMode, setDeliveryMode] = useState<LocationMode>('station');
@@ -315,7 +310,7 @@ export default function CreateRequestScreen({ navigation, route }: Props) {
     params?.mode === 'reservation' ? 'reservation' : 'immediate'
   );
   const [packageItemName, setPackageItemName] = useState('');
-  const [packageCategory, setPackageCategory] = useState('');
+  const [packageCategory, _setPackageCategory] = useState('');
   const [packageDescription, setPackageDescription] = useState(prefill?.packageDescription ?? '');
   const [packageSize, setPackageSize] = useState<PackageSize>(prefill?.packageSize ?? 'small');
   const [weightKg, setWeightKg] = useState(String(prefill?.weightKg ?? 1));
@@ -328,7 +323,7 @@ export default function CreateRequestScreen({ navigation, route }: Props) {
   const [urgency, setUrgency] = useState<'normal' | 'fast' | 'urgent'>(prefill?.urgency ?? 'fast');
   const [preferredPickupDate, setPreferredPickupDate] = useState(prefilledReservation.date);
   const [preferredPickupTime, setPreferredPickupTime] = useState(prefilledReservation.time);
-  const [preferredArrivalTime, setPreferredArrivalTime] = useState(prefill?.preferredArrivalTime ?? '');
+  const [preferredArrivalTime, _setPreferredArrivalTime] = useState(prefill?.preferredArrivalTime ?? '');
   const [reservationCalendarVisible, setReservationCalendarVisible] = useState(false);
   const [selectedQuoteType, setSelectedQuoteType] = useState<Beta1QuoteCard['quoteType']>('balanced');
   const [contactPhoneNumber, setContactPhoneNumber] = useState(
@@ -535,6 +530,67 @@ export default function CreateRequestScreen({ navigation, route }: Props) {
     } finally {
       setResolvingLocation(null);
     }
+  }
+
+  async function handleRecommendStationFromAddress(target: PickerType, roadAddress: string) {
+    const trimmedAddress = roadAddress.trim();
+    if (!trimmedAddress) {
+      Alert.alert('도로명 주소가 필요합니다', '주소를 먼저 선택한 뒤 다시 시도해 주세요.');
+      return;
+    }
+
+    try {
+      setResolvingAddressStation(target);
+      const geocoded = await geocodeRoadAddress(trimmedAddress);
+      if (!geocoded) {
+        Alert.alert(
+          '주소 좌표를 찾지 못했습니다',
+          '이 주소 주변 역을 바로 찾지 못했어요. 다른 주소를 선택하거나 직접 노선을 골라 주세요.'
+        );
+
+        setPickerType(target);
+        setPickerVisible(true);
+        return;
+      }
+
+      const recommendations = buildNearbyRecommendations(geocoded.latitude, geocoded.longitude);
+      if (recommendations.length === 0) {
+        Alert.alert(
+          '주변 역 추천이 없습니다',
+          '직접 노선을 선택할 수 있도록 역 선택 화면을 열어 드릴게요.'
+        );
+
+        setPickerType(target);
+        setPickerVisible(true);
+        return;
+      }
+
+      setNearbyPicker({
+        target,
+        title: target === 'pickup' ? '출발역을 선택해 주세요' : '도착역을 선택해 주세요',
+        description: '입력한 도로명 주소 기준으로 가까운 역을 추천해 드립니다.',
+        recommendations,
+      });
+    } catch (error) {
+      console.error('Failed to resolve nearest station from address', error);
+      Alert.alert(
+        '주소 기반 역 추천 실패',
+        error instanceof Error ? error.message : '잠시 후 다시 시도해 주세요.'
+      );
+    } finally {
+      setResolvingAddressStation(null);
+    }
+  }
+
+  function handleBack() {
+    if (navigation.canGoBack()) {
+      navigation.goBack();
+      return;
+    }
+
+    navigation.navigate('Tabs', {
+      screen: requestMode === 'reservation' ? 'Requests' : 'Home',
+    });
   }
 
   async function handleUploadPhoto() {
@@ -782,7 +838,7 @@ export default function CreateRequestScreen({ navigation, route }: Props) {
 
   return (
     <KeyboardAvoidingView style={styles.container} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-      <AppTopBar title={requestMode === 'reservation' ? '예약 요청' : '배송 요청'} onBack={() => navigation.goBack()} />
+      <AppTopBar title={requestMode === 'reservation' ? '예약 요청' : '배송 요청'} onBack={handleBack} />
 
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
         <Block title="요청 방식">
@@ -805,6 +861,7 @@ export default function CreateRequestScreen({ navigation, route }: Props) {
                 onSelect={(address) => {
                   setPickupRoadAddress(address.roadAddress);
                   setPickupDetailAddress(address.detailAddress);
+                  void handleRecommendStationFromAddress('pickup', address.roadAddress);
                 }}
               />
               <AddressQuickPick
@@ -813,6 +870,7 @@ export default function CreateRequestScreen({ navigation, route }: Props) {
                 onSelect={(address) => {
                   setPickupRoadAddress(address.roadAddress);
                   setPickupDetailAddress(address.detailAddress);
+                  void handleRecommendStationFromAddress('pickup', address.roadAddress);
                 }}
               />
               <TouchableOpacity style={styles.selector} onPress={() => setAddressTarget('pickup')}>
@@ -826,6 +884,19 @@ export default function CreateRequestScreen({ navigation, route }: Props) {
                 placeholder="출발지 상세 주소"
                 placeholderTextColor={Colors.gray400}
               />
+              <TouchableOpacity
+                style={styles.secondaryButton}
+                onPress={() => {
+                  void handleRecommendStationFromAddress('pickup', pickupRoadAddress);
+                }}
+                disabled={resolvingAddressStation === 'pickup'}
+              >
+                {resolvingAddressStation === 'pickup' ? (
+                  <ActivityIndicator color={Colors.primary} />
+                ) : (
+                  <Text style={styles.secondaryButtonText}>주소 기준으로 가까운 출발역 추천</Text>
+                )}
+              </TouchableOpacity>
             </View>
           ) : null}
           <TouchableOpacity
@@ -866,6 +937,7 @@ export default function CreateRequestScreen({ navigation, route }: Props) {
                 onSelect={(address) => {
                   setDeliveryRoadAddress(address.roadAddress);
                   setDeliveryDetailAddress(address.detailAddress);
+                  void handleRecommendStationFromAddress('delivery', address.roadAddress);
                 }}
               />
               <AddressQuickPick
@@ -874,6 +946,7 @@ export default function CreateRequestScreen({ navigation, route }: Props) {
                 onSelect={(address) => {
                   setDeliveryRoadAddress(address.roadAddress);
                   setDeliveryDetailAddress(address.detailAddress);
+                  void handleRecommendStationFromAddress('delivery', address.roadAddress);
                 }}
               />
               <TouchableOpacity style={styles.selector} onPress={() => setAddressTarget('delivery')}>
@@ -887,6 +960,19 @@ export default function CreateRequestScreen({ navigation, route }: Props) {
                 placeholder="도착지 상세 주소"
                 placeholderTextColor={Colors.gray400}
               />
+              <TouchableOpacity
+                style={styles.secondaryButton}
+                onPress={() => {
+                  void handleRecommendStationFromAddress('delivery', deliveryRoadAddress);
+                }}
+                disabled={resolvingAddressStation === 'delivery'}
+              >
+                {resolvingAddressStation === 'delivery' ? (
+                  <ActivityIndicator color={Colors.primary} />
+                ) : (
+                  <Text style={styles.secondaryButtonText}>주소 기준으로 가까운 도착역 추천</Text>
+                )}
+              </TouchableOpacity>
             </View>
           ) : null}
           <TouchableOpacity
@@ -1191,6 +1277,7 @@ export default function CreateRequestScreen({ navigation, route }: Props) {
         onClose={() => setAddressTarget(null)}
         onSelectAddress={(item) => {
           setPickupRoadAddress(item.roadAddress);
+          void handleRecommendStationFromAddress('pickup', item.roadAddress);
         }}
       />
 
@@ -1200,6 +1287,7 @@ export default function CreateRequestScreen({ navigation, route }: Props) {
         onClose={() => setAddressTarget(null)}
         onSelectAddress={(item) => {
           setDeliveryRoadAddress(item.roadAddress);
+          void handleRecommendStationFromAddress('delivery', item.roadAddress);
         }}
       />
 

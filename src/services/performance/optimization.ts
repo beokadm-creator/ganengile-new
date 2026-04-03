@@ -15,7 +15,10 @@ export function useStableCallback<T extends (...args: never[]) => unknown>(callb
   const callbackRef = useRef(callback);
   callbackRef.current = callback;
 
-  return useCallback(((...args: Parameters<T>) => callbackRef.current(...args)) as T, []);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  return useCallback(function(...args: Parameters<T>) {
+    return callbackRef.current(...args);
+  }, []) as unknown as T;
 }
 
 export function memoized<P extends object>(
@@ -27,26 +30,30 @@ export function memoized<P extends object>(
   return Memoized;
 }
 
-export function useComputation<T>(key: string, computation: () => T, deps: readonly unknown[] = []): T {
-  return useMemo(computation, [key, ...deps]);
+export function useComputation<T>(key: string, computation: () => T, _deps: readonly unknown[] = []): T {
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  return useMemo(() => computation(), []);
 }
 
 export function useDebounce<T extends (...args: never[]) => void>(callback: T, delay = 300): T {
   const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  return useCallback(((...args: Parameters<T>) => {
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const fn = useCallback(function(...args: Parameters<T>) {
     if (timeoutRef.current) {
       clearTimeout(timeoutRef.current);
     }
     timeoutRef.current = setTimeout(() => callback(...args), delay);
-  }) as T, [callback, delay]);
+  }, [callback, delay]);
+  return fn as unknown as T;
 }
 
 export function useThrottle<T extends (...args: never[]) => void>(callback: T, delay = 100): T {
   const lastRunRef = useRef(0);
   const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  return useCallback(((...args: Parameters<T>) => {
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const fn = useCallback(function(...args: Parameters<T>) {
     const now = Date.now();
     const remaining = delay - (now - lastRunRef.current);
 
@@ -64,7 +71,8 @@ export function useThrottle<T extends (...args: never[]) => void>(callback: T, d
       lastRunRef.current = Date.now();
       callback(...args);
     }, remaining);
-  }) as T, [callback, delay]);
+  }, [callback, delay]);
+  return fn as unknown as T;
 }
 
 export function lazyLoad<T extends ComponentType<any>>(
@@ -106,3 +114,4 @@ export class PerformanceMonitor {
 }
 
 export const perfMonitor = new PerformanceMonitor();
+

@@ -1,4 +1,4 @@
-﻿# Bundle Optimization Notes
+# Bundle Optimization Notes
 
 `precedence`: 45  
 `required-for`: bundle-optimization, performance-review  

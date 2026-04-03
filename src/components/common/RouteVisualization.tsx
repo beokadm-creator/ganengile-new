@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useState } from 'react';
 import { View, Text, StyleSheet, ViewStyle, Animated } from 'react-native';
 import { Colors, Spacing, BorderRadius, Typography } from '../../theme';
 import { Ionicons } from '@expo/vector-icons';
@@ -39,7 +39,7 @@ export default function RouteVisualization({
   style,
 }: RouteVisualizationProps) {
   // 애니메이션 값 초기화
-  const fadeAnim = React.useRef(new Animated.Value(0)).current;
+  const [fadeAnim] = useState(new Animated.Value(0));
   
   React.useEffect(() => {
     Animated.timing(fadeAnim, {

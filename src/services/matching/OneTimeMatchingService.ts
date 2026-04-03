@@ -48,7 +48,7 @@ export class OneTimeMatchingService {
     const results: MatchingResult[] = [];
 
     for (const giller of availableGillers) {
-      const matchResult = await this.calculateMatchScore(giller, request, nearbyStation);
+      const matchResult = this.calculateMatchScore(giller, request, nearbyStation);
       results.push(matchResult);
     }
 
@@ -165,7 +165,7 @@ export class OneTimeMatchingService {
   private static calculateMatchScore(
     giller: any,
     request: DeliveryRequestP1,
-    nearbyStation: any
+    _nearbyStation: any
   ): MatchingResult {
     // 점수 계산 로직
     const routeScore = this.calculateRouteScore(giller, request);
@@ -203,7 +203,7 @@ export class OneTimeMatchingService {
   /**
    * 경로 점수 계산 (0-100)
    */
-  private static calculateRouteScore(giller: any, request: DeliveryRequestP1): number {
+  private static calculateRouteScore(giller: any, _request: DeliveryRequestP1): number {
     // 목적지까지 직행 여부, 환승 횟수 등 고려
     const hasDirectRoute = !giller.transferCount || giller.transferCount === 0;
     return hasDirectRoute ? 100 : Math.max(0, 100 - giller.transferCount * 20);
@@ -212,7 +212,7 @@ export class OneTimeMatchingService {
   /**
    * 시간 점수 계산 (0-100)
    */
-  private static calculateTimeScore(giller: any, request: DeliveryRequestP1): number {
+  private static calculateTimeScore(giller: any, _request: DeliveryRequestP1): number {
     // 이동 시간이 짧을수록 높은 점수
     const travelTime = giller.travelTime || 30;
     return Math.max(0, 100 - travelTime);

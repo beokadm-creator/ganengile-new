@@ -1,4 +1,4 @@
-﻿/**
+/**
  * useNotifications Hook
  * Handles push notification permissions, registration, and event handling
  * for Expo Notifications

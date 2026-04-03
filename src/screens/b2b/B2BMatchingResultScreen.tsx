@@ -14,7 +14,7 @@ import {
 import { BadgeService } from '../../services/BadgeService';
 import { acceptRequest, getMatchingResults } from '../../services/matching-service';
 import { calculateGrade, getGradeInfo } from '../../services/grade-service';
-import { BorderRadius, Colors, Shadows, Spacing, Typography } from '../../theme';
+import { BorderRadius, Colors, Spacing, Typography } from '../../theme';
 import type { B2BStackNavigationProp, B2BStackParamList } from '../../types/navigation';
 import type { Badge } from '../../types/user';
 
@@ -87,7 +87,7 @@ export default function B2BMatchingResultScreen() {
         }
 
         setSelectedMatch(firstMatch);
-        const fetchedBadges = await BadgeService.getGillerBadges(firstMatch.gillerId);
+        const fetchedBadges = BadgeService.getGillerBadges(firstMatch.gillerId);
 
         if (!cancelled) {
           setBadges(fetchedBadges);

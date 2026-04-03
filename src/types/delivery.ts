@@ -181,10 +181,14 @@ export interface DeliveryRequest {
   /** Unique request ID */
   requestId: string;
 
-  /** Gller (sender) user ID */
-  gllerId: string;
+  /** Requester user ID */
+  requesterId: string;
 
-  /** Gller name (denormalized) */
+  /** Requester name (denormalized) */
+  requesterName?: string;
+  /** @deprecated Use requesterId */
+  gllerId?: string;
+  /** @deprecated Use requesterName */
   gllerName?: string;
 
   /** Pickup station */
@@ -333,8 +337,10 @@ export interface Delivery {
   /** Associated request ID */
   requestId: string;
 
-  /** Gller (sender) user ID */
-  gllerId: string;
+  /** Requester user ID */
+  requesterId: string;
+  /** @deprecated Use requesterId */
+  gllerId?: string;
 
   /** Courier (giller) user ID */
   gillerId: string;
@@ -406,7 +412,13 @@ export interface Delivery {
   /** Delivery photos (proof of delivery) */
   deliveryPhotos?: string[];
 
-  /** Rating from gller */
+  /** Rating from requester */
+  requesterRating?: {
+    rating: number;
+    comment?: string;
+    ratedAt: Date;
+  };
+  /** @deprecated Use requesterRating */
   gllerRating?: {
     rating: number;
     comment?: string;
@@ -483,7 +495,9 @@ export interface DeliveryHistoryFilter {
   /** Filter by courier ID */
   courierId?: string;
 
-  /** Filter by gller ID */
+  /** Filter by requester ID */
+  requesterId?: string;
+  /** @deprecated Use requesterId */
   gllerId?: string;
 
   /** Filter by delivery type */

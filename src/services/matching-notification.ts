@@ -103,6 +103,37 @@ export async function sendMatchFoundNotification(
   }
 }
 
+export async function sendMissionBundleAvailableNotification(
+  gillerId: string,
+  requestId: string,
+  pickupStation: string,
+  deliveryStation: string,
+  fee: number,
+  bundleCount: number
+): Promise<void> {
+  const title = '선택 가능한 배송 구간이 도착했습니다';
+  const body = `${pickupStation} -> ${deliveryStation} · ${bundleCount}개 구간 카드 · ${fee.toLocaleString()}원`;
+
+  await saveNotification(gillerId, NotificationType.MATCH_FOUND, title, body, {
+    requestId,
+    pickupStation,
+    deliveryStation,
+    fee,
+    bundleCount,
+    mode: 'mission_bundle',
+  });
+
+  const token = await getUserFCMToken(gillerId);
+  if (token) {
+    await sendFCM(token, title, body, {
+      type: NotificationType.MATCH_FOUND,
+      requestId,
+      screen: 'GillerRequests',
+      mode: 'mission_bundle',
+    });
+  }
+}
+
 export async function sendRequestAcceptedNotification(
   gllerId: string,
   requestId: string,

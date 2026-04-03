@@ -3,7 +3,7 @@
  * Animated slider for switching between gller/giller roles
  */
 
-import React from 'react';
+import React, { useState } from 'react';
 import {
   View,
   Text,
@@ -28,9 +28,9 @@ export const RoleSwitcher: React.FC<RoleSwitcherProps> = ({
   onRoleChange,
   disabled = false,
 }) => {
-  const translateX = React.useRef(
-    new Animated.Value(currentRole === UserRole.GLER ? 0 : width * 0.5 - 80)
-  ).current;
+  const [translateX] = useState(
+    () => new Animated.Value(currentRole === UserRole.GLER ? 0 : width * 0.5 - 80)
+  );
 
   React.useEffect(() => {
     Animated.timing(translateX, {

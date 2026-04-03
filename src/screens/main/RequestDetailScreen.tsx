@@ -295,7 +295,8 @@ export default function RequestDetailScreen() {
 
     navigation.navigate('DepositPayment', {
       gillerId: request.matchedGillerId,
-      gllerId: request.matchedGillerId,
+      requesterId: request.requesterId,
+      gllerId: request.requesterId,
       requestId: request.requestId,
       itemValue: Number(request.itemValue ?? 0),
     });

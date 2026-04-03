@@ -1,16 +1,18 @@
-﻿import {
+import {
   Timestamp,
   addDoc,
   collection,
+  getDoc,
   getDocs,
+  query,
   serverTimestamp,
   updateDoc,
   doc,
   setDoc,
+  where,
 } from 'firebase/firestore';
 import { db } from './firebase';
 import { createAIAnalysis, createPricingQuote, createRequestDraft, markPricingQuoteSelected, updateRequestDraft } from './request-draft-service';
-import type { StationInfo } from '../types/request';
 import type {
   ActorSelectionActorType,
   ActorSelectionDecision,
@@ -38,8 +40,11 @@ import {
 } from '../types/beta1';
 import { calculatePhase1DeliveryFee, estimateStationCountFromCoords, type PackageSizeType } from './pricing-service';
 import { getAIIntegrationConfig } from './integration-config-service';
-import { buildRequestDraftFromLegacyInput } from '../utils/request-draft-adapters';
+import { buildRequestDraftFromLegacyInput, type LegacyStationInfo as StationInfo } from '../utils/request-draft-adapters';
 import { getWalletLedger } from './beta1-wallet-service';
+import { findMatchesForRequest } from './matching-service';
+import { sendMissionBundleAvailableNotification } from './matching-notification';
+import { B2BDeliveryService } from './b2b-delivery-service';
 
 export interface Beta1RequestCreateInput {
   requesterUserId: string;
@@ -141,6 +146,12 @@ export interface Beta1HomeSnapshot {
     rewardLabel: string;
     strategyTitle: string;
     strategyBody: string;
+    bundleId?: string;
+    missionIds?: string[];
+    actionLabel?: string;
+    legSummary?: string;
+    fallbackLabel?: string;
+    selectionState?: 'available' | 'accepted' | 'fallback';
   }>;
   wallet: {
     chargeBalance: number;
@@ -223,6 +234,25 @@ type Beta1MissionDoc = {
   status?: string;
   currentReward?: number;
   assignedGillerUserId?: string;
+  originRef?: LocationRef;
+  destinationRef?: LocationRef;
+};
+
+type Beta1LegDoc = DeliveryLeg & { id?: string };
+
+type Beta1MissionBundleDoc = MissionBundle & {
+  bundleType?: 'single_leg' | 'contiguous_range';
+  startSequence?: number;
+  endSequence?: number;
+  title?: string;
+  summary?: string;
+  windowLabel?: string;
+  rewardTotal?: number;
+  recommendedActorType?: ActorSelectionActorType;
+  candidateGillerUserIds?: string[];
+  selectedGillerUserId?: string;
+  requiresExternalPartner?: boolean;
+  fallbackDeliveryIds?: string[];
 };
 
 type Beta1DeliveryDoc = {
@@ -267,6 +297,202 @@ function formatDetailedAddress(roadAddress?: string, detailAddress?: string): st
   const detail = (detailAddress ?? '').trim();
   if (!road) return undefined;
   return detail ? `${road} ${detail}` : road;
+}
+
+function mapLegTypeToMissionType(legType: DeliveryLegType): MissionType {
+  switch (legType) {
+    case 'pickup_address':
+    case 'pickup_station':
+      return 'pickup';
+    case 'locker_dropoff':
+      return 'locker_dropoff';
+    case 'locker_pickup':
+      return 'locker_pickup';
+    case 'meetup_handover':
+      return 'meetup_handover';
+    case 'last_mile_address':
+      return 'last_mile';
+    case 'subway_transport':
+    default:
+      return 'subway_transport';
+  }
+}
+
+function describeLocationRef(location: LocationRef): string {
+  if (location.type === 'address') {
+    return location.addressText ?? location.roadAddress ?? '주소';
+  }
+  if (location.type === 'locker') {
+    return location.lockerId ?? location.stationName ?? '보관함';
+  }
+  return location.stationName ?? '역';
+}
+
+function describeLegType(legType: DeliveryLegType): string {
+  switch (legType) {
+    case 'pickup_address':
+      return '주소 수거';
+    case 'pickup_station':
+      return '출발역 인계';
+    case 'locker_dropoff':
+      return '보관함 투입';
+    case 'locker_pickup':
+      return '보관함 수령';
+    case 'meetup_handover':
+      return '대면 인계';
+    case 'last_mile_address':
+      return '도착지 전달';
+    case 'subway_transport':
+    default:
+      return '역간 이동';
+  }
+}
+
+function requiresAddressHandling(legType: DeliveryLegType): boolean {
+  return legType === 'pickup_address' || legType === 'last_mile_address';
+}
+
+function buildMissionWindowLabel(missionCount: number, requiresPartner: boolean): string {
+  if (requiresPartner) {
+    return '주소 구간 포함, 빠른 선택 권장';
+  }
+  return missionCount > 1 ? '연속 구간 선택 가능' : '지금 수락 가능';
+}
+
+function splitRewardAcrossLegs(totalReward: number, legCount: number): number[] {
+  if (legCount <= 0) {
+    return [];
+  }
+
+  const base = Math.floor(totalReward / legCount);
+  const rewards = Array.from({ length: legCount }, () => base);
+  let remainder = totalReward - base * legCount;
+
+  for (let index = 0; index < rewards.length && remainder > 0; index += 1) {
+    rewards[index] += 1;
+    remainder -= 1;
+  }
+
+  return rewards;
+}
+
+function buildSegmentedLegDefinitions(input: {
+  requestId: string;
+  deliveryId: string;
+  originType: 'station' | 'address';
+  destinationType: 'station' | 'address';
+  pickupStation: StationInfo;
+  deliveryStation: StationInfo;
+  pickupAddress?: string;
+  pickupRoadAddress?: string;
+  pickupDetailAddress?: string;
+  deliveryAddress?: string;
+  deliveryRoadAddress?: string;
+  deliveryDetailAddress?: string;
+}): Array<{
+  legType: DeliveryLegType;
+  actorType: DeliveryActorType;
+  sequence: number;
+  originRef: LocationRef;
+  destinationRef: LocationRef;
+}> {
+  const legs: Array<{
+    legType: DeliveryLegType;
+    actorType: DeliveryActorType;
+    sequence: number;
+    originRef: LocationRef;
+    destinationRef: LocationRef;
+  }> = [];
+
+  if (input.originType === 'address' && input.pickupAddress) {
+    legs.push({
+      legType: 'pickup_address',
+      actorType: 'giller',
+      sequence: legs.length + 1,
+      originRef: {
+        ...toAddressLocationRef(input.pickupAddress, input.pickupStation),
+        roadAddress: input.pickupRoadAddress?.trim(),
+        detailAddress: input.pickupDetailAddress?.trim(),
+      },
+      destinationRef: toLocationRef(input.pickupStation),
+    });
+  }
+
+  if (
+    input.pickupStation.stationId !== input.deliveryStation.stationId ||
+    input.pickupStation.stationName !== input.deliveryStation.stationName
+  ) {
+    legs.push({
+      legType: 'subway_transport',
+      actorType: 'giller',
+      sequence: legs.length + 1,
+      originRef: toLocationRef(input.pickupStation),
+      destinationRef: toLocationRef(input.deliveryStation),
+    });
+  }
+
+  if (input.destinationType === 'address' && input.deliveryAddress) {
+    legs.push({
+      legType: 'last_mile_address',
+      actorType: 'giller',
+      sequence: legs.length + 1,
+      originRef: toLocationRef(input.deliveryStation),
+      destinationRef: {
+        ...toAddressLocationRef(input.deliveryAddress, input.deliveryStation),
+        roadAddress: input.deliveryRoadAddress?.trim(),
+        detailAddress: input.deliveryDetailAddress?.trim(),
+      },
+    });
+  }
+
+  if (legs.length === 0) {
+    legs.push({
+      legType: 'subway_transport',
+      actorType: 'giller',
+      sequence: 1,
+      originRef: toLocationRef(input.pickupStation),
+      destinationRef: toLocationRef(input.deliveryStation),
+    });
+  }
+
+  return legs.map((leg, index) => ({
+    ...leg,
+    sequence: index + 1,
+  }));
+}
+
+async function createDeliveryLegRecord(params: {
+  requestId: string;
+  deliveryId: string;
+  legType: DeliveryLegType;
+  actorType: DeliveryActorType;
+  sequence: number;
+  originRef: LocationRef;
+  destinationRef: LocationRef;
+  status?: DeliveryLegStatus;
+}): Promise<DeliveryLeg> {
+  const legPayload = {
+    requestId: params.requestId,
+    deliveryId: params.deliveryId,
+    legType: params.legType,
+    actorType: params.actorType,
+    sequence: params.sequence,
+    originRef: params.originRef,
+    destinationRef: params.destinationRef,
+    status: params.status ?? DeliveryLegStatus.READY,
+    createdAt: serverTimestamp(),
+    updatedAt: serverTimestamp(),
+  };
+
+  const legRef = await addDoc(collection(db, 'delivery_legs'), legPayload);
+
+  return {
+    deliveryLegId: legRef.id,
+    ...legPayload,
+    status: params.status ?? DeliveryLegStatus.READY,
+    createdAt: Timestamp.now(),
+    updatedAt: Timestamp.now(),
+  };
 }
 
 function buildQuotePricing(
@@ -641,6 +867,107 @@ export async function createBeta1Request(input: Beta1RequestCreateInput): Promis
   };
 
   const requestRef = await addDoc(collection(db, 'requests'), requestPayload);
+
+  const deliveryRef = await addDoc(collection(db, 'deliveries'), {
+    requestId: requestRef.id,
+    requesterId: input.requesterUserId,
+    pickupStation: input.pickupStation,
+    deliveryStation: input.deliveryStation,
+    status: 'pending',
+    beta1DeliveryStatus: 'created',
+    fee: {
+      ...selectedCard.pricing,
+      totalFee: selectedCard.pricing.publicPrice,
+      breakdown: {
+        gillerFee: Math.round(selectedCard.pricing.publicPrice * 0.7),
+      },
+    },
+    createdAt: serverTimestamp(),
+    updatedAt: serverTimestamp(),
+  });
+
+  await updateDoc(doc(db, 'requests', requestRef.id), {
+    primaryDeliveryId: deliveryRef.id,
+    updatedAt: serverTimestamp(),
+  });
+
+  const legDefinitions = buildSegmentedLegDefinitions({
+    requestId: requestRef.id,
+    deliveryId: deliveryRef.id,
+    originType: input.originType ?? 'station',
+    destinationType: input.destinationType ?? 'station',
+    pickupStation: input.pickupStation,
+    deliveryStation: input.deliveryStation,
+    pickupAddress: formatDetailedAddress(input.pickupRoadAddress, input.pickupDetailAddress),
+    pickupRoadAddress: input.pickupRoadAddress,
+    pickupDetailAddress: input.pickupDetailAddress,
+    deliveryAddress: formatDetailedAddress(input.deliveryRoadAddress, input.deliveryDetailAddress),
+    deliveryRoadAddress: input.deliveryRoadAddress,
+    deliveryDetailAddress: input.deliveryDetailAddress,
+  });
+  const legRewards = splitRewardAcrossLegs(
+    Math.max(0, Math.round(selectedCard.pricing.publicPrice * 0.7)),
+    legDefinitions.length
+  );
+
+  for (let index = 0; index < legDefinitions.length; index += 1) {
+    const definition = legDefinitions[index];
+    const deliveryLeg = await createDeliveryLegRecord({
+      requestId: requestRef.id,
+      deliveryId: deliveryRef.id,
+      legType: definition.legType,
+      actorType: definition.actorType,
+      sequence: definition.sequence,
+      originRef: definition.originRef,
+      destinationRef: definition.destinationRef,
+    });
+
+    await createMissionForDeliveryLeg({
+      requestId: requestRef.id,
+      deliveryId: deliveryRef.id,
+      deliveryLeg,
+      currentReward: legRewards[index] ?? 0,
+    });
+
+    await persistActorSelectionDecision({
+      requestId: requestRef.id,
+      deliveryId: deliveryRef.id,
+      deliveryLegId: deliveryLeg.deliveryLegId,
+      interventionLevel: requiresAddressHandling(definition.legType) ? 'guarded_execute' : 'recommend',
+      selectedActorType: requiresAddressHandling(definition.legType) ? ActorType.EXTERNAL_PARTNER : ActorType.GILLER,
+      selectedPartnerId: requiresAddressHandling(definition.legType) ? PARTNER_QUOTES[0]?.partnerId : undefined,
+      selectionReason: requiresAddressHandling(definition.legType)
+        ? '주소 구간이라 길러 선택이 없으면 B2B fallback을 우선 검토합니다.'
+        : '역간 이동 구간이라 길러 수행을 우선 제안합니다.',
+      fallbackActorTypes: requiresAddressHandling(definition.legType)
+        ? [ActorType.GILLER]
+        : [ActorType.EXTERNAL_PARTNER],
+      fallbackPartnerIds: PARTNER_QUOTES.map((quote) => quote.partnerId),
+      manualReviewRequired: false,
+      riskFlags: requiresAddressHandling(definition.legType) ? ['address_leg'] : [],
+    });
+  }
+
+  const bundles = await bundleMissionsForDelivery(deliveryRef.id);
+  const candidateGillerIds = Array.from(
+    new Set(
+      bundles.flatMap((bundle) => bundle.candidateGillerUserIds ?? [])
+    )
+  );
+
+  await Promise.all(
+    candidateGillerIds.map((gillerId) =>
+      sendMissionBundleAvailableNotification(
+        gillerId,
+        requestRef.id,
+        input.pickupStation.stationName,
+        input.deliveryStation.stationName,
+        selectedCard.pricing.publicPrice,
+        bundles.length
+      )
+    )
+  );
+
   return {
     requestId: requestRef.id,
     requestDraftId: requestDraft.requestDraftId,
@@ -658,16 +985,16 @@ export function selectActorForMission(params: {
   const interventionLevel: AIInterventionLevel = params.requiresAddressHandling ? 'guarded_execute' : 'recommend';
   let selectedActorType: ActorSelectionActorType = ActorType.GILLER;
   let selectedPartnerId: string | undefined;
-  let selectionReason = '吏?섏쿋 湲곕컲 湲몃윭 誘몄뀡??媛???좎뿰?⑸땲??';
+  let selectionReason = '지하철 기반 구간이라 길러 미션으로 이어지는 흐름이 자연스럽습니다.';
   const fallbackActorTypes: ActorSelectionActorType[] = [ActorType.LOCKER, ActorType.EXTERNAL_PARTNER];
 
   if (params.preferLocker) {
     selectedActorType = ActorType.LOCKER;
-    selectionReason = '鍮꾨?硫??멸퀎瑜??곗꽑 ?곸슜???щℓ移?由ъ뒪?щ? ??땅?덈떎.';
+    selectionReason = '비대면 인계가 유리해 보관함 연계를 우선 적용합니다.';
   } else if (params.requiresAddressHandling || params.urgency === 'urgent') {
     selectedActorType = ActorType.EXTERNAL_PARTNER;
     selectedPartnerId = PARTNER_QUOTES[0].partnerId;
-    selectionReason = '二쇱냼 湲곕컲 利됱떆 泥섎━ 援ш컙?대?濡??몃? ?뚰듃?덈? ?곗꽑 寃?좏빀?덈떎.';
+    selectionReason = '주소 기반 즉시 처리 구간이라 외부 파트너를 우선 검토합니다.';
   }
 
   return {
@@ -684,34 +1011,85 @@ export function selectActorForMission(params: {
 }
 
 export async function bundleMissionsForDelivery(deliveryId: string): Promise<MissionBundle[]> {
-  const missionSnapshot = await getDocs(collection(db, 'missions'));
+  const [missionSnapshot, legSnapshot, deliveryDoc] = await Promise.all([
+    getDocs(query(collection(db, 'missions'), where('deliveryId', '==', deliveryId))),
+    getDocs(query(collection(db, 'delivery_legs'), where('deliveryId', '==', deliveryId))),
+    getDoc(doc(db, 'deliveries', deliveryId)),
+  ]);
+
   const deliveryMissions = missionSnapshot.docs
-    .map((missionDoc) => ({ missionId: missionDoc.id, ...(missionDoc.data() as Record<string, unknown>) }) as { missionId: string; deliveryId?: string; sequence?: number; assignedGillerUserId?: string; status?: string; requestId?: string })
-    .filter((mission) => mission.deliveryId === deliveryId)
+    .map((missionDoc) => ({
+      id: missionDoc.id,
+      ...(missionDoc.data() as Record<string, unknown>),
+    }) as Beta1MissionDoc)
     .sort((a, b) => Number(a.sequence ?? 0) - Number(b.sequence ?? 0));
 
   if (deliveryMissions.length === 0) {
     return [];
   }
 
-  const grouped = new Map<string, string[]>();
-  for (const mission of deliveryMissions) {
-    const owner = String(mission.assignedGillerUserId ?? mission.status ?? 'unassigned');
-    const missionIds = grouped.get(owner) ?? [];
-    missionIds.push(String(mission.missionId));
-    grouped.set(owner, missionIds);
+  const legsById = new Map(
+    legSnapshot.docs.map((legDoc) => {
+      const leg = { id: legDoc.id, ...(legDoc.data() as Record<string, unknown>) } as Beta1LegDoc;
+      return [legDoc.id, leg] as const;
+    })
+  );
+
+  const requestId = String(deliveryMissions[0].requestId ?? '');
+  const _deliveryData = (deliveryDoc.data() as Record<string, unknown> | undefined) ?? {};
+
+  let candidateGillerUserIds: string[] = [];
+  try {
+    const matches = await findMatchesForRequest(requestId, 5);
+    candidateGillerUserIds = matches.map((match) => match.gillerId);
+  } catch {
+    candidateGillerUserIds = [];
   }
 
-  const bundles: MissionBundle[] = Array.from(grouped.entries()).map(([owner, missionIds], index) => ({
-    missionBundleId: `${deliveryId}-bundle-${index + 1}`,
-    requestId: String(deliveryMissions[0].requestId ?? ''),
-    deliveryId,
-    missionIds,
-    status: BundleStatus.ACTIVE as MissionBundleStatus,
-    strategy: owner === 'unassigned' ? 'multi_actor' : 'single_actor',
-    createdAt: Timestamp.now(),
-    updatedAt: Timestamp.now(),
-  }));
+  const bundles: MissionBundle[] = [];
+  let bundleIndex = 0;
+
+  for (let start = 0; start < deliveryMissions.length; start += 1) {
+    for (let end = start; end < deliveryMissions.length; end += 1) {
+      bundleIndex += 1;
+      const missionGroup = deliveryMissions.slice(start, end + 1);
+      const firstMission = missionGroup[0];
+      const lastMission = missionGroup[missionGroup.length - 1];
+      const firstLeg = legsById.get(String(firstMission.deliveryLegId ?? ''));
+      const lastLeg = legsById.get(String(lastMission.deliveryLegId ?? ''));
+      const missionIds = missionGroup.map((mission) => String(mission.id));
+      const rewardTotal = missionGroup.reduce((sum, mission) => sum + Number(mission.currentReward ?? 0), 0);
+      const legTypes = missionGroup.map((mission) => legsById.get(String(mission.deliveryLegId ?? ''))?.legType ?? 'subway_transport');
+      const hasAddressLeg = legTypes.some((legType) => requiresAddressHandling(legType));
+      const selectedGillerUserId = missionGroup.every((mission) => mission.assignedGillerUserId)
+        ? String(missionGroup[0].assignedGillerUserId)
+        : undefined;
+      const title = `${describeLocationRef(firstMission.originRef ?? firstLeg?.originRef ?? { type: 'station' })} -> ${describeLocationRef(lastMission.destinationRef ?? lastLeg?.destinationRef ?? { type: 'station' })}`;
+      const summary = legTypes.map((legType) => describeLegType(legType)).join(' · ');
+
+      bundles.push({
+        missionBundleId: `${deliveryId}-bundle-${bundleIndex}`,
+        requestId,
+        deliveryId,
+        missionIds,
+        status: BundleStatus.ACTIVE as MissionBundleStatus,
+        strategy: hasAddressLeg ? 'partner_fallback' : missionGroup.length > 1 ? 'multi_actor' : 'single_actor',
+        bundleType: missionGroup.length > 1 ? 'contiguous_range' : 'single_leg',
+        startSequence: Number(firstMission.sequence ?? start + 1),
+        endSequence: Number(lastMission.sequence ?? end + 1),
+        title,
+        summary,
+        windowLabel: buildMissionWindowLabel(missionGroup.length, hasAddressLeg),
+        rewardTotal,
+        recommendedActorType: hasAddressLeg ? ActorType.EXTERNAL_PARTNER : ActorType.GILLER,
+        candidateGillerUserIds,
+        selectedGillerUserId,
+        requiresExternalPartner: hasAddressLeg,
+        createdAt: Timestamp.now(),
+        updatedAt: Timestamp.now(),
+      });
+    }
+  }
 
   await Promise.all(
     bundles.map((bundle) =>
@@ -733,7 +1111,7 @@ export async function createMissionForDeliveryLeg(params: {
   assignedGillerUserId?: string;
   currentReward?: number;
 }): Promise<Mission> {
-  const missionType: MissionType = params.deliveryLeg.legType === 'last_mile_address' ? 'last_mile' : 'subway_transport';
+  const missionType = mapLegTypeToMissionType(params.deliveryLeg.legType);
   const missionPayload = {
     requestId: params.requestId,
     deliveryId: params.deliveryId,
@@ -771,6 +1149,233 @@ export async function createMissionForDeliveryLeg(params: {
   };
 }
 
+async function dispatchMissionToB2BFallback(params: {
+  requestId: string;
+  mission: Beta1MissionDoc;
+  leg: Beta1LegDoc;
+  requestDoc?: Record<string, unknown>;
+}): Promise<string | null> {
+  if (!requiresAddressHandling(params.leg.legType)) {
+    return null;
+  }
+
+  try {
+    const requestData = params.requestDoc ?? {};
+    const pickupStationName =
+      String(
+        (requestData.pickupStation as { stationName?: string } | undefined)?.stationName ??
+          params.leg.originRef.stationName ??
+          '출발역'
+      );
+    const deliveryStationName =
+      String(
+        (requestData.deliveryStation as { stationName?: string } | undefined)?.stationName ??
+          params.leg.destinationRef.stationName ??
+          '도착역'
+      );
+
+    return await B2BDeliveryService.createDelivery({
+      contractId: 'beta1-fallback-contract',
+      businessId: 'beta1-fallback',
+      pickupLocation: {
+        station: pickupStationName,
+        address: describeLocationRef(params.leg.originRef),
+        latitude: params.leg.originRef.latitude,
+        longitude: params.leg.originRef.longitude,
+      },
+      dropoffLocation: {
+        station: deliveryStationName,
+        address: describeLocationRef(params.leg.destinationRef),
+        latitude: params.leg.destinationRef.latitude,
+        longitude: params.leg.destinationRef.longitude,
+      },
+      scheduledTime: new Date(Date.now() + 1000 * 60 * 15),
+      weight: Number((requestData.packageInfo as { weightKg?: number; weight?: number } | undefined)?.weightKg ?? (requestData.packageInfo as { weight?: number } | undefined)?.weight ?? 1),
+      notes: `beta1 mission fallback:${params.requestId}:${params.mission.id}`,
+    });
+  } catch (error) {
+    console.warn('Unable to create B2B fallback delivery', error);
+    return null;
+  }
+}
+
+export async function acceptMissionBundleForGiller(bundleId: string, gillerUserId: string): Promise<void> {
+  const bundleRef = doc(db, 'mission_bundles', bundleId);
+  const bundleSnapshot = await getDoc(bundleRef);
+  if (!bundleSnapshot.exists()) {
+    throw new Error('Mission bundle not found');
+  }
+
+  const bundle = {
+    missionBundleId: bundleSnapshot.id,
+    ...(bundleSnapshot.data() as Record<string, unknown>),
+  } as Beta1MissionBundleDoc;
+
+  if (bundle.selectedGillerUserId && bundle.selectedGillerUserId !== gillerUserId) {
+    throw new Error('Mission bundle already accepted by another giller');
+  }
+
+  const missionDocs = await Promise.all(
+    (bundle.missionIds ?? []).map(async (missionId) => {
+      const snapshot = await getDoc(doc(db, 'missions', missionId));
+      return snapshot.exists()
+        ? ({ id: snapshot.id, ...(snapshot.data() as Record<string, unknown>) } as Beta1MissionDoc)
+        : null;
+    })
+  );
+  const selectedMissions = missionDocs.filter(Boolean) as Beta1MissionDoc[];
+  const requestSnapshot = bundle.requestId ? await getDoc(doc(db, 'requests', bundle.requestId)) : null;
+  const requestData = (requestSnapshot?.data() as Record<string, unknown> | undefined) ?? {};
+  const siblingBundleSnapshots = await getDocs(query(collection(db, 'mission_bundles'), where('deliveryId', '==', bundle.deliveryId)));
+  const siblingBundles = siblingBundleSnapshots.docs.map((snapshot) => ({
+    missionBundleId: snapshot.id,
+    ...(snapshot.data() as Record<string, unknown>),
+  })) as Beta1MissionBundleDoc[];
+
+  await Promise.all(
+    selectedMissions.map((mission) =>
+      updateDoc(doc(db, 'missions', mission.id), {
+        assignedGillerUserId: gillerUserId,
+        status: MissionState.ACCEPTED,
+        updatedAt: serverTimestamp(),
+      })
+    )
+  );
+
+  const selectedLegIds = selectedMissions.map((mission) => String(mission.deliveryLegId ?? ''));
+  await Promise.all(
+    selectedLegIds.map((deliveryLegId) =>
+      updateDoc(doc(db, 'delivery_legs', deliveryLegId), {
+        actorType: 'giller',
+        status: DeliveryLegStatus.READY,
+        updatedAt: serverTimestamp(),
+      })
+    )
+  );
+
+  await setDoc(
+    bundleRef,
+    {
+      ...bundle,
+      selectedGillerUserId: gillerUserId,
+      status: BundleStatus.ACTIVE,
+      updatedAt: serverTimestamp(),
+    },
+    { merge: true }
+  );
+
+  const [allMissionSnapshots, allLegSnapshots] = await Promise.all([
+    getDocs(query(collection(db, 'missions'), where('deliveryId', '==', bundle.deliveryId))),
+    getDocs(query(collection(db, 'delivery_legs'), where('deliveryId', '==', bundle.deliveryId))),
+  ]);
+  const allMissions = allMissionSnapshots.docs.map((snapshot) => ({
+    id: snapshot.id,
+    ...(snapshot.data() as Record<string, unknown>),
+  })) as Beta1MissionDoc[];
+  const allLegsById = new Map(
+    allLegSnapshots.docs.map((snapshot) => {
+      const leg = { id: snapshot.id, ...(snapshot.data() as Record<string, unknown>) } as Beta1LegDoc;
+      return [snapshot.id, leg] as const;
+    })
+  );
+
+  const fallbackDeliveryIds: string[] = [];
+  const fallbackMissionIds: string[] = [];
+  for (const mission of allMissions) {
+    if (selectedLegIds.includes(String(mission.deliveryLegId ?? '')) || mission.assignedGillerUserId) {
+      continue;
+    }
+
+    const leg = allLegsById.get(String(mission.deliveryLegId ?? ''));
+    if (!leg || !requiresAddressHandling(leg.legType)) {
+      continue;
+    }
+
+    const fallbackDeliveryId = await dispatchMissionToB2BFallback({
+      requestId: bundle.requestId,
+      mission,
+      leg,
+      requestDoc: requestData,
+    });
+
+    if (!fallbackDeliveryId) {
+      continue;
+    }
+
+    fallbackDeliveryIds.push(fallbackDeliveryId);
+    fallbackMissionIds.push(mission.id);
+    await Promise.all([
+      updateDoc(doc(db, 'missions', mission.id), {
+        status: MissionState.OFFERED,
+        fallbackPlanId: fallbackDeliveryId,
+        updatedAt: serverTimestamp(),
+      }),
+      updateDoc(doc(db, 'delivery_legs', leg.deliveryLegId), {
+        actorType: 'external_partner',
+        status: DeliveryLegStatus.READY,
+        updatedAt: serverTimestamp(),
+      }),
+      persistActorSelectionDecision({
+        requestId: bundle.requestId,
+        deliveryId: bundle.deliveryId,
+        deliveryLegId: leg.deliveryLegId,
+        missionId: mission.id,
+        interventionLevel: 'guarded_execute',
+        selectedActorType: ActorType.EXTERNAL_PARTNER,
+        selectedPartnerId: PARTNER_QUOTES[0]?.partnerId,
+        selectionReason: '길러가 선택하지 않은 주소 구간을 B2B fallback으로 전환했습니다.',
+        fallbackActorTypes: [ActorType.GILLER],
+        fallbackPartnerIds: PARTNER_QUOTES.map((quote) => quote.partnerId),
+        manualReviewRequired: false,
+        riskFlags: ['address_leg_fallback'],
+      }),
+    ]);
+  }
+
+  const coversEntireDelivery = selectedMissions.length === allMissions.length;
+  const deliveryUpdate: Record<string, unknown> = {
+    beta1DeliveryStatus: coversEntireDelivery ? 'assigned' : 'created',
+    updatedAt: serverTimestamp(),
+  };
+  if (coversEntireDelivery) {
+    deliveryUpdate.gillerId = gillerUserId;
+  }
+  await updateDoc(doc(db, 'deliveries', bundle.deliveryId), deliveryUpdate);
+
+  if (bundle.requestId) {
+    await updateDoc(doc(db, 'requests', bundle.requestId), {
+      matchedGillerId: coversEntireDelivery ? gillerUserId : null,
+      status: coversEntireDelivery ? 'accepted' : 'pending',
+      beta1RequestStatus: coversEntireDelivery ? 'accepted' : 'match_pending',
+      updatedAt: serverTimestamp(),
+    });
+  }
+
+  const blockedMissionIds = new Set([...selectedMissions.map((mission) => mission.id), ...fallbackMissionIds]);
+  await Promise.all(
+    siblingBundles
+      .filter((candidate) => candidate.missionBundleId !== bundle.missionBundleId)
+      .filter((candidate) => (candidate.missionIds ?? []).some((missionId) => blockedMissionIds.has(missionId)))
+      .map((candidate) =>
+        updateDoc(doc(db, 'mission_bundles', candidate.missionBundleId), {
+          status: BundleStatus.CANCELLED,
+          updatedAt: serverTimestamp(),
+        })
+      )
+  );
+
+  if (fallbackDeliveryIds.length > 0) {
+    await setDoc(
+      bundleRef,
+      {
+        fallbackDeliveryIds,
+        updatedAt: serverTimestamp(),
+      },
+      { merge: true }
+    );
+  }
+}
+
 async function getUserWalletSummary(userId: string): Promise<Beta1HomeSnapshot['wallet']> {
   const walletLedger = await getWalletLedger(userId);
   return {
@@ -783,10 +1388,11 @@ async function getUserWalletSummary(userId: string): Promise<Beta1HomeSnapshot['
 }
 
 export async function getBeta1HomeSnapshot(userId: string, role: 'requester' | 'giller'): Promise<Beta1HomeSnapshot> {
-  const [requestSnapshot, missionSnapshot, deliverySnapshot, wallet] = await Promise.all([
+  const [requestSnapshot, missionSnapshot, deliverySnapshot, missionBundleSnapshot, wallet] = await Promise.all([
     getDocs(collection(db, 'requests')),
     getDocs(collection(db, 'missions')),
     getDocs(collection(db, 'deliveries')),
+    getDocs(collection(db, 'mission_bundles')),
     getUserWalletSummary(userId),
   ]);
 
@@ -797,6 +1403,23 @@ export async function getBeta1HomeSnapshot(userId: string, role: 'requester' | '
   const missions = missionSnapshot.docs
     .map((docItem) => ({ id: docItem.id, ...(docItem.data() as Record<string, unknown>) }) as Beta1MissionDoc)
     .filter((mission) => mission.assignedGillerUserId === userId);
+
+  const missionBundles = missionBundleSnapshot.docs
+    .map((docItem) => ({
+      missionBundleId: docItem.id,
+      ...(docItem.data() as Record<string, unknown>),
+    }) as Beta1MissionBundleDoc)
+    .filter((bundle) => {
+      if (role !== 'giller') {
+        return false;
+      }
+
+      const candidateList = bundle.candidateGillerUserIds ?? [];
+      const selectedBySameUser = bundle.selectedGillerUserId === userId;
+      const availableToUser = candidateList.length === 0 || candidateList.includes(userId);
+      const notTaken = !bundle.selectedGillerUserId || selectedBySameUser;
+      return bundle.status === BundleStatus.ACTIVE && availableToUser && notTaken;
+    });
 
   const deliveries = deliverySnapshot.docs
     .map((docItem) => ({ id: docItem.id, ...(docItem.data() as Record<string, unknown>) }) as Beta1DeliveryDoc)
@@ -851,6 +1474,37 @@ export async function getBeta1HomeSnapshot(userId: string, role: 'requester' | '
     };
   });
 
+  const missionCardsFromBundles = missionBundles.map((bundle) => {
+    const rewardTotal = Number(bundle.rewardTotal ?? 0);
+    const selectedByUser = bundle.selectedGillerUserId === userId;
+    const selectionState: 'available' | 'accepted' | 'fallback' =
+      selectedByUser ? 'accepted' : bundle.fallbackDeliveryIds?.length ? 'fallback' : 'available';
+    const fallbackLabel =
+      bundle.fallbackDeliveryIds && bundle.fallbackDeliveryIds.length > 0
+        ? `주소 구간 ${bundle.fallbackDeliveryIds.length}건은 B2B fallback 진행`
+        : bundle.requiresExternalPartner
+          ? '주소 구간 미선택 시 B2B fallback'
+          : undefined;
+
+    return {
+      id: bundle.missionBundleId,
+      bundleId: bundle.missionBundleId,
+      missionIds: bundle.missionIds,
+      title: bundle.title ?? '구간 선택 미션',
+      status: selectedByUser ? 'accepted' : 'available',
+      windowLabel: bundle.windowLabel ?? '연속 구간 선택 가능',
+      rewardLabel: `${rewardTotal.toLocaleString()}원`,
+      strategyTitle: selectedByUser ? '내가 맡은 구간' : '어디까지 수행할지 선택',
+      strategyBody:
+        bundle.summary ??
+        '길러가 선택한 범위만 먼저 확정하고, 남는 주소 구간은 fallback actor를 붙입니다.',
+      actionLabel: selectedByUser ? '수락 완료' : '이 구간 수행하기',
+      legSummary: bundle.summary,
+      fallbackLabel,
+      selectionState,
+    };
+  });
+
   const missionCardsFromMissions = activeMissions.map((mission) => {
     const missionType = String(mission.missionType ?? 'mission');
     const missionStatus = String(mission.status ?? 'queued');
@@ -876,6 +1530,8 @@ export async function getBeta1HomeSnapshot(userId: string, role: 'requester' | '
       rewardLabel: `${recommendedReward.toLocaleString()}원`,
       strategyTitle,
       strategyBody,
+      actionLabel: '진행 상태 보기',
+      selectionState: 'accepted' as const,
     };
   });
 
@@ -894,12 +1550,15 @@ export async function getBeta1HomeSnapshot(userId: string, role: 'requester' | '
         rewardLabel: `${reward.toLocaleString()}원`,
         strategyTitle: '수락한 배송 유지',
         strategyBody: '미션 문서가 늦게 생성되더라도 수락한 배송이 홈 목록에서 사라지지 않도록 배송 문서를 함께 기준으로 보여줍니다.',
+        actionLabel: '배송 보기',
+        selectionState: 'accepted' as const,
       };
     });
 
-  const missionCards = [...missionCardsFromMissions, ...deliveryFallbackCards].slice(0, 3);
-  const activeMissionLikeCount = activeMissions.length + deliveryFallbackCards.length;
+  const missionCards = [...missionCardsFromBundles, ...missionCardsFromMissions, ...deliveryFallbackCards].slice(0, 6);
+  const activeMissionLikeCount = missionBundles.length + activeMissions.length + deliveryFallbackCards.length;
   const pendingRewardTotal =
+    missionBundles.reduce((sum, bundle) => sum + Number(bundle.rewardTotal ?? 0), 0) +
     activeMissions.reduce((sum, mission) => sum + Number(mission.currentReward ?? 0), 0) +
     deliveryFallbackCards.reduce((sum, card) => sum + Number(card.rewardLabel.replace(/[^\d]/g, '') || 0), 0);
 
@@ -937,15 +1596,15 @@ export async function getBeta1ChatContext(chatRoomId: string): Promise<Beta1Chat
   const status = String(request?.beta1RequestStatus ?? request?.status ?? roomData.status ?? 'pending');
   const minimalRecipient = request?.recipientName
     ? `${String(request.recipientName).slice(0, 1)}* / ${String(request.recipientPhone ?? '').slice(0, 3)}-****`
-    : '?섎졊???뺣낫??誘몄뀡 ?섎씫 ???대┰?덈떎.';
+    : '수령인 정보는 미션 수락 후 열립니다.';
 
   return {
     title: roomData.requestInfo
       ? `${roomData.requestInfo.from} ??${roomData.requestInfo.to}`
       : '가는길에 채팅',
     subtitle: status === 'match_pending'
-      ? '媛寃⑷낵 誘몄뀡 援ъ“瑜??④퍡 ?뺤씤?섎뒗 ?묒쓽 梨꾪똿'
-      : '?멸퀎? ETA 以묒떖???ㅽ뻾 梨꾪똿',
+      ? '가격과 미션 구조를 함께 확인하는 준비 채팅'
+      : '단계와 ETA 전달을 위한 실행 채팅',
     trustSummary: [
       '수령인 상세 정보는 인계 직전까지 최소 공개합니다.',
       '사진, 위치, 인증 이벤트는 배송 상태와 분리해 기록합니다.',
@@ -1041,44 +1700,55 @@ export async function syncDeliveryToBeta1Execution(deliveryId: string): Promise<
     return;
   }
 
-  const legType: DeliveryLegType = 'subway_transport';
-  const actorType: DeliveryActorType = deliveryData.gillerId ? 'giller' : 'system';
-  const deliveryLegPayload = {
+  const requestId = String(deliveryData.requestId ?? '');
+  const legDefinitions = buildSegmentedLegDefinitions({
+    requestId,
     deliveryId,
-    requestId: String(deliveryData.requestId ?? ''),
-    legType,
-    actorType,
-    sequence: 1,
-    originRef: toLocationRef(deliveryData.pickupStation as StationInfo),
-    destinationRef: toLocationRef(deliveryData.deliveryStation as StationInfo),
-    status: DeliveryLegStatus.READY,
-    createdAt: serverTimestamp(),
-    updatedAt: serverTimestamp(),
-  };
-  const legRef = await addDoc(collection(db, 'delivery_legs'), deliveryLegPayload);
-
-  await createMissionForDeliveryLeg({
-    requestId: String(deliveryData.requestId ?? ''),
-    deliveryId,
-    deliveryLeg: {
-      deliveryLegId: legRef.id,
-      deliveryId,
-      requestId: String(deliveryData.requestId ?? ''),
-      legType,
-      actorType,
-      sequence: 1,
-      originRef: toLocationRef(deliveryData.pickupStation as StationInfo),
-      destinationRef: toLocationRef(deliveryData.deliveryStation as StationInfo),
-      status: DeliveryLegStatus.READY,
-      createdAt: Timestamp.now(),
-      updatedAt: Timestamp.now(),
-    },
-    assignedGillerUserId: deliveryData.gillerId,
-    currentReward: Number(deliveryData.fee?.breakdown?.gillerFee ?? deliveryData.fee?.totalFee ?? 0),
+    originType: deliveryData.pickupAddress ? 'address' : 'station',
+    destinationType: deliveryData.deliveryAddress ? 'address' : 'station',
+    pickupStation: deliveryData.pickupStation as StationInfo,
+    deliveryStation: deliveryData.deliveryStation as StationInfo,
+    pickupAddress: String(deliveryData.pickupAddress ?? ''),
+    pickupRoadAddress: deliveryData.pickupAddressDetail?.roadAddress as string | undefined,
+    pickupDetailAddress: deliveryData.pickupAddressDetail?.detailAddress as string | undefined,
+    deliveryAddress: String(deliveryData.deliveryAddress ?? ''),
+    deliveryRoadAddress: deliveryData.deliveryAddressDetail?.roadAddress as string | undefined,
+    deliveryDetailAddress: deliveryData.deliveryAddressDetail?.detailAddress as string | undefined,
   });
+  const legRewards = splitRewardAcrossLegs(
+    Number(deliveryData.fee?.breakdown?.gillerFee ?? deliveryData.fee?.totalFee ?? 0),
+    legDefinitions.length
+  );
+
+  let firstLegId: string | undefined;
+  for (let index = 0; index < legDefinitions.length; index += 1) {
+    const definition = legDefinitions[index];
+    const deliveryLeg = await createDeliveryLegRecord({
+      requestId,
+      deliveryId,
+      legType: definition.legType,
+      actorType: deliveryData.gillerId ? 'giller' : definition.actorType,
+      sequence: definition.sequence,
+      originRef: definition.originRef,
+      destinationRef: definition.destinationRef,
+    });
+    if (!firstLegId) {
+      firstLegId = deliveryLeg.deliveryLegId;
+    }
+
+    await createMissionForDeliveryLeg({
+      requestId,
+      deliveryId,
+      deliveryLeg,
+      assignedGillerUserId: deliveryData.gillerId,
+      currentReward: legRewards[index] ?? 0,
+    });
+  }
+
+  await bundleMissionsForDelivery(deliveryId).catch(() => []);
 
   await updateDoc(doc(db, 'deliveries', deliveryId), {
-    currentLegId: legRef.id,
+    currentLegId: firstLegId,
     beta1DeliveryStatus: typeof deliveryData.status === 'string' ? deliveryData.status : 'accepted',
     updatedAt: serverTimestamp(),
   });

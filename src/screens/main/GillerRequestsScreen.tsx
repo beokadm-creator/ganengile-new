@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
+  Alert,
   RefreshControl,
   ScrollView,
   StyleSheet,
@@ -9,28 +10,27 @@ import {
   View,
 } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
-import { useNavigation } from '@react-navigation/native';
 
 import { useUser } from '../../contexts/UserContext';
 import {
+  acceptMissionBundleForGiller,
   getBeta1HomeSnapshot,
   type Beta1HomeSnapshot,
 } from '../../services/beta1-orchestration-service';
 import { BorderRadius, Colors, Shadows, Spacing, Typography } from '../../theme';
-import type { MainStackNavigationProp } from '../../types/navigation';
 
 type MissionCard = Beta1HomeSnapshot['missionCards'][number];
 
 function isImmediateMission(card: MissionCard): boolean {
-  return card.windowLabel.includes('지금 수락 가능');
+  return card.selectionState === 'available' || card.windowLabel.includes('지금');
 }
 
 export default function GillerRequestsScreen() {
-  const navigation = useNavigation<MainStackNavigationProp>();
   const { user } = useUser();
   const [snapshot, setSnapshot] = useState<Beta1HomeSnapshot | null>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [submittingBundleId, setSubmittingBundleId] = useState<string | null>(null);
 
   const loadSnapshot = useCallback(async (mode: 'initial' | 'refresh' = 'initial') => {
     if (!user?.uid) {
@@ -68,11 +68,40 @@ export default function GillerRequestsScreen() {
     [snapshot],
   );
 
+  const handleAccept = useCallback((card: MissionCard) => {
+    if (!user?.uid || !card.bundleId || card.selectionState === 'accepted') {
+      return;
+    }
+
+    Alert.alert(
+      '이 구간을 맡을까요?',
+      `${card.title}\n${card.legSummary ?? card.strategyBody}\n\n선택하지 않은 주소 구간은 B2B fallback으로 전환될 수 있습니다.`,
+      [
+        { text: '취소', style: 'cancel' },
+        {
+          text: '수행하기',
+          onPress: async () => {
+            try {
+              setSubmittingBundleId(card.bundleId ?? null);
+              await acceptMissionBundleForGiller(card.bundleId!, user.uid);
+              await loadSnapshot('refresh');
+            } catch (error) {
+              const message = error instanceof Error ? error.message : '구간 수락에 실패했습니다.';
+              Alert.alert('수락 실패', message);
+            } finally {
+              setSubmittingBundleId(null);
+            }
+          },
+        },
+      ],
+    );
+  }, [loadSnapshot, user?.uid]);
+
   if (loading) {
     return (
       <View style={styles.center}>
         <ActivityIndicator size="large" color={Colors.primary} />
-        <Text style={styles.loadingText}>미션을 불러오는 중입니다.</Text>
+        <Text style={styles.loadingText}>선택 가능한 배송 구간을 불러오는 중입니다.</Text>
       </View>
     );
   }
@@ -87,36 +116,38 @@ export default function GillerRequestsScreen() {
       }
     >
       <View style={styles.header}>
-        <Text style={styles.kicker}>가는길에</Text>
+        <Text style={styles.kicker}>GOING BOARD</Text>
         <Text style={styles.title}>미션 보드</Text>
-        <Text style={styles.subtitle}>받을 미션만 빠르게 확인하세요.</Text>
+        <Text style={styles.subtitle}>어디서부터 어디까지 맡을지 구간 카드로 바로 선택하세요.</Text>
       </View>
 
       <View style={styles.metricRow}>
-        <MetricCard label="지금 수락 가능" value={immediateMissions.length} />
-        <MetricCard label="검토해볼 제안" value={suggestedMissions.length} />
+        <MetricCard label="즉시 선택" value={immediateMissions.length} />
+        <MetricCard label="추가 제안" value={suggestedMissions.length} />
         <MetricCard
-          label="예상 정산"
+          label="예상 보상"
           value={`${(snapshot?.pendingRewardTotal ?? 0).toLocaleString()}원`}
         />
       </View>
 
       <Section
-        title="지금 수락 가능"
-        subtitle="바로 움직일 수 있는 미션입니다."
+        title="지금 선택 가능"
+        subtitle="바로 맡을 수 있는 구간 카드입니다."
         items={immediateMissions}
-        emptyTitle="지금 바로 받을 미션이 없습니다"
-        emptySubtitle="새 제안이 들어오면 여기에 먼저 보여드릴게요."
-        onPress={(_missionId) => navigation.navigate('ChatList')}
+        emptyTitle="지금 바로 맡을 수 있는 구간이 없습니다"
+        emptySubtitle="새 카드가 도착하면 여기에서 가장 먼저 보여드립니다."
+        submittingBundleId={submittingBundleId}
+        onPress={handleAccept}
       />
 
       <Section
         title="검토해볼 제안"
-        subtitle="동선은 맞지만 시간 확인이 더 필요한 제안입니다."
+        subtitle="시간 확인이 필요하거나 fallback이 함께 걸린 카드입니다."
         items={suggestedMissions}
         emptyTitle="검토할 제안이 없습니다"
-        emptySubtitle="지금은 바로 수락 가능한 미션만 열려 있습니다."
-        onPress={(_missionId) => navigation.navigate('ChatList')}
+        emptySubtitle="현재는 바로 수락 가능한 카드만 열려 있습니다."
+        submittingBundleId={submittingBundleId}
+        onPress={handleAccept}
       />
     </ScrollView>
   );
@@ -128,6 +159,7 @@ function Section({
   items,
   emptyTitle,
   emptySubtitle,
+  submittingBundleId,
   onPress,
 }: {
   title: string;
@@ -135,7 +167,8 @@ function Section({
   items: MissionCard[];
   emptyTitle: string;
   emptySubtitle: string;
-  onPress: (missionId: string) => void;
+  submittingBundleId: string | null;
+  onPress: (card: MissionCard) => void;
 }) {
   return (
     <View style={styles.section}>
@@ -145,22 +178,37 @@ function Section({
       </View>
 
       {items.length ? (
-        items.map((card) => (
-          <TouchableOpacity
-            key={card.id}
-            style={styles.card}
-            activeOpacity={0.88}
-            onPress={() => onPress(card.id)}
-          >
-            <View style={styles.cardTop}>
-              <Text style={styles.cardTitle}>{card.title}</Text>
-              <StatusBadge label={card.status} />
+        items.map((card) => {
+          const disabled = card.selectionState === 'accepted' || !card.bundleId || submittingBundleId === card.bundleId;
+          const actionLabel =
+            submittingBundleId === card.bundleId
+              ? '처리 중...'
+              : card.actionLabel ?? (card.selectionState === 'accepted' ? '수락 완료' : '이 구간 수행하기');
+
+          return (
+            <View key={card.id} style={styles.card}>
+              <View style={styles.cardTop}>
+                <Text style={styles.cardTitle}>{card.title}</Text>
+                <StatusBadge label={card.status} />
+              </View>
+              <Text style={styles.windowLabel}>{card.windowLabel}</Text>
+              <Text style={styles.rewardLabel}>{card.rewardLabel}</Text>
+              <Text style={styles.cardBody}>{card.strategyTitle}</Text>
+              <Text style={styles.cardSummary}>{card.strategyBody}</Text>
+              {card.fallbackLabel ? <Text style={styles.fallbackLabel}>{card.fallbackLabel}</Text> : null}
+              <TouchableOpacity
+                style={[styles.actionButton, disabled && styles.actionButtonDisabled]}
+                activeOpacity={0.88}
+                disabled={disabled}
+                onPress={() => onPress(card)}
+              >
+                <Text style={[styles.actionButtonText, disabled && styles.actionButtonTextDisabled]}>
+                  {actionLabel}
+                </Text>
+              </TouchableOpacity>
             </View>
-            <Text style={styles.windowLabel}>{card.windowLabel}</Text>
-            <Text style={styles.rewardLabel}>{card.rewardLabel}</Text>
-            <Text style={styles.cardBody}>{card.strategyTitle}</Text>
-          </TouchableOpacity>
-        ))
+          );
+        })
       ) : (
         <View style={styles.emptyCard}>
           <Text style={styles.emptyTitle}>{emptyTitle}</Text>
@@ -183,7 +231,7 @@ function MetricCard({ label, value }: { label: string; value: string | number })
 function StatusBadge({ label }: { label: string }) {
   return (
     <View style={styles.statusBadge}>
-      <MaterialIcons name="flash-on" size={14} color={Colors.primaryDark} />
+      <MaterialIcons name="bolt" size={14} color={Colors.primaryDark} />
       <Text style={styles.statusBadgeText}>{label}</Text>
     </View>
   );
@@ -219,16 +267,18 @@ const styles = StyleSheet.create({
   kicker: {
     color: Colors.primary,
     fontSize: Typography.fontSize.sm,
-    fontWeight: '700',
+    fontWeight: Typography.fontWeight.bold,
+    letterSpacing: 1,
   },
   title: {
     color: Colors.textPrimary,
-    fontSize: Typography.fontSize['3xl'],
-    fontWeight: '800',
+    fontSize: Typography.fontSize['2xl'],
+    fontWeight: Typography.fontWeight.bold,
   },
   subtitle: {
     color: Colors.textSecondary,
-    fontSize: Typography.fontSize.base,
+    fontSize: Typography.fontSize.sm,
+    lineHeight: 20,
   },
   metricRow: {
     flexDirection: 'row',
@@ -240,16 +290,16 @@ const styles = StyleSheet.create({
     borderRadius: BorderRadius.lg,
     padding: Spacing.md,
     ...Shadows.sm,
+    gap: 4,
   },
   metricLabel: {
-    color: Colors.textTertiary,
+    color: Colors.textSecondary,
     fontSize: Typography.fontSize.xs,
-    marginBottom: 6,
   },
   metricValue: {
     color: Colors.textPrimary,
     fontSize: Typography.fontSize.lg,
-    fontWeight: '800',
+    fontWeight: Typography.fontWeight.bold,
   },
   section: {
     gap: Spacing.md,
@@ -260,7 +310,7 @@ const styles = StyleSheet.create({
   sectionTitle: {
     color: Colors.textPrimary,
     fontSize: Typography.fontSize.xl,
-    fontWeight: '800',
+    fontWeight: Typography.fontWeight.bold,
   },
   sectionSubtitle: {
     color: Colors.textSecondary,
@@ -270,59 +320,89 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.surface,
     borderRadius: BorderRadius.xl,
     padding: Spacing.lg,
-    gap: 8,
+    gap: Spacing.sm,
     ...Shadows.sm,
   },
   cardTop: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    gap: Spacing.sm,
+    gap: Spacing.md,
   },
   cardTitle: {
     flex: 1,
     color: Colors.textPrimary,
+    fontSize: Typography.fontSize.lg,
+    fontWeight: Typography.fontWeight.bold,
+  },
+  windowLabel: {
+    color: Colors.primary,
+    fontSize: Typography.fontSize.sm,
+    fontWeight: Typography.fontWeight.medium,
+  },
+  rewardLabel: {
+    color: Colors.textPrimary,
+    fontSize: Typography.fontSize.lg,
+    fontWeight: Typography.fontWeight.bold,
+  },
+  cardBody: {
+    color: Colors.textPrimary,
     fontSize: Typography.fontSize.base,
-    fontWeight: '700',
+    fontWeight: Typography.fontWeight.bold,
+  },
+  cardSummary: {
+    color: Colors.textSecondary,
+    fontSize: Typography.fontSize.sm,
+    lineHeight: 20,
+  },
+  fallbackLabel: {
+    color: Colors.warning,
+    fontSize: Typography.fontSize.sm,
+  },
+  actionButton: {
+    marginTop: Spacing.xs,
+    backgroundColor: Colors.primary,
+    borderRadius: BorderRadius.lg,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: Spacing.md,
+  },
+  actionButtonDisabled: {
+    backgroundColor: Colors.border,
+  },
+  actionButtonText: {
+    color: Colors.white,
+    fontSize: Typography.fontSize.sm,
+    fontWeight: Typography.fontWeight.bold,
+  },
+  actionButtonTextDisabled: {
+    color: Colors.textSecondary,
   },
   statusBadge: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 4,
-    backgroundColor: Colors.secondaryLight,
     borderRadius: BorderRadius.full,
-    paddingHorizontal: 10,
+    backgroundColor: Colors.primaryLight,
+    paddingHorizontal: Spacing.sm,
     paddingVertical: 6,
   },
   statusBadgeText: {
     color: Colors.primaryDark,
     fontSize: Typography.fontSize.xs,
-    fontWeight: '800',
-  },
-  windowLabel: {
-    color: Colors.textSecondary,
-    fontSize: Typography.fontSize.sm,
-  },
-  rewardLabel: {
-    color: Colors.primary,
-    fontSize: Typography.fontSize.lg,
-    fontWeight: '800',
-  },
-  cardBody: {
-    color: Colors.textPrimary,
-    fontSize: Typography.fontSize.sm,
-    lineHeight: 20,
+    fontWeight: Typography.fontWeight.bold,
   },
   emptyCard: {
     backgroundColor: Colors.surface,
     borderRadius: BorderRadius.xl,
     padding: Spacing.xl,
-    gap: 6,
+    gap: Spacing.sm,
+    ...Shadows.sm,
   },
   emptyTitle: {
     color: Colors.textPrimary,
     fontSize: Typography.fontSize.base,
-    fontWeight: '700',
+    fontWeight: Typography.fontWeight.bold,
   },
   emptySubtitle: {
     color: Colors.textSecondary,

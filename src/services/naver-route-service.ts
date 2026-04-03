@@ -34,7 +34,7 @@ export async function getDrivingRoute(args: {
 }): Promise<NaverRouteResult | null> {
   const proxyUrl = getNaverDirectionsProxyUrl();
   if (!proxyUrl) {
-    throw new Error('경로 프록시 URL이 아직 설정되지 않았습니다.');
+    return null;
   }
 
   const requestUrl = new URL(proxyUrl);
@@ -46,6 +46,10 @@ export async function getDrivingRoute(args: {
   const payload = (await response.json().catch(() => ({}))) as DirectionsProxyPayload;
 
   if (!response.ok) {
+    if (response.status === 404) {
+      return null;
+    }
+
     throw new Error(payload.message || '경로 좌표를 불러오지 못했습니다.');
   }
 
@@ -82,3 +86,4 @@ export function formatRouteDuration(durationMs: number): string {
   const minutes = totalMinutes % 60;
   return minutes > 0 ? `${hours}시간 ${minutes}분` : `${hours}시간`;
 }
+

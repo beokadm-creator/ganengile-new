@@ -1,4 +1,4 @@
-﻿# AI Documentation Governance
+# AI Documentation Governance
 
 `precedence`: 90  
 `required-for`: 모든 문서 수정, 충돌 해석, 압축 후 복원  

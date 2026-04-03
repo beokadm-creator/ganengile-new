@@ -20,7 +20,6 @@ import {
 import { db } from './firebase';
 import {
   Rating,
-  CreateRatingData,
   RatingTag,
   UserRatingStats,
   RatingSummary,

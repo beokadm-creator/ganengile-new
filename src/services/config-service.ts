@@ -97,6 +97,15 @@ class ConfigCache {
 
 const cache = new ConfigCache();
 
+function isPermissionDeniedError(error: unknown): boolean {
+  if (typeof error !== 'object' || error == null) {
+    return false;
+  }
+
+  const code = 'code' in error ? String((error as { code?: unknown }).code ?? '') : '';
+  return code === 'permission-denied' || code === 'firestore/permission-denied';
+}
+
 function convertTimestampToDate(timestamp: { seconds: number; nanoseconds?: number }): Date {
   return new Date(timestamp.seconds * 1000 + (timestamp.nanoseconds || 0) / 1000000);
 }
@@ -1161,7 +1170,11 @@ export async function getRecipientContactPrivacyConfig(): Promise<RecipientConta
     cache.set(cacheKey, resolved);
     return resolved;
   } catch (error) {
-    console.warn('Using fallback recipient contact privacy config:', error);
+    if (isPermissionDeniedError(error)) {
+      console.warn('Using fallback recipient contact privacy config because access was denied.');
+    } else {
+      console.warn('Using fallback recipient contact privacy config:', error);
+    }
     const fallback: RecipientContactPrivacyConfig = {
       safeNumberEnabled: false,
       providerName: '관리자 설정 대기',

@@ -1,4 +1,4 @@
-﻿import type { B2BGillerTierLevel } from './b2b-giller-tier';
+import type { B2BGillerTierLevel } from './b2b-giller-tier';
 
 export interface SettlementPeriod {
   start: Date;

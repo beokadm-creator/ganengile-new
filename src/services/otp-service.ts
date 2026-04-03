@@ -43,14 +43,19 @@ export async function requestPhoneOtp(phoneNumber: string): Promise<RequestOtpRe
 
   try {
     const functionsInstance = getFunctions();
-    const requestOtp = httpsCallable<{ phoneNumber: string }, RequestOtpResult>(functionsInstance, 'requestPhoneOtp');
+    const requestOtp = httpsCallable<{ phoneNumber: string }, RequestOtpResult>(
+      functionsInstance,
+      'requestPhoneOtp'
+    );
     const response = await requestOtp({ phoneNumber: normalized });
     return response.data;
   } catch (error) {
     console.warn('requestPhoneOtp fallback:', error);
 
     if (!isDevelopmentOtpFallbackEnabled) {
-      throw new Error('휴대폰 인증 서비스를 지금 사용할 수 없습니다. 운영 환경에서는 개발용 OTP를 사용할 수 없습니다.');
+      throw new Error(
+        '본인인증 서비스가 현재 사용 불가합니다. 운영 환경에서는 개발용 OTP를 사용할 수 없습니다.'
+      );
     }
 
     const sessionId = `local-${Date.now()}`;
@@ -88,24 +93,29 @@ export async function confirmPhoneOtp(params: {
 
   try {
     const functionsInstance = getFunctions();
-    const confirmOtp = httpsCallable<typeof payload, ConfirmOtpResult>(functionsInstance, 'confirmPhoneOtp');
+    const confirmOtp = httpsCallable<typeof payload, ConfirmOtpResult>(
+      functionsInstance,
+      'confirmPhoneOtp'
+    );
     const response = await confirmOtp(payload);
     return response.data;
   } catch (error) {
     console.warn('confirmPhoneOtp fallback:', error);
 
     if (!isDevelopmentOtpFallbackEnabled) {
-      throw new Error('휴대폰 인증 확인을 완료하지 못했습니다. 운영 환경에서는 개발용 OTP를 사용할 수 없습니다.');
+      throw new Error(
+        '본인인증 확인을 완료하지 못했습니다. 운영 환경에서는 개발용 OTP를 사용할 수 없습니다.'
+      );
     }
 
     const session = fallbackSessions.get(payload.sessionId);
     if (session?.phoneNumber !== payload.phoneNumber) {
-      throw new Error('인증 세션을 찾지 못했습니다. 인증번호를 다시 요청해주세요.');
+      throw new Error('인증 세션을 찾지 못했습니다. 인증번호를 다시 요청해 주세요.');
     }
 
     if (new Date(session.expiresAt).getTime() < Date.now()) {
       fallbackSessions.delete(payload.sessionId);
-      throw new Error('인증번호가 만료되었습니다. 다시 요청해주세요.');
+      throw new Error('인증번호가 만료되었습니다. 다시 요청해 주세요.');
     }
 
     if (session.code !== payload.code) {

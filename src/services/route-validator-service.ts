@@ -123,10 +123,10 @@ export const validateRouteInput = (
 /**
  * 예상 소요 시간 계산 (PathfindingService 활용)
  */
-export const estimateTravelTime = async (
+export const estimateTravelTime = (
   startStation: StationInfo,
   endStation: StationInfo
-): Promise<number> => {
+): number => {
   try {
     // PathfindingService가 초기화되었는지 확인
     const result = pathfindingService.calculateETA(

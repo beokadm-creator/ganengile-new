@@ -8,7 +8,6 @@ import {
   doc,
   updateDoc,
   serverTimestamp,
-  onSnapshot,
 } from 'firebase/firestore';
 import { db } from './firebase';
 

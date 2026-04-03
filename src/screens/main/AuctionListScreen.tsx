@@ -9,7 +9,7 @@ import {
   View,
 } from 'react-native';
 import type { StackNavigationProp } from '@react-navigation/stack';
-import { getAuctionsByGller, toAuctionListItem } from '../../services/auction-service';
+import { getAuctionsByRequester, toAuctionListItem } from '../../services/auction-service';
 import { requireUserId } from '../../services/firebase';
 import { AuctionStatus, type AuctionListItem } from '../../types/auction';
 import type { MainStackParamList } from '../../types/navigation';
@@ -95,7 +95,7 @@ export default function AuctionListScreen({ navigation }: Props) {
   async function loadAuctions(): Promise<void> {
     try {
       const userId = requireUserId();
-      const data = await getAuctionsByGller(userId);
+      const data = await getAuctionsByRequester(userId);
       setAuctions(data.map((auction) => toAuctionListItem(auction)));
     } catch (error) {
       console.error('Failed to load auctions', error);

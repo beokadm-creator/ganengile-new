@@ -286,11 +286,11 @@ export async function getUserStats(userId: string): Promise<UserStatsResult> {
       averageRating = totalRating / ratingsSnapshot.size;
     }
 
-    const allGillerRequestsQuery = query(collection(db, 'requests'), where('gllerId', '==', userId));
-    const allGillerRequestsSnapshot = await getDocs(allGillerRequestsQuery);
+    const allRequesterRequestsQuery = query(collection(db, 'requests'), where('requesterId', '==', userId));
+    const allRequesterRequestsSnapshot = await getDocs(allRequesterRequestsQuery);
     const completionRate =
-      allGillerRequestsSnapshot.size > 0
-        ? (completedRequestsSnapshot.size / allGillerRequestsSnapshot.size) * 100
+      allRequesterRequestsSnapshot.size > 0
+        ? (completedRequestsSnapshot.size / allRequesterRequestsSnapshot.size) * 100
         : 0;
 
     return {
@@ -371,7 +371,7 @@ export async function saveFCMToken(userId: string, token: string): Promise<void>
 
 export async function getUserDeliveryHistory(userId: string, limitCount: number = 20): Promise<UserHistoryItem[]> {
   try {
-    const requestsQuery = query(collection(db, 'requests'), where('gllerId', '==', userId));
+    const requestsQuery = query(collection(db, 'requests'), where('requesterId', '==', userId));
     const snapshot = await getDocs(requestsQuery);
 
     const history = snapshot.docs.map((docSnapshot) => {

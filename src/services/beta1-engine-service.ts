@@ -1,10 +1,12 @@
 import {
-  addDoc,
   collection,
   doc,
+  getDocs,
+  query,
   serverTimestamp,
   Timestamp,
   updateDoc,
+  where,
 } from 'firebase/firestore';
 import { db } from './firebase';
 import {
@@ -18,13 +20,12 @@ import {
   analyzeRequestDraftWithAI,
   generatePricingQuotesWithAI,
 } from './beta1-ai-service';
-import type { CreateRequestData, StationInfo } from '../types/request';
+import type { CreateRequestData } from '../types/request';
 import type {
   AIAnalysis,
   DeliveryActorType,
   DeliveryLeg,
   DeliveryLegType,
-  LocationRef,
   Mission,
   MissionType,
   PricingQuote,
@@ -38,9 +39,13 @@ import {
   RequestDraftStatus,
 } from '../types/beta1';
 import {
-  buildPricingQuoteFromLegacyFee,
+  type LegacyRequestPricingInput,
+  type LegacyStationInfo,
+  buildPricingQuoteFromLegacyRequest,
   buildRequestDraftFromLegacyInput,
+  mapLegacyStationToLocationRef,
 } from '../utils/request-draft-adapters';
+import { syncDeliveryToBeta1Execution } from './beta1-orchestration-service';
 
 export interface RequestCreationBootstrapResult {
   requestDraft: RequestDraft;
@@ -53,8 +58,8 @@ export interface DeliveryPlanBootstrapInput {
   requestId: string;
   requesterUserId: string;
   assignedGillerUserId?: string;
-  pickupStation: StationInfo;
-  deliveryStation: StationInfo;
+  pickupStation: LegacyStationInfo;
+  deliveryStation: LegacyStationInfo;
   deadline?: Date | Timestamp;
   currentReward?: number;
 }
@@ -62,16 +67,6 @@ export interface DeliveryPlanBootstrapInput {
 export interface DeliveryPlanBootstrapResult {
   deliveryLeg: DeliveryLeg;
   mission: Mission;
-}
-
-function stationToLocationRef(station: StationInfo): LocationRef {
-  return {
-    type: 'station',
-    stationId: station.stationId,
-    stationName: station.stationName,
-    latitude: station.lat,
-    longitude: station.lng,
-  };
 }
 
 function resolveMissionWindowEnd(deadline?: Date | Timestamp): Timestamp | undefined {
@@ -148,42 +143,10 @@ async function createRequestDraftAnalysis(
 }
 
 function buildFallbackQuote(
-  requestData: CreateRequestData,
+  requestData: LegacyRequestPricingInput,
   requestDraftId: string
 ): Omit<PricingQuote, 'pricingQuoteId'> {
-  const fee = (requestData.fee ?? requestData.feeBreakdown) as
-    | {
-        baseFee: number;
-        distanceFee: number;
-        weightFee: number;
-        sizeFee: number;
-        urgencySurcharge: number;
-        publicFare?: number;
-        serviceFee: number;
-        vat: number;
-        totalFee: number;
-      }
-    | undefined;
-  if (!fee) {
-    throw new Error('Fee is required to create a pricing quote.');
-  }
-
-  return buildPricingQuoteFromLegacyFee({
-    requestDraftId,
-    requesterUserId: requestData.requesterId,
-    publicPrice: fee.totalFee,
-    depositAmount: requestData.itemValue ? Math.round(requestData.itemValue) : 0,
-    baseFee: fee.baseFee,
-    distanceFee: fee.distanceFee,
-    weightFee: fee.weightFee,
-    sizeFee: fee.sizeFee,
-    urgencySurcharge: fee.urgencySurcharge,
-    publicFare: fee.publicFare,
-    serviceFee: fee.serviceFee,
-    vat: fee.vat,
-    speedLabel: 'Balanced',
-    includesAddressDropoff: true,
-  });
+  return buildPricingQuoteFromLegacyRequest(requestData, requestDraftId);
 }
 
 async function createPricingQuotes(
@@ -292,83 +255,69 @@ export async function bootstrapRequestCreationEngine(
 export async function bootstrapAcceptedDeliveryPlan(
   input: DeliveryPlanBootstrapInput
 ): Promise<DeliveryPlanBootstrapResult> {
-  const originRef = stationToLocationRef(input.pickupStation);
-  const destinationRef = stationToLocationRef(input.deliveryStation);
-  const actorType: DeliveryActorType = input.assignedGillerUserId ? 'giller' : 'system';
-  const legType: DeliveryLegType = 'subway_transport';
+  await syncDeliveryToBeta1Execution(input.deliveryId);
 
-  const deliveryLegPayload = {
-    deliveryId: input.deliveryId,
-    requestId: input.requestId,
-    legType,
-    actorType,
-    sequence: 1,
-    originRef,
-    destinationRef,
-    status: DeliveryLegStatus.READY,
-    createdAt: serverTimestamp(),
-    updatedAt: serverTimestamp(),
-  };
+  const [legSnapshot, missionSnapshot] = await Promise.all([
+    getDocs(query(collection(db, 'delivery_legs'), where('deliveryId', '==', input.deliveryId))),
+    getDocs(query(collection(db, 'missions'), where('deliveryId', '==', input.deliveryId))),
+  ]);
 
-  const deliveryLegRef = await addDoc(collection(db, 'delivery_legs'), deliveryLegPayload);
-  const missionPayload = {
-    requestId: input.requestId,
-    deliveryId: input.deliveryId,
-    deliveryLegId: deliveryLegRef.id,
-    sequence: 1,
-    missionType: mapLegTypeToMissionType(legType),
-    status: input.assignedGillerUserId ? MissionStatus.ACCEPTED : MissionStatus.QUEUED,
-    originRef,
-    destinationRef,
-    windowStartAt: Timestamp.now(),
-    windowEndAt: resolveMissionWindowEnd(input.deadline),
-    recommendedReward: input.currentReward,
-    minimumReward: input.currentReward,
-    currentReward: input.currentReward,
-    assignedGillerUserId: input.assignedGillerUserId,
-    createdAt: serverTimestamp(),
-    updatedAt: serverTimestamp(),
-  };
+  const firstLeg = legSnapshot.docs
+    .map((snapshot) => ({
+      deliveryLegId: snapshot.id,
+      ...(snapshot.data() as Omit<DeliveryLeg, 'deliveryLegId'>),
+    }))
+    .sort((left, right) => left.sequence - right.sequence)[0];
+  const firstMission = missionSnapshot.docs
+    .map((snapshot) => ({
+      missionId: snapshot.id,
+      ...(snapshot.data() as Omit<Mission, 'missionId'>),
+    }))
+    .sort((left, right) => left.sequence - right.sequence)[0];
 
-  const missionRef = await addDoc(collection(db, 'missions'), missionPayload);
-
-  await updateDoc(doc(db, 'deliveries', input.deliveryId), {
-    currentLegId: deliveryLegRef.id,
-    updatedAt: serverTimestamp(),
-  });
+  if (!firstLeg || !firstMission) {
+    const originRef = mapLegacyStationToLocationRef(input.pickupStation);
+    const destinationRef = mapLegacyStationToLocationRef(input.deliveryStation);
+    const actorType: DeliveryActorType = input.assignedGillerUserId ? 'giller' : 'system';
+    const legType: DeliveryLegType = 'subway_transport';
+    return {
+      deliveryLeg: {
+        deliveryLegId: '',
+        deliveryId: input.deliveryId,
+        requestId: input.requestId,
+        legType,
+        actorType,
+        sequence: 1,
+        originRef,
+        destinationRef,
+        status: DeliveryLegStatus.READY,
+        createdAt: Timestamp.now(),
+        updatedAt: Timestamp.now(),
+      },
+      mission: {
+        missionId: '',
+        requestId: input.requestId,
+        deliveryId: input.deliveryId,
+        deliveryLegId: '',
+        sequence: 1,
+        missionType: mapLegTypeToMissionType(legType),
+        status: input.assignedGillerUserId ? MissionStatus.ACCEPTED : MissionStatus.QUEUED,
+        originRef,
+        destinationRef,
+        windowStartAt: Timestamp.now(),
+        windowEndAt: resolveMissionWindowEnd(input.deadline),
+        recommendedReward: input.currentReward,
+        minimumReward: input.currentReward,
+        currentReward: input.currentReward,
+        assignedGillerUserId: input.assignedGillerUserId,
+        createdAt: Timestamp.now(),
+        updatedAt: Timestamp.now(),
+      },
+    };
+  }
 
   return {
-    deliveryLeg: {
-      deliveryLegId: deliveryLegRef.id,
-      deliveryId: input.deliveryId,
-      requestId: input.requestId,
-      legType,
-      actorType,
-      sequence: 1,
-      originRef,
-      destinationRef,
-      status: DeliveryLegStatus.READY,
-      createdAt: Timestamp.now(),
-      updatedAt: Timestamp.now(),
-    },
-    mission: {
-      missionId: missionRef.id,
-      requestId: input.requestId,
-      deliveryId: input.deliveryId,
-      deliveryLegId: deliveryLegRef.id,
-      sequence: 1,
-      missionType: mapLegTypeToMissionType(legType),
-      status: input.assignedGillerUserId ? MissionStatus.ACCEPTED : MissionStatus.QUEUED,
-      originRef,
-      destinationRef,
-      windowStartAt: Timestamp.now(),
-      windowEndAt: resolveMissionWindowEnd(input.deadline),
-      recommendedReward: input.currentReward,
-      minimumReward: input.currentReward,
-      currentReward: input.currentReward,
-      assignedGillerUserId: input.assignedGillerUserId,
-      createdAt: Timestamp.now(),
-      updatedAt: Timestamp.now(),
-    },
+    deliveryLeg: firstLeg,
+    mission: firstMission,
   };
 }

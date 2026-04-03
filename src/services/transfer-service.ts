@@ -3,7 +3,7 @@
  * 환승 매칭 알고리즘 구현
  */
 
-import { collection, doc, getDoc, addDoc, updateDoc, query, where, getDocs } from 'firebase/firestore';
+import { collection, doc, getDoc, addDoc, query, where, getDocs } from 'firebase/firestore';
 import { db } from './firebase';
 import type { TransferPossibility, TransferPricing, TransferMatch, Route } from '../types/transfer';
 import type { Station } from '../types/config';
@@ -82,10 +82,10 @@ export class TransferService {
    * @param route 경로
    * @returns 소요 시간 (분)
    */
-  private async calculateTravelTime(route: Route): Promise<number> {
+  private calculateTravelTime(_route: Route): Promise<number> {
     // 실제로는 config_travel_times 테이블에서 조회
     // 여기서는 단순화를 위해 고정 시간 반환
-    return 30; // 30분 가정
+    return Promise.resolve(30); // 30분 가정
   }
 
   /**

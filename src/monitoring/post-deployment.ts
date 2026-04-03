@@ -40,7 +40,7 @@ export const setupNativeCrashReporting = (): void => {
   }
 };
 
-export const runPostDeploymentChecks = async (): Promise<void> => {
+export const runPostDeploymentChecks = (): void => {
   if (__DEV__) {
     return;
   }

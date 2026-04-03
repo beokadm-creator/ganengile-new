@@ -14,21 +14,18 @@ import {
   query,
   where,
   orderBy,
-  QueryDocumentSnapshot,
-  Timestamp,
 } from 'firebase/firestore';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { db } from './firebase';
 import type {
   Route,
-  StationInfo,
-  DetailedAddress,
-  CreateRouteParams,
-  UpdateRouteParams,
   RouteValidationResult,
   RouteSummary,
-  RoutesByDay,
   StationRoutesResult,
+  StationInfo,
+  CreateRouteParams,
+  UpdateRouteParams,
+  DetailedAddress,
 } from '../types/route';
 
 // 요일 라벨 (DaySelector와 동일)
@@ -225,16 +222,16 @@ async function withRetry<T>(
       const errorCode = (error as { code?: string })?.code;
       const isNetworkError = !errorCode || errorCode === 'unavailable' || errorCode === 'deadline-exceeded';
 
-      if (!isNetworkError || attempt === maxRetries - 1) {
-        throw error;
-      }
+    if (!isNetworkError || attempt === maxRetries - 1) {
+      throw lastError ?? new Error('Unknown error occurred');
+    }
 
       const delay = Math.pow(2, attempt) * 1000;
       await new Promise(resolve => setTimeout(resolve, delay));
     }
   }
 
-  throw lastError;
+    throw lastError ?? new Error('Unknown error occurred');
 }
 
 // ==================== Route Validation ====================
@@ -286,7 +283,7 @@ function isOperatingTime(time: string): boolean {
  * @param time 출발 시간 (HH:mm)
  * @returns 혼잡 시간대 여부
  */
-function isCongestionTime(time: string): boolean {
+function _isCongestionTime(time: string): boolean {
   const [hourStr] = time.split(':');
   const hour = parseInt(hourStr, 10);
 
@@ -1056,7 +1053,7 @@ export async function checkRouteOverlap(
     daysOfWeek: number[];
   }
 ): Promise<{ hasOverlap: boolean; overlappingRoutes: Route[] }> {
-  const { startStation, endStation, departureTime, daysOfWeek } = routeData;
+  const { startStation: _startStation, endStation: _endStation, departureTime, daysOfWeek } = routeData;
 
   // 기존 동선 조회
   const existingRoutes = await getUserRoutes(userId);

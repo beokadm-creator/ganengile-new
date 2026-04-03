@@ -4,7 +4,7 @@
  */
 
 import React from 'react';
-import { View, ScrollView, TouchableOpacity, Text, StyleSheet } from 'react-native';
+import { ScrollView, TouchableOpacity, Text, StyleSheet } from 'react-native';
 
 interface Props {
   selectedLines: string[];

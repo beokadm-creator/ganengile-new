@@ -13,9 +13,10 @@ import {
   where,
   getDocs,
   serverTimestamp,
+  Timestamp,
 } from 'firebase/firestore';
-import { Timestamp } from 'firebase/firestore';
 import { db } from './firebase';
+import { getAuth } from 'firebase/auth';
 import {
   GillerType,
   GillerStatus,
@@ -24,12 +25,10 @@ import {
 } from '../types/giller';
 import type {
   GillerProfile,
-  GillerLimits,
-  GillerBenefits,
   GillerPromotion,
   PromotionCriteria,
 } from '../types/giller';
-import type { Badge, BadgeRank } from '../types/badge';
+import type { Badge } from '../types/badge';
 import { ALL_BADGES } from '../types/badge';
 
 interface UserBadge {
@@ -51,7 +50,6 @@ export class GillerService {
 
   private getCurrentUserId(): string {
     // Firebase Auth currentUser 사용
-    const { getAuth } = require('firebase/auth');
     const auth = getAuth();
     if (!auth.currentUser) {
       throw new Error('User not authenticated');

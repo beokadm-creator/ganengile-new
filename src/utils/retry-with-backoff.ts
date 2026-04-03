@@ -201,7 +201,7 @@ export async function retryAll<T>(
     fns.map(fn => retryWithBackoffSafe(fn, options))
   );
 
-  return results.map((result, index) => {
+  return results.map((result, _index) => {
     if (result.status === 'fulfilled') {
       return result.value;
     } else {

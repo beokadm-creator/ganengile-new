@@ -15,6 +15,7 @@ import * as ImagePicker from 'expo-image-picker';
 import * as FileSystem from 'expo-file-system';
 import { getStorage, ref, uploadBytesResumable, getDownloadURL, deleteObject } from 'firebase/storage';
 import { firebaseApp } from './firebase';
+import * as ImageManipulator from 'expo-image-manipulator';
 
 export interface MediaUploadResult {
   url: string;
@@ -264,7 +265,7 @@ export class MediaService {
   /**
    * 이미지 압축 (업로드 전에 미리보기)
    */
-  async compressImage(uri: string, quality: number = this.COMPRESSION_QUALITY): Promise<string> {
+  compressImage(uri: string, _quality: number = this.COMPRESSION_QUALITY): string {
     try {
       // Expo ImageManipulator를 사용한 압축 (향후 구현)
       // 현재는 ImagePicker의 allowsEditing으로 대체
@@ -297,7 +298,6 @@ export class MediaService {
    */
   async resizeImage(uri: string, maxWidth: number = 200): Promise<string> {
     try {
-      const { manipulateAsync, ImageManipulator } = require('expo-image-manipulator');
 
       // 이미지 정보 가져오기
       const fileInfo = await FileSystem.getInfoAsync(uri);
@@ -309,7 +309,7 @@ export class MediaService {
       const originalSize = fileInfo.size || 0;
 
       // 이미지 조작 (리사이징)
-      const result = await manipulateAsync(
+      const result = await ImageManipulator.manipulateAsync(
         uri,
         [
           {
@@ -324,7 +324,7 @@ export class MediaService {
         }
       );
 
-      console.log(`Image resized: ${originalSize} -> ${result.size} bytes (${maxWidth}px width)`);
+      console.log(`Image resized: ${originalSize} -> ??? bytes (${maxWidth}px width)`);
 
       return result.uri;
     } catch (error) {
@@ -339,9 +339,7 @@ export class MediaService {
    */
   async rotateImage(uri: string, degrees: number = 0): Promise<string> {
     try {
-      const { manipulateAsync } = require('expo-image-manipulator');
-
-      const result = await manipulateAsync(
+      const result = await ImageManipulator.manipulateAsync(
         uri,
         [
           {
@@ -350,7 +348,7 @@ export class MediaService {
         ],
         {
           compress: 0.7,
-          format: 'jpeg',
+          format: ImageManipulator.SaveFormat.JPEG,
         }
       );
 
@@ -372,9 +370,7 @@ export class MediaService {
     height: number
   ): Promise<string> {
     try {
-      const { manipulateAsync } = require('expo-image-manipulator');
-
-      const result = await manipulateAsync(
+      const result = await ImageManipulator.manipulateAsync(
         uri,
         [
           {
@@ -388,7 +384,7 @@ export class MediaService {
         ],
         {
           compress: 0.7,
-          format: 'jpeg',
+          format: ImageManipulator.SaveFormat.JPEG,
         }
       );
 

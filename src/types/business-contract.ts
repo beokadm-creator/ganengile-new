@@ -1,4 +1,4 @@
-﻿export interface Location {
+export interface Location {
   station: string;
   address: string;
   contact: string;

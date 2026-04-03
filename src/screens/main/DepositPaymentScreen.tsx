@@ -16,7 +16,8 @@ export default function DepositPaymentScreen({ navigation, route }: { navigation
   const [modeTitle, setModeTitle] = useState('결제 준비 상태를 불러오는 중입니다.');
   const [modeBody, setModeBody] = useState('관리자 설정과 현재 결제 공급자 상태를 확인하고 있습니다.');
 
-  const { gillerId, gllerId, requestId, itemValue } = route.params;
+  const { gillerId, requesterId, gllerId, requestId, itemValue } = route.params;
+  const resolvedRequesterId = requesterId ?? gllerId ?? '';
   const depositAmount = Math.round(itemValue * DEPOSIT_RATE);
   const pointCoverage = Math.min(pointBalance, depositAmount);
   const pgAmount = Math.max(0, depositAmount - pointCoverage);
@@ -57,7 +58,7 @@ export default function DepositPaymentScreen({ navigation, route }: { navigation
   async function handlePayment() {
     try {
       setLoading(true);
-      const result = await DepositService.payDeposit(gillerId, gllerId, requestId, itemValue);
+      const result = await DepositService.payDeposit(gillerId, resolvedRequesterId, requestId, itemValue);
       if (!result.success) {
         Alert.alert('결제 실패', result.error ?? '보증금 결제 중 문제가 발생했습니다.');
         return;

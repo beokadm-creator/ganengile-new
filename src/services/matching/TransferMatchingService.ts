@@ -104,7 +104,7 @@ export class TransferMatchingService {
     const results: MatchingResult[] = [];
 
     for (const giller of [...gillersToTransfer, ...gillersFromTransfer]) {
-      const matchResult = await this.calculateTransferMatchScore(
+      const matchResult = this.calculateTransferMatchScore(
         giller,
         request,
         transferRoute
@@ -267,7 +267,7 @@ export class TransferMatchingService {
   private static async getTravelTime(
     fromStationId: string,
     toStationId: string,
-    lineCode: string
+    _lineCode: string
   ): Promise<number | null> {
     // config_travel_times에서 조회
     const travelTimesRef = collection(db, 'config_travel_times');
@@ -320,12 +320,12 @@ export class TransferMatchingService {
   /**
    * 환승 매칭 점수 계산
    */
-  private static async calculateTransferMatchScore(
+  private static calculateTransferMatchScore(
     giller: any,
     request: DeliveryRequestP1,
     transferRoute: TransferRoute
-  ): Promise<MatchingResult> {
-    // 점수 계산 (환�승 보너스 포함)
+  ): MatchingResult {
+    // 점수 계산 (환승 보너스 포함)
     const routeScore = this.calculateRouteScore(giller, transferRoute);
     const timeScore = this.calculateTimeScore(giller, transferRoute);
     const ratingScore = this.calculateRatingScore(giller);

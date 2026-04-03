@@ -152,6 +152,7 @@ export default function DeliveryCompletionScreen() {
             navigation.replace('Rating', {
               deliveryId,
               gillerId,
+              requesterId: requesterOrOwnerId,
               gllerId: requesterOrOwnerId,
             }),
         },

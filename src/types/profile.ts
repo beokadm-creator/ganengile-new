@@ -1,27 +1,23 @@
-﻿/**
+/**
  * Profile & Verification Types
- * ?꾨줈??諛??좎썝 ?몄쬆 愿??????뺤쓽
+ * 프로필 및 신원 인증 관련 타입 정의
  */
 
 import { Timestamp } from 'firebase/firestore';
 
-/**
- * 湲몃윭 ?깃툒 (諛곗넚 ?잛닔 湲곗?)
- */
+/** 길러 등급 (배송 횟수 기준) */
 export enum GillerGrade {
-  NEWCOMER = 'newcomer',   // 0~10??
-  REGULAR = 'regular',     // 11~30??
-  EXPERT = 'expert',       // 31~50??
-  MASTER = 'master',       // 51??
+  NEWCOMER = 'newcomer',   // 0~10회
+  REGULAR = 'regular',     // 11~30회
+  EXPERT = 'expert',       // 31~50회
+  MASTER = 'master',       // 51회 이상
 }
 
-/**
- * ?꾨줈???뺣낫 (users/{uid}/profile)
- */
+/** 프로필 정보 (`users/{uid}/profile`) */
 export interface UserProfile {
   userId: string;
 
-  // 湲곕낯 ?뺣낫
+  // 기본 정보
   name: string;
   phoneNumber?: string;
   profilePhotoUrl?: string;
@@ -31,27 +27,27 @@ export interface UserProfile {
     fullAddress: string;
   };
 
-  // 怨꾩쥖 ?뺣낫
+  // 계좌 정보
   bankAccount?: {
-    bankName: string;      // ??됰챸 (?? KB援????? ?좏븳???
-    accountNumber?: string; // 怨꾩쥖踰덊샇
+    bankName: string;      // 은행명
+    accountNumber?: string; // 계좌번호
     accountNumberMasked?: string;
     accountLast4?: string;
-    accountHolder: string;  // ?덇툑二?
+    accountHolder: string;  // 예금주
     bankCode?: string;
     verificationStatus?: string;
   };
 
-  // 湲몃윭 ?뺣낫
+  // 길러 정보
   gillerInfo?: {
-    totalDeliveries: number;  // 珥?諛곗넚 ?잛닔
-    grade: GillerGrade;       // 湲몃윭 ?깃툒
+    totalDeliveries: number;  // 총 배송 횟수
+    grade: GillerGrade;       // 길러 등급
   };
 
-  // ?몄쬆 ?곹깭
+  // 인증 상태
   isVerified: boolean;
 
-  // ??꾩뒪?ы봽
+  // 타임스탬프
   createdAt: Timestamp;
   updatedAt: Timestamp;
 }
@@ -68,29 +64,27 @@ export interface SavedAddress {
   updatedAt: Timestamp;
 }
 
-/**
- * ?좎썝 ?몄쬆 ?뺣낫 (users/{uid}/verification)
- */
+/** 신원 인증 정보 (`users/{uid}/verification`) */
 export interface UserVerification {
   userId: string;
 
-  // ?몄쬆 ?곹깭
+  // 인증 상태
   status: 'pending' | 'under_review' | 'approved' | 'rejected';
 
-  // ?좊텇利??뺣낫
+  // 신분증 정보
   idCard?: {
-    type: 'resident' | 'driver' | 'passport'; // 二쇰??깅줉利? ?댁쟾硫댄뿀利? ?ш텒
-    frontImageUrl: string;    // ?욌㈃ ?ъ쭊 URL
-    backImageUrl?: string;     // ?룸㈃ ?ъ쭊 URL (?댁쟾硫댄뿀利???
+    type: 'resident' | 'driver' | 'passport'; // 주민등록증, 운전면허증, 여권
+    frontImageUrl: string;    // 앞면 사진 URL
+    backImageUrl?: string;     // 뒷면 사진 URL
     uploadedAt: Timestamp;
   };
 
-  // ?ㅻ챸 ?뺤씤
-  name: string;          // ?좊텇利앹긽 ?대쫫
-  birthDate: string;     // ?앸뀈?붿씪 (YYYYMMDD)
-  personalId?: string;   // 二쇰??깅줉踰덊샇 ??7?먮━ (?뷀샇??
+  // 실명 확인
+  name: string;          // 신분증상 이름
+  birthDate: string;     // 생년월일 (YYYYMMDD)
+  personalId?: string;   // 주민등록번호 뒤 7자리
 
-  // ?몃? 蹂몄씤?몄쬆 (PASS/Kakao CI)
+  // 외부 본인인증 (PASS/Kakao CI)
   externalAuth?: {
     provider: 'pass' | 'kakao';
     status: 'started' | 'verified' | 'failed';
@@ -100,19 +94,17 @@ export interface UserVerification {
   ciHash?: string;
   verificationMethod?: 'id_card' | 'ci';
 
-  // ?ъ궗 ?뺣낫
+  // 심사 정보
   reviewedAt?: Timestamp;
-  reviewedBy?: string;   // ?ъ궗??UID
+  reviewedBy?: string;   // 심사자 UID
   rejectionReason?: string;
 
-  // ??꾩뒪?ы봽
+  // 타임스탬프
   submittedAt: Timestamp;
   updatedAt: Timestamp;
 }
 
-/**
- * ?꾨줈???섏젙 ???곗씠??
- */
+/** 프로필 수정용 데이터 */
 export interface ProfileFormData {
   name: string;
   phoneNumber?: string;
@@ -133,9 +125,7 @@ export interface ProfileFormData {
   };
 }
 
-/**
- * ?좎썝 ?몄쬆 ?쒖텧 ?곗씠??
- */
+/** 신원 인증 제출 데이터 */
 export interface VerificationSubmitData {
   idCardType: 'resident' | 'driver' | 'passport';
   frontImageUrl: string;
@@ -147,9 +137,7 @@ export interface VerificationSubmitData {
 
 export type VerificationProvider = 'pass' | 'kakao';
 
-/**
- * ???紐⑸줉
- */
+/** 은행 목록 */
 export const BANK_LIST = [
   { code: 'kb', name: 'KB국민은행' },
   { code: 'shinhan', name: '신한은행' },
@@ -172,4 +160,3 @@ export const BANK_LIST = [
 ] as const;
 
 export type BankCode = typeof BANK_LIST[number]['code'];
-

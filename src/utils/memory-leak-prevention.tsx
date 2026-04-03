@@ -31,7 +31,6 @@ export const useInterval = (
   delay: number | null
 ) => {
   const savedCallback = useRef(callback);
-  // @ts-ignore - useRef type issue
   const intervalRef = useRef<number | undefined>(undefined);
 
   useEffect(() => {
@@ -61,7 +60,6 @@ export const useTimeout = (
   delay: number | null
 ) => {
   const savedCallback = useRef(callback);
-  // @ts-ignore - useRef type issue
   const timeoutRef = useRef<number | undefined>(undefined);
 
   useEffect(() => {
@@ -178,7 +176,6 @@ export const useImagePreload = (imageUrls: string[]) => {
 
     const preloadImages = async () => {
       try {
-        // @ts-ignore - Image.prefetch exists in React Native
         await Promise.all(
           imageUrls.map(url => (Image as any).prefetch?.(url))
         );
@@ -208,9 +205,7 @@ export const useMemoryMonitor = (intervalMs: number = 10000) => {
     if (typeof performance === 'undefined') return;
 
     const intervalId = setInterval(() => {
-      // @ts-ignore - performance.memory is not in standard TypeScript lib
       if ((performance as any).memory) {
-        // @ts-ignore
         const { usedJSHeapSize, totalJSHeapSize, jsHeapSizeLimit } = (performance as any).memory;
 
         const usedMB = (usedJSHeapSize / 1024 / 1024).toFixed(2);

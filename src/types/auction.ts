@@ -74,10 +74,14 @@ export interface Bid {
   auctionId: string;
 
   /** 입찰자 (이용자) ID */
-  gllerId: string;
+  bidderId: string;
+  /** @deprecated Use bidderId */
+  gllerId?: string;
 
   /** 입찰자 이름 */
-  gllerName: string;
+  bidderName: string;
+  /** @deprecated Use bidderName */
+  gllerName?: string;
 
   /** 입찰 금액 (원) */
   bidAmount: number;
@@ -110,10 +114,14 @@ export interface Auction {
 
   // ===== 요청자 정보 =====
   /** 요청자 (이용자) ID */
-  gllerId: string;
+  requesterId: string;
+  /** @deprecated Use requesterId */
+  gllerId?: string;
 
   /** 요청자 이름 */
-  gllerName: string;
+  requesterName: string;
+  /** @deprecated Use requesterName */
+  gllerName?: string;
 
   // ===== 경로 정보 =====
   /** 픽업 역 */
@@ -229,10 +237,14 @@ export interface Auction {
  */
 export interface CreateAuctionData {
   /** 요청자 ID */
-  gllerId: string;
+  requesterId: string;
+  /** @deprecated Use requesterId */
+  gllerId?: string;
 
   /** 요청자 이름 */
-  gllerName: string;
+  requesterName: string;
+  /** @deprecated Use requesterName */
+  gllerName?: string;
 
   /** 연관된 요청 ID (선택) */
   requestId?: string;
@@ -306,10 +318,14 @@ export interface CreateBidData {
   auctionId: string;
 
   /** 입찰자 ID */
-  gllerId: string;
+  bidderId: string;
+  /** @deprecated Use bidderId */
+  gllerId?: string;
 
   /** 입찰자 이름 */
-  gllerName: string;
+  bidderName: string;
+  /** @deprecated Use bidderName */
+  gllerName?: string;
 
   /** 입찰 금액 */
   bidAmount: number;
@@ -326,6 +342,8 @@ export interface AuctionFilterOptions {
   status?: AuctionStatus | AuctionStatus[];
 
   /** 요청자 ID 필터 */
+  requesterId?: string;
+  /** @deprecated Use requesterId */
   gllerId?: string;
 
   /** 픽업 역 ID 필터 */
@@ -420,7 +438,9 @@ export interface AuctionListItem {
   myBidRank?: number;
 
   /** 요청자 이름 */
-  gllerName: string;
+  requesterName: string;
+  /** @deprecated Use requesterName */
+  gllerName?: string;
 
   /** 생성 시간 */
   createdAt: Timestamp;

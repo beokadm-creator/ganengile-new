@@ -22,7 +22,8 @@ type RatingRoute = RouteProp<MainStackParamList, 'Rating'>;
 export default function RatingScreen() {
   const navigation = useNavigation<MainStackNavigationProp>();
   const route = useRoute<RatingRoute>();
-  const { deliveryId, gillerId, gllerId } = route.params;
+  const { deliveryId, gillerId, requesterId, gllerId } = route.params;
+  const resolvedRequesterId = requesterId ?? gllerId ?? '';
 
   const [rating, setRating] = useState(0);
   const [selectedTags, setSelectedTags] = useState<RatingTag[]>([]);
@@ -32,8 +33,8 @@ export default function RatingScreen() {
 
   const targetUserId = useMemo(() => {
     const currentUserId = requireUserId();
-    return currentUserId === gillerId ? gllerId : gillerId;
-  }, [gillerId, gllerId]);
+    return currentUserId === gillerId ? resolvedRequesterId : gillerId;
+  }, [gillerId, resolvedRequesterId]);
 
   const toggleTag = (tag: RatingTag): void => {
     setSelectedTags((current) =>

@@ -82,7 +82,7 @@ export async function uploadPhoto(
           try {
             const downloadUrl = await getDownloadURL(uploadTask.snapshot.ref);
             resolve(downloadUrl);
-          } catch (error) {
+          } catch (_error) {
             reject(new Error('다운로드 URL을 가져올 수 없습니다.'));
           }
         }

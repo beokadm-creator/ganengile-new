@@ -3,6 +3,8 @@
  * 배송 요청 (Request) CRUD 서비스
  */
 
+/* eslint-disable no-redeclare */
+
 import {
   collection,
   doc,
@@ -546,8 +548,8 @@ export function validateRequest(
   fee: any,
   recipientName: string,
   recipientPhone: string,
-  preferredTime?: Date,
-  deadline?: Date
+  _preferredTime?: Date,
+  _deadline?: Date
 ): ValidationResult {
   const errors: string[] = [];
 

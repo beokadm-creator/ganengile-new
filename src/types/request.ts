@@ -159,6 +159,8 @@ export interface Request {
 
   // 평가 정보
   gillerRating?: number;
+  requesterRating?: number;
+  /** @deprecated Use requesterRating */
   gllerRating?: number;
 
   // 취소 정보
@@ -231,6 +233,8 @@ export interface UpdateRequestData {
   primaryDeliveryId?: string;
   matchedGillerId?: string;
   gillerRating?: number;
+  requesterRating?: number;
+  /** @deprecated Use requesterRating */
   gllerRating?: number;
   specialRequests?: string[];
   cancellationReason?: string;

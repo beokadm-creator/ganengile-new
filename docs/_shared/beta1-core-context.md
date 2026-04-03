@@ -1,4 +1,4 @@
-﻿# Beta1 Shared Context
+# Beta1 Shared Context
 
 `precedence`: 88  
 `required-for`: beta1-docs, product-planning, flow-design  

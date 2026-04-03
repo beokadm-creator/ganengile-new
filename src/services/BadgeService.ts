@@ -208,9 +208,9 @@ export class BadgeService {
    * This is a lightweight fetcher to support UI rendering.
    * Returns an array of Badge-like objects or an empty array if unavailable.
    */
-  static async getGillerBadges(userId: string): Promise<import('../types/user').Badge[]> {
+  static getGillerBadges(_userId: string): import('../types/user').Badge[] {
     // Minimal implementation: return empty list for now to avoid breaking UI.
     // A full implementation would read user.badges from Firestore and map to Badge objects.
-    return [] as any;
+    return [];
   }
 }

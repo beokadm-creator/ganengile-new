@@ -1,4 +1,4 @@
-﻿import type { SettlementPeriod } from './b2b-settlement';
+import type { SettlementPeriod } from './b2b-settlement';
 
 export type TaxInvoiceStatus = 'issued' | 'sent' | 'paid' | 'overdue';
 

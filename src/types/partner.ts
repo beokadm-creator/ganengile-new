@@ -127,6 +127,9 @@ export interface StorageRequest {
   // 요청자 정보
   gllerId: string;           // 이용자 ID
   gllerName: string;
+  /** Standard requester aliases for new code */
+  requesterId?: string;
+  requesterName?: string;
 
   // 길러 정보
   gillerId: string;

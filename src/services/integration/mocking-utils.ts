@@ -3,17 +3,7 @@
  * Firestore Mock Utilities for Integration Tests
  */
 
-import {
-  doc,
-  getDoc,
-  getDocs,
-  addDoc,
-  updateDoc,
-  deleteDoc,
-  query,
-  where,
-  serverTimestamp,
-} from 'firebase/firestore';
+import { serverTimestamp } from 'firebase/firestore';
 
 // In-memory Firestore simulator
 class MockFirestore {
@@ -52,7 +42,7 @@ class MockFirestore {
   }
 
   // CRUD operations
-  private async addDoc(collectionName: string, data: any): Promise<any> {
+  private addDoc(collectionName: string, data: any): { id: string } {
     const docId = `doc_${Date.now()}_${Math.random()}`;
     const docData = {
       ...data,
@@ -63,7 +53,7 @@ class MockFirestore {
     return { id: docId };
   }
 
-  private async getDoc(collectionName: string, docId: string): Promise<any> {
+  private getDoc(collectionName: string, docId: string): { exists: boolean; data: () => any; id: string } {
     const path = this.getPath(collectionName, docId);
     const data = this.data.get(path);
 
@@ -82,7 +72,7 @@ class MockFirestore {
     };
   }
 
-  private async getDocs(collectionName: string, constraints: any[] = []): Promise<any> {
+  private getDocs(collectionName: string, constraints: any[] = []): { docs: any[] } {
     const docs: any[] = [];
 
     for (const [path, data] of this.data.entries()) {
@@ -111,7 +101,7 @@ class MockFirestore {
     return { docs };
   }
 
-  private async setDoc(collectionName: string, docId: string, data: any): Promise<void> {
+  private setDoc(collectionName: string, docId: string, data: any): void {
     const path = this.getPath(collectionName, docId);
     this.data.set(path, {
       ...data,
@@ -120,7 +110,7 @@ class MockFirestore {
     });
   }
 
-  private async updateDoc(collectionName: string, docId: string, updates: any): Promise<void> {
+  private updateDoc(collectionName: string, docId: string, updates: any): void {
     const path = this.getPath(collectionName, docId);
     const existing = this.data.get(path);
     if (existing) {
@@ -132,7 +122,7 @@ class MockFirestore {
     }
   }
 
-  private async deleteDoc(collectionName: string, docId: string): Promise<void> {
+  private deleteDoc(collectionName: string, docId: string): void {
     const path = this.getPath(collectionName, docId);
     this.data.delete(path);
   }

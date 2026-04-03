@@ -5,7 +5,6 @@
 
 import { DeliveryRequest } from './delivery';
 import { Route } from './route';
-import { LocationData } from '../services/location-service';
 
 /**
  * 동선 매칭 점수 상세 정보

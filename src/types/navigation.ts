@@ -69,7 +69,8 @@ export type MainStackParamList = {
   Rating: {
     deliveryId: string;
     gillerId: string;
-    gllerId: string;
+    requesterId: string;
+    gllerId?: string;
   };
   ChatList: undefined;
   Chat: {
@@ -110,7 +111,8 @@ export type MainStackParamList = {
   };
   DepositPayment: {
     gillerId: string;
-    gllerId: string;
+    requesterId: string;
+    gllerId?: string;
     requestId: string;
     itemValue: number;
   };

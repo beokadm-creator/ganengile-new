@@ -79,7 +79,7 @@ export default function AddressSearchModal({
   }
 
   return (
-    <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
+    <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose} statusBarTranslucent>
       <View style={styles.backdrop}>
         <View style={styles.sheet}>
           <View style={styles.header}>
@@ -142,8 +142,13 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: 'rgba(15, 23, 42, 0.45)',
     justifyContent: 'flex-end',
+    paddingHorizontal: Spacing.sm,
+    paddingTop: Spacing.xl,
   },
   sheet: {
+    width: '100%',
+    maxWidth: 520,
+    alignSelf: 'center',
     maxHeight: '82%',
     backgroundColor: Colors.surface,
     borderTopLeftRadius: BorderRadius['2xl'],

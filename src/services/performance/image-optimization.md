@@ -1,4 +1,4 @@
-﻿# Image Optimization Notes
+# Image Optimization Notes
 
 `precedence`: 45  
 `required-for`: image-optimization, performance-review  

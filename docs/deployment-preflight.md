@@ -1,4 +1,4 @@
-﻿# Deployment Preflight
+# Deployment Preflight
 
 `precedence`: 65  
 `required-for`: deploy, env, release-check  
