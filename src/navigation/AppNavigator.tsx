@@ -3,7 +3,6 @@ import { NavigationContainer } from '@react-navigation/native';
 import { createStackNavigator } from '@react-navigation/stack';
 import { ActivityIndicator, Platform, StyleSheet, View } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
-import * as Notifications from 'expo-notifications';
 import * as ExpoLinking from 'expo-linking';
 import { UserProvider, useUser } from '../contexts/UserContext';
 import { AuthProvider } from '../contexts/AuthContext';
@@ -28,28 +27,35 @@ const linking = buildLinkingConfig();
 function AppNavigatorContent() {
   const { user, loading } = useUser();
   const { user: authUser } = useAuth();
-  const notificationResponseListener = useRef<Notifications.Subscription | undefined>(undefined);
-  const notificationReceivedListener = useRef<Notifications.Subscription | undefined>(undefined);
+  const notificationResponseListener = useRef<{ remove: () => void } | undefined>(undefined);
+  const notificationReceivedListener = useRef<{ remove: () => void } | undefined>(undefined);
 
   useEffect(() => {
     if (Platform.OS === 'web') {
       return;
     }
 
-    notificationResponseListener.current = Notifications.addNotificationResponseReceivedListener(
-      (response) => {
-        handleNotificationResponse(response);
+    let isMounted = true;
+
+    void (async () => {
+      const Notifications = await import('expo-notifications');
+      if (!isMounted) {
+        return;
       }
-    );
 
-    void getInitialNotification();
+      notificationResponseListener.current = Notifications.addNotificationResponseReceivedListener(
+        (response) => {
+          handleNotificationResponse(response);
+        }
+      );
 
-    const responseSubscription = notificationResponseListener.current;
-    const receivedSubscription = notificationReceivedListener.current;
+      await getInitialNotification();
+    })();
 
     return () => {
-      responseSubscription?.remove();
-      receivedSubscription?.remove();
+      isMounted = false;
+      notificationResponseListener.current?.remove();
+      notificationReceivedListener.current?.remove();
     };
   }, []);
 

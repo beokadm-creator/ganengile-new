@@ -7,7 +7,7 @@
     "android": "expo run:android",
     "ios": "expo run:ios",
     "web": "expo start --web",
-    "web:export": "expo export --platform web && node scripts/postexport-web-assets.mjs",
+    "web:export": "node scripts/verify-web-env.mjs && expo export --platform web && node scripts/postexport-web-assets.mjs",
     "web:deploy": "npm run web:export && firebase deploy --only hosting --project ganengile",
     "preflight:maps": "node scripts/preflight-maps.mjs",
     "init-config": "ts-node scripts/init-config.ts",

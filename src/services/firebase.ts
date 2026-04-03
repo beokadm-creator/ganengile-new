@@ -19,6 +19,27 @@ const firebaseConfig = {
   measurementId: process.env.EXPO_PUBLIC_FIREBASE_MEASUREMENT_ID,
 };
 
+const requiredFirebaseKeys = [
+  'apiKey',
+  'authDomain',
+  'projectId',
+  'storageBucket',
+  'messagingSenderId',
+  'appId',
+] as const;
+
+const missingFirebaseKeys = requiredFirebaseKeys.filter((key) => {
+  const value = firebaseConfig[key];
+  return typeof value !== 'string' || value.trim().length === 0;
+});
+
+if (missingFirebaseKeys.length > 0) {
+  throw new Error(
+    `Firebase public config is missing: ${missingFirebaseKeys.join(', ')}. ` +
+      'Check EXPO_PUBLIC_FIREBASE_* variables before building or deploying.'
+  );
+}
+
 // Initialize Firebase
 let app: FirebaseApp;
 if (!getApps().length) {
