@@ -85,6 +85,11 @@ service cloud.firestore {
       allow write: if false; // Admin SDK로만 쓰기
     }
 
+    match /config_operational/{docId} {
+      allow read: if docId == 'recipient_contact_privacy' || isAuthenticated();
+      allow write: if false;
+    }
+
     // ==================== Users Collection ====================
 
     match /users/{userId} {

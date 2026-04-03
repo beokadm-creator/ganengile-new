@@ -877,7 +877,16 @@ export function subscribeToRequest(
       callback(null);
     }
   }, (error) => {
-    console.error('Error listening to request:', error);
+    const code =
+      typeof error === 'object' && error != null && 'code' in error
+        ? String((error as { code?: unknown }).code ?? '')
+        : '';
+
+    if (code === 'permission-denied' || code === 'firestore/permission-denied') {
+      console.warn('Request subscription denied by Firestore rules.');
+    } else {
+      console.error('Error listening to request:', error);
+    }
     callback(null);
   });
 

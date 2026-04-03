@@ -336,6 +336,7 @@ export default function CreateRequestScreen({ navigation, route }: Props) {
   const [contactOtpExpiresAt, setContactOtpExpiresAt] = useState<string | null>(null);
   const [contactOtpSending, setContactOtpSending] = useState(false);
   const [contactOtpVerifying, setContactOtpVerifying] = useState(false);
+  const [verifiedPhoneOverride, setVerifiedPhoneOverride] = useState<string | null>(null);
   const [recipientPrivacyConfig, setRecipientPrivacyConfig] = useState<RecipientContactPrivacyConfig>(
     FALLBACK_RECIPIENT_PRIVACY_CONFIG
   );
@@ -388,7 +389,14 @@ export default function CreateRequestScreen({ navigation, route }: Props) {
     setContactPhoneNumber(formatPhoneDigits(user?.phoneVerification?.phoneNumber ?? user?.phoneNumber ?? ''));
   }, [user?.phoneNumber, user?.phoneVerification?.phoneNumber]);
 
-  const isPhoneVerified = user?.phoneVerification?.verified === true;
+  const normalizedContactPhone = normalizePhoneNumber(contactPhoneNumber);
+  const normalizedVerifiedPhone = normalizePhoneNumber(
+    verifiedPhoneOverride ?? user?.phoneVerification?.phoneNumber ?? ''
+  );
+  const isPhoneVerified =
+    (verifiedPhoneOverride != null || user?.phoneVerification?.verified === true) &&
+    normalizedVerifiedPhone.length > 0 &&
+    normalizedVerifiedPhone === normalizedContactPhone;
   const desiredArrivalSchedule =
     requestMode === 'reservation'
       ? combineReservationSchedule(preferredPickupDate, preferredPickupTime)
@@ -666,7 +674,7 @@ export default function CreateRequestScreen({ navigation, route }: Props) {
   }
 
   async function handleRequestContactOtp() {
-    const normalized = normalizePhoneNumber(contactPhoneNumber);
+    const normalized = normalizedContactPhone;
     if (!/^010\d{8}$/.test(normalized)) {
       Alert.alert('휴대폰 번호', '010으로 시작하는 올바른 휴대폰 번호를 먼저 입력해 주세요.');
       return;
@@ -709,7 +717,7 @@ export default function CreateRequestScreen({ navigation, route }: Props) {
 
     setContactOtpVerifying(true);
     try {
-      const normalized = normalizePhoneNumber(contactPhoneNumber);
+      const normalized = normalizedContactPhone;
       const result = await confirmPhoneOtp({
         sessionId: contactOtpSessionId,
         phoneNumber: normalized,
@@ -731,7 +739,13 @@ export default function CreateRequestScreen({ navigation, route }: Props) {
         { merge: true }
       );
 
-      await refreshUser();
+      setVerifiedPhoneOverride(normalized);
+      setContactOtpSessionId(null);
+      setContactOtpCode('');
+      setContactOtpHintCode(null);
+      setContactOtpDestination('');
+      setContactOtpExpiresAt(null);
+      void refreshUser();
       Alert.alert('휴대폰 인증 완료', '이제 배송 요청을 계속 진행할 수 있습니다.');
     } catch (error) {
       Alert.alert('휴대폰 인증 실패', error instanceof Error ? error.message : '휴대폰 번호를 인증하지 못했습니다.');
@@ -1161,11 +1175,20 @@ export default function CreateRequestScreen({ navigation, route }: Props) {
           <TextInput
             style={styles.input}
             value={contactPhoneNumber}
-            onChangeText={(value) => setContactPhoneNumber(formatPhoneDigits(value))}
+            onChangeText={(value) => {
+              const formatted = formatPhoneDigits(value);
+              setContactPhoneNumber(formatted);
+              if (normalizePhoneNumber(formatted) !== normalizedVerifiedPhone) {
+                setContactOtpSessionId(null);
+                setContactOtpCode('');
+                setContactOtpHintCode(null);
+                setContactOtpDestination('');
+                setContactOtpExpiresAt(null);
+              }
+            }}
             keyboardType="phone-pad"
             placeholder="010-1234-5678"
             placeholderTextColor={Colors.gray400}
-            editable={!isPhoneVerified}
           />
           {isPhoneVerified ? (
             <Text style={styles.selectorValue}>이미 인증된 휴대폰입니다.</Text>

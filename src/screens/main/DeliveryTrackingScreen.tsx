@@ -479,7 +479,12 @@ export default function DeliveryTrackingScreen(): JSX.Element {
     routeData?.coordinates?.map((point) => ({
       latitude: point.latitude,
       longitude: point.longitude,
-    })) ?? [];
+    })) ??
+    trackingData?.locationHistory?.map((point) => ({
+      latitude: point.latitude,
+      longitude: point.longitude,
+    })) ??
+    [];
 
   if (loading || !trackingData) {
     return (

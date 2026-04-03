@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, Image, StyleSheet, Text, View } from 'react-native';
 
 import { getStaticMapProxyUrl, isMapEnabled } from '../../config/map-config';
@@ -71,6 +71,23 @@ export default function StaticMapPreview({
     return `${baseUrl}?${query.toString()}`;
   }, [center.latitude, center.longitude, height, markers, path, width, zoom]);
 
+  useEffect(() => {
+    if (!uri) {
+      setLoading(false);
+      return;
+    }
+
+    setLoading(true);
+    setLoadFailed(false);
+
+    const timeoutId = setTimeout(() => {
+      setLoading(false);
+      setLoadFailed(true);
+    }, 12000);
+
+    return () => clearTimeout(timeoutId);
+  }, [uri]);
+
   if (!uri || loadFailed) {
     return (
       <View style={styles.emptyCard}>
@@ -91,6 +108,7 @@ export default function StaticMapPreview({
         <Text style={styles.subtitle}>{subtitle}</Text>
       </View>
       <Image
+        key={uri}
         source={{ uri }}
         style={styles.image}
         resizeMode="cover"

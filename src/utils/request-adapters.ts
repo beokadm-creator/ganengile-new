@@ -95,6 +95,12 @@ interface TrackingInput {
   recipientVerificationCode?: string;
   createdAt?: Date | Timestamp | null;
   updatedAt?: Date | Timestamp | null;
+  matchedAt?: Date | Timestamp | null;
+  acceptedAt?: Date | Timestamp | null;
+  pickedUpAt?: Date | Timestamp | null;
+  arrivedAt?: Date | Timestamp | null;
+  deliveredAt?: Date | Timestamp | null;
+  requesterConfirmedAt?: Date | Timestamp | null;
   tracking?: {
     events?: TrackingEventInput[];
     courierLocation?: {
@@ -177,6 +183,65 @@ function extractNumber(value: unknown): number | undefined {
   return undefined;
 }
 
+function createFallbackEvent(
+  type: string,
+  title: string,
+  description: string,
+  timestamp?: Date
+): TrackingEvent | null {
+  if (!timestamp) {
+    return null;
+  }
+
+  return {
+    type,
+    title,
+    description,
+    timestamp,
+    completed: true,
+  };
+}
+
+function buildFallbackTrackingEvents(data: TrackingInput, createdAt?: Date, updatedAt?: Date): TrackingEvent[] {
+  const events = [
+    createFallbackEvent('created', '요청 생성', '배송 요청이 생성되었습니다.', createdAt),
+    createFallbackEvent('matched', '매칭 완료', '길러가 매칭되었습니다.', toDateOrUndefined(data.matchedAt)),
+    createFallbackEvent('accepted', '수락 완료', '길러가 배송을 수락했습니다.', toDateOrUndefined(data.acceptedAt)),
+    createFallbackEvent('picked_up', '픽업 완료', '물품을 수령했습니다.', toDateOrUndefined(data.pickedUpAt)),
+    createFallbackEvent('in_transit', '배송 중', '지정된 경로를 따라 이동 중입니다.', toDateOrUndefined(data.pickedUpAt)),
+    createFallbackEvent('arrived', '도착 완료', '목적지에 도착했습니다.', toDateOrUndefined(data.arrivedAt)),
+    createFallbackEvent('delivered', '전달 완료', '수령 확인을 기다리고 있습니다.', toDateOrUndefined(data.deliveredAt)),
+    createFallbackEvent(
+      'completed',
+      '배송 완료',
+      '배송이 완료되었습니다.',
+      toDateOrUndefined(data.requesterConfirmedAt) ?? (data.status === 'completed' ? updatedAt : undefined)
+    ),
+  ].filter((event): event is TrackingEvent => event != null);
+
+  if (events.length > 0) {
+    return events.sort((left, right) => {
+      const leftTime = left.timestamp?.getTime() ?? 0;
+      const rightTime = right.timestamp?.getTime() ?? 0;
+      return leftTime - rightTime;
+    });
+  }
+
+  if (!createdAt && updatedAt && data.status && data.status !== 'pending') {
+    return [
+      {
+        type: data.status,
+        title: eventTitle(data.status),
+        description: eventTitle(data.status),
+        timestamp: updatedAt,
+        completed: true,
+      },
+    ];
+  }
+
+  return [];
+}
+
 export function toTrackingModel(data: TrackingInput): TrackingModel {
   const createdAt = toDateOrUndefined(data.createdAt);
   const updatedAt = toDateOrUndefined(data.updatedAt);
@@ -195,57 +260,7 @@ export function toTrackingModel(data: TrackingInput): TrackingModel {
       })
     : null;
 
-  const fallbackEvents: TrackingEvent[] = [
-    {
-      type: 'created',
-      title: '요청 생성',
-      description: '배송 요청이 생성되었습니다.',
-      timestamp: createdAt,
-      completed: true,
-    },
-    {
-      type: 'matched',
-      title: '매칭 완료',
-      description: '길러가 매칭되었습니다.',
-      timestamp: updatedAt,
-      completed: ['matched', 'accepted', 'in_transit', 'arrived', 'completed'].includes(status),
-    },
-    {
-      type: 'accepted',
-      title: '수락 완료',
-      description: '길러가 배송을 수락했습니다.',
-      timestamp: updatedAt,
-      completed: ['accepted', 'in_transit', 'arrived', 'completed'].includes(status),
-    },
-    {
-      type: 'picked_up',
-      title: '픽업 완료',
-      description: '물품을 수령했습니다.',
-      timestamp: updatedAt,
-      completed: ['in_transit', 'arrived', 'completed'].includes(status),
-    },
-    {
-      type: 'in_transit',
-      title: '배송 중',
-      description: '지정된 경로를 따라 이동 중입니다.',
-      timestamp: updatedAt,
-      completed: ['in_transit', 'arrived', 'completed'].includes(status),
-    },
-    {
-      type: 'arrived',
-      title: '도착 완료',
-      description: '목적지에 도착했습니다.',
-      timestamp: updatedAt,
-      completed: ['arrived', 'completed'].includes(status),
-    },
-    {
-      type: 'completed',
-      title: '배송 완료',
-      description: '배송이 완료되었습니다.',
-      timestamp: updatedAt,
-      completed: status === 'completed',
-    },
-  ];
+  const fallbackEvents = buildFallbackTrackingEvents(data, createdAt, updatedAt);
 
   return {
     status,
@@ -317,12 +332,17 @@ function eventTitle(type: string): string {
       return '배송 중';
     case 'arrived':
       return '도착 완료';
+    case 'delivered':
+      return '전달 완료';
     case 'completed':
+    case 'confirmed_by_requester':
       return '배송 완료';
     case 'matched':
       return '매칭 완료';
     case 'created':
       return '요청 생성';
+    case 'dropped_at_locker':
+      return '보관함 전달';
     default:
       return '상태 변경';
   }

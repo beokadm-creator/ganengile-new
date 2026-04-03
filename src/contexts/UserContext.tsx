@@ -140,7 +140,16 @@ export function UserProvider({ children }: UserProviderProps) {
         setUser(userData);
         setCurrentRole(resolveActiveRole(userData));
       } catch (error) {
-        console.error('Error refreshing user:', error);
+        const code =
+          typeof error === 'object' && error != null && 'code' in error
+            ? String((error as { code?: unknown }).code ?? '')
+            : '';
+
+        if (code === 'permission-denied' || code === 'firestore/permission-denied') {
+          console.warn('User refresh skipped because Firestore access was denied.');
+        } else {
+          console.error('Error refreshing user:', error);
+        }
       } finally {
         refreshInFlightRef.current = null;
       }
