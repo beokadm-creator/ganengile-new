@@ -7,15 +7,15 @@ import { doc, onSnapshot } from 'firebase/firestore';
 
 import AppTopBar from '../../components/common/AppTopBar';
 import { NaverMapCard } from '../../components/maps/NaverMapCard';
+import { updateGillerLocation } from '../../services/delivery-service';
 import { db, requireUserId } from '../../services/firebase';
+import { locationService } from '../../services/location-service';
 import {
   formatRouteDistance,
   formatRouteDuration,
   getDrivingRoute,
   type RouteCoordinate,
 } from '../../services/naver-route-service';
-import { locationService } from '../../services/location-service';
-import { updateGillerLocation } from '../../services/delivery-service';
 import { BorderRadius, Colors, Shadows, Spacing, Typography } from '../../theme';
 import type { MainStackNavigationProp, MainStackParamList } from '../../types/navigation';
 
@@ -219,7 +219,10 @@ export default function RealtimeTrackingScreen(): JSX.Element {
           <View style={styles.metricRow}>
             <MetricPill label="예상 소요" value={etaSummary.durationLabel} />
             <MetricPill label="경로 길이" value={etaSummary.distanceLabel} />
-            <MetricPill label="좌표 수" value={routeData?.coordinates?.length ? `${routeData.coordinates.length}개` : '-'} />
+            <MetricPill
+              label="좌표 수"
+              value={routeData?.coordinates?.length ? `${routeData.coordinates.length}개` : '-'}
+            />
           </View>
           <Text style={styles.routeHint}>{etaSummary.currentLegLabel}</Text>
         </View>
@@ -227,8 +230,14 @@ export default function RealtimeTrackingScreen(): JSX.Element {
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>현재 위치 정보</Text>
           <View style={styles.locationCard}>
-            <LocationRow label="출발 좌표" value={`${formatCoordinate(pickupStation.latitude)}, ${formatCoordinate(pickupStation.longitude)}`} />
-            <LocationRow label="도착 좌표" value={`${formatCoordinate(dropoffStation.latitude)}, ${formatCoordinate(dropoffStation.longitude)}`} />
+            <LocationRow
+              label="출발 좌표"
+              value={`${formatCoordinate(pickupStation.latitude)}, ${formatCoordinate(pickupStation.longitude)}`}
+            />
+            <LocationRow
+              label="도착 좌표"
+              value={`${formatCoordinate(dropoffStation.latitude)}, ${formatCoordinate(dropoffStation.longitude)}`}
+            />
             <LocationRow
               label="길러 GPS"
               value={
@@ -247,13 +256,28 @@ export default function RealtimeTrackingScreen(): JSX.Element {
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>운영 기준</Text>
           <View style={styles.timelineCard}>
-            <TimelineRow title="GPS 저장" body="길러 기기에서 5초 간격 위치를 올리고 Firestore에 최근 위치와 이력을 저장합니다." tone="done" />
-            <TimelineRow title="경로 좌표 계산" body="현재 GPS 또는 출발역을 시작점으로 사용해 도착지까지의 경로 좌표를 받아옵니다." tone="active" />
-            <TimelineRow title="이용자 표시" body="배송 추적 화면에서는 단계, 현재 GPS, 경로 길이와 예상 소요를 함께 보여줍니다." tone="pending" />
+            <TimelineRow
+              title="GPS 저장"
+              body="길러 기기에서 5초 간격 위치를 올리고 Firestore에 최근 위치와 이력을 저장합니다."
+              tone="done"
+            />
+            <TimelineRow
+              title="경로 좌표 계산"
+              body="현재 GPS 또는 출발역을 시작점으로 사용해 도착지까지의 경로 좌표를 받아옵니다."
+              tone="active"
+            />
+            <TimelineRow
+              title="이용자 표시"
+              body="배송 추적 화면에서는 단계, 현재 GPS, 경로 길이와 예상 소요를 함께 보여줍니다."
+              tone="pending"
+            />
           </View>
         </View>
 
-        <TouchableOpacity style={styles.linkButton} onPress={() => navigation.navigate('DeliveryTracking', { requestId: deliveryId })}>
+        <TouchableOpacity
+          style={styles.linkButton}
+          onPress={() => navigation.navigate('DeliveryTracking', { requestId: deliveryId })}
+        >
           <MaterialIcons name="local-shipping" size={18} color={Colors.primary} />
           <Text style={styles.linkButtonText}>배송 상세 보기</Text>
         </TouchableOpacity>

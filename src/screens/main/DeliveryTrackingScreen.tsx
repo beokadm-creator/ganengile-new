@@ -536,7 +536,7 @@ export default function DeliveryTrackingScreen(): JSX.Element {
           <Text style={styles.panelTitle}>지도 표시 방식</Text>
           <Text style={styles.panelBody}>
             현재는 길러 GPS가 들어오면 현재 위치를 시작점으로, 아직 GPS가 없으면 출발역을 시작점으로 사용합니다.
-            그리고 경로 좌표 API에서 받은 좌표열을 웹 지도에서는 선으로 표시합니다.
+            경로 좌표 API에서 받은 좌표열은 웹 지도에서 실제 경로선으로 표시합니다.
           </Text>
         </View>
 
