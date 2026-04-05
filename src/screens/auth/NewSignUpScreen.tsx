@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -16,13 +16,19 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { createUserWithEmailAndPassword, sendEmailVerification } from 'firebase/auth';
-import { doc, serverTimestamp, setDoc } from 'firebase/firestore';
+import { doc, serverTimestamp, setDoc, Timestamp } from 'firebase/firestore';
 
-import { Colors } from '../../theme';
+import { Colors, Typography } from '../../theme';
 import { auth, db } from '../../services/firebase';
+import {
+  checkRequiredConsents,
+  fetchConsentTemplates,
+  getFallbackConsentItems,
+} from '../../services/consent-service';
 import { handleGoogleSignIn } from '../../services/google-auth';
 import { getKakaoLoginErrorMessage, signUpWithKakao } from '../../services/kakao-auth';
 import type { AuthNavigationProp } from '../../types/navigation';
+import { ConsentDisplayItem, ConsentKey, ConsentRecord } from '../../types/consent';
 import { UserRole } from '../../types/user';
 
 type Props = {
@@ -36,12 +42,6 @@ type SignUpForm = {
   email: string;
   password: string;
   confirmPassword: string;
-};
-
-type TermsAgreement = {
-  service: boolean;
-  privacy: boolean;
-  marketing: boolean;
 };
 
 const STEP_ORDER: Step[] = ['name', 'email', 'password', 'terms'];
@@ -111,27 +111,84 @@ export default function NewSignUpScreen({ navigation }: Props) {
     password: '',
     confirmPassword: '',
   });
-  const [termsAgreed, setTermsAgreed] = useState<TermsAgreement>({
-    service: false,
-    privacy: false,
-    marketing: false,
-  });
+
+  // Dynamic consent state
+  const [consentTemplates, setConsentTemplates] = useState<ConsentDisplayItem[]>([]);
+  const [consents, setConsents] = useState<Record<string, boolean>>({});
+  const [loadingTemplates, setLoadingTemplates] = useState(false);
+  const [expandedItems, setExpandedItems] = useState<Set<string>>(new Set());
 
   const step = STEP_ORDER[stepIndex];
   const copy = STEP_COPY[step];
   const progressWidth = useMemo<DimensionValue>(
     () => `${((stepIndex + 1) / STEP_ORDER.length) * 100}%`,
-    [stepIndex]
+    [stepIndex],
   );
   const footerPaddingBottom = Math.max(insets.bottom, 12);
+
+  // Load consent templates when reaching the terms step
+  useEffect(() => {
+    if (step !== 'terms') return;
+    if (consentTemplates.length > 0) return;
+
+    let cancelled = false;
+    async function load() {
+      setLoadingTemplates(true);
+      try {
+        const templates = await fetchConsentTemplates();
+        if (cancelled) return;
+        if (templates.length > 0) {
+          setConsentTemplates(templates);
+        } else {
+          setConsentTemplates(getFallbackConsentItems());
+        }
+      } catch {
+        if (!cancelled) {
+          setConsentTemplates(getFallbackConsentItems());
+        }
+      } finally {
+        if (!cancelled) setLoadingTemplates(false);
+      }
+    }
+    load();
+    return () => { cancelled = true; };
+  }, [step, consentTemplates.length]);
 
   function updateForm(key: keyof SignUpForm, value: string) {
     setForm((current) => ({ ...current, [key]: value }));
   }
 
-  function setAgreement(key: keyof TermsAgreement, value: boolean) {
-    setTermsAgreed((current) => ({ ...current, [key]: value }));
-  }
+  const toggleConsent = useCallback((key: string) => {
+    setConsents((prev) => ({ ...prev, [key]: !prev[key] }));
+  }, []);
+
+  const allAgreed = useMemo(
+    () => consentTemplates.length > 0 && consentTemplates.every((t) => consents[t.key]),
+    [consentTemplates, consents],
+  );
+
+  const toggleAll = useCallback(() => {
+    const nextValue = !allAgreed;
+    setConsents((prev) => {
+      const next = { ...prev };
+      for (const t of consentTemplates) {
+        next[t.key] = nextValue;
+      }
+      return next;
+    });
+  }, [allAgreed, consentTemplates]);
+
+  const toggleExpanded = useCallback((key: string) => {
+    setExpandedItems((prev) => {
+      const next = new Set(prev);
+      if (next.has(key)) {
+        next.delete(key);
+      } else {
+        next.add(key);
+      }
+      return next;
+    });
+  }, []);
 
   function validateCurrentStep() {
     if (step === 'name' && !form.name.trim()) {
@@ -163,8 +220,8 @@ export default function NewSignUpScreen({ navigation }: Props) {
       }
     }
 
-    if (step === 'terms' && (!termsAgreed.service || !termsAgreed.privacy)) {
-      Alert.alert('필수 약관 동의 필요', '서비스 이용약관과 개인정보 처리방침에 동의해주세요.');
+    if (step === 'terms' && !checkRequiredConsents(consents, consentTemplates)) {
+      Alert.alert('필수 약관 동의 필요', '모든 필수 약관에 동의해주세요.');
       return false;
     }
 
@@ -203,6 +260,26 @@ export default function NewSignUpScreen({ navigation }: Props) {
       const userCredential = await createUserWithEmailAndPassword(auth, form.email.trim(), form.password);
       await sendEmailVerification(userCredential.user);
 
+      // Build backward-compatible agreedTerms
+      const agreedTerms = {
+        giller: false,
+        gller: consents[ConsentKey.SERVICE_TERMS] === true,
+        privacy: consents[ConsentKey.PRIVACY_POLICY] === true,
+        marketing: consents[ConsentKey.MARKETING] === true,
+      };
+
+      // Build consent history records
+      const now = Timestamp.now();
+      const consentRecords: ConsentRecord[] = consentTemplates
+        .filter((t) => consents[t.key])
+        .map((t) => ({
+          templateId: t.templateId,
+          key: t.key,
+          version: t.version,
+          agreedAt: now,
+          title: t.title,
+        }));
+
       await setDoc(
         doc(db, 'users', userCredential.user.uid),
         {
@@ -222,23 +299,19 @@ export default function NewSignUpScreen({ navigation }: Props) {
             sentAt: new Date().toISOString(),
             email: form.email.trim(),
           },
-          agreedTerms: {
-            giller: false,
-            gller: termsAgreed.service,
-            privacy: termsAgreed.privacy,
-            marketing: termsAgreed.marketing,
-          },
+          agreedTerms,
+          consentHistory: consentRecords,
           gillerApplicationStatus: 'none',
           isVerified: false,
           createdAt: serverTimestamp(),
           updatedAt: serverTimestamp(),
         },
-        { merge: true }
+        { merge: true },
       );
 
       Alert.alert(
         '가입이 완료되었습니다',
-        '가입은 바로 완료됐습니다. 이메일 인증 메일을 보냈고, 배송 요청 전에 휴대폰 확인만 진행하면 됩니다.'
+        '가입은 바로 완료됐습니다. 이메일 인증 메일을 보냈고, 배송 요청 전에 휴대폰 확인만 진행하면 됩니다.',
       );
       navigation.navigate('Login');
     } catch (error) {
@@ -302,7 +375,21 @@ export default function NewSignUpScreen({ navigation }: Props) {
           </Text>
         </View>
 
-        <View style={styles.card}>{renderStepContent(step, form, termsAgreed, updateForm, setAgreement)}</View>
+        <View style={styles.card}>
+          {renderStepContent({
+            step,
+            form,
+            consentTemplates,
+            consents,
+            loadingTemplates,
+            expandedItems,
+            allAgreed,
+            updateForm,
+            toggleConsent,
+            toggleAll,
+            toggleExpanded,
+          })}
+        </View>
 
         <View style={styles.contextCard}>
           <Text style={styles.contextTitle}>인증 흐름 안내</Text>
@@ -335,13 +422,37 @@ export default function NewSignUpScreen({ navigation }: Props) {
   );
 }
 
-function renderStepContent(
-  step: Step,
-  form: SignUpForm,
-  termsAgreed: TermsAgreement,
-  updateForm: (key: keyof SignUpForm, value: string) => void,
-  setAgreement: (key: keyof TermsAgreement, value: boolean) => void
-) {
+// ─── Step content renderer ────────────────────────────────
+
+type StepContentProps = {
+  step: Step;
+  form: SignUpForm;
+  consentTemplates: ConsentDisplayItem[];
+  consents: Record<string, boolean>;
+  loadingTemplates: boolean;
+  expandedItems: Set<string>;
+  allAgreed: boolean;
+  updateForm: (key: keyof SignUpForm, value: string) => void;
+  toggleConsent: (key: string) => void;
+  toggleAll: () => void;
+  toggleExpanded: (key: string) => void;
+};
+
+function renderStepContent(props: StepContentProps) {
+  const {
+    step,
+    form,
+    consentTemplates,
+    consents,
+    loadingTemplates,
+    expandedItems,
+    allAgreed,
+    updateForm,
+    toggleConsent,
+    toggleAll,
+    toggleExpanded,
+  } = props;
+
   switch (step) {
     case 'name':
       return (
@@ -395,33 +506,85 @@ function renderStepContent(
       );
     case 'terms':
       return (
-        <>
-          <AgreementRow
-            title="서비스 이용약관"
-            description="서비스 이용에 필요한 기본 약관입니다."
-            required
-            value={termsAgreed.service}
-            onValueChange={(value) => setAgreement('service', value)}
-          />
-          <AgreementRow
-            title="개인정보 처리방침"
-            description="주문, 정산, 본인 확인에 필요한 개인정보 처리 안내입니다."
-            required
-            value={termsAgreed.privacy}
-            onValueChange={(value) => setAgreement('privacy', value)}
-          />
-          <AgreementRow
-            title="마케팅 정보 수신"
-            description="이벤트와 혜택 소식을 받습니다."
-            value={termsAgreed.marketing}
-            onValueChange={(value) => setAgreement('marketing', value)}
-          />
-        </>
+        <TermsStepContent
+          consentTemplates={consentTemplates}
+          consents={consents}
+          loadingTemplates={loadingTemplates}
+          expandedItems={expandedItems}
+          allAgreed={allAgreed}
+          toggleConsent={toggleConsent}
+          toggleAll={toggleAll}
+          toggleExpanded={toggleExpanded}
+        />
       );
     default:
       return null;
   }
 }
+
+// ─── Terms step content ───────────────────────────────────
+
+function TermsStepContent({
+  consentTemplates,
+  consents,
+  loadingTemplates,
+  expandedItems,
+  allAgreed,
+  toggleConsent,
+  toggleAll,
+  toggleExpanded,
+}: {
+  consentTemplates: ConsentDisplayItem[];
+  consents: Record<string, boolean>;
+  loadingTemplates: boolean;
+  expandedItems: Set<string>;
+  allAgreed: boolean;
+  toggleConsent: (key: string) => void;
+  toggleAll: () => void;
+  toggleExpanded: (key: string) => void;
+}) {
+  if (loadingTemplates) {
+    return (
+      <View style={styles.loadingWrap}>
+        <ActivityIndicator color={Colors.primary} />
+        <Text style={styles.loadingText}>약관을 불러오는 중...</Text>
+      </View>
+    );
+  }
+
+  return (
+    <>
+      {/* 전체 동의 토글 */}
+      <View style={styles.switchRow}>
+        <View style={styles.switchCopy}>
+          <Text style={styles.switchTitle}>전체 동의</Text>
+        </View>
+        <Switch
+          value={allAgreed}
+          onValueChange={toggleAll}
+          trackColor={{ false: Colors.border, true: Colors.primaryMint }}
+          thumbColor={allAgreed ? Colors.primary : Colors.surface}
+        />
+      </View>
+
+      <View style={styles.termsDivider} />
+
+      {/* 개별 동의 항목 */}
+      {consentTemplates.map((item) => (
+        <ConsentItemRow
+          key={item.key}
+          item={item}
+          agreed={consents[item.key] === true}
+          expanded={expandedItems.has(item.key)}
+          onToggle={() => toggleConsent(item.key)}
+          onToggleExpand={() => toggleExpanded(item.key)}
+        />
+      ))}
+    </>
+  );
+}
+
+// ─── Reusable components ──────────────────────────────────
 
 function Field({ label, style, ...props }: TextInputProps & { label: string }) {
   return (
@@ -432,36 +595,51 @@ function Field({ label, style, ...props }: TextInputProps & { label: string }) {
   );
 }
 
-function AgreementRow({
-  title,
-  description,
-  required = false,
-  value,
-  onValueChange,
+function ConsentItemRow({
+  item,
+  agreed,
+  expanded,
+  onToggle,
+  onToggleExpand,
 }: {
-  title: string;
-  description: string;
-  required?: boolean;
-  value: boolean;
-  onValueChange: (value: boolean) => void;
+  item: ConsentDisplayItem;
+  agreed: boolean;
+  expanded: boolean;
+  onToggle: () => void;
+  onToggleExpand: () => void;
+  key?: string;
 }) {
   return (
-    <View style={styles.switchRow}>
-      <View style={styles.switchCopy}>
-        <View style={styles.switchTitleRow}>
-          <Text style={styles.switchTitle}>{title}</Text>
-          <Text style={[styles.badge, required ? styles.badgeRequired : styles.badgeOptional]}>
-            {required ? '필수' : '선택'}
-          </Text>
+    <View style={styles.consentItemWrap}>
+      <View style={styles.switchRow}>
+        <View style={styles.switchCopy}>
+          <View style={styles.switchTitleRow}>
+            <Text style={styles.switchTitle}>{item.title}</Text>
+            <Text style={[styles.badge, item.isRequired ? styles.badgeRequired : styles.badgeOptional]}>
+              {item.isRequired ? '필수' : '선택'}
+            </Text>
+          </View>
+          <Text style={styles.switchBody}>{item.description}</Text>
         </View>
-        <Text style={styles.switchBody}>{description}</Text>
+        <Switch
+          value={agreed}
+          onValueChange={onToggle}
+          trackColor={{ false: Colors.border, true: Colors.primaryMint }}
+          thumbColor={agreed ? Colors.primary : Colors.surface}
+        />
       </View>
-      <Switch
-        value={value}
-        onValueChange={onValueChange}
-        trackColor={{ false: Colors.border, true: Colors.primaryMint }}
-        thumbColor={value ? Colors.primary : Colors.surface}
-      />
+      {item.content ? (
+        <TouchableOpacity onPress={onToggleExpand} activeOpacity={0.6}>
+          <Text style={styles.expandButton}>
+            {expanded ? '내용 닫기' : '내용 보기'}
+          </Text>
+        </TouchableOpacity>
+      ) : null}
+      {expanded && item.content ? (
+        <View style={styles.expandedContent}>
+          <Text style={styles.expandedText}>{item.content}</Text>
+        </View>
+      ) : null}
     </View>
   );
 }
@@ -505,6 +683,15 @@ const styles = StyleSheet.create({
     fontSize: 16,
   },
   helperText: { color: Colors.textSecondary, fontSize: 13, lineHeight: 19 },
+  loadingWrap: {
+    alignItems: 'center',
+    gap: 8,
+    paddingVertical: 12,
+  },
+  loadingText: {
+    color: Colors.textTertiary,
+    fontSize: 13,
+  },
   secondaryButton: {
     minHeight: 54,
     borderRadius: 18,
@@ -531,6 +718,26 @@ const styles = StyleSheet.create({
   badge: { paddingHorizontal: 8, paddingVertical: 3, borderRadius: 999, fontSize: 11, fontWeight: '800' },
   badgeRequired: { backgroundColor: Colors.errorBackground, color: Colors.error },
   badgeOptional: { backgroundColor: Colors.gray100, color: Colors.textSecondary },
+  termsDivider: { height: 1, backgroundColor: Colors.border },
+  consentItemWrap: { gap: 4 },
+  expandButton: {
+    color: Colors.primary,
+    fontSize: 12,
+    fontWeight: '700',
+    paddingLeft: 2,
+  },
+  expandedContent: {
+    backgroundColor: Colors.background,
+    borderRadius: 14,
+    padding: 14,
+    borderWidth: 1,
+    borderColor: Colors.border,
+  },
+  expandedText: {
+    color: Colors.textSecondary,
+    fontSize: Typography.fontSize.xs,
+    lineHeight: 18,
+  },
   footer: {
     flexDirection: 'row',
     gap: 12,

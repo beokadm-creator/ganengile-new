@@ -1,5 +1,6 @@
-import React, { useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
+  ActivityIndicator,
   Alert,
   KeyboardAvoidingView,
   Platform,
@@ -11,11 +12,17 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-import { doc, serverTimestamp, setDoc } from 'firebase/firestore';
+import { serverTimestamp, setDoc, doc, Timestamp } from 'firebase/firestore';
 
 import { useUser } from '../../contexts/UserContext';
 import { db } from '../../services/firebase';
+import {
+  checkRequiredConsents,
+  fetchConsentTemplates,
+  getFallbackConsentItems,
+} from '../../services/consent-service';
 import { BorderRadius, Colors, Shadows, Spacing, Typography } from '../../theme';
+import { ConsentDisplayItem, ConsentKey, ConsentRecord } from '../../types/consent';
 import { UserRole } from '../../types/user';
 
 export default function BasicInfoOnboarding() {
@@ -23,17 +30,68 @@ export default function BasicInfoOnboarding() {
   const [loading, setLoading] = useState(false);
   const [name, setName] = useState(user?.name ?? '');
   const [phoneNumber, setPhoneNumber] = useState(user?.phoneNumber ?? '');
-  const [agreements, setAgreements] = useState({
-    service: false,
-    privacy: false,
-    marketing: false,
-  });
+  const [consentTemplates, setConsentTemplates] = useState<ConsentDisplayItem[]>([]);
+  const [consents, setConsents] = useState<Record<string, boolean>>({});
+  const [loadingTemplates, setLoadingTemplates] = useState(true);
+  const [expandedItems, setExpandedItems] = useState<Set<string>>(new Set());
 
   const cleanedPhone = useMemo(() => phoneNumber.replace(/[^0-9]/g, ''), [phoneNumber]);
 
-  function toggleAgreement(key: 'service' | 'privacy' | 'marketing') {
-    setAgreements((current) => ({ ...current, [key]: !current[key] }));
-  }
+  useEffect(() => {
+    let cancelled = false;
+    async function load() {
+      setLoadingTemplates(true);
+      try {
+        const templates = await fetchConsentTemplates();
+        if (cancelled) return;
+        if (templates.length > 0) {
+          setConsentTemplates(templates);
+        } else {
+          setConsentTemplates(getFallbackConsentItems());
+        }
+      } catch {
+        if (!cancelled) {
+          setConsentTemplates(getFallbackConsentItems());
+        }
+      } finally {
+        if (!cancelled) setLoadingTemplates(false);
+      }
+    }
+    load();
+    return () => { cancelled = true; };
+  }, []);
+
+  const toggleConsent = useCallback((key: string) => {
+    setConsents((prev) => ({ ...prev, [key]: !prev[key] }));
+  }, []);
+
+  const allAgreed = useMemo(
+    () => consentTemplates.length > 0 && consentTemplates.every((t) => consents[t.key]),
+    [consentTemplates, consents],
+  );
+
+  const toggleAll = useCallback(() => {
+    const nextValue = !allAgreed;
+    setConsents((prev) => {
+      const next = { ...prev };
+      for (const t of consentTemplates) {
+        next[t.key] = nextValue;
+      }
+      return next;
+    });
+  }, [allAgreed, consentTemplates]);
+
+  const toggleExpanded = useCallback((key: string) => {
+    setExpandedItems((prev) => {
+      const next = new Set(prev);
+      if (next.has(key)) {
+        next.delete(key);
+      } else {
+        next.add(key);
+      }
+      return next;
+    });
+  }, []);
 
   function validate() {
     if (!name.trim()) {
@@ -46,8 +104,8 @@ export default function BasicInfoOnboarding() {
       return false;
     }
 
-    if (!agreements.service || !agreements.privacy) {
-      Alert.alert('필수 약관 동의가 필요합니다', '서비스 이용약관과 개인정보 처리방침에 동의해 주세요.');
+    if (!checkRequiredConsents(consents, consentTemplates)) {
+      Alert.alert('필수 약관 동의가 필요합니다', '모든 필수 약관에 동의해 주세요.');
       return false;
     }
 
@@ -66,6 +124,25 @@ export default function BasicInfoOnboarding() {
 
     setLoading(true);
     try {
+      // Build backward-compatible agreedTerms
+      const agreedTerms = {
+        service: consents[ConsentKey.SERVICE_TERMS] === true,
+        privacy: consents[ConsentKey.PRIVACY_POLICY] === true,
+        marketing: consents[ConsentKey.MARKETING] === true,
+      };
+
+      // Build consent history records
+      const now = Timestamp.now();
+      const consentRecords: ConsentRecord[] = consentTemplates
+        .filter((t) => consents[t.key])
+        .map((t) => ({
+          templateId: t.templateId,
+          key: t.key,
+          version: t.version,
+          agreedAt: now,
+          title: t.title,
+        }));
+
       await setDoc(
         doc(db, 'users', user.uid),
         {
@@ -74,13 +151,14 @@ export default function BasicInfoOnboarding() {
           name: name.trim(),
           phoneNumber: cleanedPhone,
           role: user.role ?? UserRole.GLER,
-          agreedTerms: agreements,
+          agreedTerms,
+          consentHistory: consentRecords,
           hasCompletedOnboarding: true,
           isActive: true,
           updatedAt: serverTimestamp(),
           ...(user.createdAt ? {} : { createdAt: serverTimestamp() }),
         },
-        { merge: true }
+        { merge: true },
       );
 
       await completeOnboarding();
@@ -127,24 +205,42 @@ export default function BasicInfoOnboarding() {
 
         <View style={styles.card}>
           <Text style={styles.sectionTitle}>약관 동의</Text>
-          <AgreementRow
-            title="서비스 이용약관"
-            subtitle="필수"
-            value={agreements.service}
-            onValueChange={() => toggleAgreement('service')}
-          />
-          <AgreementRow
-            title="개인정보 처리방침"
-            subtitle="필수"
-            value={agreements.privacy}
-            onValueChange={() => toggleAgreement('privacy')}
-          />
-          <AgreementRow
-            title="마케팅 정보 수신"
-            subtitle="선택"
-            value={agreements.marketing}
-            onValueChange={() => toggleAgreement('marketing')}
-          />
+
+          {loadingTemplates ? (
+            <View style={styles.loadingWrap}>
+              <ActivityIndicator color={Colors.primary} />
+              <Text style={styles.loadingText}>약관을 불러오는 중...</Text>
+            </View>
+          ) : (
+            <>
+              {/* 전체 동의 토글 */}
+              <View style={styles.agreementRow}>
+                <View style={styles.agreementCopy}>
+                  <Text style={styles.agreementTitle}>전체 동의</Text>
+                </View>
+                <Switch
+                  value={allAgreed}
+                  onValueChange={toggleAll}
+                  trackColor={{ false: Colors.gray300, true: Colors.primaryMint }}
+                  thumbColor={allAgreed ? Colors.primary : Colors.white}
+                />
+              </View>
+
+              <View style={styles.divider} />
+
+              {/* 개별 동의 항목 */}
+              {consentTemplates.map((item) => (
+                <ConsentItemRow
+                  key={item.key}
+                  item={item}
+                  agreed={consents[item.key] === true}
+                  expanded={expandedItems.has(item.key)}
+                  onToggle={() => toggleConsent(item.key)}
+                  onToggleExpand={() => toggleExpanded(item.key)}
+                />
+              ))}
+            </>
+          )}
         </View>
 
         <View style={styles.notice}>
@@ -182,29 +278,54 @@ function Field({
   );
 }
 
-function AgreementRow({
-  title,
-  subtitle,
-  value,
-  onValueChange,
+function ConsentItemRow({
+  item,
+  agreed,
+  expanded,
+  onToggle,
+  onToggleExpand,
 }: {
-  title: string;
-  subtitle: string;
-  value: boolean;
-  onValueChange: () => void;
+  item: ConsentDisplayItem;
+  agreed: boolean;
+  expanded: boolean;
+  onToggle: () => void;
+  onToggleExpand: () => void;
+  key?: string;
 }) {
   return (
-    <View style={styles.agreementRow}>
-      <View style={styles.agreementCopy}>
-        <Text style={styles.agreementTitle}>{title}</Text>
-        <Text style={styles.agreementSubtitle}>{subtitle}</Text>
+    <View style={styles.consentItemWrap}>
+      <View style={styles.agreementRow}>
+        <View style={styles.agreementCopy}>
+          <View style={styles.titleRow}>
+            <Text style={styles.agreementTitle}>{item.title}</Text>
+            <Text style={[
+              styles.badge,
+              item.isRequired ? styles.badgeRequired : styles.badgeOptional,
+            ]}>
+              {item.isRequired ? '필수' : '선택'}
+            </Text>
+          </View>
+          <Text style={styles.agreementSubtitle}>{item.description}</Text>
+        </View>
+        <Switch
+          value={agreed}
+          onValueChange={onToggle}
+          trackColor={{ false: Colors.gray300, true: Colors.primaryMint }}
+          thumbColor={agreed ? Colors.primary : Colors.white}
+        />
       </View>
-      <Switch
-        value={value}
-        onValueChange={onValueChange}
-        trackColor={{ false: Colors.gray300, true: Colors.primaryMint }}
-        thumbColor={value ? Colors.primary : Colors.white}
-      />
+      {item.content ? (
+        <TouchableOpacity onPress={onToggleExpand} activeOpacity={0.6}>
+          <Text style={styles.expandButton}>
+            {expanded ? '내용 닫기' : '내용 보기'}
+          </Text>
+        </TouchableOpacity>
+      ) : null}
+      {expanded && item.content ? (
+        <View style={styles.expandedContent}>
+          <Text style={styles.expandedText}>{item.content}</Text>
+        </View>
+      ) : null}
     </View>
   );
 }
@@ -270,6 +391,15 @@ const styles = StyleSheet.create({
     fontSize: Typography.fontSize.xs,
     marginTop: Spacing.xs,
   },
+  loadingWrap: {
+    alignItems: 'center',
+    gap: Spacing.sm,
+    paddingVertical: Spacing.md,
+  },
+  loadingText: {
+    color: Colors.textTertiary,
+    fontSize: Typography.fontSize.sm,
+  },
   agreementRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -285,6 +415,52 @@ const styles = StyleSheet.create({
   agreementSubtitle: {
     color: Colors.textTertiary,
     fontSize: Typography.fontSize.xs,
+  },
+  titleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.xs,
+  },
+  badge: {
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 999,
+    fontSize: 10,
+    fontWeight: '800',
+    overflow: 'hidden',
+  },
+  badgeRequired: {
+    backgroundColor: Colors.errorBackground,
+    color: Colors.error,
+  },
+  badgeOptional: {
+    backgroundColor: Colors.gray100,
+    color: Colors.textSecondary,
+  },
+  divider: {
+    height: 1,
+    backgroundColor: Colors.border,
+  },
+  consentItemWrap: {
+    gap: Spacing.xs,
+  },
+  expandButton: {
+    color: Colors.primary,
+    fontSize: Typography.fontSize.xs,
+    fontWeight: '700',
+    paddingLeft: 2,
+  },
+  expandedContent: {
+    backgroundColor: Colors.gray50,
+    borderRadius: BorderRadius.md,
+    padding: Spacing.md,
+    borderWidth: 1,
+    borderColor: Colors.border,
+  },
+  expandedText: {
+    color: Colors.textSecondary,
+    fontSize: Typography.fontSize.xs,
+    lineHeight: 18,
   },
   notice: {
     backgroundColor: Colors.warningLight,
