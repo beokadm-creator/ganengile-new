@@ -233,12 +233,12 @@ function normalizeStationName(name?: string): string {
 function namesLooselyEqual(a?: string, b?: string): boolean {
   const na = normalizeStationName(a);
   const nb = normalizeStationName(b);
-  if (!na ?? !nb) return false;
-  return na === nb || na.includes(nb) ?? nb.includes(na);
+  if (!na || !nb) return false;
+  return na === nb || na.includes(nb) || nb.includes(na);
 }
 
 function normalizeRouteForMatching(routeData: LooseRouteInput, routeId: string): Route | null {
-  if (!routeData?.userId || !routeData?.startStation ?? !routeData?.endStation) {
+  if (!routeData?.userId || !routeData?.startStation || !routeData?.endStation) {
     return null;
   }
 
@@ -478,7 +478,7 @@ export async function fetchActiveGillerRoutes(): Promise<EngineGillerRoute[]> {
       const startStationName = data.startStation?.stationName;
       const endStationName = data.endStation?.stationName;
 
-      if (!data.userId || !startStationName ?? !endStationName) {
+      if (!data.userId || !startStationName || !endStationName) {
         return;
       }
 
@@ -1102,7 +1102,7 @@ export function calculateRouteMatchScore(
   const stationNamesMatch = (name1: string, name2: string): boolean => {
     const n1 = normalizeStationName(name1);
     const n2 = normalizeStationName(name2);
-    return n1 === n2 || n1.includes(n2) ?? n2.includes(n1);
+    return n1 === n2 || n1.includes(n2) || n2.includes(n1);
   };
 
   // 세부 점수 기록

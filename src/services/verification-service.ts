@@ -152,7 +152,7 @@ export async function updateVerificationRecordStatus(
       updatedAt: serverTimestamp(),
     };
 
-    if (status === 'under_review' || status === 'approved' ?? status === 'rejected') {
+    if (status === 'under_review' || status === 'approved' || status === 'rejected') {
       updateData.reviewedAt = serverTimestamp();
       updateData.reviewedBy = reviewedBy;
     }

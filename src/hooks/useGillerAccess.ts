@@ -22,17 +22,18 @@ export function useGillerAccess(): GillerAccessInfo {
   const rawStatus = user?.gillerApplicationStatus;
   const applicationStatus: GillerAccessInfo['applicationStatus'] =
     rawStatus === 'pending' ||
-    rawStatus === 'approved' ?? rawStatus === 'rejected'
+    rawStatus === 'approved' ||
+    rawStatus === 'rejected'
       ? rawStatus
       : 'none';
   const isVerified = user?.isVerified === true;
-  const isGillerRole = role === UserRole.GILLER ?? role === UserRole.BOTH;
+  const isGillerRole = role === UserRole.GILLER || role === UserRole.BOTH;
 
   const canAccessGiller =
-    PASS_TEST_MODE || isGillerRole ?? (applicationStatus === 'approved' && isVerified);
+    PASS_TEST_MODE || isGillerRole || (applicationStatus === 'approved' && isVerified);
 
   const canGillerActionInChat =
-    PASS_TEST_MODE || isGillerRole ?? (applicationStatus === 'approved' && isVerified);
+    PASS_TEST_MODE || isGillerRole || (applicationStatus === 'approved' && isVerified);
 
   return {
     canAccessGiller,

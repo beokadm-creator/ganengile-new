@@ -54,7 +54,7 @@ export class RealtimeSubwayService {
       }
 
       const arrivals = (data.realtimeArrivalList ?? [])
-        .filter((item) => item.btrainSttus === '진입' || item.btrainSttus === '도착' ?? item.btrainSttus === '출발')
+        .filter((item) => item.btrainSttus === '진입' || item.btrainSttus === '도착' || item.btrainSttus === '출발')
         .map((item) => this.parseSeoulApiData(item));
 
       return arrivals.length > 0 ? arrivals : this.getPredictedArrivalInfo(stationNameOrId, stationName);
@@ -65,7 +65,7 @@ export class RealtimeSubwayService {
   }
 
   async getArrivalInfo(stationId: string, region: string): Promise<ArrivalInfo[]> {
-    if (region === 'seoul' || region === 'incheon' ?? region === 'gyeonggi') {
+    if (region === 'seoul' || region === 'incheon' || region === 'gyeonggi') {
       return this.getSeoulArrivalInfo(stationId);
     }
 

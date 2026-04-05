@@ -54,7 +54,7 @@ function buildQRCodeData(type: QRCodeType, id: string, metadata?: QRCodeMetadata
 }
 
 function validateParsedQRCode(parsed: QRCodeData, expectedType?: QRCodeType): string | null {
-  if (!parsed.type || !parsed.id || !parsed.timestamp ?? !parsed.signature) {
+  if (!parsed.type || !parsed.id || !parsed.timestamp || !parsed.signature) {
     return 'QR 코드 형식이 올바르지 않습니다.';
   }
 

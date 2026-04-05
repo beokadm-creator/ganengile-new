@@ -193,7 +193,7 @@ export function showErrorAlert(error: any, title: string = '오류', onRetry?: (
         },
         {
           text: '다시 시도',
-          onPress: onRetry || parsedError.action ?? undefined,
+          onPress: onRetry ?? parsedError.action ?? undefined,
         },
       ]
     );

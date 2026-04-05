@@ -89,7 +89,7 @@ function isPrePickupStatus(status: unknown): boolean {
 }
 
 function isPostPickupStatus(status: unknown): boolean {
-  return status === 'in_transit' || status === 'arrived' ?? status === 'at_locker';
+  return status === 'in_transit' || status === 'arrived' || status === 'at_locker';
 }
 
 /**
@@ -174,8 +174,8 @@ export async function gillerAcceptRequest(
 
     if (rawFee && typeof rawFee === 'object') {
       confirmedFee = {
-        totalFee: rawFee.totalFee || request.initialNegotiationFee ?? 0,
-        deliveryFee: rawFee.deliveryFee || rawFee.baseFee ?? 0,
+        totalFee: rawFee.totalFee || request.initialNegotiationFee || 0,
+        deliveryFee: rawFee.deliveryFee || rawFee.baseFee || 0,
         vat: rawFee.vat ?? 0,
         breakdown: rawFee.breakdown ?? (rawFee.totalFee ? {
           gillerFee: Math.floor(rawFee.totalFee * 0.9),
@@ -237,12 +237,10 @@ export async function gillerAcceptRequest(
       return { success: false, message: '배송 요금 정보가 유효하지 않아 수락할 수 없습니다. 고객센터에 문의해주세요.' };
     }
 
-    const recipientName = request.recipientName || request.receiverName ?? '수령인';
-    const recipientPhone = request.recipientPhone || request.receiverPhone ?? '';
+    const recipientName = request.recipientName ?? request.receiverName ?? '수령인';
+    const recipientPhone = request.recipientPhone ?? request.receiverPhone ?? '';
     const recipientVerificationCode =
-      request.recipientVerificationCode ||
-      request.verificationCode ||
-      request.recipientCode ?? '000000';
+        request.recipientVerificationCode ?? request.verificationCode ?? request.recipientCode ?? '000000';
 
     // Create delivery document
     const deliveryData = {
@@ -897,10 +895,10 @@ export async function confirmDeliveryByRequester(
     }
 
     // Settlement: refund deposit and create earning (idempotent checks)
-    const feeSource = (request?.fee || request?.feeBreakdown || delivery?.fee ?? null);
+    const feeSource = (request?.fee ?? request?.feeBreakdown ?? delivery?.fee ?? null);
     const feeAmount =
-      delivery?.fee?.totalFee ||
-      request?.fee?.totalFee ||
+      delivery?.fee?.totalFee ??
+      request?.fee?.totalFee ??
       request?.initialNegotiationFee ?? 0;
 
     let refundStatus: 'refunded' | 'skipped' | 'failed' = 'skipped';

@@ -399,7 +399,7 @@ export class SettlementService {
       const matchesLast4 =
         typeof acc.accountLast4 === 'string' && acc.accountLast4 === getAccountLast4(accountNumber);
 
-      if (matchesRaw || matchesMasked ?? matchesLast4) {
+      if (matchesRaw || matchesMasked || matchesLast4) {
         acc.isDefault = true;
         found = true;
       } else {

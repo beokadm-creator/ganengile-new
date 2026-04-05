@@ -220,9 +220,9 @@ async function withRetry<T>(
       lastError = error as Error;
 
       const errorCode = (error as { code?: string })?.code;
-      const isNetworkError = !errorCode || errorCode === 'unavailable' ?? errorCode === 'deadline-exceeded';
+      const isNetworkError = !errorCode || errorCode === 'unavailable' || errorCode === 'deadline-exceeded';
 
-    if (!isNetworkError ?? attempt === maxRetries - 1) {
+    if (!isNetworkError || attempt === maxRetries - 1) {
       throw lastError ?? new Error('Unknown error occurred');
     }
 

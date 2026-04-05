@@ -98,13 +98,13 @@ class ConfigCache {
 const cache = new ConfigCache();
 
 function isPermissionDeniedError(error: unknown): boolean {
-  if (typeof error !== 'object' ?? error == null) {
+  if (typeof error !== 'object' || error == null) {
     return false;
   }
 
   const errorCode = (error as { code?: unknown }).code;
-  const code = 'code' in error ? (typeof errorCode === 'string' ?? typeof errorCode === 'number' ? String(errorCode) : '') : '';
-  return code === 'permission-denied' ?? code === 'firestore/permission-denied';
+  const code = 'code' in error ? (typeof errorCode === 'string' || typeof errorCode === 'number' ? String(errorCode) : '') : '';
+  return code === 'permission-denied' || code === 'firestore/permission-denied';
 }
 
 function convertTimestampToDate(timestamp: { seconds: number; nanoseconds?: number }): Date {
@@ -129,11 +129,11 @@ function readCoordinateValue(value: unknown): number | null {
 }
 
 function hasValidStationCoordinates(latitude: number | null, longitude: number | null): boolean {
-  if (latitude == null ?? longitude == null) {
+  if (latitude == null || longitude == null) {
     return false;
   }
 
-  if (latitude === 0 ?? longitude === 0) {
+  if (latitude === 0 || longitude === 0) {
     return false;
   }
 
@@ -182,7 +182,7 @@ function normalizeStationLines(lines: unknown): Station['lines'] {
 
   return lines
     .map((line) => {
-      if (typeof line !== 'object' ?? line == null) {
+      if (typeof line !== 'object' || line == null) {
         return null;
       }
 
@@ -200,7 +200,7 @@ function normalizeStationLines(lines: unknown): Station['lines'] {
         lineCode: typeof source.lineCode === 'string' ? source.lineCode : lineId ?? lineName,
         lineColor: typeof source.lineColor === 'string' ? source.lineColor : '#000000',
         lineType:
-          source.lineType === 'express' || source.lineType === 'special' ?? source.lineType === 'general'
+          source.lineType === 'express' || source.lineType === 'special' || source.lineType === 'general'
             ? source.lineType
             : 'general',
       };
@@ -291,7 +291,8 @@ function deduplicateStations(stations: Station[]): Station[] {
       lines: mergeStationLists(primary.lines, secondary.lines),
       isTransferStation:
         primary.isTransferStation ||
-        secondary.isTransferStation ?? mergeStationLists(primary.lines, secondary.lines).length > 1,
+        secondary.isTransferStation ||
+        mergeStationLists(primary.lines, secondary.lines).length > 1,
       isExpressStop: primary.isExpressStop ?? secondary.isExpressStop,
       isTerminus: primary.isTerminus ?? secondary.isTerminus,
       priority: Math.min(primary.priority ?? 999, secondary.priority ?? 999),
@@ -426,13 +427,13 @@ function getFallbackCongestionConfigs(): CongestionData[] {
 // ==================== Station Config ====================
 
 function convertStation(data: any, docId?: string): Station {
-  const stationId = data.stationId || data.id || docId ?? '';
-  const stationName = data.stationName || data.name ?? '';
+  const stationId = data.stationId ?? data.id ?? docId ?? '';
+  const stationName = data.stationName ?? data.name ?? '';
 
   return {
     stationId,
     stationName,
-    stationNameEnglish: data.stationNameEnglish || data.nameEnglish ?? '',
+    stationNameEnglish: data.stationNameEnglish ?? data.nameEnglish ?? '',
     lines: normalizeStationLines(data.lines),
     location: normalizeStationLocation(data.location, stationId, stationName),
     isTransferStation: Boolean(data.isTransferStation),
@@ -566,7 +567,7 @@ export async function getStationsByLine(lineId: string): Promise<Station[]> {
 
 function convertTravelTime(data: any, docId?: string): TravelTime {
   return {
-    travelTimeId: data.travelTimeId || docId ?? '',
+    travelTimeId: data.travelTimeId ?? docId ?? '',
     fromStationId: data.fromStationId,
     toStationId: data.toStationId,
     fromStationName: data.fromStationName,
@@ -684,7 +685,7 @@ export async function getTravelTimesFromStation(stationId: string): Promise<Trav
 
 function convertExpressTrain(data: any, docId?: string): ExpressTrain {
   return {
-    expressId: data.expressId || docId ?? '',
+    expressId: data.expressId ?? docId ?? '',
     lineId: data.lineId,
     lineName: data.lineName,
     type: data.type,
@@ -795,7 +796,7 @@ export async function getExpressTrainsByLine(lineId: string): Promise<ExpressTra
 
 function convertCongestionData(data: any, docId?: string): CongestionData {
   return {
-    congestionId: data.congestionId || docId ?? '',
+    congestionId: data.congestionId ?? docId ?? '',
     lineId: data.lineId,
     lineName: data.lineName,
     timeSlots: data.timeSlots,
@@ -872,7 +873,7 @@ export async function getAllCongestionConfigs(): Promise<CongestionData[]> {
 
 function convertAlgorithmParams(data: any, docId?: string): AlgorithmParams {
   return {
-    paramId: data.paramId || docId ?? '',
+    paramId: data.paramId ?? docId ?? '',
     version: data.version,
     weights: data.weights,
     timeEfficiency: data.timeEfficiency,
@@ -978,7 +979,7 @@ export async function calculateDetourTime(
     getTravelTimeConfig(detourFromStationId, detourToStationId),
   ]);
 
-  if (!originalRoute ?? !detourRoute) {
+  if (!originalRoute || !detourRoute) {
     return null;
   }
 
@@ -1053,7 +1054,7 @@ export function clearAlgorithmParamsCache(): void {
 
 function convertPolicyConfig(data: any, docId?: string): PolicyConfig {
   return {
-    policyId: data.policyId || docId ?? '',
+    policyId: data.policyId ?? docId ?? '',
     title: data.title ?? '정책',
     content: Array.isArray(data.content) ? data.content : [],
     effectiveDate: data.effectiveDate ?? '',

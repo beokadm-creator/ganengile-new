@@ -77,7 +77,7 @@ export class MediaService {
         quality: this.COMPRESSION_QUALITY,
       });
 
-      if (result.canceled || !result.assets ?? result.assets.length === 0) {
+      if (result.canceled || !result.assets || result.assets.length === 0) {
         return null;
       }
 
@@ -132,7 +132,7 @@ export class MediaService {
         quality: this.COMPRESSION_QUALITY,
       });
 
-      if (result.canceled || !result.assets ?? result.assets.length === 0) {
+      if (result.canceled || !result.assets || result.assets.length === 0) {
         return null;
       }
 

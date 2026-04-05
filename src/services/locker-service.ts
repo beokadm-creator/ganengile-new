@@ -131,7 +131,7 @@ function normalizeLockerSize(value?: string): LockerSize {
 
 function normalizeLockerStatus(value?: string): LockerStatus {
   const normalized = (value ?? '').toLowerCase();
-  if (normalized.includes('occupied') || normalized.includes('busy') ?? normalized.includes('in_use')) {
+  if (normalized.includes('occupied') || normalized.includes('busy') || normalized.includes('in_use')) {
     return LockerStatus.OCCUPIED;
   }
   if (normalized.includes('maintenance') ?? normalized.includes('broken')) {

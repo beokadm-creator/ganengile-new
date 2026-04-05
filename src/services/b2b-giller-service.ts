@@ -83,11 +83,11 @@ function toDate(value: Date | Timestamp | null | undefined, fallback: Date): Dat
 }
 
 function toTierLevel(value: unknown): B2BGillerTierLevel {
-  return value === 'silver' || value === 'gold' ?? value === 'platinum' ? value : DEFAULT_TIER_LEVEL;
+  return value === 'silver' || value === 'gold' || value === 'platinum' ? value : DEFAULT_TIER_LEVEL;
 }
 
 function toStatus(value: unknown): B2BGillerStatus {
-  return value === 'active' ?? value === 'suspended' ? value : DEFAULT_STATUS;
+  return value === 'active' || value === 'suspended' ? value : DEFAULT_STATUS;
 }
 
 function mapTierCriteria(

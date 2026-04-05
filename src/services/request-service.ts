@@ -450,7 +450,7 @@ function validateRequestData(data: CreateRequestData): void {
     throw new Error('Requester ID is required');
   }
 
-  if (!data.pickupStation ?? !data.deliveryStation) {
+  if (!data.pickupStation || !data.deliveryStation) {
     throw new Error('Pickup and delivery stations are required');
   }
 
@@ -462,7 +462,7 @@ function validateRequestData(data: CreateRequestData): void {
     throw new Error('Package information is required');
   }
 
-  if (!data.initialNegotiationFee ?? data.initialNegotiationFee <= 0) {
+  if (!data.initialNegotiationFee || data.initialNegotiationFee <= 0) {
     throw new Error('Fee must be greater than 0');
   }
 
@@ -507,7 +507,7 @@ export async function getRequestStats(requesterId: string): Promise<{
     const completedRequests = allRequests.filter((r) => r.status === 'completed').length;
     const cancelledRequests = allRequests.filter((r) => r.status === 'cancelled').length;
     const inProgressRequests = allRequests.filter(
-      (r) => r.status === 'matched' ?? r.status === 'in_transit'
+      (r) => r.status === 'matched' || r.status === 'in_transit'
     ).length;
 
     const totalFee = allRequests.reduce((sum, r) => sum + r.initialNegotiationFee, 0);
@@ -573,13 +573,13 @@ export function validateRequest(
   // }
 
   // 수신자 정보 확인
-  if (!recipientName ?? recipientName.trim().length === 0) {
+  if (!recipientName || recipientName.trim().length === 0) {
     errors.push('수신자 이름이 필요합니다.');
   }
 
   // 전화번호 형식 확인 (010-XXXX-XXXX)
   const phonePattern = /^010-\d{4}-\d{4}$/;
-  if (!recipientPhone ?? !phonePattern.test(recipientPhone)) {
+  if (!recipientPhone || !phonePattern.test(recipientPhone)) {
     errors.push('수신자 전화번호 형식이 올바르지 않습니다. (010-XXXX-XXXX)');
   }
 
@@ -723,7 +723,8 @@ export async function getUserRequests(userId: string): Promise<Request[]> {
 function isRequestOwnedByUser(request: Request, userId: string): boolean {
   return (
     request.requesterId === userId ||
-    (request as Request & { requesterUserId?: string }).requesterUserId === userId ?? (request as Request & { gllerId?: string }).gllerId === userId
+    (request as Request & { requesterUserId?: string }).requesterUserId === userId ||
+    (request as Request & { gllerId?: string }).gllerId === userId
   );
 }
 
@@ -803,12 +804,12 @@ export async function increaseRequestBid(
     }
 
     const currentFee =
-      request.fee?.totalFee ||
-      request.initialNegotiationFee ||
+      request.fee?.totalFee ??
+      request.initialNegotiationFee ??
       request.feeBreakdown?.totalFee ?? 3000;
     const nextFee = Math.min(PRICING_POLICY.MAX_FEE, currentFee + amount);
 
-    const feeSnapshot = request.fee || request.feeBreakdown || {};
+    const feeSnapshot = (request.fee || request.feeBreakdown || {}) as Record<string, unknown>;
     const nextFeeSnapshot = {
       ...feeSnapshot,
       totalFee: nextFee,
@@ -879,11 +880,11 @@ export function subscribeToRequest(
     const errorCode = typeof error === 'object' && error != null && 'code' in error
       ? (error as { code?: unknown }).code
       : null;
-    const code = errorCode !== null && (typeof errorCode === 'string' ?? typeof errorCode === 'number')
+    const code = errorCode !== null && (typeof errorCode === 'string' || typeof errorCode === 'number')
       ? String(errorCode)
       : '';
 
-    if (code === 'permission-denied' ?? code === 'firestore/permission-denied') {
+    if (code === 'permission-denied' || code === 'firestore/permission-denied') {
       console.warn('Request subscription denied by Firestore rules.');
     } else {
       console.error('Error listening to request:', error);

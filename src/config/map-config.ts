@@ -36,7 +36,7 @@ export function getDefaultFunctionsBaseUrl(): string {
       ? getApps()[0]?.options.projectId
       : '';
   const projectId =
-    readEnv(env.EXPO_PUBLIC_FIREBASE_PROJECT_ID) ||
+    readEnv(env.EXPO_PUBLIC_FIREBASE_PROJECT_ID) ??
     readEnv(env.FIREBASE_PROJECT_ID) ?? readEnv(firebaseProjectId);
   const region = readEnv(env.EXPO_PUBLIC_FIREBASE_FUNCTIONS_REGION) ?? 'us-central1';
   if (!projectId) {

@@ -143,7 +143,7 @@ export class TransferMatchingService {
     return {
       id: stationId,
       stationId,
-      stationName: station.stationName || station.name ?? '',
+      stationName: station.stationName ?? station.name ?? '',
       line: station.line,
       lineCode: station.lineCode,
       lat: station.lat,
@@ -186,7 +186,7 @@ export class TransferMatchingService {
         transferStations.push({
           id: doc.id,
           stationId: doc.id,
-          stationName: station.stationName || station.name ?? '',
+          stationName: station.stationName ?? station.name ?? '',
           line: station.line,
           lineCode: station.lineCode,
           lat: station.lat,
