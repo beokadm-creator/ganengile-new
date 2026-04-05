@@ -22,7 +22,7 @@ export async function GET(
   const data = snap.data();
   const settlementSnap = await db.collection('settlements').doc(requestId).get();
   const settlement = settlementSnap.exists ? settlementSnap.data() : null;
-  const earningPaymentId = settlement?.earningPaymentId || null;
+  const earningPaymentId = settlement?.earningPaymentId ?? null;
   const earningPaymentSnap =
     earningPaymentId
       ? await db.collection('payments').doc(earningPaymentId).get()

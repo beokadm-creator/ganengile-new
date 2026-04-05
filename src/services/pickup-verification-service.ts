@@ -39,9 +39,9 @@ export class PickupVerificationService {
       const verificationData = {
         deliveryId: data.deliveryId,
         verificationMethod: data.verificationMethod,
-        verificationCode: data.verificationCode || null,
-        photoUri: data.photoUri || null,
-        locationData: data.locationData || null,
+        verificationCode: data.verificationCode ?? null,
+        photoUri: data.photoUri ?? null,
+        locationData: data.locationData ?? null,
         verifiedAt: serverTimestamp(),
       };
 
@@ -56,8 +56,8 @@ export class PickupVerificationService {
           status: 'picked_up',
           pickupVerifiedAt: serverTimestamp(),
           pickupVerificationMethod: data.verificationMethod,
-          pickupLocation: data.locationData || null,
-          pickupPhoto: data.photoUri || null,
+          pickupLocation: data.locationData ?? null,
+          pickupPhoto: data.photoUri ?? null,
         });
       }
 
@@ -93,7 +93,7 @@ export class PickupVerificationService {
         verificationCode: data.verificationCode,
         photoUri: data.photoUri,
         locationData: data.locationData,
-        verifiedAt: data.verifiedAt?.toDate() || new Date(),
+        verifiedAt: data.verifiedAt?.toDate() ?? new Date(),
       };
     } catch (error) {
       console.error('Error getting pickup verification:', error);

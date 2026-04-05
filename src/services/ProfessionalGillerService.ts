@@ -102,15 +102,15 @@ export class ProfessionalGillerService {
     const userRef = doc(db, 'users', userId);
     const userDoc = await getDoc(userRef);
 
-    if (!userDoc.exists) {
+    if (!userDoc.exists()) {
       throw new Error('User not found');
     }
 
     const user = userDoc.data() as User;
-    const currentGrade = user.gillerProfile?.type || GillerType.REGULAR;
+    const currentGrade = user.gillerProfile?.type ?? GillerType.REGULAR;
 
     // 이미 목표 등급 이상인 경우
-    if (currentGrade === targetGrade || currentGrade === GillerType.MASTER) {
+    if (currentGrade === targetGrade ?? currentGrade === GillerType.MASTER) {
       throw new Error('Already at or above target grade');
     }
 
@@ -122,7 +122,7 @@ export class ProfessionalGillerService {
       },
     });
 
-    console.log(`📝 Promotion application: ${userId} -> ${targetGrade}`);
+    console.warn(`📝 Promotion application: ${userId} -> ${targetGrade}`);
   }
 
   /**
@@ -135,7 +135,7 @@ export class ProfessionalGillerService {
     const userRef = doc(db, 'users', userId);
     const userDoc = await getDoc(userRef);
 
-    if (!userDoc.exists) {
+    if (!userDoc.exists()) {
       throw new Error('User not found');
     }
 
@@ -146,7 +146,7 @@ export class ProfessionalGillerService {
       return { approved: false, reason: 'No pending promotion application' };
     }
 
-    const currentGrade = user.gillerProfile?.type || GillerType.REGULAR;
+    const currentGrade = user.gillerProfile?.type ?? GillerType.REGULAR;
     const targetGrade = currentGrade === GillerType.REGULAR
       ? GillerType.PROFESSIONAL
       : GillerType.MASTER;
@@ -201,7 +201,7 @@ export class ProfessionalGillerService {
       'updatedAt': Timestamp.now(),
     });
 
-    console.log(`🎉 Promoted: ${userId} -> ${newGrade}`);
+    console.warn(`🎉 Promoted: ${userId} -> ${newGrade}`);
   }
 
   /**
@@ -214,12 +214,12 @@ export class ProfessionalGillerService {
     const userRef = doc(db, 'users', userId);
     const userDoc = await getDoc(userRef);
 
-    if (!userDoc.exists) {
+    if (!userDoc.exists()) {
       throw new Error('User not found');
     }
 
     const user = userDoc.data() as User;
-    const currentGrade = user.gillerProfile?.type || GillerType.REGULAR;
+    const currentGrade = user.gillerProfile?.type ?? GillerType.REGULAR;
 
     if (currentGrade === GillerType.REGULAR) {
       throw new Error('Already at Regular grade');
@@ -237,7 +237,7 @@ export class ProfessionalGillerService {
       'updatedAt': Timestamp.now(),
     });
 
-    console.log(`⚠️ Demoted: ${userId} -> ${newGrade} (Reason: ${reason})`);
+    console.warn(`⚠️ Demoted: ${userId} -> ${newGrade} (Reason: ${reason})`);
   }
 
   /**
@@ -255,7 +255,7 @@ export class ProfessionalGillerService {
       'updatedAt': Timestamp.now(),
     });
 
-    console.log(`⛔ Suspended: ${userId} (Reason: ${reason})`);
+    console.warn(`⛔ Suspended: ${userId} (Reason: ${reason})`);
   }
 
   /**
@@ -270,7 +270,7 @@ export class ProfessionalGillerService {
       'updatedAt': Timestamp.now(),
     });
 
-    console.log(`✅ Unsuspended: ${userId}`);
+    console.warn(`✅ Unsuspended: ${userId}`);
   }
 
   /**
@@ -289,12 +289,12 @@ export class ProfessionalGillerService {
     const userRef = doc(db, 'users', userId);
     const userDoc = await getDoc(userRef);
 
-    if (!userDoc.exists) {
+    if (!userDoc.exists()) {
       return 'normal';
     }
 
     const user = userDoc.data() as User;
-    return user.gillerProfile?.benefits?.priorityMatching || 'normal';
+    return user.gillerProfile?.benefits?.priorityMatching ?? 'normal';
   }
 }
 

@@ -134,7 +134,8 @@ async function createRequestDraftAnalysis(
     });
 
     return aiAnalysis;
-  } catch {
+  } catch (error) {
+    console.error('[beta1-engine] AI 분석 실패, 폴백 진행:', error);
     await updateRequestDraft(requestDraft.requestDraftId, {
       status: RequestDraftStatus.READY_FOR_REVIEW,
     });
@@ -179,7 +180,8 @@ async function createPricingQuotes(
       createdAt: Timestamp.now(),
       updatedAt: Timestamp.now(),
     }));
-  } catch {
+  } catch (error) {
+    console.error('[beta1-engine] AI 가격 견적 생성 실패:', error);
     // Deterministic fallback remains available.
   }
 
@@ -275,7 +277,7 @@ export async function bootstrapAcceptedDeliveryPlan(
     }))
     .sort((left, right) => left.sequence - right.sequence)[0];
 
-  if (!firstLeg || !firstMission) {
+  if (!firstLeg ?? !firstMission) {
     const originRef = mapLegacyStationToLocationRef(input.pickupStation);
     const destinationRef = mapLegacyStationToLocationRef(input.deliveryStation);
     const actorType: DeliveryActorType = input.assignedGillerUserId ? 'giller' : 'system';

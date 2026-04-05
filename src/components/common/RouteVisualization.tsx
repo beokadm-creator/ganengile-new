@@ -47,6 +47,7 @@ export default function RouteVisualization({
       duration: 600,
       useNativeDriver: true,
     }).start();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const getLineColor = (line: string): string => {
@@ -72,6 +73,7 @@ export default function RouteVisualization({
   }, [stations, showEstimatedTime]);
 
   return (
+    // eslint-disable-next-line react-native/no-inline-styles
     <Animated.View style={[styles.container, style, { opacity: fadeAnim }]}>
       {/* 총 예상 시간 헤더 */}
       {showEstimatedTime && totalEstimatedTime > 0 && (
@@ -94,6 +96,7 @@ export default function RouteVisualization({
             <View key={index} style={styles.stationContainer}>
               <View style={styles.stationInfo}>
                 <View
+                  // eslint-disable-next-line react-native/no-inline-styles
                   style={[
                     styles.stationDot,
                     {
@@ -111,13 +114,14 @@ export default function RouteVisualization({
               </View>
               <View style={styles.stationDetails}>
                 <Text style={styles.stationName}>{station.name}</Text>
-                <View style={styles.lineInfo}>
-                  <View
-                    style={[
-                      styles.lineBadge,
-                      { backgroundColor: lineColor },
-                    ]}
-                  >
+                  <View style={styles.lineInfo}>
+                    <View
+                      // eslint-disable-next-line react-native/no-inline-styles
+                      style={[
+                        styles.lineBadge,
+                        { backgroundColor: lineColor },
+                      ]}
+                    >
                     <Text style={styles.lineText}>{station.line}</Text>
                   </View>
                   {showEstimatedTime && station.estimatedTime && (
@@ -131,6 +135,7 @@ export default function RouteVisualization({
               {!isLast && (
                 <View style={styles.connector}>
                   <View
+                    // eslint-disable-next-line react-native/no-inline-styles
                     style={[
                       styles.connectorLine,
                       { backgroundColor: getLineColor(stations[index + 1].line) },

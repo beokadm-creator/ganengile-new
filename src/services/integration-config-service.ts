@@ -153,7 +153,7 @@ export async function getIdentityIntegrationConfig(): Promise<IdentityIntegratio
       providers: {
         pass: {
           enabled: Boolean(data?.providers?.pass?.enabled ?? fallback.providers.pass.enabled),
-          label: String(data?.providers?.pass?.label || fallback.providers.pass.label),
+          label: String(data?.providers?.pass?.label ?? fallback.providers.pass.label),
           liveReady: Boolean(data?.providers?.pass?.liveReady ?? fallback.providers.pass.liveReady),
           startUrl:
             typeof data?.providers?.pass?.startUrl === 'string'
@@ -166,7 +166,7 @@ export async function getIdentityIntegrationConfig(): Promise<IdentityIntegratio
         },
         kakao: {
           enabled: Boolean(data?.providers?.kakao?.enabled ?? fallback.providers.kakao.enabled),
-          label: String(data?.providers?.kakao?.label || fallback.providers.kakao.label),
+          label: String(data?.providers?.kakao?.label ?? fallback.providers.kakao.label),
           liveReady: Boolean(
             data?.providers?.kakao?.liveReady ?? fallback.providers.kakao.liveReady
           ),
@@ -183,7 +183,8 @@ export async function getIdentityIntegrationConfig(): Promise<IdentityIntegratio
     };
     identityCache = { data: config, expiresAt: Date.now() + CACHE_TTL };
     return config;
-  } catch {
+  } catch (error) {
+    console.error('[integration-config] 은행 설정 로드 실패:', error);
     return fallback;
   }
 }
@@ -202,8 +203,8 @@ export async function getBankIntegrationConfig(): Promise<BankIntegrationConfig>
       enabled: Boolean(data?.enabled ?? fallback.enabled),
       testMode: Boolean(data?.testMode ?? fallback.testMode),
       allowTestBypass: Boolean(data?.allowTestBypass ?? fallback.allowTestBypass),
-      provider: String(data?.provider || fallback.provider),
-      verificationMode: String(data?.verificationMode || fallback.verificationMode),
+      provider: String(data?.provider ?? fallback.provider),
+      verificationMode: String(data?.verificationMode ?? fallback.verificationMode),
       liveReady: Boolean(data?.liveReady ?? fallback.liveReady),
       requiresAccountHolderMatch: Boolean(
         data?.requiresAccountHolderMatch ?? fallback.requiresAccountHolderMatch
@@ -211,48 +212,12 @@ export async function getBankIntegrationConfig(): Promise<BankIntegrationConfig>
       manualReviewFallback: Boolean(
         data?.manualReviewFallback ?? fallback.manualReviewFallback
       ),
-      statusMessage: String(data?.statusMessage || fallback.statusMessage),
+      statusMessage: String(data?.statusMessage ?? fallback.statusMessage),
     };
     bankCache = { data: config, expiresAt: Date.now() + CACHE_TTL };
     return config;
-  } catch {
-    return fallback;
-  }
-}
-
-export async function getPaymentTestMode(): Promise<boolean> {
-  const config = await getPaymentIntegrationConfig();
-  return config.testMode;
-}
-
-export async function getPaymentIntegrationConfig(): Promise<PaymentIntegrationConfig> {
-  if (paymentCache && Date.now() < paymentCache.expiresAt) {
-    return paymentCache.data;
-  }
-
-  const fallback = getDefaultPaymentIntegrationConfig();
-
-  try {
-    const snap = await getDoc(doc(db, 'config_integrations', 'payment'));
-    const data = snap.exists() ? snap.data() : {};
-    const config: PaymentIntegrationConfig = {
-      enabled: Boolean(data?.enabled ?? fallback.enabled),
-      testMode: Boolean(data?.testMode ?? fallback.testMode),
-      allowTestBypass: Boolean(data?.allowTestBypass ?? fallback.allowTestBypass),
-      provider: String(data?.provider || fallback.provider),
-      liveReady: Boolean(data?.liveReady ?? fallback.liveReady),
-      clientKey: String(data?.clientKey || fallback.clientKey),
-      bankVerificationRequired: Boolean(
-        data?.bankVerificationRequired ?? fallback.bankVerificationRequired
-      ),
-      manualSettlementReview: Boolean(
-        data?.manualSettlementReview ?? fallback.manualSettlementReview
-      ),
-      statusMessage: String(data?.statusMessage || fallback.statusMessage),
-    };
-    paymentCache = { data: config, expiresAt: Date.now() + CACHE_TTL };
-    return config;
-  } catch {
+  } catch (error) {
+    console.error('[integration-config] 결제 설정 로드 실패:', error);
     return fallback;
   }
 }
@@ -290,23 +255,24 @@ export async function getAIIntegrationConfig(): Promise<AIIntegrationConfig> {
     const data = snap.exists() ? snap.data() : {};
     const config: AIIntegrationConfig = {
       enabled: Boolean(data?.enabled ?? fallback.enabled),
-      provider: String(data?.provider || fallback.provider),
-      baseUrl: String(data?.baseUrl || fallback.baseUrl),
-      model: String(data?.model || fallback.model),
-      analysisModel: String(data?.analysisModel || data?.model || fallback.analysisModel),
-      pricingModel: String(data?.pricingModel || data?.model || fallback.pricingModel),
-      missionModel: String(data?.missionModel || data?.model || fallback.missionModel),
+      provider: String(data?.provider ?? fallback.provider),
+      baseUrl: String(data?.baseUrl ?? fallback.baseUrl),
+      model: String(data?.model ?? fallback.model),
+      analysisModel: String(data?.analysisModel || data?.model ?? fallback.analysisModel),
+      pricingModel: String(data?.pricingModel || data?.model ?? fallback.pricingModel),
+      missionModel: String(data?.missionModel || data?.model ?? fallback.missionModel),
       confidenceThreshold: Number(data?.confidenceThreshold ?? fallback.confidenceThreshold),
-      fallbackMode: String(data?.fallbackMode || fallback.fallbackMode),
+      fallbackMode: String(data?.fallbackMode ?? fallback.fallbackMode),
       disableThinking: Boolean(data?.disableThinking ?? fallback.disableThinking),
       autoFillFields: {
         ...fallback.autoFillFields,
-        ...(data?.autoFillFields || {}),
+        ...(data?.autoFillFields ?? {}),
       },
     };
     aiCache = { data: config, expiresAt: Date.now() + CACHE_TTL };
     return config;
-  } catch {
+  } catch (error) {
+    console.error('[integration-config] AI 설정 로드 실패:', error);
     return fallback;
   }
 }

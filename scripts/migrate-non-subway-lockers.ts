@@ -17,8 +17,7 @@ const args = new Set(process.argv.slice(2));
 const apply = args.has('--apply');
 
 const serviceAccountPath =
-  process.env.FIREBASE_SERVICE_ACCOUNT_PATH ||
-  path.join(process.env.HOME || '', 'Downloads/ganengile-firebase-adminsdk-fbsvc-6178badd66.json');
+  process.env.FIREBASE_SERVICE_ACCOUNT_PATH ?? path.join(process.env.HOME || '', 'Downloads/ganengile-firebase-adminsdk-fbsvc-6178badd66.json');
 
 if (!fs.existsSync(serviceAccountPath)) {
   console.error(`❌ Service account not found: ${serviceAccountPath}`);

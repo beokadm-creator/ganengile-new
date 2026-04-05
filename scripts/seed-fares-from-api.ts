@@ -14,8 +14,7 @@ const args = new Set(process.argv.slice(2));
 const apply = args.has('--apply');
 
 const serviceAccountPath =
-  process.env.FIREBASE_SERVICE_ACCOUNT_PATH ||
-  path.join(process.env.HOME || '', 'Downloads/ganengile-firebase-adminsdk-fbsvc-6178badd66.json');
+  process.env.FIREBASE_SERVICE_ACCOUNT_PATH ?? path.join(process.env.HOME || '', 'Downloads/ganengile-firebase-adminsdk-fbsvc-6178badd66.json');
 
 if (!fs.existsSync(serviceAccountPath)) {
   throw new Error(`Service account not found: ${serviceAccountPath}`);
@@ -30,8 +29,8 @@ if (!admin.apps.length) {
 }
 const db = admin.firestore();
 
-const FARE_API_URL = process.env.EXPO_PUBLIC_SEOUL_FARE_API_URL || 'https://apis.data.go.kr/B553766/fare';
-const FARE_SERVICE_KEY = process.env.EXPO_PUBLIC_SEOUL_FARE_SERVICE_KEY || '';
+const FARE_API_URL = process.env.EXPO_PUBLIC_SEOUL_FARE_API_URL ?? 'https://apis.data.go.kr/B553766/fare';
+const FARE_SERVICE_KEY = process.env.EXPO_PUBLIC_SEOUL_FARE_SERVICE_KEY ?? '';
 if (!FARE_SERVICE_KEY) {
   throw new Error('EXPO_PUBLIC_SEOUL_FARE_SERVICE_KEY is required');
 }
@@ -46,8 +45,7 @@ function normalizeItems(payload: any): any[] {
     payload?.body?.items?.item ||
     payload?.getRltmFare?.row ||
     payload?.getRltmFare ||
-    payload?.row ||
-    [];
+    payload?.row ?? [];
   const list = Array.isArray(candidates) ? candidates : [candidates];
   return list.filter(Boolean);
 }
@@ -82,7 +80,7 @@ async function fetchFareByCode(dptreStnCd: string, arvlStnCd: string): Promise<{
     const match = text.match(/<gnrlCardFare>(\d+)<\/gnrlCardFare>/);
     if (!match) return null;
     const fare = parseInt(match[1], 10);
-    if (!Number.isFinite(fare) || fare <= 0) return null;
+    if (!Number.isFinite(fare) ?? fare <= 0) return null;
     return { fare, raw: { gnrlCardFare: fare } };
   }
 }
@@ -121,16 +119,16 @@ async function run() {
   const pairCodes = new Set<string>();
   const stationNameByCode = new Map<string, string>();
   const add = (a?: string, b?: string) => {
-    const from = String(a || '').trim();
-    const to = String(b || '').trim();
-    if (!from || !to || from === to) return;
+    const from = String(a ?? '').trim();
+    const to = String(b ?? '').trim();
+    if (!from || !to ?? from === to) return;
     const s1 = stations.get(from);
     const s2 = stations.get(to);
-    const c1 = s1?.fare?.stationCode || s1?.kric?.stationCode;
-    const c2 = s2?.fare?.stationCode || s2?.kric?.stationCode;
-    if (!c1 || !c2) return;
-    const n1 = String(s1?.stationName || '').trim();
-    const n2 = String(s2?.stationName || '').trim();
+    const c1 = s1?.fare?.stationCode ?? s1?.kric?.stationCode;
+    const c2 = s2?.fare?.stationCode ?? s2?.kric?.stationCode;
+    if (!c1 ?? !c2) return;
+    const n1 = String(s1?.stationName ?? '').trim();
+    const n2 = String(s2?.stationName ?? '').trim();
     if (n1) stationNameByCode.set(String(c1), n1.endsWith('역') ? n1.slice(0, -1) : n1);
     if (n2) stationNameByCode.set(String(c2), n2.endsWith('역') ? n2.slice(0, -1) : n2);
     pairCodes.add(`${c1}_${c2}`);
@@ -150,7 +148,7 @@ async function run() {
   const missing: string[] = [];
   for (const key of pairCodes) {
     const snap = await db.collection('config_fares').doc(key).get();
-    if (!snap.exists || !((snap.data() as any)?.fare > 0)) missing.push(key);
+    if (!snap.exists ?? !((snap.data() as any)?.fare > 0)) missing.push(key);
   }
 
   console.log(
@@ -166,7 +164,7 @@ async function run() {
     )
   );
 
-  if (!apply || !missing.length) return;
+  if (!apply ?? !missing.length) return;
 
   let updated = 0;
   const failed: string[] = [];
@@ -192,7 +190,7 @@ async function run() {
           departureStationCode: from,
           arrivalStationCode: to,
           fare: fareResult.fare,
-          raw: fareResult.raw || null,
+          raw: fareResult.raw ?? null,
           source: 'seed_script',
           updatedAt: admin.firestore.FieldValue.serverTimestamp(),
         },

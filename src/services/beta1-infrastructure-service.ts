@@ -46,7 +46,7 @@ export async function getBeta1InfrastructureSnapshot(): Promise<Beta1Infrastruct
   ).length;
 
   const supportsMiniMap = stationsWithCoordinates > 0 && travelTimes.length > 0;
-  const supportsRealtimeEta = congestionConfigs.length > 0 || expressTrains.length > 0;
+  const supportsRealtimeEta = congestionConfigs.length > 0 ?? expressTrains.length > 0;
 
   return {
     stationCatalog: {

@@ -3,6 +3,7 @@ import { db } from './firebase';
 import { PointService } from './PointService';
 import { TossPaymentService } from './TossPaymentService';
 import type { Deposit, DepositStatus } from '../types/point';
+import { PointCategory } from '../types/point';
 
 const DEPOSITS_COLLECTION = 'deposits';
 
@@ -42,7 +43,7 @@ export class DepositCompensationService {
         await PointService.earnPoints(
           deposit.userId,
           deposit.pointAmount,
-          'deposit_refund' as any,
+          PointCategory.DEPOSIT_REFUND,
           `보증금 환급 (${deposit.pointAmount.toLocaleString()}원)`
         );
       }
@@ -88,7 +89,7 @@ export class DepositCompensationService {
       await PointService.spendPoints(
         deposit.userId,
         deposit.depositAmount,
-        'deposit_compensation' as any,
+        PointCategory.DEPOSIT_COMPENSATION,
         `사고/분실에 따른 보증금 배상 차감 (${deposit.depositAmount.toLocaleString()}원)`
       );
 

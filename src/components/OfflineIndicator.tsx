@@ -36,10 +36,11 @@ export const OfflineIndicator: React.FC<OfflineIndicatorProps> = ({ height = 40 
         duration: 300,
         useNativeDriver: true
       }).start(() => {
-         
+
         setIsOffline(false);
       });
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [netInfo.isConnected]);
 
   if (!isOffline) return null;

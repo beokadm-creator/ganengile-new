@@ -205,7 +205,7 @@ function readMessageContent(content: unknown): string | undefined {
       })
       .filter(Boolean)
       .join('\n')
-      .trim() || undefined
+      .trim() ?? undefined
   );
 }
 
@@ -261,7 +261,7 @@ function extractJsonPayload(content?: string): string | null {
     return null;
   }
 
-  const fenced = content.match(/```json\s*([\s\S]*?)```/i) || content.match(/```\s*([\s\S]*?)```/i);
+  const fenced = content.match(/```json\s*([\s\S]*?)```/i) ?? content.match(/```\s*([\s\S]*?)```/i);
   if (fenced?.[1]) {
     return fenced[1].trim();
   }
@@ -397,7 +397,7 @@ async function runZaiChatCompletion(config: Beta1AIConfig, model: string, prompt
 }
 
 function buildAnalysisFallback(input: Beta1RequestDraftAnalysisInput, config: Beta1AIConfig): Beta1RequestDraftAnalysisResult {
-  const description = input.packageDraft?.description?.trim() || `${input.origin.stationName || '출발역'}에서 ${input.destination.stationName || '도착역'}까지 보내는 물품`;
+  const description = input.packageDraft?.description?.trim() ?? `${input.origin.stationName || '출발역'}에서 ${input.destination.stationName || '도착역'}까지 보내는 물품`;
   const riskFlags: string[] = [];
   const handlingNotes: string[] = [];
   const reservationMode = isReservationMode(input.requestMode);
@@ -431,12 +431,12 @@ function buildAnalysisFallback(input: Beta1RequestDraftAnalysisInput, config: Be
     fallbackUsed: true,
     confidence: 0.62,
     result: {
-      itemName: input.packageDraft?.itemName || '배송 물품',
-      category: input.packageDraft?.category || '일반',
+      itemName: input.packageDraft?.itemName ?? '배송 물품',
+      category: input.packageDraft?.category ?? '일반',
       description,
       estimatedValue: input.packageDraft?.estimatedValue,
       estimatedWeightKg: input.packageDraft?.estimatedWeightKg,
-      estimatedSize: input.packageDraft?.estimatedSize || 'medium',
+      estimatedSize: input.packageDraft?.estimatedSize ?? 'medium',
       riskFlags: Array.from(new Set(riskFlags)),
       handlingNotes,
     },
@@ -453,7 +453,7 @@ function isReservationMode(value?: string): boolean {
 
 function buildPricingFallback(input: Beta1PricingQuoteInput, config: Beta1AIConfig): Beta1PricingQuoteResult {
   const base = input.basePricing;
-  const deposit = base.depositAmount || Math.round(input.packageDraft?.estimatedValue ?? 0);
+  const deposit = base.depositAmount ?? Math.round(input.packageDraft?.estimatedValue ?? 0);
   const reservationMode = isReservationMode(input.requestMode);
   const urgencyBonus = input.urgency === 'high' ? 1200 : input.urgency === 'medium' ? 400 : 0;
   const lockerPreferred = input.directParticipationMode === 'locker_assisted';
@@ -644,8 +644,8 @@ function buildMissionFallback(input: Beta1MissionPlanInput, config: Beta1AIConfi
     },
     bundleStrategy: assigned ? 'single_actor' : reservationMode ? 'locker_assisted' : 'partner_fallback',
     missionSummary: reservationMode
-      ? `${input.pickupStation.stationName || '출발역'}에서 ${input.deliveryStation.stationName || '도착역'}까지 예약 시간대를 지키는 leg와 handover를 우선 설계합니다.`
-      : `${input.pickupStation.stationName || '출발역'}에서 ${input.deliveryStation.stationName || '도착역'}까지 단일 레그 중심으로 먼저 실행합니다.`,
+      ? `${input.pickupStation.stationName ?? '출발역'}에서 ${input.deliveryStation.stationName ?? '도착역'}까지 예약 시간대를 지키는 leg와 handover를 우선 설계합니다.`
+      : `${input.pickupStation.stationName ?? '출발역'}에서 ${input.deliveryStation.stationName ?? '도착역'}까지 단일 레그 중심으로 먼저 실행합니다.`,
   };
 }
 
@@ -654,7 +654,7 @@ export async function executeRequestDraftAnalysis(
   input: Beta1RequestDraftAnalysisInput
 ): Promise<Beta1RequestDraftAnalysisResult> {
   const config = await getAIConfig(db);
-  if (!config.enabled || !config.apiKey) {
+  if (!config.enabled ?? !config.apiKey) {
     return buildAnalysisFallback(input, config);
   }
 
@@ -684,13 +684,13 @@ export async function executeRequestDraftAnalysis(
       confidence: Math.max(0, Math.min(1, asNumber(parsed.confidence, config.confidenceThreshold))),
       result: {
         itemName: asString(parsed.itemName, input.packageDraft?.itemName),
-        category: asString(parsed.category, input.packageDraft?.category || '일반'),
-        description: asString(parsed.description, input.packageDraft?.description || ''),
-        estimatedValue: asNumber(parsed.estimatedValue, input.packageDraft?.estimatedValue ?? 0) || input.packageDraft?.estimatedValue,
-        estimatedWeightKg: asNumber(parsed.estimatedWeightKg, input.packageDraft?.estimatedWeightKg ?? 0) || input.packageDraft?.estimatedWeightKg,
+        category: asString(parsed.category, input.packageDraft?.category ?? '일반'),
+        description: asString(parsed.description, input.packageDraft?.description ?? ''),
+        estimatedValue: asNumber(parsed.estimatedValue, input.packageDraft?.estimatedValue ?? 0) ?? input.packageDraft?.estimatedValue,
+        estimatedWeightKg: asNumber(parsed.estimatedWeightKg, input.packageDraft?.estimatedWeightKg ?? 0) ?? input.packageDraft?.estimatedWeightKg,
         estimatedSize: ['small', 'medium', 'large', 'xl'].includes(asString(parsed.estimatedSize))
           ? (parsed.estimatedSize as 'small' | 'medium' | 'large' | 'xl')
-          : (input.packageDraft?.estimatedSize || 'medium'),
+          : (input.packageDraft?.estimatedSize ?? 'medium'),
         riskFlags: Array.isArray(parsed.riskFlags) ? parsed.riskFlags.map((flag) => asString(flag)).filter(Boolean) : [],
         handlingNotes: Array.isArray(parsed.handlingNotes) ? parsed.handlingNotes.map((note) => asString(note)).filter(Boolean) : [],
       },
@@ -705,7 +705,7 @@ export async function executePricingQuoteGeneration(
   input: Beta1PricingQuoteInput
 ): Promise<Beta1PricingQuoteResult> {
   const config = await getAIConfig(db);
-  if (!config.enabled || !config.apiKey) {
+  if (!config.enabled ?? !config.apiKey) {
     return buildPricingFallback(input, config);
   }
 
@@ -721,7 +721,7 @@ export async function executePricingQuoteGeneration(
     const response = await runZaiChatCompletion(config, config.pricingModel, prompt, 900);
     const parsed = parseJson<Record<string, unknown>>(response.content);
     const quoteList = Array.isArray(parsed?.quotes) ? parsed?.quotes : null;
-    if (!quoteList || quoteList.length === 0) {
+    if (!quoteList ?? quoteList.length === 0) {
       return {
         ...buildPricingFallback(input, config),
         model: config.pricingModel,
@@ -794,7 +794,7 @@ export async function executeMissionPlanning(
   input: Beta1MissionPlanInput
 ): Promise<Beta1MissionPlanResult> {
   const config = await getAIConfig(db);
-  if (!config.enabled || !config.apiKey) {
+  if (!config.enabled ?? !config.apiKey) {
     return buildMissionFallback(input, config);
   }
 
@@ -827,7 +827,7 @@ export async function executeMissionPlanning(
             ? asString(actor.selectedActorType)
             : fallback.actorSelection.selectedActorType
         ) as Beta1MissionPlanResult['actorSelection']['selectedActorType'],
-        selectedPartnerId: asString(actor.selectedPartnerId) || fallback.actorSelection.selectedPartnerId,
+        selectedPartnerId: asString(actor.selectedPartnerId) ?? fallback.actorSelection.selectedPartnerId,
         selectionReason: asString(actor.selectionReason, fallback.actorSelection.selectionReason),
         fallbackActorTypes: Array.isArray(actor.fallbackActorTypes)
           ? actor.fallbackActorTypes

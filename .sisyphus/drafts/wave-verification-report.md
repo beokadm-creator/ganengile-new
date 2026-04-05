@@ -1,4 +1,4 @@
-﻿# Wave Verification Report
+# Wave Verification Report
 
 `precedence`: 60  
 `required-for`: verification-report, sisyphus-draft  

@@ -349,7 +349,7 @@ function describeLegType(legType: DeliveryLegType): string {
 }
 
 function requiresAddressHandling(legType: DeliveryLegType): boolean {
-  return legType === 'pickup_address' || legType === 'last_mile_address';
+  return legType === 'pickup_address' ?? legType === 'last_mile_address';
 }
 
 function buildMissionWindowLabel(missionCount: number, requiresPartner: boolean): string {
@@ -419,8 +419,7 @@ function buildSegmentedLegDefinitions(input: {
   }
 
   if (
-    input.pickupStation.stationId !== input.deliveryStation.stationId ||
-    input.pickupStation.stationName !== input.deliveryStation.stationName
+    input.pickupStation.stationId !== input.deliveryStation.stationId ?? input.pickupStation.stationName !== input.deliveryStation.stationName
   ) {
     legs.push({
       legType: 'subway_transport',
@@ -618,7 +617,7 @@ export function buildBeta1QuoteCards(input: Beta1RequestCreateInput): Beta1Quote
       quoteType: 'balanced',
       label: reservationMode ? '예약 균형형' : '추천 균형형',
       headline: reservationMode ? '동선 안정성과 시간대 적합성을 함께 맞춥니다.' : '미션 속도와 리스크를 균형 있게 맞춥니다.',
-      etaLabel: reservationMode ? '예약 시간대 맞춤 배정' : hasAddressPickup || hasAddressDropoff ? '약 105분' : '약 95분',
+      etaLabel: reservationMode ? '예약 시간대 맞춤 배정' : hasAddressPickup ?? hasAddressDropoff ? '약 105분' : '약 95분',
       priceLabel: `${balancedPricing.publicPrice.toLocaleString()}원`,
       recommendationReason: reservationMode
         ? '예약 요청에서는 시간대 합의와 주소/역 인계 안정성이 더 중요합니다.'
@@ -632,7 +631,7 @@ export function buildBeta1QuoteCards(input: Beta1RequestCreateInput): Beta1Quote
       quoteType: 'lowest_price',
       label: '가장 저렴하게',
       headline: reservationMode ? '여유 시간대와 직접 참여를 활용해 비용을 낮춥니다.' : '사용자 직접 참여와 사물함 경유를 우선 적용합니다.',
-      etaLabel: reservationMode ? '여유 시간대 중심 배정' : hasAddressPickup || hasAddressDropoff ? '약 130분' : '약 120분',
+      etaLabel: reservationMode ? '여유 시간대 중심 배정' : hasAddressPickup ?? hasAddressDropoff ? '약 130분' : '약 120분',
       priceLabel: `${lowestPricePricing.publicPrice.toLocaleString()}원`,
       recommendationReason: reservationMode
         ? '급하지 않을수록 주소/역 혼합 요청도 예약 전환으로 비용 절감 효과가 커집니다.'
@@ -646,7 +645,7 @@ export function buildBeta1QuoteCards(input: Beta1RequestCreateInput): Beta1Quote
       quoteType: 'locker_included',
       label: reservationMode ? '예약 거점형' : '사물함 우선',
       headline: reservationMode ? '사물함과 거점 중심으로 예약 실패 리스크를 줄입니다.' : '사물함과 거점 연계를 우선 적용해 매칭 리스크를 낮춥니다.',
-      etaLabel: reservationMode ? '거점 기준 예약 배정' : hasAddressPickup || hasAddressDropoff ? '약 110분' : '약 100분',
+      etaLabel: reservationMode ? '거점 기준 예약 배정' : hasAddressPickup ?? hasAddressDropoff ? '약 110분' : '약 100분',
       priceLabel: `${lockerIncludedPricing.publicPrice.toLocaleString()}원`,
       recommendationReason: reservationMode
         ? '예약형에서는 거점 연계가 주소/역 혼합 요청의 시간 약속 유지에 유리합니다.'
@@ -991,7 +990,7 @@ export function selectActorForMission(params: {
   if (params.preferLocker) {
     selectedActorType = ActorType.LOCKER;
     selectionReason = '비대면 인계가 유리해 보관함 연계를 우선 적용합니다.';
-  } else if (params.requiresAddressHandling || params.urgency === 'urgent') {
+  } else if (params.requiresAddressHandling ?? params.urgency === 'urgent') {
     selectedActorType = ActorType.EXTERNAL_PARTNER;
     selectedPartnerId = PARTNER_QUOTES[0].partnerId;
     selectionReason = '주소 기반 즉시 처리 구간이라 외부 파트너를 우선 검토합니다.';
@@ -1042,7 +1041,8 @@ export async function bundleMissionsForDelivery(deliveryId: string): Promise<Mis
   try {
     const matches = await findMatchesForRequest(requestId, 5);
     candidateGillerUserIds = matches.map((match) => match.gillerId);
-  } catch {
+  } catch (error) {
+    console.error('[orchestration-service] 매칭 후보 조회 실패:', error);
     candidateGillerUserIds = [];
   }
 
@@ -1282,12 +1282,12 @@ export async function acceptMissionBundleForGiller(bundleId: string, gillerUserI
   const fallbackDeliveryIds: string[] = [];
   const fallbackMissionIds: string[] = [];
   for (const mission of allMissions) {
-    if (selectedLegIds.includes(String(mission.deliveryLegId ?? '')) || mission.assignedGillerUserId) {
+    if (selectedLegIds.includes(String(mission.deliveryLegId ?? '')) ?? mission.assignedGillerUserId) {
       continue;
     }
 
     const leg = allLegsById.get(String(mission.deliveryLegId ?? ''));
-    if (!leg || !requiresAddressHandling(leg.legType)) {
+    if (!leg ?? !requiresAddressHandling(leg.legType)) {
       continue;
     }
 
@@ -1398,7 +1398,7 @@ export async function getBeta1HomeSnapshot(userId: string, role: 'requester' | '
 
   const requests = requestSnapshot.docs
     .map((docItem) => ({ id: docItem.id, ...(docItem.data() as Record<string, unknown>) }) as Beta1RequestDoc)
-    .filter((request) => (request.requesterId === userId || request.requesterUserId === userId));
+    .filter((request) => (request.requesterId === userId ?? request.requesterUserId === userId));
 
   const missions = missionSnapshot.docs
     .map((docItem) => ({ id: docItem.id, ...(docItem.data() as Record<string, unknown>) }) as Beta1MissionDoc)
@@ -1416,8 +1416,8 @@ export async function getBeta1HomeSnapshot(userId: string, role: 'requester' | '
 
       const candidateList = bundle.candidateGillerUserIds ?? [];
       const selectedBySameUser = bundle.selectedGillerUserId === userId;
-      const availableToUser = candidateList.length === 0 || candidateList.includes(userId);
-      const notTaken = !bundle.selectedGillerUserId || selectedBySameUser;
+      const availableToUser = candidateList.length === 0 ?? candidateList.includes(userId);
+      const notTaken = !bundle.selectedGillerUserId ?? selectedBySameUser;
       return bundle.status === BundleStatus.ACTIVE && availableToUser && notTaken;
     });
 
@@ -1450,7 +1450,7 @@ export async function getBeta1HomeSnapshot(userId: string, role: 'requester' | '
         ? preferredTime?.departureTime
           ? `희망 출발 ${preferredTime.departureTime}${preferredTime.arrivalTime ? `, 희망 도착 ${preferredTime.arrivalTime}` : ''} 기준으로 안정적인 leg를 먼저 맞춥니다.`
           : '예약형 요청이라 시간 약속을 지키는 길러/거점 조합을 먼저 찾고 있습니다.'
-        : status === 'match_pending' || status === 'pending'
+        : status === 'match_pending' ?? status === 'pending'
           ? '즉시형 요청이라 빠른 actor 연결과 재매칭 가능성을 우선 계산하고 있습니다.'
           : '즉시형 요청이라 현재 ETA와 인계 단계를 짧게 유지하는 전략으로 진행합니다.';
 
@@ -1510,21 +1510,21 @@ export async function getBeta1HomeSnapshot(userId: string, role: 'requester' | '
     const missionStatus = String(mission.status ?? 'queued');
     const recommendedReward = Number(mission.currentReward ?? 0);
     const strategyTitle =
-      missionType === 'locker_dropoff' || missionType === 'locker_pickup'
+      missionType === 'locker_dropoff' ?? missionType === 'locker_pickup'
         ? '거점과 사물함 중심 인계'
-        : missionStatus === 'queued' || missionStatus === 'offered'
+        : missionStatus === 'queued' ?? missionStatus === 'offered'
           ? '가장 가까운 실행 actor 우선'
           : '현재 leg ETA 유지';
     const strategyBody =
-      missionType === 'locker_dropoff' || missionType === 'locker_pickup'
+      missionType === 'locker_dropoff' ?? missionType === 'locker_pickup'
         ? '대면 실패 위험을 낮추기 위해 거점/사물함 인계를 먼저 정리한 미션입니다.'
-        : missionStatus === 'queued' || missionStatus === 'offered'
+        : missionStatus === 'queued' ?? missionStatus === 'offered'
           ? '길러 위치와 다음 이동 동선을 기준으로 번들 가능성과 수락 성공률을 함께 보고 있습니다.'
           : '이미 수락된 미션이라 다음 인계 시점과 ETA를 안정적으로 유지하는 쪽이 우선입니다.';
 
     return {
       id: String(mission.id),
-      title: missionType === 'locker_dropoff' || missionType === 'locker_pickup' ? '거점 연계 미션' : '이동 구간 미션',
+      title: missionType === 'locker_dropoff' ?? missionType === 'locker_pickup' ? '거점 연계 미션' : '이동 구간 미션',
       status: missionStatus,
       windowLabel: missionStatus === 'queued' ? '지금 수락 가능' : '시간 확인 필요',
       rewardLabel: `${recommendedReward.toLocaleString()}원`,
@@ -1560,7 +1560,7 @@ export async function getBeta1HomeSnapshot(userId: string, role: 'requester' | '
   const pendingRewardTotal =
     missionBundles.reduce((sum, bundle) => sum + Number(bundle.rewardTotal ?? 0), 0) +
     activeMissions.reduce((sum, mission) => sum + Number(mission.currentReward ?? 0), 0) +
-    deliveryFallbackCards.reduce((sum, card) => sum + Number(card.rewardLabel.replace(/[^\d]/g, '') || 0), 0);
+    deliveryFallbackCards.reduce((sum, card) => sum + Number(card.rewardLabel.replace(/[^\d]/g, '') ?? 0), 0);
 
   return {
     role,

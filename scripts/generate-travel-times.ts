@@ -67,7 +67,7 @@ async function generateTravelTimes() {
       const fromStation = stations[fromStationId];
       const toStation = stations[toStationId];
       
-      if (!fromStation || !toStation) continue;
+      if (!fromStation ?? !toStation) continue;
       
       // 거리 계산 (Haversine formula)
       const distance = calculateDistance(

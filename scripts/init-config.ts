@@ -57,28 +57,28 @@ async function initConfigStations(options: InitOptions = {}) {
     const stationData = {
       stationId: station.stationId,
       stationName: station.stationName,
-      stationNameEnglish: station.stationNameEnglish || '',
+      stationNameEnglish: station.stationNameEnglish ?? '',
       lines: station.lines.map(line => ({
         lineId: line.lineId,
         lineName: line.lineName,
-        lineCode: line.lineCode || '',
-        lineColor: line.lineColor || '#000000',
-        lineType: line.lineType || 'general',
+        lineCode: line.lineCode ?? '',
+        lineColor: line.lineColor ?? '#000000',
+        lineType: line.lineType ?? 'general',
       })),
       location: {
         latitude: station.location.latitude,
         longitude: station.location.longitude,
       },
-      isTransferStation: station.isTransferStation || false,
-      isExpressStop: station.isExpressStop || false,
-      isTerminus: station.isTerminus || false,
+      isTransferStation: station.isTransferStation ?? false,
+      isExpressStop: station.isExpressStop ?? false,
+      isTerminus: station.isTerminus ?? false,
       facilities: {
-        hasElevator: station.facilities?.hasElevator || false,
-        hasEscalator: station.facilities?.hasEscalator || false,
-        wheelchairAccessible: station.facilities?.wheelchairAccessible || false,
+        hasElevator: station.facilities?.hasElevator ?? false,
+        hasEscalator: station.facilities?.hasEscalator ?? false,
+        wheelchairAccessible: station.facilities?.wheelchairAccessible ?? false,
       },
-      region: station.region || 'etc',
-      priority: station.priority || 5,
+      region: station.region ?? 'etc',
+      priority: station.priority ?? 5,
       isActive: true,
       createdAt: new Date(),
       updatedAt: new Date(),
@@ -122,17 +122,17 @@ async function initConfigTravelTimes(options: InitOptions = {}) {
         travelTimeId,
         fromStationId: fromId,
         toStationId: toId,
-        fromStationName: timeInfo.fromStationName || '',
-        toStationName: timeInfo.toStationName || '',
-        normalTime: timeInfo.normalTime || 0,
-        expressTime: timeInfo.expressTime || null,
-        transferCount: timeInfo.transferCount || 0,
-        transferStations: timeInfo.transferStations || [],
-        hasExpress: timeInfo.hasExpress || false,
-        walkingDistance: timeInfo.walkingDistance || 0,
-        distance: timeInfo.distance || 0,
-        lineIds: timeInfo.lineIds || [],
-        reliability: timeInfo.reliability || 8,
+        fromStationName: timeInfo.fromStationName ?? '',
+        toStationName: timeInfo.toStationName ?? '',
+        normalTime: timeInfo.normalTime ?? 0,
+        expressTime: timeInfo.expressTime ?? null,
+        transferCount: timeInfo.transferCount ?? 0,
+        transferStations: timeInfo.transferStations ?? [],
+        hasExpress: timeInfo.hasExpress ?? false,
+        walkingDistance: timeInfo.walkingDistance ?? 0,
+        distance: timeInfo.distance ?? 0,
+        lineIds: timeInfo.lineIds ?? [],
+        reliability: timeInfo.reliability ?? 8,
         lastVerified: new Date(),
         isActive: true,
         createdAt: new Date(),
@@ -143,7 +143,7 @@ async function initConfigTravelTimes(options: InitOptions = {}) {
       count++;
 
       if (options.verbose) {
-        console.log(`  ✓ ${fromId} → ${toId}: ${Math.floor((timeInfo.normalTime || 0) / 60)}min`);
+        console.log(`  ✓ ${fromId} → ${toId}: ${Math.floor((timeInfo.normalTime ?? 0) / 60)}min`);
       }
 
       if (count % 500 === 0) {
@@ -175,19 +175,19 @@ async function initConfigExpressTrains(options: InitOptions = {}) {
     const expressData = {
       expressId: expressId,
       lineId: express.lineId,
-      lineName: express.lineName || express.lineId,
+      lineName: express.lineName ?? express.lineId,
       type: express.type,
       typeName: express.typeName,
-      operatingDays: express.operatingDays || [1, 2, 3, 4, 5, 6, 7],
-      firstTrain: express.firstTrain || '05:30',
-      lastTrain: express.lastTrain || '23:50',
-      rushHourMorningInterval: express.intervals?.rushHourMorning || 300,
-      rushHourEveningInterval: express.intervals?.rushHourEvening || 300,
-      daytimeInterval: express.intervals?.daytime || 600,
-      nightInterval: express.intervals?.night || 900,
-      stops: express.stops || [],
+      operatingDays: express.operatingDays ?? [1, 2, 3, 4, 5, 6, 7],
+      firstTrain: express.firstTrain ?? '05:30',
+      lastTrain: express.lastTrain ?? '23:50',
+      rushHourMorningInterval: express.intervals?.rushHourMorning ?? 300,
+      rushHourEveningInterval: express.intervals?.rushHourEvening ?? 300,
+      daytimeInterval: express.intervals?.daytime ?? 600,
+      nightInterval: express.intervals?.night ?? 900,
+      stops: express.stops ?? [],
       avgSpeed: 40,
-      timeSavings: express.timeSavings || {},
+      timeSavings: express.timeSavings ?? {},
       isActive: true,
       seasonStart: null,
       seasonEnd: null,
@@ -230,10 +230,10 @@ async function initConfigCongestion(options: InitOptions = {}) {
     const congestionData = {
       congestionId,
       lineId,
-      lineName: congestionInfo.lineName || '',
-      timeSlots: congestionInfo.timeSlots || {},
-      sections: congestionInfo.sections || [],
-      dataSource: congestionInfo.dataSource || 'seoul-metro',
+      lineName: congestionInfo.lineName ?? '',
+      timeSlots: congestionInfo.timeSlots ?? {},
+      sections: congestionInfo.sections ?? [],
+      dataSource: congestionInfo.dataSource ?? 'seoul-metro',
       lastUpdated: new Date(),
       isValid: true,
       createdAt: new Date(),
@@ -395,8 +395,8 @@ async function initializeConfig(options: InitOptions = {}) {
   console.log('🔧 Firebase Config Initialization');
   console.log('='.repeat(60));
   console.log(`Project: ${firebaseConfig.projectId}`);
-  console.log(`Force: ${options.force || false}`);
-  console.log(`Verbose: ${options.verbose || false}`);
+  console.log(`Force: ${options.force ?? false}`);
+  console.log(`Verbose: ${options.verbose ?? false}`);
 
   try {
     const startTime = Date.now();
@@ -434,10 +434,10 @@ async function main() {
   const args = process.argv.slice(2);
   const options: InitOptions = {
     force: args.includes('--force'),
-    verbose: args.includes('--verbose') || args.includes('-v'),
+    verbose: args.includes('--verbose') ?? args.includes('-v'),
   };
 
-  if (args.includes('--help') || args.includes('-h')) {
+  if (args.includes('--help') ?? args.includes('-h')) {
     console.log(`
 Usage: npm run init-config [options]
 

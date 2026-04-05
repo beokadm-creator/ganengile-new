@@ -207,7 +207,7 @@ async function importToFirebase() {
         location: { latitude: station.latitude, longitude: station.longitude },
         isTransferStation: false,
         isExpressStop: false,
-        isTerminus: station.stationId.endsWith('0') || station.stationId.endsWith('1'),
+        isTerminus: station.stationId.endsWith('0') ?? station.stationId.endsWith('1'),
         facilities: ['elevator', 'escalator', 'toilet'],
         isActive: true,
         region: station.region,

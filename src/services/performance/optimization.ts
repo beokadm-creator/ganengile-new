@@ -1,4 +1,4 @@
-import { lazy, memo, useCallback, useMemo, useRef } from 'react';
+import { lazy, memo, useCallback, useEffect, useMemo, useRef } from 'react';
 import type { ComponentType, LazyExoticComponent } from 'react';
 
 export function shallowEqual(objA: Record<string, unknown>, objB: Record<string, unknown>): boolean {
@@ -13,9 +13,11 @@ export function shallowEqual(objA: Record<string, unknown>, objB: Record<string,
 
 export function useStableCallback<T extends (...args: never[]) => unknown>(callback: T): T {
   const callbackRef = useRef(callback);
-  callbackRef.current = callback;
-
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+  
+  useEffect(() => {
+    callbackRef.current = callback;
+  });
+  
   return useCallback(function(...args: Parameters<T>) {
     return callbackRef.current(...args);
   }, []) as unknown as T;
@@ -38,7 +40,7 @@ export function useComputation<T>(key: string, computation: () => T, _deps: read
 export function useDebounce<T extends (...args: never[]) => void>(callback: T, delay = 300): T {
   const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+   
   const fn = useCallback(function(...args: Parameters<T>) {
     if (timeoutRef.current) {
       clearTimeout(timeoutRef.current);
@@ -52,7 +54,7 @@ export function useThrottle<T extends (...args: never[]) => void>(callback: T, d
   const lastRunRef = useRef(0);
   const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+   
   const fn = useCallback(function(...args: Parameters<T>) {
     const now = Date.now();
     const remaining = delay - (now - lastRunRef.current);

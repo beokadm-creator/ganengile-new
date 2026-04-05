@@ -186,7 +186,7 @@ export async function createRequestPayment(
 
     const docRef = await addDoc(collection(db, 'payments'), paymentData);
 
-    console.log('✅ Request payment created:', docRef.id);
+    // Request payment created
 
     return docRef.id;
   } catch (error) {
@@ -276,26 +276,7 @@ export async function createGillerEarning(
 
     const docRef = await addDoc(collection(db, 'payments'), paymentData);
 
-    console.log(`✅ Giller earning created: ${docRef.id}`);
-    console.log(`   - 기본 요금: ${baseAmount.toLocaleString()}원`);
-    if (badgeBonus > 0) {
-      console.log(`   - 배지 보너스(${(badgeBonus * 100).toFixed(0)}%): +${bonusAmount.toLocaleString()}원`);
-    }
-    console.log(`   - 세전 총액: ${totalAmount.toLocaleString()}원`);
-    if (platformFeeAlreadyDeducted) {
-      console.log(`   - 수수료: 정산단에서 이미 차감됨 (추가 차감 없음)`);
-      if (typeof platformFeeSnapshot === 'number') {
-        console.log(`   - 수수료 스냅샷: ${platformFeeSnapshot.toLocaleString()}원`);
-      }
-    } else {
-      console.log(`   - 수수료(10%): ${platformFee.toLocaleString()}원`);
-    }
-    console.log(`   - 세금(3.3%): ${tax.toLocaleString()}원`);
-    if (isTaxable) {
-      console.log(`   - 사업소득세(3.0%): ${withholdingBreakdown.businessIncomeTax.toLocaleString()}원`);
-      console.log(`   - 지방소득세(0.3%): ${withholdingBreakdown.localIncomeTax.toLocaleString()}원`);
-    }
-    console.log(`   - 세후 수익: ${netAmount.toLocaleString()}원`);
+    // Giller earning created: breakdown details logged internally
 
     // Update user's total earnings (세후 기준)
     await updateUserEarnings(userId, netAmount);
@@ -368,7 +349,7 @@ export async function getGillerEarningForRequest(
       deliveryId: data.deliveryId,
       description: data.description,
       metadata: data.metadata,
-      createdAt: data.createdAt?.toDate() || new Date(),
+      createdAt: data.createdAt?.toDate() ?? new Date(),
       completedAt: data.completedAt?.toDate(),
     };
   } catch (error) {
@@ -392,7 +373,7 @@ async function updateUserEarnings(userId: string, amount: number): Promise<void>
       earningsUpdatedAt: serverTimestamp(),
     });
 
-    console.log(`✅ Updated earnings for user ${userId}: +${amount.toLocaleString()}원`);
+    // Updated earnings for user
   } catch (error) {
     console.error('Error updating user earnings:', error);
   }
@@ -413,7 +394,7 @@ async function updateUserTaxWithheld(userId: string, taxAmount: number): Promise
       taxUpdatedAt: serverTimestamp(),
     });
 
-    console.log(`✅ Updated tax withheld for user ${userId}: +${taxAmount.toLocaleString()}원`);
+    // Updated tax withheld for user
   } catch (error) {
     console.error('Error updating user tax withheld:', error);
   }
@@ -454,7 +435,7 @@ export async function getUserPayments(
         deliveryId: data.deliveryId,
         description: data.description,
         metadata: data.metadata,
-        createdAt: data.createdAt?.toDate() || new Date(),
+        createdAt: data.createdAt?.toDate() ?? new Date(),
         completedAt: data.completedAt?.toDate(),
       });
     });
@@ -516,7 +497,7 @@ export async function getUserTotalEarningsGross(userId: string): Promise<number>
 
     snapshot.forEach((docSnapshot) => {
       const data = docSnapshot.data();
-      total += data.amount || 0; // 세전 기준
+      total += data.amount ?? 0; // 세전 기준
     });
 
     return total;
@@ -546,7 +527,7 @@ export async function getUserTotalTaxWithheld(userId: string): Promise<number> {
 
     snapshot.forEach((docSnapshot) => {
       const data = docSnapshot.data();
-      totalTax += data.tax || 0;
+      totalTax += data.tax ?? 0;
     });
 
     return totalTax;
@@ -576,7 +557,7 @@ export async function getUserNetIncome(userId: string): Promise<number> {
 
     snapshot.forEach((docSnapshot) => {
       const data = docSnapshot.data();
-      netIncome += data.netAmount || 0;
+      netIncome += data.netAmount ?? 0;
     });
 
     return netIncome;
@@ -621,10 +602,10 @@ export async function getUserMonthlyEarnings(
 
     snapshot.forEach((docSnapshot) => {
       const data = docSnapshot.data();
-      total += data.amount || 0;
+      total += data.amount ?? 0;
       count++;
-      platformFee += data.fee || 0;
-      taxWithheld += data.tax || 0;
+      platformFee += data.fee ?? 0;
+      taxWithheld += data.tax ?? 0;
     });
 
     const netIncome = total - platformFee - taxWithheld;
@@ -688,9 +669,9 @@ export async function generateAnnualTaxReport(
 
     snapshot.forEach((docSnapshot) => {
       const data = docSnapshot.data();
-      totalEarnings += data.amount || 0;
-      totalTaxWithheld += data.tax || 0;
-      totalPlatformFee += data.fee || 0;
+      totalEarnings += data.amount ?? 0;
+      totalTaxWithheld += data.tax ?? 0;
+      totalPlatformFee += data.fee ?? 0;
       paymentCount++;
     });
 
@@ -734,7 +715,7 @@ async function saveTaxReport(userId: string, year: number, report: TaxReport): P
       generatedAt: serverTimestamp(),
     }, { merge: true });
 
-    console.log(`✅ Tax report saved for user ${userId}, year ${year}`);
+    // Tax report saved for user
   } catch (error) {
     console.error('Error saving tax report:', error);
     throw error;
@@ -764,7 +745,7 @@ export async function getUserAvailableBalance(userId: string): Promise<number> {
 
     snapshot.forEach((docSnapshot) => {
       const data = docSnapshot.data();
-      withdrawnAmount += data.amount || 0;
+      withdrawnAmount += data.amount ?? 0;
     });
 
     return netIncome - withdrawnAmount;
@@ -815,9 +796,7 @@ export async function requestWithdrawal(
 
     const docRef = await addDoc(collection(db, 'payments'), paymentData);
 
-    console.log('✅ Withdrawal requested:', docRef.id);
-    console.log(`   - 출금 금액: ${amount.toLocaleString()}원`);
-    console.log(`   - 계좌: ${bankInfo.bankName} ${bankInfo.accountNumber}`);
+    // Withdrawal requested
 
     return docRef.id;
   } catch (error) {
@@ -857,7 +836,7 @@ export async function getPayment(paymentId: string): Promise<Payment | null> {
       deliveryId: data.deliveryId,
       description: data.description,
       metadata: data.metadata,
-      createdAt: data.createdAt?.toDate() || new Date(),
+      createdAt: data.createdAt?.toDate() ?? new Date(),
       completedAt: data.completedAt?.toDate(),
     };
   } catch (error) {
@@ -951,7 +930,7 @@ export async function getTotalTaxCollected(
 
     snapshot.forEach((docSnapshot) => {
       const data = docSnapshot.data();
-      const tax = data.tax || 0;
+      const tax = data.tax ?? 0;
 
       if (tax > 0) {
         const createdAt = data.createdAt?.toDate();
@@ -968,7 +947,7 @@ export async function getTotalTaxCollected(
         // Group by month (if year provided)
         if (year && createdAt) {
           const monthKey = `${year}-${String(createdAt.getMonth() + 1).padStart(2, '0')}`;
-          breakdown[monthKey] = (breakdown[monthKey] || 0) + tax;
+          breakdown[monthKey] = (breakdown[monthKey] ?? 0) + tax;
         }
       }
     });

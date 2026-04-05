@@ -16,21 +16,21 @@ export class BadgeService {
    * 배지 초기화 (Firestore에 배지 데이터 생성)
    */
   static async initializeBadges(): Promise<void> {
-    console.log('🎖️ Initializing badges...');
+    console.warn('🎖️ Initializing badges...');
 
     const batch = INITIAL_BADGES.map(async (badgeData) => {
       const badgeRef = doc(db, 'badges', badgeData.id);
       const badgeDoc = await getDoc(badgeRef);
 
-      if (!badgeDoc.exists) {
+      if (!badgeDoc.exists()) {
         // 배지 문서 생성 (Admin SDK 필요)
-        console.log(`Creating badge: ${badgeData.name}`);
+        console.warn(`Creating badge: ${badgeData.name}`);
         // Firebase Functions를 통해 생성하거나 Admin SDK 사용 필요
       }
     });
 
     await Promise.all(batch);
-    console.log('✅ Badges initialized');
+    console.warn('✅ Badges initialized');
   }
 
   /**
@@ -42,10 +42,10 @@ export class BadgeService {
     total: number;
   } {
     const totalBadges =
-      (badges?.activity?.length || 0) +
-      (badges?.quality?.length || 0) +
-      (badges?.expertise?.length || 0) +
-      (badges?.community?.length || 0);
+      (badges?.activity?.length ?? 0) +
+      (badges?.quality?.length ?? 0) +
+      (badges?.expertise?.length ?? 0) +
+      (badges?.community?.length ?? 0);
 
     let tier: 'none' | 'bronze' | 'silver' | 'gold' | 'platinum' = 'none';
 
@@ -74,7 +74,7 @@ export class BadgeService {
     const userRef = doc(db, 'users', userId);
     const userDoc = await getDoc(userRef);
 
-    if (!userDoc.exists) return false;
+    if (!userDoc.exists()) return false;
 
     const user = userDoc.data() as User;
 
@@ -107,7 +107,7 @@ export class BadgeService {
 
       case 'consecutiveWeeks':
         // 연속 주간 활동 확인 (별도 로직 필요)
-        return stats.completedDeliveries >= ((requirement.value as any).minWeekly * (requirement.value as any));
+        return stats.completedDeliveries >= ((requirement.value as { minWeekly: number }).minWeekly * (requirement.value as { weeks: number }).weeks);
 
       case 'consecutiveDeliveriesWithoutDelay':
         // 지연 없는 연속 배송 확인 (별도 로직 필요)
@@ -115,11 +115,11 @@ export class BadgeService {
 
       case 'minRating':
         return stats.rating >= (requirement.value as number) &&
-               stats.completedDeliveries >= (requirement as any).minDeliveries;
+               stats.completedDeliveries >= (requirement.minDeliveries as number);
 
       case 'noShowCount':
         return stats.recentPenalties === 0 &&
-               stats.completedDeliveries >= (requirement as any).completedDeliveries;
+               stats.completedDeliveries >= (requirement.completedDeliveries as number);
 
       case 'uniqueLinesUsed':
         // 이용 노선 수 확인 (별도 로직 필요)
@@ -132,7 +132,7 @@ export class BadgeService {
       case 'delayRate':
         // 지연율 확인 (별도 로직 필요)
         return stats.recentPenalties < ((requirement.value as number) * stats.completedDeliveries) &&
-               stats.completedDeliveries >= (requirement as any).minDeliveries;
+               stats.completedDeliveries >= (requirement.minDeliveries as number);
 
       default:
         return false;
@@ -167,7 +167,7 @@ export class BadgeService {
       'badgeBenefits.profileFrame': badgeBenefits.frame,
     });
 
-    console.log(`🎖️ Badge awarded: ${badge.name} to user ${userId}`);
+    console.warn(`🎖️ Badge awarded: ${badge.name} to user ${userId}`);
   }
 
   /**
@@ -187,7 +187,7 @@ export class BadgeService {
     const categoryKey = badge.category as keyof NonNullable<User['badges']>;
     const updatedBadges = {
       ...user.badges,
-      [categoryKey]: (user.badges?.[categoryKey] || []).filter((id: string) => id !== badgeId),
+      [categoryKey]: (user.badges?.[categoryKey] ?? []).filter((id: string) => id !== badgeId),
     };
 
     // 배지 혜택 재계산
@@ -200,7 +200,7 @@ export class BadgeService {
       'badgeBenefits.profileFrame': badgeBenefits.frame,
     });
 
-    console.log(`⚠️ Badge revoked: ${badge.name} from user ${userId}`);
+    console.warn('⚠️ Badge revoked:', badge.name, 'from user', userId);
   }
 
   /**

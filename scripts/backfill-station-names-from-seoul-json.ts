@@ -19,8 +19,7 @@ const jsonPath =
 const apply = args.has('--apply');
 
 const serviceAccountPath =
-  process.env.FIREBASE_SERVICE_ACCOUNT_PATH ||
-  path.join(process.env.HOME || '', 'Downloads/ganengile-firebase-adminsdk-fbsvc-6178badd66.json');
+  process.env.FIREBASE_SERVICE_ACCOUNT_PATH ?? path.join(process.env.HOME || '', 'Downloads/ganengile-firebase-adminsdk-fbsvc-6178badd66.json');
 
 if (!fs.existsSync(serviceAccountPath)) {
   throw new Error(`Service account not found: ${serviceAccountPath}`);
@@ -50,16 +49,16 @@ async function run() {
 
   const byCode = new Map<string, SeoulRow>();
   for (const row of rows) {
-    const code = String(row.station_cd || '').trim();
-    if (!code || byCode.has(code)) continue;
+    const code = String(row.station_cd ?? '').trim();
+    if (!code ?? byCode.has(code)) continue;
     byCode.set(code, row);
   }
 
   const snap = await db.collection('config_stations').get();
   const targets = snap.docs.filter((doc) => {
     const data = doc.data() as any;
-    const name = String(data?.stationName || '').trim();
-    const code = String(data?.fare?.stationCode || '').trim();
+    const name = String(data?.stationName ?? '').trim();
+    const code = String(data?.fare?.stationCode ?? '').trim();
     return !name && !!code && byCode.has(code);
   });
 
@@ -81,15 +80,15 @@ async function run() {
   let count = 0;
   for (const doc of targets) {
     const data = doc.data() as any;
-    const code = String(data?.fare?.stationCode || '').trim();
+    const code = String(data?.fare?.stationCode ?? '').trim();
     const row = byCode.get(code);
     if (!row) continue;
-    const stationName = String(row.station_nm || '').trim();
+    const stationName = String(row.station_nm ?? '').trim();
     if (!stationName) continue;
 
     batch.update(doc.ref, {
       stationName: stationName.endsWith('역') ? stationName : `${stationName}역`,
-      stationNameEnglish: String(row.station_nm_eng || '').trim(),
+      stationNameEnglish: String(row.station_nm_eng ?? '').trim(),
       updatedAt: admin.firestore.FieldValue.serverTimestamp(),
     });
     count++;

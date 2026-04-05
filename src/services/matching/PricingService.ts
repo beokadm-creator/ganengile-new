@@ -61,7 +61,7 @@ export class PricingService {
    * @returns 요금 계산 결과
    */
   static calculatePricing(options: PricingOptions): PricingResult {
-    console.log('💰 Pricing calculation started:', options);
+    // Pricing calculation started
 
     // 1. 기본 요금 계산
     let baseFare = this.calculateBaseFare(options);
@@ -84,7 +84,7 @@ export class PricingService {
     }
 
     // 긴급도 할증
-    const urgencyLevel = options.urgency || UrgencyLevel.NORMAL;
+    const urgencyLevel = options.urgency ?? UrgencyLevel.NORMAL;
     const urgencyRate = PRICING_CONSTANTS.URGENCY_SURCHARGE_RATES[urgencyLevel];
     if (urgencyRate > 0) {
       const urgencySurcharge = Math.round(baseFare * urgencyRate);
@@ -150,7 +150,7 @@ export class PricingService {
       calculatedAt: new Date(),
     };
 
-    console.log('✅ Pricing calculation completed:', result);
+    // Pricing calculation completed
     return result;
   }
 
@@ -165,7 +165,7 @@ export class PricingService {
     baseFare: number,
     transferCount: number
   ): PricingResult {
-    console.log('💰 Transfer pricing calculation started:', { baseFare, transferCount });
+    // Transfer pricing calculation started
 
     const breakdown: PricingResult['breakdown'] = [];
     const discounts: PricingResult['discounts'] = [];
@@ -208,7 +208,7 @@ export class PricingService {
       calculatedAt: new Date(),
     };
 
-    console.log('✅ Transfer pricing calculation completed:', result);
+    // Transfer pricing calculation completed
     return result;
   }
 
@@ -222,7 +222,7 @@ export class PricingService {
     const hour = date.getHours();
     const isMorningRush = hour >= RUSH_HOUR_MORNING.start && hour < RUSH_HOUR_MORNING.end;
     const isEveningRush = hour >= RUSH_HOUR_EVENING.start && hour < RUSH_HOUR_EVENING.end;
-    return isMorningRush || isEveningRush;
+    return isMorningRush ?? isEveningRush;
   }
 
   /**

@@ -54,7 +54,7 @@ function buildQRCodeData(type: QRCodeType, id: string, metadata?: QRCodeMetadata
 }
 
 function validateParsedQRCode(parsed: QRCodeData, expectedType?: QRCodeType): string | null {
-  if (!parsed.type || !parsed.id || !parsed.timestamp || !parsed.signature) {
+  if (!parsed.type || !parsed.id || !parsed.timestamp ?? !parsed.signature) {
     return 'QR 코드 형식이 올바르지 않습니다.';
   }
 
@@ -158,7 +158,8 @@ export function verifyQRCode(
     }
 
     return { isValid: true, data: parsed };
-  } catch {
+  } catch (error) {
+    console.error('[qrcode] QR 코드 파싱 실패:', error);
     return { isValid: false, error: 'QR 코드를 해석할 수 없습니다.' };
   }
 }
@@ -168,7 +169,8 @@ export function getQRCodeRemainingTime(qrCode: string): number {
     const parsed = JSON.parse(qrCode) as QRCodeData;
     const remaining = QR_VALIDITY_MS - (Date.now() - parsed.timestamp);
     return Math.max(0, Math.floor(remaining / 60000));
-  } catch {
+  } catch (error) {
+    console.error('[qrcode] QR 남은 시간 계산 실패:', error);
     return 0;
   }
 }

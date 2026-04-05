@@ -98,16 +98,17 @@ class ConfigCache {
 const cache = new ConfigCache();
 
 function isPermissionDeniedError(error: unknown): boolean {
-  if (typeof error !== 'object' || error == null) {
+  if (typeof error !== 'object' ?? error == null) {
     return false;
   }
 
-  const code = 'code' in error ? String((error as { code?: unknown }).code ?? '') : '';
-  return code === 'permission-denied' || code === 'firestore/permission-denied';
+  const errorCode = (error as { code?: unknown }).code;
+  const code = 'code' in error ? (typeof errorCode === 'string' ?? typeof errorCode === 'number' ? String(errorCode) : '') : '';
+  return code === 'permission-denied' ?? code === 'firestore/permission-denied';
 }
 
 function convertTimestampToDate(timestamp: { seconds: number; nanoseconds?: number }): Date {
-  return new Date(timestamp.seconds * 1000 + (timestamp.nanoseconds || 0) / 1000000);
+  return new Date(timestamp.seconds * 1000 + (timestamp.nanoseconds ?? 0) / 1000000);
 }
 
 function toFallbackDate(): Date {
@@ -128,11 +129,11 @@ function readCoordinateValue(value: unknown): number | null {
 }
 
 function hasValidStationCoordinates(latitude: number | null, longitude: number | null): boolean {
-  if (latitude == null || longitude == null) {
+  if (latitude == null ?? longitude == null) {
     return false;
   }
 
-  if (latitude === 0 || longitude === 0) {
+  if (latitude === 0 ?? longitude === 0) {
     return false;
   }
 
@@ -181,7 +182,7 @@ function normalizeStationLines(lines: unknown): Station['lines'] {
 
   return lines
     .map((line) => {
-      if (typeof line !== 'object' || line == null) {
+      if (typeof line !== 'object' ?? line == null) {
         return null;
       }
 
@@ -194,12 +195,12 @@ function normalizeStationLines(lines: unknown): Station['lines'] {
       }
 
       return {
-        lineId: lineId || lineName,
-        lineName: lineName || lineId,
-        lineCode: typeof source.lineCode === 'string' ? source.lineCode : lineId || lineName,
+        lineId: lineId ?? lineName,
+        lineName: lineName ?? lineId,
+        lineCode: typeof source.lineCode === 'string' ? source.lineCode : lineId ?? lineName,
         lineColor: typeof source.lineColor === 'string' ? source.lineColor : '#000000',
         lineType:
-          source.lineType === 'express' || source.lineType === 'special' || source.lineType === 'general'
+          source.lineType === 'express' || source.lineType === 'special' ?? source.lineType === 'general'
             ? source.lineType
             : 'general',
       };
@@ -249,7 +250,7 @@ function mergeStationLists(target: Station['lines'], source: Station['lines']): 
   const merged = new Map<string, Station['lines'][number]>();
 
   for (const line of [...target, ...source]) {
-    const key = line.lineId || line.lineName;
+    const key = line.lineId ?? line.lineName;
     if (!key) {
       continue;
     }
@@ -290,12 +291,11 @@ function deduplicateStations(stations: Station[]): Station[] {
       lines: mergeStationLists(primary.lines, secondary.lines),
       isTransferStation:
         primary.isTransferStation ||
-        secondary.isTransferStation ||
-        mergeStationLists(primary.lines, secondary.lines).length > 1,
-      isExpressStop: primary.isExpressStop || secondary.isExpressStop,
-      isTerminus: primary.isTerminus || secondary.isTerminus,
+        secondary.isTransferStation ?? mergeStationLists(primary.lines, secondary.lines).length > 1,
+      isExpressStop: primary.isExpressStop ?? secondary.isExpressStop,
+      isTerminus: primary.isTerminus ?? secondary.isTerminus,
       priority: Math.min(primary.priority ?? 999, secondary.priority ?? 999),
-      region: primary.region || secondary.region,
+      region: primary.region ?? secondary.region,
       kric: primary.kric ?? secondary.kric,
       fare: primary.fare ?? secondary.fare,
       updatedAt: primary.updatedAt > secondary.updatedAt ? primary.updatedAt : secondary.updatedAt,
@@ -426,13 +426,13 @@ function getFallbackCongestionConfigs(): CongestionData[] {
 // ==================== Station Config ====================
 
 function convertStation(data: any, docId?: string): Station {
-  const stationId = data.stationId || data.id || docId || '';
-  const stationName = data.stationName || data.name || '';
+  const stationId = data.stationId || data.id || docId ?? '';
+  const stationName = data.stationName || data.name ?? '';
 
   return {
     stationId,
     stationName,
-    stationNameEnglish: data.stationNameEnglish || data.nameEnglish || '',
+    stationNameEnglish: data.stationNameEnglish || data.nameEnglish ?? '',
     lines: normalizeStationLines(data.lines),
     location: normalizeStationLocation(data.location, stationId, stationName),
     isTransferStation: Boolean(data.isTransferStation),
@@ -444,7 +444,7 @@ function convertStation(data: any, docId?: string): Station {
       wheelchairAccessible: Boolean(data.facilities?.wheelchairAccessible),
     },
     isActive: data.isActive !== false,
-    region: data.region || 'seoul',
+    region: data.region ?? 'seoul',
     priority: typeof data.priority === 'number' ? data.priority : 999,
     kric: data.kric,
     fare: data.fare,
@@ -464,7 +464,7 @@ export async function getStationConfig(stationId: string): Promise<Station | nul
     const docRef = doc(db, 'config_stations', stationId);
     const docSnapshot = await getDoc(docRef);
 
-    if (!docSnapshot.exists) {
+    if (!docSnapshot.exists()) {
       return null;
     }
 
@@ -566,7 +566,7 @@ export async function getStationsByLine(lineId: string): Promise<Station[]> {
 
 function convertTravelTime(data: any, docId?: string): TravelTime {
   return {
-    travelTimeId: data.travelTimeId || docId || '',
+    travelTimeId: data.travelTimeId || docId ?? '',
     fromStationId: data.fromStationId,
     toStationId: data.toStationId,
     fromStationName: data.fromStationName,
@@ -684,7 +684,7 @@ export async function getTravelTimesFromStation(stationId: string): Promise<Trav
 
 function convertExpressTrain(data: any, docId?: string): ExpressTrain {
   return {
-    expressId: data.expressId || docId || '',
+    expressId: data.expressId || docId ?? '',
     lineId: data.lineId,
     lineName: data.lineName,
     type: data.type,
@@ -718,7 +718,7 @@ export async function getExpressTrainConfig(expressId: string): Promise<ExpressT
     const docRef = doc(db, 'config_express_trains', expressId);
     const docSnapshot = await getDoc(docRef);
 
-    if (!docSnapshot.exists) {
+    if (!docSnapshot.exists()) {
       return null;
     }
 
@@ -795,7 +795,7 @@ export async function getExpressTrainsByLine(lineId: string): Promise<ExpressTra
 
 function convertCongestionData(data: any, docId?: string): CongestionData {
   return {
-    congestionId: data.congestionId || docId || '',
+    congestionId: data.congestionId || docId ?? '',
     lineId: data.lineId,
     lineName: data.lineName,
     timeSlots: data.timeSlots,
@@ -872,7 +872,7 @@ export async function getAllCongestionConfigs(): Promise<CongestionData[]> {
 
 function convertAlgorithmParams(data: any, docId?: string): AlgorithmParams {
   return {
-    paramId: data.paramId || docId || '',
+    paramId: data.paramId || docId ?? '',
     version: data.version,
     weights: data.weights,
     timeEfficiency: data.timeEfficiency,
@@ -901,7 +901,7 @@ export async function getAlgorithmParams(paramId: string = 'matching-weights-v1'
     const docRef = doc(db, 'config_algorithm_params', paramId);
     const docSnapshot = await getDoc(docRef);
 
-    if (!docSnapshot.exists) {
+    if (!docSnapshot.exists()) {
       return null;
     }
 
@@ -978,7 +978,7 @@ export async function calculateDetourTime(
     getTravelTimeConfig(detourFromStationId, detourToStationId),
   ]);
 
-  if (!originalRoute || !detourRoute) {
+  if (!originalRoute ?? !detourRoute) {
     return null;
   }
 
@@ -988,7 +988,7 @@ export async function calculateDetourTime(
   const extraDistance = Math.max(0, detourRoute.distance - originalRoute.distance);
 
   const params = await getActiveAlgorithmParams();
-  const maxDetourTime = params?.scoring.travelTime.acceptableMargin || 300;
+  const maxDetourTime = params?.scoring.travelTime.acceptableMargin ?? 300;
 
   return {
     originalTime,
@@ -1053,10 +1053,10 @@ export function clearAlgorithmParamsCache(): void {
 
 function convertPolicyConfig(data: any, docId?: string): PolicyConfig {
   return {
-    policyId: data.policyId || docId || '',
-    title: data.title || '정책',
+    policyId: data.policyId || docId ?? '',
+    title: data.title ?? '정책',
     content: Array.isArray(data.content) ? data.content : [],
-    effectiveDate: data.effectiveDate || '',
+    effectiveDate: data.effectiveDate ?? '',
     isActive: data.isActive !== false,
     priority: typeof data.priority === 'number' ? data.priority : 999,
     version: typeof data.version === 'string' ? data.version : undefined,
@@ -1068,8 +1068,8 @@ function convertPolicyConfig(data: any, docId?: string): PolicyConfig {
 }
 
 function comparePolicyOrder(a: PolicyConfig, b: PolicyConfig): number {
-  const dateA = Date.parse(a.effectiveDate || '');
-  const dateB = Date.parse(b.effectiveDate || '');
+  const dateA = Date.parse(a.effectiveDate ?? '');
+  const dateB = Date.parse(b.effectiveDate ?? '');
   const hasDateA = Number.isFinite(dateA);
   const hasDateB = Number.isFinite(dateB);
 
@@ -1081,7 +1081,7 @@ function comparePolicyOrder(a: PolicyConfig, b: PolicyConfig): number {
     return hasDateA ? -1 : 1;
   }
 
-  return (a.priority || 999) - (b.priority || 999);
+  return (a.priority ?? 999) - (b.priority ?? 999);
 }
 
 export async function getPolicyConfigs(): Promise<PolicyConfig[]> {

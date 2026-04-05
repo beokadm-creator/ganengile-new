@@ -3,7 +3,7 @@
  * 
  * B2B 고객사의 계약 관리 (신청, 승인, 해지)
  */
-import { collection, doc, getDoc, updateDoc, query, where, getDocs, addDoc } from 'firebase/firestore';
+import { collection, doc, getDoc, updateDoc, query, where, getDocs, addDoc, serverTimestamp } from 'firebase/firestore';
 import { db } from '../config/firebase';
 import type { 
   BusinessContract, 
@@ -151,12 +151,32 @@ export class BusinessContractService {
    */
   static async cancelContract(contractId: string, _reason?: string): Promise<void> {
     const contractRef = doc(db, COLLECTION, contractId);
+    // Cancel contract
     await updateDoc(contractRef, {
       status: 'cancelled',
       updatedAt: new Date()
     });
 
-    // TODO: 계약 해지 기록 저장
+    // Record termination history
+    try {
+      const contractSnap = await getDoc(contractRef);
+      if (contractSnap.exists()) {
+        const contractData = contractSnap.data();
+        await addDoc(collection(db, 'contractHistory'), {
+          contractId,
+          action: 'cancelled',
+          reason: _reason ?? 'N/A',
+          performedAt: serverTimestamp(),
+          contractSnapshot: {
+            status: contractData.status,
+            companyName: contractData.companyName,
+            tier: contractData.tier,
+          },
+        });
+      }
+    } catch (historyError) {
+      console.error('[business-contract] failed to save cancellation history:', historyError);
+    }
   }
 
   /**
@@ -186,7 +206,7 @@ export class BusinessContractService {
    */
   static async getContract(contractId: string): Promise<BusinessContract | null> {
     const contractDoc = await getDoc(doc(db, COLLECTION, contractId));
-    if (!contractDoc.exists) {
+    if (!contractDoc.exists()) {
       return null;
     }
     return {

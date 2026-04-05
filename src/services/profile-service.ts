@@ -37,28 +37,28 @@ export async function getUserProfile(userId: string): Promise<UserProfile | null
       return null;
     }
 
-    console.log('🔍 getUserProfile: Fetching profile for userId:', userId);
+    // Fetching profile for userId
 
     const profileRef = doc(db, 'users', userId, PROFILE_COLLECTION, userId);
     const docSnapshot = await getDoc(profileRef);
 
-    if (!docSnapshot.exists) {
-      console.log('⚠️ getUserProfile: No profile found for userId:', userId);
+    if (!docSnapshot.exists()) {
+      console.warn('getUserProfile: No profile found for userId:', userId);
       return null;
     }
 
     const data = docSnapshot.data();
     if (!data) {
-      console.log('⚠️ getUserProfile: Profile data is empty for userId:', userId);
+      console.warn('getUserProfile: Profile data is empty for userId:', userId);
       return null;
     }
 
-    console.log('✅ getUserProfile: Profile found for userId:', userId);
+    // Profile found for userId
 
     return {
-      userId: data.userId || userId,
-      name: data.name || '',
-      phoneNumber: data.phoneNumber || '',
+      userId: data.userId ?? userId,
+      name: data.name ?? '',
+      phoneNumber: data.phoneNumber ?? '',
       profilePhotoUrl: data.profilePhotoUrl,
       defaultAddress: data.defaultAddress,
       bankAccount: data.bankAccount,
@@ -262,7 +262,7 @@ export async function saveAddress(
 ): Promise<string> {
   const fullAddress = `${input.roadAddress.trim()} ${input.detailAddress.trim()}`.trim();
   const payload = {
-    label: input.label.trim() || '저장된 주소',
+    label: input.label.trim() ?? '저장된 주소',
     roadAddress: input.roadAddress.trim(),
     detailAddress: input.detailAddress.trim(),
     fullAddress,
@@ -283,7 +283,7 @@ export async function saveAddress(
         roadAddress: input.roadAddress.trim(),
         detailAddress: input.detailAddress.trim(),
         fullAddress,
-      } as any,
+      },
     } as Partial<ProfileFormData>);
   }
 
@@ -316,7 +316,7 @@ export async function addRecentAddress(
   await setDoc(
     doc(recentAddressCollection(userId), dedupeId),
     {
-      label: input.label?.trim() || '최근 사용 주소',
+      label: input.label?.trim() ?? '최근 사용 주소',
       roadAddress: input.roadAddress.trim(),
       detailAddress: input.detailAddress.trim(),
       fullAddress,

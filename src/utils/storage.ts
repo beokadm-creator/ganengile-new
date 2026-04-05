@@ -24,7 +24,7 @@ const KEYS = {
 export async function saveOnboardingStep(step: string): Promise<void> {
   try {
     await AsyncStorage.setItem(KEYS.ONBOARDING_LAST_STEP, step);
-    console.log('💾 Onboarding step saved:', step);
+    // Onboarding step saved
   } catch (error) {
     console.error('Error saving onboarding step:', error);
   }
@@ -48,7 +48,7 @@ export async function getOnboardingStep(): Promise<string | null> {
 export async function saveOnboardingTempData(data: Record<string, unknown>): Promise<void> {
   try {
     await AsyncStorage.setItem(KEYS.ONBOARDING_TEMP_DATA, await encryptStorageJson(data));
-    console.log('💾 Onboarding temp data saved:', data);
+    // Onboarding temp data saved
   } catch (error) {
     console.error('Error saving onboarding temp data:', error);
   }
@@ -76,7 +76,7 @@ export async function clearOnboardingData(): Promise<void> {
       KEYS.ONBOARDING_LAST_STEP,
       KEYS.ONBOARDING_TEMP_DATA,
     ]);
-    console.log('💾 Onboarding data cleared');
+    // Onboarding data cleared
   } catch (error) {
     console.error('Error clearing onboarding data:', error);
   }
@@ -85,10 +85,10 @@ export async function clearOnboardingData(): Promise<void> {
 /**
  * 현재 사용자 역할 저장
  */
-export function saveCurrentRole(role: 'gller' | 'giller' | 'both'): Promise<void> {
+export function saveCurrentRole(_role: 'gller' | 'giller' | 'both'): Promise<void> {
   try {
     // await AsyncStorage.setItem(KEYS.USER_ROLE, role);
-    console.log('💾 Current role saved:', role);
+    // Current role saved
     return Promise.resolve();
   } catch (error) {
     console.error('Error saving current role:', error);
@@ -103,7 +103,7 @@ export function getCurrentRole(): Promise<'gller' | 'giller' | 'both' | null> {
   try {
     // const role = await AsyncStorage.getItem(KEYS.USER_ROLE);
     // return role as 'gller' | 'giller' | 'both' | null;
-    console.log('💾 Current role retrieved');
+    // Current role retrieved
     return Promise.resolve(null);
   } catch (error) {
     console.error('Error getting current role:', error);

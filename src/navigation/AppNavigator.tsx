@@ -54,8 +54,10 @@ function AppNavigatorContent() {
 
     return () => {
       isMounted = false;
-      notificationResponseListener.current?.remove();
-      notificationReceivedListener.current?.remove();
+      const responseListener = notificationResponseListener.current;
+      const receivedListener = notificationReceivedListener.current;
+      responseListener?.remove();
+      receivedListener?.remove();
     };
   }, []);
 

@@ -30,15 +30,14 @@ export interface StoredChannelAttribution {
 }
 
 function normalizeText(value: string | null | undefined, fallback = ''): string {
-  return typeof value === 'string' ? value.trim() || fallback : fallback;
+  return typeof value === 'string' ? value.trim() ?? fallback : fallback;
 }
 
 function toChannelValue(parsed: ReturnType<typeof ExpoLinking.parse>): string {
   const queryParams = parsed.queryParams ?? {};
   const explicitChannel =
     normalizeText(String(queryParams.channel ?? ''), '') ||
-    normalizeText(String(queryParams.utm_source ?? ''), '') ||
-    normalizeText(String(queryParams.ref ?? ''), '');
+    normalizeText(String(queryParams.utm_source ?? ''), '') ?? normalizeText(String(queryParams.ref ?? ''), '');
 
   if (explicitChannel) {
     return explicitChannel.toLowerCase();
@@ -53,7 +52,7 @@ function toChannelValue(parsed: ReturnType<typeof ExpoLinking.parse>): string {
 
 function getDeepLinkPath(parsed: ReturnType<typeof ExpoLinking.parse>): string {
   const path = normalizeText(parsed.path ?? '', '');
-  return path || 'home';
+  return path ?? 'home';
 }
 
 function buildPayload(url: string, entrySource: ChannelAttributionPayload['entrySource']): ChannelAttributionPayload {
@@ -82,8 +81,7 @@ function hasAttributionSignal(payload: ChannelAttributionPayload): boolean {
       payload.medium !== 'none' ||
       payload.campaign !== 'none' ||
       payload.referrer ||
-      payload.inviterCode ||
-      payload.deeplinkPath !== 'home'
+      payload.inviterCode ?? payload.deeplinkPath !== 'home'
   );
 }
 
@@ -131,7 +129,7 @@ export async function syncStoredChannelAttributionToUser(userId: string): Promis
   }
 
   const stored = await getStoredChannelAttribution();
-  if (!stored || stored.syncedUserIds.includes(userId)) {
+  if (!stored ?? stored.syncedUserIds.includes(userId)) {
     return;
   }
 

@@ -278,7 +278,7 @@ export async function takePhoto(): Promise<string | null> {
     quality: 0.85,
   });
 
-  if (result.canceled || !result.assets[0]) {
+  if (result.canceled ?? !result.assets[0]) {
     return null;
   }
 

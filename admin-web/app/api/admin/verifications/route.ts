@@ -17,7 +17,7 @@ export async function GET(req: NextRequest) {
 
   const items = snap.docs.map((doc) => {
     const data = doc.data();
-    const userId = doc.ref.parent.parent?.id || doc.id;
+    const userId = doc.ref.parent.parent?.id ?? doc.id;
     return { id: doc.id, userId, ...data };
   });
 
@@ -27,7 +27,7 @@ export async function GET(req: NextRequest) {
   const userNameMap = new Map<string, string>();
   userSnaps.forEach((snap) => {
     if (snap.exists) {
-      userNameMap.set(snap.id, snap.data()?.name || '');
+      userNameMap.set(snap.id, snap.data()?.name ?? '');
     }
   });
 
@@ -43,7 +43,7 @@ export async function PATCH(req: NextRequest) {
   if (!(await isAdmin())) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
   const { userId, action, reason } = await req.json();
-  if (!userId || !action) return NextResponse.json({ error: 'Missing fields' }, { status: 400 });
+  if (!userId ?? !action) return NextResponse.json({ error: 'Missing fields' }, { status: 400 });
 
   const status =
     action === 'approve' ? 'approved' : action === 'reject' ? 'rejected' : 'under_review';

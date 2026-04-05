@@ -22,7 +22,7 @@ export async function saveFormDraft(formId: string, data: FormData): Promise<voi
       data,
       timestamp: Date.now(),
     }));
-    console.log(`💾 Form draft saved: ${formId}`);
+    // Form draft saved
   } catch (error) {
     console.error('Error saving form draft:', error);
   }
@@ -49,7 +49,7 @@ export async function loadFormDraft(formId: string): Promise<FormData | null> {
       return null;
     }
 
-    console.log(`💾 Form draft loaded: ${formId}`);
+    // Form draft loaded
     return parsed.data;
   } catch (error) {
     console.error('Error loading form draft:', error);
@@ -64,7 +64,7 @@ export async function clearFormDraft(formId: string): Promise<void> {
   try {
     const key = `${PREFIX}${formId}`;
     await AsyncStorage.removeItem(key);
-    console.log(`💾 Form draft cleared: ${formId}`);
+    // Form draft cleared
   } catch (error) {
     console.error('Error clearing form draft:', error);
   }
@@ -113,7 +113,7 @@ export async function clearOldFormDrafts(): Promise<void> {
       }
     }
 
-    console.log('💾 Old form drafts cleared');
+    // Old form drafts cleared
   } catch (error) {
     console.error('Error clearing old form drafts:', error);
   }

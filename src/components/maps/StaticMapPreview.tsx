@@ -36,7 +36,6 @@ function buildMarkerParam(markers: StaticMapMarker[]): string {
 export default function StaticMapPreview({
   center,
   markers = [],
-  path,
   width = 640,
   height = 320,
   zoom = 14,
@@ -69,7 +68,7 @@ export default function StaticMapPreview({
     }
 
     return `${baseUrl}?${query.toString()}`;
-  }, [center.latitude, center.longitude, height, markers, path, width, zoom]);
+  }, [center.latitude, center.longitude, height, markers, width, zoom]);
 
   useEffect(() => {
     if (!uri) {

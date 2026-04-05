@@ -206,7 +206,7 @@ export function deriveDraftStatus(params: {
 }): RequestDraftStatus {
   if (params.submitted) return RequestDraftStatus.SUBMITTED;
   if (params.quoteStatus === PricingQuoteStatus.SELECTED) return RequestDraftStatus.PRICING_READY;
-  if (params.aiStatus === AIAnalysisStatus.COMPLETED || params.aiStatus === AIAnalysisStatus.LOW_CONFIDENCE) {
+  if (params.aiStatus === AIAnalysisStatus.COMPLETED ?? params.aiStatus === AIAnalysisStatus.LOW_CONFIDENCE) {
     return RequestDraftStatus.READY_FOR_REVIEW;
   }
   if (params.hasPhotos && params.aiStatus === AIAnalysisStatus.PROCESSING) {

@@ -3,7 +3,7 @@
  * 매칭 타임아웃 시 자동 재시도 (최대 3회, 지수 백오프)
  */
 
-import { updateDoc, doc } from 'firebase/firestore';
+import { updateDoc, doc, collection, query, where, getDocs, Timestamp } from 'firebase/firestore';
 import { db } from './firebase';
 import { findMatchesForRequest } from './matching-service';
 
@@ -23,14 +23,14 @@ export async function retryMatchingWithBackoff(
 
   for (let attempt = 0; attempt < maxRetries; attempt++) {
     try {
-      console.log(`🔄 매칭 재시도 ${attempt + 1}/${maxRetries} (Request ID: ${requestId})`);
+      console.warn(`🔄 매칭 재시도 ${attempt + 1}/${maxRetries} (Request ID: ${requestId})`);
 
       // 1. 매칭 시도
       const matches = await findMatchesForRequest(requestId, 3);
 
       // 2. 매칭 성공 시
       if (matches.length > 0) {
-        console.log(`✅ 매칭 성공! ${matches.length}개의 매칭 발견 (시도 ${attempt + 1}회)`);
+        console.warn(`✅ 매칭 성공! ${matches.length}개의 매칭 발견 (시도 ${attempt + 1}회)`);
 
         // 3. 요청 문서에 매칭 성공 표시
         await updateDoc(doc(db, 'requests', requestId), {
@@ -47,7 +47,7 @@ export async function retryMatchingWithBackoff(
       }
 
       // 4. 매칭 실패 시 재시도 전 지연
-      console.log(`⏳ 매칭 실패. ${baseDelay * Math.pow(2, attempt)}ms 후 재시도...`);
+      console.warn(`⏳ 매칭 실패. ${baseDelay * Math.pow(2, attempt)}ms 후 재시도...`);
 
       // 지수 백오프: 2초, 4초, 8초...
       await new Promise(resolve => setTimeout(resolve, baseDelay * Math.pow(2, attempt)));
@@ -94,16 +94,16 @@ export function scheduleAutoRetry(
   requestId: string,
   timeoutMs: number = 30000
 ): NodeJS.Timeout {
-  console.log(`⏰ ${timeoutMs}ms 후 자동 재시도 예약 (Request ID: ${requestId})`);
+  console.warn(`⏰ ${timeoutMs}ms 후 자동 재시도 예약 (Request ID: ${requestId})`);
 
   const timeoutId = setTimeout(async () => {
     try {
       const result = await retryMatchingWithBackoff(requestId);
 
       if (result.success) {
-        console.log(`✅ 자동 재시도 성공: ${result.foundMatches}개 매칭 발견`);
+        console.warn(`✅ 자동 재시도 성공: ${result.foundMatches}개 매칭 발견`);
       } else {
-        console.log(`❌ 자동 재시도 실패: ${result.attempts}회 시도 후 매칭 없음`);
+        console.warn(`❌ 자동 재시도 실패: ${result.attempts}회 시도 후 매칭 없음`);
       }
     } catch (error) {
       console.error('❌ 자동 재시도 중 오류 발생:', error);
@@ -119,7 +119,7 @@ export function scheduleAutoRetry(
  */
 export function cancelAutoRetry(timeoutId: NodeJS.Timeout): void {
   clearTimeout(timeoutId);
-  console.log('⏹️ 자동 재시도 취소됨');
+  console.warn('⏹️ 자동 재시도 취소됨');
 }
 
 /**
@@ -128,35 +128,43 @@ export function cancelAutoRetry(timeoutId: NodeJS.Timeout): void {
  * @param intervalMs 확인 간격 (ms, 기본값 60000 = 1분)
  */
 export function startMatchingStatusMonitor(intervalMs: number = 60000): NodeJS.Timeout {
-  console.log(`🔍 매칭 상태 모니터링 시작 (${intervalMs}ms 간격)`);
+  console.warn(`🔍 매칭 상태 모니터링 시작 (${intervalMs}ms 간격)`);
 
-  const intervalId = setInterval(() => {
+  const intervalId = setInterval(async () => {
     try {
-      // TODO: Firestore에서 매칭되지 않은 요청 조회
-      // const q = query(
-      //   collection(db, 'requests'),
-      //   where('matchingStatus', '==', 'pending'),
-      //   where('createdAt', '>', new Date(Date.now() - 5 * 60 * 1000)) // 5분 이내
-      // );
+      const cutoff = Timestamp.fromDate(new Date(Date.now() - 5 * 60 * 1000));
+      const q = query(
+        collection(db, 'requests'),
+        where('status', '==', 'pending'),
+        where('matchingStatus', '==', 'no-match'),
+        where('createdAt', '<=', cutoff)
+      );
+      const snapshot = await getDocs(q);
 
-      // const snapshot = await getDocs(q);
+      if (snapshot.empty) {
+        return;
+      }
 
-      // snapshot.forEach((doc) => {
-      //   const requestId = doc.id;
-      //   const createdAt = doc.data().createdAt?.toDate();
-      //   const elapsed = Date.now() - createdAt.getTime();
+      console.warn(`[matching-monitor] Found ${snapshot.size} unmatched request(s), retrying...`);
 
-      //   // 30초 이상 경과했으면 자동 재시도
-      //   if (elapsed > 30000) {
-      //     console.log(`🔄 자동 재시도 트리거: ${requestId}`);
-      //     retryMatchingWithBackoff(requestId);
-      //   }
-      // });
+      for (const docSnap of snapshot.docs) {
+        try {
+          const data = docSnap.data();
+          const createdAt = data.createdAt instanceof Timestamp
+            ? data.createdAt.toDate()
+            : new Date();
+          const elapsed = Date.now() - createdAt.getTime();
 
-      // 임시: 모니터링 중임을 로그로 표시
-      console.log('💓 매칭 상태 모니터링 중...');
+          if (elapsed > 30000) {
+            console.warn(`[matching-monitor] Retrying request: ${docSnap.id} (${Math.round(elapsed / 1000)}s elapsed)`);
+            await retryMatchingWithBackoff(docSnap.id);
+          }
+        } catch (retryError) {
+          console.error(`[matching-monitor] Failed to retry request ${docSnap.id}:`, retryError);
+        }
+      }
     } catch (error) {
-      console.error('❌ 매칭 상태 모니터링 중 오류:', error);
+      console.error('[matching-monitor] Query error:', error);
     }
   }, intervalMs);
 
@@ -169,7 +177,7 @@ export function startMatchingStatusMonitor(intervalMs: number = 60000): NodeJS.T
  */
 export function stopMatchingStatusMonitor(intervalId: NodeJS.Timeout): void {
   clearInterval(intervalId);
-  console.log('⏹️ 매칭 상태 모니터링 중지됨');
+  console.warn('⏹️ 매칭 상태 모니터링 중지됨');
 }
 
 /**
@@ -183,7 +191,7 @@ export async function manualRetry(requestId: string): Promise<{
   attempts: number;
   foundMatches: number
 }> {
-  console.log(`🔄 수동 재시도 시작 (Request ID: ${requestId})`);
+  console.warn(`🔄 수동 재시도 시작 (Request ID: ${requestId})`);
 
   try {
     const result = await retryMatchingWithBackoff(requestId);

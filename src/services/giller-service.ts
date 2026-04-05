@@ -45,7 +45,7 @@ export class GillerService {
 
   constructor(userId?: string) {
     // Firebase Auth에서 userId 가져오기
-    this.userId = userId || this.getCurrentUserId();
+    this.userId = userId ?? this.getCurrentUserId();
   }
 
   private getCurrentUserId(): string {
@@ -61,7 +61,7 @@ export class GillerService {
    * 길러 프로필 조회
    */
   async getGillerProfile(userId?: string): Promise<GillerProfile | null> {
-    const targetUserId = userId || this.userId;
+    const targetUserId = userId ?? this.userId;
     const docRef = doc(db, GILLERS_COLLECTION, targetUserId);
     const docSnap = await getDoc(docRef);
 
@@ -75,11 +75,11 @@ export class GillerService {
     }
     return {
       userId: docSnap.id,
-      gillerType: data.gillerType || GillerType.REGULAR,
-      status: data.status || GillerStatus.ACTIVE,
-      limits: data.limits || REGULAR_GILLER_CONFIG.limits,
-      benefits: data.benefits || REGULAR_GILLER_CONFIG.benefits,
-      stats: data.stats || {
+      gillerType: data.gillerType ?? GillerType.REGULAR,
+      status: data.status ?? GillerStatus.ACTIVE,
+      limits: data.limits ?? REGULAR_GILLER_CONFIG.limits,
+      benefits: data.benefits ?? REGULAR_GILLER_CONFIG.benefits,
+      stats: data.stats ?? {
         totalCompletedDeliveries: 0,
         totalEarnings: 0,
         rating: 5.0,
@@ -198,7 +198,7 @@ export class GillerService {
    * 전문 길러 승급
    */
   async promoteToProfessional(userId?: string): Promise<void> {
-    const targetUserId = userId || this.userId;
+    const targetUserId = userId ?? this.userId;
     const eligibility = await this.checkPromotionEligibility(targetUserId);
 
     if (!eligibility.isEligible) {
@@ -225,7 +225,7 @@ export class GillerService {
    * 일반 길러 강등 (평점 저하, 페널티 등)
    */
   async demoteToRegular(userId?: string): Promise<void> {
-    const targetUserId = userId || this.userId;
+    const targetUserId = userId ?? this.userId;
     const docRef = doc(db, GILLERS_COLLECTION, targetUserId);
 
     await updateDoc(docRef, {
@@ -244,7 +244,7 @@ export class GillerService {
     currentRating: number,
     userId?: string
   ): Promise<Badge[]> {
-    const targetUserId = userId || this.userId;
+    const targetUserId = userId ?? this.userId;
     const profile = await this.getGillerProfile(targetUserId);
     if (!profile) {
       throw new Error('Giller profile not found');
@@ -359,7 +359,7 @@ export class GillerService {
    * 사용자 배지 목록 조회
    */
   async getUserBadges(userId?: string): Promise<Badge[]> {
-    const targetUserId = userId || this.userId;
+    const targetUserId = userId ?? this.userId;
     const collectionRef = collection(db, USER_BADGES_COLLECTION);
     const q = query(collectionRef, where('userId', '==', targetUserId));
     const querySnapshot = await getDocs(q);
@@ -389,7 +389,7 @@ export class GillerService {
     rating: number,
     userId?: string
   ): Promise<void> {
-    const targetUserId = userId || this.userId;
+    const targetUserId = userId ?? this.userId;
     const docRef = doc(db, GILLERS_COLLECTION, targetUserId);
 
     await updateDoc(docRef, {

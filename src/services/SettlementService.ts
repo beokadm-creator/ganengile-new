@@ -141,7 +141,7 @@ export class SettlementService {
       scheduledFor,
     });
 
-    console.log(`✅ Settlement created: ${settlement.settlementId} for giller: ${payment.gllerId}`);
+    console.warn(`✅ Settlement created: ${settlement.settlementId} for giller: ${payment.gllerId}`);
 
     return settlement;
   }
@@ -206,7 +206,7 @@ export class SettlementService {
 
     await updateDoc(settlementRef, updateData);
 
-    console.log(`📝 Settlement ${settlementId} status updated to: ${status}`);
+    console.warn(`📝 Settlement ${settlementId} status updated to: ${status}`);
   }
 
   static async processPendingSettlements(): Promise<number> {
@@ -250,7 +250,7 @@ export class SettlementService {
       }
     }
 
-    console.log(`✅ Processed ${processedCount} settlements`);
+    console.warn(`✅ Processed ${processedCount} settlements`);
     return processedCount;
   }
 
@@ -295,8 +295,7 @@ export class SettlementService {
           }
 
           if (
-            !stats.lastSettlementDate ||
-            (settlement.completedAt &&
+            !stats.lastSettlementDate ?? (settlement.completedAt &&
               settlement.completedAt.toDate() > stats.lastSettlementDate)
           ) {
             stats.lastSettlementDate = settlement.completedAt?.toDate();
@@ -347,7 +346,7 @@ export class SettlementService {
 
     const user = userDoc.data() as User;
 
-    const existingAccounts = (user as any).bankAccounts || [];
+    const existingAccounts = user.bankAccounts ?? [];
 
     if (isDefault) {
       existingAccounts.forEach((acc: GillerBankAccount) => {
@@ -374,7 +373,7 @@ export class SettlementService {
     }
 
     const user = userDoc.data() as User;
-    return (user as any).bankAccounts || [];
+    return user.bankAccounts ?? [];
   }
 
   static async setDefaultBankAccount(
@@ -389,7 +388,7 @@ export class SettlementService {
     }
 
     const user = userDoc.data() as User;
-    const accounts = (user as any).bankAccounts || [];
+    const accounts = user.bankAccounts ?? [];
 
     let found = false;
     accounts.forEach((acc: GillerBankAccount) => {
@@ -400,7 +399,7 @@ export class SettlementService {
       const matchesLast4 =
         typeof acc.accountLast4 === 'string' && acc.accountLast4 === getAccountLast4(accountNumber);
 
-      if (matchesRaw || matchesMasked || matchesLast4) {
+      if (matchesRaw || matchesMasked ?? matchesLast4) {
         acc.isDefault = true;
         found = true;
       } else {

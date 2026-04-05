@@ -77,14 +77,16 @@ export async function uploadPhoto(
 
           reject(new Error(errorMessage));
         },
-        async () => {
-          // 업로드 완료 후 다운로드 URL 가져오기
-          try {
-            const downloadUrl = await getDownloadURL(uploadTask.snapshot.ref);
-            resolve(downloadUrl);
-          } catch (_error) {
-            reject(new Error('다운로드 URL을 가져올 수 없습니다.'));
-          }
+        () => {
+          void (async () => {
+            // 업로드 완료 후 다운로드 URL 가져오기
+            try {
+              const downloadUrl = await getDownloadURL(uploadTask.snapshot.ref);
+              resolve(downloadUrl);
+            } catch (_error) {
+              reject(new Error('다운로드 URL을 가져올 수 없습니다.'));
+            }
+          })();
         }
       );
     });

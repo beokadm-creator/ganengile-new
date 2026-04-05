@@ -51,12 +51,12 @@ async function run() {
     for (const settlementDoc of snap.docs) {
       scanned += 1;
       const settlement = settlementDoc.data() as any;
-      const requestId = settlement?.requestId || settlementDoc.id;
+      const requestId = settlement?.requestId ?? settlementDoc.id;
       if (!requestId) continue;
 
       const requestSnap = await db.collection('requests').doc(requestId).get();
       const requestData = requestSnap.exists ? (requestSnap.data() as any) : null;
-      const fee = requestData?.feeBreakdown || requestData?.fee || null;
+      const fee = requestData?.feeBreakdown || requestData?.fee ?? null;
 
       let payment: any = null;
       if (settlement?.earningPaymentId) {
@@ -85,8 +85,7 @@ async function run() {
         settlement?.settlementVersion !== 2 ||
         settlement?.customerPaidAmount == null ||
         settlement?.feeSupplyAmount == null ||
-        settlement?.vatAmount == null ||
-        settlement?.gillerNetAmount == null;
+        settlement?.vatAmount == null ?? settlement?.gillerNetAmount == null;
 
       if (!needsUpdate) continue;
 

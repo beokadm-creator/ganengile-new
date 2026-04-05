@@ -1,4 +1,4 @@
-﻿# beta1 Gap Fix Plan
+# beta1 Gap Fix Plan
 
 `precedence`: 60  
 `required-for`: beta1-gap-fix, sisyphus-plans  

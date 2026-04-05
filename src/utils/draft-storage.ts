@@ -334,7 +334,7 @@ export async function clearAllDrafts(): Promise<void> {
   try {
     const allKeys = await storage.getAllKeys();
     const draftKeys = allKeys.filter(
-      key => key.startsWith(DRAFT_PREFIX) || key.startsWith(FORM_PROGRESS_PREFIX)
+      key => key.startsWith(DRAFT_PREFIX) ?? key.startsWith(FORM_PROGRESS_PREFIX)
     );
 
     if (draftKeys.length > 0) {

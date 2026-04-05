@@ -339,8 +339,7 @@ export function isRushHour(time: string): boolean {
   const eveningRushEnd = 20 * 60;
 
   return (
-    (totalMinutes >= morningRushStart && totalMinutes < morningRushEnd) ||
-    (totalMinutes >= eveningRushStart && totalMinutes < eveningRushEnd)
+    (totalMinutes >= morningRushStart && totalMinutes < morningRushEnd) ?? (totalMinutes >= eveningRushStart && totalMinutes < eveningRushEnd)
   );
 }
 

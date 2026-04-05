@@ -17,8 +17,7 @@ const args = new Set(process.argv.slice(2));
 const apply = args.has('--apply');
 
 const serviceAccountPath =
-  process.env.FIREBASE_SERVICE_ACCOUNT_PATH ||
-  path.join(process.env.HOME || '', 'Downloads/ganengile-firebase-adminsdk-fbsvc-6178badd66.json');
+  process.env.FIREBASE_SERVICE_ACCOUNT_PATH ?? path.join(process.env.HOME || '', 'Downloads/ganengile-firebase-adminsdk-fbsvc-6178badd66.json');
 
 if (!fs.existsSync(serviceAccountPath)) {
   console.error(`❌ Service account not found: ${serviceAccountPath}`);
@@ -35,12 +34,12 @@ admin.initializeApp({
 const db = admin.firestore();
 
 function normalizeName(name: string): string {
-  const trimmed = (name || '').replace(/\s+/g, '').trim();
+  const trimmed = (name ?? '').replace(/\s+/g, '').trim();
   return trimmed.endsWith('역') ? trimmed.slice(0, -1) : trimmed;
 }
 
 function normalizeLineName(line: string): string {
-  const v = String(line || '').trim();
+  const v = String(line ?? '').trim();
   if (!v) return '';
   const digits = v.replace(/\D/g, '');
   if (digits) return `${parseInt(digits, 10)}호선`;
@@ -59,7 +58,7 @@ function scoreStation(station: { id: string; data: any }, lineName: string): num
   // Prefer numeric lineId for numeric line
   const digits = lineName.replace(/\D/g, '');
   if (digits) {
-    const hasExactLineId = (station.data?.lines || []).some((l: any) => String(l.lineId) === digits);
+    const hasExactLineId = (station.data?.lines ?? []).some((l: any) => String(l.lineId) === digits);
     if (hasExactLineId) score += 3;
   }
 
@@ -79,11 +78,11 @@ async function main() {
   const groups = new Map<string, { station: { id: string; data: any }; lineName: string }[]>();
 
   for (const station of stations) {
-    const name = station.data.stationName || station.data.name || station.id;
+    const name = station.data.stationName || station.data.name ?? station.id;
     const nameKey = normalizeName(name);
     const lines = Array.isArray(station.data?.lines) ? station.data.lines : [];
     for (const line of lines) {
-      const lineName = normalizeLineName(line.lineName || '');
+      const lineName = normalizeLineName(line.lineName ?? '');
       if (!lineName) continue;
       const key = `${nameKey}|${lineName}`;
       if (!groups.has(key)) groups.set(key, []);
@@ -99,7 +98,7 @@ async function main() {
         id: e.station.id,
         score: scoreStation(e.station, e.lineName),
       }))
-      .sort((a, b) => b.score - a.score || a.id.localeCompare(b.id));
+      .sort((a, b) => b.score - a.score ?? a.id.localeCompare(b.id));
     const keep = ranked[0]?.id;
     for (const entry of entries) {
       if (entry.station.id !== keep) {

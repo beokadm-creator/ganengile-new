@@ -1,4 +1,4 @@
-﻿# Admin Improvement Plan
+# Admin Improvement Plan
 
 `precedence`: 60  
 `required-for`: admin-improvement, sisyphus-plans  

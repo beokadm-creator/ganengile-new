@@ -14,8 +14,8 @@ export function normalizeKakaoProfile(profile: KakaoUserInfo): SocialAuthProfile
   return {
     provider: AuthProviderType.KAKAO,
     providerUserId: profile.id,
-    email: profile.email || undefined,
-    name: profile.nickname || undefined,
+    email: profile.email ?? undefined,
+    name: profile.nickname ?? undefined,
     profileImage: profile.profileImageUrl,
   };
 }
@@ -33,8 +33,8 @@ export function buildUserAuthPatch(profile: SocialAuthProfile): Partial<User> {
             ? 'email'
             : 'unknown',
     providerLinkedAt: undefined as never,
-    email: profile.email || '',
-    name: profile.name || '사용자',
+    email: profile.email ?? '',
+    name: profile.name ?? '사용자',
     profilePhoto: profile.profileImage,
   };
 }

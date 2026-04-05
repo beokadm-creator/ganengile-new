@@ -41,7 +41,7 @@ function readMessageContent(content: unknown): string | undefined {
       })
       .filter(Boolean)
       .join('\n')
-      .trim() || undefined
+      .trim() ?? undefined
   );
 }
 

@@ -1,4 +1,4 @@
-﻿# Sisyphus Workflow Rules
+# Sisyphus Workflow Rules
 
 `precedence`: 60  
 `required-for`: sisyphus-plans, verification-report  

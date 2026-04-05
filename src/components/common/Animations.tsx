@@ -36,6 +36,7 @@ export function FadeIn({
       delay,
       useNativeDriver: true,
     }).start();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   return (
@@ -71,6 +72,7 @@ export function SlideUp({
       delay,
       useNativeDriver: true,
     }).start();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   return (
@@ -102,6 +104,7 @@ export function ScaleIn({
       friction: 7,
       useNativeDriver: true,
     }).start();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   return (
@@ -163,6 +166,7 @@ export function StaggerChildren({
     });
 
     Animated.stagger(staggerDelay, staggerAnimations).start();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [children.length]);
 
   return (
@@ -218,6 +222,7 @@ export function Pulse({
     pulse.start();
 
     return () => pulse.stop();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   return (
@@ -246,6 +251,7 @@ export function Shimmer({ width = '100%', height = 20, style }: ShimmerProps) {
         useNativeDriver: true,
       })
     ).start();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const translateX = shimmerAnim.interpolate({

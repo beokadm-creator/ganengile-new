@@ -80,17 +80,19 @@ export default function GillerRequestsScreen() {
         { text: '취소', style: 'cancel' },
         {
           text: '수행하기',
-          onPress: async () => {
-            try {
-              setSubmittingBundleId(card.bundleId ?? null);
-              await acceptMissionBundleForGiller(card.bundleId!, user.uid);
-              await loadSnapshot('refresh');
-            } catch (error) {
-              const message = error instanceof Error ? error.message : '구간 수락에 실패했습니다.';
-              Alert.alert('수락 실패', message);
-            } finally {
-              setSubmittingBundleId(null);
-            }
+          onPress: () => {
+            void (async () => {
+              try {
+                setSubmittingBundleId(card.bundleId ?? null);
+                await acceptMissionBundleForGiller(card.bundleId!, user.uid);
+                await loadSnapshot('refresh');
+              } catch (error) {
+                const message = error instanceof Error ? error.message : '구간 수락에 실패했습니다.';
+                Alert.alert('수락 실패', message);
+              } finally {
+                setSubmittingBundleId(null);
+              }
+            })();
           },
         },
       ],

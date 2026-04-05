@@ -45,7 +45,7 @@ export function RouteProvider({ children, userId }: { children: React.ReactNode;
 
       // 버전 확인
       if (parsed.version !== ROUTES_CACHE_VERSION) {
-        console.log('Cache version mismatch, clearing cache');
+        console.warn('Cache version mismatch, clearing cache');
         await AsyncStorage.removeItem(`${ROUTES_CACHE_KEY}_${userId}`);
         return null;
       }
@@ -53,7 +53,7 @@ export function RouteProvider({ children, userId }: { children: React.ReactNode;
       // TTL 확인
       const now = Date.now();
       if (now - parsed.timestamp > ROUTE_CACHE_TTL) {
-        console.log('Cache expired, clearing cache');
+        console.warn('Cache expired, clearing cache');
         await AsyncStorage.removeItem(`${ROUTES_CACHE_KEY}_${userId}`);
         return null;
       }
@@ -65,7 +65,7 @@ export function RouteProvider({ children, userId }: { children: React.ReactNode;
         updatedAt: new Date(route.updatedAt),
       }));
 
-      console.log(`Loaded ${restoredRoutes.length} routes from cache`);
+      // Loaded routes from cache
       return restoredRoutes;
     } catch (err) {
       console.error('Error loading cached routes:', err);
@@ -85,7 +85,7 @@ export function RouteProvider({ children, userId }: { children: React.ReactNode;
       };
 
       await AsyncStorage.setItem(`${ROUTES_CACHE_KEY}_${userId}`, JSON.stringify(cacheData));
-      console.log(`Saved ${routesToCache.length} routes to cache`);
+      // Routes saved to cache
     } catch (err) {
       console.error('Error saving routes to cache:', err);
     }
@@ -126,7 +126,7 @@ export function RouteProvider({ children, userId }: { children: React.ReactNode;
       setRoutes(activeRoutes);
     } catch (err: any) {
       console.error('Error refreshing routes:', err);
-      setError(err.message || '동선 로드 실패');
+      setError(err.message ?? '동선 로드 실패');
 
       // 캐시된 데이터가 있으면 fallback
       const cachedRoutes = await loadCachedRoutes();
@@ -146,7 +146,7 @@ export function RouteProvider({ children, userId }: { children: React.ReactNode;
     try {
       await AsyncStorage.removeItem(`${ROUTES_CACHE_KEY}_${userId}`);
       setRoutes([]);
-      console.log('Route cache cleared');
+      // Route cache cleared
     } catch (err) {
       console.error('Error clearing cache:', err);
     }
@@ -172,11 +172,12 @@ export function RouteProvider({ children, userId }: { children: React.ReactNode;
       await refreshRoutes();
     };
 
-    initializeRoutes();
+    void initializeRoutes();
 
     return () => {
       mounted = false;
     };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [userId]);
 
   const value: RouteContextValue = {

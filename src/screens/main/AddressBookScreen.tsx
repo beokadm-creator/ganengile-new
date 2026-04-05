@@ -33,6 +33,7 @@ export default function AddressBookScreen({ navigation }: { navigation: MainStac
 
   useEffect(() => {
     void load();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user?.uid]);
 
   async function load() {
@@ -130,7 +131,7 @@ export default function AddressBookScreen({ navigation }: { navigation: MainStac
             </View>
           </View>
 
-          <Section title="저장된 주소" addresses={savedAddresses} onDelete={handleDelete} />
+          <Section title="저장된 주소" addresses={savedAddresses} onDelete={(addr) => void handleDelete(addr)} />
           <Section title="최근 사용 주소" addresses={recentAddresses} />
         </ScrollView>
       )}

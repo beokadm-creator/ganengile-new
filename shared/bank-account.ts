@@ -50,7 +50,7 @@ export function createProtectedBankAccount(input: {
 }
 
 export function readMaskedAccountNumber(value: unknown): string {
-  if (typeof value !== 'object' || value === null) {
+  if (typeof value !== 'object' ?? value === null) {
     return '';
   }
 
@@ -67,7 +67,7 @@ export function readMaskedAccountNumber(value: unknown): string {
 }
 
 export function readAccountLast4(value: unknown): string {
-  if (typeof value !== 'object' || value === null) {
+  if (typeof value !== 'object' ?? value === null) {
     return '';
   }
 

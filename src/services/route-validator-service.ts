@@ -197,7 +197,7 @@ export const saveRouteToFavorites = async (
     );
 
     if (isDuplicate) {
-      console.log('Route already exists in favorites:', routeId);
+      // Route already exists in favorites
       return true; // 이미 있으면 성공으로 처리
     }
 
@@ -207,7 +207,7 @@ export const saveRouteToFavorites = async (
     // AsyncStorage에 저장
     await AsyncStorage.setItem(FAVORITE_ROUTES_KEY, JSON.stringify(updatedFavorites));
 
-    console.log('Route saved to favorites:', routeId);
+    // Route saved to favorites
     return true;
   } catch (error) {
     console.error('Failed to save route to favorites:', error);
@@ -242,7 +242,7 @@ export const removeFavoriteRoute = async (routeId: string): Promise<boolean> => 
 
     await AsyncStorage.setItem(FAVORITE_ROUTES_KEY, JSON.stringify(updatedFavorites));
 
-    console.log('Route removed from favorites:', routeId);
+    // Route removed from favorites
     return true;
   } catch (error) {
     console.error('Failed to remove favorite route:', error);

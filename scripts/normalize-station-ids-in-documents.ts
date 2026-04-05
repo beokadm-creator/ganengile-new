@@ -14,8 +14,7 @@ const args = new Set(process.argv.slice(2));
 const apply = args.has('--apply');
 
 const serviceAccountPath =
-  process.env.FIREBASE_SERVICE_ACCOUNT_PATH ||
-  path.join(process.env.HOME || '', 'Downloads/ganengile-firebase-adminsdk-fbsvc-6178badd66.json');
+  process.env.FIREBASE_SERVICE_ACCOUNT_PATH ?? path.join(process.env.HOME || '', 'Downloads/ganengile-firebase-adminsdk-fbsvc-6178badd66.json');
 
 if (!fs.existsSync(serviceAccountPath)) {
   throw new Error(`Service account not found: ${serviceAccountPath}`);
@@ -37,7 +36,7 @@ type StationDoc = {
 };
 
 function normalizeName(name?: string): string {
-  const trimmed = String(name || '')
+  const trimmed = String(name ?? '')
     .replace(/\s+/g, '')
     .trim();
   if (!trimmed) return '';
@@ -45,19 +44,19 @@ function normalizeName(name?: string): string {
 }
 
 function normalizeLineCode(value?: string): string {
-  const digits = String(value || '').replace(/\D/g, '');
+  const digits = String(value ?? '').replace(/\D/g, '');
   return digits ? String(parseInt(digits, 10)) : '';
 }
 
 function stationScore(station: StationDoc, wantedLineCode?: string): number {
   let score = 0;
   if (station.data?.isActive) score += 10;
-  if (station.data?.fare?.stationCode || station.data?.kric?.stationCode) score += 8;
-  if (station.data?.location?.lat || station.data?.location?.latitude) score += 3;
+  if (station.data?.fare?.stationCode ?? station.data?.kric?.stationCode) score += 8;
+  if (station.data?.location?.lat ?? station.data?.location?.latitude) score += 3;
   const lines = Array.isArray(station.data?.lines) ? station.data.lines : [];
   if (lines.length > 0) score += 2;
   if (wantedLineCode) {
-    const found = lines.some((l: any) => normalizeLineCode(l?.lineCode || l?.lineName) === wantedLineCode);
+    const found = lines.some((l: any) => normalizeLineCode(l?.lineCode ?? l?.lineName) === wantedLineCode);
     if (found) score += 15;
   }
   return score;
@@ -70,9 +69,9 @@ function buildStationPatch(station: StationDoc, original: any): any {
   return {
     id: station.id,
     stationId: station.id,
-    stationName: station.data?.stationName || original?.stationName || station.id,
-    line: firstLine?.lineName || original?.line || '',
-    lineCode: firstLine?.lineCode || normalizeLineCode(firstLine?.lineName) || original?.lineCode || '',
+    stationName: station.data?.stationName || original?.stationName ?? station.id,
+    line: firstLine?.lineName || original?.line ?? '',
+    lineCode: firstLine?.lineCode || normalizeLineCode(firstLine?.lineName) || original?.lineCode ?? '',
     lat,
     lng,
   };
@@ -80,10 +79,10 @@ function buildStationPatch(station: StationDoc, original: any): any {
 
 function isSameStationInfo(a: any, b: any): boolean {
   return (
-    String(a?.stationId || '') === String(b?.stationId || '') &&
-    String(a?.id || '') === String(b?.id || '') &&
-    String(a?.stationName || '') === String(b?.stationName || '') &&
-    String(a?.lineCode || '') === String(b?.lineCode || '') &&
+    String(a?.stationId ?? '') === String(b?.stationId ?? '') &&
+    String(a?.id ?? '') === String(b?.id ?? '') &&
+    String(a?.stationName ?? '') === String(b?.stationName ?? '') &&
+    String(a?.lineCode ?? '') === String(b?.lineCode ?? '') &&
     Number(a?.lat ?? 0) === Number(b?.lat ?? 0) &&
     Number(a?.lng ?? 0) === Number(b?.lng ?? 0)
   );
@@ -104,7 +103,7 @@ async function run() {
 
   for (const s of stations) {
     byId.set(s.id, s);
-    const key = normalizeName(s.data?.stationName || s.id);
+    const key = normalizeName(s.data?.stationName ?? s.id);
     if (!byName.has(key)) byName.set(key, []);
     byName.get(key)!.push(s);
   }
@@ -116,33 +115,33 @@ async function run() {
   }> = [];
 
   const resolveStation = (raw: any): StationDoc | null => {
-    const stationId = String(raw?.stationId || raw?.id || '').trim();
-    const stationName = String(raw?.stationName || '').trim();
-    const wantedLineCode = normalizeLineCode(raw?.lineCode || raw?.line);
+    const stationId = String(raw?.stationId || raw?.id ?? '').trim();
+    const stationName = String(raw?.stationName ?? '').trim();
+    const wantedLineCode = normalizeLineCode(raw?.lineCode ?? raw?.line);
 
     const direct = stationId ? byId.get(stationId) : undefined;
-    if (direct && (direct.data?.fare?.stationCode || direct.data?.kric?.stationCode)) {
+    if (direct && (direct.data?.fare?.stationCode ?? direct.data?.kric?.stationCode)) {
       return direct;
     }
 
-    const nameKey = normalizeName(stationName || stationId);
-    const candidates = byName.get(nameKey) || [];
+    const nameKey = normalizeName(stationName ?? stationId);
+    const candidates = byName.get(nameKey) ?? [];
     if (candidates.length === 0) {
-      unresolved.add(stationId || stationName || '(empty)');
+      unresolved.add(stationId || stationName ?? '(empty)');
       return null;
     }
 
     const ranked = candidates
       .map((s) => ({ s, score: stationScore(s, wantedLineCode) }))
-      .sort((a, b) => b.score - a.score || a.s.id.localeCompare(b.s.id));
-    return ranked[0]?.s || null;
+      .sort((a, b) => b.score - a.score ?? a.s.id.localeCompare(b.s.id));
+    return ranked[0]?.s ?? null;
   };
 
   for (const doc of requestsSnap.docs) {
     const data = doc.data() as any;
     const pickupResolved = resolveStation(data?.pickupStation);
     const deliveryResolved = resolveStation(data?.deliveryStation);
-    if (!pickupResolved || !deliveryResolved) continue;
+    if (!pickupResolved ?? !deliveryResolved) continue;
 
     const pickupPatch = buildStationPatch(pickupResolved, data?.pickupStation);
     const deliveryPatch = buildStationPatch(deliveryResolved, data?.deliveryStation);
@@ -161,7 +160,7 @@ async function run() {
     const data = doc.data() as any;
     const startResolved = resolveStation(data?.startStation);
     const endResolved = resolveStation(data?.endStation);
-    if (!startResolved || !endResolved) continue;
+    if (!startResolved ?? !endResolved) continue;
 
     const startPatch = buildStationPatch(startResolved, data?.startStation);
     const endPatch = buildStationPatch(endResolved, data?.endStation);

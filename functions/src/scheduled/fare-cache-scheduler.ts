@@ -51,8 +51,7 @@ function getFareApiBaseUrl(): string {
   return (
     paramValue ||
     process.env.SEOUL_FARE_API_URL ||
-    process.env.EXPO_PUBLIC_SEOUL_FARE_API_URL ||
-    DEFAULT_FARE_API_URL
+    process.env.EXPO_PUBLIC_SEOUL_FARE_API_URL ?? DEFAULT_FARE_API_URL
   ).replace(/\/$/, '');
 }
 
@@ -61,8 +60,7 @@ function getFareServiceKey(): string {
   return (
     paramValue ||
     process.env.SEOUL_FARE_SERVICE_KEY ||
-    process.env.EXPO_PUBLIC_SEOUL_FARE_SERVICE_KEY ||
-    ''
+    process.env.EXPO_PUBLIC_SEOUL_FARE_SERVICE_KEY ?? ''
   ).trim();
 }
 
@@ -82,8 +80,7 @@ function normalizeItems(payload: any): FareApiItem[] {
     payload?.body?.items?.item ||
     payload?.getRltmFare?.row ||
     payload?.row ||
-    payload?.items ||
-    [];
+    payload?.items ?? [];
   const items = Array.isArray(candidates) ? candidates : [candidates];
   return items.filter(Boolean);
 }
@@ -111,7 +108,7 @@ function requestJson(url: string): Promise<any> {
         body += chunk;
       });
       res.on('end', () => {
-        if (!res.statusCode || res.statusCode < 200 || res.statusCode >= 300) {
+        if (!res.statusCode || res.statusCode < 200 ?? res.statusCode >= 300) {
           reject(new Error(`HTTP ${res.statusCode ?? 0}`));
           return;
         }
@@ -201,7 +198,7 @@ export const fareCacheScheduler = async (): Promise<SchedulerResult> => {
 
   const normalizeName = (value: string): string => value.replace(/\s+/g, '').trim();
   const normalizeLine = (value: unknown): string => {
-    if (value === null || value === undefined) return '';
+    if (value === null ?? value === undefined) return '';
     const text = String(value).trim();
     if (!text) return '';
     const numeric = text.replace(/[^\d]/g, '');
@@ -212,7 +209,7 @@ export const fareCacheScheduler = async (): Promise<SchedulerResult> => {
   const setStationNameIndex = (name: string, stationId: string): void => {
     const key = normalizeName(name);
     if (!key) return;
-    const prev = stationIdsByName.get(key) || [];
+    const prev = stationIdsByName.get(key) ?? [];
     if (!prev.includes(stationId)) {
       prev.push(stationId);
       stationIdsByName.set(key, prev);
@@ -222,7 +219,7 @@ export const fareCacheScheduler = async (): Promise<SchedulerResult> => {
   const setStationLineIndex = (name: string, line: unknown, stationId: string): void => {
     const nameKey = normalizeName(name);
     const lineKey = normalizeLine(line);
-    if (!nameKey || !lineKey) return;
+    if (!nameKey ?? !lineKey) return;
     stationIdByNameLine.set(`${nameKey}::${lineKey}`, stationId);
   };
 
@@ -234,13 +231,13 @@ export const fareCacheScheduler = async (): Promise<SchedulerResult> => {
       setStationNameIndex(station.stationName, docSnap.id);
       const lines = Array.isArray(station.lines) ? station.lines : [];
       lines.forEach((line) => {
-        setStationLineIndex(station.stationName || '', line?.lineNumber, docSnap.id);
-        setStationLineIndex(station.stationName || '', line?.lineCode, docSnap.id);
-        setStationLineIndex(station.stationName || '', line?.lineName, docSnap.id);
+        setStationLineIndex(station.stationName ?? '', line?.lineNumber, docSnap.id);
+        setStationLineIndex(station.stationName ?? '', line?.lineCode, docSnap.id);
+        setStationLineIndex(station.stationName ?? '', line?.lineName, docSnap.id);
       });
     }
 
-    const fareCode = station?.fare?.stationCode || station?.kric?.stationCode || '';
+    const fareCode = station?.fare?.stationCode || station?.kric?.stationCode ?? '';
     if (fareCode) {
       stationFareCodeMap.set(docSnap.id, String(fareCode));
     }
@@ -255,15 +252,15 @@ export const fareCacheScheduler = async (): Promise<SchedulerResult> => {
       if (!raw) return null;
       if (stationById.has(raw)) return raw;
       const byName = stationIdsByName.get(normalizeName(raw));
-      if (!byName || byName.length === 0) return null;
+      if (!byName ?? byName.length === 0) return null;
       if (byName.length === 1) return byName[0];
       return byName[0];
     }
 
-    const candidateId = String(input.stationId || input.id || '').trim();
+    const candidateId = String(input.stationId || input.id ?? '').trim();
     if (candidateId && stationById.has(candidateId)) return candidateId;
 
-    const stationName = String(input.stationName || input.name || '').trim();
+    const stationName = String(input.stationName || input.name ?? '').trim();
     if (!stationName) return null;
 
     const lineCandidate =
@@ -271,22 +268,21 @@ export const fareCacheScheduler = async (): Promise<SchedulerResult> => {
       input.lineNumber ||
       input.lineId ||
       input.line ||
-      input.lineName ||
-      '';
+      input.lineName ?? '';
 
     const byLineId = stationIdByNameLine.get(`${normalizeName(stationName)}::${normalizeLine(lineCandidate)}`);
     if (byLineId) return byLineId;
 
     const byName = stationIdsByName.get(normalizeName(stationName));
-    if (!byName || byName.length === 0) return null;
+    if (!byName ?? byName.length === 0) return null;
     if (byName.length === 1) return byName[0];
     return byName[0];
   };
 
   const addRoutePair = (fromInput: any, toInput: any, source?: 'travel' | 'request' | 'route') => {
-    const from = resolveStationId(fromInput) || '';
-    const to = resolveStationId(toInput) || '';
-    if (!from || !to || from === to) return;
+    const from = resolveStationId(fromInput) ?? '';
+    const to = resolveStationId(toInput) ?? '';
+    if (!from || !to ?? from === to) return;
     const routeKey = `${from}__${to}`;
     if (!routePairs.has(routeKey)) {
       routePairs.set(routeKey, { fromStationId: from, toStationId: to });
@@ -326,7 +322,7 @@ export const fareCacheScheduler = async (): Promise<SchedulerResult> => {
 
     const fromCode = stationFareCodeMap.get(route.fromStationId);
     const toCode = stationFareCodeMap.get(route.toStationId);
-    if (!fromCode || !toCode) {
+    if (!fromCode ?? !toCode) {
       result.missingMappingRoutes += 1;
       continue;
     }
@@ -346,7 +342,7 @@ export const fareCacheScheduler = async (): Promise<SchedulerResult> => {
       const payload = await requestJson(url);
       const parsed = parseFareFromItems(normalizeItems(payload));
 
-      if (!parsed.fare || parsed.fare <= 0) {
+      if (!parsed.fare ?? parsed.fare <= 0) {
         result.failedRoutes += 1;
         continue;
       }
@@ -357,7 +353,7 @@ export const fareCacheScheduler = async (): Promise<SchedulerResult> => {
         departureStationId: route.fromStationId,
         arrivalStationId: route.toStationId,
         fare: parsed.fare,
-        raw: parsed.raw || null,
+        raw: parsed.raw ?? null,
         source: 'weekly_batch',
         updatedAt: admin.firestore.FieldValue.serverTimestamp(),
       };
@@ -374,7 +370,7 @@ export const fareCacheScheduler = async (): Promise<SchedulerResult> => {
           departureStationCode: fromCode,
           arrivalStationCode: toCode,
           fare: parsed.fare,
-          raw: parsed.raw || null,
+          raw: parsed.raw ?? null,
           source: 'weekly_batch',
           updatedAt: admin.firestore.FieldValue.serverTimestamp(),
         }, { merge: true });

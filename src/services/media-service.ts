@@ -46,9 +46,9 @@ export class MediaService {
       const { status: cameraStatus } = await ImagePicker.requestCameraPermissionsAsync();
       const { status: libraryStatus } = await ImagePicker.requestMediaLibraryPermissionsAsync();
 
-      if (cameraStatus !== 'granted' || libraryStatus !== 'granted') {
-        console.error('Camera or library permission denied');
-        return false;
+       if (cameraStatus !== 'granted' ?? libraryStatus !== 'granted') {
+         console.warn('Camera or library permission denied');
+         return false;
       }
 
       return true;
@@ -77,7 +77,7 @@ export class MediaService {
         quality: this.COMPRESSION_QUALITY,
       });
 
-      if (result.canceled || !result.assets || result.assets.length === 0) {
+      if (result.canceled || !result.assets ?? result.assets.length === 0) {
         return null;
       }
 
@@ -132,7 +132,7 @@ export class MediaService {
         quality: this.COMPRESSION_QUALITY,
       });
 
-      if (result.canceled || !result.assets || result.assets.length === 0) {
+      if (result.canceled || !result.assets ?? result.assets.length === 0) {
         return null;
       }
 
@@ -221,7 +221,7 @@ export class MediaService {
 
       // 재시도 로직
       if (retryCount < this.MAX_RETRIES) {
-        console.log(`Retrying upload... (${retryCount + 1}/${this.MAX_RETRIES})`);
+        console.warn(`Retrying upload... (${retryCount + 1}/${this.MAX_RETRIES})`);
         await this.delay(1000 * (retryCount + 1)); // 지수 시간 대기
         return this.uploadToFirebaseWithRetry(localUri, source, onProgress, retryCount + 1);
       }
@@ -237,7 +237,7 @@ export class MediaService {
     try {
       // 파일을 읽어서 ArrayBuffer로 변환
       const fileData = await FileSystem.readAsStringAsync(uri, {
-        encoding: 'base64' as any, // Type casting for compatibility
+        encoding: FileSystem.EncodingType.Base64,
       });
 
       // Base64를 Blob으로 변환
@@ -306,7 +306,7 @@ export class MediaService {
       }
 
       // 원본 이미지 크기 확인
-      const originalSize = fileInfo.size || 0;
+      const _originalSize = fileInfo.size ?? 0;
 
       // 이미지 조작 (리사이징)
       const result = await ImageManipulator.manipulateAsync(
@@ -321,12 +321,12 @@ export class MediaService {
         {
           compress: 0.7,
           format: ImageManipulator.SaveFormat.JPEG,
-        }
-      );
+         }
+       );
 
-      console.log(`Image resized: ${originalSize} -> ??? bytes (${maxWidth}px width)`);
+       // Image resized
 
-      return result.uri;
+       return result.uri;
     } catch (error) {
       console.error('Error resizing image:', error);
       // 실패 시 원본 URI 반환

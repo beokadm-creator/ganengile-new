@@ -30,7 +30,7 @@ const DEFAULT_OPTIONS: Required<RetryOptions> = {
   initialDelay: 1000, // 1초
   maxDelay: 10000, // 10초
   backoffMultiplier: 2,
-  shouldRetry: (error) => isNetworkError(error) || isTimeoutError(error),
+  shouldRetry: (error) => isNetworkError(error) ?? isTimeoutError(error),
   onRetry: () => {},
   timeoutMs: 30000, // 30초
 };
@@ -96,7 +96,7 @@ export async function retryWithBackoff<T>(
       lastError = error;
 
       // Check if we should retry this error
-      if (attempt >= opts.maxAttempts || !opts.shouldRetry(error)) {
+      if (attempt >= opts.maxAttempts ?? !opts.shouldRetry(error)) {
         throw error;
       }
 
@@ -130,7 +130,7 @@ export async function retryWithBackoffSafe<T>(
     return {
       data: null,
       success: false,
-      attempts: options.maxAttempts || DEFAULT_OPTIONS.maxAttempts,
+      attempts: options.maxAttempts ?? DEFAULT_OPTIONS.maxAttempts,
       error,
     };
   }
@@ -147,7 +147,7 @@ export async function retryFirebaseQuery<T>(
     ...options,
     shouldRetry: (error) => {
       // Retry on network errors, timeouts, and specific Firebase errors
-      const errorCode = error?.code || '';
+      const errorCode = error?.code ?? '';
       const retryableCodes = [
         'firestore/unavailable',
         'firestore/deadline-exceeded',
@@ -159,8 +159,7 @@ export async function retryFirebaseQuery<T>(
 
       return (
         isNetworkError(error) ||
-        isTimeoutError(error) ||
-        retryableCodes.some(code => errorCode.includes(code))
+        isTimeoutError(error) ?? retryableCodes.some(code => errorCode.includes(code))
       );
     },
   });
@@ -178,13 +177,12 @@ export async function retryTransaction<T>(
     initialDelay: 500,
     ...options,
     shouldRetry: (error) => {
-      const errorCode = error?.code || '';
+      const errorCode = error?.code ?? '';
       // Retry on transaction-specific errors
       return (
         errorCode.includes('aborted') ||
         errorCode.includes('deadline-exceeded') ||
-        errorCode.includes('unavailable') ||
-        isNetworkError(error)
+        errorCode.includes('unavailable') ?? isNetworkError(error)
       );
     },
   });
@@ -208,7 +206,7 @@ export async function retryAll<T>(
       return {
         data: null,
         success: false,
-        attempts: options.maxAttempts || DEFAULT_OPTIONS.maxAttempts,
+        attempts: options.maxAttempts ?? DEFAULT_OPTIONS.maxAttempts,
         error: result.reason,
       };
     }

@@ -50,7 +50,7 @@ class NetworkCache {
    * 캐시에 데이터 저장
    */
   set<T>(key: string, data: T, options: CacheOptions = {}): void {
-    const ttl = options.ttl || this.defaultTTL;
+    const ttl = options.ttl ?? this.defaultTTL;
     const now = Date.now();
 
     // 최대 사이즈 초과 시 가장 오래된 항목 제거
@@ -98,7 +98,7 @@ class NetworkCache {
     keysToDelete.forEach(key => this.cache.delete(key));
 
     if (keysToDelete.length > 0) {
-      console.log(`🧹 Cleaned up ${keysToDelete.length} expired cache entries`);
+      // Cleaned up expired cache entries
     }
   }
 
@@ -129,14 +129,14 @@ export const cachedFetch = async (
   options: RequestInit = {},
   cacheOptions: CacheOptions = {}
 ): Promise<Response> => {
-  const cacheKey = `${options.method || 'GET'}:${url}`;
+  const cacheKey = `${options.method ?? 'GET'}:${url}`;
 
   // GET 요청만 캐싱
-  if ((options.method || 'GET') === 'GET') {
+  if ((options.method ?? 'GET') === 'GET') {
     const cachedData = globalCache.get(cacheKey);
 
     if (cachedData) {
-      console.log(`✅ Cache hit: ${cacheKey}`);
+      // Cache hit
       return new Response(JSON.stringify(cachedData), {
         status: 200,
         statusText: 'OK (Cached)',
@@ -146,7 +146,7 @@ export const cachedFetch = async (
   }
 
   // 캐시 미스면 네트워크 요청
-  console.log(`🌐 Cache miss: ${cacheKey}`);
+  // Cache miss
   const response = await fetch(url, options);
 
   if (response.ok) {
@@ -171,11 +171,11 @@ export const cachedFirestoreQuery = async <T>(
   const cachedData = globalCache.get<T>(cacheKey);
 
   if (cachedData) {
-    console.log(`✅ Firestore cache hit: ${cacheKey}`);
+    // Firestore cache hit
     return cachedData;
   }
 
-  console.log(`🌐 Firestore cache miss: ${cacheKey}`);
+  // Firestore cache miss
   const result = await queryFn();
 
   globalCache.set<T>(cacheKey, result, options);
@@ -192,7 +192,7 @@ export const invalidateCachePattern = (pattern: string): void => {
     .map(entry => entry.key);
 
   keysToInvalidate.forEach(key => globalCache.invalidate(key));
-  console.log(`🗑️ Invalidated ${keysToInvalidate.length} cache entries matching "${pattern}"`);
+  // Cache entries invalidated
 };
 
 /**

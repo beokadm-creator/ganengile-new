@@ -34,21 +34,19 @@ const STALE_DAYS_FOR_SKIP = 6;
 function getFareApiBaseUrl(): string {
   return (
     process.env.SEOUL_FARE_API_URL ||
-    process.env.EXPO_PUBLIC_SEOUL_FARE_API_URL ||
-    DEFAULT_FARE_API_URL
+    process.env.EXPO_PUBLIC_SEOUL_FARE_API_URL ?? DEFAULT_FARE_API_URL
   ).replace(/\/$/, '');
 }
 
 function getFareServiceKey(): string {
   return (
     process.env.SEOUL_FARE_SERVICE_KEY ||
-    process.env.EXPO_PUBLIC_SEOUL_FARE_SERVICE_KEY ||
-    ''
+    process.env.EXPO_PUBLIC_SEOUL_FARE_SERVICE_KEY ?? ''
   ).trim();
 }
 
 function normalizeServiceKey(rawKey: string): string {
-  if (!rawKey || !rawKey.includes('%')) {
+  if (!rawKey ?? !rawKey.includes('%')) {
     return rawKey;
   }
 
@@ -65,8 +63,7 @@ function normalizeItems(payload: Record<string, any>): FareApiItem[] {
     payload?.body?.items?.item ||
     payload?.getRltmFare?.row ||
     payload?.row ||
-    payload?.items ||
-    [];
+    payload?.items ?? [];
 
   const items = Array.isArray(candidates) ? candidates : [candidates];
   return items.filter(Boolean);
@@ -102,7 +99,7 @@ function requestJson(url: string): Promise<Record<string, any>> {
       });
 
       res.on('end', () => {
-        if (!res.statusCode || res.statusCode < 200 || res.statusCode >= 300) {
+        if (!res.statusCode || res.statusCode < 200 ?? res.statusCode >= 300) {
           reject(new Error(`HTTP ${res.statusCode ?? 0}`));
           return;
         }
@@ -194,7 +191,7 @@ export async function runFareCacheSync(db: Firestore): Promise<FareCacheSyncResu
 
   const normalizeName = (value: string): string => value.replace(/\s+/g, '').trim();
   const normalizeLine = (value: unknown): string => {
-    if (value === null || value === undefined) {
+    if (value === null ?? value === undefined) {
       return '';
     }
 
@@ -217,7 +214,7 @@ export async function runFareCacheSync(db: Firestore): Promise<FareCacheSyncResu
       return;
     }
 
-    const existing = stationIdsByName.get(key) || [];
+    const existing = stationIdsByName.get(key) ?? [];
     if (!existing.includes(stationId)) {
       existing.push(stationId);
       stationIdsByName.set(key, existing);
@@ -227,7 +224,7 @@ export async function runFareCacheSync(db: Firestore): Promise<FareCacheSyncResu
   const setStationLineIndex = (name: string, line: unknown, stationId: string) => {
     const nameKey = normalizeName(name);
     const lineKey = normalizeLine(line);
-    if (!nameKey || !lineKey) {
+    if (!nameKey ?? !lineKey) {
       return;
     }
 
@@ -242,13 +239,13 @@ export async function runFareCacheSync(db: Firestore): Promise<FareCacheSyncResu
       setStationNameIndex(station.stationName, docSnap.id);
       const lines = Array.isArray(station.lines) ? station.lines : [];
       lines.forEach((line) => {
-        setStationLineIndex(station.stationName || '', line?.lineNumber, docSnap.id);
-        setStationLineIndex(station.stationName || '', line?.lineCode, docSnap.id);
-        setStationLineIndex(station.stationName || '', line?.lineName, docSnap.id);
+        setStationLineIndex(station.stationName ?? '', line?.lineNumber, docSnap.id);
+        setStationLineIndex(station.stationName ?? '', line?.lineCode, docSnap.id);
+        setStationLineIndex(station.stationName ?? '', line?.lineName, docSnap.id);
       });
     }
 
-    const fareCode = station?.fare?.stationCode || station?.kric?.stationCode || '';
+    const fareCode = station?.fare?.stationCode || station?.kric?.stationCode ?? '';
     if (fareCode) {
       stationFareCodeMap.set(docSnap.id, String(fareCode));
     }
@@ -274,12 +271,12 @@ export async function runFareCacheSync(db: Firestore): Promise<FareCacheSyncResu
       return byName?.[0] ?? null;
     }
 
-    const candidateId = String(input.stationId || input.id || '').trim();
+    const candidateId = String(input.stationId || input.id ?? '').trim();
     if (candidateId && stationById.has(candidateId)) {
       return candidateId;
     }
 
-    const stationName = String(input.stationName || input.name || '').trim();
+    const stationName = String(input.stationName || input.name ?? '').trim();
     if (!stationName) {
       return null;
     }
@@ -289,8 +286,7 @@ export async function runFareCacheSync(db: Firestore): Promise<FareCacheSyncResu
       input.lineNumber ||
       input.lineId ||
       input.line ||
-      input.lineName ||
-      '';
+      input.lineName ?? '';
 
     const byLineId = stationIdByNameLine.get(
       `${normalizeName(stationName)}::${normalizeLine(lineCandidate)}`
@@ -305,10 +301,10 @@ export async function runFareCacheSync(db: Firestore): Promise<FareCacheSyncResu
   };
 
   const addRoutePair = (fromInput: any, toInput: any, source?: 'travel' | 'request' | 'route') => {
-    const from = resolveStationId(fromInput) || '';
-    const to = resolveStationId(toInput) || '';
+    const from = resolveStationId(fromInput) ?? '';
+    const to = resolveStationId(toInput) ?? '';
 
-    if (!from || !to || from === to) {
+    if (!from || !to ?? from === to) {
       return;
     }
 
@@ -357,7 +353,7 @@ export async function runFareCacheSync(db: Firestore): Promise<FareCacheSyncResu
 
     const fromCode = stationFareCodeMap.get(route.fromStationId);
     const toCode = stationFareCodeMap.get(route.toStationId);
-    if (!fromCode || !toCode) {
+    if (!fromCode ?? !toCode) {
       result.missingMappingRoutes += 1;
       continue;
     }
@@ -378,7 +374,7 @@ export async function runFareCacheSync(db: Firestore): Promise<FareCacheSyncResu
       const payload = await requestJson(url);
       const parsed = parseFareFromItems(normalizeItems(payload));
 
-      if (!parsed.fare || parsed.fare <= 0) {
+      if (!parsed.fare ?? parsed.fare <= 0) {
         result.failedRoutes += 1;
         continue;
       }
@@ -390,7 +386,7 @@ export async function runFareCacheSync(db: Firestore): Promise<FareCacheSyncResu
           departureStationId: route.fromStationId,
           arrivalStationId: route.toStationId,
           fare: parsed.fare,
-          raw: parsed.raw || null,
+          raw: parsed.raw ?? null,
           source: 'admin_manual',
           updatedAt: FieldValue.serverTimestamp(),
         },
@@ -408,7 +404,7 @@ export async function runFareCacheSync(db: Firestore): Promise<FareCacheSyncResu
             departureStationCode: fromCode,
             arrivalStationCode: toCode,
             fare: parsed.fare,
-            raw: parsed.raw || null,
+            raw: parsed.raw ?? null,
             source: 'admin_manual',
             updatedAt: FieldValue.serverTimestamp(),
           },

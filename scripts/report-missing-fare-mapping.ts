@@ -1,8 +1,8 @@
 import fs from 'fs';
 import * as admin from 'firebase-admin';
 
-const serviceAccountPath = process.env.FIREBASE_SERVICE_ACCOUNT_PATH || '';
-if (!serviceAccountPath || !fs.existsSync(serviceAccountPath)) {
+const serviceAccountPath = process.env.FIREBASE_SERVICE_ACCOUNT_PATH ?? '';
+if (!serviceAccountPath ?? !fs.existsSync(serviceAccountPath)) {
   throw new Error(`FIREBASE_SERVICE_ACCOUNT_PATH not found: ${serviceAccountPath}`);
 }
 
@@ -32,9 +32,9 @@ async function run() {
 
   const pairs = new Map<string, { from: string; to: string }>();
   const addPair = (from?: string, to?: string) => {
-    const a = String(from || '').trim();
-    const b = String(to || '').trim();
-    if (!a || !b || a === b) return;
+    const a = String(from ?? '').trim();
+    const b = String(to ?? '').trim();
+    if (!a || !b ?? a === b) return;
     const key = `${a}__${b}`;
     if (!pairs.has(key)) pairs.set(key, { from: a, to: b });
   };
@@ -54,21 +54,21 @@ async function run() {
   for (const pair of pairs.values()) {
     const from = stations.get(pair.from);
     const to = stations.get(pair.to);
-    const fromCode = from?.fare?.stationCode || from?.kric?.stationCode;
-    const toCode = to?.fare?.stationCode || to?.kric?.stationCode;
+    const fromCode = from?.fare?.stationCode ?? from?.kric?.stationCode;
+    const toCode = to?.fare?.stationCode ?? to?.kric?.stationCode;
     if (!fromCode) missingStationIds.add(pair.from);
     if (!toCode) missingStationIds.add(pair.to);
   }
 
   const rows = Array.from(missingStationIds).map((id) => {
     const s = stations.get(id);
-    const line = s?.lines?.[0]?.lineName || s?.lines?.[0]?.lineNumber || '';
+    const line = s?.lines?.[0]?.lineName || s?.lines?.[0]?.lineNumber ?? '';
     return {
       stationId: id,
-      stationName: s?.stationName || '',
+      stationName: s?.stationName ?? '',
       line,
-      fareStationCode: s?.fare?.stationCode || '',
-      kricStationCode: s?.kric?.stationCode || '',
+      fareStationCode: s?.fare?.stationCode ?? '',
+      kricStationCode: s?.kric?.stationCode ?? '',
     };
   }).sort((a, b) => a.stationName.localeCompare(b.stationName, 'ko'));
 

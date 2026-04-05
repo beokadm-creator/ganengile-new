@@ -48,15 +48,15 @@ async function run() {
 
     const requestSnap = await db.collection('requests').doc(requestId).get();
     const request = requestSnap.exists ? (requestSnap.data() as any) : null;
-    const fee = request?.feeBreakdown || request?.fee || null;
-    const requestPlatformFee = Number(fee?.breakdown?.platformFee || 0);
+    const fee = request?.feeBreakdown || request?.fee ?? null;
+    const requestPlatformFee = Number(fee?.breakdown?.platformFee ?? 0);
 
     const earningPaymentId = settlement?.earningPaymentId;
     if (!earningPaymentId) continue;
     const paymentSnap = await db.collection('payments').doc(earningPaymentId).get();
     const payment = paymentSnap.exists ? (paymentSnap.data() as any) : null;
-    const paymentFee = Number(payment?.fee || 0);
-    const paymentAmount = Number(payment?.amount || 0);
+    const paymentFee = Number(payment?.fee ?? 0);
+    const paymentAmount = Number(payment?.amount ?? 0);
 
     const isRisky = requestPlatformFee > 0 && paymentFee > 0;
     if (!isRisky) continue;

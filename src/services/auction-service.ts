@@ -38,7 +38,7 @@ export async function createAuction(data: CreateAuctionData): Promise<Auction> {
   validateAuctionData(data);
 
   const now = new Date();
-  const durationMinutes = data.durationMinutes || 30;
+  const durationMinutes = data.durationMinutes ?? 30;
   const endsAt = new Date(now.getTime() + durationMinutes * 60 * 1000);
 
   const config: AuctionConfig = {
@@ -60,11 +60,11 @@ export async function createAuction(data: CreateAuctionData): Promise<Auction> {
     packageWeight: data.packageWeight,
     packageDescription: data.packageDescription,
     baseFee: data.baseFee,
-    distanceFee: data.distanceFee || 0,
-    weightFee: data.weightFee || 0,
-    sizeFee: data.sizeFee || 0,
-    serviceFee: data.serviceFee || 0,
-    vat: Math.round((data.baseFee + (data.distanceFee || 0)) * 0.1),
+    distanceFee: data.distanceFee ?? 0,
+    weightFee: data.weightFee ?? 0,
+    sizeFee: data.sizeFee ?? 0,
+    serviceFee: data.serviceFee ?? 0,
+    vat: Math.round((data.baseFee + (data.distanceFee ?? 0)) * 0.1),
     currentHighestBid: data.baseFee,
     startedAt: Timestamp.fromDate(now),
     endsAt: Timestamp.fromDate(endsAt),
@@ -234,7 +234,7 @@ export async function cancelAuction(auctionId: string, _reason?: string): Promis
 
   const auction = auctionDoc.data() as Auction;
 
-  if (auction.status === AuctionStatus.CLOSED || auction.status === AuctionStatus.CANCELLED) {
+  if (auction.status === AuctionStatus.CLOSED ?? auction.status === AuctionStatus.CANCELLED) {
     throw new Error('이미 완료되거나 취소된 경매는 취소할 수 없습니다.');
   }
 
@@ -376,7 +376,7 @@ export async function getBidsByBidder(bidderId: string): Promise<(Bid & { auctio
     } as Bid;
 
     const auction = await getAuctionById(bid.auctionId);
-    bids.push({ ...bid, auction: auction || undefined });
+    bids.push({ ...bid, auction: auction ?? undefined });
   }
 
   return bids;
@@ -429,7 +429,7 @@ function validateAuctionData(data: CreateAuctionData): void {
     throw new Error('요청자 ID가 필요합니다.');
   }
 
-  if (!data.pickupStation || !data.deliveryStation) {
+  if (!data.pickupStation ?? !data.deliveryStation) {
     throw new Error('픽업 역과 배송 역을 선택해주세요.');
   }
 
@@ -437,7 +437,7 @@ function validateAuctionData(data: CreateAuctionData): void {
     throw new Error('픽업 역과 배송 역이 같을 수 없습니다.');
   }
 
-  if (!data.baseFee || data.baseFee < 3000) {
+  if (!data.baseFee ?? data.baseFee < 3000) {
     throw new Error('기본 요금은 3,000원 이상이어야 합니다.');
   }
 
@@ -476,7 +476,7 @@ export async function getAuctionStatistics(requesterId?: string): Promise<{
 
   const closedAuctions = auctions.filter(a => a.status === AuctionStatus.CLOSED && a.winningBidAmount);
   const totalBids = auctions.reduce((sum, a) => sum + a.totalBids, 0);
-  const totalTransactionAmount = closedAuctions.reduce((sum, a) => sum + (a.winningBidAmount || 0), 0);
+  const totalTransactionAmount = closedAuctions.reduce((sum, a) => sum + (a.winningBidAmount ?? 0), 0);
   const averageWinningBid = closedAuctions.length > 0
     ? totalTransactionAmount / closedAuctions.length
     : 0;

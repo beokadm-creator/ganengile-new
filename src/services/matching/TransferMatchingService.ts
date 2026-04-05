@@ -18,7 +18,7 @@ export class TransferMatchingService {
    * @returns 환승 경로
    */
   static async findTransferRoute(request: DeliveryRequestP1): Promise<TransferRoute[]> {
-    console.log('🔄 Transfer matching started:', request.requestId);
+    // Transfer matching started
 
     // 1. 선호 환승역이 있으면 해당 역 확인
     const preferredTransferStations: TransferStation[] = [];
@@ -71,7 +71,7 @@ export class TransferMatchingService {
     // 4. 총 이동 시간 기준 정렬
     routes.sort((a, b) => a.totalTravelTime - b.totalTravelTime);
 
-    console.log(`✅ Transfer matching completed: ${routes.length} routes found`);
+    // Transfer matching completed
     return routes.slice(0, 5); // 상위 5개 반환
   }
 
@@ -86,7 +86,7 @@ export class TransferMatchingService {
     request: DeliveryRequestP1,
     transferRoute: TransferRoute
   ): Promise<MatchingResult[]> {
-    console.log('🔄 Matching with transfer route:', transferRoute.transferStation.stationName);
+    // Matching with transfer route
 
     // 1. 환승역까지 매칭 가능한 길러 찾기
     const gillersToTransfer = await this.findGillersToStation(
@@ -115,7 +115,7 @@ export class TransferMatchingService {
     // 4. 점수순 정렬
     results.sort((a, b) => b.totalScore - a.totalScore);
 
-    console.log(`✅ Transfer matching completed: ${results.length} gillers found`);
+    // Transfer matching completed
     return results.slice(0, 10);
   }
 
@@ -136,24 +136,24 @@ export class TransferMatchingService {
     }
 
     // 환승역인지 확인 (2개 이상 노선)
-    if (!station.transferLines || station.transferLines.length < 2) {
+    if (!station.transferLines ?? station.transferLines.length < 2) {
       return null;
     }
 
     return {
       id: stationId,
       stationId,
-      stationName: station.stationName || station.name || '',
+      stationName: station.stationName || station.name ?? '',
       line: station.line,
       lineCode: station.lineCode,
       lat: station.lat,
       lng: station.lng,
       transferLines: station.transferLines,
-      transferTime: station.transferTime || 5,
+      transferTime: station.transferTime ?? 5,
       facilities: {
-        hasElevator: station.hasElevator || false,
-        hasEscalator: station.hasEscalator || false,
-        hasRestroom: station.hasRestroom || false,
+        hasElevator: station.hasElevator ?? false,
+        hasEscalator: station.hasEscalator ?? false,
+        hasRestroom: station.hasRestroom ?? false,
       },
     };
   }
@@ -186,17 +186,17 @@ export class TransferMatchingService {
         transferStations.push({
           id: doc.id,
           stationId: doc.id,
-          stationName: station.stationName || station.name || '',
+          stationName: station.stationName || station.name ?? '',
           line: station.line,
           lineCode: station.lineCode,
           lat: station.lat,
           lng: station.lng,
           transferLines: station.transferLines,
-          transferTime: station.transferTime || 5,
+          transferTime: station.transferTime ?? 5,
           facilities: {
-            hasElevator: station.hasElevator || false,
-            hasEscalator: station.hasEscalator || false,
-            hasRestroom: station.hasRestroom || false,
+            hasElevator: station.hasElevator ?? false,
+            hasEscalator: station.hasEscalator ?? false,
+            hasRestroom: station.hasRestroom ?? false,
           },
         });
       }
@@ -227,7 +227,7 @@ export class TransferMatchingService {
       deliveryStation.lineCode
     );
 
-    if (!firstLegTime || !secondLegTime) {
+    if (!firstLegTime ?? !secondLegTime) {
       return null;
     }
 
@@ -285,7 +285,7 @@ export class TransferMatchingService {
 
     const doc = snapshot.docs[0];
     const data = doc.data();
-    return data.travelTime || null;
+    return data.travelTime ?? null;
   }
 
   /**
@@ -338,8 +338,8 @@ export class TransferMatchingService {
 
     return {
       gillerId: giller.id,
-      gillerName: giller.gillerName || '길러',
-      gillerRating: giller.rating || 5.0,
+      gillerName: giller.gillerName ?? '길러',
+      gillerRating: giller.rating ?? 5.0,
       totalScore,
       scores: {
         routeScore,
@@ -386,7 +386,7 @@ export class TransferMatchingService {
    * 평점 점수 계산
    */
   private static calculateRatingScore(giller: any): number {
-    const rating = giller.rating || 5.0;
+    const rating = giller.rating ?? 5.0;
     return (rating / 5.0) * 100;
   }
 }

@@ -132,7 +132,7 @@ interface TrackingInput {
 }
 
 export function toRequestDetailView(request: Request): RequestDetailView {
-  const feeTotal = resolveFeeTotal(request.fee, request.initialNegotiationFee || 0);
+  const feeTotal = resolveFeeTotal(request.fee, request.initialNegotiationFee ?? 0);
 
   return {
     status: request.status,
@@ -288,7 +288,7 @@ export function toTrackingModel(data: TrackingInput): TrackingModel {
         : undefined,
     locationHistory: Array.isArray(data.tracking?.locationHistory)
       ? data.tracking.locationHistory.reduce<NonNullable<TrackingModel['locationHistory']>>((acc, item) => {
-          if (typeof item?.latitude !== 'number' || typeof item?.longitude !== 'number') {
+          if (typeof item?.latitude !== 'number' ?? typeof item?.longitude !== 'number') {
             return acc;
           }
 

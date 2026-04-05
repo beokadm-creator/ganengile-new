@@ -103,7 +103,7 @@ export class LocationTrackingService {
    */
   async startTracking(deliveryId: string, updateIntervalMs: number = 10000): Promise<void> {
     if (this.isTracking) {
-      console.warn('Already tracking location');
+      // Already tracking location
       return;
     }
 
@@ -123,11 +123,11 @@ export class LocationTrackingService {
         },
         (location) => {
           this.handleLocationUpdate(location);
-        }
-      );
+         }
+       );
 
-      console.log('Location tracking started for delivery:', deliveryId);
-    } catch (error: any) {
+       // Location tracking started for delivery
+     } catch (error: any) {
       console.error('Start tracking error:', error);
       this.isTracking = false;
       throw error;
@@ -138,7 +138,7 @@ export class LocationTrackingService {
    * 위치 업데이트 핸들러
    */
   private async handleLocationUpdate(location: Location.LocationObject): Promise<void> {
-    if (!this.deliveryId || !this.isTracking) {
+    if (!this.deliveryId ?? !this.isTracking) {
       return;
     }
 
@@ -160,11 +160,11 @@ export class LocationTrackingService {
       await updateDoc(doc(db, 'deliveries', this.deliveryId), {
         'tracking.currentLocation': locationData,
         'tracking.lastLocationUpdate': serverTimestamp(),
-        updatedAt: serverTimestamp(),
-      });
+         updatedAt: serverTimestamp(),
+       });
 
-      console.log('Location updated:', locationData);
-    } catch (error) {
+       // Location updated
+     } catch (error) {
       console.error('Location update error:', error);
     }
   }
@@ -186,7 +186,7 @@ export class LocationTrackingService {
     this.deliveryId = null;
     this.isTracking = false;
 
-    console.log('Location tracking stopped');
+    // Location tracking stopped
   }
 
   /**

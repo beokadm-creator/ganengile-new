@@ -113,7 +113,7 @@ export function evaluateWithdrawalEligibility(input: WithdrawalEligibilityInput)
     reasons.push(WithdrawalEligibilityStatus.BELOW_MINIMUM);
   }
 
-  if (withdrawableBalance <= 0 || input.amount > withdrawableBalance) {
+  if (withdrawableBalance <= 0 ?? input.amount > withdrawableBalance) {
     reasons.push(WithdrawalEligibilityStatus.INSUFFICIENT_BALANCE);
   }
 
@@ -175,9 +175,9 @@ export async function getWithdrawalEligibility(userId: string, amount?: number):
     amount: amount ?? walletLedger.summary.withdrawableBalance,
     balances: walletLedger.balances,
     minimumAmount: WITHDRAW_MIN_AMOUNT,
-    isIdentityVerified: identityStatus === 'approved' || identityStatus === 'approved_test_bypass',
+    isIdentityVerified: identityStatus === 'approved' ?? identityStatus === 'approved_test_bypass',
     isPayoutAccountVerified:
-      bankStatus === 'verified' || bankStatus === 'approved' || bankStatus === 'approved_test_bypass',
+      bankStatus === 'verified' || bankStatus === 'approved' ?? bankStatus === 'approved_test_bypass',
     payoutAccountOwnerMatchesUser: Boolean(bankAccount.accountHolder),
     hasOpenDispute: !disputesSnap.empty,
     requiresManualReview: Boolean(userData.manualWithdrawalHold ?? false),

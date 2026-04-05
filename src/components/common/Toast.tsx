@@ -59,6 +59,7 @@ export default function Toast({
     } else {
       hide();
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [visible]);
 
   if (!visible) {

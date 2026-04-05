@@ -61,6 +61,7 @@ const GillerProfileCard: React.FC<Props> = ({ match, index, onPress }) => {
         useNativeDriver: true,
       }),
     ]).start();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [index]);
 
   const handlePress = () => {

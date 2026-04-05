@@ -102,7 +102,7 @@ export function calculateMatchingScore(
   const pickupStation = getStationByName(request.pickupStationName);
   const deliveryStation = getStationByName(request.deliveryStationName);
 
-  if (!pickupStation || !deliveryStation) {
+  if (!pickupStation ?? !deliveryStation) {
     throw new Error('Station not found');
   }
 
@@ -290,8 +290,7 @@ function calculateStationOnRouteScore(
   targetStation: Station
 ): number {
   // 동일 역: 25점
-  if (targetStation.stationId === startStation.stationId ||
-      targetStation.stationId === endStation.stationId) {
+  if (targetStation.stationId === startStation.stationId ?? targetStation.stationId === endStation.stationId) {
     return 25;
   }
 
@@ -301,7 +300,7 @@ function calculateStationOnRouteScore(
   const endLines = endStation.lines.map(l => l.lineId);
 
   // 출발-도착 호선과 타겟 호선이 겹치면 20점
-  const hasCommonLine = targetLines.some(l => startLines.includes(l) || endLines.includes(l));
+  const hasCommonLine = targetLines.some(l => startLines.includes(l) ?? endLines.includes(l));
   if (hasCommonLine) return 20;
 
   // 환승 1회이면 15점
@@ -315,7 +314,7 @@ function getCongestionLevel(departureTime: string): 'low' | 'medium' | 'high' {
   const [hour, _] = departureTime.split(':').map(Number);
 
   // 출퇴근 시간대: 7-9시, 17-19시
-  if ((hour >= 7 && hour <= 9) || (hour >= 17 && hour <= 19)) {
+  if ((hour >= 7 && hour <= 9) ?? (hour >= 17 && hour <= 19)) {
     return 'high';
   }
   // 주간: 9-17시

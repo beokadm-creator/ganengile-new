@@ -25,8 +25,7 @@ const apply = args.has('--apply');
 const deactivateDuplicates = args.has('--deactivate-duplicates');
 
 const serviceAccountPath =
-  process.env.FIREBASE_SERVICE_ACCOUNT_PATH ||
-  path.join(process.env.HOME || '', 'Downloads/ganengile-firebase-adminsdk-fbsvc-4436800611.json');
+  process.env.FIREBASE_SERVICE_ACCOUNT_PATH ?? path.join(process.env.HOME || '', 'Downloads/ganengile-firebase-adminsdk-fbsvc-4436800611.json');
 
 if (!fs.existsSync(serviceAccountPath)) {
   console.error(`❌ Service account not found: ${serviceAccountPath}`);
@@ -67,12 +66,12 @@ function parseCsv(content: string): MappingRow[] {
     });
     if (!row.stationId && !row.stationName) continue;
     rows.push({
-      stationId: row.stationId || '',
-      stationName: row.stationName || '',
-      lineCode: row.lineCode || '',
-      stationCode: row.stationCode || '',
-      railOprIsttCd: row.railOprIsttCd || 'S1',
-      fareStationCode: row.fareStationCode || '',
+      stationId: row.stationId ?? '',
+      stationName: row.stationName ?? '',
+      lineCode: row.lineCode ?? '',
+      stationCode: row.stationCode ?? '',
+      railOprIsttCd: row.railOprIsttCd ?? 'S1',
+      fareStationCode: row.fareStationCode ?? '',
     });
   }
 
@@ -94,13 +93,13 @@ function buildDuplicateReport(stations: { id: string; data: any }[]) {
   const byCoords = new Map<string, string[]>();
 
   for (const station of stations) {
-    const nameKey = normalizeName(station.data.stationName || station.id);
+    const nameKey = normalizeName(station.data.stationName ?? station.id);
     if (!byName.has(nameKey)) byName.set(nameKey, []);
     byName.get(nameKey)!.push(station.id);
 
     const lines = Array.isArray(station.data.lines) ? station.data.lines : [];
     for (const line of lines) {
-      const lineCode = line.lineCode || '';
+      const lineCode = line.lineCode ?? '';
       const nameLineKey = `${nameKey}|${lineCode}`;
       if (!byNameLine.has(nameLineKey)) byNameLine.set(nameLineKey, []);
       byNameLine.get(nameLineKey)!.push(station.id);
@@ -143,10 +142,10 @@ async function updateMappings(rows: MappingRow[], stations: { id: string; data: 
   const byNameLine = new Map<string, { id: string; data: any }>();
 
   for (const station of stations) {
-    const nameKey = normalizeName(station.data.stationName || station.id);
+    const nameKey = normalizeName(station.data.stationName ?? station.id);
     const lines = Array.isArray(station.data.lines) ? station.data.lines : [];
     for (const line of lines) {
-      const lineCode = line.lineCode || '';
+      const lineCode = line.lineCode ?? '';
       const key = `${nameKey}|${lineCode}`;
       if (!byNameLine.has(key)) {
         byNameLine.set(key, station);
@@ -167,7 +166,7 @@ async function updateMappings(rows: MappingRow[], stations: { id: string; data: 
 
     if (!target) {
       missing++;
-      console.warn(`⚠️ Station not found for mapping: ${row.stationId || row.stationName}`);
+      console.warn(`⚠️ Station not found for mapping: ${row.stationId ?? row.stationName}`);
       continue;
     }
 
@@ -175,9 +174,9 @@ async function updateMappings(rows: MappingRow[], stations: { id: string; data: 
     const ref = db.collection('config_stations').doc(target.id);
     const updateData: any = {
       kric: {
-        stationCode: row.stationCode || row.stationId,
+        stationCode: row.stationCode ?? row.stationId,
         lineCode: row.lineCode,
-        railOprIsttCd: row.railOprIsttCd || 'S1',
+        railOprIsttCd: row.railOprIsttCd ?? 'S1',
       },
       updatedAt: admin.firestore.FieldValue.serverTimestamp(),
     };
@@ -217,7 +216,7 @@ async function deactivateDuplicateStations(stations: { id: string; data: any }[]
       .filter(Boolean) as { id: string; data: any }[];
     const ranked = candidates
       .map((s) => ({ id: s.id, score: scoreStation(s) }))
-      .sort((a, b) => b.score - a.score || a.id.localeCompare(b.id));
+      .sort((a, b) => b.score - a.score ?? a.id.localeCompare(b.id));
     const keep = ranked[0]?.id;
     for (const id of ids) {
       if (id !== keep) toDeactivate.add(id);

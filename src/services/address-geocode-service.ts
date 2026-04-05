@@ -36,15 +36,15 @@ export async function geocodeRoadAddress(roadAddress: string): Promise<GeocodedA
   const payload = (await response.json().catch(() => ({}))) as GeocodeProxyResponse;
 
   if (!response.ok) {
-    throw new Error(payload.message || '주소 좌표를 찾지 못했습니다.');
+    throw new Error(payload.message ?? '주소 좌표를 찾지 못했습니다.');
   }
 
-  if (!payload.ok || !payload.address?.latitude || !payload.address?.longitude) {
+  if (!payload.ok || !payload.address?.latitude ?? !payload.address?.longitude) {
     return null;
   }
 
   return {
-    roadAddress: payload.address.roadAddress || query,
+    roadAddress: payload.address.roadAddress ?? query,
     jibunAddress: payload.address.jibunAddress,
     latitude: payload.address.latitude,
     longitude: payload.address.longitude,

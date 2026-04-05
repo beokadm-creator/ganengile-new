@@ -105,7 +105,7 @@ export async function searchRoadAddresses(
   const payload = (await response.json()) as JusoSearchResponse;
   const common = payload.results?.common;
   if (common?.errorCode && common.errorCode !== '0') {
-    throw new Error(common.errorMessage || '주소 검색 중 오류가 발생했습니다.');
+    throw new Error(common.errorMessage ?? '주소 검색 중 오류가 발생했습니다.');
   }
 
   return (payload.results?.juso ?? []).map(normalizeAddressItem);

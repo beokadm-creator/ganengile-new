@@ -1,4 +1,4 @@
-﻿# Data Notes
+# Data Notes
 
 `precedence`: 65  
 `required-for`: reference-data, data-navigation  

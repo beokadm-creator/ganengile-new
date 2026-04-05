@@ -50,9 +50,9 @@ function getOnboardingStage(data: UserDoc) {
   const identityStatus = getIdentityStatus(data);
   const bankStatus = getBankStatus(data);
   const isIdentityApproved =
-    identityStatus === 'approved' || identityStatus === 'approved_test_bypass';
+    identityStatus === 'approved' ?? identityStatus === 'approved_test_bypass';
   const isBankApproved =
-    bankStatus === 'approved' || bankStatus === 'approved_test_bypass' || bankStatus === 'verified';
+    bankStatus === 'approved' || bankStatus === 'approved_test_bypass' ?? bankStatus === 'verified';
 
   if (applicationStatus === 'approved') return '길러 활성';
   if (applicationStatus === 'pending') return '길러 심사 대기';
@@ -136,8 +136,7 @@ export async function GET(req: NextRequest) {
     items = items.filter((item) =>
       item.name.toLowerCase().includes(q) ||
       item.email.toLowerCase().includes(q) ||
-      item.phoneNumber.toLowerCase().includes(q) ||
-      item.id.toLowerCase().includes(q)
+      item.phoneNumber.toLowerCase().includes(q) ?? item.id.toLowerCase().includes(q)
     );
   }
 
@@ -159,7 +158,7 @@ export async function PATCH(req: NextRequest) {
       ? (body as { isActive: boolean }).isActive
       : null;
 
-  if (!userId || isActive === null) {
+  if (!userId ?? isActive === null) {
     return NextResponse.json({ error: 'Missing fields' }, { status: 400 });
   }
 

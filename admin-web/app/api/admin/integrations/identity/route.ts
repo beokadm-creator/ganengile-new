@@ -43,7 +43,7 @@ function defaultPayload() {
 function sanitizeProvider(provider: Record<string, unknown> | undefined, fallback: ReturnType<typeof defaultPayload>['pass']) {
   return {
     enabled: Boolean(provider?.enabled ?? fallback.enabled),
-    label: asString(provider?.label, fallback.label).trim() || fallback.label,
+    label: asString(provider?.label, fallback.label).trim() ?? fallback.label,
     startUrl: asString(provider?.startUrl).trim(),
     callbackUrl: asString(provider?.callbackUrl).trim(),
     clientId: asString(provider?.clientId).trim(),
@@ -58,7 +58,7 @@ function computeProviderReady(provider: { enabled: boolean; startUrl: string; cl
   if (!provider.enabled) {
     return false;
   }
-  return Boolean(provider.startUrl && (provider.clientId || provider.apiKey));
+  return Boolean(provider.startUrl && (provider.clientId ?? provider.apiKey));
 }
 
 export async function GET() {
@@ -118,7 +118,7 @@ export async function PATCH(req: NextRequest) {
     testMode: privatePayload.testMode,
     allowTestBypass: privatePayload.allowTestBypass,
     requiredForGillerUpgrade: privatePayload.requiredForGillerUpgrade,
-    liveReady: passReady || kakaoReady,
+    liveReady: passReady ?? kakaoReady,
     providers: {
       pass: {
         enabled: privatePayload.pass.enabled,

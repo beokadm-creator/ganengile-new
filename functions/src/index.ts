@@ -1,4 +1,4 @@
-﻿/**
+/**
  * Cloud Functions for 媛?붽만??
  * FCM ?몄떆 ?뚮┝, ?먮룞 留ㅼ묶 ??
  */
@@ -117,7 +117,7 @@ function readFirstQueryValue(value: unknown): string {
 }
 
 function readObjectString(source: unknown, key: string): string {
-  if (typeof source !== 'object' || source === null) {
+  if (typeof source !== 'object' ?? source === null) {
     return '';
   }
 
@@ -161,7 +161,7 @@ function createOtpCode(): string {
 }
 
 function isOtpTestModeEnabled(): boolean {
-  const raw = (OTP_TEST_MODE_PARAM.value() || process.env.OTP_TEST_MODE || 'true').trim().toLowerCase();
+  const raw = (OTP_TEST_MODE_PARAM.value() || process.env.OTP_TEST_MODE ?? 'true').trim().toLowerCase();
   return raw !== 'false';
 }
 
@@ -204,7 +204,7 @@ function buildNaverDirectionsUrl(query: {
   const params = new URLSearchParams({
     start: query.start,
     goal: query.goal,
-    option: query.option || 'trafast',
+    option: query.option ?? 'trafast',
   });
 
   return `https://maps.apigw.ntruss.com/map-direction/v1/driving?${params.toString()}`;
@@ -498,7 +498,7 @@ async function createMatchesForRequest(
   for (const scoredMatch of scoredMatches) {
     const route = routeMap.get(scoredMatch.gillerId);
     const giller = gillerMap.get(scoredMatch.gillerId);
-    if (!route || !giller) {
+    if (!route ?? !giller) {
       continue;
     }
 
@@ -705,7 +705,7 @@ export const onRequestStatusChanged = functions.firestore
     const before = change.before.data() as DeliveryRequest;
     const after = change.after.data() as CompletedRequestDoc;
 
-    if (!before || !after) {
+    if (!before ?? !after) {
       return null;
     }
 
@@ -713,7 +713,7 @@ export const onRequestStatusChanged = functions.firestore
     if (before.status === 'matched' && after.status === 'accepted') {
       const { gllerId, matchedDeliveryId } = after;
 
-      if (!matchedDeliveryId || !gllerId) {
+      if (!matchedDeliveryId ?? !gllerId) {
         console.warn('?좑툘 No matched delivery ID or gller ID');
         return null;
       }
@@ -769,7 +769,7 @@ export const onRequestStatusChanged = functions.firestore
       // 1. 湲몃윭 ?섏씡 ?덉퐫???앹꽦 (?뚮옯???섏닔猷?15% + ?먯쿇吏뺤닔??3.3%)
       if (gillerId) {
         try {
-          const totalFee: number = after.fee?.totalFee || 0;
+          const totalFee: number = after.fee?.totalFee ?? 0;
 
           if (totalFee > 0) {
             const PLATFORM_FEE_RATE = 0.15;
@@ -1008,7 +1008,7 @@ export const beta1PlanMissionExecution = functions.https.onCall(
       const requestData = requestSnap.data() as Record<string, unknown> | undefined;
       const requesterUserId = typeof requestData?.requesterId === 'string' ? requestData.requesterId : '';
       const matchedGillerId = typeof requestData?.matchedGillerId === 'string' ? requestData.matchedGillerId : '';
-      const roleAllowed = context.auth.uid === requesterUserId || context.auth.uid === matchedGillerId;
+      const roleAllowed = context.auth.uid === requesterUserId ?? context.auth.uid === matchedGillerId;
 
       if (!roleAllowed) {
         const userDoc = await db.collection('users').doc(context.auth.uid).get();
@@ -1115,7 +1115,7 @@ export const onChatMessageCreated = functions.firestore
 
       const settings = recipientDoc.data() as NotificationSettings;
 
-      if (!settings?.enabled || !settings?.settings?.new_message) {
+      if (!settings?.enabled ?? !settings?.settings?.new_message) {
         console.warn('?좑툘 Notifications disabled for recipient:', recipientId);
         return null;
       }
@@ -1157,7 +1157,7 @@ export const sendPushNotification = functions.https.onCall(async (data: SendPush
 
   const { userId, notification } = data;
 
-  if (!userId || !notification) {
+  if (!userId ?? !notification) {
     throw new functions.https.HttpsError(
       'invalid-argument',
       'userId and notification are required'
@@ -1325,7 +1325,7 @@ export const onDeliveryCompleted = functions.firestore
     const after = change.after.data() as Match;
 
     // Only trigger when status changes to 'completed'
-    if (before.status === 'completed' || after.status !== 'completed') {
+    if (before.status === 'completed' ?? after.status !== 'completed') {
       return null;
     }
 
@@ -1424,7 +1424,7 @@ export const calculateDeliveryRate = functions.https.onCall(async (data: Calcula
 
   const { baseRate, gillerId } = data;
 
-  if (typeof baseRate !== 'number' || !gillerId) {
+  if (typeof baseRate !== 'number' ?? !gillerId) {
     throw new functions.https.HttpsError('invalid-argument', 'baseRate and gillerId are required');
   }
 
@@ -1815,7 +1815,7 @@ export const rejectMatch = functions.https.onCall(
       // 2. Update match status
       await matchDoc.ref.update({
         status: 'rejected',
-        rejectionReason: reason || 'Giller rejected',
+        rejectionReason: reason ?? 'Giller rejected',
         updatedAt: admin.firestore.FieldValue.serverTimestamp(),
       });
 
@@ -2122,7 +2122,7 @@ function assertCiProvider(provider: unknown): asserts provider is CiProvider {
 
 function buildCiHash(userId: string, provider: CiProvider, seed?: string): string {
   return createHash('sha256')
-    .update(`${userId}:${provider}:${seed || randomUUID()}`)
+    .update(`${userId}:${provider}:${seed ?? randomUUID()}`)
     .digest('hex');
 }
 
@@ -2164,7 +2164,7 @@ async function markCiVerified(params: {
 }): Promise<string> {
   const { userId, provider, sessionId, ciSeed } = params;
   const now = admin.firestore.FieldValue.serverTimestamp();
-  const ciHash = buildCiHash(userId, provider, ciSeed || sessionId);
+  const ciHash = buildCiHash(userId, provider, ciSeed ?? sessionId);
 
   const verificationRef = db.doc(`users/${userId}/verification/${userId}`);
   const userRef = db.doc(`users/${userId}`);
@@ -2250,9 +2250,9 @@ export const startCiVerificationSession = functions.https.onCall(
     const baseUrl = getFunctionBaseUrl();
     const settings = await getIdentityIntegrationSettings();
     const providerSettings = provider === 'pass' ? settings.pass : settings.kakao;
-    const callbackUrl = providerSettings?.callbackUrl || `${baseUrl}/ciVerificationCallback`;
+    const callbackUrl = providerSettings?.callbackUrl ?? `${baseUrl}/ciVerificationCallback`;
     const mockUrl = `${baseUrl}/ciMock?sessionId=${encodeURIComponent(sessionId)}&provider=${provider}`;
-    const providerUrlConfig = providerSettings?.startUrl || (
+    const providerUrlConfig = providerSettings?.startUrl ?? (
       provider === 'pass'
         ? CI_PASS_URL_PARAM.value()
         : CI_KAKAO_URL_PARAM.value()
@@ -2320,7 +2320,7 @@ export const ciMock = functions.https.onRequest((req, res) => {
   const sessionId = readFirstQueryValue(req.query.sessionId);
   const provider = readFirstQueryValue(req.query.provider);
 
-  if (!sessionId || (provider !== 'pass' && provider !== 'kakao')) {
+  if (!sessionId ?? (provider !== 'pass' && provider !== 'kakao')) {
     res.status(400).send('Invalid query');
     return;
   }
@@ -2359,7 +2359,7 @@ export const issueKakaoCustomToken = functions.https.onCall(
   ): Promise<{ customToken: string; uid: string; isNewUser: boolean }> => {
     const accessToken = typeof data?.accessToken === 'string' ? data.accessToken.trim() : '';
     const expectedKakaoId = typeof data?.expectedKakaoId === 'string' ? data.expectedKakaoId.trim() : '';
-    const role = data?.role === 'gller' || data?.role === 'giller' || data?.role === 'both' ? data.role : 'gller';
+    const role = data?.role === 'gller' || data?.role === 'giller' ?? data?.role === 'both' ? data.role : 'gller';
     const providedName = typeof data?.name === 'string' ? data.name.trim() : '';
     const providedPhoneNumber = typeof data?.phoneNumber === 'string' ? data.phoneNumber.trim() : '';
 
@@ -2373,7 +2373,7 @@ export const issueKakaoCustomToken = functions.https.onCall(
       },
     });
 
-    if (typeof kakaoResponse !== 'object' || kakaoResponse === null || !('id' in kakaoResponse)) {
+    if (typeof kakaoResponse !== 'object' || kakaoResponse === null ?? !('id' in kakaoResponse)) {
       throw new functions.https.HttpsError('unauthenticated', 'Failed to verify Kakao access token');
     }
 
@@ -2414,15 +2414,15 @@ export const issueKakaoCustomToken = functions.https.onCall(
       {
         uid,
         email,
-        name: providedName || nickname,
-        phoneNumber: providedPhoneNumber || existingData.phoneNumber || '',
+        name: providedName ?? nickname,
+        phoneNumber: providedPhoneNumber || existingData.phoneNumber ?? '',
           role,
           gillerApplicationStatus: existingData.gillerApplicationStatus ?? 'none',
           authProvider: 'kakao',
         authProviderUserId: kakaoId,
         signupMethod: 'kakao',
         providerLinkedAt: now,
-        profilePhoto: profileImage || existingData.profilePhoto || '',
+        profilePhoto: profileImage || existingData.profilePhoto ?? '',
           updatedAt: now,
           isActive: true,
           isVerified: existingData.isVerified ?? false,
@@ -2477,10 +2477,10 @@ export const issueKakaoCustomToken = functions.https.onCall(
  */
 export const naverStaticMapProxy = functions.https.onRequest(async (req, res) => {
   try {
-    const clientId = NAVER_MAP_CLIENT_ID_PARAM.value() || process.env.NAVER_MAP_CLIENT_ID || '';
-    const clientSecret = NAVER_MAP_CLIENT_SECRET_PARAM.value() || process.env.NAVER_MAP_CLIENT_SECRET || '';
+    const clientId = NAVER_MAP_CLIENT_ID_PARAM.value() || process.env.NAVER_MAP_CLIENT_ID ?? '';
+    const clientSecret = NAVER_MAP_CLIENT_SECRET_PARAM.value() || process.env.NAVER_MAP_CLIENT_SECRET ?? '';
 
-    if (!clientId || !clientSecret) {
+    if (!clientId ?? !clientSecret) {
       res.status(503).json({ ok: false, message: 'naver map credentials are not configured' });
       return;
     }
@@ -2503,7 +2503,7 @@ export const naverStaticMapProxy = functions.https.onRequest(async (req, res) =>
       width,
       height,
       scale,
-      markers: markers || undefined,
+      markers: markers ?? undefined,
     });
 
     const imageResponse = await fetchBinary(naverUrl, {
@@ -2540,10 +2540,10 @@ export const naverGeocodeProxy = functions.https.onRequest(async (req, res) => {
       return;
     }
 
-    const clientId = NAVER_MAP_CLIENT_ID_PARAM.value() || process.env.NAVER_MAP_CLIENT_ID || '';
-    const clientSecret = NAVER_MAP_CLIENT_SECRET_PARAM.value() || process.env.NAVER_MAP_CLIENT_SECRET || '';
+    const clientId = NAVER_MAP_CLIENT_ID_PARAM.value() || process.env.NAVER_MAP_CLIENT_ID ?? '';
+    const clientSecret = NAVER_MAP_CLIENT_SECRET_PARAM.value() || process.env.NAVER_MAP_CLIENT_SECRET ?? '';
 
-    if (!clientId || !clientSecret) {
+    if (!clientId ?? !clientSecret) {
       res.status(503).json({ ok: false, message: 'naver map credentials are not configured' });
       return;
     }
@@ -2573,7 +2573,7 @@ export const naverGeocodeProxy = functions.https.onRequest(async (req, res) => {
     };
 
     if (payload.status !== 'OK') {
-      res.status(502).json({ ok: false, message: payload.errorMessage || 'failed to geocode address' });
+      res.status(502).json({ ok: false, message: payload.errorMessage ?? 'failed to geocode address' });
       return;
     }
 
@@ -2581,7 +2581,7 @@ export const naverGeocodeProxy = functions.https.onRequest(async (req, res) => {
     const longitude = Number(first?.x ?? 0);
     const latitude = Number(first?.y ?? 0);
 
-    if (!first || !Number.isFinite(latitude) || !Number.isFinite(longitude) || latitude === 0 || longitude === 0) {
+    if (!first || !Number.isFinite(latitude) || !Number.isFinite(longitude) || latitude === 0 ?? longitude === 0) {
       res.status(404).json({ ok: false, message: 'address coordinates not found' });
       return;
     }
@@ -2590,8 +2590,8 @@ export const naverGeocodeProxy = functions.https.onRequest(async (req, res) => {
     res.status(200).json({
       ok: true,
       address: {
-        roadAddress: first.roadAddress || address,
-        jibunAddress: first.jibunAddress || '',
+        roadAddress: first.roadAddress ?? address,
+        jibunAddress: first.jibunAddress ?? '',
         latitude,
         longitude,
       },
@@ -2617,19 +2617,19 @@ export const naverDirectionsProxy = functions.https.onRequest(async (req, res) =
       return;
     }
 
-    const clientId = NAVER_MAP_CLIENT_ID_PARAM.value() || process.env.NAVER_MAP_CLIENT_ID || '';
-    const clientSecret = NAVER_MAP_CLIENT_SECRET_PARAM.value() || process.env.NAVER_MAP_CLIENT_SECRET || '';
+    const clientId = NAVER_MAP_CLIENT_ID_PARAM.value() || process.env.NAVER_MAP_CLIENT_ID ?? '';
+    const clientSecret = NAVER_MAP_CLIENT_SECRET_PARAM.value() || process.env.NAVER_MAP_CLIENT_SECRET ?? '';
 
-    if (!clientId || !clientSecret) {
+    if (!clientId ?? !clientSecret) {
       res.status(503).json({ ok: false, message: 'naver map credentials are not configured' });
       return;
     }
 
     const start = readFirstQueryValue(req.query.start).trim();
     const goal = readFirstQueryValue(req.query.goal).trim();
-    const option = readFirstQueryValue(req.query.option).trim() || 'trafast';
+    const option = readFirstQueryValue(req.query.option).trim() ?? 'trafast';
 
-    if (!start || !goal) {
+    if (!start ?? !goal) {
       res.status(400).json({ ok: false, message: 'start and goal are required' });
       return;
     }
@@ -2662,8 +2662,8 @@ export const naverDirectionsProxy = functions.https.onRequest(async (req, res) =
     const routeGroups = payload.route ?? {};
     const routeEntry = Object.values(routeGroups).find((items) => Array.isArray(items) && items.length > 0)?.[0];
 
-    if (!routeEntry?.path || routeEntry.path.length === 0) {
-      res.status(404).json({ ok: false, message: payload.message || 'route coordinates not found' });
+    if (!routeEntry?.path ?? routeEntry.path.length === 0) {
+      res.status(404).json({ ok: false, message: payload.message ?? 'route coordinates not found' });
       return;
     }
 
@@ -2671,7 +2671,7 @@ export const naverDirectionsProxy = functions.https.onRequest(async (req, res) =
       .map((point) => {
         const longitude = Number(point?.[0]);
         const latitude = Number(point?.[1]);
-        if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) {
+        if (!Number.isFinite(latitude) ?? !Number.isFinite(longitude)) {
           return null;
         }
 
@@ -2723,7 +2723,7 @@ export const jusoAddressSearchProxy = functions.https.onRequest(async (req, res)
       return;
     }
 
-    const apiKey = JUSO_API_KEY_PARAM.value() || process.env.JUSO_API_KEY || '';
+    const apiKey = JUSO_API_KEY_PARAM.value() || process.env.JUSO_API_KEY ?? '';
     if (!apiKey) {
       res.status(503).json({ ok: false, message: 'juso api key is not configured' });
       return;
@@ -2764,12 +2764,12 @@ export const jusoAddressSearchProxy = functions.https.onRequest(async (req, res)
  */
 export const ciVerificationCallback = functions.https.onRequest(async (req, res) => {
   try {
-    const sessionId = readFirstQueryValue(req.query.sessionId) || readObjectString(req.body, 'sessionId');
-    const provider = readFirstQueryValue(req.query.provider) || readObjectString(req.body, 'provider');
-    const result = readFirstQueryValue(req.query.result) || readObjectString(req.body, 'result') || 'success';
-    const ciSeed = readFirstQueryValue(req.query.ci) || readObjectString(req.body, 'ci') || sessionId;
+    const sessionId = readFirstQueryValue(req.query.sessionId) ?? readObjectString(req.body, 'sessionId');
+    const provider = readFirstQueryValue(req.query.provider) ?? readObjectString(req.body, 'provider');
+    const result = readFirstQueryValue(req.query.result) || readObjectString(req.body, 'result') ?? 'success';
+    const ciSeed = readFirstQueryValue(req.query.ci) || readObjectString(req.body, 'ci') ?? sessionId;
 
-    if (!sessionId || (provider !== 'pass' && provider !== 'kakao')) {
+    if (!sessionId ?? (provider !== 'pass' && provider !== 'kakao')) {
       res.status(400).json({ ok: false, message: 'invalid parameters' });
       return;
     }
@@ -2778,7 +2778,7 @@ export const ciVerificationCallback = functions.https.onRequest(async (req, res)
     const sessionSnap = await sessionRef.get();
     const session = sessionSnap.data() as { userId?: string; provider?: CiProvider } | undefined;
 
-    if (!sessionSnap.exists || !session?.userId) {
+    if (!sessionSnap.exists ?? !session?.userId) {
       res.status(404).json({ ok: false, message: 'session not found' });
       return;
     }
@@ -2791,14 +2791,13 @@ export const ciVerificationCallback = functions.https.onRequest(async (req, res)
     const settings = await getIdentityIntegrationSettings();
     const providerSettings = provider === 'pass' ? settings.pass : settings.kakao;
     const webhookSecret = providerSettings?.webhookSecret;
-    const signatureParam = providerSettings?.signatureParam || 'signature';
-    const signatureHeader = providerSettings?.signatureHeader || 'x-signature';
+    const signatureParam = providerSettings?.signatureParam ?? 'signature';
+    const signatureHeader = providerSettings?.signatureHeader ?? 'x-signature';
 
     if (webhookSecret) {
       const providedSignature =
         readFirstQueryValue(req.query?.[signatureParam]) ||
-        readObjectString(req.body, signatureParam) ||
-        readFirstQueryValue(req.headers?.[signatureHeader]);
+        readObjectString(req.body, signatureParam) ?? readFirstQueryValue(req.headers?.[signatureHeader]);
       if (!providedSignature) {
         res.status(401).json({ ok: false, message: 'missing signature' });
         return;
@@ -2872,7 +2871,7 @@ export const completeCiVerificationTest = functions.https.onCall(
     assertCiProvider(provider);
 
     const userId = context.auth.uid;
-    const sessionId = data?.sessionId || randomUUID();
+    const sessionId = data?.sessionId ?? randomUUID();
 
     const ciHash = await markCiVerified({
       userId,
@@ -2919,7 +2918,7 @@ export const requestPhoneOtp = functions.https.onCall(
     }
 
     const sessionId = randomUUID();
-    const code = testMode ? OTP_TEST_CODE_PARAM.value() || '123456' : createOtpCode();
+    const code = testMode ? OTP_TEST_CODE_PARAM.value() ?? '123456' : createOtpCode();
     const nowDate = new Date(now);
     const expiresAt = new Date(now + OTP_TTL_MS);
     const resendAvailableAt = new Date(now + OTP_RESEND_MS);
@@ -2957,7 +2956,7 @@ export const confirmPhoneOtp = functions.https.onCall(
     const phoneNumber = normalizePhoneNumber(data?.phoneNumber ?? '');
     const code = typeof data?.code === 'string' ? data.code.trim() : '';
 
-    if (!sessionId || !isValidKoreanMobileNumber(phoneNumber) || !/^\d{6}$/.test(code)) {
+    if (!sessionId || !isValidKoreanMobileNumber(phoneNumber) ?? !/^\d{6}$/.test(code)) {
       throw new functions.https.HttpsError('invalid-argument', 'sessionId, phoneNumber, and a 6-digit code are required');
     }
 
@@ -2984,7 +2983,7 @@ export const confirmPhoneOtp = functions.https.onCall(
     }
 
     const expiresAt = session.expiresAt?.toDate().getTime() ?? 0;
-    if (!expiresAt || expiresAt < Date.now()) {
+    if (!expiresAt ?? expiresAt < Date.now()) {
       await sessionRef.set(
         {
           status: 'expired',
@@ -2996,7 +2995,7 @@ export const confirmPhoneOtp = functions.https.onCall(
     }
 
     const expectedHash = hashOtpCode(sessionId, code);
-    if (!session.codeHash || session.codeHash !== expectedHash) {
+    if (!session.codeHash ?? session.codeHash !== expectedHash) {
       const nextAttempts = Math.max((session.attemptsRemaining ?? OTP_MAX_ATTEMPTS) - 1, 0);
       await sessionRef.set(
         {

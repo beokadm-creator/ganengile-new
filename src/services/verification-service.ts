@@ -36,7 +36,7 @@ export async function getUserVerification(
     const verificationRef = doc(db, 'users', userId, VERIFICATION_COLLECTION, userId);
     const docSnapshot = await getDoc(verificationRef);
 
-    if (!docSnapshot.exists) {
+    if (!docSnapshot.exists()) {
       return null;
     }
 
@@ -46,8 +46,8 @@ export async function getUserVerification(
     }
 
     return {
-      userId: data.userId || userId,
-      status: data.status || 'pending',
+      userId: data.userId ?? userId,
+      status: data.status ?? 'pending',
       idCard: data.idCard,
       name: data.name,
       birthDate: data.birthDate,
@@ -152,7 +152,7 @@ export async function updateVerificationRecordStatus(
       updatedAt: serverTimestamp(),
     };
 
-    if (status === 'under_review' || status === 'approved' || status === 'rejected') {
+    if (status === 'under_review' || status === 'approved' ?? status === 'rejected') {
       updateData.reviewedAt = serverTimestamp();
       updateData.reviewedBy = reviewedBy;
     }
@@ -284,7 +284,7 @@ async function tryStartCiVerificationCallable(
       callbackUrl?: string;
     };
     return {
-      provider: data.provider || provider,
+      provider: data.provider ?? provider,
       redirectUrl: data.redirectUrl,
       sessionId: data.sessionId,
       callbackUrl: data.callbackUrl,
@@ -296,8 +296,11 @@ async function tryStartCiVerificationCallable(
 }
 
 function buildProviderRedirectUrl(provider: VerificationProvider, userId: string): string | undefined {
-  const passUrl = process.env.EXPO_PUBLIC_PASS_VERIFY_URL;
-  const kakaoUrl = process.env.EXPO_PUBLIC_KAKAO_VERIFY_URL;
+const passUrl = process.env.EXPO_PUBLIC_PASS_VERIFY_URL;
+const kakaoUrl = process.env.EXPO_PUBLIC_KAKAO_VERIFY_URL;
+if (!passUrl || !kakaoUrl) {
+  console.warn('[verification-service] verify URL env missing:', { passUrl: !!passUrl, kakaoUrl: !!kakaoUrl });
+}
   const baseUrl = provider === 'pass' ? passUrl : kakaoUrl;
   if (!baseUrl) return undefined;
 
@@ -363,7 +366,7 @@ export function getVerificationStatusDisplay(
         statusKo: '반려',
         icon: '❌',
         color: '#F44336',
-        description: verification.rejectionReason || '인증이 반려되었습니다',
+        description: verification.rejectionReason ?? '인증이 반려되었습니다',
       };
     default:
       return {

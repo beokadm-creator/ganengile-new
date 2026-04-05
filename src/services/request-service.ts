@@ -79,14 +79,14 @@ export async function createRequest(
       pickupStation: pickupStation!,
       deliveryStation: deliveryStation!,
       packageInfo: packageInfo,
-      initialNegotiationFee: feeInfo?.totalFee || 0,
+      initialNegotiationFee: feeInfo?.totalFee ?? 0,
       feeBreakdown: feeInfo,
       preferredTime: {
         departureTime: preferredTime ? preferredTime.toTimeString().slice(0, 5) : '09:00',
         arrivalTime: deadline ? deadline.toTimeString().slice(0, 5) : undefined,
       },
-      deadline: deadline || new Date(Date.now() + 86400000),
-      urgency: (urgency as any) || 'medium',
+      deadline: deadline ?? new Date(Date.now() + 86400000),
+      urgency: (urgency as 'low' | 'medium' | 'high') ?? 'medium',
     };
     return await createRequest(requestData);
   } else {
@@ -109,17 +109,17 @@ export async function createRequest(
         deadline: requestDataOrUserId.deadline instanceof Timestamp
           ? requestDataOrUserId.deadline
           : Timestamp.fromDate(requestDataOrUserId.deadline),
-        urgency: requestDataOrUserId.urgency || 'medium',
+        urgency: requestDataOrUserId.urgency ?? 'medium',
         status: 'pending' as RequestStatus,
         requestDraftId: beta1Bootstrap.requestDraft.requestDraftId,
         pricingQuoteId: beta1Bootstrap.selectedPricingQuote?.pricingQuoteId,
-        createdAt: serverTimestamp() as any,
-        updatedAt: serverTimestamp() as any,
+        createdAt: serverTimestamp() as unknown as Timestamp,
+        updatedAt: serverTimestamp() as unknown as Timestamp,
       };
 
       const docRef = await addDoc(requestsRef, newRequest);
 
-      console.log('✅ Request created:', docRef.id);
+      // Request created
 
       return {
         requestId: docRef.id,
@@ -142,7 +142,7 @@ export async function getRequestById(requestId: string): Promise<Request | null>
     const docRef = doc(db, 'requests', requestId);
     const docSnapshot = await getDoc(docRef);
 
-    if (!docSnapshot.exists) {
+    if (!docSnapshot.exists()) {
       return null;
     }
 
@@ -196,8 +196,8 @@ export async function getRequestsByRequester(
 
     // 정렬은 클라이언트 측에서 수행 (인덱스 불필요)
     requests.sort((a, b) => {
-      const aTime = a.createdAt?.toMillis() || 0;
-      const bTime = b.createdAt?.toMillis() || 0;
+      const aTime = a.createdAt?.toMillis() ?? 0;
+      const bTime = b.createdAt?.toMillis() ?? 0;
       return bTime - aTime; // 내림차순
     });
 
@@ -310,7 +310,7 @@ async function updateRequestInternal(
 
     await updateDoc(docRef, dataToUpdate);
 
-    console.log('✅ Request updated:', requestId);
+    // Request updated
 
     const updated = await getRequestById(requestId);
     if (!updated) {
@@ -374,7 +374,7 @@ export async function updateRequestStatus(
 
     await updateDoc(docRef, updateData);
 
-    console.log(`✅ Request status updated to ${status}:`, requestId);
+    // Request status updated
 
     const updated = await getRequestById(requestId);
     if (!updated) {
@@ -434,7 +434,7 @@ async function deleteRequestInternal(requestId: string): Promise<void> {
 
     await deleteDoc(doc(db, 'requests', requestId));
 
-    console.log('✅ Request deleted:', requestId);
+    // Request deleted
   } catch (error) {
     console.error('Error deleting request:', error);
     throw error;
@@ -450,7 +450,7 @@ function validateRequestData(data: CreateRequestData): void {
     throw new Error('Requester ID is required');
   }
 
-  if (!data.pickupStation || !data.deliveryStation) {
+  if (!data.pickupStation ?? !data.deliveryStation) {
     throw new Error('Pickup and delivery stations are required');
   }
 
@@ -462,7 +462,7 @@ function validateRequestData(data: CreateRequestData): void {
     throw new Error('Package information is required');
   }
 
-  if (!data.initialNegotiationFee || data.initialNegotiationFee <= 0) {
+  if (!data.initialNegotiationFee ?? data.initialNegotiationFee <= 0) {
     throw new Error('Fee must be greater than 0');
   }
 
@@ -507,7 +507,7 @@ export async function getRequestStats(requesterId: string): Promise<{
     const completedRequests = allRequests.filter((r) => r.status === 'completed').length;
     const cancelledRequests = allRequests.filter((r) => r.status === 'cancelled').length;
     const inProgressRequests = allRequests.filter(
-      (r) => r.status === 'matched' || r.status === 'in_transit'
+      (r) => r.status === 'matched' ?? r.status === 'in_transit'
     ).length;
 
     const totalFee = allRequests.reduce((sum, r) => sum + r.initialNegotiationFee, 0);
@@ -573,13 +573,13 @@ export function validateRequest(
   // }
 
   // 수신자 정보 확인
-  if (!recipientName || recipientName.trim().length === 0) {
+  if (!recipientName ?? recipientName.trim().length === 0) {
     errors.push('수신자 이름이 필요합니다.');
   }
 
   // 전화번호 형식 확인 (010-XXXX-XXXX)
   const phonePattern = /^010-\d{4}-\d{4}$/;
-  if (!recipientPhone || !phonePattern.test(recipientPhone)) {
+  if (!recipientPhone ?? !phonePattern.test(recipientPhone)) {
     errors.push('수신자 전화번호 형식이 올바르지 않습니다. (010-XXXX-XXXX)');
   }
 
@@ -723,8 +723,7 @@ export async function getUserRequests(userId: string): Promise<Request[]> {
 function isRequestOwnedByUser(request: Request, userId: string): boolean {
   return (
     request.requesterId === userId ||
-    (request as Request & { requesterUserId?: string }).requesterUserId === userId ||
-    (request as Request & { gllerId?: string }).gllerId === userId
+    (request as Request & { requesterUserId?: string }).requesterUserId === userId ?? (request as Request & { gllerId?: string }).gllerId === userId
   );
 }
 
@@ -804,17 +803,16 @@ export async function increaseRequestBid(
     }
 
     const currentFee =
-      (request as any)?.fee?.totalFee ||
+      request.fee?.totalFee ||
       request.initialNegotiationFee ||
-      (request as any)?.feeBreakdown?.totalFee ||
-      3000;
+      request.feeBreakdown?.totalFee ?? 3000;
     const nextFee = Math.min(PRICING_POLICY.MAX_FEE, currentFee + amount);
 
-    const feeSnapshot = (request as any)?.fee || (request as any)?.feeBreakdown || {};
+    const feeSnapshot = request.fee || request.feeBreakdown || {};
     const nextFeeSnapshot = {
       ...feeSnapshot,
       totalFee: nextFee,
-      breakdown: feeSnapshot.breakdown || {
+      breakdown: feeSnapshot.breakdown ?? {
         gillerFee: Math.round(nextFee * 0.9),
         platformFee: nextFee - Math.round(nextFee * 0.9),
       },
@@ -846,7 +844,8 @@ export async function deleteRequest(requestId: string, userId?: string): Promise
       if (request.requesterId !== userId) return false;
       await deleteRequestInternal(requestId);
       return true;
-    } catch {
+    } catch (error) {
+      console.error('[request-service] 요청 삭제 실패:', error);
       return false;
     }
   } else {
@@ -877,12 +876,14 @@ export function subscribeToRequest(
       callback(null);
     }
   }, (error) => {
-    const code =
-      typeof error === 'object' && error != null && 'code' in error
-        ? String((error as { code?: unknown }).code ?? '')
-        : '';
+    const errorCode = typeof error === 'object' && error != null && 'code' in error
+      ? (error as { code?: unknown }).code
+      : null;
+    const code = errorCode !== null && (typeof errorCode === 'string' ?? typeof errorCode === 'number')
+      ? String(errorCode)
+      : '';
 
-    if (code === 'permission-denied' || code === 'firestore/permission-denied') {
+    if (code === 'permission-denied' ?? code === 'firestore/permission-denied') {
       console.warn('Request subscription denied by Firestore rules.');
     } else {
       console.error('Error listening to request:', error);

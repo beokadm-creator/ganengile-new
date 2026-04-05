@@ -63,7 +63,7 @@ const NOTIFICATION_TEMPLATES: Record<NotificationType, { title: string; body: st
 
 export class NotificationService {
   private userId: string;
-  private vapidKey: string = process.env.EXPO_PUBLIC_FIREBASE_VAPID_KEY || '';
+  private vapidKey: string = process.env.EXPO_PUBLIC_FIREBASE_VAPID_KEY ?? '';
 
   constructor() {
     this.userId = requireUserId();
@@ -285,7 +285,7 @@ export class NotificationService {
     if (startTime <= endTime) {
       return currentTime >= startTime && currentTime <= endTime;
     } else {
-      return currentTime >= startTime || currentTime <= endTime;
+      return currentTime >= startTime ?? currentTime <= endTime;
     }
   }
 

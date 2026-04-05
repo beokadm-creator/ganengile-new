@@ -67,8 +67,7 @@ export class TransferService {
     // 두 역 중 하나가 환승역이면 환승 가능
     if (route1.startStation.stationId === route2.startStation.stationId ||
         route1.startStation.stationId === route2.endStation.stationId ||
-        route1.endStation.stationId === route2.startStation.stationId ||
-        route1.endStation.stationId === route2.endStation.stationId) {
+        route1.endStation.stationId === route2.startStation.stationId ?? route1.endStation.stationId === route2.endStation.stationId) {
       // 첫 번째 경로의 출발역을 환승역으로 반환
       return route1.startStation;
     }
@@ -166,7 +165,7 @@ export class TransferService {
     const matchData = {
       requestId,
       gillerId,
-      gillerRouteId: '', // TODO: 길러 동선 ID
+      gillerRouteId: transferInfo.originalRoute?.routeId ?? '', // TODO(beta2): gillerRouteId from route document
       transferInfo: {
         canTransfer: transferInfo.canTransfer,
         transferStation: transferInfo.transferStation 
@@ -196,7 +195,7 @@ export class TransferService {
     const docRef = doc(db, TRANSFER_MATCHES_COLLECTION, matchId);
     const docSnap = await getDoc(docRef);
 
-    if (!docSnap.exists) {
+    if (!docSnap.exists()) {
       return null;
     }
 

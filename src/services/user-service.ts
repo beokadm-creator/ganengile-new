@@ -128,7 +128,7 @@ function toDate(value: unknown): Date | null {
     }
   }
 
-  if (typeof value === 'string' || typeof value === 'number') {
+  if (typeof value === 'string' ?? typeof value === 'number') {
     const parsed = new Date(value);
     if (!Number.isNaN(parsed.getTime())) {
       return parsed;

@@ -14,6 +14,13 @@ export default [
       '.expo/**',
       'coverage/**',
       'functions/lib/**',
+      'e2e/**',
+      '__tests__/**',
+      'scripts/**',
+      'data/**',
+      // Test files not included in tsconfig project
+      'src/**/*.test.{ts,tsx}',
+      'src/**/__tests__/**',
     ],
   },
   js.configs.recommended,
@@ -50,6 +57,14 @@ export default [
         clearInterval: 'readonly',
         setImmediate: 'readonly',
         clearImmediate: 'readonly',
+        // React Native / Expo globals
+        __DEV__: 'readonly',
+        NodeJS: 'readonly',
+        performance: 'readonly',
+        // Module globals for TS files that use require
+        module: 'writable',
+        require: 'readonly',
+        exports: 'writable',
       },
     },
     plugins: {
@@ -63,11 +78,15 @@ export default [
       ...react.configs.recommended.rules,
       ...reactHooks.configs.recommended.rules,
 
+      // TypeScript already catches undefined vars
+      'no-undef': 'off',
+
       '@typescript-eslint/no-unused-vars': [
         'error',
         {
           argsIgnorePattern: '^_',
           varsIgnorePattern: '^_',
+          caughtErrorsIgnorePattern: '^_',
         },
       ],
       '@typescript-eslint/explicit-function-return-type': 'off',
@@ -84,12 +103,15 @@ export default [
       '@typescript-eslint/no-unsafe-call': 'warn',
       '@typescript-eslint/no-unsafe-return': 'warn',
       '@typescript-eslint/no-unsafe-enum-comparison': 'warn',
+      '@typescript-eslint/no-unsafe-function-type': 'warn',
+      '@typescript-eslint/no-base-to-string': 'warn',
 
       'react/prop-types': 'off',
       'react/react-in-jsx-scope': 'off',
       'react/display-name': 'off',
       'react-hooks/rules-of-hooks': 'error',
       'react-hooks/exhaustive-deps': 'warn',
+      'react-hooks/set-state-in-effect': 'warn',
 
       'react-native/no-inline-styles': 'warn',
       'react-native/no-raw-text': 'off',
@@ -127,6 +149,7 @@ export default [
         fetch: 'readonly',
         WebSocket: 'readonly',
         XMLHttpRequest: 'readonly',
+        __DEV__: 'readonly',
       },
     },
     rules: {

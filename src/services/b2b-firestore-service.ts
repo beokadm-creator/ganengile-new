@@ -77,7 +77,7 @@ export class B2BFirestoreService {
       // 캐싱 확인
       const cached = this.statsCache.get(cacheKey);
       if (cached && Date.now() - cached.timestamp < CACHE_DURATION) {
-        console.log('Returning cached monthly stats');
+        console.warn('Returning cached monthly stats');
         return cached.data;
       }
 
@@ -116,7 +116,7 @@ export class B2BFirestoreService {
       let totalAmount = 0;
       querySnapshot.forEach((doc) => {
         const data = doc.data();
-        totalAmount += data.pricing?.totalFee || 0;
+        totalAmount += data.pricing?.totalFee ?? 0;
       });
 
       const totalDeliveries = querySnapshot.size;
@@ -153,7 +153,7 @@ export class B2BFirestoreService {
       // 캐싱 확인
       const cached = this.invoicesCache.get(cacheKey);
       if (cached && Date.now() - cached.timestamp < CACHE_DURATION) {
-        console.log('Returning cached invoices');
+        console.warn('Returning cached invoices');
         return cached.data;
       }
 
@@ -171,11 +171,11 @@ export class B2BFirestoreService {
         const data = doc.data();
         invoices.push({
           id: doc.id,
-          invoiceNumber: data.invoiceNumber || '',
-          period: data.period || '',
-          totalAmount: data.totalAmount || 0,
-          status: data.status || 'issued',
-          issuedAt: data.issuedAt?.toDate().toISOString().split('T')[0] || '',
+          invoiceNumber: data.invoiceNumber ?? '',
+          period: data.period ?? '',
+          totalAmount: data.totalAmount ?? 0,
+          status: data.status ?? 'issued',
+          issuedAt: data.issuedAt?.toDate().toISOString().split('T')[0] ?? '',
         });
       });
 
@@ -204,7 +204,7 @@ export class B2BFirestoreService {
       // 캐싱 확인
       const cached = this.settlementsCache.get(cacheKey);
       if (cached && Date.now() - cached.timestamp < CACHE_DURATION) {
-        console.log('Returning cached settlements');
+        console.warn('Returning cached settlements');
         return cached.data;
       }
 
@@ -222,10 +222,10 @@ export class B2BFirestoreService {
         const data = doc.data();
         settlements.push({
           id: doc.id,
-          period: data.period || '',
-          totalAmount: data.totalAmount || 0,
-          status: data.status || 'pending',
-          transferredAt: data.transferredAt?.toDate().toISOString().split('T')[0] || '',
+          period: data.period ?? '',
+          totalAmount: data.totalAmount ?? 0,
+          status: data.status ?? 'pending',
+          transferredAt: data.transferredAt?.toDate().toISOString().split('T')[0] ?? '',
         });
       });
 
@@ -254,7 +254,7 @@ export class B2BFirestoreService {
       // 캐싱 확인
       const cached = this.recentDeliveriesCache.get(cacheKey);
       if (cached && Date.now() - cached.timestamp < CACHE_DURATION) {
-        console.log('Returning cached recent deliveries');
+        console.warn('Returning cached recent deliveries');
         return cached.data;
       }
 
@@ -357,7 +357,7 @@ export class B2BFirestoreService {
       }
     }
 
-    console.log('Cache invalidated for business:', businessId);
+    console.warn('Cache invalidated for business:', businessId);
   }
 
   /**
@@ -368,7 +368,7 @@ export class B2BFirestoreService {
     this.invoicesCache.clear();
     this.settlementsCache.clear();
     this.recentDeliveriesCache.clear();
-    console.log('All caches cleared');
+    console.warn('All caches cleared');
   }
 }
 

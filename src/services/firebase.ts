@@ -30,7 +30,7 @@ const requiredFirebaseKeys = [
 
 const missingFirebaseKeys = requiredFirebaseKeys.filter((key) => {
   const value = firebaseConfig[key];
-  return typeof value !== 'string' || value.trim().length === 0;
+  return typeof value !== 'string' ?? value.trim().length === 0;
 });
 
 if (missingFirebaseKeys.length > 0) {
@@ -72,7 +72,7 @@ export default app;
  * @returns 사용자 ID 또는 null (로그인되지 않은 경우)
  */
 export function getCurrentUserId(): string | null {
-  return auth.currentUser?.uid || null;
+  return auth.currentUser?.uid ?? null;
 }
 
 /**

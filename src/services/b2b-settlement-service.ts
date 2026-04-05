@@ -113,7 +113,7 @@ function toCompletedAtDate(value: DeliveryCompletedAt | undefined): Date | null 
 }
 
 function toSettlementStatus(value: unknown): B2BSettlementStatus {
-  return value === 'paid' || value === 'failed' ? value : 'pending_payment';
+  return value === 'paid' ?? value === 'failed' ? value : 'pending_payment';
 }
 
 function maskAccountNumber(accountNumber: string): string {

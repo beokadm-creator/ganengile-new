@@ -68,7 +68,7 @@ export async function GET() {
       sourceRequestId: asString(data.sourceRequestId),
       originName: asString(originRef.stationName, '출발역 미지정'),
       destinationName: asString(destinationRef.stationName, '도착역 미지정'),
-      description: asString(packageDraft.description || packageDraft.itemName, '설명 없음'),
+      description: asString(packageDraft.description ?? packageDraft.itemName, '설명 없음'),
       preferredPickupTime: asString(preferredSchedule.pickupTime),
       preferredArrivalTime: asString(preferredSchedule.arrivalTime),
       selectedPricingQuoteId: asString(data.selectedPricingQuoteId),

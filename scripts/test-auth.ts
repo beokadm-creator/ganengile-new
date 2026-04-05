@@ -33,8 +33,8 @@ const auth = getAuth(app);
 async function testEmailPasswordLogin() {
   console.log('\n📧 Testing Email/Password Login...\n');
 
-  const testEmail = process.env.TEST_USER_EMAIL || 'test@example.com';
-  const testPassword = process.env.TEST_USER_PASSWORD || 'test123456';
+  const testEmail = process.env.TEST_USER_EMAIL ?? 'test@example.com';
+  const testPassword = process.env.TEST_USER_PASSWORD ?? 'test123456';
 
   console.log(`  Email: ${testEmail}`);
 
@@ -99,9 +99,9 @@ async function testConfigRead(user: any) {
         const data = firstDoc.data();
 
         if (collectionName === 'config_stations') {
-          console.log(`   Sample: ${data.stationName || data.name || firstDoc.id}`);
+          console.log(`   Sample: ${data.stationName || data.name ?? firstDoc.id}`);
         } else if (collectionName === 'config_algorithm_params') {
-          console.log(`   Version: ${data.version || 'N/A'}`);
+          console.log(`   Version: ${data.version ?? 'N/A'}`);
         } else {
           console.log(`   Sample ID: ${firstDoc.id}`);
         }

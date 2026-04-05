@@ -31,9 +31,9 @@ export function testFirestoreConnection(): Promise<ConnectionState> {
       const unsubscribe = onSnapshot(
         q,
         (snapshot) => {
-          console.log('✅ Firestore 연결 성공');
-          console.log('📊 스냅샷 수:', snapshot.docs.length);
-          
+          // Firestore 연결 성공
+          // 스냅샷 수 logged
+
           state.connected = true;
           state.hasSnapshots = snapshot.docs.length > 0;
           
@@ -54,7 +54,7 @@ export function testFirestoreConnection(): Promise<ConnectionState> {
       setTimeout(() => {
         unsubscribe();
         if (!state.connected) {
-          console.warn('⚠️ 연결 시간 초과');
+          console.warn('Connection timeout');
           state.error = 'Connection timeout';
         }
         resolve(state);
@@ -73,10 +73,9 @@ export async function testNetworkConnection(): Promise<boolean> {
   try {
     const NetInfo = require('@react-native-community/netinfo').default;
     const state = await NetInfo.fetch();
-    
-    console.log('📡 네트워크 상태:', state.isConnected ? '연결됨' : '연결 안됨');
-    console.log('📡 네트워크 타입:', state.type);
-    
+
+    // 네트워크 상태 logged
+
     return state.isConnected === true;
   } catch {
     console.warn('⚠️ NetInfo를 사용할 수 없음');

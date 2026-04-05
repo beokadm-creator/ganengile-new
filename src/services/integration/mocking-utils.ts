@@ -139,7 +139,7 @@ class MockFirestore {
   // Seed test data
   seedData(collectionName: string, documents: any[]): void {
     documents.forEach((doc) => {
-      const docId = doc.id || `doc_${Date.now()}_${Math.random()}`;
+      const docId = doc.id ?? `doc_${Date.now()}_${Math.random()}`;
       this.data.set(this.getPath(collectionName, docId), {
         ...doc,
         _id: docId,

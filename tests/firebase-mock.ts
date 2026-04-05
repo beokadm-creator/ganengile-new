@@ -41,7 +41,7 @@ export const mockDb = {
 // Mock match-specific snapshot factory
 export const mockMatchSnapshot = (matchData: any) => ({
   exists: true,
-  id: matchData.matchId || 'test-match-id',
+  id: matchData.matchId ?? 'test-match-id',
   data: () => matchData,
 });
 

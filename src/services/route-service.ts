@@ -167,7 +167,7 @@ const cache = new RouteCache();
 // ==================== Helper Functions ====================
 
 function convertTimestampToDate(timestamp: { seconds: number; nanoseconds?: number }): Date {
-  return new Date(timestamp.seconds * 1000 + (timestamp.nanoseconds || 0) / 1000000);
+  return new Date(timestamp.seconds * 1000 + (timestamp.nanoseconds ?? 0) / 1000000);
 }
 
 function convertDateToTimestamp(date: Date): { seconds: number; nanoseconds: number } {
@@ -220,9 +220,9 @@ async function withRetry<T>(
       lastError = error as Error;
 
       const errorCode = (error as { code?: string })?.code;
-      const isNetworkError = !errorCode || errorCode === 'unavailable' || errorCode === 'deadline-exceeded';
+      const isNetworkError = !errorCode || errorCode === 'unavailable' ?? errorCode === 'deadline-exceeded';
 
-    if (!isNetworkError || attempt === maxRetries - 1) {
+    if (!isNetworkError ?? attempt === maxRetries - 1) {
       throw lastError ?? new Error('Unknown error occurred');
     }
 
@@ -242,7 +242,7 @@ function validateTimeFormat(time: string): boolean {
 }
 
 function validateDaysOfWeek(days: number[]): boolean {
-  if (!Array.isArray(days) || days.length === 0) {
+  if (!Array.isArray(days) ?? days.length === 0) {
     return false;
   }
 
@@ -306,7 +306,7 @@ function isCommuteTime(time: string): boolean {
   const minute = parseInt(minuteStr, 10);
 
   // 07:00 이전 또는 22:00 이후는 출퇴근 시간대 아님
-  if (hour < 7 || hour > 22) return false;
+  if (hour < 7 ?? hour > 22) return false;
   if (hour === 22 && minute > 0) return false;
 
   return true;
@@ -379,7 +379,7 @@ export function validateRoute(
   departureTime: string,
   daysOfWeek: number[]
 ): RouteValidationResult {
-  console.log('[RouteService] validateRoute called', { startStation, endStation, departureTime, daysOfWeek });
+  // RouteService validateRoute called
   const errors: string[] = [];
   const warnings: string[] = [];
 
@@ -394,12 +394,12 @@ export function validateRoute(
   }
 
   if (!validateStationInfo(startStation)) {
-    console.log('[RouteService] startStation validation failed');
+    console.warn('[RouteService] startStation validation failed');
     errors.push('🚫 출발역 정보가 올바르지 않습니다.');
   }
 
   if (!validateStationInfo(endStation)) {
-    console.log('[RouteService] endStation validation failed');
+    console.warn('[RouteService] endStation validation failed');
     errors.push('🚫 도착역 정보가 올바르지 않습니다.');
   }
 
@@ -428,18 +428,18 @@ export function validateRoute(
     errors.push('🚫 요일 정보가 올바르지 않습니다.\n\n1(월)~7(일) 사이의 숫자를 선택해주세요.');
   }
 
-  if (!daysOfWeek || daysOfWeek.length === 0) {
+  if (!daysOfWeek ?? daysOfWeek.length === 0) {
     errors.push('🚫 운영 요일을 선택해주세요.\n\n최소 1개 이상의 요일을 선택해야 합니다.');
   }
 
-  const hasWeekend = daysOfWeek?.some(day => day === 6 || day === 7);
+  const hasWeekend = daysOfWeek?.some(day => day === 6 ?? day === 7);
   const hasWeekday = daysOfWeek?.some(day => day >= 1 && day <= 5);
 
   if (hasWeekend && hasWeekday) {
     warnings.push('ℹ️ 평일과 주말이 모두 포함되어 있습니다.\n\n주말 출퇴근 경로가 맞는지 확인해주세요.');
   }
 
-  console.log('[RouteService] validation result:', { isValid: errors.length === 0, errors, warnings });
+  // RouteService validation result completed
   return {
     isValid: errors.length === 0,
     errors,
@@ -811,7 +811,7 @@ export async function getUserActiveRoutes(userId: string): Promise<Route[]> {
  * @returns 해당 요일의 활성 경로 목록
  */
 export async function getActiveRoutesForDay(userId: string, dayOfWeek: number): Promise<Route[]> {
-  if (dayOfWeek < 1 || dayOfWeek > 7) {
+  if (dayOfWeek < 1 ?? dayOfWeek > 7) {
     throw new Error('요일은 1-7 사이여야 합니다.');
   }
 
@@ -842,7 +842,7 @@ export async function getRoutesByStation(stationId: string): Promise<StationRout
 
     snapshot.forEach((docSnapshot) => {
       const route = convertRoute(docSnapshot.data(), docSnapshot.id);
-      if (route.startStation.stationId === stationId || route.endStation.stationId === stationId) {
+      if (route.startStation.stationId === stationId ?? route.endStation.stationId === stationId) {
         routes.push(route);
       }
     });
@@ -851,7 +851,7 @@ export async function getRoutesByStation(stationId: string): Promise<StationRout
       stationId,
       stationName: routes[0]?.startStation.stationId === stationId
         ? routes[0].startStation.stationName
-        : routes[0]?.endStation.stationName || '',
+        : routes[0]?.endStation.stationName ?? '',
       routes,
     };
 

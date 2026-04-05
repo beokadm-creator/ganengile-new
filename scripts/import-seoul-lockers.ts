@@ -22,8 +22,7 @@ const jsonPath =
 const apply = args.has('--apply');
 
 const serviceAccountPath =
-  process.env.FIREBASE_SERVICE_ACCOUNT_PATH ||
-  path.join(process.env.HOME || '', 'Downloads/ganengile-firebase-adminsdk-fbsvc-6178badd66.json');
+  process.env.FIREBASE_SERVICE_ACCOUNT_PATH ?? path.join(process.env.HOME || '', 'Downloads/ganengile-firebase-adminsdk-fbsvc-6178badd66.json');
 
 if (!fs.existsSync(serviceAccountPath)) {
   console.error(`❌ Service account not found: ${serviceAccountPath}`);
@@ -40,12 +39,12 @@ admin.initializeApp({
 const db = admin.firestore();
 
 function normalizeName(name: string): string {
-  const trimmed = (name || '').replace(/\s+/g, '').trim();
+  const trimmed = (name ?? '').replace(/\s+/g, '').trim();
   return trimmed.endsWith('역') ? trimmed.slice(0, -1) : trimmed;
 }
 
 function normalizeLineName(line: string): string {
-  const v = String(line || '').trim();
+  const v = String(line ?? '').trim();
   if (!v) return '';
   const digits = v.replace(/\D/g, '');
   if (digits) return `${parseInt(digits, 10)}호선`;
@@ -53,7 +52,7 @@ function normalizeLineName(line: string): string {
 }
 
 function extractLineDigits(line: string): string {
-  const digits = String(line || '').replace(/\D/g, '');
+  const digits = String(line ?? '').replace(/\D/g, '');
   return digits ? String(parseInt(digits, 10)) : '';
 }
 
@@ -115,7 +114,7 @@ async function main() {
 
   const stationByName = new Map<string, { id: string; data: any }[]>();
   for (const station of stations) {
-    const name = station.data.stationName || station.data.name || station.id;
+    const name = station.data.stationName || station.data.name ?? station.id;
     const key = normalizeName(name);
     if (!stationByName.has(key)) stationByName.set(key, []);
     stationByName.get(key)!.push(station);
@@ -133,16 +132,16 @@ async function main() {
   let batchCount = 0;
 
   for (const row of data) {
-    const line = String(row.line || '').trim();
-    const lockerName = String(row.lockerName || '').trim();
-    const detailLocation = String(row.detailLocation || '').trim();
-    const counts = row.counts || {};
+    const line = String(row.line ?? '').trim();
+    const lockerName = String(row.lockerName ?? '').trim();
+    const detailLocation = String(row.detailLocation ?? '').trim();
+    const counts = row.counts ?? {};
     const targetLineName = normalizeLineName(line);
     const targetLineDigits = extractLineDigits(line);
 
     // Non-subway facilities (no numeric line)
     if (!targetLineDigits) {
-      const facilityName = row.stationName || lockerName;
+      const facilityName = row.stationName ?? lockerName;
       const sizes: Array<{ key: 'small' | 'medium' | 'large'; label: string }> = [
         { key: 'small', label: 'small' },
         { key: 'medium', label: 'medium' },
@@ -150,8 +149,8 @@ async function main() {
       ];
 
       for (const size of sizes) {
-        const count = Number(counts[size.key] || 0);
-        if (!count || count <= 0) continue;
+        const count = Number(counts[size.key] ?? 0);
+        if (!count ?? count <= 0) continue;
 
         const lockerId = sanitizeId(`non_subway_${facilityName}_${lockerName}_${size.key}`);
         const ref = db.collection('non_subway_lockers').doc(lockerId);
@@ -168,7 +167,7 @@ async function main() {
             stationName: facilityName,
             line: '',
             floor: 1,
-            section: detailLocation || lockerName,
+            section: detailLocation ?? lockerName,
             address: '',
             nearby: false,
           },
@@ -211,7 +210,7 @@ async function main() {
     }
 
     const stationKey = normalizeName(row.stationName);
-    const allCandidates = stationByName.get(stationKey) || [];
+    const allCandidates = stationByName.get(stationKey) ?? [];
     const activeCandidates = allCandidates.filter((c) => c.data?.isActive !== false);
     const candidates = activeCandidates.length > 0 ? activeCandidates : allCandidates;
     if (!candidates.length) {
@@ -249,13 +248,13 @@ async function main() {
       ambiguous++;
       ambiguousItems.push({
         row,
-        candidates: matchedCandidates.map((c) => ({ id: c.id, name: c.data?.stationName || c.data?.name })),
+        candidates: matchedCandidates.map((c) => ({ id: c.id, name: c.data?.stationName ?? c.data?.name })),
       });
     }
 
     const station = matchedCandidates
       .map((c) => ({ station: c, score: scoreStationForLine(c, targetLineDigits) }))
-      .sort((a, b) => b.score - a.score || a.station.id.localeCompare(b.station.id))[0].station;
+      .sort((a, b) => b.score - a.score ?? a.station.id.localeCompare(b.station.id))[0].station;
 
     const sizes: Array<{ key: 'small' | 'medium' | 'large'; label: string }> = [
       { key: 'small', label: 'small' },
@@ -264,8 +263,8 @@ async function main() {
     ];
 
     for (const size of sizes) {
-      const count = Number(counts[size.key] || 0);
-      if (!count || count <= 0) continue;
+      const count = Number(counts[size.key] ?? 0);
+      if (!count ?? count <= 0) continue;
 
       const lockerId = sanitizeId(`seoul_${line}_${lockerName}_${size.key}`);
       const ref = db.collection('lockers').doc(lockerId);
@@ -276,10 +275,10 @@ async function main() {
         operator: 'seoul_metro',
         location: {
           stationId: station.id,
-          stationName: station.data.stationName || station.data.name || '',
+          stationName: station.data.stationName || station.data.name ?? '',
           line: `${line}호선`,
           floor: 1,
-          section: detailLocation || lockerName,
+          section: detailLocation ?? lockerName,
           address: '',
           nearby: false,
         },

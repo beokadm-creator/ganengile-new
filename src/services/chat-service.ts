@@ -64,8 +64,8 @@ export class ChatService {
       });
 
       const merged = [...deduped.values()].sort((a, b) => {
-        const aTime = (a.updatedAt as any)?.toDate?.()?.getTime?.() || 0;
-        const bTime = (b.updatedAt as any)?.toDate?.()?.getTime?.() || 0;
+        const aTime = a.updatedAt?.toDate?.()?.getTime?.() ?? 0;
+        const bTime = b.updatedAt?.toDate?.()?.getTime?.() ?? 0;
         return bTime - aTime;
       });
       listener(merged);
@@ -162,17 +162,17 @@ export class ChatService {
         user1: {
           userId: data.user1.userId,
           name: data.user1.name,
-          profileImage: data.user1.profileImage || null,
+          profileImage: data.user1.profileImage ?? null,
         },
         user2: {
           userId: data.user2.userId,
           name: data.user2.name,
-          profileImage: data.user2.profileImage || null,
+          profileImage: data.user2.profileImage ?? null,
         },
       },
-      requestId: data.requestId || null,
-      matchId: data.matchId || null,
-      requestInfo: data.requestInfo || null,
+      requestId: data.requestId ?? null,
+      matchId: data.matchId ?? null,
+      requestInfo: data.requestInfo ?? null,
       unreadCounts: {
         user1: 0,
         user2: 0,
@@ -206,9 +206,9 @@ export class ChatService {
       senderId: this.userId,
       type: data.type,
       content: data.content,
-      imageUrl: data.imageUrl || null,
+      imageUrl: data.imageUrl ?? null,
       readStatus: 'sent' as MessageReadStatus,
-      metadata: data.metadata || null,
+      metadata: data.metadata ?? null,
       createdAt: serverTimestamp(),
     };
 
@@ -286,7 +286,7 @@ export class ChatService {
     const docRef = doc(db, CHAT_ROOMS_COLLECTION, chatRoomId);
     const docSnap = await getDoc(docRef);
 
-    if (!docSnap.exists) {
+    if (!docSnap.exists()) {
       return null;
     }
 

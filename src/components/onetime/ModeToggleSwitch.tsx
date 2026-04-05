@@ -57,6 +57,7 @@ export default function ModeToggleSwitch({ onModeChange }: ModeToggleSwitchProps
     });
 
     return () => unsubscribe();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user?.uid]);
 
   const handleToggle = async () => {

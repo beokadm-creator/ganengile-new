@@ -1,4 +1,4 @@
-﻿# Seoul Station Reference
+# Seoul Station Reference
 
 `precedence`: 65  
 `required-for`: station-data, map-reference  

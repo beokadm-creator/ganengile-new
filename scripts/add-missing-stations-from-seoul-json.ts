@@ -22,8 +22,7 @@ const jsonPath =
 const apply = args.has('--apply');
 
 const serviceAccountPath =
-  process.env.FIREBASE_SERVICE_ACCOUNT_PATH ||
-  path.join(process.env.HOME || '', 'Downloads/ganengile-firebase-adminsdk-fbsvc-6178badd66.json');
+  process.env.FIREBASE_SERVICE_ACCOUNT_PATH ?? path.join(process.env.HOME || '', 'Downloads/ganengile-firebase-adminsdk-fbsvc-6178badd66.json');
 
 if (!fs.existsSync(serviceAccountPath)) {
   console.error(`❌ Service account not found: ${serviceAccountPath}`);
@@ -40,12 +39,12 @@ admin.initializeApp({
 const db = admin.firestore();
 
 function normalizeName(name: string): string {
-  const trimmed = (name || '').replace(/\s+/g, '').trim();
+  const trimmed = (name ?? '').replace(/\s+/g, '').trim();
   return trimmed.endsWith('역') ? trimmed.slice(0, -1) : trimmed;
 }
 
 function normalizeLineName(lineNum: string): string {
-  const v = String(lineNum || '').trim();
+  const v = String(lineNum ?? '').trim();
   if (!v) return '';
   const digits = v.replace(/\D/g, '');
   if (digits) return `${parseInt(digits, 10)}호선`;
@@ -53,7 +52,7 @@ function normalizeLineName(lineNum: string): string {
 }
 
 function normalizeLineCode(lineNum: string): string {
-  const digits = String(lineNum || '').replace(/\D/g, '');
+  const digits = String(lineNum ?? '').replace(/\D/g, '');
   return digits ? String(parseInt(digits, 10)) : '';
 }
 
@@ -63,7 +62,7 @@ function loadSeoulData(filePath: string): any[] {
     process.exit(1);
   }
   const raw = JSON.parse(fs.readFileSync(filePath, 'utf8'));
-  const items = raw?.DATA || raw?.data || raw || [];
+  const items = raw?.DATA || raw?.data || raw ?? [];
   return Array.isArray(items) ? items : [];
 }
 
@@ -78,11 +77,11 @@ async function main() {
 
   const existingByNameLine = new Set<string>();
   for (const s of existing) {
-    const name = s.data.stationName || s.data.name || s.id;
+    const name = s.data.stationName || s.data.name ?? s.id;
     const nameKey = normalizeName(name);
     const lines = Array.isArray(s.data?.lines) ? s.data.lines : [];
     for (const line of lines) {
-      const lineName = normalizeLineName(line.lineName || '');
+      const lineName = normalizeLineName(line.lineName ?? '');
       if (!lineName) continue;
       existingByNameLine.add(`${nameKey}|${lineName}`);
     }
@@ -93,27 +92,27 @@ async function main() {
   let batchCount = 0;
 
   for (const row of rows) {
-    const stationName = String(row.station_nm || '').trim();
+    const stationName = String(row.station_nm ?? '').trim();
     if (!stationName) continue;
     const nameKey = normalizeName(stationName);
-    const lineName = normalizeLineName(row.line_num || '');
-    const lineCode = normalizeLineCode(row.line_num || '');
+    const lineName = normalizeLineName(row.line_num ?? '');
+    const lineCode = normalizeLineCode(row.line_num ?? '');
     if (!lineName) continue;
     const nameLineKey = `${nameKey}|${lineName}`;
     if (existingByNameLine.has(nameLineKey)) {
       continue;
     }
 
-    const docId = row.fr_code || row.station_cd || `${lineCode}_${nameKey}`;
+    const docId = row.fr_code || row.station_cd ?? `${lineCode}_${nameKey}`;
     const ref = db.collection('config_stations').doc(String(docId));
 
     const payload = {
       stationId: String(docId),
       stationName: stationName.endsWith('역') ? stationName : `${stationName}역`,
-      stationNameEnglish: row.station_nm_eng || '',
+      stationNameEnglish: row.station_nm_eng ?? '',
       lines: [
         {
-          lineId: lineCode || lineName,
+          lineId: lineCode ?? lineName,
           lineName,
           lineCode,
           lineColor: '#000000',

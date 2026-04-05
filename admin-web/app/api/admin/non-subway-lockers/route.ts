@@ -7,7 +7,7 @@ export async function GET(req: NextRequest) {
 
   const db = getAdminDb();
   const { searchParams } = new URL(req.url);
-  const limit = Number(searchParams.get('limit') || '200');
+  const limit = Number(searchParams.get('limit') ?? '200');
 
   const snap = await db.collection('non_subway_lockers').orderBy('updatedAt', 'desc').limit(limit).get();
   const items = snap.docs.map((doc) => ({ id: doc.id, ...doc.data() }));

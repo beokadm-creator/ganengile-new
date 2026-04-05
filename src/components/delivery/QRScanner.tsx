@@ -18,7 +18,7 @@ export default function QRScanner({ onScan, onError, onClose }: Props) {
   const [scanned, setScanned] = useState(false);
 
   useEffect(() => {
-    (async () => {
+    void (async () => {
       const { status } = await Camera.requestCameraPermissionsAsync();
       setHasPermission(status === 'granted');
 
@@ -26,6 +26,7 @@ export default function QRScanner({ onScan, onError, onClose }: Props) {
         onError('카메라 권한이 필요합니다.');
       }
     })();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const handleBarCodeScanned = ({ type: _type, data }: { type: string; data: string }) => {

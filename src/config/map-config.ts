@@ -9,7 +9,7 @@ function readEnv(value: string | undefined): string {
 const env = process.env as Record<string, string | undefined>;
 
 export const mapConfig = {
-  provider: (readEnv(env.EXPO_PUBLIC_MAP_PROVIDER) || 'naver-static') as SupportedMapProvider,
+  provider: (readEnv(env.EXPO_PUBLIC_MAP_PROVIDER) ?? 'naver-static') as SupportedMapProvider,
   publicClientId: readEnv(env.EXPO_PUBLIC_NAVER_MAP_CLIENT_ID),
   staticMapProxyBaseUrl: readEnv(env.EXPO_PUBLIC_NAVER_STATIC_MAP_PROXY_URL),
   webClientId: readEnv(env.EXPO_PUBLIC_NAVER_MAP_WEB_CLIENT_ID),
@@ -37,9 +37,8 @@ export function getDefaultFunctionsBaseUrl(): string {
       : '';
   const projectId =
     readEnv(env.EXPO_PUBLIC_FIREBASE_PROJECT_ID) ||
-    readEnv(env.FIREBASE_PROJECT_ID) ||
-    readEnv(firebaseProjectId);
-  const region = readEnv(env.EXPO_PUBLIC_FIREBASE_FUNCTIONS_REGION) || 'us-central1';
+    readEnv(env.FIREBASE_PROJECT_ID) ?? readEnv(firebaseProjectId);
+  const region = readEnv(env.EXPO_PUBLIC_FIREBASE_FUNCTIONS_REGION) ?? 'us-central1';
   if (!projectId) {
     return '';
   }

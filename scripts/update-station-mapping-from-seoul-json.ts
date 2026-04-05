@@ -23,8 +23,7 @@ const apply = args.has('--apply');
 const deactivateDuplicates = args.has('--deactivate-duplicates');
 
 const serviceAccountPath =
-  process.env.FIREBASE_SERVICE_ACCOUNT_PATH ||
-  path.join(process.env.HOME || '', 'Downloads/ganengile-firebase-adminsdk-fbsvc-4436800611.json');
+  process.env.FIREBASE_SERVICE_ACCOUNT_PATH ?? path.join(process.env.HOME || '', 'Downloads/ganengile-firebase-adminsdk-fbsvc-4436800611.json');
 
 if (!fs.existsSync(serviceAccountPath)) {
   console.error(`❌ Service account not found: ${serviceAccountPath}`);
@@ -53,7 +52,7 @@ function normalizeName(name: string): string {
 }
 
 function normalizeLineCode(lineNum: string): string | null {
-  const digits = (lineNum || '').replace(/\D/g, '');
+  const digits = (lineNum ?? '').replace(/\D/g, '');
   if (digits.length === 0) return null;
   const parsed = parseInt(digits, 10);
   if (Number.isNaN(parsed)) return null;
@@ -80,7 +79,7 @@ function loadSeoulData(filePath: string): SeoulRow[] {
     process.exit(1);
   }
   const raw = JSON.parse(fs.readFileSync(filePath, 'utf8'));
-  const items = raw?.DATA || raw?.data || raw || [];
+  const items = raw?.DATA || raw?.data || raw ?? [];
   return Array.isArray(items) ? items : [];
 }
 
@@ -105,13 +104,13 @@ function buildDuplicateReport(stations: { id: string; data: any }[]) {
   const byNameLine = new Map<string, string[]>();
 
   for (const station of stations) {
-    const nameKey = normalizeName(station.data.stationName || station.data.name || station.id);
+    const nameKey = normalizeName(station.data.stationName || station.data.name ?? station.id);
     if (!byName.has(nameKey)) byName.set(nameKey, []);
     byName.get(nameKey)!.push(station.id);
 
     const lines = Array.isArray(station.data.lines) ? station.data.lines : [];
     for (const line of lines) {
-      const lineName = normalizeLineName(line.lineName || '');
+      const lineName = normalizeLineName(line.lineName ?? '');
       const nameLineKey = `${nameKey}|${lineName}`;
       if (!byNameLine.has(nameLineKey)) byNameLine.set(nameLineKey, []);
       byNameLine.get(nameLineKey)!.push(station.id);
@@ -134,7 +133,7 @@ async function deactivateDuplicateStations(stations: { id: string; data: any }[]
       .filter(Boolean) as { id: string; data: any }[];
     const ranked = candidates
       .map((s) => ({ id: s.id, score: scoreStation(s) }))
-      .sort((a, b) => b.score - a.score || a.id.localeCompare(b.id));
+      .sort((a, b) => b.score - a.score ?? a.id.localeCompare(b.id));
     const keep = ranked[0]?.id;
     for (const id of ids) {
       if (id !== keep) toDeactivate.add(id);
@@ -183,9 +182,9 @@ async function main() {
 
   const byNameLine = new Map<string, SeoulRow>();
   for (const row of rows) {
-    const nameKey = normalizeName(row.station_nm || '');
-    const lineNameKey = normalizeLineName(row.line_num || '');
-    if (!nameKey || !lineNameKey) continue;
+    const nameKey = normalizeName(row.station_nm ?? '');
+    const lineNameKey = normalizeLineName(row.line_num ?? '');
+    if (!nameKey ?? !lineNameKey) continue;
     const key = `${nameKey}|${lineNameKey}`;
     if (!byNameLine.has(key)) {
       byNameLine.set(key, row);
@@ -210,7 +209,7 @@ async function main() {
   let batchCount = 0;
 
   for (const station of stations) {
-    const stationName = station.data.stationName || station.data.name || station.id;
+    const stationName = station.data.stationName || station.data.name ?? station.id;
     const nameKey = normalizeName(stationName);
     const lines = Array.isArray(station.data.lines) ? station.data.lines : [];
 
@@ -220,16 +219,16 @@ async function main() {
     }
 
     for (const line of lines) {
-      const lineName = normalizeLineName(line.lineName || '');
+      const lineName = normalizeLineName(line.lineName ?? '');
       const key = `${nameKey}|${lineName}`;
       const row = byNameLine.get(key);
       if (!row) continue;
 
       matched++;
-      const lineCode = normalizeLineCode(row.line_num || '') || '';
+      const lineCode = normalizeLineCode(row.line_num || '') ?? '';
       const ref = db.collection('config_stations').doc(station.id);
       const kricData: any = {
-        stationCode: row.fr_code || row.station_cd,
+        stationCode: row.fr_code ?? row.station_cd,
         railOprIsttCd: 'S1',
       };
       if (lineCode) {

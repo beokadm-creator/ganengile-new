@@ -233,12 +233,12 @@ function normalizeStationName(name?: string): string {
 function namesLooselyEqual(a?: string, b?: string): boolean {
   const na = normalizeStationName(a);
   const nb = normalizeStationName(b);
-  if (!na || !nb) return false;
-  return na === nb || na.includes(nb) || nb.includes(na);
+  if (!na ?? !nb) return false;
+  return na === nb || na.includes(nb) ?? nb.includes(na);
 }
 
 function normalizeRouteForMatching(routeData: LooseRouteInput, routeId: string): Route | null {
-  if (!routeData?.userId || !routeData?.startStation || !routeData?.endStation) {
+  if (!routeData?.userId || !routeData?.startStation ?? !routeData?.endStation) {
     return null;
   }
 
@@ -261,7 +261,7 @@ function normalizeRouteForMatching(routeData: LooseRouteInput, routeId: string):
     lng: end.lng ?? end.longitude ?? 0,
   };
 
-  if (!startStation.stationName || !endStation.stationName) {
+  if (!startStation.stationName ?? !endStation.stationName) {
     return null;
   }
 
@@ -304,7 +304,7 @@ async function findMatchesByRouteHeuristic(
     const loosePickup = namesLooselyEqual(route.startStation.stationName, requestPickup);
     const looseDelivery = namesLooselyEqual(route.endStation.stationName, requestDelivery);
     const isTodayRoute = route.daysOfWeek.includes(dayOfWeek);
-    const adjustedScore = routeScore.score + (isTodayRoute ? 10 : 0) + ((loosePickup || looseDelivery) ? 5 : 0);
+    const adjustedScore = routeScore.score + (isTodayRoute ? 10 : 0) + ((loosePickup ?? looseDelivery) ? 5 : 0);
 
     if (adjustedScore < 10) return;
 
@@ -410,7 +410,7 @@ export async function calculateBadgeBonus(userId: string): Promise<{
       none: { feeBonus: 0, priorityBoost: 0 },
     };
 
-    const tier = badgeTier.tier || 'none';
+    const tier = badgeTier.tier ?? 'none';
     return bonusConfig[tier];
   } catch (error) {
     console.error('Error calculating badge bonus:', error);
@@ -478,7 +478,7 @@ export async function fetchActiveGillerRoutes(): Promise<EngineGillerRoute[]> {
       const startStationName = data.startStation?.stationName;
       const endStationName = data.endStation?.stationName;
 
-      if (!data.userId || !startStationName || !endStationName) {
+      if (!data.userId || !startStationName ?? !endStationName) {
         return;
       }
 
@@ -486,7 +486,7 @@ export async function fetchActiveGillerRoutes(): Promise<EngineGillerRoute[]> {
       const startStation = getStationByName(startStationName);
       const endStation = getStationByName(endStationName);
 
-      if (!startStation || !endStation) {
+      if (!startStation ?? !endStation) {
         console.warn(`Station not found for route ${docSnapshot.id}`);
         return;
       }
@@ -615,7 +615,6 @@ export async function findMatchesForRequest(
     const gillerRoutes = await fetchActiveGillerRoutes();
 
     // 3. Filter by day of week
-    // TODO: Get current day of week
     const today = new Date().getDay(); // 0 = Sunday, 1 = Monday, ...
     const dayOfWeek = today === 0 ? 7 : today; // Convert to 1-7 (Mon-Sun)
 
@@ -786,7 +785,7 @@ export async function getMatchingResults(requestId: string) {
         rating: userInfo.rating,
         completedDeliveries: userInfo.completedDeliveries,
         estimatedFee: Math.round(baseFee * (1 + (index * 0.1))), // Slightly higher fee for lower ranked matches
-        profileImage: userInfo.profileImage || undefined,
+        profileImage: userInfo.profileImage ?? undefined,
       };
     })
   );
@@ -1103,7 +1102,7 @@ export function calculateRouteMatchScore(
   const stationNamesMatch = (name1: string, name2: string): boolean => {
     const n1 = normalizeStationName(name1);
     const n2 = normalizeStationName(name2);
-    return n1 === n2 || n1.includes(n2) || n2.includes(n1);
+    return n1 === n2 || n1.includes(n2) ?? n2.includes(n1);
   };
 
   // 세부 점수 기록
@@ -1117,8 +1116,8 @@ export function calculateRouteMatchScore(
 
   // 1. 출발역 일치: +30점
   const pickupMatch = stationNamesMatch(
-    route.startStation?.stationName || '',
-    request.pickupStation?.stationName || ''
+    route.startStation?.stationName ?? '',
+    request.pickupStation?.stationName ?? ''
   );
   if (pickupMatch) {
     details.pickupStationScore = 30;
@@ -1127,8 +1126,8 @@ export function calculateRouteMatchScore(
 
   // 2. 도착역 일치: +30점
   const deliveryMatch = stationNamesMatch(
-    route.endStation?.stationName || '',
-    request.deliveryStation?.stationName || ''
+    route.endStation?.stationName ?? '',
+    request.deliveryStation?.stationName ?? ''
   );
   if (deliveryMatch) {
     details.deliveryStationScore = 30;
@@ -1147,7 +1146,7 @@ export function calculateRouteMatchScore(
   // 4. 출발 시간 근접도 보너스(최대 15점)
   const requestTime = request.preferredTime?.departureTime ?? '08:00';
   const [requestHour, requestMinute] = requestTime.split(':').map(Number);
-  const [routeHour, routeMinute] = (route.departureTime || '08:00').split(':').map(Number);
+  const [routeHour, routeMinute] = (route.departureTime ?? '08:00').split(':').map(Number);
 
   const requestMinutes = requestHour * 60 + requestMinute;
   const routeMinutes = routeHour * 60 + routeMinute;
@@ -1166,7 +1165,7 @@ export function calculateRouteMatchScore(
     routeDirection = 'exact';
     details.directionBonus = 15;
     score += 15;
-  } else if (pickupMatch || deliveryMatch) {
+  } else if (pickupMatch ?? deliveryMatch) {
     routeDirection = 'partial';
     details.directionBonus = 5;
     score += 5;
@@ -1341,7 +1340,7 @@ export function applyMatchingFilters<T extends LocationFilteredRequest | RouteFi
       const pickupLine = request.pickupStation.line;
       const deliveryLine = request.deliveryStation.line;
       return filters.lineFilter!.selectedLines.some(line =>
-        pickupLine?.includes(line) || deliveryLine?.includes(line)
+        pickupLine?.includes(line) ?? deliveryLine?.includes(line)
       );
     });
   }

@@ -554,8 +554,7 @@ export function getTransferStations(): Station[] {
 export function searchStations(query: string): Station[] {
   const lowerQuery = query.toLowerCase();
   return MAJOR_STATIONS.filter(s =>
-    s.stationName.toLowerCase().includes(lowerQuery) ||
-    s.stationNameEnglish.toLowerCase().includes(lowerQuery)
+    s.stationName.toLowerCase().includes(lowerQuery) ?? s.stationNameEnglish.toLowerCase().includes(lowerQuery)
   );
 }
 

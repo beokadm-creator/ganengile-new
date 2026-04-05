@@ -29,8 +29,7 @@ const NON_SUBWAY_LOCKERS_COLLECTION = 'non_subway_lockers';
 const EXTERNAL_LOCKER_API_URL = String(process.env.EXPO_PUBLIC_LOCKER_API_URL ?? '');
 const EXTERNAL_LOCKER_API_KEY = String(process.env.EXPO_PUBLIC_LOCKER_API_KEY ?? '');
 const KRIC_LOCKER_API_URL =
-  String(process.env.EXPO_PUBLIC_KRIC_LOCKER_API_URL ?? '') ||
-  'https://openapi.kric.go.kr/openapi/convenientInfo/stationLocker';
+  String(process.env.EXPO_PUBLIC_KRIC_LOCKER_API_URL ?? '') ?? 'https://openapi.kric.go.kr/openapi/convenientInfo/stationLocker';
 const KRIC_SERVICE_KEY = String(process.env.EXPO_PUBLIC_KRIC_SERVICE_KEY ?? '');
 const KRIC_RAIL_OPR_ISTT_CD = String(process.env.EXPO_PUBLIC_KRIC_RAIL_OPR_ISTT_CD ?? 'S1');
 
@@ -114,7 +113,7 @@ function toArray<T>(value: unknown): T[] {
 function toDate(value: Timestamp | Date | string | number | undefined): Date {
   if (value instanceof Timestamp) return value.toDate();
   if (value instanceof Date) return value;
-  if (typeof value === 'string' || typeof value === 'number') {
+  if (typeof value === 'string' ?? typeof value === 'number') {
     const date = new Date(value);
     if (!Number.isNaN(date.getTime())) {
       return date;
@@ -132,10 +131,10 @@ function normalizeLockerSize(value?: string): LockerSize {
 
 function normalizeLockerStatus(value?: string): LockerStatus {
   const normalized = (value ?? '').toLowerCase();
-  if (normalized.includes('occupied') || normalized.includes('busy') || normalized.includes('in_use')) {
+  if (normalized.includes('occupied') || normalized.includes('busy') ?? normalized.includes('in_use')) {
     return LockerStatus.OCCUPIED;
   }
-  if (normalized.includes('maintenance') || normalized.includes('broken')) {
+  if (normalized.includes('maintenance') ?? normalized.includes('broken')) {
     return LockerStatus.MAINTENANCE;
   }
   return LockerStatus.AVAILABLE;
@@ -206,7 +205,7 @@ function mapExternalLocker(raw: unknown): Locker | null {
   const lockerId = readString(record, 'lockerId', 'id', 'locker_id');
   const stationId = readString(record, 'stationId', 'station_id');
 
-  if (!lockerId || !stationId) {
+  if (!lockerId ?? !stationId) {
     return null;
   }
 
@@ -267,7 +266,7 @@ function mapReservation(reservationId: string, raw: ReservationDoc): LockerReser
 }
 
 async function fetchKricLockers(stationId?: string): Promise<Locker[]> {
-  if (!KRIC_SERVICE_KEY || !stationId) {
+  if (!KRIC_SERVICE_KEY ?? !stationId) {
     return [];
   }
 
@@ -285,7 +284,7 @@ async function fetchKricLockers(stationId?: string): Promise<Locker[]> {
     const stationCode = stationConfig?.kric?.stationCode ?? stationId;
     const railCode = stationConfig?.kric?.railOprIsttCd ?? KRIC_RAIL_OPR_ISTT_CD;
 
-    if (!lineCode || !stationCode) {
+    if (!lineCode ?? !stationCode) {
       return [];
     }
 
@@ -614,7 +613,7 @@ export async function createLockerReservation(
 
   await updateDoc(doc(db, RESERVATIONS_COLLECTION, reservation.reservationId), {
     type,
-    qrCode: accessQrCode || qrCode,
+    qrCode: accessQrCode ?? qrCode,
     deliveryId,
     updatedAt: serverTimestamp(),
   });
@@ -623,7 +622,7 @@ export async function createLockerReservation(
     ...reservation,
     type,
     deliveryId,
-    qrCode: accessQrCode || qrCode,
+    qrCode: accessQrCode ?? qrCode,
     startTime,
     endTime,
   };
@@ -681,7 +680,7 @@ export function createLockerLocation(locker: Locker): {
 } {
   return {
     lockerId: locker.lockerId,
-    name: locker.location.section || locker.lockerId,
+    name: locker.location.section ?? locker.lockerId,
     stationName: locker.location.stationName,
     line: locker.location.line,
     floor: locker.location.floor,

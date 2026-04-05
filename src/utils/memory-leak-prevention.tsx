@@ -16,7 +16,7 @@ export const useMemoryLeakDetection = () => {
 
     return () => {
       mountedRef.current = false;
-      console.log('🧹 Component unmounted, cleanup performed');
+      // Component unmounted, cleanup performed
     };
   }, []);
 
@@ -46,7 +46,7 @@ export const useInterval = (
     return () => {
       if (intervalRef.current) {
         clearInterval(intervalRef.current);
-        console.log('🧹 Interval cleared');
+        // Interval cleared
       }
     };
   }, [delay]);
@@ -76,7 +76,7 @@ export const useTimeout = (
     return () => {
       if (timeoutRef.current) {
         clearTimeout(timeoutRef.current);
-        console.log('🧹 Timeout cleared');
+        // Timeout cleared
       }
     };
   }, [delay]);
@@ -107,7 +107,7 @@ export const useEventListener = (
 
     return () => {
       target.removeEventListener(type, listener);
-      console.log(`🧹 Event listener removed: ${type}`);
+      // Event listener removed
     };
   }, [target, type, callback]);
 };
@@ -142,7 +142,7 @@ export const useFirestoreRealtime = (
     return () => {
       mountedRef.current = false;
       unsubscribe();
-      console.log('🧹 Firestore listener detached');
+      // Firestore listener detached
     };
   }, [query, onNext, onError]);
 };
@@ -159,9 +159,10 @@ export const useAnimation = (
     return () => {
       if (animation?.stop) {
         animation.stop();
-        console.log('🧹 Animation stopped');
+        // Animation stopped
       }
     };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, deps);
 };
 
@@ -177,12 +178,12 @@ export const useImagePreload = (imageUrls: string[]) => {
     const preloadImages = async () => {
       try {
         await Promise.all(
-          imageUrls.map(url => (Image as any).prefetch?.(url))
-        );
-        console.log(`✅ Preloaded ${imageUrls.length} images`);
-      } catch (error) {
+           imageUrls.map(url => (Image as any).prefetch?.(url))
+         );
+         // Images preloaded
+       } catch (error) {
         if (abortController.signal.aborted) {
-          console.log('⚠️ Image preload aborted');
+          console.warn('⚠️ Image preload aborted');
         } else {
           console.error('❌ Image preload error:', error);
         }
@@ -194,6 +195,7 @@ export const useImagePreload = (imageUrls: string[]) => {
     return () => {
       abortController.abort();
     };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, imageUrls);
 };
 
@@ -208,12 +210,12 @@ export const useMemoryMonitor = (intervalMs: number = 10000) => {
       if ((performance as any).memory) {
         const { usedJSHeapSize, totalJSHeapSize, jsHeapSizeLimit } = (performance as any).memory;
 
-        const usedMB = (usedJSHeapSize / 1024 / 1024).toFixed(2);
-        const totalMB = (totalJSHeapSize / 1024 / 1024).toFixed(2);
-        const limitMB = (jsHeapSizeLimit / 1024 / 1024).toFixed(2);
+        const _usedMB = (usedJSHeapSize / 1024 / 1024).toFixed(2);
+        const _totalMB = (totalJSHeapSize / 1024 / 1024).toFixed(2);
+        const _limitMB = (jsHeapSizeLimit / 1024 / 1024).toFixed(2);
         const percentage = ((usedJSHeapSize / jsHeapSizeLimit) * 100).toFixed(2);
 
-        console.log(`📊 Memory: ${usedMB}MB / ${totalMB}MB (${percentage}% of ${limitMB}MB)`);
+        // Memory usage logged
 
         // 80% 이상 사용 시 경고
         if (parseFloat(percentage) > 80) {
@@ -237,11 +239,11 @@ export const withMemoryLeakDetection = <P extends object>(
 
     useEffect(() => {
       mountedRef.current = true;
-      console.log(`✅ ${WrappedComponent.name} mounted`);
+      // Component mounted
 
       return () => {
         mountedRef.current = false;
-        console.log(`🧹 ${WrappedComponent.name} unmounted`);
+        // Component unmounted
       };
     }, []);
 
@@ -272,7 +274,7 @@ export const createAutoCleanupCache = <K extends object, V>() => {
     get: (key: K) => cache.get(key),
     set: (key: K, value: V) => {
       cache.set(key, value);
-      console.log('✅ WeakMap entry added (auto-cleanup on GC)');
+      // WeakMap entry added
     },
     has: (key: K) => cache.has(key),
     delete: (key: K) => cache.delete(key)

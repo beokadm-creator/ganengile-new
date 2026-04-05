@@ -18,7 +18,7 @@ const discovery = {
   revocationEndpoint: 'https://oauth2.googleapis.com/revoke',
 };
 
-const GOOGLE_CLIENT_ID = process.env.EXPO_PUBLIC_GOOGLE_CLIENT_ID || '';
+const GOOGLE_CLIENT_ID = process.env.EXPO_PUBLIC_GOOGLE_CLIENT_ID ?? '';
 const GOOGLE_REDIRECT_URI = AuthSession.makeRedirectUri({
   scheme: undefined, // Default scheme
 });

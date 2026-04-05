@@ -1,4 +1,4 @@
-﻿# Test Current Changes Plan
+# Test Current Changes Plan
 
 `precedence`: 60  
 `required-for`: current-change-test, sisyphus-plans  

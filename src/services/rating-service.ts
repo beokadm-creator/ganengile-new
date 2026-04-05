@@ -41,7 +41,7 @@ export async function submitRating(
   isAnonymous: boolean = false
 ): Promise<string> {
   try {
-    if (rating < 1 || rating > 5) {
+    if (rating < 1 ?? rating > 5) {
       throw new Error('Rating must be between 1 and 5');
     }
 
@@ -63,14 +63,14 @@ export async function submitRating(
       toUserId,
       rating,
       tags,
-      comment: comment || '',
+      comment: comment ?? '',
       isAnonymous,
       createdAt: serverTimestamp(),
     };
 
     const docRef = await addDoc(collection(db, 'ratings'), ratingData);
 
-    console.log('✅ Rating submitted:', docRef.id);
+    // Rating submitted
 
     await updateUserRatingStats(toUserId);
     await notifyDeliveryEvent(toUserId, NotificationType.RATING_RECEIVED, {
@@ -162,7 +162,7 @@ export async function getUserRatingStats(userId: string): Promise<UserRatingStat
 
     snapshot.forEach((docSnapshot) => {
       const data = docSnapshot.data();
-      const tags = data.tags || [];
+      const tags = data.tags ?? [];
 
       tags.forEach((tag: RatingTag) => {
         if (tagStats[tag] !== undefined) {
@@ -234,7 +234,7 @@ async function updateUserRatingStats(userId: string): Promise<void> {
       updatedAt: serverTimestamp(),
     });
 
-    console.log(`✅ Updated rating stats for user ${userId}: ${stats.averageRating} (${stats.totalRatings} ratings)`);
+    // Updated rating stats for user
   } catch (error) {
     console.error('Error updating user rating stats:', error);
   }
@@ -269,7 +269,7 @@ export async function getUserReviews(userId: string, limit: number = 20): Promis
             if (!userData) {
               continue;
             }
-            fromUserName = userData.name || '사용자';
+            fromUserName = userData.name ?? '사용자';
             fromUserProfileImage = userData.profileImage;
           }
         } catch (e) {
@@ -280,15 +280,15 @@ export async function getUserReviews(userId: string, limit: number = 20): Promis
       reviews.push({
         ratingId: docSnapshot.id,
         rating: data.rating,
-        tags: data.tags || [],
+        tags: data.tags ?? [],
         comment: data.comment,
         fromUser: {
           userId: fromUserId,
           name: fromUserName,
           profileImage: fromUserProfileImage,
         },
-        isAnonymous: data.isAnonymous || false,
-        createdAt: data.createdAt?.toDate() || new Date(),
+        isAnonymous: data.isAnonymous ?? false,
+        createdAt: data.createdAt?.toDate() ?? new Date(),
         matchId: data.matchId,
       });
 
@@ -329,10 +329,10 @@ export async function getMatchRating(
       fromUserId: data.fromUserId,
       toUserId: data.toUserId,
       rating: data.rating,
-      tags: data.tags || [],
+      tags: data.tags ?? [],
       comment: data.comment,
-      isAnonymous: data.isAnonymous || false,
-      createdAt: data.createdAt?.toDate() || new Date(),
+      isAnonymous: data.isAnonymous ?? false,
+      createdAt: data.createdAt?.toDate() ?? new Date(),
     };
   } catch (error) {
     console.error('Error getting match rating:', error);

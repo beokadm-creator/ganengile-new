@@ -79,7 +79,7 @@ export async function PATCH(req: NextRequest) {
   const liveReady = Boolean(
     privatePayload.enabled &&
       privatePayload.apiBaseUrl &&
-      (privatePayload.apiKey || (privatePayload.clientId && privatePayload.secretKey))
+      (privatePayload.apiKey ?? (privatePayload.clientId && privatePayload.secretKey))
   );
 
   const publicPayload = {

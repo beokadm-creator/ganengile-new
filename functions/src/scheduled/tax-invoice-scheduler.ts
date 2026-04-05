@@ -9,6 +9,68 @@
 
 import * as admin from 'firebase-admin';
 
+interface PlatformInfo {
+  name: string;
+  registrationNumber: string;
+  ceo: string;
+  address: string;
+  contact: string;
+}
+
+const DEFAULT_PLATFORM_INFO: PlatformInfo = {
+  name: '가는길에',
+  registrationNumber: '',
+  ceo: '',
+  address: '',
+  contact: '',
+};
+
+async function getPlatformInfo(db: admin.firestore.Firestore): Promise<PlatformInfo> {
+  try {
+    const snap = await db.doc('config/platform_info').get();
+    if (snap.exists) {
+      const data = snap.data() as Partial<PlatformInfo>;
+      return { ...DEFAULT_PLATFORM_INFO, ...data };
+    }
+  } catch (error) {
+    console.warn('⚠️ Failed to load platform_info config, using defaults:', error);
+  }
+  return DEFAULT_PLATFORM_INFO;
+}
+
+/**
+ * 플랫폼 사업자 정보를 Firestore config/platform_info에서 로드합니다.
+ * 문서가 없으면 기본값을 반환합니다.
+ */
+interface PlatformInfo {
+  name: string;
+  registrationNumber: string;
+  ceo: string;
+  address: string;
+  contact: string;
+}
+
+const DEFAULT_PLATFORM_INFO: PlatformInfo = {
+  name: '가는길에',
+  registrationNumber: '',
+  ceo: '',
+  address: '',
+  contact: '',
+};
+
+async function getPlatformInfo(db: admin.firestore.Firestore): Promise<PlatformInfo> {
+  try {
+    const snap = await db.doc('config/platform_info').get();
+    if (snap.exists) {
+      const data = snap.data() as Partial<PlatformInfo>;
+      return { ...DEFAULT_PLATFORM_INFO, ...data };
+    }
+  } catch (error) {
+    console.warn('⚠️ Failed to load platform_info config, using defaults:', error);
+  }
+  return DEFAULT_PLATFORM_INFO;
+}
+
 /**
  * 매월 1일 세금계산서 발행 스케줄러
  *
@@ -83,7 +145,7 @@ export const taxInvoiceScheduler = async (): Promise<{
 
         // 2-2. 금액 집계
         const totalDeliveries = deliveries.length;
-        const subtotal = deliveries.reduce((sum, d) => sum + (d.fee?.total || 0), 0);
+        const subtotal = deliveries.reduce((sum, d) => sum + (d.fee?.total ?? 0), 0);
         const tax = Math.round(subtotal * 0.1); // 부가세 10%
         const totalAmount = subtotal + tax;
 
@@ -96,13 +158,7 @@ export const taxInvoiceScheduler = async (): Promise<{
           invoiceNumber: `TAX-${year}${String(month).padStart(2, '0')}-${String(invoicesGenerated + 1).padStart(4, '0')}`,
           contractId,
           companyId: contract.companyId,
-          issuer: {
-            name: '가는길에',
-            registrationNumber: '123-45-67890', // TODO: 실제 사업자등록번호
-            ceo: '김OO',
-            address: '서울특별시 OO구 OO로 123',
-            contact: '02-1234-5678',
-          },
+          issuer: await getPlatformInfo(db),
           recipient: {
             name: contract.companyName,
             registrationNumber: contract.companyRegistrationNumber,

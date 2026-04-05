@@ -14,6 +14,13 @@ import { db } from './firebase';
 
 type FareResponseItem = Record<string, any>;
 
+/** Firestore config_fares 문서 캐시 데이터 타입 */
+interface FareCacheData {
+  fare: number;
+  raw?: FareResponseItem;
+  updatedAt: Timestamp;
+}
+
 export interface FareResult {
   fare?: number;
   raw?: FareResponseItem;
@@ -27,9 +34,8 @@ export interface FareQueryOptions {
 }
 
 const FARE_API_URL =
-  process.env.EXPO_PUBLIC_SEOUL_FARE_API_URL ||
-  'http://openapi.seoul.go.kr:8088';
-const FARE_SERVICE_KEY = process.env.EXPO_PUBLIC_SEOUL_FARE_SERVICE_KEY || '';
+  process.env.EXPO_PUBLIC_SEOUL_FARE_API_URL ?? 'http://openapi.seoul.go.kr:8088';
+const FARE_SERVICE_KEY = process.env.EXPO_PUBLIC_SEOUL_FARE_SERVICE_KEY ?? '';
 // 운영 안정성을 위해 기본은 캐시 전용(관리자 적재 운임)으로 동작
 const STRICT_CACHE_ONLY = process.env.EXPO_PUBLIC_SEOUL_FARE_CACHE_ONLY !== 'false';
 const CACHE_MAX_AGE_DAYS = 7;
@@ -49,8 +55,7 @@ function normalizeItems(payload: any): FareResponseItem[] {
     payload?.response?.body?.items?.item ||
     payload?.body?.items?.item ||
     payload?.row ||
-    payload?.items ||
-    [];
+    payload?.items ?? [];
   const items = Array.isArray(candidates) ? candidates : [candidates];
   return items.filter(Boolean);
 }
@@ -65,14 +70,14 @@ function extractFare(
   departureStationCode?: string,
   arrivalStationCode?: string
 ): FareResult | null {
-  if (!items || items.length === 0) return null;
+  if (!items ?? items.length === 0) return null;
 
   const exactMatch = items.find(
     (it) =>
-      String(it?.dptreStnCd || '') === String(departureStationCode || '') &&
-      String(it?.arvlStnCd || '') === String(arrivalStationCode || '')
+      String(it?.dptreStnCd ?? '') === String(departureStationCode ?? '') &&
+      String(it?.arvlStnCd ?? '') === String(arrivalStationCode ?? '')
   );
-  const item = exactMatch || items[0];
+  const item = exactMatch ?? items[0];
   const candidates = [
     item?.gnrlCardFare,
     item?.gnrlCashFare,
@@ -117,7 +122,7 @@ async function getCachedFare(
     const directRef = doc(db, 'config_fares', getFareDocId(departureStationCode, arrivalStationCode));
     const directSnap = await getDoc(directRef);
     if (directSnap.exists()) {
-      const data = directSnap.data() as any;
+      const data = directSnap.data() as FareCacheData;
       if (isCacheFresh(data.updatedAt) && typeof data.fare === 'number' && data.fare > 0) {
         return { fare: data.fare, raw: data.raw };
       }
@@ -131,13 +136,13 @@ async function getCachedFare(
     const reverseRef = doc(db, 'config_fares', getFareDocId(arrivalStationCode, departureStationCode));
     const reverseSnap = await getDoc(reverseRef);
     if (reverseSnap.exists()) {
-      const data = reverseSnap.data() as any;
+      const data = reverseSnap.data() as FareCacheData;
       if (isCacheFresh(data.updatedAt) && typeof data.fare === 'number' && data.fare > 0) {
         return { fare: data.fare, raw: data.raw };
       }
       if (typeof data.fare === 'number' && data.fare > 0) {
         const updatedAtMs = data.updatedAt instanceof Timestamp ? data.updatedAt.toMillis() : 0;
-        if (!staleCandidate || updatedAtMs > staleCandidate.updatedAtMs) {
+        if (!staleCandidate ?? updatedAtMs > staleCandidate.updatedAtMs) {
           staleCandidate = { fare: data.fare, raw: data.raw, updatedAtMs };
         }
       }
@@ -162,7 +167,7 @@ async function getCachedFareByName(
     const directRef = doc(db, 'config_fares', getFareNameDocId(departureStationName, arrivalStationName));
     const directSnap = await getDoc(directRef);
     if (directSnap.exists()) {
-      const data = directSnap.data() as any;
+      const data = directSnap.data() as FareCacheData;
       if (isCacheFresh(data.updatedAt) && typeof data.fare === 'number' && data.fare > 0) {
         return { fare: data.fare, raw: data.raw };
       }
@@ -175,13 +180,13 @@ async function getCachedFareByName(
     const reverseRef = doc(db, 'config_fares', getFareNameDocId(arrivalStationName, departureStationName));
     const reverseSnap = await getDoc(reverseRef);
     if (reverseSnap.exists()) {
-      const data = reverseSnap.data() as any;
+      const data = reverseSnap.data() as FareCacheData;
       if (isCacheFresh(data.updatedAt) && typeof data.fare === 'number' && data.fare > 0) {
         return { fare: data.fare, raw: data.raw };
       }
       if (typeof data.fare === 'number' && data.fare > 0) {
         const updatedAtMs = data.updatedAt instanceof Timestamp ? data.updatedAt.toMillis() : 0;
-        if (!staleCandidate || updatedAtMs > staleCandidate.updatedAtMs) {
+        if (!staleCandidate ?? updatedAtMs > staleCandidate.updatedAtMs) {
           staleCandidate = { fare: data.fare, raw: data.raw, updatedAtMs };
         }
       }
@@ -202,13 +207,13 @@ async function upsertFareCache(
   fareResult: FareResult
 ): Promise<void> {
   try {
-    if (!fareResult?.fare || fareResult.fare <= 0) return;
+    if (!fareResult?.fare ?? fareResult.fare <= 0) return;
     const ref = doc(db, 'config_fares', getFareDocId(departureStationCode, arrivalStationCode));
     await setDoc(ref, {
       departureStationCode,
       arrivalStationCode,
       fare: fareResult.fare,
-      raw: fareResult.raw || null,
+      raw: fareResult.raw ?? null,
       source: 'realtime_api',
       updatedAt: serverTimestamp(),
     }, { merge: true });
@@ -223,13 +228,13 @@ async function upsertFareCacheByName(
   fareResult: FareResult
 ): Promise<void> {
   try {
-    if (!fareResult?.fare || fareResult.fare <= 0) return;
+    if (!fareResult?.fare ?? fareResult.fare <= 0) return;
     const ref = doc(db, 'config_fares', getFareNameDocId(departureStationName, arrivalStationName));
     await setDoc(ref, {
       departureStationName,
       arrivalStationName,
       fare: fareResult.fare,
-      raw: fareResult.raw || null,
+      raw: fareResult.raw ?? null,
       source: 'realtime_api',
       updatedAt: serverTimestamp(),
     }, { merge: true });
@@ -320,7 +325,8 @@ export async function getRealtimeFare(
         }
       }
       return fareResult;
-    } catch {
+    } catch (error) {
+      console.error('[fare-service] 요금 파싱 실패, XML 폴백:', error);
       // XML fallback (very small parsing)
       const match = text.match(/<gnrlCardFare>(\d+)<\/gnrlCardFare>/);
       const fareValue = match ? parseInt(match[1], 10) : undefined;

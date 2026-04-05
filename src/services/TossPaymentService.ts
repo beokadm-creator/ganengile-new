@@ -17,7 +17,7 @@ export class TossPaymentService {
         };
       }
 
-      if (config.testMode || config.allowTestBypass || !config.liveReady) {
+      if (config.testMode || config.allowTestBypass ?? !config.liveReady) {
         console.warn(`Payment test flow used: ${amount} / ${orderId} / ${orderName}`);
         return { success: true, paymentId, mode: 'test' };
       }

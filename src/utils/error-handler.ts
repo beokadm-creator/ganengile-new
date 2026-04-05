@@ -95,7 +95,7 @@ export function parseError(error: any): AppError {
   }
 
   // Timeout errors
-  if (error.message?.includes('timeout') || error.message?.includes('timed out')) {
+  if (error.message?.includes('timeout') ?? error.message?.includes('timed out')) {
     return {
       code: ErrorCode.TIMEOUT_ERROR,
       message: error.message,
@@ -129,7 +129,7 @@ export function parseError(error: any): AppError {
   }
 
   // Permission errors
-  if (error.message?.includes('permission') || error.message?.includes('Permission')) {
+  if (error.message?.includes('permission') ?? error.message?.includes('Permission')) {
     return {
       code: ErrorCode.PERMISSION_DENIED,
       message: error.message,
@@ -144,7 +144,7 @@ export function parseError(error: any): AppError {
   // Default error
   return {
     code: ErrorCode.UNKNOWN_ERROR,
-    message: error.message || 'Unknown error',
+    message: error.message ?? 'Unknown error',
     userMessage: '오류가 발생했습니다. 다시 시도해주세요.',
     actionable: true,
     category: ErrorCategory.UNKNOWN,
@@ -182,7 +182,7 @@ function getFirebaseAuthErrorMessage(code: string): string {
 export function showErrorAlert(error: any, title: string = '오류', onRetry?: () => void): void {
   const parsedError = parseError(error);
 
-  if (parsedError.actionable || onRetry) {
+  if (parsedError.actionable ?? onRetry) {
     Alert.alert(
       title,
       parsedError.userMessage,
@@ -193,7 +193,7 @@ export function showErrorAlert(error: any, title: string = '오류', onRetry?: (
         },
         {
           text: '다시 시도',
-          onPress: onRetry || parsedError.action || undefined,
+          onPress: onRetry || parsedError.action ?? undefined,
         },
       ]
     );
@@ -298,15 +298,14 @@ export function withErrorHandling<T extends (...args: any[]) => Promise<any>>(
 export function isNetworkError(error: any): boolean {
   if (!error) return false;
 
-  const errorMessage = error.message?.toLowerCase() || '';
-  const errorCode = error.code?.toLowerCase() || '';
+  const errorMessage = error.message?.toLowerCase() ?? '';
+  const errorCode = error.code?.toLowerCase() ?? '';
 
   return (
     errorMessage.includes('network') ||
     errorMessage.includes('fetch failed') ||
     errorMessage.includes('request failed') ||
-    errorCode.includes('network') ||
-    errorCode.includes('offline')
+    errorCode.includes('network') ?? errorCode.includes('offline')
   );
 }
 
@@ -316,14 +315,13 @@ export function isNetworkError(error: any): boolean {
 export function isTimeoutError(error: any): boolean {
   if (!error) return false;
 
-  const errorMessage = error.message?.toLowerCase() || '';
-  const errorCode = error.code?.toLowerCase() || '';
+  const errorMessage = error.message?.toLowerCase() ?? '';
+  const errorCode = error.code?.toLowerCase() ?? '';
 
   return (
     errorMessage.includes('timeout') ||
     errorMessage.includes('timed out') ||
-    errorCode.includes('timeout') ||
-    errorCode.includes('deadline-exceeded')
+    errorCode.includes('timeout') ?? errorCode.includes('deadline-exceeded')
   );
 }
 
@@ -333,13 +331,12 @@ export function isTimeoutError(error: any): boolean {
 export function isPermissionError(error: any): boolean {
   if (!error) return false;
 
-  const errorMessage = error.message?.toLowerCase() || '';
-  const errorCode = error.code?.toLowerCase() || '';
+  const errorMessage = error.message?.toLowerCase() ?? '';
+  const errorCode = error.code?.toLowerCase() ?? '';
 
   return (
     errorMessage.includes('permission') ||
-    errorCode.includes('permission') ||
-    errorCode.includes('auth/') && errorMessage.includes('denied')
+    errorCode.includes('permission') ?? errorCode.includes('auth/') && errorMessage.includes('denied')
   );
 }
 
@@ -349,12 +346,11 @@ export function isPermissionError(error: any): boolean {
 export function isFirebaseError(error: any): boolean {
   if (!error) return false;
 
-  const errorCode = error.code?.toLowerCase() || '';
+  const errorCode = error.code?.toLowerCase() ?? '';
 
   return (
     errorCode.startsWith('auth/') ||
-    errorCode.startsWith('firestore/') ||
-    errorCode.startsWith('firebase/')
+    errorCode.startsWith('firestore/') ?? errorCode.startsWith('firebase/')
   );
 }
 
@@ -363,7 +359,7 @@ export function isFirebaseError(error: any): boolean {
  */
 export function categorizeError(error: any): ErrorCategory {
   const parsed = parseError(error);
-  return parsed.category || ErrorCategory.UNKNOWN;
+  return parsed.category ?? ErrorCategory.UNKNOWN;
 }
 
 /**
@@ -371,5 +367,5 @@ export function categorizeError(error: any): ErrorCategory {
  */
 export function assessSeverity(error: any): ErrorSeverity {
   const parsed = parseError(error);
-  return parsed.severity || ErrorSeverity.MEDIUM;
+  return parsed.severity ?? ErrorSeverity.MEDIUM;
 }

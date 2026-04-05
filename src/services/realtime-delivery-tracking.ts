@@ -54,15 +54,15 @@ export function subscribeToDeliveryTracking(
         requestId: data.requestId,
         gillerId: data.gillerId,
         currentLocation: {
-          latitude: data.currentLocation?.latitude || 37.5,
-          longitude: data.currentLocation?.longitude || 127.0,
-          station: data.currentLocation?.station || '위치 정보 없음',
-          updatedAt: data.currentLocation?.updatedAt?.toDate() || new Date(),
-          status: data.currentLocation?.status || 'moving',
+          latitude: data.currentLocation?.latitude ?? 37.5,
+          longitude: data.currentLocation?.longitude ?? 127.0,
+          station: data.currentLocation?.station ?? '위치 정보 없음',
+          updatedAt: data.currentLocation?.updatedAt?.toDate() ?? new Date(),
+          status: data.currentLocation?.status ?? 'moving',
         },
-        estimatedArrival: data.estimatedArrival?.toDate() || new Date(),
+        estimatedArrival: data.estimatedArrival?.toDate() ?? new Date(),
         progress: calculateProgress(data),
-        status: data.status || 'in-transit',
+        status: data.status ?? 'in-transit',
       };
 
       onUpdate(trackingData);
@@ -99,7 +99,7 @@ export async function updateGillerLocation(
       lastLocationUpdateAt: new Date(),
     });
 
-    console.log(`Giller ${gillerId} location updated for request ${requestId}`);
+    // Giller location updated for request
   } catch (error) {
     console.error('Error updating giller location:', error);
     throw error;
@@ -107,13 +107,13 @@ export async function updateGillerLocation(
 }
 
 function calculateProgress(deliveryData: Record<string, any>): number {
-  if (!deliveryData.pickupStation || !deliveryData.deliveryStation) {
+  if (!deliveryData.pickupStation ?? !deliveryData.deliveryStation) {
     return 0;
   }
 
-  const pickupTime = deliveryData.pickupCompletedAt?.toDate?.() || new Date();
+  const pickupTime = deliveryData.pickupCompletedAt?.toDate?.() ?? new Date();
   const deliveryTime =
-    deliveryData.deliveryCompletedAt?.toDate?.() || new Date(Date.now() + 30 * 60 * 1000);
+    deliveryData.deliveryCompletedAt?.toDate?.() ?? new Date(Date.now() + 30 * 60 * 1000);
   const currentTime = new Date();
 
   const totalDuration = deliveryTime.getTime() - pickupTime.getTime();
@@ -146,13 +146,13 @@ export function startLocationUpdates(
     }
   }, 10000);
 
-  console.log(`Started location updates for request ${requestId} (every 10s)`);
+  // Started location updates for request
   return intervalId;
 }
 
 export function stopLocationUpdates(intervalId: ReturnType<typeof setInterval>): void {
   clearInterval(intervalId);
-  console.log('Location updates stopped');
+  // Location updates stopped
 }
 
 /**
@@ -173,7 +173,7 @@ function getCurrentLocation(): Promise<{
   });
 }
 
-export async function completeDelivery(requestId: string, gillerId: string): Promise<void> {
+export async function completeDelivery(requestId: string, _gillerId: string): Promise<void> {
   try {
     const deliveryDoc = doc(db, 'deliveries', requestId);
 
@@ -183,14 +183,14 @@ export async function completeDelivery(requestId: string, gillerId: string): Pro
       progress: 100,
     });
 
-    console.log(`Delivery ${requestId} completed by giller ${gillerId}`);
+    // Delivery completed by giller
   } catch (error) {
     console.error('Error completing delivery:', error);
     throw error;
   }
 }
 
-export async function completePickup(requestId: string, gillerId: string): Promise<void> {
+export async function completePickup(requestId: string, _gillerId: string): Promise<void> {
   try {
     const deliveryDoc = doc(db, 'deliveries', requestId);
 
@@ -200,7 +200,7 @@ export async function completePickup(requestId: string, gillerId: string): Promi
       progress: 10,
     });
 
-    console.log(`Pickup completed for request ${requestId} by giller ${gillerId}`);
+    // Pickup completed for request by giller
   } catch (error) {
     console.error('Error completing pickup:', error);
     throw error;

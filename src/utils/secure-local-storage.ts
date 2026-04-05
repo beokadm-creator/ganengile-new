@@ -1,8 +1,13 @@
 import * as Crypto from 'expo-crypto';
 
 const STORAGE_ENVELOPE_PREFIX = 'enc:v1';
-const STORAGE_ENCRYPTION_SECRET: string =
-  String(process.env.EXPO_PUBLIC_STORAGE_ENCRYPTION_KEY ?? 'ganengile-beta1-local-storage-fallback-key');
+const STORAGE_ENCRYPTION_SECRET: string = (() => {
+  const key = process.env.EXPO_PUBLIC_STORAGE_ENCRYPTION_KEY;
+  if (!key && !(typeof __DEV__ !== 'undefined' && __DEV__)) {
+    console.error('[secure-storage] WARNING: encryption key missing in production');
+  }
+  return String(key ?? 'ganengile-beta1-local-storage-fallback-key');
+})();
 
 function stringToBytes(value: string): Uint8Array {
   return new TextEncoder().encode(value);

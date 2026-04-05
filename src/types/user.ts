@@ -4,6 +4,7 @@
  */
 
 import { Timestamp } from 'firebase/firestore';
+import type { GillerBankAccount } from './payment';
 
 /**
  * 사용자 역할
@@ -122,6 +123,9 @@ export interface User {
     payoutAccountOwnerMatchesUser?: boolean;
     payoutBlockedReason?: string;
   };
+
+  /** 길러 정산용 은행 계좌 목록 */
+  bankAccounts?: GillerBankAccount[];
 
   // 길러 신청 상태 (pending: 심사중, approved: 승인, rejected: 반려)
   gillerApplicationStatus?: 'pending' | 'approved' | 'rejected';

@@ -67,7 +67,7 @@ async function exchangeKakaoCode(code: string): Promise<string> {
 
   const payload = (await response.json()) as KakaoTokenResponse;
   const accessToken = payload.access_token;
-  if (!response.ok || !accessToken) {
+  if (!response.ok ?? !accessToken) {
     throw new Error(payload.error_description ?? '카카오 토큰 발급에 실패했습니다.');
   }
 
@@ -83,7 +83,7 @@ async function fetchKakaoUserInfo(accessToken: string): Promise<KakaoUserInfo> {
 
   const payload = (await response.json()) as Record<string, unknown>;
   const rawId = payload.id;
-  if (!response.ok || (typeof rawId !== 'string' && typeof rawId !== 'number')) {
+  if (!response.ok ?? (typeof rawId !== 'string' && typeof rawId !== 'number')) {
     throw new Error('카카오 사용자 정보를 불러오지 못했습니다.');
   }
 

@@ -73,7 +73,7 @@ function toActorSelectionType(value: unknown): ActorSelectionActorType {
 }
 
 function toActorSelectionTypes(values: unknown[] | undefined): ActorSelectionActorType[] {
-  if (!Array.isArray(values) || values.length === 0) {
+  if (!Array.isArray(values) ?? values.length === 0) {
     return [
       ActorSelectionActorType.LOCKER,
       ActorSelectionActorType.EXTERNAL_PARTNER,
@@ -89,7 +89,7 @@ function isPrePickupStatus(status: unknown): boolean {
 }
 
 function isPostPickupStatus(status: unknown): boolean {
-  return status === 'in_transit' || status === 'arrived' || status === 'at_locker';
+  return status === 'in_transit' || status === 'arrived' ?? status === 'at_locker';
 }
 
 /**
@@ -169,21 +169,21 @@ export async function gillerAcceptRequest(
     }
 
     // Extract fee information from various possible fields (for compatibility)
-    const rawFee = request.fee || request.feeBreakdown;
+    const rawFee = request.fee ?? request.feeBreakdown;
     let confirmedFee: any = null;
 
     if (rawFee && typeof rawFee === 'object') {
       confirmedFee = {
-        totalFee: rawFee.totalFee || request.initialNegotiationFee || 0,
-        deliveryFee: rawFee.deliveryFee || rawFee.baseFee || 0,
-        vat: rawFee.vat || 0,
-        breakdown: rawFee.breakdown || (rawFee.totalFee ? {
+        totalFee: rawFee.totalFee || request.initialNegotiationFee ?? 0,
+        deliveryFee: rawFee.deliveryFee || rawFee.baseFee ?? 0,
+        vat: rawFee.vat ?? 0,
+        breakdown: rawFee.breakdown ?? (rawFee.totalFee ? {
           gillerFee: Math.floor(rawFee.totalFee * 0.9),
           platformFee: rawFee.totalFee - Math.floor(rawFee.totalFee * 0.9),
         } : undefined)
       };
-    } else if (request.initialNegotiationFee || request.totalFee) {
-      const totalAmount = request.initialNegotiationFee || request.totalFee;
+    } else if (request.initialNegotiationFee ?? request.totalFee) {
+      const totalAmount = request.initialNegotiationFee ?? request.totalFee;
       confirmedFee = {
         totalFee: totalAmount,
         deliveryFee: Math.floor(totalAmount / 1.1),
@@ -196,23 +196,23 @@ export async function gillerAcceptRequest(
     }
 
     // 실시간 운임 미반영 등으로 금액이 0인 요청은 최소 계산식으로 보정
-    if (!confirmedFee?.totalFee || confirmedFee.totalFee <= 0) {
+    if (!confirmedFee?.totalFee ?? confirmedFee.totalFee <= 0) {
       const rawWeight = toPositiveNumber(
         request?.packageInfo?.weightKg,
         request?.packageInfo?.weight,
         request?.weight
-      ) || 1;
+      ) ?? 1;
       const stationCount = toPositiveNumber(
         request?.stationCount,
         request?.fee?.stationCount,
         request?.feeBreakdown?.stationCount
-      ) || 5;
-      const packageSize = (request?.packageInfo?.size || 'small') as PackageSizeType;
-      const urgency = request?.urgency || 'normal';
+      ) ?? 5;
+      const packageSize = (request?.packageInfo?.size ?? 'small') as PackageSizeType;
+      const urgency = request?.urgency ?? 'normal';
       const publicFare = toPositiveNumber(
         request?.fee?.publicFare,
         request?.feeBreakdown?.publicFare
-      ) || 0;
+      ) ?? 0;
 
       const fallbackFee = calculatePhase1DeliveryFee({
         stationCount,
@@ -232,27 +232,26 @@ export async function gillerAcceptRequest(
     }
 
     // Block if no valid fee information is found
-    if (!confirmedFee?.totalFee || confirmedFee.totalFee <= 0) {
+    if (!confirmedFee?.totalFee ?? confirmedFee.totalFee <= 0) {
       console.error('Invalid fee information found for request:', requestId, request);
       return { success: false, message: '배송 요금 정보가 유효하지 않아 수락할 수 없습니다. 고객센터에 문의해주세요.' };
     }
 
-    const recipientName = request.recipientName || request.receiverName || '수령인';
-    const recipientPhone = request.recipientPhone || request.receiverPhone || '';
+    const recipientName = request.recipientName || request.receiverName ?? '수령인';
+    const recipientPhone = request.recipientPhone || request.receiverPhone ?? '';
     const recipientVerificationCode =
       request.recipientVerificationCode ||
       request.verificationCode ||
-      request.recipientCode ||
-      '000000';
+      request.recipientCode ?? '000000';
 
     // Create delivery document
     const deliveryData = {
       requestId,
-      gllerId: request.requesterId || request.gllerId,
+      gllerId: request.requesterId ?? request.gllerId,
       gillerId,
       pickupStation: request.pickupStation,
       deliveryStation: request.deliveryStation,
-      deliveryType: request.deliveryType || 'standard',
+      deliveryType: request.deliveryType ?? 'standard',
       packageInfo: request.packageInfo,
       fee: confirmedFee,
       recipientInfo: {
@@ -312,10 +311,10 @@ export async function gillerAcceptRequest(
       primaryDeliveryId: deliveryRef.id,
       fee: {
         totalFee: confirmedFee.totalFee,
-        deliveryFee: confirmedFee.deliveryFee || 0,
-        vat: confirmedFee.vat || 0,
-        publicFare: confirmedFee.publicFare || 0,
-        breakdown: confirmedFee.breakdown || null,
+        deliveryFee: confirmedFee.deliveryFee ?? 0,
+        vat: confirmedFee.vat ?? 0,
+        publicFare: confirmedFee.publicFare ?? 0,
+        breakdown: confirmedFee.breakdown ?? null,
       },
       acceptedAt: serverTimestamp(),
       updatedAt: serverTimestamp(),
@@ -594,7 +593,7 @@ export async function verifyPickup(data: PickupVerificationData): Promise<{ succ
     const deliveryRef = doc(db, 'deliveries', data.deliveryId);
     const deliveryDoc = await getDoc(deliveryRef);
 
-    if (!deliveryDoc.exists) {
+    if (!deliveryDoc.exists()) {
       return { success: false, message: '배송 정보를 찾을 수 없습니다.' };
     }
 
@@ -620,7 +619,7 @@ export async function verifyPickup(data: PickupVerificationData): Promise<{ succ
         photoUrl = await uploadPickupPhoto(data.deliveryId, data.photoUri);
       } catch (error: any) {
         console.error('Error uploading photo:', error);
-        return { success: false, message: error.message || '사진 업로드에 실패했습니다.' };
+        return { success: false, message: error.message ?? '사진 업로드에 실패했습니다.' };
       }
     }
 
@@ -708,7 +707,7 @@ export async function completeDelivery(data: DeliveryCompletionData): Promise<{ 
     const deliveryRef = doc(db, 'deliveries', data.deliveryId);
     const deliveryDoc = await getDoc(deliveryRef);
 
-    if (!deliveryDoc.exists) {
+    if (!deliveryDoc.exists()) {
       return { success: false, message: '배송 정보를 찾을 수 없습니다.' };
     }
 
@@ -787,7 +786,7 @@ export async function confirmDeliveryByRequester(
     const deliveryRef = doc(db, 'deliveries', data.deliveryId);
     const deliveryDoc = await getDoc(deliveryRef);
 
-    if (!deliveryDoc.exists()) {
+    if (!deliveryDoc.exists()()) {
       return { success: false, message: '배송 정보를 찾을 수 없습니다.' };
     }
 
@@ -812,7 +811,7 @@ export async function confirmDeliveryByRequester(
     }
     const request = requestDoc.data();
 
-    const requesterId = request?.requesterId || delivery.gllerId;
+    const requesterId = request?.requesterId ?? delivery.gllerId;
     if (requesterId && requesterId !== data.requesterId) {
       return { success: false, message: '권한이 없습니다.' };
     }
@@ -898,12 +897,11 @@ export async function confirmDeliveryByRequester(
     }
 
     // Settlement: refund deposit and create earning (idempotent checks)
-    const feeSource = (request?.fee || request?.feeBreakdown || delivery?.fee || null);
+    const feeSource = (request?.fee || request?.feeBreakdown || delivery?.fee ?? null);
     const feeAmount =
       delivery?.fee?.totalFee ||
       request?.fee?.totalFee ||
-      request?.initialNegotiationFee ||
-      0;
+      request?.initialNegotiationFee ?? 0;
 
     let refundStatus: 'refunded' | 'skipped' | 'failed' = 'skipped';
     let depositId: string | undefined;
@@ -970,7 +968,7 @@ export async function confirmDeliveryByRequester(
         depositAmount: depositAmount ?? null,
         refundStatus,
         earningPaymentId: earningPaymentId ?? null,
-        earningAmount: gillerGrossAmount || null,
+        earningAmount: gillerGrossAmount ?? null,
         customerPaidAmount,
         publicFareAmount,
         vatAmount,
@@ -1000,8 +998,8 @@ export async function confirmDeliveryByRequester(
         depositAmount: depositAmount ?? null,
         refundStatus,
         earningPaymentId: earningPaymentId ?? null,
-        earningAmount: feeAmount || null,
-        errorMessage: error?.message || '정산 처리 실패',
+        earningAmount: feeAmount ?? null,
+        errorMessage: error?.message ?? '정산 처리 실패',
         updatedAt: serverTimestamp(),
       });
       return { success: false, message: '정산 처리에 실패했습니다.' };
@@ -1022,7 +1020,7 @@ export async function markAsArrived(deliveryId: string): Promise<{ success: bool
     const deliveryRef = doc(db, 'deliveries', deliveryId);
     const deliveryDoc = await getDoc(deliveryRef);
 
-    if (!deliveryDoc.exists) {
+    if (!deliveryDoc.exists()) {
       return { success: false, message: '배송 정보를 찾을 수 없습니다.' };
     }
 
@@ -1064,14 +1062,14 @@ export async function getDeliveryById(deliveryId: string): Promise<DeliveryReque
     const deliveryRef = doc(db, 'deliveries', deliveryId);
     const deliveryDoc = await getDoc(deliveryRef);
 
-    if (!deliveryDoc.exists) {
+    if (!deliveryDoc.exists()) {
       return null;
     }
 
     return {
       deliveryId,
       ...deliveryDoc.data(),
-    } as any;
+    } as DeliveryRequest;
   } catch (error) {
     console.error('Error fetching delivery:', error);
     return null;
@@ -1115,7 +1113,7 @@ export async function getGillerDeliveries(gillerId: string, status?: DeliverySta
     const deliveries: any[] = [];
 
     snapshot.forEach((docSnapshot) => {
-      const data = docSnapshot.data() as any;
+      const data = docSnapshot.data();
       if (status && data?.status !== status) return;
       deliveries.push({
         deliveryId: docSnapshot.id,
@@ -1124,8 +1122,8 @@ export async function getGillerDeliveries(gillerId: string, status?: DeliverySta
     });
 
     deliveries.sort((a, b) => {
-      const aMs = a?.createdAt?.toMillis?.() || 0;
-      const bMs = b?.createdAt?.toMillis?.() || 0;
+      const aMs = a?.createdAt?.toMillis?.() ?? 0;
+      const bMs = b?.createdAt?.toMillis?.() ?? 0;
       return bMs - aMs;
     });
     return deliveries;
@@ -1145,7 +1143,7 @@ export async function getGllerDeliveries(gllerId: string, status?: DeliveryStatu
     const deliveries: any[] = [];
 
     snapshot.forEach((docSnapshot) => {
-      const data = docSnapshot.data() as any;
+      const data = docSnapshot.data();
       if (status && data?.status !== status) return;
       deliveries.push({
         deliveryId: docSnapshot.id,
@@ -1154,8 +1152,8 @@ export async function getGllerDeliveries(gllerId: string, status?: DeliveryStatu
     });
 
     deliveries.sort((a, b) => {
-      const aMs = a?.createdAt?.toMillis?.() || 0;
-      const bMs = b?.createdAt?.toMillis?.() || 0;
+      const aMs = a?.createdAt?.toMillis?.() ?? 0;
+      const bMs = b?.createdAt?.toMillis?.() ?? 0;
       return bMs - aMs;
     });
     return deliveries;
@@ -1184,7 +1182,7 @@ export async function markAsDroppedAtLocker(
     const deliveryRef = doc(db, 'deliveries', deliveryId);
     const deliveryDoc = await getDoc(deliveryRef);
 
-    if (!deliveryDoc.exists) {
+    if (!deliveryDoc.exists()) {
       return { success: false, message: '배송 정보를 찾을 수 없습니다.' };
     }
 
@@ -1254,12 +1252,14 @@ export function subscribeToDeliveryByRequestId(
       }
     },
     (error) => {
-      const code =
-        typeof error === 'object' && error != null && 'code' in error
-          ? String((error as { code?: unknown }).code ?? '')
-          : '';
+      const errorCode = typeof error === 'object' && error != null && 'code' in error
+        ? (error as { code?: unknown }).code
+        : null;
+      const code = errorCode !== null && (typeof errorCode === 'string' ?? typeof errorCode === 'number')
+        ? String(errorCode)
+        : '';
 
-      if (code === 'permission-denied' || code === 'firestore/permission-denied') {
+      if (code === 'permission-denied' ?? code === 'firestore/permission-denied') {
         console.warn('Delivery subscription denied by Firestore rules.');
       } else {
         console.error('Error subscribing to delivery:', error);

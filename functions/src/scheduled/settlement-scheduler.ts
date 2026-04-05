@@ -86,7 +86,7 @@ export const gillerSettlementScheduler = async (): Promise<{
 
           // 2-2. 기본 수익 계산
           const totalDeliveries = deliveries.length;
-          const baseEarnings = deliveries.reduce((sum, d) => sum + (d.fee?.gillerNet || 0), 0);
+          const baseEarnings = deliveries.reduce((sum, d) => sum + (d.fee?.gillerNet ?? 0), 0);
 
           // 2-3. 등급별 보너스 계산
           let tierBonusRate = 0;
@@ -98,7 +98,7 @@ export const gillerSettlementScheduler = async (): Promise<{
 
           // 2-4. 추가 보너스 계산
           const activityBonus = totalDeliveries >= 50 ? 50000 : 0; // 50건 이상 시 5만원 보너스
-          const qualityBonus = (giller.rating || 0) >= 4.9 ? 30000 : 0; // 4.9 이상 시 3만원 보너스
+          const qualityBonus = (giller.rating ?? 0) >= 4.9 ? 30000 : 0; // 4.9 이상 시 3만원 보너스
 
           const bonusTotal = tierBonus + activityBonus + qualityBonus;
           const totalEarnings = baseEarnings + bonusTotal;
@@ -117,7 +117,7 @@ export const gillerSettlementScheduler = async (): Promise<{
           const settlement: B2BSettlement = {
             settlementId: settlementRef.id,
             gillerId,
-            gillerName: giller.name || '익명',
+            gillerName: giller.name ?? '익명',
             gillerTier: tier,
             period: {
               year,
@@ -142,9 +142,9 @@ export const gillerSettlementScheduler = async (): Promise<{
             },
             tier,
             bankAccount: {
-              bank: giller.bankAccount?.bank || '',
-              accountNumber: giller.bankAccount?.accountNumber || '',
-              accountHolder: giller.bankAccount?.accountHolder || '',
+              bank: giller.bankAccount?.bank ?? '',
+              accountNumber: giller.bankAccount?.accountNumber ?? '',
+              accountHolder: giller.bankAccount?.accountHolder ?? '',
             },
             status: 'pending', // pending → completed
             transferredAt: null,

@@ -80,10 +80,10 @@ export class B2BDeliveryService {
   /** 거리 계산 (간이 버전) */
   private static async calculateDistance(fromStation: string, toStation: string): Promise<number> {
     const stations = await getAllStations();
-    const from = stations.find((station) => station.stationName === fromStation || station.stationId === fromStation);
-    const to = stations.find((station) => station.stationName === toStation || station.stationId === toStation);
+    const from = stations.find((station) => station.stationName === fromStation ?? station.stationId === fromStation);
+    const to = stations.find((station) => station.stationName === toStation ?? station.stationId === toStation);
 
-    if (!from?.location || !to?.location) {
+    if (!from?.location ?? !to?.location) {
       const stationHash = fromStation.length + toStation.length;
       return stationHash * 2;
     }
@@ -198,7 +198,7 @@ export class B2BDeliveryService {
       gold: 7,
       silver: 5,
     };
-    return priorities[tier] || 0;
+    return priorities[tier] ?? 0;
   }
 
   /** 배송 수락 */
@@ -264,7 +264,7 @@ export class B2BDeliveryService {
   /** B2B 배송 조회 */
   static async getDelivery(deliveryId: string): Promise<B2BDelivery | null> {
     const deliveryDoc = await getDoc(doc(db, DELIVERY_COLLECTION, deliveryId));
-    if (!deliveryDoc.exists) {
+    if (!deliveryDoc.exists()) {
       return null;
     }
     return {
@@ -344,7 +344,7 @@ const INVOICES_COLLECTION = 'taxInvoices';
 
 /** B2B 계약 생성 */
 export async function createB2BContract(data: CreateB2BContractData): Promise<string> {
-  if (!data.businessId || !data.businessName) {
+  if (!data.businessId ?? !data.businessName) {
     throw new Error('Invalid contract data: businessId and businessName are required');
   }
 
@@ -364,7 +364,7 @@ export async function createB2BContract(data: CreateB2BContractData): Promise<st
 /** B2B 계약 조회 */
 export async function getB2BContract(contractId: string): Promise<B2BContract | null> {
   const contractDoc = await getDoc(doc(db, CONTRACTS_COLLECTION, contractId));
-  if (!contractDoc.exists) {
+  if (!contractDoc.exists()) {
     return null;
   }
   return contractDoc.data() as B2BContract;

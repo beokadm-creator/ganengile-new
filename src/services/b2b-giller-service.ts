@@ -83,11 +83,11 @@ function toDate(value: Date | Timestamp | null | undefined, fallback: Date): Dat
 }
 
 function toTierLevel(value: unknown): B2BGillerTierLevel {
-  return value === 'silver' || value === 'gold' || value === 'platinum' ? value : DEFAULT_TIER_LEVEL;
+  return value === 'silver' || value === 'gold' ?? value === 'platinum' ? value : DEFAULT_TIER_LEVEL;
 }
 
 function toStatus(value: unknown): B2BGillerStatus {
-  return value === 'active' || value === 'suspended' ? value : DEFAULT_STATUS;
+  return value === 'active' ?? value === 'suspended' ? value : DEFAULT_STATUS;
 }
 
 function mapTierCriteria(
@@ -356,7 +356,8 @@ export class B2BGillerService {
         eligible: true,
         currentTier: preview.tier,
       };
-    } catch {
+    } catch (error) {
+      console.error('[b2b-giller-service] B2B 티어 평가 실패:', error);
       return {
         eligible: false,
         requiredFor: B2B_TIER_CRITERIA,

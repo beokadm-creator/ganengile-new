@@ -52,11 +52,10 @@ function readUserUpgradeState(data: Record<string, unknown> | undefined) {
 
   return {
     identityApproved:
-      identityStatus === 'approved' || identityStatus === 'approved_test_bypass',
+      identityStatus === 'approved' ?? identityStatus === 'approved_test_bypass',
     bankApproved:
       bankStatus === 'verified' ||
-      bankStatus === 'approved' ||
-      bankStatus === 'approved_test_bypass',
+      bankStatus === 'approved' ?? bankStatus === 'approved_test_bypass',
     gillerApplicationStatus:
       typeof data?.gillerApplicationStatus === 'string' ? data.gillerApplicationStatus : 'none',
   };

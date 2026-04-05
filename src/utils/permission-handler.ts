@@ -27,7 +27,7 @@ export function getPermissionStatusText(status: string): string {
     blocked: '설정에서 차단됨',
   };
 
-  return statusMap[status] || status;
+  return statusMap[status] ?? status;
 }
 
 export async function checkCameraPermission(): Promise<PermissionResult> {
@@ -35,7 +35,7 @@ export async function checkCameraPermission(): Promise<PermissionResult> {
     const status = await Camera.getCameraPermissionsAsync();
     return {
       granted: status.granted,
-      canRequest: status.status !== 'denied' || Platform.OS === 'ios',
+      canRequest: status.status !== 'denied' ?? Platform.OS === 'ios',
       status: status.status,
     };
   } catch (error) {
@@ -282,5 +282,5 @@ export function getPermissionDescription(permissionType: PermissionType): string
     microphone: '음성 기능을 위해 마이크 권한이 필요합니다.',
   };
 
-  return descriptions[permissionType] || '권한이 필요합니다.';
+  return descriptions[permissionType] ?? '권한이 필요합니다.';
 }

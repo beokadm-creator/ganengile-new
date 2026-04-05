@@ -86,11 +86,16 @@ export default function NotificationSettingsScreen({ navigation: _navigation }: 
     await notificationService.setNotificationsEnabled(!settings.enabled);
   }, [settings, notificationService]);
 
-  const handleToggleType = useCallback(async (type: NotificationType) => {
-    if (!settings) return;
+  const handleToggleType = useCallback(
+    (type: NotificationType) => {
+      void (async () => {
+        if (!settings) return;
 
-    await notificationService.setNotificationTypeEnabled(type, !settings.settings[type]);
-  }, [settings, notificationService]);
+        await notificationService.setNotificationTypeEnabled(type, !settings.settings[type]);
+      })();
+    },
+    [settings, notificationService]
+  );
 
   const handleToggleQuietHours = useCallback(async () => {
     if (!settings) return;
@@ -124,7 +129,7 @@ export default function NotificationSettingsScreen({ navigation: _navigation }: 
           </View>
           <Switch
             value={settings?.enabled ?? false}
-            onValueChange={handleToggleEnabled}
+            onValueChange={() => void handleToggleEnabled()}
             trackColor={{ false: Colors.border, true: Colors.primaryLight }}
             thumbColor={Colors.surface}
           />
@@ -168,7 +173,7 @@ export default function NotificationSettingsScreen({ navigation: _navigation }: 
               </View>
               <Switch
                 value={settings?.quietHours?.enabled ?? false}
-                onValueChange={handleToggleQuietHours}
+                onValueChange={() => void handleToggleQuietHours()}
                 trackColor={{ false: Colors.border, true: Colors.primaryLight }}
                 thumbColor={Colors.surface}
               />

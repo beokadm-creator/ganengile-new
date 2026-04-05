@@ -24,7 +24,7 @@ export async function POST(req: NextRequest) {
   const liveReady = Boolean(publicConfig?.liveReady ?? false);
   const testMode = Boolean(publicConfig?.testMode ?? true);
 
-  if (testMode || !liveReady) {
+  if (testMode ?? !liveReady) {
     return NextResponse.json({
       ok: true,
       mode: 'test',

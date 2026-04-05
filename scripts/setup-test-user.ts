@@ -32,7 +32,7 @@ async function getUserByEmail() {
     console.log('✅ User found in Firebase Auth!');
     console.log('UID:', userRecord.uid);
     console.log('Email:', userRecord.email);
-    console.log('Display Name:', userRecord.displayName || '(none)');
+    console.log('Display Name:', userRecord.displayName ?? '(none)');
     console.log('Email Verified:', userRecord.emailVerified);
 
     return userRecord.uid;

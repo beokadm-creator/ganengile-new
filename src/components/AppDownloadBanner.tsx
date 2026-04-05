@@ -73,10 +73,10 @@ export function AppDownloadBanner({ visible = true, onDismiss }: AppDownloadBann
     // 앱 배포 후 실제 앱 스토어 링크로 교체 필요
     if (platform === 'ios') {
       // App Store 링크 (배포 후 idXXXXXXXXX를 실제 App ID로 교체)
-      Linking.openURL('https://apps.apple.com/app/idXXXXXXXXX');
+      void Linking.openURL('https://apps.apple.com/app/idXXXXXXXXX');
     } else {
       // Play Store 링크 (배포 후 패키지명 확인)
-      Linking.openURL('https://play.google.com/store/apps/details?id=com.ganengile');
+      void Linking.openURL('https://play.google.com/store/apps/details?id=com.ganengile');
     }
   };
 
@@ -105,7 +105,7 @@ export function AppDownloadBanner({ visible = true, onDismiss }: AppDownloadBann
               <Text style={styles.downloadButtonText}>설치하기</Text>
             </TouchableOpacity>
 
-            <TouchableOpacity style={styles.dismissButton} onPress={handleDismiss}>
+            <TouchableOpacity style={styles.dismissButton} onPress={() => void handleDismiss()}>
               <Text style={styles.dismissButtonText}>✕</Text>
             </TouchableOpacity>
           </View>
@@ -174,7 +174,7 @@ export function AppDownloadBanner({ visible = true, onDismiss }: AppDownloadBann
                 <Text style={styles.continueWebButtonText}>웹으로 계속하기</Text>
               </TouchableOpacity>
 
-              <TouchableOpacity style={styles.dontShowAgainButton} onPress={handleDontShowAgain}>
+              <TouchableOpacity style={styles.dontShowAgainButton} onPress={() => void handleDontShowAgain()}>
                 <Text style={styles.dontShowAgainText}>다시 보지 않기</Text>
               </TouchableOpacity>
             </View>

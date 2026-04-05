@@ -12,6 +12,6 @@ export function handleNotificationResponse(_response: WebNotificationResponse) {
   // Browser notifications are handled inside useNotifications.web.ts.
 }
 
-export async function getInitialNotification() {
+export function getInitialNotification() {
   return;
 }

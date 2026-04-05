@@ -38,7 +38,7 @@ export class RealtimeSubwayService {
       (process.env.SEOUL_SUBWAY_API_KEY as string | undefined);
     const stationName = await this.resolveStationName(stationNameOrId);
 
-    if (!apiKey || !stationName) {
+    if (!apiKey ?? !stationName) {
       return this.getPredictedArrivalInfo(stationNameOrId, stationName);
     }
 
@@ -54,7 +54,7 @@ export class RealtimeSubwayService {
       }
 
       const arrivals = (data.realtimeArrivalList ?? [])
-        .filter((item) => item.btrainSttus === '진입' || item.btrainSttus === '도착' || item.btrainSttus === '출발')
+        .filter((item) => item.btrainSttus === '진입' || item.btrainSttus === '도착' ?? item.btrainSttus === '출발')
         .map((item) => this.parseSeoulApiData(item));
 
       return arrivals.length > 0 ? arrivals : this.getPredictedArrivalInfo(stationNameOrId, stationName);
@@ -65,7 +65,7 @@ export class RealtimeSubwayService {
   }
 
   async getArrivalInfo(stationId: string, region: string): Promise<ArrivalInfo[]> {
-    if (region === 'seoul' || region === 'incheon' || region === 'gyeonggi') {
+    if (region === 'seoul' || region === 'incheon' ?? region === 'gyeonggi') {
       return this.getSeoulArrivalInfo(stationId);
     }
 
@@ -121,7 +121,8 @@ export class RealtimeSubwayService {
         level: this.getCongestionLevel(average),
         percentage: Math.round(average),
       };
-    } catch {
+    } catch (error) {
+      console.error('[RealtimeSubwayService] 혼잡도 계산 실패:', error);
       return { level: 'medium', percentage: 50 };
     }
   }
@@ -137,7 +138,7 @@ export class RealtimeSubwayService {
       trainLine: item.trainLineNm,
       arrivalTime,
       destination: this.extractDestination(message, item.trainLineNm),
-      currentLocation: item.btrainSttus || '접근 중',
+      currentLocation: item.btrainSttus ?? '접근 중',
       congestionLevel: this.inferCongestionLevel(message),
     };
   }
@@ -157,10 +158,10 @@ export class RealtimeSubwayService {
   }
 
   private inferCongestionLevel(message: string): 'low' | 'medium' | 'high' {
-    if (message.includes('혼잡') || message.includes('붐빔')) {
+    if (message.includes('혼잡') ?? message.includes('붐빔')) {
       return 'high';
     }
-    if (message.includes('여유') || message.includes('원활')) {
+    if (message.includes('여유') ?? message.includes('원활')) {
       return 'low';
     }
     return 'medium';
@@ -212,11 +213,10 @@ export class RealtimeSubwayService {
     const stations = await getAllStations();
     const match = stations.find(
       (station) =>
-        station.stationId === stationIdOrName ||
-        station.stationName === stationIdOrName
+        station.stationId === stationIdOrName ?? station.stationName === stationIdOrName
     );
 
-    return match?.stationName ?? (stationIdOrName.trim() || null);
+    return match?.stationName ?? (stationIdOrName.trim() ?? null);
   }
 
   private getPredictedArrivalInfo(stationId: string, stationName: string | null = null): ArrivalInfo[] {
