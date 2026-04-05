@@ -5,6 +5,7 @@
 
 import { Timestamp } from 'firebase/firestore';
 import type { GillerBankAccount } from './payment';
+import type { ConsentRecord } from './consent';
 
 /**
  * 사용자 역할
@@ -74,6 +75,9 @@ export interface User {
 
   // 온보딩 완료 여부
   hasCompletedOnboarding?: boolean;
+
+  // 동의 이력 (버전 관리)
+  consentHistory?: ConsentRecord[];
 
   // 프로필 사진
   profilePhoto?: string;
