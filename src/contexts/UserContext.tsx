@@ -14,7 +14,7 @@ interface UserContextType {
   currentRole: UserRole | null;
   switchRole: (role: UserRole) => void;
   refreshUser: () => Promise<void>;
-  completeOnboarding: () => Promise<void>;
+  completeOnboarding: () => Promise<string | null>;
   logout: () => Promise<void>;
 }
 
@@ -160,10 +160,10 @@ export function UserProvider({ children }: UserProviderProps) {
     return refreshInFlightRef.current;
   };
 
-  const completeOnboarding = async () => {
+  const completeOnboarding = async (): Promise<string | null> => {
     const activeUser = auth.currentUser;
     if (!activeUser) {
-      return;
+      return null;
     }
 
     await updateDoc(doc(db, 'users', activeUser.uid), {
@@ -179,6 +179,10 @@ export function UserProvider({ children }: UserProviderProps) {
           }
         : currentUser
     );
+
+    // 온보딩 전에 사용자가 가려던 URL 반환
+    const { consumePendingDeepLink } = require('../navigation/navigationRef');
+    return consumePendingDeepLink();
   };
 
   const switchRole = (role: UserRole) => {

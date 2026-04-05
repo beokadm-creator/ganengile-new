@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from 'react';
+﻿import React, { useEffect, useRef } from 'react';
 import { NavigationContainer } from '@react-navigation/native';
 import { createStackNavigator } from '@react-navigation/stack';
 import { ActivityIndicator, Platform, StyleSheet, View } from 'react-native';
@@ -12,7 +12,7 @@ import BasicInfoOnboarding from '../screens/onboarding/BasicInfoOnboarding';
 import MainNavigator from './MainNavigator';
 import B2BNavigator from './B2BNavigator';
 import { AppDownloadBanner } from '../components/AppDownloadBanner';
-import { navigationRef } from './navigationRef';
+import { navigationRef, savePendingDeepLink, consumePendingDeepLink } from './navigationRef';
 import { getInitialNotification, handleNotificationResponse } from './notificationHandler';
 import { useAuth } from '../contexts/AuthContext';
 import {
@@ -29,6 +29,7 @@ function AppNavigatorContent() {
   const { user: authUser } = useAuth();
   const notificationResponseListener = useRef<{ remove: () => void } | undefined>(undefined);
   const notificationReceivedListener = useRef<{ remove: () => void } | undefined>(undefined);
+  const prevOnboardingRef = useRef(user?.hasCompletedOnboarding ?? false);
 
   useEffect(() => {
     if (Platform.OS === 'web') {
@@ -85,6 +86,40 @@ function AppNavigatorContent() {
 
     void syncStoredChannelAttributionToUser(authUser.uid);
   }, [authUser?.uid]);
+
+
+  // Save pending URL when user needs onboarding
+  useEffect(() => {
+    if (!user || user.hasCompletedOnboarding) return;
+    if (Platform.OS !== 'web') return;
+    const currentPath = window.location.pathname;
+    if (currentPath && currentPath !== '/' && currentPath !== '/onboarding') {
+      void savePendingDeepLink(currentPath);
+    }
+  }, [user?.hasCompletedOnboarding, user]);
+
+  // Detect onboarding completion and navigate to pending URL
+  useEffect(() => {
+    const wasCompleted = prevOnboardingRef.current;
+    const isCompleted = user?.hasCompletedOnboarding ?? false;
+
+    if (!wasCompleted && isCompleted) {
+      prevOnboardingRef.current = true;
+      void (async () => {
+        const pendingUrl = await consumePendingDeepLink();
+        if (pendingUrl && navigationRef.current?.isReady()) {
+          if (pendingUrl.includes('request/new')) {
+            navigationRef.current.navigate('Main', {
+              screen: 'CreateRequest',
+              params: undefined,
+            });
+          }
+        }
+      })();
+    }
+
+    prevOnboardingRef.current = isCompleted;
+  }, [user?.hasCompletedOnboarding]);
 
   if (loading) {
     return (
