@@ -35,10 +35,13 @@ export function getDefaultFunctionsBaseUrl(): string {
     getApps()[0]?.options.projectId && typeof getApps()[0]?.options.projectId === 'string'
       ? getApps()[0]?.options.projectId
       : '';
+  // Use process.env directly so Expo's bundler inlines EXPO_PUBLIC_* at build time.
+  // Indirect access via the `env` variable prevents inlining on web.
+  // Use || instead of ?? so empty-string fallbacks actually cascade.
   const projectId =
-    readEnv(env.EXPO_PUBLIC_FIREBASE_PROJECT_ID) ??
-    readEnv(env.FIREBASE_PROJECT_ID) ?? readEnv(firebaseProjectId);
-  const region = readEnv(env.EXPO_PUBLIC_FIREBASE_FUNCTIONS_REGION) ?? 'us-central1';
+    readEnv(process.env.EXPO_PUBLIC_FIREBASE_PROJECT_ID) ||
+    readEnv(firebaseProjectId);
+  const region = readEnv(process.env.EXPO_PUBLIC_FIREBASE_FUNCTIONS_REGION) || 'us-central1';
   if (!projectId) {
     return '';
   }
