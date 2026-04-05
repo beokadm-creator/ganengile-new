@@ -2480,7 +2480,7 @@ export const naverStaticMapProxy = functions.https.onRequest(async (req, res) =>
     const clientId = NAVER_MAP_CLIENT_ID_PARAM.value() || process.env.NAVER_MAP_CLIENT_ID ?? '';
     const clientSecret = NAVER_MAP_CLIENT_SECRET_PARAM.value() || process.env.NAVER_MAP_CLIENT_SECRET ?? '';
 
-    if (!clientId ?? !clientSecret) {
+    if (!clientId || !clientSecret) {
       res.status(503).json({ ok: false, message: 'naver map credentials are not configured' });
       return;
     }
@@ -2543,7 +2543,7 @@ export const naverGeocodeProxy = functions.https.onRequest(async (req, res) => {
     const clientId = NAVER_MAP_CLIENT_ID_PARAM.value() || process.env.NAVER_MAP_CLIENT_ID ?? '';
     const clientSecret = NAVER_MAP_CLIENT_SECRET_PARAM.value() || process.env.NAVER_MAP_CLIENT_SECRET ?? '';
 
-    if (!clientId ?? !clientSecret) {
+    if (!clientId || !clientSecret) {
       res.status(503).json({ ok: false, message: 'naver map credentials are not configured' });
       return;
     }
@@ -2581,7 +2581,7 @@ export const naverGeocodeProxy = functions.https.onRequest(async (req, res) => {
     const longitude = Number(first?.x ?? 0);
     const latitude = Number(first?.y ?? 0);
 
-    if (!first || !Number.isFinite(latitude) || !Number.isFinite(longitude) || latitude === 0 ?? longitude === 0) {
+    if (!first || !Number.isFinite(latitude) || !Number.isFinite(longitude) || latitude === 0 || longitude === 0) {
       res.status(404).json({ ok: false, message: 'address coordinates not found' });
       return;
     }
@@ -2620,7 +2620,7 @@ export const naverDirectionsProxy = functions.https.onRequest(async (req, res) =
     const clientId = NAVER_MAP_CLIENT_ID_PARAM.value() || process.env.NAVER_MAP_CLIENT_ID ?? '';
     const clientSecret = NAVER_MAP_CLIENT_SECRET_PARAM.value() || process.env.NAVER_MAP_CLIENT_SECRET ?? '';
 
-    if (!clientId ?? !clientSecret) {
+    if (!clientId || !clientSecret) {
       res.status(503).json({ ok: false, message: 'naver map credentials are not configured' });
       return;
     }
