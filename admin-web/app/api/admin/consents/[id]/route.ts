@@ -28,7 +28,7 @@ export async function GET(
     return NextResponse.json({ error: 'Not found' }, { status: 404 });
   }
 
-  const data = doc.data();
+  const data = doc.data() ?? {};
   return NextResponse.json({
     item: {
       id: doc.id,

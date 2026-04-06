@@ -108,7 +108,7 @@ function slugifyLineId(lineName: string): string {
     normalized
       .toLowerCase()
       .replace(/[^a-z0-9가-힣]+/g, '_')
-      .replace(/^_+|_+$/g, '') ?? 'line'
+      .replace(/^_+|_+$/g, '') || 'line'
   );
 }
 

@@ -51,7 +51,7 @@ function getFareApiBaseUrl(): string {
   return (
     paramValue ||
     process.env.SEOUL_FARE_API_URL ||
-    process.env.EXPO_PUBLIC_SEOUL_FARE_API_URL ?? DEFAULT_FARE_API_URL
+    process.env.EXPO_PUBLIC_SEOUL_FARE_API_URL || DEFAULT_FARE_API_URL
   ).replace(/\/$/, '');
 }
 
@@ -60,7 +60,7 @@ function getFareServiceKey(): string {
   return (
     paramValue ||
     process.env.SEOUL_FARE_SERVICE_KEY ||
-    process.env.EXPO_PUBLIC_SEOUL_FARE_SERVICE_KEY ?? ''
+    process.env.EXPO_PUBLIC_SEOUL_FARE_SERVICE_KEY || ''
   ).trim();
 }
 
@@ -80,7 +80,7 @@ function normalizeItems(payload: any): FareApiItem[] {
     payload?.body?.items?.item ||
     payload?.getRltmFare?.row ||
     payload?.row ||
-    payload?.items ?? [];
+    payload?.items || [];
   const items = Array.isArray(candidates) ? candidates : [candidates];
   return items.filter(Boolean);
 }
@@ -268,7 +268,7 @@ export const fareCacheScheduler = async (): Promise<SchedulerResult> => {
       input.lineNumber ||
       input.lineId ||
       input.line ||
-      input.lineName ?? '';
+      input.lineName || '';
 
     const byLineId = stationIdByNameLine.get(`${normalizeName(stationName)}::${normalizeLine(lineCandidate)}`);
     if (byLineId) return byLineId;

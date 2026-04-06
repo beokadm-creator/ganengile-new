@@ -2797,7 +2797,7 @@ export const ciVerificationCallback = functions.https.onRequest(async (req, res)
     if (webhookSecret) {
       const providedSignature =
         readFirstQueryValue(req.query?.[signatureParam]) ||
-        readObjectString(req.body, signatureParam) ?? readFirstQueryValue(req.headers?.[signatureHeader]);
+        readObjectString(req.body, signatureParam) || readFirstQueryValue(req.headers?.[signatureHeader]);
       if (!providedSignature) {
         res.status(401).json({ ok: false, message: 'missing signature' });
         return;
