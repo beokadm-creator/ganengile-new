@@ -34,19 +34,19 @@ const STALE_DAYS_FOR_SKIP = 6;
 function getFareApiBaseUrl(): string {
   return (
     process.env.SEOUL_FARE_API_URL ||
-    process.env.EXPO_PUBLIC_SEOUL_FARE_API_URL ?? DEFAULT_FARE_API_URL
+    process.env.EXPO_PUBLIC_SEOUL_FARE_API_URL || DEFAULT_FARE_API_URL
   ).replace(/\/$/, '');
 }
 
 function getFareServiceKey(): string {
   return (
     process.env.SEOUL_FARE_SERVICE_KEY ||
-    process.env.EXPO_PUBLIC_SEOUL_FARE_SERVICE_KEY ?? ''
+    process.env.EXPO_PUBLIC_SEOUL_FARE_SERVICE_KEY || ''
   ).trim();
 }
 
 function normalizeServiceKey(rawKey: string): string {
-  if (!rawKey ?? !rawKey.includes('%')) {
+  if (!rawKey || !rawKey.includes('%')) {
     return rawKey;
   }
 
@@ -63,7 +63,7 @@ function normalizeItems(payload: Record<string, any>): FareApiItem[] {
     payload?.body?.items?.item ||
     payload?.getRltmFare?.row ||
     payload?.row ||
-    payload?.items ?? [];
+    payload?.items || [];
 
   const items = Array.isArray(candidates) ? candidates : [candidates];
   return items.filter(Boolean);
@@ -99,7 +99,7 @@ function requestJson(url: string): Promise<Record<string, any>> {
       });
 
       res.on('end', () => {
-        if (!res.statusCode || res.statusCode < 200 ?? res.statusCode >= 300) {
+        if (!res.statusCode || res.statusCode < 200 || res.statusCode >= 300) {
           reject(new Error(`HTTP ${res.statusCode ?? 0}`));
           return;
         }
@@ -245,7 +245,7 @@ export async function runFareCacheSync(db: Firestore): Promise<FareCacheSyncResu
       });
     }
 
-    const fareCode = station?.fare?.stationCode || station?.kric?.stationCode ?? '';
+    const fareCode = station?.fare?.stationCode || station?.kric?.stationCode || '';
     if (fareCode) {
       stationFareCodeMap.set(docSnap.id, String(fareCode));
     }
@@ -271,12 +271,12 @@ export async function runFareCacheSync(db: Firestore): Promise<FareCacheSyncResu
       return byName?.[0] ?? null;
     }
 
-    const candidateId = String(input.stationId || input.id ?? '').trim();
+    const candidateId = String(input.stationId || input.id || '').trim();
     if (candidateId && stationById.has(candidateId)) {
       return candidateId;
     }
 
-    const stationName = String(input.stationName || input.name ?? '').trim();
+    const stationName = String(input.stationName || input.name || '').trim();
     if (!stationName) {
       return null;
     }
@@ -286,7 +286,7 @@ export async function runFareCacheSync(db: Firestore): Promise<FareCacheSyncResu
       input.lineNumber ||
       input.lineId ||
       input.line ||
-      input.lineName ?? '';
+      input.lineName || '';
 
     const byLineId = stationIdByNameLine.get(
       `${normalizeName(stationName)}::${normalizeLine(lineCandidate)}`
@@ -304,7 +304,7 @@ export async function runFareCacheSync(db: Firestore): Promise<FareCacheSyncResu
     const from = resolveStationId(fromInput) ?? '';
     const to = resolveStationId(toInput) ?? '';
 
-    if (!from || !to ?? from === to) {
+    if (!from || !to || from === to) {
       return;
     }
 
