@@ -40,53 +40,48 @@ function badgeClass(status: Beta1AreaCard['status']): string {
 export default function Beta1OverviewPage() {
   return (
     <div className="min-h-screen bg-stone-50 p-6">
-      <section className="rounded-[24px] border border-slate-200 bg-white p-8 shadow-sm">
-        <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
-          <div className="space-y-2">
-            <p className="text-sm font-semibold uppercase tracking-[0.24em] text-sky-600">
-              Beta1 Ops
-            </p>
-            <h1 className="text-3xl font-semibold text-slate-900">beta1 운영 허브</h1>
-            <p className="max-w-3xl text-sm leading-6 text-slate-600">
-              현재 운영 가능한 beta1 영역과 다음 확장 후보를 한곳에서 확인할 수 있도록
-              정리한 시작 화면입니다.
-            </p>
-          </div>
-          <Link
-            href="/beta1/ai-review"
-            className="inline-flex items-center justify-center rounded-full bg-slate-900 px-5 py-3 text-sm font-semibold text-white transition hover:bg-slate-700"
-          >
-            AI Review 열기
-          </Link>
-        </div>
-      </section>
-
-      <section className="grid gap-4 lg:grid-cols-2">
-        {beta1Areas.map((area) => {
-          const cardBody = (
-            <article className="flex h-full flex-col gap-4 rounded-3xl border border-slate-200 bg-white p-6 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md">
-              <div className="flex items-center justify-between gap-3">
-                <h2 className="text-xl font-semibold text-slate-900">{area.title}</h2>
-                <span className={`rounded-full px-3 py-1 text-xs font-semibold ${badgeClass(area.status)}`}>
-                  {area.status === 'live' ? '운영 중' : '확장 후보'}
-                </span>
-              </div>
-              <p className="text-sm leading-6 text-slate-600">{area.description}</p>
-              <p className="mt-auto text-sm font-medium text-slate-500">
-                {area.href ? '바로 진입 가능' : '현재는 운영 범위 설명만 제공'}
-              </p>
-            </article>
-          );
-
-          return area.href ? (
-            <Link key={area.title} href={area.href} className="block">
-              {cardBody}
+      <div className="mx-auto max-w-7xl space-y-6">
+        <section className="rounded-[28px] bg-[#0f172a] px-7 py-8 text-white shadow-sm">
+          <p className="text-xs font-semibold uppercase tracking-[0.25em] text-cyan-200">beta1 ops</p>
+          <h1 className="mt-3 text-3xl font-bold">beta1 운영 허브</h1>
+          <p className="mt-2 max-w-3xl text-sm leading-6 text-white/70">현재 운영 가능한 beta1 영역과 다음 확장 후보를 한곳에서 확인할 수 있도록 정리한 시작 화면입니다.</p>
+          <div className="mt-5 flex flex-wrap gap-3">
+            <Link
+              href="/beta1/ai-review"
+              className="rounded-full border border-white/15 bg-white/10 px-4 py-2 text-sm font-semibold text-white transition hover:bg-white/15"
+            >
+              AI Review 열기
             </Link>
-          ) : (
-            <div key={area.title}>{cardBody}</div>
-          );
-        })}
-      </section>
+          </div>
+        </section>
+
+        <section className="grid gap-4 lg:grid-cols-2">
+          {beta1Areas.map((area) => {
+            const cardBody = (
+              <article className="flex h-full flex-col gap-4 rounded-[24px] bg-white p-6 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md">
+                <div className="flex items-center justify-between gap-3">
+                  <h2 className="text-xl font-semibold text-slate-900">{area.title}</h2>
+                  <span className={`rounded-full px-3 py-1 text-xs font-semibold ${badgeClass(area.status)}`}>
+                    {area.status === 'live' ? '운영 중' : '확장 후보'}
+                  </span>
+                </div>
+                <p className="text-sm leading-6 text-slate-600">{area.description}</p>
+                <p className="mt-auto text-sm font-medium text-slate-500">
+                  {area.href ? '바로 진입 가능' : '현재는 운영 범위 설명만 제공'}
+                </p>
+              </article>
+            );
+
+            return area.href ? (
+              <Link key={area.title} href={area.href} className="block">
+                {cardBody}
+              </Link>
+            ) : (
+              <div key={area.title}>{cardBody}</div>
+            );
+          })}
+        </section>
+      </div>
     </div>
   );
 }
