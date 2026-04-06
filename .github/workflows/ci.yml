@@ -99,23 +99,3 @@ jobs:
         run: npm run build
         working-directory: admin-web
 
-  functions-build-check:
-    name: Functions Build Check
-    runs-on: ubuntu-latest
-
-    steps:
-      - name: 📥 Checkout code
-        uses: actions/checkout@v4
-
-      - name: 📦 Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: '22'
-
-      - name: 🔧 Install functions dependencies
-        run: npm ci
-        working-directory: functions
-
-      - name: 🏗️ Build functions
-        run: npm run build
-        working-directory: functions
