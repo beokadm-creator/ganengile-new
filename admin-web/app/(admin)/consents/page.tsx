@@ -1,52 +1,27 @@
 'use client';
 
-import type { ChangeEvent, FormEvent, ReactElement } from 'react';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import type { ChangeEvent, JSX } from 'react';
 import {
   ConsentKey,
   CONSENT_KEY_LABELS,
   CONSENT_LEGAL_BASIS,
 } from '@/lib/consent-types';
-import type { ConsentTemplateItem, ConsentVersionItem, ConsentFormData } from '@/lib/consent-types';
+import type {
+  ConsentTemplateItem,
+  ConsentVersionItem,
+  ConsentFormData,
+} from '@/lib/consent-types';
+import { formatDate } from '@/lib/format';
 
-/* ─── helpers ──────────────────────────────────────────────────── */
-
-function formatDate(date: string | null | undefined): string {
-  if (!date) return '-';
-  const d = new Date(date);
-  if (Number.isNaN(d.getTime())) return '-';
-  return d.toLocaleDateString('ko-KR', {
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-  });
-}
-
-function formatDateTime(date: string | null | undefined): string {
-  if (!date) return '-';
-  const d = new Date(date);
-  if (Number.isNaN(d.getTime())) return '-';
-  return d.toLocaleDateString('ko-KR', {
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit',
-  });
-}
-
-function bumpVersion(current: string): string {
-  const parts = current.split('.').map(Number);
-  if (parts.length === 3 && parts.every((p) => !Number.isNaN(p))) {
-    return `${parts[0]}.${parts[1]}.${parts[2] + 1}`;
-  }
-  return '1.0.1';
-}
+/* ------------------------------------------------------------------ */
+/*  Constants                                                          */
+/* ------------------------------------------------------------------ */
 
 const ALL_KEYS = Object.values(ConsentKey);
 
 const EMPTY_FORM: ConsentFormData = {
-  key: '',
+  key: ConsentKey.SERVICE_TERMS,
   title: '',
   description: '',
   content: '',
@@ -57,22 +32,34 @@ const EMPTY_FORM: ConsentFormData = {
   changeNote: '',
 };
 
-/* ─── data fetching ────────────────────────────────────────────── */
+/* ------------------------------------------------------------------ */
+/*  Helpers                                                            */
+/* ------------------------------------------------------------------ */
+
+function bumpVersion(current: string): string {
+  const parts = current.split('.');
+  const major = parts[0] ?? '1';
+  const minor = parts[1] ?? '0';
+  const patch = parseInt(parts[2] ?? '0', 10) + 1;
+  return `${major}.${minor}.${patch}`;
+}
 
 function asRecord(value: unknown): Record<string, unknown> | null {
-  return typeof value === 'object' && value !== null ? (value as Record<string, unknown>) : null;
+  return typeof value === 'object' && value !== null
+    ? (value as Record<string, unknown>)
+    : null;
 }
 
 function asTemplateItem(value: unknown): ConsentTemplateItem | null {
   const r = asRecord(value);
   if (!r || typeof r.id !== 'string') return null;
   return {
-    id: r.id,
-    key: typeof r.key === 'string' ? r.key : r.id,
-    title: typeof r.title === 'string' ? r.title : '',
-    description: typeof r.description === 'string' ? r.description : '',
-    content: typeof r.content === 'string' ? r.content : '',
-    version: typeof r.version === 'string' ? r.version : '1.0.0',
+    id: r.id as string,
+    key: typeof r.key === 'string' ? (r.key as string) : (r.id as string),
+    title: typeof r.title === 'string' ? (r.title as string) : '',
+    description: typeof r.description === 'string' ? (r.description as string) : '',
+    content: typeof r.content === 'string' ? (r.content as string) : '',
+    version: typeof r.version === 'string' ? (r.version as string) : '1.0.0',
     category: r.category === 'optional' ? 'optional' : 'required',
     sortOrder: typeof r.sortOrder === 'number' ? r.sortOrder : 0,
     effectiveDate: typeof r.effectiveDate === 'string' ? r.effectiveDate : null,
@@ -85,547 +72,536 @@ function asVersionItem(value: unknown): ConsentVersionItem | null {
   const r = asRecord(value);
   if (!r || typeof r.id !== 'string') return null;
   return {
-    id: r.id,
-    version: typeof r.version === 'string' ? r.version : '',
-    content: typeof r.content === 'string' ? r.content : '',
-    title: typeof r.title === 'string' ? r.title : '',
-    description: typeof r.description === 'string' ? r.description : '',
+    id: r.id as string,
+    version: typeof r.version === 'string' ? (r.version as string) : '',
+    content: typeof r.content === 'string' ? (r.content as string) : '',
+    title: typeof r.title === 'string' ? (r.title as string) : '',
+    description: typeof r.description === 'string' ? (r.description as string) : '',
     effectiveDate: typeof r.effectiveDate === 'string' ? r.effectiveDate : null,
     createdAt: typeof r.createdAt === 'string' ? r.createdAt : null,
-    createdBy: typeof r.createdBy === 'string' ? r.createdBy : '',
-    changeNote: typeof r.changeNote === 'string' ? r.changeNote : '',
+    createdBy: typeof r.createdBy === 'string' ? (r.createdBy as string) : '',
+    changeNote: typeof r.changeNote === 'string' ? (r.changeNote as string) : '',
   };
 }
 
+/* ------------------------------------------------------------------ */
+/*  Data fetching                                                      */
+/* ------------------------------------------------------------------ */
+
 async function fetchTemplates(): Promise<ConsentTemplateItem[]> {
-  const res = await fetch('/api/admin/consents');
-  if (!res.ok) return [];
-  const json: unknown = await res.json();
+  const response = await fetch('/api/admin/consents');
+  if (!response.ok) throw new Error('약관 목록을 불러오지 못했습니다.');
+  const json: unknown = await response.json();
   const record = asRecord(json);
-  if (!Array.isArray(record?.items)) return [];
-  return record.items.map(asTemplateItem).filter((item): item is ConsentTemplateItem => item !== null);
+  if (!record || !Array.isArray(record.items)) return [];
+  return (record.items as unknown[])
+    .map(asTemplateItem)
+    .filter((item): item is ConsentTemplateItem => item !== null);
 }
 
 async function fetchVersions(id: string): Promise<ConsentVersionItem[]> {
-  const res = await fetch(`/api/admin/consents/${encodeURIComponent(id)}/versions`);
-  if (!res.ok) return [];
-  const json: unknown = await res.json();
+  const response = await fetch(`/api/admin/consents/${id}/versions`);
+  if (!response.ok) return [];
+  const json: unknown = await response.json();
   const record = asRecord(json);
-  if (!Array.isArray(record?.items)) return [];
-  return record.items.map(asVersionItem).filter((item): item is ConsentVersionItem => item !== null);
+  if (!record || !Array.isArray(record.items)) return [];
+  return (record.items as unknown[])
+    .map(asVersionItem)
+    .filter((item): item is ConsentVersionItem => item !== null);
 }
 
-async function saveTemplate(formData: ConsentFormData): Promise<boolean> {
-  const res = await fetch('/api/admin/consents', {
+async function saveTemplate(formData: ConsentFormData): Promise<void> {
+  const response = await fetch('/api/admin/consents', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(formData),
   });
-  return res.ok;
+  if (!response.ok) {
+    const err: unknown = await response.json();
+    const record = asRecord(err);
+    throw new Error(
+      typeof record?.error === 'string' ? record.error : '저장에 실패했습니다.',
+    );
+  }
 }
 
-async function deleteTemplate(id: string): Promise<boolean> {
-  const res = await fetch(`/api/admin/consents/${encodeURIComponent(id)}`, {
+async function deleteTemplate(id: string): Promise<void> {
+  const response = await fetch(`/api/admin/consents/${id}`, {
     method: 'DELETE',
   });
-  return res.ok;
+  if (!response.ok) throw new Error('삭제에 실패했습니다.');
 }
 
-/* ─── page ─────────────────────────────────────────────────────── */
+/* ================================================================== */
+/*  Page Component                                                     */
+/* ================================================================== */
 
-export default function ConsentsPage(): ReactElement {
+export default function ConsentsPage(): JSX.Element {
   const [templates, setTemplates] = useState<ConsentTemplateItem[]>([]);
   const [loading, setLoading] = useState(true);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [categoryFilter, setCategoryFilter] = useState<
+    'all' | 'required' | 'optional'
+  >('all');
   const [showModal, setShowModal] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [form, setForm] = useState<ConsentFormData>({ ...EMPTY_FORM });
   const [saving, setSaving] = useState(false);
   const [expandedId, setExpandedId] = useState<string | null>(null);
-  const [versions, setVersions] = useState<ConsentVersionItem[]>([]);
-  const [loadingVersions, setLoadingVersions] = useState(false);
+  const [versions, setVersions] = useState<Record<string, ConsentVersionItem[]>>({});
+  const [loadingVersions, setLoadingVersions] = useState<Record<string, boolean>>({});
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
   const [errorMsg, setErrorMsg] = useState('');
 
-  const loadTemplates = useCallback(async () => {
-    setLoading(true);
-    const items = await fetchTemplates();
-    setTemplates(items);
-    setLoading(false);
+  /* ---- Load templates ---- */
+  const loadAll = useCallback(async () => {
+    try {
+      setErrorMsg('');
+      setLoading(true);
+      const items = await fetchTemplates();
+      setTemplates(items);
+    } catch (err) {
+      setErrorMsg(
+        err instanceof Error ? err.message : '약관 목록을 불러오지 못했습니다.',
+      );
+    } finally {
+      setLoading(false);
+    }
   }, []);
 
   useEffect(() => {
-    void loadTemplates();
-  }, [loadTemplates]);
+    void loadAll();
+  }, [loadAll]);
 
-  const handleToggleVersions = useCallback(
-    async (id: string) => {
-      if (expandedId === id) {
-        setExpandedId(null);
-        setVersions([]);
-        return;
-      }
-      setExpandedId(id);
-      setLoadingVersions(true);
-      const items = await fetchVersions(id);
-      setVersions(items);
-      setLoadingVersions(false);
-    },
-    [expandedId]
+  /* ---- Filtering ---- */
+  const filtered = useMemo(() => {
+    return templates.filter((t) => {
+      const q = searchQuery.toLowerCase();
+      const matchesSearch =
+        q === '' ||
+        t.title.toLowerCase().includes(q) ||
+        t.key.toLowerCase().includes(q);
+      const matchesCategory =
+        categoryFilter === 'all' || t.category === categoryFilter;
+      return matchesSearch && matchesCategory;
+    });
+  }, [templates, searchQuery, categoryFilter]);
+
+  /* ---- Stats ---- */
+  const stats = useMemo(
+    () => ({
+      total: templates.length,
+      required: templates.filter((t) => t.category === 'required').length,
+      optional: templates.filter((t) => t.category === 'optional').length,
+    }),
+    [templates],
   );
 
-  const handleOpenCreate = useCallback(() => {
-    setEditingId(null);
-    setErrorMsg('');
-    setForm({ ...EMPTY_FORM, effectiveDate: new Date().toISOString().split('T')[0] });
-    setShowModal(true);
-  }, []);
+  /* ---- Form helpers ---- */
+  function updateForm<K extends keyof ConsentFormData>(
+    key: K,
+    value: ConsentFormData[K],
+  ): void {
+    setForm((prev) => ({ ...prev, [key]: value }));
+  }
 
-  const handleOpenEdit = useCallback(
-    (template: ConsentTemplateItem) => {
-      setEditingId(template.id);
-      setErrorMsg('');
-      setForm({
-        key: template.key,
-        title: template.title,
-        description: template.description,
-        content: template.content,
-        version: template.version,
-        category: template.category,
-        sortOrder: template.sortOrder,
-        effectiveDate: template.effectiveDate
-          ? new Date(template.effectiveDate).toISOString().split('T')[0]
-          : new Date().toISOString().split('T')[0],
-        changeNote: '',
-      });
-      setShowModal(true);
-    },
-    []
-  );
-
-  const handleCloseModal = useCallback(() => {
-    setShowModal(false);
+  function openCreate(): void {
     setEditingId(null);
-    setErrorMsg('');
     setForm({ ...EMPTY_FORM });
-  }, []);
+    setShowModal(true);
+  }
 
-  const handleFieldChange = useCallback(
-    (field: keyof ConsentFormData, value: string | number) => {
-      setForm((prev) => ({ ...prev, [field]: value }));
-    },
-    []
-  );
+  function openEdit(template: ConsentTemplateItem): void {
+    setEditingId(template.id);
+    setForm({
+      key: template.key,
+      title: template.title,
+      description: template.description,
+      content: template.content,
+      version: bumpVersion(template.version),
+      category: template.category,
+      sortOrder: template.sortOrder,
+      effectiveDate: new Date().toISOString().split('T')[0],
+      changeNote: '',
+    });
+    setShowModal(true);
+  }
 
-  const handleKeySelect = useCallback((key: string) => {
-    const label = CONSENT_KEY_LABELS[key as ConsentKey] ?? '';
-    setForm((prev) => ({
-      ...prev,
-      key,
-      title: prev.title || label,
-    }));
-  }, []);
-
-  const handleSubmit = useCallback(
-    async (e: FormEvent) => {
-      e.preventDefault();
-      setSaving(true);
-      setErrorMsg('');
-
-      const ok = await saveTemplate({
-        ...form,
-        version: editingId ? bumpVersion(form.version) : form.version,
-      });
-
-      if (ok) {
-        await loadTemplates();
-        handleCloseModal();
-      } else {
-        setErrorMsg('저장에 실패했습니다. 다시 시도해주세요.');
-      }
+  async function handleSave(): Promise<void> {
+    setSaving(true);
+    try {
+      await saveTemplate(form);
+      setShowModal(false);
+      await loadAll();
+    } catch (err) {
+      setErrorMsg(
+        err instanceof Error ? err.message : '저장에 실패했습니다.',
+      );
+    } finally {
       setSaving(false);
-    },
-    [editingId, form, loadTemplates, handleCloseModal]
-  );
+    }
+  }
 
-  const handleDelete = useCallback(
-    async (id: string) => {
-      const ok = await deleteTemplate(id);
-      if (ok) {
-        setDeleteConfirmId(null);
-        await loadTemplates();
-      }
-    },
-    [loadTemplates]
-  );
+  async function handleDelete(): Promise<void> {
+    if (!deleteConfirmId) return;
+    try {
+      await deleteTemplate(deleteConfirmId);
+      setDeleteConfirmId(null);
+      await loadAll();
+    } catch (err) {
+      setErrorMsg(
+        err instanceof Error ? err.message : '삭제에 실패했습니다.',
+      );
+    }
+  }
 
-  const usedKeys = new Set(templates.map((t) => t.key));
-  const availableKeys = editingId ? ALL_KEYS : ALL_KEYS.filter((k) => !usedKeys.has(k));
-  const requiredItems = templates.filter((t) => t.category === 'required');
-  const optionalItems = templates.filter((t) => t.category === 'optional');
+  /* ---- Version history ---- */
+  async function toggleVersions(id: string): Promise<void> {
+    if (expandedId === id) {
+      setExpandedId(null);
+      return;
+    }
+    setExpandedId(id);
+    if (versions[id]) return;
+    setLoadingVersions((prev) => ({ ...prev, [id]: true }));
+    try {
+      const items = await fetchVersions(id);
+      setVersions((prev) => ({ ...prev, [id]: items }));
+    } catch {
+      setVersions((prev) => ({ ...prev, [id]: [] }));
+    } finally {
+      setLoadingVersions((prev) => ({ ...prev, [id]: false }));
+    }
+  }
 
+  /* ---- Render ---- */
   return (
     <div className="min-h-screen bg-stone-50 p-6">
       <div className="mx-auto max-w-7xl space-y-6">
         {/* Header */}
-        <section className="rounded-[28px] bg-[#0f172a] px-7 py-8 text-white shadow-sm">
-          <p className="text-xs font-semibold uppercase tracking-[0.25em] text-cyan-200">
-            legal &amp; compliance
+        <section className="rounded-[28px] bg-white p-6 shadow-sm">
+          <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-400">
+            consent management
           </p>
-          <h1 className="mt-3 text-3xl font-bold">약관 관리</h1>
-          <p className="mt-3 max-w-2xl text-sm leading-6 text-slate-300">
-            온보딩에서 사용자에게 동의받는 약관과 정책을 관리합니다. 버전을 업데이트하면 이전 버전이 자동으로 보관됩니다.
+          <h1 className="mt-2 text-2xl font-bold text-slate-900">
+            약관 동의 관리
+          </h1>
+          <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-500">
+            서비스 이용약관, 개인정보처리방침 등 국내 법령에 따라 온보딩에서
+            동의받아야 하는 항목의 버전을 관리합니다. 약관을 수정하면 이전
+            버전이 자동으로 보관됩니다.
           </p>
-          <div className="mt-5 flex gap-3">
+        </section>
+
+        {/* Error banner */}
+        {errorMsg ? (
+          <div className="rounded-2xl border border-rose-200 bg-rose-50 p-4 text-sm text-rose-700">
+            {errorMsg}
             <button
               type="button"
-              onClick={handleOpenCreate}
-              className="rounded-full border border-white/15 bg-white/10 px-5 py-2 text-sm font-semibold text-white transition hover:bg-white/15"
+              onClick={() => setErrorMsg('')}
+              className="ml-3 font-semibold text-rose-900 hover:text-rose-600"
             >
-              + 새 약관 추가
+              닫기
             </button>
           </div>
-        </section>
+        ) : null}
 
         {/* Stats */}
-        <section className="grid gap-4 md:grid-cols-4">
-          <StatCard title="전체 약관" value={`${templates.length}`} hint="등록된 동의 항목 수" />
-          <StatCard title="필수 동의" value={`${requiredItems.length}`} hint="법정 필수 동의 항목" />
-          <StatCard title="선택 동의" value={`${optionalItems.length}`} hint="마케팅·광고 동의 항목" />
-          <StatCard title="미등록 키" value={`${ALL_KEYS.length - templates.length}`} hint="아직 등록되지 않은 ConsentKey" />
+        <section className="grid gap-4 md:grid-cols-3">
+          <StatCard title="전체 약관" value={`${stats.total}건`} hint="등록된 약관 템플릿 수" />
+          <StatCard title="필수 동의" value={`${stats.required}건`} hint="법적 필수 동의 항목" />
+          <StatCard title="선택 동의" value={`${stats.optional}건`} hint="선택적 마케팅·광고 동의" />
         </section>
 
-        {/* Required Consents */}
-        <section>
-          <div className="mb-3 flex items-center gap-2">
-            <h2 className="text-lg font-bold text-slate-900">필수 동의 항목</h2>
-            <span className="rounded-full bg-rose-100 px-2.5 py-0.5 text-xs font-bold text-rose-700">
-              {requiredItems.length}
-            </span>
-          </div>
-          {loading ? (
-            <div className="rounded-[24px] bg-white p-16 text-center text-sm text-slate-400 shadow-sm">
-              불러오는 중...
-            </div>
-          ) : (
-            <div className="space-y-3">
-              {requiredItems.map((item) => (
-                <ConsentCard
-                  key={item.id}
-                  item={item}
-                  expanded={expandedId === item.id}
-                  versions={expandedId === item.id ? versions : []}
-                  loadingVersions={loadingVersions}
-                  deleteConfirmId={deleteConfirmId}
-                  onEdit={() => handleOpenEdit(item)}
-                  onDelete={() => setDeleteConfirmId(item.id)}
-                  onConfirmDelete={() => handleDelete(item.id)}
-                  onCancelDelete={() => setDeleteConfirmId(null)}
-                  onToggleVersions={() => handleToggleVersions(item.id)}
-                />
-              ))}
-              {requiredItems.length === 0 ? (
-                <div className="rounded-[24px] bg-white p-8 text-center text-sm text-slate-400 shadow-sm">
-                  필수 동의 항목이 아직 등록되지 않았습니다.
-                </div>
-              ) : null}
-            </div>
-          )}
+        {/* Toolbar */}
+        <section className="flex flex-wrap items-center gap-3">
+          <input
+            type="text"
+            placeholder="약관명 또는 키로 검색..."
+            value={searchQuery}
+            onChange={(e: ChangeEvent<HTMLInputElement>) =>
+              setSearchQuery(e.target.value)
+            }
+            className="w-64 rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm"
+          />
+          <select
+            value={categoryFilter}
+            onChange={(e: ChangeEvent<HTMLSelectElement>) =>
+              setCategoryFilter(
+                e.target.value as 'all' | 'required' | 'optional',
+              )
+            }
+            className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm"
+          >
+            <option value="all">전체</option>
+            <option value="required">필수</option>
+            <option value="optional">선택</option>
+          </select>
+          <div className="flex-1" />
+          <button
+            type="button"
+            onClick={openCreate}
+            className="rounded-xl bg-slate-900 px-4 py-3 text-sm font-semibold text-white hover:bg-slate-800"
+          >
+            새 약관 추가
+          </button>
         </section>
 
-        {/* Optional Consents */}
-        <section>
-          <div className="mb-3 flex items-center gap-2">
-            <h2 className="text-lg font-bold text-slate-900">선택 동의 항목</h2>
-            <span className="rounded-full bg-sky-100 px-2.5 py-0.5 text-xs font-bold text-sky-700">
-              {optionalItems.length}
-            </span>
+        {/* Content */}
+        {loading ? (
+          <div className="rounded-[24px] bg-white p-16 text-center text-sm text-slate-400 shadow-sm">
+            약관 목록을 불러오는 중입니다.
           </div>
-          <div className="space-y-3">
-            {optionalItems.map((item) => (
+        ) : filtered.length === 0 ? (
+          <div className="rounded-[24px] bg-white p-16 text-center text-sm text-slate-400 shadow-sm">
+            {searchQuery || categoryFilter !== 'all'
+              ? '검색 조건에 맞는 약관이 없습니다.'
+              : '등록된 약관이 없습니다. "새 약관 추가" 버튼으로 시작하세요.'}
+          </div>
+        ) : (
+          <div className="space-y-4">
+            {filtered.map((template) => (
               <ConsentCard
-                key={item.id}
-                item={item}
-                expanded={expandedId === item.id}
-                versions={expandedId === item.id ? versions : []}
-                loadingVersions={loadingVersions}
-                deleteConfirmId={deleteConfirmId}
-                onEdit={() => handleOpenEdit(item)}
-                onDelete={() => setDeleteConfirmId(item.id)}
-                onConfirmDelete={() => handleDelete(item.id)}
-                onCancelDelete={() => setDeleteConfirmId(null)}
-                onToggleVersions={() => handleToggleVersions(item.id)}
+                key={template.id}
+                template={template}
+                expanded={expandedId === template.id}
+                versions={versions[template.id] ?? []}
+                loadingVersions={loadingVersions[template.id] ?? false}
+                onToggleVersions={() => void toggleVersions(template.id)}
+                onEdit={() => openEdit(template)}
+                onDelete={() => setDeleteConfirmId(template.id)}
               />
             ))}
-            {optionalItems.length === 0 ? (
-              <div className="rounded-[24px] bg-white p-8 text-center text-sm text-slate-400 shadow-sm">
-                선택 동의 항목이 아직 등록되지 않았습니다.
-              </div>
-            ) : null}
           </div>
-        </section>
+        )}
 
-        {/* Consent Key Reference */}
+        {/* Legal reference */}
         <section className="rounded-[24px] bg-white p-6 shadow-sm">
           <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-400">
-            consent key reference
+            legal reference
           </p>
-          <h2 className="mt-2 text-lg font-bold text-slate-900">ConsentKey 전체 목록</h2>
-          <div className="mt-4 grid gap-3 md:grid-cols-3">
+          <h2 className="mt-2 text-xl font-bold text-slate-900">
+            법적 근거 참고
+          </h2>
+          <p className="mt-2 text-sm leading-6 text-slate-500">
+            각 동의 항목의 근거 법령과 조항입니다. 약관 내용에 법적 근거를
+            포함해야 합니다.
+          </p>
+          <div className="mt-5 grid gap-3 md:grid-cols-3">
             {ALL_KEYS.map((key) => {
-              const legal = CONSENT_LEGAL_BASIS[key];
-              const registered = usedKeys.has(key);
+              const basis = CONSENT_LEGAL_BASIS[key];
               return (
                 <div
                   key={key}
-                  className={`rounded-2xl border p-4 ${
-                    registered
-                      ? 'border-emerald-200 bg-emerald-50'
-                      : 'border-slate-100 bg-stone-50'
-                  }`}
+                  className="rounded-2xl border border-slate-100 bg-stone-50 p-4"
                 >
-                  <div className="flex items-center justify-between gap-2">
-                    <p className="text-sm font-semibold text-slate-900">
-                      {CONSENT_KEY_LABELS[key]}
-                    </p>
-                    <span
-                      className={`rounded-full px-2 py-0.5 text-[10px] font-bold ${
-                        registered
-                          ? 'bg-emerald-200 text-emerald-800'
-                          : 'bg-slate-200 text-slate-600'
-                      }`}
-                    >
-                      {registered ? '등록됨' : '미등록'}
-                    </span>
-                  </div>
-                  <p className="mt-1 font-mono text-xs text-slate-500">{key}</p>
-                  {legal && (
-                    <p className="mt-2 text-xs text-slate-500">
-                      {legal.law} {legal.article}
-                    </p>
-                  )}
+                  <p className="text-sm font-semibold text-slate-900">
+                    {CONSENT_KEY_LABELS[key]}
+                  </p>
+                  <p className="mt-1 text-xs text-slate-500">{key}</p>
+                  <p className="mt-2 text-sm text-slate-600">
+                    {basis.law} {basis.article}
+                  </p>
                 </div>
               );
             })}
           </div>
         </section>
+      </div>
 
-        {/* Modal Overlay */}
-        {showModal && (
-          <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/40 pt-16 pb-10">
-            <div className="w-full max-w-2xl rounded-[24px] bg-white p-8 shadow-2xl">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-400">
-                    {editingId ? 'edit template' : 'new template'}
-                  </p>
-                  <h2 className="mt-1 text-xl font-bold text-slate-900">
-                    {editingId ? '약관 수정' : '새 약관 등록'}
-                  </h2>
-                </div>
-                <button
-                  type="button"
-                  onClick={handleCloseModal}
-                  className="rounded-xl border border-slate-200 px-3 py-1.5 text-sm text-slate-500 transition hover:bg-slate-50"
-                >
-                  닫기
-                </button>
+      {/* Create/Edit Modal */}
+      {showModal ? (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/45 p-4">
+          <div className="w-full max-w-3xl rounded-[24px] bg-white p-6 shadow-2xl">
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-400">
+                  consent form
+                </p>
+                <h2 className="mt-2 text-xl font-bold text-slate-900">
+                  {editingId ? '약관 수정' : '새 약관 등록'}
+                </h2>
               </div>
+              <button
+                type="button"
+                onClick={() => setShowModal(false)}
+                className="text-sm text-slate-500 hover:text-slate-700"
+              >
+                닫기
+              </button>
+            </div>
 
-              {errorMsg && (
-                <div className="mt-4 rounded-xl border border-rose-200 bg-rose-50 p-3 text-sm text-rose-700">
-                  {errorMsg}
-                </div>
-              )}
+            <div className="mt-5 grid gap-4 md:grid-cols-2">
+              <label className="text-sm font-medium text-slate-700">
+                약관 키
+                <select
+                  value={form.key}
+                  onChange={(e) => updateForm('key', e.target.value)}
+                  disabled={editingId !== null}
+                  className="mt-2 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm disabled:opacity-50"
+                >
+                  {ALL_KEYS.map((k) => (
+                    <option key={k} value={k}>
+                      {CONSENT_KEY_LABELS[k]}
+                    </option>
+                  ))}
+                </select>
+              </label>
 
-              <form onSubmit={handleSubmit} className="mt-6 space-y-5">
-                {/* Key */}
-                <div>
-                  <label htmlFor="consent-key" className="mb-1.5 block text-sm font-semibold text-slate-700">
-                    약관 키 (ConsentKey)
-                  </label>
-                  {editingId ? (
-                    <input
-                      id="consent-key"
-                      type="text"
-                      value={form.key}
-                      readOnly
-                      className="w-full rounded-xl border border-slate-200 bg-slate-100 px-4 py-2.5 text-sm text-slate-600"
-                    />
-                  ) : (
-                    <select
-                      id="consent-key"
-                      value={form.key}
-                      onChange={(e: ChangeEvent<HTMLSelectElement>) => handleKeySelect(e.target.value)}
-                      className="w-full rounded-xl border border-slate-200 bg-stone-50 px-4 py-2.5 text-sm text-slate-900 outline-none transition focus:border-cyan-400 focus:ring-2 focus:ring-cyan-100"
-                    >
-                      <option value="">선택해주세요</option>
-                      {availableKeys.map((k) => (
-                        <option key={k} value={k}>
-                          {k} — {CONSENT_KEY_LABELS[k]}
-                        </option>
-                      ))}
-                    </select>
-                  )}
-                </div>
+              <label className="text-sm font-medium text-slate-700">
+                버전
+                <input
+                  type="text"
+                  value={form.version}
+                  onChange={(e) => updateForm('version', e.target.value)}
+                  className="mt-2 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm"
+                />
+              </label>
 
-                {/* Title + Description */}
-                <div className="grid gap-4 md:grid-cols-2">
-                  <div>
-                    <label htmlFor="consent-title" className="mb-1.5 block text-sm font-semibold text-slate-700">
-                      제목
-                    </label>
-                    <input
-                      id="consent-title"
-                      type="text"
-                      value={form.title}
-                      onChange={(e: ChangeEvent<HTMLInputElement>) => handleFieldChange('title', e.target.value)}
-                      placeholder="예: 서비스 이용약관"
-                      className="w-full rounded-xl border border-slate-200 bg-stone-50 px-4 py-2.5 text-sm text-slate-900 outline-none transition focus:border-cyan-400 focus:ring-2 focus:ring-cyan-100"
-                    />
-                  </div>
-                  <div>
-                    <label htmlFor="consent-desc" className="mb-1.5 block text-sm font-semibold text-slate-700">
-                      설명
-                    </label>
-                    <input
-                      id="consent-desc"
-                      type="text"
-                      value={form.description}
-                      onChange={(e: ChangeEvent<HTMLInputElement>) => handleFieldChange('description', e.target.value)}
-                      placeholder="약관에 대한 간단한 설명"
-                      className="w-full rounded-xl border border-slate-200 bg-stone-50 px-4 py-2.5 text-sm text-slate-900 outline-none transition focus:border-cyan-400 focus:ring-2 focus:ring-cyan-100"
-                    />
-                  </div>
-                </div>
+              <label className="text-sm font-medium text-slate-700">
+                카테고리
+                <select
+                  value={form.category}
+                  onChange={(e) =>
+                    updateForm(
+                      'category',
+                      e.target.value as 'required' | 'optional',
+                    )
+                  }
+                  className="mt-2 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm"
+                >
+                  <option value="required">필수</option>
+                  <option value="optional">선택</option>
+                </select>
+              </label>
 
-                {/* Content */}
-                <div>
-                  <label htmlFor="consent-content" className="mb-1.5 block text-sm font-semibold text-slate-700">
-                    약관 본문
-                  </label>
-                  <textarea
-                    id="consent-content"
-                    rows={10}
-                    value={form.content}
-                    onChange={(e: ChangeEvent<HTMLTextAreaElement>) => handleFieldChange('content', e.target.value)}
-                    placeholder="전체 약관 텍스트를 입력하세요"
-                    className="w-full rounded-xl border border-slate-200 bg-stone-50 px-4 py-2.5 text-sm leading-6 text-slate-900 outline-none transition focus:border-cyan-400 focus:ring-2 focus:ring-cyan-100"
-                  />
-                </div>
+              <label className="text-sm font-medium text-slate-700">
+                정렬 순서
+                <input
+                  type="number"
+                  value={form.sortOrder}
+                  onChange={(e) =>
+                    updateForm('sortOrder', Number(e.target.value))
+                  }
+                  className="mt-2 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm"
+                />
+              </label>
 
-                {/* Version + Category + Sort Order */}
-                <div className="grid gap-4 md:grid-cols-3">
-                  <div>
-                    <label htmlFor="consent-version" className="mb-1.5 block text-sm font-semibold text-slate-700">
-                      버전
-                    </label>
-                    <input
-                      id="consent-version"
-                      type="text"
-                      value={editingId ? bumpVersion(form.version) : form.version}
-                      readOnly
-                      className="w-full rounded-xl border border-slate-200 bg-slate-100 px-4 py-2.5 text-sm text-slate-600"
-                    />
-                    {editingId && (
-                      <p className="mt-1 text-xs text-slate-400">
-                        {form.version} → {bumpVersion(form.version)} 자동 증가
-                      </p>
-                    )}
-                  </div>
-                  <div>
-                    <label htmlFor="consent-category" className="mb-1.5 block text-sm font-semibold text-slate-700">
-                      카테고리
-                    </label>
-                    <select
-                      id="consent-category"
-                      value={form.category}
-                      onChange={(e: ChangeEvent<HTMLSelectElement>) =>
-                        handleFieldChange('category', e.target.value)
-                      }
-                      className="w-full rounded-xl border border-slate-200 bg-stone-50 px-4 py-2.5 text-sm text-slate-900 outline-none transition focus:border-cyan-400 focus:ring-2 focus:ring-cyan-100"
-                    >
-                      <option value="required">필수 (required)</option>
-                      <option value="optional">선택 (optional)</option>
-                    </select>
-                  </div>
-                  <div>
-                    <label htmlFor="consent-sort" className="mb-1.5 block text-sm font-semibold text-slate-700">
-                      정렬 순서
-                    </label>
-                    <input
-                      id="consent-sort"
-                      type="number"
-                      value={form.sortOrder}
-                      onChange={(e: ChangeEvent<HTMLInputElement>) =>
-                        handleFieldChange('sortOrder', Number(e.target.value))
-                      }
-                      className="w-full rounded-xl border border-slate-200 bg-stone-50 px-4 py-2.5 text-sm text-slate-900 outline-none transition focus:border-cyan-400 focus:ring-2 focus:ring-cyan-100"
-                    />
-                  </div>
-                </div>
+              <label className="md:col-span-2 text-sm font-medium text-slate-700">
+                제목
+                <input
+                  type="text"
+                  value={form.title}
+                  onChange={(e) => updateForm('title', e.target.value)}
+                  className="mt-2 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm"
+                />
+              </label>
 
-                {/* Effective Date + Change Note */}
-                <div className="grid gap-4 md:grid-cols-2">
-                  <div>
-                    <label htmlFor="consent-date" className="mb-1.5 block text-sm font-semibold text-slate-700">
-                      시행일
-                    </label>
-                    <input
-                      id="consent-date"
-                      type="date"
-                      value={form.effectiveDate}
-                      onChange={(e: ChangeEvent<HTMLInputElement>) =>
-                        handleFieldChange('effectiveDate', e.target.value)
-                      }
-                      className="w-full rounded-xl border border-slate-200 bg-stone-50 px-4 py-2.5 text-sm text-slate-900 outline-none transition focus:border-cyan-400 focus:ring-2 focus:ring-cyan-100"
-                    />
-                  </div>
-                  {editingId && (
-                    <div>
-                      <label htmlFor="consent-note" className="mb-1.5 block text-sm font-semibold text-slate-700">
-                        변경 사유
-                      </label>
-                      <input
-                        id="consent-note"
-                        type="text"
-                        value={form.changeNote ?? ''}
-                        onChange={(e: ChangeEvent<HTMLInputElement>) =>
-                          handleFieldChange('changeNote', e.target.value)
-                        }
-                        placeholder="예: 개인정보처리방침 개정"
-                        className="w-full rounded-xl border border-slate-200 bg-stone-50 px-4 py-2.5 text-sm text-slate-900 outline-none transition focus:border-cyan-400 focus:ring-2 focus:ring-cyan-100"
-                      />
-                    </div>
-                  )}
-                </div>
+              <label className="md:col-span-2 text-sm font-medium text-slate-700">
+                설명
+                <input
+                  type="text"
+                  value={form.description}
+                  onChange={(e) => updateForm('description', e.target.value)}
+                  className="mt-2 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm"
+                />
+              </label>
 
-                {/* Submit */}
-                <div className="flex items-center justify-end gap-3 pt-2">
-                  <button
-                    type="button"
-                    onClick={handleCloseModal}
-                    className="rounded-xl border border-slate-200 px-5 py-2.5 text-sm font-medium text-slate-600 transition hover:bg-slate-50"
-                  >
-                    취소
-                  </button>
-                  <button
-                    type="submit"
-                    disabled={saving || !form.key || !form.title || !form.content}
-                    className="rounded-xl bg-cyan-600 px-5 py-2.5 text-sm font-medium text-white transition hover:bg-cyan-700 disabled:cursor-not-allowed disabled:opacity-50"
-                  >
-                    {saving ? '저장 중...' : editingId ? '수정하기' : '등록하기'}
-                  </button>
-                </div>
-              </form>
+              <label className="md:col-span-2 text-sm font-medium text-slate-700">
+                약관 본문
+                <textarea
+                  rows={8}
+                  value={form.content}
+                  onChange={(e) => updateForm('content', e.target.value)}
+                  className="mt-2 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm"
+                />
+              </label>
+
+              <label className="text-sm font-medium text-slate-700">
+                시행일
+                <input
+                  type="date"
+                  value={form.effectiveDate}
+                  onChange={(e) => updateForm('effectiveDate', e.target.value)}
+                  className="mt-2 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm"
+                />
+              </label>
+
+              <label className="text-sm font-medium text-slate-700">
+                변경 메모
+                <input
+                  type="text"
+                  value={form.changeNote ?? ''}
+                  onChange={(e) => updateForm('changeNote', e.target.value)}
+                  placeholder="이번 변경 사유"
+                  className="mt-2 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm"
+                />
+              </label>
+            </div>
+
+            <div className="mt-6 flex gap-2">
+              <button
+                type="button"
+                onClick={() => void handleSave()}
+                disabled={saving || !form.key || !form.title || !form.content}
+                className="rounded-xl bg-slate-900 px-4 py-3 text-sm font-semibold text-white hover:bg-slate-800 disabled:opacity-60"
+              >
+                {saving ? '저장 중...' : '저장'}
+              </button>
+              <button
+                type="button"
+                onClick={() => setShowModal(false)}
+                className="rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-700 hover:bg-slate-50"
+              >
+                취소
+              </button>
             </div>
           </div>
-        )}
-      </div>
+        </div>
+      ) : null}
+
+      {/* Delete Confirmation Modal */}
+      {deleteConfirmId ? (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/45 p-4">
+          <div className="w-full max-w-md rounded-[24px] bg-white p-6 shadow-2xl">
+            <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-400">
+              confirm delete
+            </p>
+            <h2 className="mt-2 text-xl font-bold text-slate-900">약관 삭제</h2>
+            <p className="mt-3 text-sm leading-6 text-slate-600">
+              <strong>
+                {templates.find((t) => t.id === deleteConfirmId)?.title ??
+                  deleteConfirmId}
+              </strong>{' '}
+              약관을 삭제하시겠습니까? 이 작업은 되돌릴 수 없습니다.
+            </p>
+            <div className="mt-6 flex gap-2">
+              <button
+                type="button"
+                onClick={() => void handleDelete()}
+                className="rounded-xl bg-rose-600 px-4 py-3 text-sm font-semibold text-white hover:bg-rose-700"
+              >
+                삭제
+              </button>
+              <button
+                type="button"
+                onClick={() => setDeleteConfirmId(null)}
+                className="rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-700 hover:bg-slate-50"
+              >
+                취소
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 }
 
-/* ─── sub-components ───────────────────────────────────────────── */
+/* ================================================================== */
+/*  Sub-components                                                      */
+/* ================================================================== */
 
 function StatCard({
   title,
@@ -635,159 +611,178 @@ function StatCard({
   title: string;
   value: string;
   hint: string;
-}): ReactElement {
+}): JSX.Element {
   return (
     <div className="rounded-[24px] bg-white p-5 shadow-sm">
       <p className="text-sm text-slate-500">{title}</p>
-      <p className="mt-3 text-4xl font-bold text-slate-900">{value}</p>
-      <p className="mt-3 text-sm leading-6 text-slate-500">{hint}</p>
+      <p className="mt-2 text-2xl font-bold text-slate-900">{value}</p>
+      <p className="mt-2 text-sm leading-6 text-slate-500">{hint}</p>
     </div>
   );
 }
 
 function ConsentCard({
-  item,
+  template,
   expanded,
-  versions,
+  versions: versionList,
   loadingVersions,
-  deleteConfirmId,
+  onToggleVersions,
   onEdit,
   onDelete,
-  onConfirmDelete,
-  onCancelDelete,
-  onToggleVersions,
 }: {
-  item: ConsentTemplateItem;
+  template: ConsentTemplateItem;
   expanded: boolean;
   versions: ConsentVersionItem[];
   loadingVersions: boolean;
-  deleteConfirmId: string | null;
+  onToggleVersions: () => void;
   onEdit: () => void;
   onDelete: () => void;
-  onConfirmDelete: () => void;
-  onCancelDelete: () => void;
-  onToggleVersions: () => void;
-}): ReactElement {
-  const legal = CONSENT_LEGAL_BASIS[item.key as ConsentKey];
-  const isDeleting = deleteConfirmId === item.id;
+}): JSX.Element {
+  const categoryBadge =
+    template.category === 'required' ? (
+      <span className="inline-flex rounded-full bg-rose-100 px-2 py-1 text-xs font-semibold text-rose-700">
+        필수
+      </span>
+    ) : (
+      <span className="inline-flex rounded-full bg-sky-100 px-2 py-1 text-xs font-semibold text-sky-700">
+        선택
+      </span>
+    );
+
+  const legal = CONSENT_LEGAL_BASIS[template.key as ConsentKey];
 
   return (
-    <div className="overflow-hidden rounded-[24px] bg-white shadow-sm">
-      <div className="flex items-start justify-between gap-4 p-5">
-        <div className="min-w-0 flex-1">
-          <div className="flex flex-wrap items-center gap-2">
-            <h3 className="text-base font-semibold text-slate-900">{item.title}</h3>
-            <span
-              className={`rounded-full px-2 py-0.5 text-[11px] font-bold ${
-                item.category === 'required'
-                  ? 'bg-rose-100 text-rose-700'
-                  : 'bg-sky-100 text-sky-700'
-              }`}
-            >
-              {item.category === 'required' ? '필수' : '선택'}
-            </span>
-          </div>
-          {item.description && (
-            <p className="mt-1 text-sm text-slate-500">{item.description}</p>
-          )}
-          <div className="mt-3 flex flex-wrap gap-3 text-xs text-slate-400">
-            <span>
-              키: <span className="font-mono text-slate-600">{item.key}</span>
-            </span>
-            <span>
-              버전: <span className="font-semibold text-slate-700">{item.version}</span>
-            </span>
-            {legal && (
-              <span>
-                법적 근거: <span className="text-slate-600">{legal.law} {legal.article}</span>
-              </span>
-            )}
-            <span>시행일: {formatDate(item.effectiveDate)}</span>
-            <span>정렬: {item.sortOrder}</span>
-          </div>
+    <div className="rounded-[24px] bg-white p-6 shadow-sm">
+      {/* Top row */}
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div className="flex items-center gap-3">
+          <h3 className="text-base font-bold text-slate-900">
+            {template.title || template.key}
+          </h3>
+          {categoryBadge}
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex gap-2">
+          <button
+            type="button"
+            onClick={onToggleVersions}
+            className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50"
+          >
+            {expanded ? '이력 닫기' : '버전 이력'}
+          </button>
           <button
             type="button"
             onClick={onEdit}
-            className="rounded-xl bg-slate-100 px-3 py-1.5 text-xs font-semibold text-slate-700 transition hover:bg-slate-200"
+            className="rounded-lg bg-slate-900 px-3 py-2 text-xs font-semibold text-white hover:bg-slate-800"
           >
             수정
           </button>
           <button
             type="button"
             onClick={onDelete}
-            className="rounded-xl bg-rose-50 px-3 py-1.5 text-xs font-semibold text-rose-700 transition hover:bg-rose-100"
+            className="rounded-lg border border-rose-200 bg-white px-3 py-2 text-xs font-semibold text-rose-700 hover:bg-rose-50"
           >
             삭제
           </button>
         </div>
       </div>
 
-      {/* Version toggle */}
-      <div className="border-t border-slate-100 px-5 py-3">
-        <button
-          type="button"
-          onClick={onToggleVersions}
-          className="text-xs font-semibold text-cyan-700 hover:text-cyan-800"
-        >
-          {expanded ? '버전 이력 닫기' : '버전 이력 보기'}
-        </button>
+      {/* Details */}
+      <div className="mt-4 grid gap-3 md:grid-cols-3">
+        <DetailItem label="키" value={template.key} mono />
+        <DetailItem label="버전" value={template.version} />
+        <DetailItem label="시행일" value={formatDate(template.effectiveDate)} />
+      </div>
+
+      {template.description ? (
+        <p className="mt-3 text-sm leading-6 text-slate-600">
+          {template.description}
+        </p>
+      ) : null}
+
+      {legal ? (
+        <p className="mt-2 text-xs text-slate-500">
+          근거: {legal.law} {legal.article}
+        </p>
+      ) : null}
+
+      <div className="mt-2 flex gap-4 text-xs text-slate-400">
+        <span>등록: {formatDate(template.createdAt)}</span>
+        <span>수정: {formatDate(template.updatedAt)}</span>
       </div>
 
       {/* Version history */}
-      {expanded && (
-        <div className="border-t border-slate-100 bg-slate-50 px-5 py-4">
+      {expanded ? (
+        <div className="mt-4 border-t border-slate-100 pt-4">
+          <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-400">
+            version history
+          </p>
           {loadingVersions ? (
-            <p className="text-xs text-slate-400">이력을 불러오는 중...</p>
-          ) : versions.length === 0 ? (
-            <p className="text-xs text-slate-400">이전 버전 이력이 없습니다.</p>
+            <p className="mt-3 text-sm text-slate-400">
+              버전 이력을 불러오는 중입니다.
+            </p>
+          ) : versionList.length === 0 ? (
+            <p className="mt-3 text-sm text-slate-400">
+              이전 버전 이력이 없습니다.
+            </p>
           ) : (
-            <div className="space-y-2">
-              {versions.map((v) => (
-                <div key={v.id} className="rounded-xl border border-slate-200 bg-white p-3">
-                  <div className="flex flex-wrap items-center gap-2 text-xs">
-                    <span className="font-semibold text-slate-900">v{v.version}</span>
-                    <span className="text-slate-400">{formatDateTime(v.createdAt)}</span>
-                    {v.changeNote && (
-                      <span className="text-slate-500">— {v.changeNote}</span>
-                    )}
-                  </div>
-                  {v.title && (
-                    <p className="mt-1 text-sm text-slate-600">{v.title}</p>
-                  )}
-                </div>
-              ))}
+            <div className="mt-3 overflow-x-auto rounded-2xl border border-slate-100">
+              <table className="w-full text-sm">
+                <thead className="bg-slate-50 text-xs text-slate-500">
+                  <tr>
+                    <th className="px-4 py-3 text-left">버전</th>
+                    <th className="px-4 py-3 text-left">제목</th>
+                    <th className="px-4 py-3 text-left">변경 메모</th>
+                    <th className="px-4 py-3 text-left">시행일</th>
+                    <th className="px-4 py-3 text-left">작성자</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {versionList.map((v) => (
+                    <tr key={v.id} className="hover:bg-slate-50">
+                      <td className="px-4 py-3 font-mono text-xs text-slate-700">
+                        {v.version}
+                      </td>
+                      <td className="px-4 py-3 text-slate-700">{v.title}</td>
+                      <td className="max-w-[240px] px-4 py-3 text-slate-500">
+                        {v.changeNote || '-'}
+                      </td>
+                      <td className="px-4 py-3 text-slate-500">
+                        {formatDate(v.effectiveDate)}
+                      </td>
+                      <td className="px-4 py-3 text-slate-500">
+                        {v.createdBy}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             </div>
           )}
         </div>
-      )}
+      ) : null}
+    </div>
+  );
+}
 
-      {/* Delete confirmation */}
-      {isDeleting && (
-        <div className="border-t border-rose-200 bg-rose-50 px-5 py-4">
-          <p className="text-sm font-semibold text-rose-900">정말 삭제하시겠습니까?</p>
-          <p className="mt-1 text-sm text-rose-600">
-            이 약관의 버전 이력도 함께 삭제됩니다. 이 작업은 되돌릴 수 없습니다.
-          </p>
-          <div className="mt-3 flex gap-2">
-            <button
-              type="button"
-              onClick={onConfirmDelete}
-              className="rounded-xl bg-rose-600 px-4 py-1.5 text-sm font-medium text-white transition hover:bg-rose-700"
-            >
-              삭제 확인
-            </button>
-            <button
-              type="button"
-              onClick={onCancelDelete}
-              className="rounded-xl border border-slate-200 bg-white px-4 py-1.5 text-sm font-medium text-slate-600 transition hover:bg-slate-50"
-            >
-              취소
-            </button>
-          </div>
-        </div>
-      )}
+function DetailItem({
+  label,
+  value,
+  mono,
+}: {
+  label: string;
+  value: string;
+  mono?: boolean;
+}): JSX.Element {
+  return (
+    <div className="rounded-2xl border border-slate-100 bg-stone-50 px-4 py-3">
+      <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-400">
+        {label}
+      </p>
+      <p
+        className={`mt-2 text-sm text-slate-700 ${mono ? 'font-mono text-xs' : ''}`}
+      >
+        {value || '-'}
+      </p>
     </div>
   );
 }
