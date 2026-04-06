@@ -69,7 +69,7 @@ export async function PATCH(
     return NextResponse.json({ error: 'Not found' }, { status: 404 });
   }
 
-  const existingData = existing.data();
+  const existingData = existing.data() ?? {};
   const previousVersion = typeof existingData.version === 'string' ? existingData.version : '0.0.0';
   const newVersion = typeof record.version === 'string' ? record.version : previousVersion;
 

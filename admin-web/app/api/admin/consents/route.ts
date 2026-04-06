@@ -21,7 +21,7 @@ export async function GET() {
   const snap = await db.collection('consentTemplates').orderBy('sortOrder', 'asc').get();
 
   const items = snap.docs.map((doc) => {
-    const data = doc.data();
+    const data = doc.data() ?? {};
     return {
       id: doc.id,
       key: typeof data.key === 'string' ? data.key : doc.id,
@@ -71,7 +71,7 @@ export async function POST(req: NextRequest) {
 
   const existing = await docRef.get();
   if (existing.exists) {
-    const prev = existing.data();
+    const prev = existing.data() ?? {};
     const prevVersion = typeof prev.version === 'string' ? prev.version : '0.0.0';
 
     if (prevVersion !== version) {

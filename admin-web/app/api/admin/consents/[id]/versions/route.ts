@@ -31,7 +31,7 @@ export async function GET(
     .get();
 
   const items = versionsSnap.docs.map((doc) => {
-    const data = doc.data();
+    const data = doc.data() ?? {};
     return {
       id: doc.id,
       version: typeof data.version === 'string' ? data.version : '',
