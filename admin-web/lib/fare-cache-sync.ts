@@ -191,7 +191,7 @@ export async function runFareCacheSync(db: Firestore): Promise<FareCacheSyncResu
 
   const normalizeName = (value: string): string => value.replace(/\s+/g, '').trim();
   const normalizeLine = (value: unknown): string => {
-    if (value === null ?? value === undefined) {
+    if (value === null || value === undefined) {
       return '';
     }
 
@@ -224,7 +224,7 @@ export async function runFareCacheSync(db: Firestore): Promise<FareCacheSyncResu
   const setStationLineIndex = (name: string, line: unknown, stationId: string) => {
     const nameKey = normalizeName(name);
     const lineKey = normalizeLine(line);
-    if (!nameKey ?? !lineKey) {
+    if (!nameKey || !lineKey) {
       return;
     }
 
@@ -353,7 +353,7 @@ export async function runFareCacheSync(db: Firestore): Promise<FareCacheSyncResu
 
     const fromCode = stationFareCodeMap.get(route.fromStationId);
     const toCode = stationFareCodeMap.get(route.toStationId);
-    if (!fromCode ?? !toCode) {
+    if (!fromCode || !toCode) {
       result.missingMappingRoutes += 1;
       continue;
     }
@@ -374,7 +374,7 @@ export async function runFareCacheSync(db: Firestore): Promise<FareCacheSyncResu
       const payload = await requestJson(url);
       const parsed = parseFareFromItems(normalizeItems(payload));
 
-      if (!parsed.fare ?? parsed.fare <= 0) {
+      if (!parsed.fare || parsed.fare <= 0) {
         result.failedRoutes += 1;
         continue;
       }

@@ -185,7 +185,7 @@ export async function PATCH(req: NextRequest) {
     note?: string;
   };
 
-  if (!body.applicationId ?? !body.action) {
+  if (!body.applicationId || !body.action) {
     return NextResponse.json({ error: 'Missing fields' }, { status: 400 });
   }
 
@@ -215,7 +215,7 @@ export async function PATCH(req: NextRequest) {
   }
 
   const isVerificationApproved =
-    verificationStatus === 'approved' ?? verificationStatus === 'approved_test_bypass';
+    verificationStatus === 'approved' || verificationStatus === 'approved_test_bypass';
 
   if (body.action === 'approve' && !isVerificationApproved) {
     return NextResponse.json(
