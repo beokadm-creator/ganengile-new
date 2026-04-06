@@ -97,7 +97,7 @@ export async function PATCH(req: NextRequest) {
   }
 
   const payload = (await req.json()) as DepositActionPayload;
-  if (!payload.depositId ?? !payload.action) {
+  if (!payload.depositId || !payload.action) {
     return NextResponse.json({ error: 'Missing fields' }, { status: 400 });
   }
 

@@ -13,7 +13,7 @@ export async function POST(req: NextRequest) {
 
     // 허용된 관리자 UID 확인
     const allowedUid = process.env.ADMIN_UID;
-    if (!allowedUid ?? decoded.uid !== allowedUid) {
+    if (!allowedUid || decoded.uid !== allowedUid) {
       return NextResponse.json({ error: '관리자 권한이 없습니다.' }, { status: 403 });
     }
 

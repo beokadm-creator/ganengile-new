@@ -11,6 +11,7 @@
     "web:deploy": "npm run web:export && firebase deploy --only hosting --project ganengile",
     "preflight:maps": "node scripts/preflight-maps.mjs",
     "init-config": "ts-node scripts/init-config.ts",
+    "seed:consents": "ts-node scripts/seed-consent-templates.ts",
     "test": "jest",
     "test:watch": "jest --watch",
     "test:coverage": "jest --coverage",

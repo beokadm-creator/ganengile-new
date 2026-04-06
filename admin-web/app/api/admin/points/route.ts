@@ -24,7 +24,7 @@ export async function GET(req: NextRequest) {
 
   if (search) {
     items = items.filter(
-      (u) => u.displayName.includes(search) || u.email.includes(search) ?? u.id.includes(search)
+      (u) => u.displayName.includes(search) || u.email.includes(search) || u.id.includes(search)
     );
   }
 
@@ -35,7 +35,7 @@ export async function PATCH(req: NextRequest) {
   if (!(await isAdmin())) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
   const { userId, type, amount, reason } = await req.json();
-  if (!userId || !type || !amount ?? !reason) return NextResponse.json({ error: 'Missing fields' }, { status: 400 });
+  if (!userId || !type || !amount || !reason) return NextResponse.json({ error: 'Missing fields' }, { status: 400 });
 
   const db = getAdminDb();
   const userRef = db.collection('users').doc(userId);

@@ -1,4 +1,4 @@
-* text=auto
+* text=auto eol=lf
 
 *.ts text eol=lf
 *.tsx text eol=lf
@@ -20,3 +20,7 @@
 *.webp binary
 *.ico binary
 *.pdf binary
+
+# Korean text files — force UTF-8 to prevent mojibake
+*.txt text eol=lf encoding=utf-8
+*.csv text eol=lf encoding=utf-8

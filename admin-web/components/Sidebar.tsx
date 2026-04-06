@@ -21,6 +21,7 @@ const NAV = [
   { href: '/disputes', label: '분쟁 처리', badge: 'hot' },
   { href: '/integrations/payment', label: '결제 설정' },
   { href: '/integrations/fare-cache', label: '운임 캐시' },
+  { href: '/consents', label: '약관 관리', badge: 'new' },
 ];
 
 export default function Sidebar() {

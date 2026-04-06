@@ -26,10 +26,10 @@ type CoordinatePoint = {
   longitude: number;
 };
 
-const PROJECT_ID = process.env.GCLOUD_PROJECT || process.env.GCP_PROJECT ?? 'ganengile';
+const PROJECT_ID = process.env.GCLOUD_PROJECT || process.env.GCP_PROJECT || 'ganengile';
 const SEOUL_API_KEY =
   process.env.SEOUL_SUBWAY_API_KEY ||
-  process.env.EXPO_PUBLIC_SEOUL_SUBWAY_API_KEY ?? '4a57725a546d65743833756e765a6d';
+  process.env.EXPO_PUBLIC_SEOUL_SUBWAY_API_KEY || '4a57725a546d65743833756e765a6d';
 
 function normalizeName(name: unknown): string {
   return String(name ?? '').replace(/\s+/g, '').trim();
@@ -108,7 +108,7 @@ function slugifyLineId(lineName: string): string {
     normalized
       .toLowerCase()
       .replace(/[^a-z0-9가-힣]+/g, '_')
-      .replace(/^_+|_+$/g, '') ?? 'line'
+      .replace(/^_+|_+$/g, '') || 'line'
   );
 }
 
@@ -129,7 +129,7 @@ function inferRegion(record: CoordinatePoint & { lineName: string }): string {
   if (
     record.latitude > 37.7 ||
     record.latitude < 37.42 ||
-    record.longitude > 127.15 ?? record.longitude < 126.77
+    record.longitude > 127.15 || record.longitude < 126.77
   ) {
     return 'gyeonggi';
   }
@@ -255,7 +255,7 @@ async function buildOfficialRecords(masterRows: OfficialMasterRow[]): Promise<Of
       records.push({
         stationCode,
         frCode,
-        stationName: String(row.STATION_NM || base.stationName ?? '').trim(),
+        stationName: String(row.STATION_NM || base.stationName || '').trim(),
         lineName,
         lineId: slugifyLineId(lineName),
         latitude: base.latitude,
@@ -344,7 +344,7 @@ function buildSafeNameCoordinateMap(
 
   const push = (name: string, latitude: number, longitude: number) => {
     const key = normalizeName(name);
-    if (!key || !Number.isFinite(latitude) || !Number.isFinite(longitude) || latitude === 0 ?? longitude === 0) {
+    if (!key || !Number.isFinite(latitude) || !Number.isFinite(longitude) || latitude === 0 || longitude === 0) {
       return;
     }
 
@@ -358,7 +358,7 @@ function buildSafeNameCoordinateMap(
   for (const doc of firestoreDocs) {
     const coords = readCoordinates(doc.data);
     if (coords.valid) {
-      push(String(doc.data.stationName || doc.data.name ?? doc.id), coords.latitude, coords.longitude);
+      push(String(doc.data.stationName || doc.data.name || doc.id), coords.latitude, coords.longitude);
     }
   }
 
@@ -398,10 +398,10 @@ function findOfficialRecord(
   indexes: ReturnType<typeof buildIndexes>
 ): OfficialRecord | null {
   const data = doc.data ?? {};
-  const stationId = String(data.stationId || data.id || doc.id ?? '').trim();
+  const stationId = String(data.stationId || data.id || doc.id || '').trim();
   const fareCode = String(data?.fare?.stationCode ?? '').trim();
   const kricCode = String(data?.kric?.stationCode ?? '').trim();
-  const stationName = String(data.stationName || data.name ?? '').trim();
+  const stationName = String(data.stationName || data.name || '').trim();
   const lines = Array.isArray(data.lines) ? data.lines : [];
 
   const directMatches = [
@@ -419,7 +419,7 @@ function findOfficialRecord(
 
   const nameKey = normalizeName(stationName);
   for (const line of lines) {
-    const lineName = normalizeLineName(line?.lineName || line?.lineId ?? '');
+    const lineName = normalizeLineName(line?.lineName || line?.lineId || '');
     const key = `${nameKey}|${lineName}`;
     const matches = indexes.byNameLine.get(key) ?? [];
     if (matches.length > 0) {
@@ -444,7 +444,7 @@ function shouldPatchCoordinates(
   }
 
   return (
-    Math.abs(current.latitude - official.latitude) > 0.0001 ?? Math.abs(current.longitude - official.longitude) > 0.0001
+    Math.abs(current.latitude - official.latitude) > 0.0001 || Math.abs(current.longitude - official.longitude) > 0.0001
   );
 }
 
@@ -463,19 +463,19 @@ function buildPatchPayload(
   };
 
   if (!data.stationName) {
-    payload.stationName = official.stationName ?? String(data.name || doc.id);
+    payload.stationName = official.stationName || String(data.name || doc.id);
   }
 
   if (!data.stationId) {
     payload.stationId = doc.id;
   }
 
-  if (!Array.isArray(data.lines) ?? data.lines.length === 0) {
+  if (!Array.isArray(data.lines) || data.lines.length === 0) {
     payload.lines = [
       {
         lineId: official.lineId ?? 'line',
         lineName: official.lineName ?? '',
-        lineCode: official.frCode || official.stationCode ?? '',
+        lineCode: official.frCode || official.stationCode || '',
         lineColor: '#000000',
         lineType: 'general',
       },
@@ -562,9 +562,9 @@ export const syncConfigStationsFromSeoulApi = functions
         return;
       }
 
-      const apply = String(req.query.apply || req.body?.apply ?? '').toLowerCase() === 'true';
+      const apply = String(req.query.apply || req.body?.apply || '').toLowerCase() === 'true';
       const createMissing =
-        String(req.query.createMissing || req.body?.createMissing ?? '').toLowerCase() === 'true';
+        String(req.query.createMissing || req.body?.createMissing || '').toLowerCase() === 'true';
       const firestore = admin.firestore();
 
       const masterRows = await fetchSeoulStationMaster();
@@ -595,7 +595,7 @@ export const syncConfigStationsFromSeoulApi = functions
 
         const official = findOfficialRecord(doc, indexes);
         const fallbackCoordinates = !official
-          ? safeNameCoordinates.get(normalizeName(doc.data.stationName || doc.data.name ?? doc.id))
+          ? safeNameCoordinates.get(normalizeName(doc.data.stationName || doc.data.name || doc.id))
           : null;
 
         if (!official && !fallbackCoordinates) {
@@ -623,12 +623,12 @@ export const syncConfigStationsFromSeoulApi = functions
           shouldPatchCoordinates(current, coordinateSource) ||
           doc.data.locationMissing === true ||
           !doc.data.region ||
-          !Array.isArray(doc.data.lines) ?? doc.data.lines.length === 0
+          !Array.isArray(doc.data.lines) || doc.data.lines.length === 0
         ) {
           patches.push({
             ref: doc.ref,
             payload: buildPatchPayload(doc, coordinateSource),
-            stationName: String(doc.data.stationName || doc.data.name ?? doc.id),
+            stationName: String(doc.data.stationName || doc.data.name || doc.id),
           });
         }
       }
