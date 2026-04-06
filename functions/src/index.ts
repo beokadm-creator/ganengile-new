@@ -161,7 +161,7 @@ function createOtpCode(): string {
 }
 
 function isOtpTestModeEnabled(): boolean {
-  const raw = (OTP_TEST_MODE_PARAM.value() || process.env.OTP_TEST_MODE ?? 'true').trim().toLowerCase();
+  const raw = (OTP_TEST_MODE_PARAM.value() || process.env.OTP_TEST_MODE || 'true').trim().toLowerCase();
   return raw !== 'false';
 }
 
@@ -2320,7 +2320,7 @@ export const ciMock = functions.https.onRequest((req, res) => {
   const sessionId = readFirstQueryValue(req.query.sessionId);
   const provider = readFirstQueryValue(req.query.provider);
 
-  if (!sessionId ?? (provider !== 'pass' && provider !== 'kakao')) {
+  if (!sessionId || (provider !== 'pass' && provider !== 'kakao')) {
     res.status(400).send('Invalid query');
     return;
   }
@@ -2359,7 +2359,7 @@ export const issueKakaoCustomToken = functions.https.onCall(
   ): Promise<{ customToken: string; uid: string; isNewUser: boolean }> => {
     const accessToken = typeof data?.accessToken === 'string' ? data.accessToken.trim() : '';
     const expectedKakaoId = typeof data?.expectedKakaoId === 'string' ? data.expectedKakaoId.trim() : '';
-    const role = data?.role === 'gller' || data?.role === 'giller' ?? data?.role === 'both' ? data.role : 'gller';
+    const role = data?.role === 'gller' || data?.role === 'giller' || data?.role === 'both' ? data.role : 'gller';
     const providedName = typeof data?.name === 'string' ? data.name.trim() : '';
     const providedPhoneNumber = typeof data?.phoneNumber === 'string' ? data.phoneNumber.trim() : '';
 
@@ -2373,7 +2373,7 @@ export const issueKakaoCustomToken = functions.https.onCall(
       },
     });
 
-    if (typeof kakaoResponse !== 'object' || kakaoResponse === null ?? !('id' in kakaoResponse)) {
+    if (typeof kakaoResponse !== 'object' || kakaoResponse === null || !('id' in kakaoResponse)) {
       throw new functions.https.HttpsError('unauthenticated', 'Failed to verify Kakao access token');
     }
 
@@ -2415,14 +2415,14 @@ export const issueKakaoCustomToken = functions.https.onCall(
         uid,
         email,
         name: providedName ?? nickname,
-        phoneNumber: providedPhoneNumber || existingData.phoneNumber ?? '',
+        phoneNumber: providedPhoneNumber || existingData.phoneNumber || '',
           role,
           gillerApplicationStatus: existingData.gillerApplicationStatus ?? 'none',
           authProvider: 'kakao',
         authProviderUserId: kakaoId,
         signupMethod: 'kakao',
         providerLinkedAt: now,
-        profilePhoto: profileImage || existingData.profilePhoto ?? '',
+        profilePhoto: profileImage || existingData.profilePhoto || '',
           updatedAt: now,
           isActive: true,
           isVerified: existingData.isVerified ?? false,
@@ -2477,8 +2477,8 @@ export const issueKakaoCustomToken = functions.https.onCall(
  */
 export const naverStaticMapProxy = functions.https.onRequest(async (req, res) => {
   try {
-    const clientId = NAVER_MAP_CLIENT_ID_PARAM.value() || process.env.NAVER_MAP_CLIENT_ID ?? '';
-    const clientSecret = NAVER_MAP_CLIENT_SECRET_PARAM.value() || process.env.NAVER_MAP_CLIENT_SECRET ?? '';
+    const clientId = NAVER_MAP_CLIENT_ID_PARAM.value() || process.env.NAVER_MAP_CLIENT_ID || '';
+    const clientSecret = NAVER_MAP_CLIENT_SECRET_PARAM.value() || process.env.NAVER_MAP_CLIENT_SECRET || '';
 
     if (!clientId || !clientSecret) {
       res.status(503).json({ ok: false, message: 'naver map credentials are not configured' });
@@ -2540,8 +2540,8 @@ export const naverGeocodeProxy = functions.https.onRequest(async (req, res) => {
       return;
     }
 
-    const clientId = NAVER_MAP_CLIENT_ID_PARAM.value() || process.env.NAVER_MAP_CLIENT_ID ?? '';
-    const clientSecret = NAVER_MAP_CLIENT_SECRET_PARAM.value() || process.env.NAVER_MAP_CLIENT_SECRET ?? '';
+    const clientId = NAVER_MAP_CLIENT_ID_PARAM.value() || process.env.NAVER_MAP_CLIENT_ID || '';
+    const clientSecret = NAVER_MAP_CLIENT_SECRET_PARAM.value() || process.env.NAVER_MAP_CLIENT_SECRET || '';
 
     if (!clientId || !clientSecret) {
       res.status(503).json({ ok: false, message: 'naver map credentials are not configured' });
@@ -2617,8 +2617,8 @@ export const naverDirectionsProxy = functions.https.onRequest(async (req, res) =
       return;
     }
 
-    const clientId = NAVER_MAP_CLIENT_ID_PARAM.value() || process.env.NAVER_MAP_CLIENT_ID ?? '';
-    const clientSecret = NAVER_MAP_CLIENT_SECRET_PARAM.value() || process.env.NAVER_MAP_CLIENT_SECRET ?? '';
+    const clientId = NAVER_MAP_CLIENT_ID_PARAM.value() || process.env.NAVER_MAP_CLIENT_ID || '';
+    const clientSecret = NAVER_MAP_CLIENT_SECRET_PARAM.value() || process.env.NAVER_MAP_CLIENT_SECRET || '';
 
     if (!clientId || !clientSecret) {
       res.status(503).json({ ok: false, message: 'naver map credentials are not configured' });
@@ -2723,7 +2723,7 @@ export const jusoAddressSearchProxy = functions.https.onRequest(async (req, res)
       return;
     }
 
-    const apiKey = JUSO_API_KEY_PARAM.value() || process.env.JUSO_API_KEY ?? '';
+    const apiKey = JUSO_API_KEY_PARAM.value() || process.env.JUSO_API_KEY || '';
     if (!apiKey) {
       res.status(503).json({ ok: false, message: 'juso api key is not configured' });
       return;
@@ -2766,10 +2766,10 @@ export const ciVerificationCallback = functions.https.onRequest(async (req, res)
   try {
     const sessionId = readFirstQueryValue(req.query.sessionId) ?? readObjectString(req.body, 'sessionId');
     const provider = readFirstQueryValue(req.query.provider) ?? readObjectString(req.body, 'provider');
-    const result = readFirstQueryValue(req.query.result) || readObjectString(req.body, 'result') ?? 'success';
-    const ciSeed = readFirstQueryValue(req.query.ci) || readObjectString(req.body, 'ci') ?? sessionId;
+    const result = readFirstQueryValue(req.query.result) || readObjectString(req.body, 'result') || 'success';
+    const ciSeed = readFirstQueryValue(req.query.ci) || readObjectString(req.body, 'ci') || sessionId;
 
-    if (!sessionId ?? (provider !== 'pass' && provider !== 'kakao')) {
+    if (!sessionId || (provider !== 'pass' && provider !== 'kakao')) {
       res.status(400).json({ ok: false, message: 'invalid parameters' });
       return;
     }
@@ -2956,7 +2956,7 @@ export const confirmPhoneOtp = functions.https.onCall(
     const phoneNumber = normalizePhoneNumber(data?.phoneNumber ?? '');
     const code = typeof data?.code === 'string' ? data.code.trim() : '';
 
-    if (!sessionId || !isValidKoreanMobileNumber(phoneNumber) ?? !/^\d{6}$/.test(code)) {
+    if (!sessionId || !isValidKoreanMobileNumber(phoneNumber) || !/^\d{6}$/.test(code)) {
       throw new functions.https.HttpsError('invalid-argument', 'sessionId, phoneNumber, and a 6-digit code are required');
     }
 

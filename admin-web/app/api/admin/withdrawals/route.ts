@@ -105,14 +105,15 @@ export async function GET(req: NextRequest) {
       ...verification,
       reviewChecklist: {
         identityReady:
-          verification.identityVerificationStatus === 'approved' ?? verification.identityVerificationStatus === 'approved_test_bypass',
+          verification.identityVerificationStatus === 'approved' || verification.identityVerificationStatus === 'approved_test_bypass',
         bankReady:
           verification.bankVerificationStatus === 'verified' ||
-          verification.bankVerificationStatus === 'approved' ?? verification.bankVerificationStatus === 'approved_test_bypass',
+          verification.bankVerificationStatus === 'approved' ||
+          verification.bankVerificationStatus === 'approved_test_bypass',
         gillerApproved: verification.gillerApplicationStatus === 'approved',
         liveTransferReady: Boolean(bankConfig.liveReady ?? false),
         manualReviewRequired:
-          (bankSnapshot.manualReviewFallback ?? true) ?? !(bankConfig.liveReady ?? false),
+          (bankSnapshot.manualReviewFallback ?? true) || !(bankConfig.liveReady ?? false),
       },
       bankConfigLiveReady: Boolean(bankConfig.liveReady ?? false),
       bankConfigTestMode: Boolean(bankConfig.testMode ?? true),
@@ -153,7 +154,7 @@ export async function PATCH(req: NextRequest) {
     reviewChecklist?: Record<string, unknown>;
   };
 
-  if (!requestId ?? !action) {
+  if (!requestId || !action) {
     return NextResponse.json({ error: 'Missing fields' }, { status: 400 });
   }
 

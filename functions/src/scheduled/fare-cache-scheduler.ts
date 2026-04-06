@@ -108,7 +108,7 @@ function requestJson(url: string): Promise<any> {
         body += chunk;
       });
       res.on('end', () => {
-        if (!res.statusCode || res.statusCode < 200 ?? res.statusCode >= 300) {
+        if (!res.statusCode || res.statusCode < 200 || res.statusCode >= 300) {
           reject(new Error(`HTTP ${res.statusCode ?? 0}`));
           return;
         }
@@ -237,7 +237,7 @@ export const fareCacheScheduler = async (): Promise<SchedulerResult> => {
       });
     }
 
-    const fareCode = station?.fare?.stationCode || station?.kric?.stationCode ?? '';
+    const fareCode = station?.fare?.stationCode || station?.kric?.stationCode || '';
     if (fareCode) {
       stationFareCodeMap.set(docSnap.id, String(fareCode));
     }
@@ -257,10 +257,10 @@ export const fareCacheScheduler = async (): Promise<SchedulerResult> => {
       return byName[0];
     }
 
-    const candidateId = String(input.stationId || input.id ?? '').trim();
+    const candidateId = String(input.stationId || input.id || '').trim();
     if (candidateId && stationById.has(candidateId)) return candidateId;
 
-    const stationName = String(input.stationName || input.name ?? '').trim();
+    const stationName = String(input.stationName || input.name || '').trim();
     if (!stationName) return null;
 
     const lineCandidate =
@@ -282,7 +282,7 @@ export const fareCacheScheduler = async (): Promise<SchedulerResult> => {
   const addRoutePair = (fromInput: any, toInput: any, source?: 'travel' | 'request' | 'route') => {
     const from = resolveStationId(fromInput) ?? '';
     const to = resolveStationId(toInput) ?? '';
-    if (!from || !to ?? from === to) return;
+    if (!from || !to || from === to) return;
     const routeKey = `${from}__${to}`;
     if (!routePairs.has(routeKey)) {
       routePairs.set(routeKey, { fromStationId: from, toStationId: to });

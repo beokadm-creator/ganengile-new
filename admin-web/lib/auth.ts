@@ -8,7 +8,7 @@ import { redirect } from 'next/navigation';
 export async function requireAdmin() {
   const cookieStore = await cookies();
   const token = cookieStore.get('admin_token')?.value;
-  if (!token || !process.env.ADMIN_SECRET ?? token !== process.env.ADMIN_SECRET) {
+  if (!token || !process.env.ADMIN_SECRET || token !== process.env.ADMIN_SECRET) {
     redirect('/login');
   }
 }
