@@ -17,6 +17,58 @@
 - `[STATIC]`은 캐시 가능한 규칙, `[DYNAMIC]`은 릴리즈 태그, 런타임 상태, 최근 판단처럼 다시 확인해야 하는 정보다.
 - 상세 정책과 스타일 규칙은 여기서 반복하지 않고 `AGENTS.md`, `MANDATORY_WORKFLOW.md`, 작업별 문서로 위임한다.
 
+## [STATIC] Windows PowerShell 인코딩 규칙 (강제)
+
+이 프로젝트는 Windows PowerShell 5.1 환경에서 실행된다. PowerShell은 기본적으로 한글 출력을 깨트린다. 아래 규칙을 **모든 셸 명령 실행 전**에 적용한다.
+
+### 원인
+- `$OutputEncoding` 기본값이 US-ASCII → 파이프/리다이렉트 시 한글 깨짐
+- `LANG`, `LC_ALL` 미설정 → Git/Node가 인코딩을 추측
+- `git i18n.*encoding` 미설정 → 한글 커밋 로그/파일명 깨짐
+- `git core.quotepath` 미설정 → 한글 파일명이 escaped octal로 출력
+
+### 강제 규칙 (MUST)
+
+**1. 모든 Bash 툴 호출 시 아래 환경변수를 함께 설정한다:**
+```powershell
+$env:LANG = "ko_KR.UTF-8"
+$env:LC_ALL = "ko_KR.UTF-8"
+$env:PYTHONIOENCODING = "utf-8"
+[Console]::OutputEncoding = [System.Text.Encoding]::UTF8
+[Console]::InputEncoding = [System.Text.Encoding]::UTF8
+$OutputEncoding = [System.Text.Encoding]::UTF8
+```
+
+**2. Git 설정 (최초 1회):**
+```powershell
+git config --global core.quotepath false
+git config --global i18n.logoutputencoding utf-8
+git config --global i18n.commitencoding utf-8
+git config --global gui.encoding utf-8
+```
+
+**3. 금지 사항 (MUST NOT):**
+- PowerShell `Set-Content` 사용 금지 (`-Encoding utf8` 지정해도 BOM 붙음)
+- PowerShell `Out-File` 사용 금지 (동일)
+- 한글이 포함된 문자열을 PowerShell 변수로 직접 파이프 금지
+- `chcp` 명령어 의존 금지 (PowerShell 5.1에서 인식 불가)
+
+**4. 파일 쓰기는 반드시 Write/Edit 툴 사용:**
+- 한글이 들어간 파일은 PowerShell 리다이렉트(`>`, `>>`)로 쓰지 않는다.
+- Write/Edit 툴은 UTF-8 without BOM으로 쓰므로 안전하다.
+
+**5. CI 환경 (GitHub Actions):**
+```yaml
+env:
+  LANG: ko_KR.UTF-8
+  LC_ALL: ko_KR.UTF-8
+```
+
+### 참고
+- 파일 인코딩 가이드: `docs/ENCODING_GUIDE.md`
+- 인코딩 검증: `npm run check:encoding`
+- 인코딩 수정: `npm run fix:encoding`
+
 ## [STATIC] Role
 - 이 파일은 저장소 전체를 설명하는 상세 정책 문서가 아니라, 코덱스와 다른 에이전트가 빠르게 진입하기 위한 루트 오버뷰다.
 - 공통 거버넌스, beta1 배경, 운영 기본값은 shared include에서 상속받고 여기에는 루트 판단 기준만 둔다.
