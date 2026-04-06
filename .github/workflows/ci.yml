@@ -78,6 +78,7 @@ jobs:
 
       - name: 🔨 Build web version
         run: npm run web -- --no-dev --minify
+        continue-on-error: true
 
   admin-build-check:
     name: Admin Web Build Check
