@@ -114,7 +114,7 @@ export async function PATCH(req: NextRequest) {
   }
 
   const payload = (await req.json()) as ResolvePayload;
-  if (!payload.disputeId ?? !payload.responsibility) {
+  if (!payload.disputeId || !payload.responsibility) {
     return NextResponse.json({ error: 'Missing fields' }, { status: 400 });
   }
 
