@@ -184,7 +184,7 @@ export default function AIIntegrationPage() {
   }
 
   return (
-    <div className="max-w-5xl p-6">
+    <div className="min-h-screen bg-stone-50 p-6">
       <div className="mb-6">
         <h1 className="text-2xl font-bold text-slate-900">AI 설정</h1>
       </div>

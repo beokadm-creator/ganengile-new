@@ -37,7 +37,7 @@ export default function DeliveriesPage() {
   useEffect(() => { loadData(tab); }, [tab]);
 
   return (
-    <div className="p-6">
+    <div className="min-h-screen bg-stone-50 p-6">
       <div className="mb-6">
         <h1 className="text-2xl font-bold">🚴 배송 관리</h1>
         <p className="text-gray-500 text-sm mt-1">배송 요청 현황을 확인합니다.</p>

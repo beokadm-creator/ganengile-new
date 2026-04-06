@@ -46,7 +46,7 @@ export default function LockersPage() {
   }, [tab]);
 
   return (
-    <div className="p-6">
+    <div className="min-h-screen bg-stone-50 p-6">
       <div className="mb-6">
         <h1 className="text-2xl font-bold">🧳 사물함 관리</h1>
         <p className="text-gray-500 text-sm mt-1">지하철/비지하철 사물함을 분리 관리합니다.</p>

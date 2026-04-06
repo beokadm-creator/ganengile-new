@@ -39,8 +39,8 @@ function badgeClass(status: Beta1AreaCard['status']): string {
 
 export default function Beta1OverviewPage() {
   return (
-    <div className="space-y-8">
-      <section className="rounded-3xl border border-slate-200 bg-white p-8 shadow-sm">
+    <div className="min-h-screen bg-stone-50 p-6">
+      <section className="rounded-[24px] border border-slate-200 bg-white p-8 shadow-sm">
         <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
           <div className="space-y-2">
             <p className="text-sm font-semibold uppercase tracking-[0.24em] text-sky-600">

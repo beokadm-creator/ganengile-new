@@ -74,7 +74,7 @@ export default function VerificationsPage() {
   ] as const;
 
   return (
-    <div className="p-6">
+    <div className="min-h-screen bg-stone-50 p-6">
       <div className="mb-6">
         <h1 className="text-2xl font-bold">🪪 신원 인증 심사</h1>
         <p className="text-gray-500 text-sm mt-1">길러 신원 인증을 검토하고 승인/반려합니다.</p>

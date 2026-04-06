@@ -126,7 +126,7 @@ export default function BankIntegrationPage() {
   }
 
   return (
-    <div className="max-w-4xl p-6">
+    <div className="min-h-screen bg-stone-50 p-6">
       <div className="mb-6">
         <h1 className="text-2xl font-bold text-slate-900">계좌 인증 / 출금 설정</h1>
         <p className="mt-2 text-sm text-slate-500">

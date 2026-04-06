@@ -92,7 +92,7 @@ export default function FareCachePage() {
   }
 
   return (
-    <div className="max-w-3xl space-y-6 p-6">
+    <div className="min-h-screen bg-stone-50 p-6">
       <section className="rounded-[24px] bg-white p-6 shadow-sm">
         <div className="flex items-start justify-between gap-4">
           <div>
