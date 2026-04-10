@@ -184,9 +184,10 @@ export default function BasicInfoOnboarding() {
   return (
     <KeyboardAvoidingView
       style={styles.container}
-      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      keyboardVerticalOffset={Platform.OS === 'ios' ? 60 : 0}
     >
-      <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
+      <ScrollView style={{ flex: 1 }} contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
         <View style={styles.hero}>
           <Text style={styles.eyebrow}>첫 배송 요청 준비</Text>
           <Text style={styles.title}>이용자 정보만 간단히 확인합니다.</Text>
@@ -343,7 +344,7 @@ function ConsentItemRow({
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: Colors.background },
-  content: { padding: Spacing.xl, gap: Spacing.lg, paddingBottom: Spacing['4xl'] },
+  content: { padding: Spacing.xl, gap: Spacing.lg, paddingBottom: 80 },
   hero: {
     backgroundColor: Colors.primaryMint,
     borderRadius: BorderRadius.xl,
