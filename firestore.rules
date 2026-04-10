@@ -438,14 +438,20 @@ service cloud.firestore {
       // 읽기: gller(요청자) 또는 giller(길러)
       allow read: if isAuthenticated() &&
                   (isOwner(resource.data.gllerId) ||
-                   isOwner(resource.data.gillerId));
+                   isOwner(resource.data.gillerId) ||
+                   isOwner(resource.data.requesterId));
 
-      // 생성: 길러 본인만
+      // 생성: 요청자(gller)가 배송 요청 시 생성, 또는 길러가 수락 시 생성
       allow create: if isAuthenticated() &&
-                    request.resource.data.gillerId == request.auth.uid;
+                    (request.resource.data.requesterId == request.auth.uid ||
+                     request.resource.data.gillerId == request.auth.uid);
 
-      // 수정: 해당 배송 길러 본인만
-      allow update: if isOwner(resource.data.gillerId);
+      // 수정: 요청자, 해당 배송 길러 본인, 또는 관리자
+      allow update: if isAuthenticated() &&
+                    (isOwner(resource.data.gllerId) ||
+                     isOwner(resource.data.gillerId) ||
+                     isOwner(resource.data.requesterId) ||
+                     isAdmin());
 
       // 삭제: 시스템만
       allow delete: if false;
