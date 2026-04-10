@@ -3047,7 +3047,7 @@ export const completeCiVerificationTest = functions.https.onCall(
 
 export const requestPhoneOtp = functions.https.onCall(
   async (data: RequestPhoneOtpData, context): Promise<RequestPhoneOtpResult> => {
-    requireCallableAuth(context, 'requestPhoneOtp');
+    const userId = requireCallableAuth(context, 'requestPhoneOtp');
     const phoneNumber = normalizePhoneNumber(data?.phoneNumber ?? '');
     if (!isValidKoreanMobileNumber(phoneNumber)) {
       throw new functions.https.HttpsError('invalid-argument', 'A valid Korean mobile number is required');
@@ -3055,6 +3055,32 @@ export const requestPhoneOtp = functions.https.onCall(
 
     const testMode = isOtpTestModeEnabled();
     const now = Date.now();
+    const verifiedPhoneOwnerQuery = await db
+      .collection('users')
+      .where('phoneVerification.phoneNumber', '==', phoneNumber)
+      .where('phoneVerification.verified', '==', true)
+      .limit(1)
+      .get();
+
+    if (!verifiedPhoneOwnerQuery.empty) {
+      const ownerDoc = verifiedPhoneOwnerQuery.docs[0];
+      if (ownerDoc.id !== userId) {
+        throw new functions.https.HttpsError(
+          'already-exists',
+          '이미 다른 계정에서 인증에 사용 중인 휴대폰 번호입니다.'
+        );
+      }
+
+      return {
+        success: true,
+        sessionId: `verified-${ownerDoc.id}`,
+        expiresAt: new Date(now + OTP_TTL_MS).toISOString(),
+        resendAvailableAt: new Date(now).toISOString(),
+        maskedDestination: maskPhoneNumber(phoneNumber),
+        alreadyVerified: true,
+      };
+    }
+
     const sessionQuery = await db
       .collection(OTP_SESSION_COLLECTION)
       .where('phoneNumber', '==', phoneNumber)
@@ -3089,6 +3115,7 @@ export const requestPhoneOtp = functions.https.onCall(
 
     await db.collection(OTP_SESSION_COLLECTION).doc(sessionId).set({
       sessionId,
+      userId,
       phoneNumber,
       maskedDestination: maskPhoneNumber(phoneNumber),
       codeHash: hashOtpCode(sessionId, code),
@@ -3116,7 +3143,7 @@ export const requestPhoneOtp = functions.https.onCall(
 
 export const confirmPhoneOtp = functions.https.onCall(
   async (data: ConfirmPhoneOtpData, context): Promise<ConfirmPhoneOtpResult> => {
-    requireCallableAuth(context, 'confirmPhoneOtp');
+    const userId = requireCallableAuth(context, 'confirmPhoneOtp');
     const sessionId = typeof data?.sessionId === 'string' ? data.sessionId.trim() : '';
     const phoneNumber = normalizePhoneNumber(data?.phoneNumber ?? '');
     const code = typeof data?.code === 'string' ? data.code.trim() : '';
@@ -3132,12 +3159,17 @@ export const confirmPhoneOtp = functions.https.onCall(
     }
 
     const session = sessionSnapshot.data() as {
+      userId?: string;
       phoneNumber?: string;
       codeHash?: string;
       status?: string;
       expiresAt?: admin.firestore.Timestamp;
       attemptsRemaining?: number;
     };
+
+    if (session.userId !== userId) {
+      throw new functions.https.HttpsError('permission-denied', 'This OTP session belongs to a different user');
+    }
 
     if (session.phoneNumber !== phoneNumber) {
       throw new functions.https.HttpsError('permission-denied', 'Phone number does not match this session');
@@ -3179,12 +3211,40 @@ export const confirmPhoneOtp = functions.https.onCall(
 
     const verifiedAt = new Date();
     const verificationToken = randomUUID();
+    const verifiedPhoneOwnerQuery = await db
+      .collection('users')
+      .where('phoneVerification.phoneNumber', '==', phoneNumber)
+      .where('phoneVerification.verified', '==', true)
+      .limit(1)
+      .get();
+
+    if (!verifiedPhoneOwnerQuery.empty && verifiedPhoneOwnerQuery.docs[0].id !== userId) {
+      throw new functions.https.HttpsError(
+        'already-exists',
+        '이미 다른 계정에서 인증에 사용 중인 휴대폰 번호입니다.'
+      );
+    }
+
     await sessionRef.set(
       {
         status: 'verified',
         verifiedAt: admin.firestore.Timestamp.fromDate(verifiedAt),
         verificationToken,
         updatedAt: admin.firestore.Timestamp.fromDate(verifiedAt),
+      },
+      { merge: true }
+    );
+
+    await db.collection('users').doc(userId).set(
+      {
+        phoneNumber,
+        phoneVerification: {
+          verified: true,
+          phoneNumber,
+          verificationToken,
+          verifiedAt: admin.firestore.Timestamp.fromDate(verifiedAt),
+        },
+        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
       },
       { merge: true }
     );

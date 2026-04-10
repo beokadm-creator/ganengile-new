@@ -227,126 +227,126 @@ export async function createBeta1Request(input: Beta1RequestCreateInput): Promis
   pricingQuoteId: string;
   quoteCards: Beta1QuoteCard[];
 }> {
-  const aiConfig = await getAIIntegrationConfig();
   const pickupAddress = formatDetailedAddress(input.pickupRoadAddress, input.pickupDetailAddress);
   const deliveryAddress = formatDetailedAddress(input.deliveryRoadAddress, input.deliveryDetailAddress);
-  const requestDraft = await createRequestDraft(
-    buildRequestDraftFromLegacyInput({
-      requesterUserId: input.requesterUserId,
-      pickupStation: input.pickupStation,
-      deliveryStation: input.deliveryStation,
-      selectedPhotoIds: input.selectedPhotoIds,
+  const quoteCards = buildBeta1QuoteCards(input);
+  const selectedCard = quoteCards.find((card) => card.quoteType === input.selectedQuoteType) ?? quoteCards[0];
+  let requestDraftId = '';
+  let selectedQuoteId = '';
+
+  try {
+    const aiConfig = await getAIIntegrationConfig();
+    const requestDraft = await createRequestDraft(
+      buildRequestDraftFromLegacyInput({
+        requesterUserId: input.requesterUserId,
+        pickupStation: input.pickupStation,
+        deliveryStation: input.deliveryStation,
+        selectedPhotoIds: input.selectedPhotoIds,
+        itemName: input.packageItemName,
+        category: input.packageCategory,
+        description: input.packageDescription,
+        estimatedValue: input.itemValue,
+        estimatedWeightKg: input.weightKg,
+        estimatedSize: normalizePackageSize(input.packageSize),
+        recipientName: input.recipientName,
+        recipientPhone: input.recipientPhone,
+      })
+    );
+    requestDraftId = requestDraft.requestDraftId;
+
+    await updateRequestDraft(requestDraft.requestDraftId, {
+      requestMode: input.requestMode ?? 'immediate',
+      sourceRequestId: input.sourceRequestId,
+      originType: input.originType ?? 'station',
+      destinationType: input.destinationType ?? 'station',
+      originRef:
+        (input.originType ?? 'station') === 'address' && pickupAddress
+          ? {
+              ...toAddressLocationRef(pickupAddress, input.pickupStation),
+              roadAddress: input.pickupRoadAddress?.trim(),
+              detailAddress: input.pickupDetailAddress?.trim(),
+            }
+          : toLocationRef(input.pickupStation),
+      destinationRef:
+        (input.destinationType ?? 'station') === 'address' && deliveryAddress
+          ? {
+              ...toAddressLocationRef(deliveryAddress, input.deliveryStation),
+              roadAddress: input.deliveryRoadAddress?.trim(),
+              detailAddress: input.deliveryDetailAddress?.trim(),
+            }
+          : toLocationRef(input.deliveryStation),
+      preferredSchedule: {
+        pickupTime: input.preferredPickupTime,
+        arrivalTime: input.preferredArrivalTime,
+      },
+    });
+
+    const aiResult = input.aiAnalysisOverride?.result ?? {
       itemName: input.packageItemName,
       category: input.packageCategory,
       description: input.packageDescription,
       estimatedValue: input.itemValue,
       estimatedWeightKg: input.weightKg,
       estimatedSize: normalizePackageSize(input.packageSize),
-      recipientName: input.recipientName,
-      recipientPhone: input.recipientPhone,
-    })
-  );
+      handlingNotes:
+        input.requestMode === 'reservation'
+          ? [
+              input.directParticipationMode === 'locker_assisted' ? 'locker_preferred' : 'meetup_preferred',
+              'reservation_window_preferred',
+            ]
+          : [
+              input.directParticipationMode === 'locker_assisted' ? 'locker_preferred' : 'meetup_preferred',
+              'fast_match_priority',
+            ],
+      riskFlags: input.requestMode === 'reservation' ? ['reserved_window'] : ['tight_sla_candidate'],
+    };
 
-  await updateRequestDraft(requestDraft.requestDraftId, {
-    requestMode: input.requestMode ?? 'immediate',
-    sourceRequestId: input.sourceRequestId,
-    originType: input.originType ?? 'station',
-    destinationType: input.destinationType ?? 'station',
-    originRef:
-      (input.originType ?? 'station') === 'address' &&
-      pickupAddress
-        ? {
-            ...toAddressLocationRef(
-              pickupAddress,
-              input.pickupStation
-            ),
-            roadAddress: input.pickupRoadAddress?.trim(),
-            detailAddress: input.pickupDetailAddress?.trim(),
-          }
-        : toLocationRef(input.pickupStation),
-    destinationRef:
-      (input.destinationType ?? 'station') === 'address' &&
-      deliveryAddress
-        ? {
-            ...toAddressLocationRef(
-              deliveryAddress,
-              input.deliveryStation
-            ),
-            roadAddress: input.deliveryRoadAddress?.trim(),
-            detailAddress: input.deliveryDetailAddress?.trim(),
-          }
-        : toLocationRef(input.deliveryStation),
-    preferredSchedule: {
-      pickupTime: input.preferredPickupTime,
-      arrivalTime: input.preferredArrivalTime,
-    },
-  });
+    const aiAnalysis = await createAIAnalysis({
+      requestDraftId: requestDraft.requestDraftId,
+      requesterUserId: input.requesterUserId,
+      inputPhotoIds: input.selectedPhotoIds ?? [],
+      provider: input.aiAnalysisOverride?.provider ?? aiConfig.provider,
+      model: input.aiAnalysisOverride?.model ?? aiConfig.analysisModel,
+      confidence: input.aiAnalysisOverride?.confidence ?? 0.72,
+      result: aiResult,
+      status: input.aiAnalysisOverride?.fallbackUsed ? AIAnalysisStatus.LOW_CONFIDENCE : AIAnalysisStatus.COMPLETED,
+    });
 
-  const aiResult = input.aiAnalysisOverride?.result ?? {
-    itemName: input.packageItemName,
-    category: input.packageCategory,
-    description: input.packageDescription,
-    estimatedValue: input.itemValue,
-    estimatedWeightKg: input.weightKg,
-    estimatedSize: normalizePackageSize(input.packageSize),
-    handlingNotes:
-      input.requestMode === 'reservation'
-        ? [
-            input.directParticipationMode === 'locker_assisted' ? 'locker_preferred' : 'meetup_preferred',
-            'reservation_window_preferred',
-          ]
-        : [
-            input.directParticipationMode === 'locker_assisted' ? 'locker_preferred' : 'meetup_preferred',
-            'fast_match_priority',
-          ],
-    riskFlags: input.requestMode === 'reservation' ? ['reserved_window'] : ['tight_sla_candidate'],
-  };
+    await updateRequestDraft(requestDraft.requestDraftId, {
+      aiAnalysisId: aiAnalysis.aiAnalysisId,
+      status: RequestDraftStatus.READY_FOR_REVIEW,
+    });
 
-  const aiAnalysis = await createAIAnalysis({
-    requestDraftId: requestDraft.requestDraftId,
-    requesterUserId: input.requesterUserId,
-    inputPhotoIds: input.selectedPhotoIds ?? [],
-    provider: input.aiAnalysisOverride?.provider ?? aiConfig.provider,
-    model: input.aiAnalysisOverride?.model ?? aiConfig.analysisModel,
-    confidence: input.aiAnalysisOverride?.confidence ?? 0.72,
-    result: aiResult,
-    status: input.aiAnalysisOverride?.fallbackUsed ? AIAnalysisStatus.LOW_CONFIDENCE : AIAnalysisStatus.COMPLETED,
-  });
+    const quoteDocs = await Promise.all(
+      quoteCards.map((card) =>
+        createPricingQuote({
+          ...pricingCardToQuote(card, requestDraft.requestDraftId, input.requesterUserId),
+          selectedDeliveryOption: {
+            ...pricingCardToQuote(card, requestDraft.requestDraftId, input.requesterUserId).selectedDeliveryOption,
+            requestMode: input.requestMode ?? 'immediate',
+            preferredPickupTime: input.preferredPickupTime,
+            preferredArrivalTime: input.preferredArrivalTime,
+          },
+        })
+      )
+    );
 
-  await updateRequestDraft(requestDraft.requestDraftId, {
-    aiAnalysisId: aiAnalysis.aiAnalysisId,
-    status: RequestDraftStatus.READY_FOR_REVIEW,
-  });
-
-  const quoteCards = buildBeta1QuoteCards(input);
-  const selectedCard = quoteCards.find((card) => card.quoteType === input.selectedQuoteType) ?? quoteCards[0];
-
-  const quoteDocs = await Promise.all(
-    quoteCards.map((card) =>
-      createPricingQuote({
-        ...pricingCardToQuote(card, requestDraft.requestDraftId, input.requesterUserId),
-        selectedDeliveryOption: {
-          ...pricingCardToQuote(card, requestDraft.requestDraftId, input.requesterUserId).selectedDeliveryOption,
-          requestMode: input.requestMode ?? 'immediate',
-          preferredPickupTime: input.preferredPickupTime,
-          preferredArrivalTime: input.preferredArrivalTime,
-        },
-      })
-    )
-  );
-
-  const selectedQuote = quoteDocs.find((quote) => quote.quoteType === selectedCard.quoteType) ?? quoteDocs[0];
-  await markPricingQuoteSelected(selectedQuote.pricingQuoteId, requestDraft.requestDraftId);
-  await updateRequestDraft(requestDraft.requestDraftId, {
-    status: RequestDraftStatus.SUBMITTED,
-    selectedPricingQuoteId: selectedQuote.pricingQuoteId,
-  });
+    const selectedQuote = quoteDocs.find((quote) => quote.quoteType === selectedCard.quoteType) ?? quoteDocs[0];
+    selectedQuoteId = selectedQuote.pricingQuoteId;
+    await markPricingQuoteSelected(selectedQuote.pricingQuoteId, requestDraft.requestDraftId);
+    await updateRequestDraft(requestDraft.requestDraftId, {
+      status: RequestDraftStatus.SUBMITTED,
+      selectedPricingQuoteId: selectedQuote.pricingQuoteId,
+    });
+  } catch (error) {
+    console.error('[orchestration-service] draft pipeline failed, continuing with direct request creation', error);
+  }
 
   const requestPayload = {
-    requestDraftId: requestDraft.requestDraftId,
+    requestDraftId: requestDraftId || null,
     requesterId: input.requesterUserId,
     requesterUserId: input.requesterUserId,
-    pricingQuoteId: selectedQuote.pricingQuoteId,
+    pricingQuoteId: selectedQuoteId || null,
     originType: input.originType ?? 'station',
     destinationType: input.destinationType ?? 'station',
     pickupAddress: pickupAddress ?? '',
@@ -510,8 +510,8 @@ export async function createBeta1Request(input: Beta1RequestCreateInput): Promis
 
   return {
     requestId: requestRef.id,
-    requestDraftId: requestDraft.requestDraftId,
-    pricingQuoteId: selectedQuote.pricingQuoteId,
+    requestDraftId,
+    pricingQuoteId: selectedQuoteId,
     quoteCards,
   };
 }

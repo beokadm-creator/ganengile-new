@@ -12,6 +12,7 @@ export interface RequestOtpResult {
   resendAvailableAt: string;
   maskedDestination: string;
   testCode?: string;
+  alreadyVerified?: boolean;
 }
 
 export interface ConfirmOtpResult {

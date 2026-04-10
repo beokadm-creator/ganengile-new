@@ -100,6 +100,7 @@ export type MainStackParamList = {
   CustomerService: undefined;
   Terms: undefined;
   AddressBook: undefined;
+  ProfileEdit: undefined;
   RequestConfirmation: {
     requestId: string;
     pickupStationName?: string;

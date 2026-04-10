@@ -208,6 +208,13 @@ export default function ProfileScreen({ navigation }: { navigation: MainStackNav
         icon: 'place',
         onPress: () => navigation.navigate('AddressBook'),
       },
+      {
+        key: 'profile-edit',
+        title: '사용자 정보 변경',
+        subtitle: '이름과 인증 휴대폰 번호를 수정합니다.',
+        icon: 'edit',
+        onPress: () => navigation.navigate('ProfileEdit'),
+      },
     ],
     [navigation]
   );

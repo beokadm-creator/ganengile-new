@@ -38,6 +38,7 @@ import BadgeCollectionScreen from '../screens/main/BadgeCollectionScreen';
 import CustomerServiceScreen from '../screens/main/CustomerServiceScreen';
 import TermsScreen from '../screens/main/TermsScreen';
 import AddressBookScreen from '../screens/main/AddressBookScreen';
+import ProfileEditScreen from '../screens/main/ProfileEditScreen';
 import DepositPaymentScreen from '../screens/main/DepositPaymentScreen';
 import PointHistoryScreen from '../screens/main/PointHistoryScreen';
 import PointWithdrawScreen from '../screens/main/PointWithdrawScreen';
@@ -91,6 +92,7 @@ const SCREEN_TITLES: Record<string, string> = {
   CustomerService: '고객센터',
   Terms: '약관 및 정책',
   AddressBook: '주소록 관리',
+  ProfileEdit: '프로필 정보 변경',
   GillerPickupFromLocker: '사물함 픽업',
   GillerDropoffAtLocker: '사물함 보관',
   GillerPickupAtLocker: '사물함 회수',
@@ -356,6 +358,11 @@ export default function MainNavigator() {
       <Stack.Screen
         name="AddressBook"
         component={AddressBookScreen}
+        options={{ headerShown: false }}
+      />
+      <Stack.Screen
+        name="ProfileEdit"
+        component={ProfileEditScreen}
         options={{ headerShown: false }}
       />
       <Stack.Screen

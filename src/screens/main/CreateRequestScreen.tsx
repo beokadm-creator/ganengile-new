@@ -13,7 +13,6 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-import { doc, serverTimestamp, setDoc } from 'firebase/firestore';
 import AppTopBar from '../../components/common/AppTopBar';
 import AddressSearchModal from '../../components/common/AddressSearchModal';
 import DatePickerModal from '../../components/common/DatePickerModal';
@@ -31,7 +30,7 @@ import {
   getRecipientContactPrivacyConfig,
   type RecipientContactPrivacyConfig,
 } from '../../services/config-service';
-import { db, requireUserId } from '../../services/firebase';
+import { requireUserId } from '../../services/firebase';
 import { locationService } from '../../services/location-service';
 import { confirmPhoneOtp, requestPhoneOtp } from '../../services/otp-service';
 import { pickPhotoFromLibrary, takePhoto, uploadPhotoWithThumbnail } from '../../services/photo-service';
@@ -506,6 +505,8 @@ export default function CreateRequestScreen({ navigation, route }: Props) {
   const normalizedVerifiedPhone = normalizePhoneNumber(
     verifiedPhoneOverride ?? user?.phoneVerification?.phoneNumber ?? ''
   );
+  const hasLockedVerifiedPhone =
+    user?.phoneVerification?.verified === true && normalizedVerifiedPhone.length > 0;
   const isOnboardingComplete = user?.hasCompletedOnboarding === true;
   const isPhoneVerified =
     (verifiedPhoneOverride != null || user?.phoneVerification?.verified === true) &&
@@ -939,27 +940,6 @@ export default function CreateRequestScreen({ navigation, route }: Props) {
     }
   }
 
-  function handleUploadPhoto() {
-    if (hasItemValue && photoRefs.length === 0) {
-      Alert.alert(
-        '보증금 사진 등록',
-        '물건 가치를 입력한 경우 사진이 꼭 필요합니다. 촬영하거나 앨범에서 선택해 주세요.',
-        [
-          { text: '취소', style: 'cancel' },
-          { text: '앨범에서 선택', onPress: () => void handleUploadPhotoFromLibrary() },
-          { text: '사진 찍기', onPress: () => void handleUploadPhotoFromCamera() },
-        ]
-      );
-      return;
-    }
-
-    Alert.alert('사진 등록', '촬영 또는 앨범에서 선택할 수 있습니다.', [
-      { text: '취소', style: 'cancel' },
-      { text: '앨범에서 선택', onPress: () => void handleUploadPhotoFromLibrary() },
-      { text: '사진 찍기', onPress: () => void handleUploadPhotoFromCamera() },
-    ]);
-  }
-
   async function handleAI() {
     if (!photoUrl) {
       Alert.alert('사진이 필요해요', '먼저 물건 사진을 올린 뒤 AI 작성 도움을 사용할 수 있어요.');
@@ -1017,6 +997,11 @@ export default function CreateRequestScreen({ navigation, route }: Props) {
   }
 
   async function handleRequestContactOtp() {
+    if (hasLockedVerifiedPhone && normalizedContactPhone === normalizedVerifiedPhone) {
+      Alert.alert('이미 인증된 번호입니다', '이 번호는 다시 인증할 필요가 없습니다.');
+      return;
+    }
+
     const normalized = normalizedContactPhone;
     if (!/^010\d{8}$/.test(normalized)) {
       Alert.alert('휴대폰 번호', '010으로 시작하는 올바른 휴대폰 번호를 먼저 입력해 주세요.');
@@ -1026,6 +1011,17 @@ export default function CreateRequestScreen({ navigation, route }: Props) {
     setContactOtpSending(true);
     try {
       const result = await requestPhoneOtp(normalized);
+      if (result.alreadyVerified) {
+        setVerifiedPhoneOverride(normalized);
+        setContactOtpSessionId(null);
+        setContactOtpCode('');
+        setContactOtpHintCode(null);
+        setContactOtpDestination(result.maskedDestination);
+        setContactOtpExpiresAt(result.expiresAt);
+        void refreshUser();
+        Alert.alert('이미 인증된 번호입니다', '이 계정에서 이미 인증된 번호라 바로 사용할 수 있습니다.');
+        return;
+      }
       setContactOtpSessionId(result.sessionId);
       setContactOtpCode('');
       setContactOtpHintCode(result.testCode ?? null);
@@ -1061,26 +1057,11 @@ export default function CreateRequestScreen({ navigation, route }: Props) {
     setContactOtpVerifying(true);
     try {
       const normalized = normalizedContactPhone;
-      const result = await confirmPhoneOtp({
+      await confirmPhoneOtp({
         sessionId: contactOtpSessionId,
         phoneNumber: normalized,
         code: contactOtpCode,
       });
-
-      await setDoc(
-        doc(db, 'users', user.uid),
-        {
-          phoneNumber: normalized,
-          phoneVerification: {
-            verified: true,
-            phoneNumber: normalized,
-            verificationToken: result.verificationToken,
-            verifiedAt: result.verifiedAt,
-          },
-          updatedAt: serverTimestamp(),
-        },
-        { merge: true }
-      );
 
       setVerifiedPhoneOverride(normalized);
       setContactOtpSessionId(null);
@@ -1374,9 +1355,14 @@ export default function CreateRequestScreen({ navigation, route }: Props) {
         </Block>
 
         <Block title={photoUrl ? '물건 사진 ✓' : hasItemValue ? '물건 사진 (필수)' : '물건 사진 (선택)'}>
-          <TouchableOpacity style={[styles.primaryButton, hasItemValue && !photoUrl && styles.disabled]} onPress={() => void handleUploadPhoto()}>
-            <Text style={styles.primaryButtonText}>{photoUrl ? '사진 다시 올리기' : '물건 사진 올리기'}</Text>
-          </TouchableOpacity>
+          <View style={styles.row}>
+            <TouchableOpacity style={[styles.primaryButton, styles.flexButton]} onPress={() => void handleUploadPhotoFromCamera()}>
+              <Text style={styles.primaryButtonText}>{photoUrl ? '다시 촬영' : '사진 찍기'}</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={[styles.secondaryButton, styles.flexButton]} onPress={() => void handleUploadPhotoFromLibrary()}>
+              <Text style={styles.secondaryButtonText}>앨범에서 선택</Text>
+            </TouchableOpacity>
+          </View>
           {hasItemValue && !photoUrl ? (
             <Text style={styles.muted}>⚠️ 물품 가치를 입력하셨습니다. 보증금 적용을 위해 사진이 필요합니다.</Text>
           ) : !photoUrl ? (
@@ -1539,6 +1525,9 @@ export default function CreateRequestScreen({ navigation, route }: Props) {
             style={styles.input}
             value={contactPhoneNumber}
             onChangeText={(value) => {
+              if (hasLockedVerifiedPhone) {
+                return;
+              }
               const formatted = formatPhoneDigits(value);
               setContactPhoneNumber(formatted);
               if (normalizePhoneNumber(formatted) !== normalizedVerifiedPhone) {
@@ -1553,8 +1542,17 @@ export default function CreateRequestScreen({ navigation, route }: Props) {
             keyboardType="phone-pad"
             placeholder="010-1234-5678"
             placeholderTextColor={Colors.gray400}
+            editable={!hasLockedVerifiedPhone}
           />
-          {isPhoneVerified ? (
+          {hasLockedVerifiedPhone ? (
+            <>
+              <Text style={styles.selectorValue}>이미 인증된 휴대폰입니다.</Text>
+              <Text style={styles.muted}>번호 변경은 프로필에서만 가능합니다.</Text>
+              <TouchableOpacity style={styles.secondaryButton} onPress={() => navigation.navigate('ProfileEdit')}>
+                <Text style={styles.secondaryButtonText}>프로필에서 번호 변경</Text>
+              </TouchableOpacity>
+            </>
+          ) : isPhoneVerified ? (
             <Text style={styles.selectorValue}>이미 인증된 휴대폰입니다.</Text>
           ) : (
             <>
@@ -1884,6 +1882,9 @@ const styles = StyleSheet.create({
     color: Colors.white,
     fontSize: 16,
     fontWeight: '800',
+  },
+  flexButton: {
+    flex: 1,
   },
   secondaryButton: {
     minHeight: 48,

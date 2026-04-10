@@ -212,6 +212,7 @@ export interface RequestPhoneOtpResult {
   resendAvailableAt: string;
   maskedDestination: string;
   testCode?: string;
+  alreadyVerified?: boolean;
 }
 
 export interface ConfirmPhoneOtpData {
