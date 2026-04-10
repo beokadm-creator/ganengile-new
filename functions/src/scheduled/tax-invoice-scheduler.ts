@@ -39,39 +39,6 @@ async function getPlatformInfo(db: admin.firestore.Firestore): Promise<PlatformI
 }
 
 /**
- * 플랫폼 사업자 정보를 Firestore config/platform_info에서 로드합니다.
- * 문서가 없으면 기본값을 반환합니다.
- */
-interface PlatformInfo {
-  name: string;
-  registrationNumber: string;
-  ceo: string;
-  address: string;
-  contact: string;
-}
-
-const DEFAULT_PLATFORM_INFO: PlatformInfo = {
-  name: '가는길에',
-  registrationNumber: '',
-  ceo: '',
-  address: '',
-  contact: '',
-};
-
-async function getPlatformInfo(db: admin.firestore.Firestore): Promise<PlatformInfo> {
-  try {
-    const snap = await db.doc('config/platform_info').get();
-    if (snap.exists) {
-      const data = snap.data() as Partial<PlatformInfo>;
-      return { ...DEFAULT_PLATFORM_INFO, ...data };
-    }
-  } catch (error) {
-    console.warn('⚠️ Failed to load platform_info config, using defaults:', error);
-  }
-  return DEFAULT_PLATFORM_INFO;
-}
-
-/**
  * 매월 1일 세금계산서 발행 스케줄러
  *
  * 1. 활성 레거시 기업 계약 조회 (status: 'active')
