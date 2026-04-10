@@ -423,82 +423,90 @@ export async function createBeta1Request(input: Beta1RequestCreateInput): Promis
     updatedAt: serverTimestamp(),
   });
 
-  const legDefinitions = buildSegmentedLegDefinitions({
-    requestId: requestRef.id,
-    deliveryId: deliveryRef.id,
-    originType: input.originType ?? 'station',
-    destinationType: input.destinationType ?? 'station',
-    pickupStation: input.pickupStation,
-    deliveryStation: input.deliveryStation,
-    pickupAddress,
-    pickupRoadAddress: input.pickupRoadAddress,
-    pickupDetailAddress: input.pickupDetailAddress,
-    deliveryAddress,
-    deliveryRoadAddress: input.deliveryRoadAddress,
-    deliveryDetailAddress: input.deliveryDetailAddress,
-  });
-  const legRewards = splitRewardAcrossLegs(
-    Math.max(0, Math.round(selectedCard.pricing.publicPrice * 0.7)),
-    legDefinitions.length
-  );
-
-  for (let index = 0; index < legDefinitions.length; index += 1) {
-    const definition = legDefinitions[index];
-    const deliveryLeg = await createDeliveryLegRecord({
+  try {
+    const legDefinitions = buildSegmentedLegDefinitions({
       requestId: requestRef.id,
       deliveryId: deliveryRef.id,
-      legType: definition.legType,
-      actorType: definition.actorType,
-      sequence: definition.sequence,
-      originRef: definition.originRef,
-      destinationRef: definition.destinationRef,
+      originType: input.originType ?? 'station',
+      destinationType: input.destinationType ?? 'station',
+      pickupStation: input.pickupStation,
+      deliveryStation: input.deliveryStation,
+      pickupAddress,
+      pickupRoadAddress: input.pickupRoadAddress,
+      pickupDetailAddress: input.pickupDetailAddress,
+      deliveryAddress,
+      deliveryRoadAddress: input.deliveryRoadAddress,
+      deliveryDetailAddress: input.deliveryDetailAddress,
     });
+    const legRewards = splitRewardAcrossLegs(
+      Math.max(0, Math.round(selectedCard.pricing.publicPrice * 0.7)),
+      legDefinitions.length
+    );
 
-    await createMissionForDeliveryLeg({
+    for (let index = 0; index < legDefinitions.length; index += 1) {
+      const definition = legDefinitions[index];
+      const deliveryLeg = await createDeliveryLegRecord({
+        requestId: requestRef.id,
+        deliveryId: deliveryRef.id,
+        legType: definition.legType,
+        actorType: definition.actorType,
+        sequence: definition.sequence,
+        originRef: definition.originRef,
+        destinationRef: definition.destinationRef,
+      });
+
+      await createMissionForDeliveryLeg({
+        requestId: requestRef.id,
+        deliveryId: deliveryRef.id,
+        deliveryLeg,
+        currentReward: legRewards[index] ?? 0,
+      });
+
+      await persistActorSelectionDecision({
+        requestId: requestRef.id,
+        deliveryId: deliveryRef.id,
+        deliveryLegId: deliveryLeg.deliveryLegId,
+        interventionLevel: requiresAddressHandling(definition.legType) ? 'guarded_execute' : 'recommend',
+        selectedActorType: requiresAddressHandling(definition.legType) ? ActorType.EXTERNAL_PARTNER : ActorType.GILLER,
+        selectedPartnerId: requiresAddressHandling(definition.legType) ? PARTNER_QUOTES[0]?.partnerId : undefined,
+        selectionReason: requiresAddressHandling(definition.legType)
+          ? '주소 구간이라 길러 선택이 없으면 external partner fallback을 우선 검토합니다.'
+          : '역간 이동 구간이라 길러 수행을 우선 제안합니다.',
+        fallbackActorTypes: requiresAddressHandling(definition.legType)
+          ? [ActorType.GILLER]
+          : [ActorType.EXTERNAL_PARTNER],
+        fallbackPartnerIds: PARTNER_QUOTES.map((quote) => quote.partnerId),
+        manualReviewRequired: false,
+        riskFlags: requiresAddressHandling(definition.legType) ? ['address_leg'] : [],
+      });
+    }
+
+    const bundles = await bundleMissionsForDelivery(deliveryRef.id);
+    const candidateGillerIds = Array.from(
+      new Set(
+        bundles.flatMap((bundle) => bundle.candidateGillerUserIds ?? [])
+      )
+    );
+
+    await Promise.all(
+      candidateGillerIds.map((gillerId) =>
+        sendMissionBundleAvailableNotification(
+          gillerId,
+          requestRef.id,
+          input.pickupStation.stationName,
+          input.deliveryStation.stationName,
+          selectedCard.pricing.publicPrice,
+          bundles.length
+        )
+      )
+    );
+  } catch (error) {
+    console.error('[orchestration-service] request created but follow-up orchestration failed', {
       requestId: requestRef.id,
       deliveryId: deliveryRef.id,
-      deliveryLeg,
-      currentReward: legRewards[index] ?? 0,
-    });
-
-    await persistActorSelectionDecision({
-      requestId: requestRef.id,
-      deliveryId: deliveryRef.id,
-      deliveryLegId: deliveryLeg.deliveryLegId,
-      interventionLevel: requiresAddressHandling(definition.legType) ? 'guarded_execute' : 'recommend',
-      selectedActorType: requiresAddressHandling(definition.legType) ? ActorType.EXTERNAL_PARTNER : ActorType.GILLER,
-      selectedPartnerId: requiresAddressHandling(definition.legType) ? PARTNER_QUOTES[0]?.partnerId : undefined,
-      selectionReason: requiresAddressHandling(definition.legType)
-        ? '주소 구간이라 길러 선택이 없으면 external partner fallback을 우선 검토합니다.'
-        : '역간 이동 구간이라 길러 수행을 우선 제안합니다.',
-      fallbackActorTypes: requiresAddressHandling(definition.legType)
-        ? [ActorType.GILLER]
-        : [ActorType.EXTERNAL_PARTNER],
-      fallbackPartnerIds: PARTNER_QUOTES.map((quote) => quote.partnerId),
-      manualReviewRequired: false,
-      riskFlags: requiresAddressHandling(definition.legType) ? ['address_leg'] : [],
+      error,
     });
   }
-
-  const bundles = await bundleMissionsForDelivery(deliveryRef.id);
-  const candidateGillerIds = Array.from(
-    new Set(
-      bundles.flatMap((bundle) => bundle.candidateGillerUserIds ?? [])
-    )
-  );
-
-  await Promise.all(
-    candidateGillerIds.map((gillerId) =>
-      sendMissionBundleAvailableNotification(
-        gillerId,
-        requestRef.id,
-        input.pickupStation.stationName,
-        input.deliveryStation.stationName,
-        selectedCard.pricing.publicPrice,
-        bundles.length
-      )
-    )
-  );
 
   return {
     requestId: requestRef.id,

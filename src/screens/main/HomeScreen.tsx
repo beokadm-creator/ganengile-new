@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { RefreshControl, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
+import { useFocusEffect } from '@react-navigation/native';
 
 import { useUser } from '../../contexts/UserContext';
 import { useGillerAccess } from '../../hooks/useGillerAccess';
@@ -11,12 +12,14 @@ import {
 import { BorderRadius, Colors, Shadows, Spacing, Typography } from '../../theme';
 import type { MainStackNavigationProp } from '../../types/navigation';
 import { UserRole } from '../../types/user';
+import { loadCreateRequestProgress } from '../../utils/draft-storage';
 
 export default function HomeScreen({ navigation }: { navigation: MainStackNavigationProp }) {
   const { user, currentRole, switchRole } = useUser();
   const { canAccessGiller } = useGillerAccess();
   const [snapshot, setSnapshot] = useState<Beta1HomeSnapshot | null>(null);
   const [refreshing, setRefreshing] = useState(false);
+  const [hasRequestDraft, setHasRequestDraft] = useState(false);
 
   const role = canAccessGiller && currentRole === UserRole.GILLER ? 'giller' : 'requester';
   const isRequesterView = role === 'requester';
@@ -42,6 +45,23 @@ export default function HomeScreen({ navigation }: { navigation: MainStackNaviga
       mounted = false;
     };
   }, [role, user]);
+
+  useFocusEffect(
+    React.useCallback(() => {
+      let active = true;
+
+      void (async () => {
+        const draft = await loadCreateRequestProgress();
+        if (active) {
+          setHasRequestDraft(Boolean(draft));
+        }
+      })();
+
+      return () => {
+        active = false;
+      };
+    }, [])
+  );
 
   const refresh = async () => {
     if (!user?.uid) {
@@ -120,6 +140,18 @@ export default function HomeScreen({ navigation }: { navigation: MainStackNaviga
 
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>빠른 실행</Text>
+        {isRequesterView && hasRequestDraft ? (
+          <TouchableOpacity
+            style={styles.resumeCard}
+            onPress={() => navigation.navigate('CreateRequest')}
+          >
+            <View style={styles.resumeCopy}>
+              <Text style={styles.resumeTitle}>이전 작성 이어쓰기</Text>
+              <Text style={styles.resumeBody}>임시 저장된 배송 요청을 이어서 작성할 수 있습니다.</Text>
+            </View>
+            <MaterialIcons name="arrow-forward-ios" size={18} color={Colors.primary} />
+          </TouchableOpacity>
+        ) : null}
         <View style={styles.actionGrid}>
           {isRequesterView ? (
             <>
@@ -430,6 +462,31 @@ const styles = StyleSheet.create({
   },
   section: {
     gap: Spacing.md,
+  },
+  resumeCard: {
+    borderRadius: BorderRadius.xl,
+    backgroundColor: Colors.surface,
+    borderWidth: 1,
+    borderColor: Colors.primary,
+    padding: Spacing.lg,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: Spacing.md,
+    ...Shadows.sm,
+  },
+  resumeCopy: {
+    flex: 1,
+    gap: 4,
+  },
+  resumeTitle: {
+    color: Colors.textPrimary,
+    fontSize: Typography.fontSize.base,
+    fontWeight: '800',
+  },
+  resumeBody: {
+    color: Colors.textSecondary,
+    ...Typography.bodySmall,
   },
   sectionTitle: {
     color: Colors.textPrimary,

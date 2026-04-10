@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -34,13 +34,19 @@ import {
 import { db, requireUserId } from '../../services/firebase';
 import { locationService } from '../../services/location-service';
 import { confirmPhoneOtp, requestPhoneOtp } from '../../services/otp-service';
-import { takePhoto, uploadPhotoWithThumbnail } from '../../services/photo-service';
+import { pickPhotoFromLibrary, takePhoto, uploadPhotoWithThumbnail } from '../../services/photo-service';
 import { addRecentAddress, getRecentAddresses, getSavedAddresses } from '../../services/profile-service';
 import { BorderRadius, Colors, Shadows, Spacing, Typography } from '../../theme';
 import type { Station } from '../../types/config';
 import type { MainStackNavigationProp, MainStackParamList } from '../../types/navigation';
 import type { SavedAddress } from '../../types/profile';
 import type { StationInfo } from '../../types/request';
+import {
+  deleteCreateRequestProgress,
+  loadCreateRequestProgress,
+  saveCreateRequestProgress,
+  type CreateRequestDraft,
+} from '../../utils/draft-storage';
 
 type LocationMode = 'station' | 'address';
 type PackageSize = 'small' | 'medium' | 'large' | 'xl';
@@ -193,6 +199,40 @@ function formatDetailedAddress(roadAddress: string, detailAddress: string) {
   return detail ? `${road} ${detail}` : road;
 }
 
+function hasDraftableContent(input: {
+  pickupStation: Station | null;
+  deliveryStation: Station | null;
+  pickupRoadAddress: string;
+  pickupDetailAddress: string;
+  deliveryRoadAddress: string;
+  deliveryDetailAddress: string;
+  photoRefs: string[];
+  packageItemName: string;
+  packageDescription: string;
+  recipientName: string;
+  recipientPhone: string;
+  itemValue: string;
+  preferredPickupDate: string;
+  preferredPickupTime: string;
+}) {
+  return Boolean(
+    input.pickupStation ||
+      input.deliveryStation ||
+      input.pickupRoadAddress.trim() ||
+      input.pickupDetailAddress.trim() ||
+      input.deliveryRoadAddress.trim() ||
+      input.deliveryDetailAddress.trim() ||
+      input.photoRefs.length > 0 ||
+      input.packageItemName.trim() ||
+      input.packageDescription.trim() ||
+      input.recipientName.trim() ||
+      input.recipientPhone.trim() ||
+      input.itemValue.trim() ||
+      input.preferredPickupDate.trim() ||
+      input.preferredPickupTime.trim()
+  );
+}
+
 function fromPrefillStation(station?: StationInfo): Station | null {
   if (!station) return null;
   return {
@@ -219,6 +259,19 @@ function fromPrefillStation(station?: StationInfo): Station | null {
     createdAt: new Date(),
     updatedAt: new Date(),
   };
+}
+
+function fromDraftStation(station?: CreateRequestDraft['pickupStation']): Station | null {
+  if (!station) return null;
+  return fromPrefillStation({
+    id: station.stationId,
+    stationId: station.stationId,
+    stationName: station.stationName,
+    line: station.line ?? '',
+    lineCode: station.lineCode ?? '',
+    lat: station.lat,
+    lng: station.lng,
+  });
 }
 
 function fallbackStation(kind: PickerType): Station {
@@ -341,6 +394,11 @@ export default function CreateRequestScreen({ navigation, route }: Props) {
     FALLBACK_RECIPIENT_PRIVACY_CONFIG
   );
   const [recipientConsentChecked, setRecipientConsentChecked] = useState(false);
+  const [draftRestored, setDraftRestored] = useState(false);
+  const [draftSaving, setDraftSaving] = useState(false);
+  const draftHydratedRef = useRef(false);
+  const draftSaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const depositPhotoNoticeShownRef = useRef(false);
 
   useEffect(() => {
     const run = async () => {
@@ -388,6 +446,61 @@ export default function CreateRequestScreen({ navigation, route }: Props) {
   useEffect(() => {
     setContactPhoneNumber(formatPhoneDigits(user?.phoneVerification?.phoneNumber ?? user?.phoneNumber ?? ''));
   }, [user?.phoneNumber, user?.phoneVerification?.phoneNumber]);
+
+  useEffect(() => {
+    let mounted = true;
+
+    const run = async () => {
+      if (prefill || params?.sourceRequestId) {
+        draftHydratedRef.current = true;
+        return;
+      }
+
+      const draft = await loadCreateRequestProgress();
+      if (!mounted) return;
+
+      if (draft) {
+        setRequestMode(draft.requestMode);
+        setPickupMode(draft.pickupMode);
+        setDeliveryMode(draft.deliveryMode);
+        setPickupStation(fromDraftStation(draft.pickupStation));
+        setDeliveryStation(fromDraftStation(draft.deliveryStation));
+        setPickupRoadAddress(draft.pickupRoadAddress);
+        setPickupDetailAddress(draft.pickupDetailAddress);
+        setDeliveryRoadAddress(draft.deliveryRoadAddress);
+        setDeliveryDetailAddress(draft.deliveryDetailAddress);
+        setPhotoUrl(draft.photoUrl);
+        setPhotoRefs(draft.photoRefs);
+        setPackageItemName(draft.packageItemName);
+        _setPackageCategory(draft.packageCategory);
+        setPackageDescription(draft.packageDescription);
+        setPackageSize(draft.packageSize);
+        setWeightKg(draft.weightKg);
+        setItemValue(draft.itemValue);
+        setRecipientName(draft.recipientName);
+        setRecipientPhone(draft.recipientPhone);
+        setDirectMode(draft.directMode);
+        setUrgency(draft.urgency);
+        setPreferredPickupDate(draft.preferredPickupDate);
+        setPreferredPickupTime(draft.preferredPickupTime);
+        _setPreferredArrivalTime(draft.preferredArrivalTime);
+        setContactPhoneNumber(draft.contactPhoneNumber);
+        setRecipientConsentChecked(draft.recipientConsentChecked);
+        setDraftRestored(true);
+      }
+
+      draftHydratedRef.current = true;
+    };
+
+    void run();
+
+    return () => {
+      mounted = false;
+      if (draftSaveTimerRef.current) {
+        clearTimeout(draftSaveTimerRef.current);
+      }
+    };
+  }, [params?.sourceRequestId, prefill]);
 
   const normalizedContactPhone = normalizePhoneNumber(contactPhoneNumber);
   const normalizedVerifiedPhone = normalizePhoneNumber(
@@ -477,6 +590,20 @@ export default function CreateRequestScreen({ navigation, route }: Props) {
 
   const hasItemValue = Number(itemValue || 0) > 0;
 
+  useEffect(() => {
+    if (hasItemValue && photoRefs.length === 0 && !depositPhotoNoticeShownRef.current) {
+      depositPhotoNoticeShownRef.current = true;
+      Alert.alert(
+        '사진이 필요합니다',
+        '물건 가치를 입력하면 보증금 적용을 위해 사진을 올려야 합니다. 지금 촬영하거나 앨범에서 골라주세요.'
+      );
+    }
+
+    if (!hasItemValue || photoRefs.length > 0) {
+      depositPhotoNoticeShownRef.current = false;
+    }
+  }, [hasItemValue, photoRefs.length]);
+
   const submitDisabled =
     !user?.uid ||
     !isOnboardingComplete ||
@@ -520,6 +647,148 @@ export default function CreateRequestScreen({ navigation, route }: Props) {
     isPhoneVerified, recipientPrivacyConfig.thirdPartyConsentRequired, recipientConsentChecked,
     requestMode, preferredPickupDate, preferredPickupTime,
   ]);
+
+  function buildDraftPayload(): CreateRequestDraft {
+    return {
+      step: 1,
+      requestMode,
+      pickupMode,
+      deliveryMode,
+      pickupStation: pickupStation ? toStationInfo(pickupStation) : null,
+      deliveryStation: deliveryStation ? toStationInfo(deliveryStation) : null,
+      pickupRoadAddress,
+      pickupDetailAddress,
+      deliveryRoadAddress,
+      deliveryDetailAddress,
+      photoUrl,
+      photoRefs,
+      packageItemName,
+      packageCategory,
+      packageDescription,
+      packageSize,
+      weightKg,
+      itemValue,
+      recipientName,
+      recipientPhone,
+      urgency,
+      directMode,
+      preferredPickupDate,
+      preferredPickupTime,
+      preferredArrivalTime,
+      contactPhoneNumber,
+      recipientConsentChecked,
+    };
+  }
+
+  useEffect(() => {
+    if (!draftHydratedRef.current || !user?.uid || saving) return;
+
+    if (draftSaveTimerRef.current) {
+      clearTimeout(draftSaveTimerRef.current);
+    }
+
+    draftSaveTimerRef.current = setTimeout(() => {
+      if (
+        !hasDraftableContent({
+          pickupStation,
+          deliveryStation,
+          pickupRoadAddress,
+          pickupDetailAddress,
+          deliveryRoadAddress,
+          deliveryDetailAddress,
+          photoRefs,
+          packageItemName,
+          packageDescription,
+          recipientName,
+          recipientPhone,
+          itemValue,
+          preferredPickupDate,
+          preferredPickupTime,
+        })
+      ) {
+        void deleteCreateRequestProgress();
+        setDraftSaving(false);
+        return;
+      }
+
+      setDraftSaving(true);
+      void saveCreateRequestProgress(buildDraftPayload()).finally(() => setDraftSaving(false));
+    }, 500);
+
+    return () => {
+      if (draftSaveTimerRef.current) {
+        clearTimeout(draftSaveTimerRef.current);
+      }
+    };
+  }, [
+    user?.uid,
+    saving,
+    requestMode,
+    pickupMode,
+    deliveryMode,
+    pickupStation,
+    deliveryStation,
+    pickupRoadAddress,
+    pickupDetailAddress,
+    deliveryRoadAddress,
+    deliveryDetailAddress,
+    photoUrl,
+    photoRefs,
+    packageItemName,
+    packageCategory,
+    packageDescription,
+    packageSize,
+    weightKg,
+    itemValue,
+    recipientName,
+    recipientPhone,
+    urgency,
+    directMode,
+    preferredPickupDate,
+    preferredPickupTime,
+    preferredArrivalTime,
+    contactPhoneNumber,
+    recipientConsentChecked,
+  ]);
+
+  async function handleClearDraft() {
+    await deleteCreateRequestProgress();
+    setDraftRestored(false);
+    Alert.alert('이어쓰기 기록을 지웠습니다', '지금 화면에서 다시 입력한 내용만 남습니다.');
+  }
+
+  async function handleSaveDraftNow() {
+    if (
+      !hasDraftableContent({
+        pickupStation,
+        deliveryStation,
+        pickupRoadAddress,
+        pickupDetailAddress,
+        deliveryRoadAddress,
+        deliveryDetailAddress,
+        photoRefs,
+        packageItemName,
+        packageDescription,
+        recipientName,
+        recipientPhone,
+        itemValue,
+        preferredPickupDate,
+        preferredPickupTime,
+      })
+    ) {
+      Alert.alert('임시 저장', '먼저 이어서 작성할 내용을 조금이라도 입력해 주세요.');
+      return;
+    }
+
+    setDraftSaving(true);
+    try {
+      await saveCreateRequestProgress(buildDraftPayload());
+      setDraftRestored(true);
+      Alert.alert('임시 저장됨', '다음에 돌아오면 이어서 작성할 수 있습니다.');
+    } finally {
+      setDraftSaving(false);
+    }
+  }
 
   function buildNearbyRecommendations(latitude: number, longitude: number): NearbyStationRecommendation[] {
     return locationService
@@ -635,12 +904,11 @@ export default function CreateRequestScreen({ navigation, route }: Props) {
     });
   }
 
-  async function handleUploadPhoto() {
+  async function uploadSelectedPhoto(localUri: string | null) {
+    if (!localUri) return;
+
     try {
       const requesterUserId = user?.uid ?? requireUserId();
-      const localUri = await takePhoto();
-      if (!localUri) return;
-
       const uploaded = await uploadPhotoWithThumbnail(localUri, requesterUserId, 'request-item');
       setPhotoUrl(uploaded.url);
       setPhotoRefs((prev) => [uploaded.url, ...prev.filter((item) => item !== uploaded.url)]);
@@ -649,6 +917,47 @@ export default function CreateRequestScreen({ navigation, route }: Props) {
       console.error(error);
       Alert.alert('사진 업로드 실패', '사진을 업로드하지 못했습니다. 잠시 후 다시 시도해 주세요.');
     }
+  }
+
+  async function handleUploadPhotoFromCamera() {
+    try {
+      const localUri = await takePhoto();
+      await uploadSelectedPhoto(localUri);
+    } catch (error) {
+      console.error(error);
+      Alert.alert('사진 촬영 실패', '카메라를 열지 못했습니다. 잠시 후 다시 시도해 주세요.');
+    }
+  }
+
+  async function handleUploadPhotoFromLibrary() {
+    try {
+      const localUri = await pickPhotoFromLibrary();
+      await uploadSelectedPhoto(localUri);
+    } catch (error) {
+      console.error(error);
+      Alert.alert('사진 선택 실패', '앨범에서 사진을 가져오지 못했습니다. 잠시 후 다시 시도해 주세요.');
+    }
+  }
+
+  function handleUploadPhoto() {
+    if (hasItemValue && photoRefs.length === 0) {
+      Alert.alert(
+        '보증금 사진 등록',
+        '물건 가치를 입력한 경우 사진이 꼭 필요합니다. 촬영하거나 앨범에서 선택해 주세요.',
+        [
+          { text: '취소', style: 'cancel' },
+          { text: '앨범에서 선택', onPress: () => void handleUploadPhotoFromLibrary() },
+          { text: '사진 찍기', onPress: () => void handleUploadPhotoFromCamera() },
+        ]
+      );
+      return;
+    }
+
+    Alert.alert('사진 등록', '촬영 또는 앨범에서 선택할 수 있습니다.', [
+      { text: '취소', style: 'cancel' },
+      { text: '앨범에서 선택', onPress: () => void handleUploadPhotoFromLibrary() },
+      { text: '사진 찍기', onPress: () => void handleUploadPhotoFromCamera() },
+    ]);
   }
 
   async function handleAI() {
@@ -800,7 +1109,8 @@ export default function CreateRequestScreen({ navigation, route }: Props) {
     }
 
     if (submitDisabled || !pickupStation || !deliveryStation) {
-      Alert.alert('입력 확인', '사진, 출발·도착 정보, 물품 정보, 수령인 정보와 휴대폰 인증 상태를 모두 확인해 주세요.');
+      const summary = missingItems.slice(0, 4).join('\n• ');
+      Alert.alert('입력 확인', summary ? `• ${summary}` : '입력 항목을 다시 확인해 주세요.');
       return;
     }
 
@@ -859,6 +1169,8 @@ export default function CreateRequestScreen({ navigation, route }: Props) {
       });
 
       const selected = result.quoteCards.find((card) => card.quoteType === selectedQuoteType) ?? result.quoteCards[0];
+      await deleteCreateRequestProgress();
+      setDraftRestored(false);
 
       navigation.replace('RequestConfirmation', {
         requestId: result.requestId,
@@ -1334,18 +1646,30 @@ export default function CreateRequestScreen({ navigation, route }: Props) {
           </View>
         )}
 
+        {(draftRestored || draftSaving) && (
+          <View style={styles.draftCard}>
+            <Text style={styles.draftTitle}>{draftRestored ? '이전 작성 내용을 이어서 불러왔습니다' : '입력 중인 내용을 임시 저장하고 있습니다'}</Text>
+            <TouchableOpacity style={styles.draftAction} onPress={() => void handleClearDraft()}>
+              <Text style={styles.draftActionText}>이어쓰기 기록 지우기</Text>
+            </TouchableOpacity>
+          </View>
+        )}
+
         <TouchableOpacity
           style={[styles.primaryButton, submitDisabled && styles.disabled]}
           onPress={() => void handleSubmit()}
-          disabled={submitDisabled || saving}
+          disabled={saving}
         >
           {saving ? (
             <ActivityIndicator color={Colors.white} />
           ) : submitDisabled ? (
-            <Text style={styles.primaryButtonText}>위 항목을 먼저 완성해 주세요</Text>
+            <Text style={styles.primaryButtonText}>부족한 항목 확인하기</Text>
           ) : (
             <Text style={styles.primaryButtonText}>배송 요청하기</Text>
           )}
+        </TouchableOpacity>
+        <TouchableOpacity style={styles.secondaryButton} onPress={() => void handleSaveDraftNow()} disabled={saving || draftSaving}>
+          <Text style={styles.secondaryButtonText}>{draftSaving ? '저장 중...' : '임시 저장하기'}</Text>
         </TouchableOpacity>
        </ScrollView>
 
@@ -1792,5 +2116,27 @@ const styles = StyleSheet.create({
     color: Colors.textSecondary,
     fontSize: Typography.fontSize.sm,
     lineHeight: 18,
+  },
+  draftCard: {
+    borderRadius: BorderRadius.lg,
+    borderWidth: 1,
+    borderColor: Colors.primary,
+    backgroundColor: Colors.gray50,
+    padding: Spacing.lg,
+    gap: 10,
+  },
+  draftTitle: {
+    color: Colors.textPrimary,
+    fontWeight: '800',
+    fontSize: Typography.fontSize.sm,
+  },
+  draftAction: {
+    alignSelf: 'flex-start',
+    paddingVertical: 4,
+  },
+  draftActionText: {
+    color: Colors.primary,
+    fontWeight: '800',
+    fontSize: Typography.fontSize.sm,
   },
 });

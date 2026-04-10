@@ -257,21 +257,46 @@ export async function deleteRatingDraft(deliveryId: string): Promise<void> {
  */
 export interface CreateRequestDraft {
   step: number;
-  pickupStation: any;
-  deliveryStation: any;
-  packageSize: string;
-  weight: string;
-  description: string;
-  isFragile: boolean;
-  isPerishable: boolean;
+  requestMode: 'immediate' | 'reservation';
+  pickupMode: 'station' | 'address';
+  deliveryMode: 'station' | 'address';
+  pickupStation: {
+    stationId: string;
+    stationName: string;
+    line?: string;
+    lineCode?: string;
+    lat: number;
+    lng: number;
+  } | null;
+  deliveryStation: {
+    stationId: string;
+    stationName: string;
+    line?: string;
+    lineCode?: string;
+    lat: number;
+    lng: number;
+  } | null;
+  pickupRoadAddress: string;
+  pickupDetailAddress: string;
+  deliveryRoadAddress: string;
+  deliveryDetailAddress: string;
+  photoUrl: string | null;
+  photoRefs: string[];
+  packageItemName: string;
+  packageCategory: string;
   recipientName: string;
   recipientPhone: string;
-  pickupTime: string;
-  deliveryTime: string;
-  urgency: string;
-  pickupLocationDetail: string;
-  storageLocation: string;
-  specialInstructions: string;
+  packageSize: 'small' | 'medium' | 'large' | 'xl';
+  weightKg: string;
+  itemValue: string;
+  packageDescription: string;
+  urgency: 'normal' | 'fast' | 'urgent';
+  directMode: 'none' | 'requester_to_station' | 'locker_assisted';
+  preferredPickupDate: string;
+  preferredPickupTime: string;
+  preferredArrivalTime: string;
+  contactPhoneNumber: string;
+  recipientConsentChecked: boolean;
 }
 
 export async function saveCreateRequestProgress(
@@ -318,7 +343,7 @@ export async function getDraftAge(key: string): Promise<number | null> {
     const json = await storage.getItem(`${DRAFT_PREFIX}${key}`);
     if (!json) return null;
 
-    const draft: DraftData = JSON.parse(json);
+    const draft = await decryptStorageJson<DraftData>(json);
     const ageHours = (Date.now() - draft.timestamp) / (1000 * 60 * 60);
     return ageHours;
   } catch (error) {
@@ -334,7 +359,7 @@ export async function clearAllDrafts(): Promise<void> {
   try {
     const allKeys = await storage.getAllKeys();
     const draftKeys = allKeys.filter(
-      key => key.startsWith(DRAFT_PREFIX) ?? key.startsWith(FORM_PROGRESS_PREFIX)
+      key => key.startsWith(DRAFT_PREFIX) || key.startsWith(FORM_PROGRESS_PREFIX)
     );
 
     if (draftKeys.length > 0) {

@@ -278,7 +278,26 @@ export async function takePhoto(): Promise<string | null> {
     quality: 0.85,
   });
 
-  if (result.canceled ?? !result.assets[0]) {
+  if (result.canceled || result.assets.length === 0 || !result.assets[0]?.uri) {
+    return null;
+  }
+
+  return result.assets[0].uri;
+}
+
+export async function pickPhotoFromLibrary(): Promise<string | null> {
+  const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
+  if (!permission.granted) {
+    return null;
+  }
+
+  const result = await ImagePicker.launchImageLibraryAsync({
+    mediaTypes: ImagePicker.MediaTypeOptions.Images,
+    quality: 0.85,
+    allowsEditing: true,
+  });
+
+  if (result.canceled || result.assets.length === 0 || !result.assets[0]?.uri) {
     return null;
   }
 
