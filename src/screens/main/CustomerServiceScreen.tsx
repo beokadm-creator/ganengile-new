@@ -32,8 +32,8 @@ const FAQS: FaqItem[] = [
   },
   {
     id: 'giller-1',
-    question: '길러 승급에는 무엇이 필요한가요?',
-    answer: '본인 확인, 정산 계좌 준비, 운영 심사 흐름을 완료해야 해요.',
+    question: '길러 전환에는 무엇이 필요한가요?',
+    answer: '본인 확인, 정산 계좌 준비, 길러 신청 및 운영 심사 흐름을 완료해야 해요.',
     category: 'giller',
   },
   {

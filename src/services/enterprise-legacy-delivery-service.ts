@@ -1,35 +1,33 @@
 /**
- * B2B 배송 서비스
- *
- * B2B 배송 요청과 길러 매칭을 관리합니다.
+ * Enterprise legacy delivery service.
  */
-import { collection, doc, getDoc, setDoc, updateDoc, query, where, getDocs, addDoc, serverTimestamp } from 'firebase/firestore';
+import { collection, doc, getDoc, updateDoc, query, where, getDocs, addDoc, serverTimestamp } from 'firebase/firestore';
 import { db } from './firebase';
 import type {
-  B2BDelivery,
-  B2BDeliveryStatus,
+  EnterpriseLegacyDelivery,
+  EnterpriseLegacyDeliveryStatus,
   DeliveryPricing,
-  CreateB2BDeliveryData,
-} from '../types/b2b-delivery';
-import type { B2BGillerTier } from '../types/b2b-giller-tier';
+  CreateEnterpriseLegacyDeliveryData,
+} from '../types/enterprise-legacy-delivery';
+import type { EnterpriseLegacyGillerTier } from '../types/enterprise-legacy-giller-tier';
 import type { Timestamp } from 'firebase/firestore';
-import { WEIGHT_SURCHARGE_RATE, BASE_DELIVERY_FEES } from '../types/b2b-delivery';
+import { WEIGHT_SURCHARGE_RATE, BASE_DELIVERY_FEES } from '../types/enterprise-legacy-delivery';
 import { getAllStations } from './config-service';
 
 const DELIVERY_COLLECTION = 'b2b_deliveries';
 const B2B_GILLER_COLLECTION = 'b2b_giller_tiers';
 const B2B_NOTIFICATION_COLLECTION = 'b2b_dispatch_notifications';
 
-type B2BGillerTierDoc = Partial<B2BGillerTier> & {
+type EnterpriseLegacyGillerTierDoc = Partial<EnterpriseLegacyGillerTier> & {
   gillerId?: string;
   createdAt?: Timestamp | Date | string;
   updatedAt?: Timestamp | Date | string;
 };
 
-/** B2B 배송 서비스 */
-export class B2BDeliveryService {
-  /** B2B 배송 요청 생성 */
-  static async createDelivery(data: CreateB2BDeliveryData): Promise<string> {
+/** Enterprise legacy delivery service */
+export class EnterpriseLegacyDeliveryService {
+  /** 레거시 기업 계약 배송 요청 생성 */
+  static async createDelivery(data: CreateEnterpriseLegacyDeliveryData): Promise<string> {
     // 1. 거리 계산 (향후 외부 지도 API로 대체 가능)
     const distance = await this.calculateDistance(data.pickupLocation.station, data.dropoffLocation.station);
 
@@ -72,7 +70,7 @@ export class B2BDeliveryService {
     });
 
     // 6. B2B 길러 매칭 시작
-    await this.matchB2BGillers(docRef.id, deliveryData as B2BDelivery);
+    await this.matchEnterpriseLegacyGillers(docRef.id, deliveryData as EnterpriseLegacyDelivery);
 
     return docRef.id;
   }
@@ -113,11 +111,11 @@ export class B2BDeliveryService {
     return BASE_DELIVERY_FEES.large;
   }
 
-  /** B2B 길러 매칭 */
-  private static async matchB2BGillers(deliveryId: string, delivery: B2BDelivery): Promise<void> {
-    const b2bGillers = await this.getB2BGillers();
+  /** 레거시 기업 계약 길러 매칭 */
+  private static async matchEnterpriseLegacyGillers(deliveryId: string, delivery: EnterpriseLegacyDelivery): Promise<void> {
+    const enterpriseLegacyGillers = await this.getEnterpriseLegacyGillers();
 
-    const compatibleGillers = b2bGillers.map((giller) => {
+    const compatibleGillers = enterpriseLegacyGillers.map((giller) => {
       const isCompatible = this.checkCompatibility(delivery, giller);
       return {
         giller,
@@ -150,14 +148,14 @@ export class B2BDeliveryService {
     }
   }
 
-  /** 활성 상태의 B2B 길러 조회 */
-  private static async getB2BGillers(): Promise<Array<B2BGillerTier & { gillerId: string }>> {
+  /** 활성 상태의 레거시 기업 계약 길러 조회 */
+  private static async getEnterpriseLegacyGillers(): Promise<Array<EnterpriseLegacyGillerTier & { gillerId: string }>> {
     const q = query(collection(db, B2B_GILLER_COLLECTION), where('status', '==', 'active'));
     const querySnapshot = await getDocs(q);
     return querySnapshot.docs.map((snapshot) => {
-      const raw = snapshot.data() as B2BGillerTierDoc;
+      const raw = snapshot.data() as EnterpriseLegacyGillerTierDoc;
       return {
-        ...(raw as B2BGillerTier),
+        ...(raw as EnterpriseLegacyGillerTier),
         gillerId: raw.gillerId ?? snapshot.id,
       };
     });
@@ -165,8 +163,8 @@ export class B2BDeliveryService {
 
   /** 배송과 길러의 호환 여부 확인 */
   private static checkCompatibility(
-    delivery: B2BDelivery,
-    giller: B2BGillerTier & { gillerId: string }
+    delivery: EnterpriseLegacyDelivery,
+    giller: EnterpriseLegacyGillerTier & { gillerId: string }
   ): boolean {
     void delivery;
     void giller;
@@ -207,7 +205,7 @@ export class B2BDeliveryService {
 
     await updateDoc(deliveryRef, {
       gillerId,
-      status: 'matched' as B2BDeliveryStatus,
+      status: 'matched' as EnterpriseLegacyDeliveryStatus,
       acceptedAt: new Date(),
       updatedAt: new Date(),
     });
@@ -223,7 +221,7 @@ export class B2BDeliveryService {
     const deliveryRef = doc(db, DELIVERY_COLLECTION, deliveryId);
 
     await updateDoc(deliveryRef, {
-      status: 'picked_up' as B2BDeliveryStatus,
+      status: 'picked_up' as EnterpriseLegacyDeliveryStatus,
       pickupPhoto,
       updatedAt: new Date(),
     });
@@ -234,7 +232,7 @@ export class B2BDeliveryService {
     const deliveryRef = doc(db, DELIVERY_COLLECTION, deliveryId);
 
     await updateDoc(deliveryRef, {
-      status: 'in_transit' as B2BDeliveryStatus,
+      status: 'in_transit' as EnterpriseLegacyDeliveryStatus,
       updatedAt: new Date(),
     });
   }
@@ -244,7 +242,7 @@ export class B2BDeliveryService {
     const deliveryRef = doc(db, DELIVERY_COLLECTION, deliveryId);
 
     await updateDoc(deliveryRef, {
-      status: 'delivered' as B2BDeliveryStatus,
+      status: 'delivered' as EnterpriseLegacyDeliveryStatus,
       deliveryPhoto,
       completedAt: new Date(),
       updatedAt: new Date(),
@@ -256,13 +254,13 @@ export class B2BDeliveryService {
     const deliveryRef = doc(db, DELIVERY_COLLECTION, deliveryId);
 
     await updateDoc(deliveryRef, {
-      status: 'cancelled' as B2BDeliveryStatus,
+      status: 'cancelled' as EnterpriseLegacyDeliveryStatus,
       updatedAt: new Date(),
     });
   }
 
-  /** B2B 배송 조회 */
-  static async getDelivery(deliveryId: string): Promise<B2BDelivery | null> {
+  /** 레거시 기업 계약 배송 조회 */
+  static async getDelivery(deliveryId: string): Promise<EnterpriseLegacyDelivery | null> {
     const deliveryDoc = await getDoc(doc(db, DELIVERY_COLLECTION, deliveryId));
     if (!deliveryDoc.exists()) {
       return null;
@@ -270,11 +268,11 @@ export class B2BDeliveryService {
     return {
       id: deliveryDoc.id,
       ...deliveryDoc.data(),
-    } as B2BDelivery;
+    } as EnterpriseLegacyDelivery;
   }
 
   /** 고객사별 배송 목록 조회 */
-  static async getBusinessDeliveries(businessId: string, status?: B2BDeliveryStatus): Promise<B2BDelivery[]> {
+  static async getBusinessDeliveries(businessId: string, status?: EnterpriseLegacyDeliveryStatus): Promise<EnterpriseLegacyDelivery[]> {
     let q = query(collection(db, DELIVERY_COLLECTION), where('businessId', '==', businessId));
 
     if (status) {
@@ -285,11 +283,11 @@ export class B2BDeliveryService {
     return querySnapshot.docs.map((snapshot) => ({
       id: snapshot.id,
       ...snapshot.data(),
-    }) as B2BDelivery);
+    }) as EnterpriseLegacyDelivery);
   }
 
   /** 길러별 배송 목록 조회 */
-  static async getGillerDeliveries(gillerId: string, status?: B2BDeliveryStatus): Promise<B2BDelivery[]> {
+  static async getGillerDeliveries(gillerId: string, status?: EnterpriseLegacyDeliveryStatus): Promise<EnterpriseLegacyDelivery[]> {
     let q = query(collection(db, DELIVERY_COLLECTION), where('gillerId', '==', gillerId));
 
     if (status) {
@@ -300,11 +298,11 @@ export class B2BDeliveryService {
     return querySnapshot.docs.map((snapshot) => ({
       id: snapshot.id,
       ...snapshot.data(),
-    }) as B2BDelivery);
+    }) as EnterpriseLegacyDelivery);
   }
 
   /** 배송 정보 수정 */
-  static async updateDelivery(deliveryId: string, updates: Partial<B2BDelivery>): Promise<void> {
+  static async updateDelivery(deliveryId: string, updates: Partial<EnterpriseLegacyDelivery>): Promise<void> {
     const deliveryRef = doc(db, DELIVERY_COLLECTION, deliveryId);
     await updateDoc(deliveryRef, {
       ...updates,
@@ -320,122 +318,8 @@ export class B2BDeliveryService {
       preferredDays?: string[];
       preferredTime: string;
     },
-    deliveryData: Omit<CreateB2BDeliveryData, 'contractId'>
+    deliveryData: Omit<CreateEnterpriseLegacyDeliveryData, 'contractId'>
   ): void {
     console.warn('Scheduled B2B delivery template requested', { contractId, schedule, deliveryData });
   }
-}
-
-// ============================================================================
-// B2B Contract & Request Functions (for tests)
-// ============================================================================
-
-import type {
-  B2BContract,
-  CreateB2BContractData,
-  B2BRequest,
-  CreateB2BRequestData,
-  TaxInvoice,
-} from '../types/b2b-delivery';
-
-const CONTRACTS_COLLECTION = 'businessContracts';
-const REQUESTS_COLLECTION = 'b2bRequests';
-const INVOICES_COLLECTION = 'taxInvoices';
-
-/** B2B 계약 생성 */
-export async function createB2BContract(data: CreateB2BContractData): Promise<string> {
-  if (!data.businessId || !data.businessName) {
-    throw new Error('Invalid contract data: businessId and businessName are required');
-  }
-
-  const contractId = `contract-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-  const contractData = {
-    ...data,
-    contractId,
-    status: 'active',
-    createdAt: new Date(),
-    updatedAt: new Date(),
-  };
-
-  await setDoc(doc(db, CONTRACTS_COLLECTION, contractId), contractData);
-  return contractId;
-}
-
-/** B2B 계약 조회 */
-export async function getB2BContract(contractId: string): Promise<B2BContract | null> {
-  const contractDoc = await getDoc(doc(db, CONTRACTS_COLLECTION, contractId));
-  if (!contractDoc.exists()) {
-    return null;
-  }
-  return contractDoc.data() as B2BContract;
-}
-
-/** B2B 계약 수정 */
-export async function updateB2BContract(contractId: string, updates: Partial<B2BContract>): Promise<void> {
-  const contractRef = doc(db, CONTRACTS_COLLECTION, contractId);
-  await updateDoc(contractRef, {
-    ...updates,
-    updatedAt: new Date(),
-  });
-}
-
-/** B2B 배송 요청 생성 */
-export async function createB2BRequest(data: CreateB2BRequestData): Promise<string> {
-  const contract = await getB2BContract(data.contractId);
-  if (!contract) {
-    throw new Error('계약을 찾을 수 없습니다.');
-  }
-
-  const requestId = `request-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-  const requestData = {
-    ...data,
-    requestId,
-    status: 'pending',
-    createdAt: new Date(),
-    updatedAt: new Date(),
-  };
-
-  await setDoc(doc(db, REQUESTS_COLLECTION, requestId), requestData);
-  return requestId;
-}
-
-/** B2B 배송 요청 목록 조회 */
-export async function getB2BRequests(businessId: string): Promise<B2BRequest[]> {
-  const q = query(collection(db, REQUESTS_COLLECTION), where('businessId', '==', businessId));
-  const querySnapshot = await getDocs(q);
-  return querySnapshot.docs.map((snapshot) => snapshot.data() as B2BRequest);
-}
-
-/** B2B 길러 배정 */
-export async function assignB2BGiller(requestId: string, gillerId: string): Promise<void> {
-  const requestRef = doc(db, REQUESTS_COLLECTION, requestId);
-  await updateDoc(requestRef, {
-    assignedGillerId: gillerId,
-    status: 'assigned',
-    updatedAt: new Date(),
-  });
-}
-
-/** 세금계산서 생성 */
-export async function createTaxInvoice(data: Record<string, unknown>): Promise<string> {
-  const invoiceId = `invoice-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-  const invoiceData: Record<string, unknown> = {
-    ...data,
-    invoiceId,
-    createdAt: new Date(),
-  };
-
-  await setDoc(doc(db, INVOICES_COLLECTION, invoiceId), invoiceData);
-  return invoiceId;
-}
-
-/** 세금계산서 목록 조회 */
-export async function getTaxInvoices(businessId: string, month: string): Promise<TaxInvoice[]> {
-  const q = query(
-    collection(db, INVOICES_COLLECTION),
-    where('businessId', '==', businessId),
-    where('month', '==', month)
-  );
-  const querySnapshot = await getDocs(q);
-  return querySnapshot.docs.map((snapshot) => snapshot.data() as TaxInvoice);
 }

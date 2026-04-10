@@ -13,7 +13,7 @@ export default function RequestConfirmationScreen() {
   const routeLabel =
     pickupStationName && deliveryStationName
       ? `${pickupStationName} -> ${deliveryStationName}`
-      : '출발역과 도착역은 다음 화면에서 다시 확인할 수 있습니다.';
+      : '경로는 다음 화면에서 확인할 수 있습니다.';
 
   return (
     <View style={styles.container}>
@@ -23,15 +23,15 @@ export default function RequestConfirmationScreen() {
             <MaterialIcons name="check-circle" size={56} color={Colors.success} />
           </View>
           <Text style={styles.heroTitle}>요청이 접수됐습니다.</Text>
-          <Text style={styles.heroBody}>매칭을 시작합니다.</Text>
+          <Text style={styles.heroBody}>곧 매칭을 시작합니다.</Text>
         </View>
 
         <View style={styles.card}>
-          <Text style={styles.cardTitle}>진행 순서</Text>
+          <Text style={styles.cardTitle}>진행</Text>
           <View style={styles.stepList}>
-            <StepRow label="1. 분석" body="요청 확인" />
-            <StepRow label="2. 가격" body="제안 확인" />
-            <StepRow label="3. 매칭" body="응답 대기" />
+            <StepRow label="1. 확인" body="요청 접수" />
+            <StepRow label="2. 매칭" body="후보 탐색" />
+            <StepRow label="3. 진행" body="상태 확인" />
           </View>
         </View>
 
@@ -47,6 +47,11 @@ export default function RequestConfirmationScreen() {
           ) : null}
         </View>
 
+        <View style={styles.noticeCard}>
+          <Text style={styles.noticeTitle}>참고</Text>
+          <Text style={styles.noticeBody}>요청 상세에서 상태를 바로 확인할 수 있습니다.</Text>
+        </View>
+
         <View style={styles.buttonGroup}>
           <TouchableOpacity
             style={[styles.button, styles.primaryButton]}
@@ -58,7 +63,7 @@ export default function RequestConfirmationScreen() {
               })
             }
           >
-            <Text style={styles.primaryButtonText}>매칭 진행 보기</Text>
+            <Text style={styles.primaryButtonText}>매칭 보기</Text>
           </TouchableOpacity>
 
           <TouchableOpacity

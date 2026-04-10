@@ -13,7 +13,7 @@ src/services/ 내 67개 서비스의 상호 import 관계 (firebase.ts는 기반
 
 | 서비스 | import하는 다른 서비스 |
 |--------|----------------------|
-| **beta1-orchestration-service** | firebase, request-draft-service, pricing-service, integration-config-service, beta1-wallet-service, matching-service, matching-notification, b2b-delivery-service |
+| **beta1-orchestration-service** | firebase, request-draft-service, pricing-service, integration-config-service, beta1-wallet-service, matching-service, matching-notification, enterprise-legacy-delivery-service |
 | **delivery-service** | firebase, beta1-orchestration-service, beta1-ai-service, storage-service, DepositService, penalty-service, pricing-service |
 | **matching-service** | delivery-service, chat-service, BadgeService, route-service, location-service |
 | **DepositService** | firebase, PointService, TossPaymentService, deposit-compensation-service |
@@ -28,8 +28,8 @@ src/services/ 내 67개 서비스의 상호 import 관계 (firebase.ts는 기반
 | **profile-service** | firebase, grade-service |
 | **rating-service** | firebase, notification-service |
 | **delivery-tracking-service** | firebase, location-service |
-| **b2b-settlement-service** | b2b-giller-service |
-| **b2b-delivery-service** | firebase, config-service |
+| **enterprise-legacy-settlement-service** | enterprise-legacy-giller-service |
+| **enterprise-legacy-delivery-service** | firebase, config-service |
 | **matching-auto-retry** | firebase, matching-service |
 | **SettlementService** | CommissionService |
 | **route-validator-service** | PathfindingService |
@@ -39,7 +39,7 @@ src/services/ 내 67개 서비스의 상호 import 관계 (firebase.ts는 기반
 | **TossPaymentService** | integration-config-service |
 | **beta1-infrastructure-service** | config-service, integration-config-service |
 | **PathfindingService** | config-service |
-| **RealtimeSubwayService** | config-service |
+| **RealtimeSubwayService** | 삭제됨 |
 | **integration-config-service** | firebase |
 
 ### 1.2 허브 서비스 (다른 서비스에서 가장 많이 import)
@@ -64,8 +64,8 @@ src/services/ 내 67개 서비스의 상호 import 관계 (firebase.ts는 기반
 - **address-geocode-service.ts** — 외부 API만 사용
 - **address-search-service.ts** — 외부 API만 사용
 - **auth-error-handler.ts** — 유틸리티
-- **b2b-firestore-service.ts** — firebase.ts만 사용
-- **b2b-giller-service.ts** — firebase.ts만 사용
+- **enterprise-legacy-firestore-service.ts** — firebase.ts만 사용
+- **enterprise-legacy-giller-service.ts** — firebase.ts만 사용
 - **badge-service.ts** — firebase.ts만 사용
 - **channel-attribution-service.ts** — firebase.ts만 사용
 - **commission-service.ts** — firebase.ts만 사용
@@ -82,7 +82,6 @@ src/services/ 내 67개 서비스의 상호 import 관계 (firebase.ts는 기반
 - **notification-service.ts** — firebase.ts만 사용
 - **otp-service.ts** — 독립
 - **penalty-service.ts** — firebase.ts만 사용
-- **professional-giller-service.ts** — 독립
 - **qrcode-service.ts** — 독립
 - **realtime-delivery-tracking.ts** — firebase.ts만 사용
 - **route-service.ts** — firebase.ts만 사용
@@ -114,7 +113,7 @@ src/services/ 내 67개 서비스의 상호 import 관계 (firebase.ts는 기반
 |---------|---------|----------|
 | auth/ | 3 | LoginScreen, LandingScreen, NewSignUpScreen |
 | main/ | 38 | HomeScreen, CreateRequestScreen, DeliveryTrackingScreen 등 |
-| b2b/ | 9 | B2BDashboardScreen, B2BRequestScreen 등 |
+| enterprise-legacy/ | 9 | legacy enterprise screens |
 | giller/ | 2 | GillerPickupAtLockerScreen, GillerDropoffAtLockerScreen |
 | requester/ | 1 | GillerPickupFromLockerScreen |
 | onboarding/ | 1 | BasicInfoOnboarding |
@@ -136,13 +135,13 @@ src/services/ 내 67개 서비스의 상호 import 관계 (firebase.ts는 기반
 | **location-service.ts** | 4 | AddRouteScreen, RealtimeTrackingScreen, LockerMapScreen 등 |
 | **route-service.ts** | 4 | EditRouteScreen, RouteManagementScreen, AddRouteScreen 등 |
 | **qrcode-service.ts** | 3 | UnlockLockerScreen, QRCodeScannerScreen, GillerPickupAtLockerScreen 등 |
-| **b2b-firestore-service.ts** | 4 | B2BDashboardScreen, B2BGillerScreen, BusinessProfileScreen, TaxInvoiceRequestScreen |
+| **enterprise-legacy-firestore-service.ts** | 4 | EnterpriseLegacyDashboardScreen, EnterpriseLegacyGillerScreen, BusinessProfileScreen, TaxInvoiceRequestScreen |
 | **verification-service.ts** | 3 | ProfileScreen, GillerApplyScreen, GillerLevelUpgradeScreen |
 | **chat-service.ts** | 3 | ChatScreen, ChatListScreen, DeliveryTrackingScreen |
 | **PointService.ts** | 3 | PointWithdrawScreen, PointHistoryScreen, DepositPaymentScreen |
 | **rating-service.ts** | 2 | RatingScreen, MyRatingScreen |
 | **profile-service.ts** | 2 | AddressBookScreen, CreateRequestScreen |
-| **matching-service.ts** | 2 | MatchingResultScreen, B2BMatchingResultScreen |
+| **matching-service.ts** | 2 | MatchingResultScreen, EnterpriseLegacyMatchingResultScreen |
 | **google-auth.ts** | 2 | LoginScreen, NewSignUpScreen |
 | **kakao-auth.ts** | 2 | LoginScreen, NewSignUpScreen |
 | **consent-service.ts** | 2 | BasicInfoOnboarding, NewSignUpScreen |
@@ -153,13 +152,13 @@ src/services/ 내 67개 서비스의 상호 import 관계 (firebase.ts는 기반
 | **notification-service.ts** | 1 | NotificationSettingsScreen |
 | **pricing-service.ts** | 1 | CreateAuctionScreen |
 | **DepositService.ts** | 1 | DepositPaymentScreen |
-| **BadgeService.ts** | 1 | B2BMatchingResultScreen |
-| **grade-service.ts** | 1 | B2BMatchingResultScreen |
+| **BadgeService.ts** | 1 | EnterpriseLegacyMatchingResultScreen |
+| **grade-service.ts** | 1 | EnterpriseLegacyMatchingResultScreen |
 | **giller-service.ts** | 1 | GillerLevelUpgradeScreen |
-| **b2b-delivery-service.ts** | 1 | B2BRequestScreen |
-| **b2b-giller-service.ts** | 1 | B2BGillerScreen |
-| **b2b-settlement-service.ts** | 1 | MonthlySettlementScreen |
-| **business-contract-service.ts** | 1 | SubscriptionTierSelectionScreen |
+| **enterprise-legacy-delivery-service.ts** | 1 | EnterpriseLegacyRequestScreen |
+| **enterprise-legacy-giller-service.ts** | 1 | EnterpriseLegacyGillerScreen |
+| **enterprise-legacy-settlement-service.ts** | 1 | MonthlySettlementScreen |
+| **enterprise-legacy-contract-service.ts** | 1 | SubscriptionTierSelectionScreen |
 | **tax-invoice-service.ts** | 1 | TaxInvoiceRequestScreen |
 
 ### 2.3 화면에서 호출되지 않는 서비스 (32개, 48%)
@@ -169,7 +168,7 @@ src/services/ 내 67개 서비스의 상호 import 관계 (firebase.ts는 기반
 | **address-geocode-service.ts** | 화면에서 직접 import 없음 (CreateRequestScreen, AddRouteScreen에서는 import 확인됨) ✅ |
 | **address-search-service.ts** | ❓ 사용처 불명확 |
 | **auth-error-handler.ts** | 서비스 내부 (social-auth, kakao-auth 등) |
-| **b2b-giller-service.ts** | b2b-settlement-service에서 import |
+| **enterprise-legacy-giller-service.ts** | enterprise-legacy-settlement-service에서 import |
 | **beta1-engine-service.ts** | request-service에서 import |
 | **beta1-infrastructure-service.ts** | admin-web에서 간접 사용 가능 |
 | **channel-attribution-service.ts** | ❓ 사용처 불명확 |
@@ -189,8 +188,8 @@ src/services/ 내 67개 서비스의 상호 import 관계 (firebase.ts는 기반
 | **performance/optimization.ts** | 성능 최적화 (개발) |
 | **performance/firestore-optimization.ts** | Firestore 최적화 (개발) |
 | **pickup-verification-service.ts** | ❓ 화면에서 직접 미사용 |
-| **ProfessionalGillerService.ts** | ❓ 사용처 불명확 |
-| **RealtimeSubwayService.ts** | ❓ 사용처 불명확 |
+| **ProfessionalGillerService.ts** | 삭제됨 |
+| **RealtimeSubwayService.ts** | 삭제됨 |
 | **realtime-delivery-tracking.ts** | ❓ 화면에서 미사용 |
 | **request-draft-service.ts** | beta1-orchestration-service에서 import |
 | **route-validator-service.ts** | ❓ 사용처 불명확 |
@@ -235,9 +234,9 @@ src/types/의 35개 타입 파일에서 **402개** export가 정의되어 있습
 | matching-extended.ts | 12 | matching-service | ✅ 활성 |
 | beta1-wallet.ts | 11 | beta1-wallet-service | ✅ 활성 |
 | beta1-payment.ts | 9 | payment 관련 | ✅ 활성 |
-| b2b-delivery.ts | 13 | b2b-delivery-service | ✅ 활성 |
-| b2b-settlement.ts | 9 | b2b-settlement-service | ✅ 활성 |
-| b2b-giller-tier.ts | 9 | b2b-giller-service | ✅ 활성 |
+| enterprise-legacy-delivery.ts | 13 | enterprise-legacy-delivery-service | ✅ 활성 |
+| enterprise-legacy-settlement.ts | 9 | enterprise-legacy-settlement-service | ✅ 활성 |
+| enterprise-legacy-giller-tier.ts | 9 | enterprise-legacy-giller-service | ✅ 활성 |
 | business-contract.ts | 8 | business-contract-service | ✅ 활성 |
 | tax-invoice.ts | 7 | tax-invoice-service | ✅ 활성 |
 | photo.ts | 5 | photo-service | ✅ 활성 |
@@ -310,7 +309,7 @@ src/types/의 35개 타입 파일에서 **402개** export가 정의되어 있습
 | 함수 | 줄수 | 복잡도 | 이유 |
 |------|------|--------|------|
 | `createBeta1Request` | ~284줄 | 🔴 높음 | AI 분석 → 견적 → Firestore 다중 쓰기 |
-| `acceptMissionBundleForGiller` | ~176줄 | 🔴 높음 | 검증 → 미션/다리 업데이트 → B2B 폴백 |
+| `acceptMissionBundleForGiller` | ~176줄 | 🔴 높음 | 검증 → 미션/다리 업데이트 → external_partner fallback |
 | `getBeta1HomeSnapshot` | ~192줄 | 🟡 중간 | 다중 컬렉션 집계 |
 
 ### 4.3 분리 시 주의사항

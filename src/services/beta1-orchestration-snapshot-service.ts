@@ -250,9 +250,9 @@ export async function getBeta1HomeSnapshot(userId: string, role: 'requester' | '
       selectedByUser ? 'accepted' : bundle.fallbackDeliveryIds?.length ? 'fallback' : 'available';
     const fallbackLabel =
       bundle.fallbackDeliveryIds && bundle.fallbackDeliveryIds.length > 0
-        ? `주소 구간 ${bundle.fallbackDeliveryIds.length}건은 B2B fallback 진행`
+        ? `주소 구간 ${bundle.fallbackDeliveryIds.length}건은 external partner fallback 진행`
         : bundle.requiresExternalPartner
-          ? '주소 구간 미선택 시 B2B fallback'
+          ? '주소 구간 미선택 시 external partner fallback'
           : undefined;
 
     return {

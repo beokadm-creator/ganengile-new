@@ -11,10 +11,10 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
-import { b2bFirestoreService } from '../../services/b2b-firestore-service';
+import { enterpriseLegacyFirestoreService } from '../../services/enterprise-legacy-firestore-service';
 import { requireUserId } from '../../services/firebase';
 import { taxInvoiceService } from '../../services/tax-invoice-service';
-import type { B2BStackNavigationProp } from '../../types/navigation';
+import type { EnterpriseLegacyStackNavigationProp } from '../../types/navigation';
 import { BorderRadius, Colors, Shadows, Spacing, Typography } from '../../theme';
 
 interface InvoicePeriod {
@@ -55,7 +55,7 @@ function formatCurrency(amount: number): string {
 }
 
 export default function TaxInvoiceRequestScreen() {
-  const navigation = useNavigation<B2BStackNavigationProp>();
+  const navigation = useNavigation<EnterpriseLegacyStackNavigationProp>();
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [period, setPeriod] = useState<InvoicePeriod | null>(null);
@@ -73,12 +73,12 @@ export default function TaxInvoiceRequestScreen() {
   async function loadInvoiceData(): Promise<void> {
     try {
       const userId = requireUserId();
-      const { year, month } = b2bFirestoreService.getCurrentYearMonth();
+      const { year, month } = enterpriseLegacyFirestoreService.getCurrentYearMonth();
       const startDate = new Date(year, month - 1, 1);
       const endDate = new Date(year, month, 0, 23, 59, 59);
       setPeriod({ year, month, startDate, endDate });
 
-      const businessInfo = (await b2bFirestoreService.getBusinessInfo(userId)) as BusinessInfo | null;
+      const businessInfo = (await enterpriseLegacyFirestoreService.getBusinessInfo(userId)) as BusinessInfo | null;
       if (businessInfo) {
         setBusinessNumber(businessInfo.businessNumber ?? '');
         setCompanyName(businessInfo.companyName ?? '');
@@ -87,7 +87,7 @@ export default function TaxInvoiceRequestScreen() {
         setContact(businessInfo.contact ?? '');
       }
 
-      const summaryData = await b2bFirestoreService.getMonthlyStats(userId, year, month);
+      const summaryData = await enterpriseLegacyFirestoreService.getMonthlyStats(userId, year, month);
       if (summaryData) {
         const supplyAmount = summaryData.totalAmount;
         const taxAmount = Math.round(supplyAmount * 0.1);

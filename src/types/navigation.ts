@@ -158,23 +158,28 @@ export type MainStackWithTabNavigationProp = MainStackNavigationProp & {
   ): void;
 };
 
-// ==================== B2B Navigator ====================
+// ==================== Enterprise Legacy Navigator ====================
 
-export type B2BStackParamList = {
-  B2BDashboard: undefined;
-  B2BRequest: undefined;
-  B2BGiller: undefined;
-  B2BMatchingResult: {
+/**
+ * Legacy enterprise customer flow.
+ * "B2B" is now reserved for external delivery partners, so this stack keeps
+ * the older enterprise customer screens under an explicit legacy label.
+ */
+export type EnterpriseLegacyStackParamList = {
+  EnterpriseLegacyDashboard: undefined;
+  EnterpriseLegacyRequest: undefined;
+  EnterpriseLegacyGiller: undefined;
+  EnterpriseLegacyMatchingResult: {
     requestId: string;
   };
-  B2BOnboarding: undefined;
+  EnterpriseLegacyOnboarding: undefined;
   BusinessProfile: undefined;
   MonthlySettlement: undefined;
   SubscriptionTierSelection: undefined;
   TaxInvoiceRequest: undefined;
 };
 
-export type B2BStackNavigationProp = StackNavigationProp<B2BStackParamList>;
+export type EnterpriseLegacyStackNavigationProp = StackNavigationProp<EnterpriseLegacyStackParamList>;
 
 // ==================== Root Navigator ====================
 
@@ -182,7 +187,7 @@ export type RootStackParamList = {
   Auth: NavigatorScreenParams<AuthStackParamList>;
   Onboarding: undefined;
   Main: NavigatorScreenParams<MainStackParamList>;
-  B2B: NavigatorScreenParams<B2BStackParamList>;
+  EnterpriseLegacy: NavigatorScreenParams<EnterpriseLegacyStackParamList>;
 };
 
 export type RootNavigationProp = StackNavigationProp<RootStackParamList>;

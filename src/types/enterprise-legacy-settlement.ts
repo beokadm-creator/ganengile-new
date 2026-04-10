@@ -1,4 +1,7 @@
-import type { B2BGillerTierLevel } from './b2b-giller-tier';
+/**
+ * Legacy enterprise customer settlement definitions.
+ */
+import type { EnterpriseLegacyGillerTierLevel } from './enterprise-legacy-giller-tier';
 
 export interface SettlementPeriod {
   start: Date;
@@ -12,9 +15,9 @@ export interface TransferInfo {
   transactionId?: string;
 }
 
-export type B2BSettlementStatus = 'pending_payment' | 'paid' | 'failed';
+export type EnterpriseLegacySettlementStatus = 'pending_payment' | 'paid' | 'failed';
 
-export interface B2BSettlement {
+export interface EnterpriseLegacySettlement {
   id: string;
   gillerId: string;
   businessId?: string;
@@ -23,14 +26,14 @@ export interface B2BSettlement {
   deliveryEarnings: number;
   monthlyBonus: number;
   totalSettlement: number;
-  status: B2BSettlementStatus;
+  status: EnterpriseLegacySettlementStatus;
   transferInfo?: TransferInfo;
   createdAt: Date;
   updatedAt?: Date;
   reviewNote?: string;
 }
 
-export interface CreateB2BSettlementData {
+export interface CreateEnterpriseLegacySettlementData {
   gillerId: string;
   periodStart: Date;
   periodEnd: Date;
@@ -46,16 +49,20 @@ export interface SettlementSummary {
   totalSettlement: number;
 }
 
-export const SETTLEMENT_STATUS_LABELS: Record<B2BSettlementStatus, string> = {
+export const ENTERPRISE_LEGACY_SETTLEMENT_STATUS_LABELS: Record<EnterpriseLegacySettlementStatus, string> = {
   pending_payment: '지급 대기',
   paid: '지급 완료',
   failed: '지급 실패',
 };
 
-export const SETTLEMENT_CYCLE_DAYS = 5;
+export const ENTERPRISE_LEGACY_SETTLEMENT_CYCLE_DAYS = 5;
 
-export const TIER_MONTHLY_BONUSES: Record<B2BGillerTierLevel, number> = {
+export const ENTERPRISE_LEGACY_TIER_MONTHLY_BONUSES: Record<EnterpriseLegacyGillerTierLevel, number> = {
   silver: 100000,
   gold: 200000,
   platinum: 300000,
 };
+
+export type EnterpriseLegacySettlementPeriod = SettlementPeriod;
+export type EnterpriseLegacySettlementSummary = SettlementSummary;
+export type EnterpriseLegacyTransferInfo = TransferInfo;

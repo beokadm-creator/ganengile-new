@@ -1,3 +1,6 @@
+/**
+ * Enterprise legacy giller tier service.
+ */
 import {
   addDoc,
   collection,
@@ -13,40 +16,40 @@ import {
 } from 'firebase/firestore';
 import { db } from '../services/firebase';
 import type {
-  B2BGillerBenefits,
-  B2BGillerCriteria,
-  B2BGillerStatus,
-  B2BGillerTier,
-  B2BGillerTierLevel,
-} from '../types/b2b-giller-tier';
+  EnterpriseLegacyGillerBenefits,
+  EnterpriseLegacyGillerCriteria,
+  EnterpriseLegacyGillerStatus,
+  EnterpriseLegacyGillerTier,
+  EnterpriseLegacyGillerTierLevel,
+} from '../types/enterprise-legacy-giller-tier';
 import {
-  B2B_TIER_BENEFITS,
-  B2B_TIER_CRITERIA,
-  B2B_TIER_DETAILS,
-} from '../types/b2b-giller-tier';
+  ENTERPRISE_LEGACY_TIER_BENEFITS,
+  ENTERPRISE_LEGACY_TIER_CRITERIA,
+  ENTERPRISE_LEGACY_TIER_DETAILS,
+} from '../types/enterprise-legacy-giller-tier';
 
 const TIER_COLLECTION = 'b2b_giller_tiers';
 const GILLER_COLLECTION = 'users';
 
 type TierEvaluationResult = {
-  tier: B2BGillerTierLevel;
-  criteria: B2BGillerCriteria;
-  benefits: B2BGillerBenefits;
+  tier: EnterpriseLegacyGillerTierLevel;
+  criteria: EnterpriseLegacyGillerCriteria;
+  benefits: EnterpriseLegacyGillerBenefits;
 };
 
-type FirestoreB2BGillerHistory = {
+type FirestoreEnterpriseLegacyGillerHistory = {
   promotedAt?: Date | Timestamp | null;
   lastEvaluated?: Date | Timestamp | null;
   nextEvaluation?: Date | Timestamp | null;
 };
 
-type FirestoreB2BGillerTierDoc = DocumentData & {
+type FirestoreEnterpriseLegacyGillerTierDoc = DocumentData & {
   gillerId?: string;
-  tier?: B2BGillerTierLevel;
-  criteria?: Partial<B2BGillerCriteria>;
-  benefits?: Partial<B2BGillerBenefits>;
-  history?: FirestoreB2BGillerHistory;
-  status?: B2BGillerStatus;
+  tier?: EnterpriseLegacyGillerTierLevel;
+  criteria?: Partial<EnterpriseLegacyGillerCriteria>;
+  benefits?: Partial<EnterpriseLegacyGillerBenefits>;
+  history?: FirestoreEnterpriseLegacyGillerHistory;
+  status?: EnterpriseLegacyGillerStatus;
   updatedAt?: Date | Timestamp | null;
 };
 
@@ -67,8 +70,8 @@ type GillerMetrics = {
   tenureMonths: number;
 };
 
-const DEFAULT_TIER_LEVEL: B2BGillerTierLevel = 'silver';
-const DEFAULT_STATUS: B2BGillerStatus = 'active';
+const DEFAULT_TIER_LEVEL: EnterpriseLegacyGillerTierLevel = 'silver';
+const DEFAULT_STATUS: EnterpriseLegacyGillerStatus = 'active';
 
 function toDate(value: Date | Timestamp | null | undefined, fallback: Date): Date {
   if (value instanceof Date) {
@@ -82,19 +85,19 @@ function toDate(value: Date | Timestamp | null | undefined, fallback: Date): Dat
   return fallback;
 }
 
-function toTierLevel(value: unknown): B2BGillerTierLevel {
+function toTierLevel(value: unknown): EnterpriseLegacyGillerTierLevel {
   return value === 'silver' || value === 'gold' || value === 'platinum' ? value : DEFAULT_TIER_LEVEL;
 }
 
-function toStatus(value: unknown): B2BGillerStatus {
+function toStatus(value: unknown): EnterpriseLegacyGillerStatus {
   return value === 'active' || value === 'suspended' ? value : DEFAULT_STATUS;
 }
 
 function mapTierCriteria(
-  tierLevel: B2BGillerTierLevel,
-  criteria?: Partial<B2BGillerCriteria>,
-): B2BGillerCriteria {
-  const defaults = B2B_TIER_CRITERIA[tierLevel];
+  tierLevel: EnterpriseLegacyGillerTierLevel,
+  criteria?: Partial<EnterpriseLegacyGillerCriteria>,
+): EnterpriseLegacyGillerCriteria {
+  const defaults = ENTERPRISE_LEGACY_TIER_CRITERIA[tierLevel];
 
   return {
     rating: typeof criteria?.rating === 'number' ? criteria.rating : defaults.rating,
@@ -107,10 +110,10 @@ function mapTierCriteria(
 }
 
 function mapTierBenefits(
-  tierLevel: B2BGillerTierLevel,
-  benefits?: Partial<B2BGillerBenefits>,
-): B2BGillerBenefits {
-  const defaults = B2B_TIER_BENEFITS[tierLevel];
+  tierLevel: EnterpriseLegacyGillerTierLevel,
+  benefits?: Partial<EnterpriseLegacyGillerBenefits>,
+): EnterpriseLegacyGillerBenefits {
+  const defaults = ENTERPRISE_LEGACY_TIER_BENEFITS[tierLevel];
 
   return {
     priorityLevel:
@@ -121,8 +124,8 @@ function mapTierBenefits(
   };
 }
 
-function mapTierDocument(snapshot: { id: string; data(): DocumentData }): B2BGillerTier {
-  const raw = snapshot.data() as FirestoreB2BGillerTierDoc;
+function mapTierDocument(snapshot: { id: string; data(): DocumentData }): EnterpriseLegacyGillerTier {
+  const raw = snapshot.data() as FirestoreEnterpriseLegacyGillerTierDoc;
   const now = new Date();
   const tierLevel = toTierLevel(raw.tier);
   const history = raw.history ?? {};
@@ -136,7 +139,7 @@ function mapTierDocument(snapshot: { id: string; data(): DocumentData }): B2BGil
     history: {
       promotedAt: history.promotedAt ? toDate(history.promotedAt, now) : undefined,
       lastEvaluated: toDate(history.lastEvaluated, now),
-      nextEvaluation: toDate(history.nextEvaluation, B2BGillerService.getNextEvaluationDate()),
+      nextEvaluation: toDate(history.nextEvaluation, EnterpriseLegacyGillerService.getNextEvaluationDate()),
     },
     status: toStatus(raw.status),
     updatedAt: toDate(raw.updatedAt, now),
@@ -147,7 +150,7 @@ function diffMonths(from: Date, to: Date): number {
   return Math.max(0, (to.getFullYear() - from.getFullYear()) * 12 + (to.getMonth() - from.getMonth()));
 }
 
-export class B2BGillerService {
+export class EnterpriseLegacyGillerService {
   static getNextEvaluationDate(baseDate = new Date()): Date {
     const nextMonth = new Date(baseDate);
     nextMonth.setMonth(nextMonth.getMonth() + 1);
@@ -191,38 +194,38 @@ export class B2BGillerService {
   static async evaluateTierForGiller(gillerId: string): Promise<TierEvaluationResult> {
     const metrics = await this.getGillerMetrics(gillerId);
 
-    if (this.meetsCriteria(metrics, B2B_TIER_CRITERIA.platinum)) {
+    if (this.meetsCriteria(metrics, ENTERPRISE_LEGACY_TIER_CRITERIA.platinum)) {
       return {
         tier: 'platinum',
-        criteria: B2B_TIER_CRITERIA.platinum,
-        benefits: B2B_TIER_BENEFITS.platinum,
+        criteria: ENTERPRISE_LEGACY_TIER_CRITERIA.platinum,
+        benefits: ENTERPRISE_LEGACY_TIER_BENEFITS.platinum,
       };
     }
 
-    if (this.meetsCriteria(metrics, B2B_TIER_CRITERIA.gold)) {
+    if (this.meetsCriteria(metrics, ENTERPRISE_LEGACY_TIER_CRITERIA.gold)) {
       return {
         tier: 'gold',
-        criteria: B2B_TIER_CRITERIA.gold,
-        benefits: B2B_TIER_BENEFITS.gold,
+        criteria: ENTERPRISE_LEGACY_TIER_CRITERIA.gold,
+        benefits: ENTERPRISE_LEGACY_TIER_BENEFITS.gold,
       };
     }
 
-    if (this.meetsCriteria(metrics, B2B_TIER_CRITERIA.silver)) {
+    if (this.meetsCriteria(metrics, ENTERPRISE_LEGACY_TIER_CRITERIA.silver)) {
       return {
         tier: 'silver',
-        criteria: B2B_TIER_CRITERIA.silver,
-        benefits: B2B_TIER_BENEFITS.silver,
+        criteria: ENTERPRISE_LEGACY_TIER_CRITERIA.silver,
+        benefits: ENTERPRISE_LEGACY_TIER_BENEFITS.silver,
       };
     }
 
-    throw new Error('아직 B2B 길러 등급 기준을 충족하지 못했습니다.');
+    throw new Error('아직 기업 계약 길러 등급 기준을 충족하지 못했습니다.');
   }
 
-  static async registerB2BGiller(gillerId: string): Promise<void> {
+  static async registerGiller(gillerId: string): Promise<void> {
     const initialTier = await this.evaluateTierForGiller(gillerId);
     const now = new Date();
 
-    const tierData: Omit<B2BGillerTier, 'id'> = {
+    const tierData: Omit<EnterpriseLegacyGillerTier, 'id'> = {
       gillerId,
       tier: initialTier.tier,
       criteria: initialTier.criteria,
@@ -238,7 +241,7 @@ export class B2BGillerService {
     await addDoc(collection(db, TIER_COLLECTION), tierData);
   }
 
-  private static meetsCriteria(metrics: GillerMetrics, criteria: B2BGillerCriteria): boolean {
+  private static meetsCriteria(metrics: GillerMetrics, criteria: EnterpriseLegacyGillerCriteria): boolean {
     return (
       metrics.tenureMonths >= criteria.tenure &&
       metrics.monthlyDeliveries >= criteria.monthlyDeliveries &&
@@ -261,7 +264,7 @@ export class B2BGillerService {
   private static async reevaluateGiller(tierId: string): Promise<void> {
     const tierDoc = await getDoc(doc(db, TIER_COLLECTION, tierId));
     if (!tierDoc.exists()) {
-      throw new Error('B2B 길러 등급 정보를 찾을 수 없습니다.');
+      throw new Error('기업 계약 길러 등급 정보를 찾을 수 없습니다.');
     }
 
     const currentTier = mapTierDocument(tierDoc);
@@ -298,12 +301,12 @@ export class B2BGillerService {
 
   static async demoteGiller(tierId: string, _reason: string): Promise<void> {
     await updateDoc(doc(db, TIER_COLLECTION, tierId), {
-      status: 'suspended' as B2BGillerStatus,
+      status: 'suspended' as EnterpriseLegacyGillerStatus,
       updatedAt: new Date(),
     });
   }
 
-  static async getB2BGillerTier(gillerId: string): Promise<B2BGillerTier | null> {
+  static async getGillerTier(gillerId: string): Promise<EnterpriseLegacyGillerTier | null> {
     const tierQuery = query(collection(db, TIER_COLLECTION), where('gillerId', '==', gillerId));
     const querySnapshot = await getDocs(tierQuery);
 
@@ -314,7 +317,7 @@ export class B2BGillerService {
     return mapTierDocument(querySnapshot.docs[0]);
   }
 
-  static async getActiveB2BGillers(): Promise<Array<B2BGillerTier & { gillerId: string }>> {
+  static async getActiveGillers(): Promise<Array<EnterpriseLegacyGillerTier & { gillerId: string }>> {
     const tierQuery = query(collection(db, TIER_COLLECTION), where('status', '==', 'active'));
     const querySnapshot = await getDocs(tierQuery);
     return querySnapshot.docs.map((snapshot) => mapTierDocument(snapshot));
@@ -322,26 +325,26 @@ export class B2BGillerService {
 
   static async getTierStats(): Promise<Record<string, number>> {
     const snapshot = await getDocs(collection(db, TIER_COLLECTION));
-    const stats: Record<B2BGillerTierLevel, number> = {
+    const stats: Record<EnterpriseLegacyGillerTierLevel, number> = {
       silver: 0,
       gold: 0,
       platinum: 0,
     };
 
     snapshot.docs.forEach((snapshotDoc) => {
-      const tier = toTierLevel((snapshotDoc.data() as FirestoreB2BGillerTierDoc).tier);
+      const tier = toTierLevel((snapshotDoc.data() as FirestoreEnterpriseLegacyGillerTierDoc).tier);
       stats[tier] += 1;
     });
 
     return stats;
   }
 
-  static async checkB2BEligibility(gillerId: string): Promise<{
+  static async checkEligibility(gillerId: string): Promise<{
     eligible: boolean;
     currentTier?: string;
-    requiredFor?: Partial<Record<B2BGillerTierLevel, B2BGillerCriteria>>;
+    requiredFor?: Partial<Record<EnterpriseLegacyGillerTierLevel, EnterpriseLegacyGillerCriteria>>;
   }> {
-    const tier = await this.getB2BGillerTier(gillerId);
+    const tier = await this.getGillerTier(gillerId);
 
     if (tier) {
       return {
@@ -357,28 +360,28 @@ export class B2BGillerService {
         currentTier: preview.tier,
       };
     } catch (error) {
-      console.error('[b2b-giller-service] B2B 티어 평가 실패:', error);
+      console.error('[enterprise-legacy-giller-service] 등급 평가 실패:', error);
       return {
         eligible: false,
-        requiredFor: B2B_TIER_CRITERIA,
+        requiredFor: ENTERPRISE_LEGACY_TIER_CRITERIA,
       };
     }
   }
 
-  static async deleteB2BGillerTier(tierId: string): Promise<void> {
+  static async deleteGillerTier(tierId: string): Promise<void> {
     await deleteDoc(doc(db, TIER_COLLECTION, tierId));
   }
 
-  static calculateMonthlyBonus(tier: B2BGillerTierLevel, _b2bDeliveries: number): number {
-    return B2B_TIER_BENEFITS[tier].monthlyBonus * 10000;
+  static calculateMonthlyBonus(tier: EnterpriseLegacyGillerTierLevel, _b2bDeliveries: number): number {
+    return ENTERPRISE_LEGACY_TIER_BENEFITS[tier].monthlyBonus * 10000;
   }
 
-  static calculateRateBonus(tier: B2BGillerTierLevel, baseEarning: number): number {
-    return Math.round(baseEarning * (B2B_TIER_BENEFITS[tier].rateBonus / 100));
+  static calculateRateBonus(tier: EnterpriseLegacyGillerTierLevel, baseEarning: number): number {
+    return Math.round(baseEarning * (ENTERPRISE_LEGACY_TIER_BENEFITS[tier].rateBonus / 100));
   }
 
   static calculateTotalEarning(
-    tier: B2BGillerTierLevel,
+    tier: EnterpriseLegacyGillerTierLevel,
     baseEarning: number,
     b2bDeliveries: number,
   ): number {
@@ -387,16 +390,16 @@ export class B2BGillerService {
     return baseEarning + rateBonus + monthlyBonus;
   }
 
-  static getTierDetails(tier: B2BGillerTierLevel): {
+  static getTierDetails(tier: EnterpriseLegacyGillerTierLevel): {
     name: string;
     description: string;
-    criteria: B2BGillerCriteria;
-    benefits: B2BGillerBenefits;
+    criteria: EnterpriseLegacyGillerCriteria;
+    benefits: EnterpriseLegacyGillerBenefits;
   } {
-    return B2B_TIER_DETAILS[tier];
+    return ENTERPRISE_LEGACY_TIER_DETAILS[tier];
   }
 
-  static compareTierPriority(tier1: B2BGillerTierLevel, tier2: B2BGillerTierLevel): number {
-    return B2B_TIER_BENEFITS[tier1].priorityLevel - B2B_TIER_BENEFITS[tier2].priorityLevel;
+  static compareTierPriority(tier1: EnterpriseLegacyGillerTierLevel, tier2: EnterpriseLegacyGillerTierLevel): number {
+    return ENTERPRISE_LEGACY_TIER_BENEFITS[tier1].priorityLevel - ENTERPRISE_LEGACY_TIER_BENEFITS[tier2].priorityLevel;
   }
 }

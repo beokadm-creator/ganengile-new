@@ -10,10 +10,10 @@ export default function LandingScreen({ navigation }: LandingScreenProps) {
       <View style={styles.hero}>
         <Text style={styles.badge}>가는길에</Text>
         <Text style={styles.title}>지하철 동선에 맞춰 바로 보내는 생활 배송</Text>
-        <Text style={styles.subtitle}>요청, 채팅, 추적, 정산까지 한 흐름으로 이어집니다.</Text>
+        <Text style={styles.subtitle}>계정은 빠르게 만들고, 첫 배송 요청 직전에 필요한 정보만 확인합니다.</Text>
 
         <TouchableOpacity style={styles.primaryButton} onPress={() => navigation.navigate('NewSignUp')} activeOpacity={0.9}>
-          <Text style={styles.primaryButtonText}>시작하기</Text>
+          <Text style={styles.primaryButtonText}>계정 만들기</Text>
         </TouchableOpacity>
 
         <TouchableOpacity style={styles.secondaryButton} onPress={() => navigation.navigate('Login')} activeOpacity={0.9}>
@@ -22,9 +22,9 @@ export default function LandingScreen({ navigation }: LandingScreenProps) {
       </View>
 
       <View style={styles.section}>
-        <StepRow number="1" title="요청 만들기" description="출발역과 도착역을 고르고 필요한 조건만 입력합니다." />
-        <StepRow number="2" title="연결 확인" description="지금 보내기와 예약하기 중 상황에 맞는 흐름으로 이어집니다." />
-        <StepRow number="3" title="진행 확인" description="채팅, 추적, 정산 준비 상태를 한 곳에서 확인합니다." />
+        <StepRow number="1" title="계정 만들기" description="이름과 로그인 정보만으로 빠르게 시작합니다." />
+        <StepRow number="2" title="첫 요청 준비" description="첫 배송 요청 직전에 필요한 이용자 정보와 연락처만 확인합니다." />
+        <StepRow number="3" title="배송 진행 확인" description="채팅, 추적, 요청 상태를 한 곳에서 이어서 확인합니다." />
       </View>
     </ScrollView>
   );

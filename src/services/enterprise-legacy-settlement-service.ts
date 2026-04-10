@@ -1,3 +1,6 @@
+/**
+ * Enterprise legacy settlement service.
+ */
 import {
   addDoc,
   collection,
@@ -13,20 +16,20 @@ import {
 } from 'firebase/firestore';
 import { db } from '../config/firebase';
 import type {
-  B2BSettlement,
-  B2BSettlementStatus,
-  CreateB2BSettlementData,
+  EnterpriseLegacySettlement,
+  EnterpriseLegacySettlementStatus,
+  CreateEnterpriseLegacySettlementData,
   SettlementPeriod,
   TransferInfo,
-} from '../types/b2b-settlement';
+} from '../types/enterprise-legacy-settlement';
 import {
-  SETTLEMENT_CYCLE_DAYS,
-  SETTLEMENT_STATUS_LABELS,
-  TIER_MONTHLY_BONUSES,
-} from '../types/b2b-settlement';
-import type { B2BDelivery } from '../types/b2b-delivery';
-import type { B2BGillerTierLevel } from '../types/b2b-giller-tier';
-import { B2BGillerService } from './b2b-giller-service';
+  ENTERPRISE_LEGACY_SETTLEMENT_CYCLE_DAYS,
+  ENTERPRISE_LEGACY_SETTLEMENT_STATUS_LABELS,
+  ENTERPRISE_LEGACY_TIER_MONTHLY_BONUSES,
+} from '../types/enterprise-legacy-settlement';
+import type { EnterpriseLegacyDelivery } from '../types/enterprise-legacy-delivery';
+import type { EnterpriseLegacyGillerTierLevel } from '../types/enterprise-legacy-giller-tier';
+import { EnterpriseLegacyGillerService } from './enterprise-legacy-giller-service';
 
 const SETTLEMENT_COLLECTION = 'b2b_settlements';
 const DELIVERY_COLLECTION = 'b2b_deliveries';
@@ -49,7 +52,7 @@ type DeliveryPricingSnapshot = {
   gillerEarning?: number;
 };
 
-type B2BDeliverySnapshot = Partial<Omit<B2BDelivery, 'completedAt' | 'pricing'>> & {
+type EnterpriseLegacyDeliverySnapshot = Partial<Omit<EnterpriseLegacyDelivery, 'completedAt' | 'pricing'>> & {
   completedAt?: DeliveryCompletedAt;
   pricing?: DeliveryPricingSnapshot;
 };
@@ -65,7 +68,7 @@ type FirestoreSettlementDoc = DocumentData & {
   deliveryEarnings?: number;
   monthlyBonus?: number;
   totalSettlement?: number;
-  status?: B2BSettlementStatus;
+  status?: EnterpriseLegacySettlementStatus;
   transferInfo?: FirestoreTransferInfo;
   createdAt?: Date | Timestamp | null;
   updatedAt?: Date | Timestamp | null;
@@ -112,7 +115,7 @@ function toCompletedAtDate(value: DeliveryCompletedAt | undefined): Date | null 
   return Number.isNaN(parsed.getTime()) ? null : parsed;
 }
 
-function toSettlementStatus(value: unknown): B2BSettlementStatus {
+function toSettlementStatus(value: unknown): EnterpriseLegacySettlementStatus {
   return value === 'paid' || value === 'failed' ? value : 'pending_payment';
 }
 
@@ -124,11 +127,11 @@ function maskAccountNumber(accountNumber: string): string {
   return `${'*'.repeat(Math.max(0, cleaned.length - 4))}${cleaned.slice(-4)}`;
 }
 
-function getTierLevel(tier: { tier: B2BGillerTierLevel } | null): B2BGillerTierLevel | null {
+function getTierLevel(tier: { tier: EnterpriseLegacyGillerTierLevel } | null): EnterpriseLegacyGillerTierLevel | null {
   return tier?.tier ?? null;
 }
 
-function mapSettlement(snapshot: { id: string; data(): DocumentData }): B2BSettlement {
+function mapSettlement(snapshot: { id: string; data(): DocumentData }): EnterpriseLegacySettlement {
   const raw = snapshot.data() as FirestoreSettlementDoc;
   const now = new Date();
   const transferInfo = raw.transferInfo;
@@ -160,17 +163,17 @@ function mapSettlement(snapshot: { id: string; data(): DocumentData }): B2BSettl
   };
 }
 
-async function getGillerTierBonus(gillerId: string): Promise<{ tier: B2BGillerTierLevel | null; monthlyBonus: number }> {
-  const tier = await B2BGillerService.getB2BGillerTier(gillerId);
+async function getGillerTierBonus(gillerId: string): Promise<{ tier: EnterpriseLegacyGillerTierLevel | null; monthlyBonus: number }> {
+  const tier = await EnterpriseLegacyGillerService.getGillerTier(gillerId);
   const tierLevel = getTierLevel(tier);
 
   return {
     tier: tierLevel,
-    monthlyBonus: tierLevel ? TIER_MONTHLY_BONUSES[tierLevel] : 0,
+    monthlyBonus: tierLevel ? ENTERPRISE_LEGACY_TIER_MONTHLY_BONUSES[tierLevel] : 0,
   };
 }
 
-async function aggregateB2BDeliveries(
+async function aggregateEnterpriseLegacyDeliveries(
   gillerId: string,
   startDate: Date,
   endDate: Date,
@@ -178,7 +181,7 @@ async function aggregateB2BDeliveries(
   const deliveriesQuery = query(collection(db, DELIVERY_COLLECTION), where('gillerId', '==', gillerId));
   const querySnapshot = await getDocs(deliveriesQuery);
   const deliveries = querySnapshot.docs
-    .map((deliveryDoc) => deliveryDoc.data() as B2BDeliverySnapshot)
+    .map((deliveryDoc) => deliveryDoc.data() as EnterpriseLegacyDeliverySnapshot)
     .filter((delivery) => {
       const completedAt = toCompletedAtDate(delivery.completedAt);
       if (!completedAt) return false;
@@ -236,15 +239,15 @@ async function getGillerAccountInfo(gillerId: string): Promise<TransferInfo | nu
   };
 }
 
-export class B2BSettlementService {
+export class EnterpriseLegacySettlementService {
   static async generateMonthlySettlements(): Promise<void> {
     const now = new Date();
     const periodStart = new Date(now.getFullYear(), now.getMonth() - 1, 1);
     const periodEnd = new Date(now.getFullYear(), now.getMonth(), 1);
-    const activeGillers = await B2BGillerService.getActiveB2BGillers();
+    const activeGillers = await EnterpriseLegacyGillerService.getActiveGillers();
 
     for (const giller of activeGillers) {
-      const aggregated = await aggregateB2BDeliveries(giller.gillerId, periodStart, periodEnd);
+      const aggregated = await aggregateEnterpriseLegacyDeliveries(giller.gillerId, periodStart, periodEnd);
       if (aggregated.b2bDeliveries === 0) {
         continue;
       }
@@ -273,7 +276,7 @@ export class B2BSettlementService {
         deliveryEarnings: aggregated.deliveryEarnings,
         monthlyBonus,
         totalSettlement,
-        status: 'pending_payment' as B2BSettlementStatus,
+        status: 'pending_payment' as EnterpriseLegacySettlementStatus,
         transferInfo: transferInfo
           ? {
               bank: transferInfo.bank,
@@ -290,7 +293,7 @@ export class B2BSettlementService {
     }
   }
 
-  static async getSettlement(settlementId: string): Promise<B2BSettlement | null> {
+  static async getSettlement(settlementId: string): Promise<EnterpriseLegacySettlement | null> {
     const settlementDoc = await getDoc(doc(db, SETTLEMENT_COLLECTION, settlementId));
     if (!settlementDoc.exists()) {
       return null;
@@ -298,7 +301,7 @@ export class B2BSettlementService {
     return mapSettlement(settlementDoc);
   }
 
-  static async getGillerSettlements(gillerId: string, status?: B2BSettlementStatus): Promise<B2BSettlement[]> {
+  static async getGillerSettlements(gillerId: string, status?: EnterpriseLegacySettlementStatus): Promise<EnterpriseLegacySettlement[]> {
     let settlementsQuery = query(collection(db, SETTLEMENT_COLLECTION), where('gillerId', '==', gillerId));
     if (status) {
       settlementsQuery = query(settlementsQuery, where('status', '==', status));
@@ -308,13 +311,13 @@ export class B2BSettlementService {
     return querySnapshot.docs.map(mapSettlement);
   }
 
-  static async getPendingSettlements(): Promise<B2BSettlement[]> {
+  static async getPendingSettlements(): Promise<EnterpriseLegacySettlement[]> {
     const settlementsQuery = query(collection(db, SETTLEMENT_COLLECTION), where('status', '==', 'pending_payment'));
     const querySnapshot = await getDocs(settlementsQuery);
     return querySnapshot.docs.map(mapSettlement);
   }
 
-  static async createManualSettlement(data: CreateB2BSettlementData): Promise<string> {
+  static async createManualSettlement(data: CreateEnterpriseLegacySettlementData): Promise<string> {
     const bonusInfo = await getGillerTierBonus(data.gillerId);
     const settlementDoc = await addDoc(collection(db, SETTLEMENT_COLLECTION), {
       gillerId: data.gillerId,
@@ -324,7 +327,7 @@ export class B2BSettlementService {
       deliveryEarnings: 0,
       monthlyBonus: data.monthlyBonus ?? bonusInfo.monthlyBonus,
       totalSettlement: data.monthlyBonus ?? bonusInfo.monthlyBonus,
-      status: 'pending_payment' as B2BSettlementStatus,
+      status: 'pending_payment' as EnterpriseLegacySettlementStatus,
       reviewNote: '수동 생성된 정산 건입니다. 운영 검토 후 지급 처리하세요.',
       createdAt: serverTimestamp(),
       updatedAt: serverTimestamp(),
@@ -335,7 +338,7 @@ export class B2BSettlementService {
 
   static async markAsFailed(settlementId: string, reason: string): Promise<void> {
     await updateDoc(doc(db, SETTLEMENT_COLLECTION, settlementId), {
-      status: 'failed' as B2BSettlementStatus,
+      status: 'failed' as EnterpriseLegacySettlementStatus,
       reviewNote: reason,
       updatedAt: serverTimestamp(),
     });
@@ -351,7 +354,7 @@ export class B2BSettlementService {
     },
   ): Promise<void> {
     await updateDoc(doc(db, SETTLEMENT_COLLECTION, settlementId), {
-      status: 'paid' as B2BSettlementStatus,
+      status: 'paid' as EnterpriseLegacySettlementStatus,
       transferInfo: {
         bank: transferInfo.bank,
         accountNumber: maskAccountNumber(transferInfo.accountNumber),
@@ -399,7 +402,7 @@ export class B2BSettlementService {
     for (let attempt = 1; attempt <= maxRetries; attempt += 1) {
       try {
         await updateDoc(doc(db, SETTLEMENT_COLLECTION, settlementId), {
-          status: 'pending_payment' as B2BSettlementStatus,
+          status: 'pending_payment' as EnterpriseLegacySettlementStatus,
           transferInfo: {
             bank: transferInfo.bank,
             accountNumber: maskAccountNumber(transferInfo.accountNumber),
@@ -425,7 +428,7 @@ export class B2BSettlementService {
   static calculateNextSettlementDate(currentDate: Date = new Date()): Date {
     const nextMonth = new Date(currentDate);
     nextMonth.setMonth(nextMonth.getMonth() + 1);
-    nextMonth.setDate(SETTLEMENT_CYCLE_DAYS);
+    nextMonth.setDate(ENTERPRISE_LEGACY_SETTLEMENT_CYCLE_DAYS);
     return nextMonth;
   }
 
@@ -441,7 +444,7 @@ export class B2BSettlementService {
     const tierBreakdown: Record<string, number> = { silver: 0, gold: 0, platinum: 0 };
 
     for (const settlement of settlements) {
-      const tier = await B2BGillerService.getB2BGillerTier(settlement.gillerId);
+      const tier = await EnterpriseLegacyGillerService.getGillerTier(settlement.gillerId);
       const tierLevel = getTierLevel(tier);
       if (tierLevel) {
         tierBreakdown[tierLevel] += 1;
@@ -461,7 +464,7 @@ export class B2BSettlementService {
 
     const gillerDoc = await getDoc(doc(db, USERS_COLLECTION, settlement.gillerId));
     const giller = gillerDoc.exists() ? (gillerDoc.data() as DocumentData & { name?: string }) : null;
-    const tier = await B2BGillerService.getB2BGillerTier(settlement.gillerId);
+    const tier = await EnterpriseLegacyGillerService.getGillerTier(settlement.gillerId);
     const tierLabel = getTierLevel(tier)?.toUpperCase() ?? 'N/A';
 
     const reportText = [
@@ -491,7 +494,7 @@ export class B2BSettlementService {
     console.warn(`B2B settlement backup requested for ${snapshot.size} documents.`);
   }
 
-  static getSettlementStatusLabel(status: B2BSettlementStatus): string {
-    return SETTLEMENT_STATUS_LABELS[status];
+  static getSettlementStatusLabel(status: EnterpriseLegacySettlementStatus): string {
+    return ENTERPRISE_LEGACY_SETTLEMENT_STATUS_LABELS[status];
   }
 }

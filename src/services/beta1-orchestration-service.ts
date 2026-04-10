@@ -41,7 +41,8 @@ import { getAIIntegrationConfig } from './integration-config-service';
 import { buildRequestDraftFromLegacyInput, type LegacyStationInfo as StationInfo } from '../utils/request-draft-adapters';
 import { findMatchesForRequest } from './matching-service';
 import { sendMissionBundleAvailableNotification } from './matching-notification';
-import { B2BDeliveryService } from './b2b-delivery-service';
+import { deliveryPartnerService } from './delivery-partner-service';
+import { EnterpriseLegacyDeliveryService } from './enterprise-legacy-delivery-service';
 import {
   buildMissionWindowLabel,
   buildSegmentedLegDefinitions,
@@ -71,6 +72,10 @@ export type {
   Beta1HomeSnapshot,
 } from './beta1-orchestration-snapshot-service';
 export { buildBeta1QuoteCards } from './beta1-orchestration-quote-service';
+export type {
+  Beta1QuoteCard,
+  Beta1RequestCreateInput,
+} from './beta1-orchestration-quote-service';
 export {
   buildSegmentedLegDefinitions,
   formatDetailedAddress,
@@ -464,7 +469,7 @@ export async function createBeta1Request(input: Beta1RequestCreateInput): Promis
       selectedActorType: requiresAddressHandling(definition.legType) ? ActorType.EXTERNAL_PARTNER : ActorType.GILLER,
       selectedPartnerId: requiresAddressHandling(definition.legType) ? PARTNER_QUOTES[0]?.partnerId : undefined,
       selectionReason: requiresAddressHandling(definition.legType)
-        ? '주소 구간이라 길러 선택이 없으면 B2B fallback을 우선 검토합니다.'
+        ? '주소 구간이라 길러 선택이 없으면 external partner fallback을 우선 검토합니다.'
         : '역간 이동 구간이라 길러 수행을 우선 제안합니다.',
       fallbackActorTypes: requiresAddressHandling(definition.legType)
         ? [ActorType.GILLER]
@@ -702,7 +707,7 @@ async function dispatchMissionToB2BFallback(params: {
           '도착역'
       );
 
-    return await B2BDeliveryService.createDelivery({
+    return await EnterpriseLegacyDeliveryService.createDelivery({
       contractId: 'beta1-fallback-contract',
       businessId: 'beta1-fallback',
       pickupLocation: {
@@ -722,7 +727,45 @@ async function dispatchMissionToB2BFallback(params: {
       notes: `beta1 mission fallback:${params.requestId}:${params.mission.id}`,
     });
   } catch (error) {
-    console.warn('Unable to create B2B fallback delivery', error);
+    console.warn('Unable to create enterprise legacy fallback delivery', error);
+    return null;
+  }
+}
+
+async function queueExternalPartnerDispatch(params: {
+  partnerId?: string;
+  requestId: string;
+  deliveryId?: string;
+  missionId: string;
+  deliveryLegId?: string;
+  leg: Beta1LegDoc;
+  fallbackDeliveryId?: string | null;
+}): Promise<string | null> {
+  if (!params.partnerId) {
+    return null;
+  }
+
+  try {
+    return await deliveryPartnerService.queueDispatch({
+      partnerId: params.partnerId,
+      missionId: params.missionId,
+      requestId: params.requestId,
+      deliveryId: params.deliveryId,
+      deliveryLegId: params.deliveryLegId,
+      partnerCapability: requiresAddressHandling(params.leg.legType) ? 'address_dropoff' : 'station_to_station',
+      dispatchMethod: 'manual_dashboard',
+      opsMemo: params.fallbackDeliveryId
+        ? `fallback_delivery:${params.fallbackDeliveryId}`
+        : 'queued_from_beta1_external_partner_selection',
+      originRef: params.leg.originRef,
+      destinationRef: params.leg.destinationRef,
+      payload: {
+        legType: params.leg.legType,
+        actorType: 'external_partner',
+      },
+    });
+  } catch (error) {
+    console.warn('Unable to queue external partner dispatch', error);
     return null;
   }
 }
@@ -832,6 +875,15 @@ export async function acceptMissionBundleForGiller(bundleId: string, gillerUserI
 
     fallbackDeliveryIds.push(fallbackDeliveryId);
     fallbackMissionIds.push(mission.id);
+    const externalPartnerDispatchId = await queueExternalPartnerDispatch({
+      partnerId: PARTNER_QUOTES[0]?.partnerId,
+      requestId: bundle.requestId,
+      deliveryId: bundle.deliveryId,
+      missionId: mission.id,
+      deliveryLegId: leg.deliveryLegId,
+      leg,
+      fallbackDeliveryId,
+    });
     await Promise.all([
       updateDoc(doc(db, 'missions', mission.id), {
         status: MissionState.OFFERED,
@@ -851,11 +903,14 @@ export async function acceptMissionBundleForGiller(bundleId: string, gillerUserI
         interventionLevel: 'guarded_execute',
         selectedActorType: ActorType.EXTERNAL_PARTNER,
         selectedPartnerId: PARTNER_QUOTES[0]?.partnerId,
-        selectionReason: '길러가 선택하지 않은 주소 구간을 B2B fallback으로 전환했습니다.',
+        selectionReason: '길러가 선택하지 않은 주소 구간을 external partner fallback으로 전환했습니다.',
         fallbackActorTypes: [ActorType.GILLER],
         fallbackPartnerIds: PARTNER_QUOTES.map((quote) => quote.partnerId),
         manualReviewRequired: false,
-        riskFlags: ['address_leg_fallback'],
+        riskFlags: [
+          'address_leg_fallback',
+          ...(externalPartnerDispatchId ? [`partner_dispatch:${externalPartnerDispatchId}`] : []),
+        ],
       }),
     ]);
   }

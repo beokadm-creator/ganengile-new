@@ -21,7 +21,7 @@
 
 | # | 항목 | 심각도 | 설명 |
 |---|------|--------|------|
-| 1 | **Firestore 규칙 미커버 컬렉션** | 🔴 HIGH | B2B_DELIVERIES, B2B_TAX_INVOICES, B2B_NOTIFICATION, TRANSFER_MATCHES 등 코드에서 사용되나 규칙에 없음 |
+| 1 | **Firestore 규칙 미커버 컬렉션** | 🔴 HIGH | b2b_deliveries, b2b_tax_invoices, b2b_dispatch_notifications, transfer_matches 등 코드에서 사용되나 규칙에 없음 |
 | 2 | **requestPhoneOtp / confirmPhoneOtp 인증 없음** | 🔴 HIGH | OTP 함수들이 `requireCallableAuth` 없이 구현됨. 남용 가능성 |
 | 3 | **onRequest 엔드포인트 rate limiting 없음** | 🟡 MEDIUM | naver*Proxy, jusoAddressSearchProxy, ciMock, syncConfigStations 등 인증/rate limiting 없음 |
 | 4 | **chats/{chatId}/messages 이중 경로** | 🟡 MEDIUM | `chats/{chatId}/messages/`(미검증)와 `chatRooms/{chatRoomId}/messages/`(검증됨)가 공존. 앱이 어느 경로를 사용하는지 확인 필요 |
@@ -89,7 +89,7 @@ request-service → matching-service → delivery-service → beta1-orchestratio
 | 함수 | 줄수 | 복잡도 | Firestore 작업 | 에러 처리 |
 |------|------|--------|---------------|----------|
 | `createBeta1Request` | ~286 (219-504) | 🔴 높음 | addDoc×5, setDoc×3, updateDoc×14+, getDoc×다수 | ✅ try/catch |
-| `acceptMissionBundleForGiller` | ~176 (730-905) | 🔴 높음 | 다중 updateDoc, B2B 폴백 | ✅ try/catch |
+| `acceptMissionBundleForGiller` | ~176 (730-905) | 🔴 높음 | 다중 updateDoc, external_partner fallback | ✅ try/catch |
 | `bundleMissionsForDelivery` | ~94 (540-633) | 🟡 중간 | Firestore 다중 쓰기 | ✅ |
 | `syncDeliveryToBeta1Execution` | ~65 (924-988) | 🟡 중간 | 동기화 업데이트 | ✅ |
 | `createMissionForDeliveryLeg` | ~44 (635-678) | 🟢 낮음 | 단일 생성 | ✅ |
@@ -183,7 +183,7 @@ if (context.auth?.uid && context.auth.uid !== uid) {
 
 | 컬렉션 | 사용 서비스 | 위험도 |
 |--------|-----------|--------|
-| b2b_deliveries | b2b-delivery-service | 🔴 HIGH |
+| b2b_deliveries | enterprise-legacy-delivery-service | 🔴 HIGH |
 | b2b_tax_invoices | tax-invoice-service | 🔴 HIGH |
 | b2b_notifications | (코드에 존재) | 🟡 MEDIUM |
 | transfer_matches | transfer-service | 🟡 MEDIUM |
@@ -241,9 +241,9 @@ match /bids/{bidId} {
 
 - beta1-orchestration-leg-service
 - beta1-orchestration-quote-service
-- ProfessionalGillerService
+- ProfessionalGillerService는 현재 제거됨
 - SettlementService (functions에서만 사용)
-- RealtimeSubwayService
+- RealtimeSubwayService는 현재 제거됨
 - media-service
 - fare-service
 - transfer-service

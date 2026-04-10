@@ -2,18 +2,21 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, ScrollView, StyleSheet, Text, View, type DimensionValue } from 'react-native';
 import type { StackNavigationProp } from '@react-navigation/stack';
 import { auth } from '../../services/firebase';
-import { b2bFirestoreService, type MonthlyStats } from '../../services/b2b-firestore-service';
-import { B2BGillerService } from '../../services/b2b-giller-service';
 import {
-  B2B_TIER_BENEFITS,
-  B2B_TIER_CRITERIA,
-  B2B_TIER_DETAILS,
-  type B2BGillerTierLevel,
-} from '../../types/b2b-giller-tier';
-import type { B2BStackParamList } from '../../types/navigation';
+  enterpriseLegacyFirestoreService,
+  type EnterpriseLegacyMonthlyStats as MonthlyStats,
+} from '../../services/enterprise-legacy-firestore-service';
+import { EnterpriseLegacyGillerService } from '../../services/enterprise-legacy-giller-service';
+import {
+  ENTERPRISE_LEGACY_TIER_BENEFITS,
+  ENTERPRISE_LEGACY_TIER_CRITERIA,
+  ENTERPRISE_LEGACY_TIER_DETAILS,
+  type EnterpriseLegacyGillerTierLevel,
+} from '../../types/enterprise-legacy-giller-tier';
+import type { EnterpriseLegacyStackParamList } from '../../types/navigation';
 import { BorderRadius, Colors, Shadows, Spacing, Typography } from '../../theme';
 
-type NavigationProp = StackNavigationProp<B2BStackParamList, 'B2BGiller'>;
+type NavigationProp = StackNavigationProp<EnterpriseLegacyStackParamList, 'EnterpriseLegacyGiller'>;
 
 type Props = {
   navigation: NavigationProp;
@@ -37,8 +40,8 @@ type MonthlyEarnings = {
   tierBonus: number;
   monthlyBonus: number;
   netEarnings: number;
-  currentTier: B2BGillerTierLevel;
-  nextTier?: B2BGillerTierLevel;
+  currentTier: EnterpriseLegacyGillerTierLevel;
+  nextTier?: EnterpriseLegacyGillerTierLevel;
   progressToNext?: number;
 };
 
@@ -105,7 +108,7 @@ function mapRecentDelivery(rawId: string, raw: RecentDeliveryDoc): GillerDeliver
   };
 }
 
-function getNextTier(currentTier: B2BGillerTierLevel): B2BGillerTierLevel | undefined {
+function getNextTier(currentTier: EnterpriseLegacyGillerTierLevel): EnterpriseLegacyGillerTierLevel | undefined {
   if (currentTier === 'silver') {
     return 'gold';
   }
@@ -115,20 +118,20 @@ function getNextTier(currentTier: B2BGillerTierLevel): B2BGillerTierLevel | unde
   return undefined;
 }
 
-function getProgressToNextTier(currentTier: B2BGillerTierLevel, totalDeliveries: number): number {
+function getProgressToNextTier(currentTier: EnterpriseLegacyGillerTierLevel, totalDeliveries: number): number {
   const nextTier = getNextTier(currentTier);
   if (!nextTier) {
     return 100;
   }
 
-  const currentRequirement = B2B_TIER_CRITERIA[currentTier].monthlyDeliveries;
-  const nextRequirement = B2B_TIER_CRITERIA[nextTier].monthlyDeliveries;
+  const currentRequirement = ENTERPRISE_LEGACY_TIER_CRITERIA[currentTier].monthlyDeliveries;
+  const nextRequirement = ENTERPRISE_LEGACY_TIER_CRITERIA[nextTier].monthlyDeliveries;
   const progress = ((totalDeliveries - currentRequirement) / Math.max(1, nextRequirement - currentRequirement)) * 100;
 
   return Math.max(0, Math.min(99, Math.round(progress)));
 }
 
-export default function B2BGillerScreen({ navigation: _navigation }: Props) {
+export default function EnterpriseLegacyGillerScreen({ navigation: _navigation }: Props) {
   const [loading, setLoading] = useState(true);
   const [deliveries, setDeliveries] = useState<GillerDelivery[]>([]);
   const [stats, setStats] = useState<MonthlyStats>({
@@ -136,7 +139,7 @@ export default function B2BGillerScreen({ navigation: _navigation }: Props) {
     totalAmount: 0,
     avgCostPerDelivery: 0,
   });
-  const [currentTier, setCurrentTier] = useState<B2BGillerTierLevel>('silver');
+  const [currentTier, setCurrentTier] = useState<EnterpriseLegacyGillerTierLevel>('silver');
 
   useEffect(() => {
     void loadGillerData();
@@ -152,13 +155,13 @@ export default function B2BGillerScreen({ navigation: _navigation }: Props) {
       }
 
       const gillerId = currentUser.uid;
-      const { year, month } = b2bFirestoreService.getCurrentYearMonth();
+      const { year, month } = enterpriseLegacyFirestoreService.getCurrentYearMonth();
 
       const [statsData, recentDeliveries, savedTier, evaluatedTier] = await Promise.all([
-        b2bFirestoreService.getMonthlyStats(gillerId, year, month),
-        b2bFirestoreService.getRecentDeliveries(gillerId, 10),
-        B2BGillerService.getB2BGillerTier(gillerId),
-        B2BGillerService.evaluateTierForGiller(gillerId).catch(() => null),
+        enterpriseLegacyFirestoreService.getMonthlyStats(gillerId, year, month),
+        enterpriseLegacyFirestoreService.getRecentDeliveries(gillerId, 10),
+        EnterpriseLegacyGillerService.getGillerTier(gillerId),
+        EnterpriseLegacyGillerService.evaluateTierForGiller(gillerId).catch(() => null),
       ]);
 
       if (statsData) {
@@ -176,17 +179,17 @@ export default function B2BGillerScreen({ navigation: _navigation }: Props) {
 
       setDeliveries(normalizedDeliveries);
     } catch (error) {
-      console.error('Failed to load B2B giller dashboard', error);
+      console.error('Failed to load enterprise legacy giller dashboard', error);
     } finally {
       setLoading(false);
     }
   }
 
   const earnings = useMemo<MonthlyEarnings>(() => {
-    const benefits = B2B_TIER_BENEFITS[currentTier];
+    const benefits = ENTERPRISE_LEGACY_TIER_BENEFITS[currentTier];
     const nextTier = getNextTier(currentTier);
     const tierBonus = Math.round(stats.totalAmount * (benefits.rateBonus / 100));
-    const monthlyBonus = B2BGillerService.calculateMonthlyBonus(currentTier, stats.totalDeliveries);
+    const monthlyBonus = EnterpriseLegacyGillerService.calculateMonthlyBonus(currentTier, stats.totalDeliveries);
 
     return {
       totalDeliveries: stats.totalDeliveries,
@@ -200,7 +203,7 @@ export default function B2BGillerScreen({ navigation: _navigation }: Props) {
     };
   }, [currentTier, stats]);
 
-  const tierInfo = B2B_TIER_DETAILS[earnings.currentTier];
+  const tierInfo = ENTERPRISE_LEGACY_TIER_DETAILS[earnings.currentTier];
   const progressWidth = `${earnings.progressToNext ?? 100}%` as DimensionValue;
   const tierCardColor =
     tierInfo.benefits.priorityLevel >= 10 ? Colors.accent : tierInfo.benefits.priorityLevel >= 7 ? Colors.warning : Colors.textSecondary;
@@ -216,8 +219,8 @@ export default function B2BGillerScreen({ navigation: _navigation }: Props) {
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
       <View style={styles.header}>
-        <Text style={styles.title}>B2B 길러 홈</Text>
-        <Text style={styles.subtitle}>최근 배송, 월 수익, 등급 기준을 한 화면에서 확인합니다.</Text>
+        <Text style={styles.title}>기업 계약 길러 홈</Text>
+        <Text style={styles.subtitle}>기업 고객 계약 흐름에서의 최근 배송, 월 수익, 등급 기준을 한 화면에서 확인합니다.</Text>
       </View>
 
       <View style={[styles.tierCard, { backgroundColor: tierCardColor }]}>
@@ -247,7 +250,7 @@ export default function B2BGillerScreen({ navigation: _navigation }: Props) {
         </View>
         {earnings.nextTier ? (
           <Text style={styles.criteriaText}>
-            다음 기준: 평점 {B2B_TIER_CRITERIA[earnings.nextTier].rating.toFixed(1)}점 이상 · 월 배송 {B2B_TIER_CRITERIA[earnings.nextTier].monthlyDeliveries}건 · 가입 {B2B_TIER_CRITERIA[earnings.nextTier].tenure}개월 이상
+            다음 기준: 평점 {ENTERPRISE_LEGACY_TIER_CRITERIA[earnings.nextTier].rating.toFixed(1)}점 이상 · 월 배송 {ENTERPRISE_LEGACY_TIER_CRITERIA[earnings.nextTier].monthlyDeliveries}건 · 가입 {ENTERPRISE_LEGACY_TIER_CRITERIA[earnings.nextTier].tenure}개월 이상
           </Text>
         ) : null}
       </View>

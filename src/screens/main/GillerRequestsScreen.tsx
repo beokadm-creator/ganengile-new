@@ -75,7 +75,7 @@ export default function GillerRequestsScreen() {
 
     Alert.alert(
       '이 구간을 맡을까요?',
-      `${card.title}\n${card.legSummary ?? card.strategyBody}\n\n선택하지 않은 주소 구간은 B2B fallback으로 전환될 수 있습니다.`,
+      `${card.title}\n${card.legSummary ?? card.strategyBody}\n\n선택하지 않은 주소 구간은 external partner fallback으로 전환될 수 있습니다.`,
       [
         { text: '취소', style: 'cancel' },
         {

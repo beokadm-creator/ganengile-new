@@ -2,7 +2,7 @@
 /**
  * Tax Invoice Scheduler
  *
- * 매월 1일 00:00에 실행되어 B2B 계약 기업의 세금계산서를 자동 발행합니다.
+ * 매월 1일 00:00에 실행되어 레거시 기업 계약의 세금계산서를 자동 발행합니다.
  *
  * 실행 일정: "0 0 1 * *" (매월 1일 00:00, Asia/Seoul)
  */
@@ -74,7 +74,7 @@ async function getPlatformInfo(db: admin.firestore.Firestore): Promise<PlatformI
 /**
  * 매월 1일 세금계산서 발행 스케줄러
  *
- * 1. 활성 B2B 계약 조회 (status: 'active')
+ * 1. 활성 레거시 기업 계약 조회 (status: 'active')
  * 2. 전월 배송 집계 (prevMonth: year, month)
  * 3. 세금계산서 생성 (TaxInvoice)
  * 4. PDF 생성 및 이메일 발송
@@ -102,7 +102,7 @@ export const taxInvoiceScheduler = async (): Promise<{
   const errors: string[] = [];
 
   try {
-    // 1. 활성 B2B 계약 조회
+    // 1. 활성 레거시 기업 계약 조회
     const contractsSnapshot = await db
       .collection('businessContracts')
       .where('status', '==', 'active')
@@ -111,7 +111,7 @@ export const taxInvoiceScheduler = async (): Promise<{
     console.warn(`📊 Found ${contractsSnapshot.size} active contracts`);
 
     if (contractsSnapshot.empty) {
-      console.warn('⚠️ No active B2B contracts found');
+      console.warn('⚠️ No active enterprise legacy contracts found');
       return { processed: 0, invoicesGenerated: 0, errors: [] };
     }
 
@@ -136,7 +136,7 @@ export const taxInvoiceScheduler = async (): Promise<{
           .where('completedAt', '<=', endOfMonth)
           .get();
 
-        const deliveries = deliveriesSnapshot.docs.map((doc) => doc.data() as B2BDelivery);
+        const deliveries = deliveriesSnapshot.docs.map((doc) => doc.data() as Record<string, any>);
 
         if (deliveries.length === 0) {
           console.warn(`⏭️ No deliveries for contract ${contractId} in ${year}-${month}`);

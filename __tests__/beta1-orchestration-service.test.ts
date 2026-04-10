@@ -42,8 +42,8 @@ jest.mock('../src/services/matching-notification', () => ({
   sendMissionBundleAvailableNotification: jest.fn(),
 }));
 
-jest.mock('../src/services/b2b-delivery-service', () => ({
-  B2BDeliveryService: {
+jest.mock('../src/services/enterprise-legacy-delivery-service', () => ({
+  EnterpriseLegacyDeliveryService: {
     createDelivery: jest.fn(),
   },
 }));

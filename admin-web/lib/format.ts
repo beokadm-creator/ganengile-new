@@ -42,6 +42,13 @@ export function formatDate(
 export function statusLabel(status: string): string {
   const map: Record<string, string> = {
     pending: '대기 중',
+    active: '활성',
+    suspended: '일시 중지',
+    cancelled: '취소',
+    matched: '매칭 완료',
+    picked_up: '픽업 완료',
+    in_transit: '이동 중',
+    delivered: '배송 완료',
     completed: '완료',
     rejected: '반려',
     processing: '처리 중',
@@ -69,6 +76,13 @@ export function statusLabel(status: string): string {
 export function statusColor(status: string): string {
   const map: Record<string, string> = {
     pending: 'bg-amber-100 text-amber-800',
+    active: 'bg-emerald-100 text-emerald-800',
+    suspended: 'bg-amber-100 text-amber-800',
+    cancelled: 'bg-slate-100 text-slate-800',
+    matched: 'bg-sky-100 text-sky-800',
+    picked_up: 'bg-cyan-100 text-cyan-800',
+    in_transit: 'bg-indigo-100 text-indigo-800',
+    delivered: 'bg-emerald-100 text-emerald-800',
     completed: 'bg-emerald-100 text-emerald-800',
     rejected: 'bg-rose-100 text-rose-800',
     processing: 'bg-sky-100 text-sky-800',

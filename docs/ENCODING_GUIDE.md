@@ -39,6 +39,4 @@
 
 - [src/services/realtime-delivery-tracking.ts](/C:/Users/whhol/Documents/trae_projects/ganengile/src/services/realtime-delivery-tracking.ts)
 - [src/services/transfer-service.ts](/C:/Users/whhol/Documents/trae_projects/ganengile/src/services/transfer-service.ts)
-- [src/services/RealtimeSubwayService.ts](/C:/Users/whhol/Documents/trae_projects/ganengile/src/services/RealtimeSubwayService.ts)
-
-위 파일들은 깨진 한글 주석/문자열 흔적이 있어, 기능 수정 시 인코딩을 가장 먼저 확인해야 합니다.
+위 파일들은 깨진 한글 주석/문자열 흔적이 있어, 기능 수정 시 인코딩을 가장 먼저 확인해야 합니다. `RealtimeSubwayService.ts`는 제거되었습니다.

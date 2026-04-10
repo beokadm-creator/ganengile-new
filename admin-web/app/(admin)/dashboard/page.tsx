@@ -19,6 +19,15 @@ interface DashboardPayload {
     manualReviewCount: number;
     reservationDraftCount: number;
     immediateDraftCount: number;
+    deliveryPartnersCount: number;
+    activeDeliveryPartnersCount: number;
+    partnerDispatchQueuedCount: number;
+    partnerDispatchActiveCount: number;
+    enterpriseLegacyContractsCount: number;
+    enterpriseLegacyPendingContractsCount: number;
+    enterpriseLegacyDeliveriesCount: number;
+    enterpriseLegacyActiveDeliveriesCount: number;
+    delayedRequestCount: number;
     criticalQueue: number;
   };
   integrations: {
@@ -31,6 +40,8 @@ interface DashboardPayload {
     };
   };
   onboarding: {
+    onboardingIncomplete: number;
+    requesterPhonePending: number;
     identityPending: number;
     identityDoneBankPending: number;
     awaitingUpgradeReview: number;
@@ -209,6 +220,13 @@ export default function DashboardPage(): ReactElement {
 
     return [
       {
+        title: '매칭 지연 요청',
+        count: dashboard.metrics.delayedRequestCount,
+        description: '15분 이상 pending 또는 matched 상태에 머문 요청입니다.',
+        href: '/delayed-requests',
+        tone: dashboard.metrics.delayedRequestCount > 0 ? 'critical' : 'neutral',
+      },
+      {
         title: '분쟁 대기',
         count: dashboard.metrics.pendingDisputes,
         description: '배송 취소 이후 조정, 환불, 책임 판단이 필요한 운영 개입 건입니다.',
@@ -228,6 +246,20 @@ export default function DashboardPage(): ReactElement {
         description: 'AI 단독 확정이 어려운 actor 선택, 환불, 보증금, 정산 개입 건입니다.',
         href: '/beta1/ai-review',
         tone: dashboard.metrics.manualReviewCount > 0 ? 'critical' : 'neutral',
+      },
+      {
+        title: '업체 위임 대기',
+        count: dashboard.metrics.partnerDispatchQueuedCount,
+        description: '외부 배송업체로 넘겼지만 아직 수락 또는 진행으로 넘어가지 않은 위임 건입니다.',
+        href: '/partner-dispatches',
+        tone: dashboard.metrics.partnerDispatchQueuedCount > 0 ? 'warning' : 'neutral',
+      },
+      {
+        title: '레거시 계약 대기',
+        count: dashboard.metrics.enterpriseLegacyPendingContractsCount,
+        description: '이전 기업고객 계약 흐름에서 아직 승인 또는 정리되지 않은 계약 대기 건입니다.',
+        href: '/enterprise-legacy',
+        tone: dashboard.metrics.enterpriseLegacyPendingContractsCount > 0 ? 'warning' : 'neutral',
       },
       {
         title: '길러 승급 병목',
@@ -255,7 +287,7 @@ export default function DashboardPage(): ReactElement {
 
   const aiMeta =
     dashboard?.integrations.ai != null
-      ? `${dashboard.integrations.ai.provider} / ${dashboard.integrations.ai.model} / thinking ${
+        ? `${dashboard.integrations.ai.provider} / ${dashboard.integrations.ai.model} / thinking ${
           dashboard.integrations.ai.disableThinking ? 'off' : 'on'
         }`
       : undefined;
@@ -283,8 +315,23 @@ export default function DashboardPage(): ReactElement {
         <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
           <MetricCard title="오늘 요청" value={dashboard?.metrics.todayRequests ?? 0} hint="오늘 들어온 전체 요청 건수" tone="neutral" />
           <MetricCard title="활성 배송" value={dashboard?.metrics.activeDeliveries ?? 0} hint="현재 진행 중인 배송 건수" tone="positive" />
+          <MetricCard title="매칭 지연" value={dashboard?.metrics.delayedRequestCount ?? 0} hint="15분 이상 응답이 지연된 요청" tone="warning" />
+          <MetricCard title="업체 위임 대기" value={dashboard?.metrics.partnerDispatchQueuedCount ?? 0} hint="외부 배송업체 응답 대기 건수" tone="warning" />
+        </section>
+
+        <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
           <MetricCard title="운영 우선 순위" value={serviceRisk} hint="먼저 확인할 항목" tone="warning" />
           <MetricCard title="전체 사용자" value={dashboard?.metrics.totalUsers ?? 0} hint="현재 서비스 전체 가입자 수" tone="neutral" />
+          <MetricCard title="등록 업체" value={dashboard?.metrics.deliveryPartnersCount ?? 0} hint="external partner로 등록된 업체 수" tone="neutral" />
+          <MetricCard title="활성 업체" value={dashboard?.metrics.activeDeliveryPartnersCount ?? 0} hint="오케스트레이션 참여 가능 상태의 업체 수" tone="positive" />
+          <MetricCard title="진행 중 위임" value={dashboard?.metrics.partnerDispatchActiveCount ?? 0} hint="업체가 수락했거나 진행 중인 위임 건수" tone="positive" />
+        </section>
+
+        <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+          <MetricCard title="레거시 계약" value={dashboard?.metrics.enterpriseLegacyContractsCount ?? 0} hint="기업고객 레거시 계약 전체 건수" tone="neutral" />
+          <MetricCard title="레거시 계약 대기" value={dashboard?.metrics.enterpriseLegacyPendingContractsCount ?? 0} hint="운영 승인이 남은 기업고객 레거시 계약" tone="warning" />
+          <MetricCard title="레거시 배송" value={dashboard?.metrics.enterpriseLegacyDeliveriesCount ?? 0} hint="기업고객 레거시 배송 요청 전체 건수" tone="neutral" />
+          <MetricCard title="레거시 배송 진행" value={dashboard?.metrics.enterpriseLegacyActiveDeliveriesCount ?? 0} hint="기업고객 레거시 배송 진행 건수" tone="positive" />
         </section>
 
         <section className="grid gap-4 xl:grid-cols-3">
@@ -331,6 +378,8 @@ export default function DashboardPage(): ReactElement {
             <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-400">upgrade funnel</p>
             <h2 className="mt-2 text-xl font-bold text-slate-900">승급 병목</h2>
             <div className="mt-5 grid gap-4 md:grid-cols-2">
+              <MetricTile title="온보딩 미완료" value={`${dashboard?.onboarding.onboardingIncomplete ?? 0}`} caption="기본 정보와 필수 약관 동의가 끝나지 않아 요청 화면으로 못 가는 사용자 수" />
+              <MetricTile title="휴대폰 인증 대기" value={`${dashboard?.onboarding.requesterPhonePending ?? 0}`} caption="온보딩은 끝났지만 요청 전 휴대폰 인증이 남아 있는 사용자 수" />
               <MetricTile title="본인 확인 대기" value={`${dashboard?.onboarding.identityPending ?? 0}`} caption="CI/PASS 또는 테스트 우회 처리가 아직 끝나지 않은 사용자 수" />
               <MetricTile title="계좌 인증 대기" value={`${dashboard?.onboarding.identityDoneBankPending ?? 0}`} caption="본인 확인은 끝났지만 정산 계좌 준비가 남아 있는 사용자 수" />
               <MetricTile title="심사 준비 완료" value={`${dashboard?.onboarding.readyForUpgradeReview ?? 0}`} caption="운영 심사만 진행하면 되는 길러 후보 수" />
@@ -378,7 +427,10 @@ export default function DashboardPage(): ReactElement {
               <TaskCard title="AI 관제" body="분석, 견적, 결정, 미션" href="/beta1/ai-review" />
               <TaskCard title="분쟁 처리" body="책임 주체, 보상 금액, 보증금 환불·차감 판단을 바로 진행합니다." href="/disputes" />
               <TaskCard title="보증금 운영" body="요청자 보호 환불과 길러 책임 차감을 운영 체크리스트로 마감합니다." href="/deposits" />
-              <TaskCard title="정산 운영" body="개인 3.3% 정산과 B2B 월 청구를 다른 규칙으로 관리합니다." href="/settlements" />
+              <TaskCard title="정산 운영" body="개인 3.3% 정산과 레거시 기업고객 월 청구를 다른 규칙으로 관리합니다." href="/settlements" />
+              <TaskCard title="배송업체 관리" body="external partner 등록, API 키, 오케스트레이션 우선순위를 관리합니다." href="/delivery-partners" />
+              <TaskCard title="업체 위임 현황" body="partner_dispatches 상태 전이와 수동 운영 메모를 관리합니다." href="/partner-dispatches" />
+              <TaskCard title="기업고객 레거시" body="이전 기업고객 계약과 b2b_deliveries 데이터를 외부 배송업체 운영과 분리해 확인합니다." href="/enterprise-legacy" />
             </div>
           </div>
         </section>

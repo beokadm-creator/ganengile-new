@@ -357,8 +357,8 @@ export function getVerificationStatusDisplay(
         icon: '✅',
         color: '#4CAF50',
         description: verification.verificationMethod === 'ci'
-          ? 'PASS/Kakao 본인인증이 완료되었습니다. 다음 단계에서 길러 신청(관리자 심사)을 진행하세요.'
-          : '신원 인증이 완료되었습니다. 다음 단계에서 길러 신청(관리자 심사)을 진행하세요.',
+          ? 'PASS/Kakao 본인인증이 완료되었습니다. 다음 단계에서 길러 전환 신청과 관리자 심사를 진행하세요.'
+          : '신원 인증이 완료되었습니다. 다음 단계에서 길러 전환 신청과 관리자 심사를 진행하세요.',
       };
     case 'rejected':
       return {

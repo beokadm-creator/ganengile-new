@@ -57,7 +57,7 @@ export default function GillerLevelUpgradeScreen({ navigation }: { navigation: M
       setPaymentStatusMessage(paymentConfig.statusMessage);
     } catch (error) {
       console.error('Failed to load giller upgrade context', error);
-      Alert.alert('승급 정보를 불러오지 못했습니다', '잠시 후 다시 시도해 주세요.');
+      Alert.alert('길러 등급 정보를 불러오지 못했습니다', '잠시 후 다시 시도해 주세요.');
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -70,13 +70,13 @@ export default function GillerLevelUpgradeScreen({ navigation }: { navigation: M
 
   async function handlePromote() {
     if (!eligibility?.isEligible) {
-      Alert.alert('아직 승급 조건이 부족합니다', '필수 조건을 먼저 확인해 주세요.');
+      Alert.alert('아직 등급 전환 조건이 부족합니다', '필수 조건을 먼저 확인해 주세요.');
       return;
     }
 
     if (!identityReady) {
-      Alert.alert('본인 확인이 먼저 필요합니다', '길러 승급 전에는 본인 확인을 완료해야 합니다.', [
-        { text: '본인 확인하기', onPress: () => navigation.navigate('IdentityVerification') },
+      Alert.alert('본인 확인이 먼저 필요합니다', '길러 등급 전환 전에는 본인 확인을 완료해야 합니다.', [
+        { text: '길러 전환용 본인 확인', onPress: () => navigation.navigate('IdentityVerification') },
         { text: '닫기', style: 'cancel' },
       ]);
       return;
@@ -88,10 +88,10 @@ export default function GillerLevelUpgradeScreen({ navigation }: { navigation: M
       await service.promoteToProfessional();
       await refreshUser();
       await loadUpgradeContext();
-      Alert.alert('승급 반영 완료', '길러 승급이 반영되었습니다.');
+      Alert.alert('등급 전환 반영 완료', '길러 등급 변경이 반영되었습니다.');
     } catch (error) {
       console.error('Failed to promote giller', error);
-      Alert.alert('승급 처리 실패', '잠시 후 다시 시도해 주세요.');
+      Alert.alert('등급 전환 처리 실패', '잠시 후 다시 시도해 주세요.');
     } finally {
       setSubmitting(false);
     }
@@ -101,7 +101,7 @@ export default function GillerLevelUpgradeScreen({ navigation }: { navigation: M
     return (
       <View style={styles.centerState}>
         <ActivityIndicator size="large" color={Colors.primary} />
-        <Text style={styles.centerText}>승급 정보를 준비하는 중입니다.</Text>
+        <Text style={styles.centerText}>길러 등급 정보를 준비하는 중입니다.</Text>
       </View>
     );
   }
@@ -115,23 +115,23 @@ export default function GillerLevelUpgradeScreen({ navigation }: { navigation: M
     >
       <View style={styles.hero}>
         <Text style={styles.kicker}>가는길에 길러</Text>
-        <Text style={styles.title}>승급 준비 상태를 확인하세요.</Text>
-        <Text style={styles.subtitle}>실적뿐 아니라 본인 확인, 계좌 준비, 보증금 결제 준비까지 함께 봅니다.</Text>
+        <Text style={styles.title}>길러 등급 전환 준비 상태를 확인하세요.</Text>
+        <Text style={styles.subtitle}>실적뿐 아니라 본인 확인, 계좌 준비, 보증금 결제 준비까지 함께 확인합니다.</Text>
       </View>
 
       <View style={styles.card}>
         <Text style={styles.sectionTitle}>현재 상태</Text>
         <MetricRow label="현재 등급" value={profile?.gillerType ?? 'regular'} helper="현재 길러 등급입니다." />
-        <MetricRow label="승급 점수" value={`${Math.round(eligibility?.score ?? 0)}점`} helper="80점 이상이면 승급을 검토합니다." />
-        <MetricRow label="본인 확인" value={identityReady ? '완료' : '필요'} helper={identityReady ? '본인 확인이 반영됐습니다.' : '승급 전에는 본인 확인이 필요합니다.'} />
+        <MetricRow label="등급 전환 점수" value={`${Math.round(eligibility?.score ?? 0)}점`} helper="80점 이상이면 상위 등급 전환을 검토합니다." />
+        <MetricRow label="본인 확인" value={identityReady ? '완료' : '필요'} helper={identityReady ? '본인 확인이 반영됐습니다.' : '등급 전환 전에는 본인 확인이 필요합니다.'} />
         <MetricRow label="계좌 준비" value={bankStatusMessage} helper="정산 계좌 준비 상태입니다." />
         <MetricRow label="보증금 결제 준비" value={paymentStatusMessage} helper="PG 준비가 끝나면 같은 흐름에서 실결제로 이어집니다." />
       </View>
 
       <View style={styles.actionGroup}>
-        <ActionButton label="본인 확인" onPress={() => navigation.navigate('IdentityVerification')} />
+        <ActionButton label="길러 전환용 본인 확인" onPress={() => navigation.navigate('IdentityVerification')} />
         <ActionButton label="지갑/출금 보기" onPress={() => navigation.navigate('PointWithdraw')} />
-        <ActionButton label={submitting ? '승급 처리 중...' : '승급 요청 반영'} onPress={() => void handlePromote()} primary disabled={submitting} />
+        <ActionButton label={submitting ? '등급 전환 처리 중...' : '등급 전환 요청 반영'} onPress={() => void handlePromote()} primary disabled={submitting} />
       </View>
     </ScrollView>
   );

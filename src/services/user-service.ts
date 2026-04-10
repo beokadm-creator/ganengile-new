@@ -57,6 +57,16 @@ interface UserDoc extends DocumentData {
   badgeBenefits?: User['badgeBenefits'];
 }
 
+type AgreedTermsShape =
+  | User['agreedTerms']
+  | {
+      service?: boolean;
+      privacy?: boolean;
+      marketing?: boolean;
+      giller?: boolean;
+      gller?: boolean;
+    };
+
 interface DeliveryDoc extends DocumentData {
   fee?: {
     gillerFee?: number;
@@ -139,6 +149,8 @@ function toDate(value: unknown): Date | null {
 }
 
 function mapUser(docId: string, data: UserDoc): User {
+  const agreedTermsSource = (data.agreedTerms ?? {}) as AgreedTermsShape;
+
   return {
     uid: docId,
     email: data.email ?? '',
@@ -151,7 +163,12 @@ function mapUser(docId: string, data: UserDoc): User {
     signupMethod: data.signupMethod ?? 'unknown',
     providerLinkedAt: data.providerLinkedAt as User['providerLinkedAt'],
     role: data.role ?? UserRole.GLER,
-    agreedTerms: data.agreedTerms ?? DEFAULT_AGREED_TERMS,
+    agreedTerms: {
+      giller: agreedTermsSource.giller ?? false,
+      gller: agreedTermsSource.gller ?? agreedTermsSource.service ?? false,
+      privacy: agreedTermsSource.privacy ?? false,
+      marketing: agreedTermsSource.marketing ?? false,
+    },
     createdAt: (data.createdAt ?? null) as User['createdAt'],
     updatedAt: (data.updatedAt ?? null) as User['updatedAt'],
     isActive: data.isActive ?? true,
@@ -434,15 +451,24 @@ export async function createUser(
       providerLinkedAt: serverTimestamp() as User['providerLinkedAt'],
       role,
       agreedTerms: {
-        giller: true,
-        gller: true,
-        privacy: true,
+        giller: false,
+        gller: false,
+        privacy: false,
         marketing: false,
+      },
+      hasCompletedOnboarding: false,
+      phoneVerification: {
+        verified: false,
+      },
+      emailVerification: {
+        verified: false,
+        email,
       },
       rating: 5,
       totalRatings: 0,
       isActive: true,
       isVerified: false,
+      gillerApplicationStatus: 'none',
       gillerInfo: {
         totalDeliveries: 0,
         totalEarnings: 0,

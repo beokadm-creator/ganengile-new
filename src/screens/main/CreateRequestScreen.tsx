@@ -393,6 +393,7 @@ export default function CreateRequestScreen({ navigation, route }: Props) {
   const normalizedVerifiedPhone = normalizePhoneNumber(
     verifiedPhoneOverride ?? user?.phoneVerification?.phoneNumber ?? ''
   );
+  const isOnboardingComplete = user?.hasCompletedOnboarding === true;
   const isPhoneVerified =
     (verifiedPhoneOverride != null || user?.phoneVerification?.verified === true) &&
     normalizedVerifiedPhone.length > 0 &&
@@ -475,9 +476,11 @@ export default function CreateRequestScreen({ navigation, route }: Props) {
   ]);
 
   const submitDisabled =
+    !user?.uid ||
+    !isOnboardingComplete ||
     !pickupStation ||
     !deliveryStation ||
-    !photoUrl ||
+    photoRefs.length === 0 ||
     !packageDescription.trim() ||
     !recipientName.trim() ||
     !recipientPhone.trim() ||
@@ -755,6 +758,16 @@ export default function CreateRequestScreen({ navigation, route }: Props) {
   }
 
   async function handleSubmit() {
+    if (!user?.uid) {
+      Alert.alert('로그인이 필요합니다', '다시 로그인한 뒤 배송 요청을 진행해 주세요.');
+      return;
+    }
+
+    if (!isOnboardingComplete) {
+      Alert.alert('이용 시작 준비가 필요합니다', '첫 배송 요청 전에 이용자 정보와 약관 동의를 완료해 주세요.');
+      return;
+    }
+
     if (submitDisabled || !pickupStation || !deliveryStation) {
       Alert.alert('입력 확인', '사진, 출발·도착 정보, 물품 정보, 수령인 정보와 휴대폰 인증 상태를 모두 확인해 주세요.');
       return;
@@ -820,11 +833,11 @@ export default function CreateRequestScreen({ navigation, route }: Props) {
         requestId: result.requestId,
         pickupStationName:
           pickupMode === 'address'
-            ? `${formatDetailedAddress(pickupRoadAddress, pickupDetailAddress)} 쨌 ${pickupStation.stationName}`
+            ? `${formatDetailedAddress(pickupRoadAddress, pickupDetailAddress)} · ${pickupStation.stationName}`
             : pickupStation.stationName,
         deliveryStationName:
           deliveryMode === 'address'
-            ? `${formatDetailedAddress(deliveryRoadAddress, deliveryDetailAddress)} 쨌 ${deliveryStation.stationName}`
+            ? `${formatDetailedAddress(deliveryRoadAddress, deliveryDetailAddress)} · ${deliveryStation.stationName}`
             : deliveryStation.stationName,
         deliveryFee: selected
           ? {
@@ -835,7 +848,10 @@ export default function CreateRequestScreen({ navigation, route }: Props) {
       });
     } catch (error) {
       console.error(error);
-      Alert.alert('요청 생성 실패', '요청을 만드는 중 문제가 발생했습니다. 잠시 후 다시 시도해 주세요.');
+      Alert.alert(
+        '요청 생성 실패',
+        error instanceof Error ? error.message : '요청을 만드는 중 문제가 발생했습니다. 잠시 후 다시 시도해 주세요.'
+      );
     } finally {
       setSaving(false);
     }

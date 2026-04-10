@@ -1,7 +1,8 @@
 /**
- * B2B 계약 서비스
- * 
- * B2B 고객사의 계약 관리 (신청, 승인, 해지)
+ * @deprecated Use enterprise-legacy-contract-service instead.
+ *
+ * This file remains as a compatibility layer while the old enterprise customer
+ * subscription flow is renamed away from the overloaded "B2B" label.
  */
 import { collection, doc, getDoc, updateDoc, query, where, getDocs, addDoc, serverTimestamp } from 'firebase/firestore';
 import { db } from '../config/firebase';
@@ -17,7 +18,7 @@ import { SUBSCRIPTION_TIERS } from '../types/business-contract';
 const COLLECTION = 'business_contracts';
 
 /**
- * B2B 계약 서비스
+ * Legacy enterprise customer contract service.
  */
 export class BusinessContractService {
   static async getSubscriptionTiers(): Promise<Array<{
@@ -216,7 +217,7 @@ export class BusinessContractService {
   }
 
   /**
-   * B2B 고객사 계약 목록 조회
+   * Legacy enterprise customer contract list.
    */
   static async getBusinessContracts(businessId: string): Promise<BusinessContract[]> {
     const q = query(

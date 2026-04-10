@@ -1,29 +1,28 @@
 /**
- * B2B Navigator
- * Stack navigator for B2B (business) screens
- * 기업 고객 전용 네비게이터
+ * Enterprise Legacy Navigator
+ * Legacy enterprise customer stack preserved for compatibility.
+ * New B2B semantics belong to external delivery partners, not enterprise customers.
  */
 
 import React from 'react';
 import { createStackNavigator } from '@react-navigation/stack';
 import { View, StyleSheet } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
-import type { B2BStackParamList } from '../types/navigation';
+import type { EnterpriseLegacyStackParamList } from '../types/navigation';
 
-// B2B screens
-import B2BDashboardScreen from '../screens/b2b/B2BDashboardScreen';
-import B2BRequestScreen from '../screens/b2b/B2BRequestScreen';
-import B2BGillerScreen from '../screens/b2b/B2BGillerScreen';
-import B2BMatchingResultScreen from '../screens/b2b/B2BMatchingResultScreen';
-import B2BOnboardingScreen from '../screens/b2b/B2BOnboardingScreen';
-import BusinessProfileScreen from '../screens/b2b/BusinessProfileScreen';
-import MonthlySettlementScreen from '../screens/b2b/MonthlySettlementScreen';
-import SubscriptionTierSelectionScreen from '../screens/b2b/SubscriptionTierSelectionScreen';
-import TaxInvoiceRequestScreen from '../screens/b2b/TaxInvoiceRequestScreen';
+import EnterpriseLegacyDashboardScreen from '../screens/enterprise-legacy/EnterpriseLegacyDashboardScreen';
+import EnterpriseLegacyRequestScreen from '../screens/enterprise-legacy/EnterpriseLegacyRequestScreen';
+import EnterpriseLegacyGillerScreen from '../screens/enterprise-legacy/EnterpriseLegacyGillerScreen';
+import EnterpriseLegacyMatchingResultScreen from '../screens/enterprise-legacy/EnterpriseLegacyMatchingResultScreen';
+import EnterpriseLegacyOnboardingScreen from '../screens/enterprise-legacy/EnterpriseLegacyOnboardingScreen';
+import BusinessProfileScreen from '../screens/enterprise-legacy/BusinessProfileScreen';
+import MonthlySettlementScreen from '../screens/enterprise-legacy/MonthlySettlementScreen';
+import SubscriptionTierSelectionScreen from '../screens/enterprise-legacy/SubscriptionTierSelectionScreen';
+import TaxInvoiceRequestScreen from '../screens/enterprise-legacy/TaxInvoiceRequestScreen';
 
-const Stack = createStackNavigator<B2BStackParamList>();
+const Stack = createStackNavigator<EnterpriseLegacyStackParamList>();
 
-export default function B2BNavigator() {
+export default function EnterpriseLegacyNavigator() {
   return (
     <Stack.Navigator
       screenOptions={{
@@ -54,34 +53,34 @@ export default function B2BNavigator() {
       }}
     >
       <Stack.Screen
-        name="B2BDashboard"
-        component={B2BDashboardScreen}
+        name="EnterpriseLegacyDashboard"
+        component={EnterpriseLegacyDashboardScreen}
         options={{ headerShown: false }}
       />
       <Stack.Screen
-        name="B2BRequest"
-        component={B2BRequestScreen}
-        options={{ headerShown: true, title: '배송 요청' }}
+        name="EnterpriseLegacyRequest"
+        component={EnterpriseLegacyRequestScreen}
+        options={{ headerShown: true, title: '기업 고객 배송 요청' }}
       />
       <Stack.Screen
-        name="B2BGiller"
-        component={B2BGillerScreen}
-        options={{ headerShown: true, title: '길러 관리' }}
+        name="EnterpriseLegacyGiller"
+        component={EnterpriseLegacyGillerScreen}
+        options={{ headerShown: true, title: '기업 계약 길러 운영' }}
       />
       <Stack.Screen
-        name="B2BMatchingResult"
-        component={B2BMatchingResultScreen}
+        name="EnterpriseLegacyMatchingResult"
+        component={EnterpriseLegacyMatchingResultScreen}
         options={{ headerShown: true, title: '매칭 결과' }}
       />
       <Stack.Screen
-        name="B2BOnboarding"
-        component={B2BOnboardingScreen}
-        options={{ headerShown: true, title: 'B2B 가입' }}
+        name="EnterpriseLegacyOnboarding"
+        component={EnterpriseLegacyOnboardingScreen}
+        options={{ headerShown: true, title: '기업 고객 계약 등록' }}
       />
       <Stack.Screen
         name="BusinessProfile"
         component={BusinessProfileScreen}
-        options={{ headerShown: true, title: '기업 프로필' }}
+        options={{ headerShown: true, title: '기업 고객 프로필' }}
       />
       <Stack.Screen
         name="MonthlySettlement"

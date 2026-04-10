@@ -77,6 +77,7 @@ export interface Request {
   requestDraftId?: string;
   pricingQuoteId?: string;
   primaryDeliveryId?: string;
+  beta1RequestStatus?: string;
   requestMode?: 'immediate' | 'reservation';
   sourceRequestId?: string | null;
 

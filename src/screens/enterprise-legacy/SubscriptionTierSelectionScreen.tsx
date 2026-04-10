@@ -10,9 +10,9 @@ import {
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
-import { businessContractService } from '../../services/business-contract-service';
+import { enterpriseLegacyContractService } from '../../services/enterprise-legacy-contract-service';
 import { requireUserId } from '../../services/firebase';
-import type { B2BStackNavigationProp } from '../../types/navigation';
+import type { EnterpriseLegacyStackNavigationProp } from '../../types/navigation';
 import type { SubscriptionTier as SubscriptionTierId } from '../../types/business-contract';
 import { BorderRadius, Colors, Shadows, Spacing, Typography } from '../../theme';
 
@@ -35,7 +35,7 @@ function getErrorMessage(error: unknown): string {
 }
 
 export default function SubscriptionTierSelectionScreen() {
-  const navigation = useNavigation<B2BStackNavigationProp>();
+  const navigation = useNavigation<EnterpriseLegacyStackNavigationProp>();
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [selectedTier, setSelectedTier] = useState<SubscriptionTierId | null>(null);
@@ -47,7 +47,7 @@ export default function SubscriptionTierSelectionScreen() {
 
   async function loadTiers(): Promise<void> {
     try {
-      const availableTiers = await businessContractService.getSubscriptionTiers();
+      const availableTiers = await enterpriseLegacyContractService.getSubscriptionTiers();
       setTiers(availableTiers as SubscriptionTierOption[]);
     } catch (error) {
       console.error('Failed to load subscription tiers', error);
@@ -66,14 +66,14 @@ export default function SubscriptionTierSelectionScreen() {
     setSubmitting(true);
     try {
       const userId = requireUserId();
-      await businessContractService.subscribeToTier(userId, selectedTier);
+      await enterpriseLegacyContractService.subscribeToTier(userId, selectedTier);
       Alert.alert('구독 시작', '구독 플랜이 적용되었습니다. 대시보드로 이동합니다.', [
         {
           text: '확인',
           onPress: () => {
             navigation.reset({
               index: 0,
-              routes: [{ name: 'B2BDashboard' }],
+              routes: [{ name: 'EnterpriseLegacyDashboard' }],
             });
           },
         },

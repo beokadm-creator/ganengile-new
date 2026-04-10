@@ -252,7 +252,7 @@ export default function GillerApplyScreen({ navigation }: { navigation: MainStac
       );
 
       await refreshUser();
-      Alert.alert('신청 완료', '길러 신청이 접수되었습니다.', [
+      Alert.alert('신청 완료', '길러 전환 신청이 접수되었습니다.', [
         { text: '확인', onPress: () => navigation.navigate('Tabs', { screen: 'Profile' }) },
       ]);
     } catch (error) {
@@ -275,8 +275,8 @@ export default function GillerApplyScreen({ navigation }: { navigation: MainStac
       case 1:
         return (
           <ScrollView style={styles.stepContent} showsVerticalScrollIndicator={false}>
-            <Text style={styles.stepTitle}>길러 신청</Text>
-            <Text style={styles.stepDescription}>기본 정보와 계좌를 등록하면 심사로 넘어갑니다.</Text>
+            <Text style={styles.stepTitle}>길러 전환 신청</Text>
+            <Text style={styles.stepDescription}>요청자 이용과 별개로, 길러 역할 활성화에 필요한 정보와 심사 단계를 진행합니다.</Text>
 
             <View style={styles.card}>
               <Text style={styles.cardTitle}>진행 순서</Text>
@@ -292,7 +292,7 @@ export default function GillerApplyScreen({ navigation }: { navigation: MainStac
 
             <View style={[styles.card, styles.alertCard]}>
               <Text style={styles.alertText}>본인확인: {identityTestMode ? '테스트 가능' : '실서비스 대기'}</Text>
-              <Text style={styles.alertText}>계좌확인: {bankTestMode ? '테스트 또는 수동 검토' : '실서비스 대기'}</Text>
+              <Text style={styles.alertText}>정산 계좌 확인: {bankTestMode ? '테스트 또는 수동 검토' : '실서비스 대기'}</Text>
             </View>
           </ScrollView>
         );
@@ -300,7 +300,7 @@ export default function GillerApplyScreen({ navigation }: { navigation: MainStac
         return (
           <ScrollView style={styles.stepContent} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
             <Text style={styles.stepTitle}>기본 정보</Text>
-            <Text style={styles.stepDescription}>연락처와 활동 정보를 입력해 주세요.</Text>
+            <Text style={styles.stepDescription}>길러 역할 심사에 필요한 연락처와 활동 정보를 입력해 주세요.</Text>
 
             <InputField
               label="연락처"
@@ -328,7 +328,7 @@ export default function GillerApplyScreen({ navigation }: { navigation: MainStac
         return (
           <ScrollView style={styles.stepContent} showsVerticalScrollIndicator={false}>
             <Text style={styles.stepTitle}>본인확인</Text>
-            <Text style={styles.stepDescription}>현재 상태를 확인합니다.</Text>
+            <Text style={styles.stepDescription}>길러 전환을 위한 본인확인 상태를 확인합니다.</Text>
 
             <View style={styles.card}>
               <Text style={styles.cardTitle}>현재 상태</Text>
@@ -351,9 +351,9 @@ export default function GillerApplyScreen({ navigation }: { navigation: MainStac
                   disabled={verificationLoading}
                   activeOpacity={0.9}
                 >
-                  <Text style={styles.primaryActionText}>본인확인 하러 가기</Text>
+                  <Text style={styles.primaryActionText}>길러 전환용 본인확인 하러 가기</Text>
                 </TouchableOpacity>
-                <Text style={styles.helperText}>완료 후 돌아오면 계속 진행됩니다.</Text>
+                <Text style={styles.helperText}>완료 후 돌아오면 길러 신청 절차를 계속 진행할 수 있습니다.</Text>
               </>
             )}
           </ScrollView>
@@ -401,7 +401,7 @@ export default function GillerApplyScreen({ navigation }: { navigation: MainStac
 
   return (
     <KeyboardAvoidingView style={styles.container} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
-      <AppTopBar title="길러 신청" onBack={handleBack} />
+      <AppTopBar title="길러 전환 신청" onBack={handleBack} />
 
       <View style={styles.progressTrack}>
         <View style={[styles.progressFill, { width: `${(step / TOTAL_STEPS) * 100}%` }]} />
@@ -422,7 +422,7 @@ export default function GillerApplyScreen({ navigation }: { navigation: MainStac
           {loading ? (
             <ActivityIndicator color={Colors.white} />
           ) : (
-            <Text style={styles.footerButtonText}>{step === TOTAL_STEPS ? '신청하기' : '다음'}</Text>
+            <Text style={styles.footerButtonText}>{step === TOTAL_STEPS ? '길러 전환 신청하기' : '다음'}</Text>
           )}
         </TouchableOpacity>
         {submitHint ? <Text style={styles.submitHint}>{submitHint}</Text> : null}

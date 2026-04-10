@@ -6,7 +6,7 @@ import { doc, serverTimestamp, updateDoc } from 'firebase/firestore';
 import { useAuth } from './AuthContext';
 import { auth, db } from '../services/firebase';
 import { createUser, getUserById } from '../services/user-service';
-import { UserRole, type User } from '../types/user';
+import { AuthProviderType, UserRole, type User } from '../types/user';
 
 interface UserContextType {
   user: User | null;
@@ -64,6 +64,22 @@ function resolveActiveRole(user: User | null): UserRole | null {
   return user.role ?? null;
 }
 
+function resolveAuthProviderFromFirebaseUser(firebaseUser: NonNullable<ReturnType<typeof useAuth>['user']>): AuthProviderType {
+  const providerIds = firebaseUser.providerData
+    .map((provider) => provider.providerId)
+    .filter((providerId): providerId is string => typeof providerId === 'string' && providerId.length > 0);
+
+  if (providerIds.includes('google.com')) {
+    return AuthProviderType.GOOGLE;
+  }
+
+  if (providerIds.includes('password')) {
+    return AuthProviderType.EMAIL;
+  }
+
+  return AuthProviderType.UNKNOWN;
+}
+
 async function clearStoredSession(): Promise<void> {
   if (typeof window !== 'undefined') {
     STORAGE_KEYS_TO_CLEAR.forEach((key) => {
@@ -104,11 +120,13 @@ export function UserProvider({ children }: UserProviderProps) {
 
         if (!userData) {
           console.warn('User profile missing, creating bootstrap document:', firebaseUser.uid);
+          const authProvider = resolveAuthProviderFromFirebaseUser(firebaseUser);
           userData = await createUser(
             firebaseUser.uid,
             firebaseUser.email ?? 'unknown@example.com',
             firebaseUser.displayName ?? '사용자',
-            UserRole.GLER
+            UserRole.GLER,
+            authProvider
           );
         }
 
@@ -171,14 +189,21 @@ export function UserProvider({ children }: UserProviderProps) {
       updatedAt: serverTimestamp(),
     });
 
+    const refreshedUser = await getUserById(activeUser.uid);
     setUser((currentUser) =>
-      currentUser
+      refreshedUser
         ? {
-            ...currentUser,
+            ...refreshedUser,
             hasCompletedOnboarding: true,
           }
         : currentUser
+          ? {
+              ...currentUser,
+              hasCompletedOnboarding: true,
+            }
+          : currentUser
     );
+    setCurrentRole(resolveActiveRole(refreshedUser ?? user));
 
     // 온보딩 전에 사용자가 가려던 URL 반환
 // eslint-disable-next-line @typescript-eslint/no-require-imports

@@ -1,4 +1,10 @@
 import { Timestamp } from 'firebase/firestore';
+import type {
+  DeliveryPartnerAdapter as StandardDeliveryPartnerAdapter,
+  DeliveryPartnerDispatchRequest as StandardDeliveryPartnerDispatchRequest,
+  DeliveryPartnerDispatch as StandardDeliveryPartnerDispatch,
+  DeliveryPartnerQuote as StandardDeliveryPartnerQuote,
+} from './delivery-partner';
 
 export type LocationRefType = 'station' | 'address' | 'locker';
 
@@ -363,36 +369,13 @@ export interface ActorSelectionDecision {
   updatedAt: Timestamp;
 }
 
-export interface PartnerMissionQuote {
-  partnerId: string;
-  estimatedPickupMinutes: number;
-  estimatedCompletionMinutes: number;
-  quotedCost: number;
-  successRate: number;
-  coverageScore: number;
-  available: boolean;
-}
+export type PartnerMissionQuote = StandardDeliveryPartnerQuote;
 
-export interface ExternalPartnerDispatchRequest {
-  missionId: string;
-  requestId: string;
+export type ExternalPartnerDispatchRequest = StandardDeliveryPartnerDispatchRequest & {
   originRef: LocationRef;
   destinationRef: LocationRef;
-  payload?: Record<string, unknown>;
-}
+};
 
-export interface ExternalPartnerDispatchStatus {
-  dispatchId: string;
-  partnerId: string;
-  status: 'queued' | 'dispatched' | 'accepted' | 'in_progress' | 'completed' | 'failed' | 'cancelled';
-  raw?: Record<string, unknown>;
-}
+export type ExternalPartnerDispatchStatus = StandardDeliveryPartnerDispatch;
 
-export interface ExternalPartnerAdapter {
-  partnerId: string;
-  quoteMission(request: ExternalPartnerDispatchRequest): Promise<PartnerMissionQuote>;
-  createDispatch(request: ExternalPartnerDispatchRequest): Promise<ExternalPartnerDispatchStatus>;
-  cancelDispatch(dispatchId: string): Promise<void>;
-  getDispatchStatus(dispatchId: string): Promise<ExternalPartnerDispatchStatus>;
-  mapWebhookEvent(payload: Record<string, unknown>): ExternalPartnerDispatchStatus;
-}
+export type ExternalPartnerAdapter = StandardDeliveryPartnerAdapter;

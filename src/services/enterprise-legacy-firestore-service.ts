@@ -1,7 +1,8 @@
 /**
- * B2B Firestore Service
- * 
- * B2B 기업 전용 Firestore 데이터 관리
+ * Legacy enterprise customer Firestore service.
+ *
+ * This keeps the old enterprise contract/order dashboard data separate from
+ * the current B2B external partner orchestration standard.
  * @version 2.0.0 - 캐싱 및 최적화 완료
  */
 
@@ -53,7 +54,7 @@ type RecentDelivery = {
   [key: string]: unknown;
 };
 
-export class B2BFirestoreService {
+export class EnterpriseLegacyFirestoreService {
   private readonly B2B_DELIVERIES_COLLECTION = 'b2b_deliveries';
   private readonly B2B_TAX_INVOICES_COLLECTION = 'b2b_tax_invoices';
   private readonly B2B_SETTLEMENTS_COLLECTION = 'b2b_settlements';
@@ -372,5 +373,11 @@ export class B2BFirestoreService {
   }
 }
 
+export type EnterpriseLegacyMonthlyStats = MonthlyStats;
+export type EnterpriseLegacySettlementPreview = Settlement;
+export type EnterpriseLegacyTaxInvoicePreview = TaxInvoice;
+
+export const enterpriseLegacyFirestoreService = new EnterpriseLegacyFirestoreService();
+
 // Singleton instance
-export const b2bFirestoreService = new B2BFirestoreService();
+export const b2bFirestoreService = new EnterpriseLegacyFirestoreService();

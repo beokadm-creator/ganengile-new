@@ -14,9 +14,9 @@ import { Ionicons } from '@expo/vector-icons';
 import * as Print from 'expo-print';
 import * as Sharing from 'expo-sharing';
 import { requireUserId } from '../../services/firebase';
-import { B2BSettlementService } from '../../services/b2b-settlement-service';
-import type { B2BSettlement } from '../../types/b2b-settlement';
-import type { B2BStackNavigationProp } from '../../types/navigation';
+import { EnterpriseLegacySettlementService } from '../../services/enterprise-legacy-settlement-service';
+import type { EnterpriseLegacySettlement } from '../../types/enterprise-legacy-settlement';
+import type { EnterpriseLegacyStackNavigationProp } from '../../types/navigation';
 import { BorderRadius, Colors, Shadows, Spacing, Typography } from '../../theme';
 
 interface SettlementSummary {
@@ -30,7 +30,7 @@ function formatCurrency(amount: number): string {
   return `${amount.toLocaleString('ko-KR')}원`;
 }
 
-function getStatusTone(status: B2BSettlement['status']): string {
+function getStatusTone(status: EnterpriseLegacySettlement['status']): string {
   switch (status) {
     case 'paid':
       return Colors.success;
@@ -42,10 +42,10 @@ function getStatusTone(status: B2BSettlement['status']): string {
 }
 
 export default function MonthlySettlementScreen() {
-  const navigation = useNavigation<B2BStackNavigationProp>();
+  const navigation = useNavigation<EnterpriseLegacyStackNavigationProp>();
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  const [settlements, setSettlements] = useState<B2BSettlement[]>([]);
+  const [settlements, setSettlements] = useState<EnterpriseLegacySettlement[]>([]);
   const [summary, setSummary] = useState<SettlementSummary | null>(null);
 
   useEffect(() => {
@@ -55,7 +55,7 @@ export default function MonthlySettlementScreen() {
   async function loadSettlementData(): Promise<void> {
     try {
       const userId = requireUserId();
-      const data = await B2BSettlementService.getGillerSettlements(userId);
+      const data = await EnterpriseLegacySettlementService.getGillerSettlements(userId);
       const sorted = [...data].sort((a, b) => b.period.start.getTime() - a.period.start.getTime());
       const paidAmount = sorted
         .filter((settlement) => settlement.status === 'paid')
@@ -87,7 +87,7 @@ export default function MonthlySettlementScreen() {
 
   async function handleExport(settlementId: string): Promise<void> {
     try {
-      const report = await B2BSettlementService.generateSettlementReport(settlementId);
+      const report = await EnterpriseLegacySettlementService.generateSettlementReport(settlementId);
       if (!report.success || !report.reportText) {
         Alert.alert('내보내기 실패', report.error ?? '정산 리포트를 만들지 못했습니다.');
         return;
@@ -180,7 +180,7 @@ export default function MonthlySettlementScreen() {
                 </View>
                 <View style={[styles.statusBadge, { backgroundColor: `${getStatusTone(settlement.status)}20` }]}>
                   <Text style={[styles.statusText, { color: getStatusTone(settlement.status) }]}>
-                    {B2BSettlementService.getSettlementStatusLabel(settlement.status)}
+                    {EnterpriseLegacySettlementService.getSettlementStatusLabel(settlement.status)}
                   </Text>
                 </View>
               </View>

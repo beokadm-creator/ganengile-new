@@ -131,8 +131,8 @@ export interface User {
   /** 길러 정산용 은행 계좌 목록 */
   bankAccounts?: GillerBankAccount[];
 
-  // 길러 신청 상태 (pending: 심사중, approved: 승인, rejected: 반려)
-  gillerApplicationStatus?: 'pending' | 'approved' | 'rejected';
+  // 길러 신청 상태 (none: 미신청, pending: 심사중, approved: 승인, rejected: 반려)
+  gillerApplicationStatus?: 'none' | 'pending' | 'approved' | 'rejected';
 
   // ===== P1 신규 필드: 전문 길러 시스템 =====
 

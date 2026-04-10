@@ -12,10 +12,10 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
 import { doc, updateDoc } from 'firebase/firestore';
-import { b2bFirestoreService } from '../../services/b2b-firestore-service';
+import { enterpriseLegacyFirestoreService } from '../../services/enterprise-legacy-firestore-service';
 import { db, requireUserId } from '../../services/firebase';
 import { BorderRadius, Colors, Shadows, Spacing, Typography } from '../../theme';
-import type { B2BStackNavigationProp } from '../../types/navigation';
+import type { EnterpriseLegacyStackNavigationProp } from '../../types/navigation';
 
 type SubscriptionStatus = 'active' | 'suspended' | 'cancelled';
 
@@ -115,7 +115,7 @@ function getStatusColor(status: SubscriptionStatus): string {
 }
 
 export default function BusinessProfileScreen() {
-  const navigation = useNavigation<B2BStackNavigationProp>();
+  const navigation = useNavigation<EnterpriseLegacyStackNavigationProp>();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [editing, setEditing] = useState(false);
@@ -130,7 +130,7 @@ export default function BusinessProfileScreen() {
     try {
       setLoading(true);
       const userId = requireUserId();
-      const businessData = await b2bFirestoreService.getBusinessInfo(userId);
+      const businessData = await enterpriseLegacyFirestoreService.getBusinessInfo(userId);
 
       if (!businessData || typeof businessData !== 'object') {
         setProfile(null);
@@ -210,7 +210,7 @@ export default function BusinessProfileScreen() {
       <View style={styles.emptyContainer}>
         <Ionicons name="business-outline" size={56} color={Colors.textTertiary} />
         <Text style={styles.emptyTitle}>기업 정보를 찾지 못했습니다.</Text>
-        <Text style={styles.emptyDescription}>B2B 계약 또는 사업자 정보가 아직 연결되지 않았습니다. 운영팀과 연결 상태를 확인해 주세요.</Text>
+        <Text style={styles.emptyDescription}>기업 고객 계약 또는 사업자 정보가 아직 연결되지 않았습니다. 운영팀과 연결 상태를 확인해 주세요.</Text>
       </View>
     );
   }

@@ -151,7 +151,7 @@ export default function LoginScreen({ navigation }: LoginScreenProps) {
         </View>
 
         <TouchableOpacity onPress={() => navigation.navigate('NewSignUp')} activeOpacity={0.8}>
-          <Text style={styles.footerLink}>계정이 없다면 회원가입</Text>
+          <Text style={styles.footerLink}>계정이 없다면 계정 만들기</Text>
         </TouchableOpacity>
       </View>
     </View>

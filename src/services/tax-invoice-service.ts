@@ -19,7 +19,7 @@ import type {
   TaxInvoiceStatus,
 } from '../types/tax-invoice';
 import { PLATFORM_INFO, TAX_RATE } from '../types/tax-invoice';
-import type { SettlementPeriod } from '../types/b2b-settlement';
+import type { SettlementPeriod } from '../types/enterprise-legacy-settlement';
 
 const INVOICE_COLLECTION = 'tax_invoices';
 

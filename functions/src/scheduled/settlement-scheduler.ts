@@ -2,7 +2,7 @@
 /**
  * Giller Settlement Scheduler
  *
- * 매월 5일 00:00에 실행되어 B2B 길러의 월간 정산을 자동 처리합니다.
+ * 매월 5일 00:00에 실행되어 레거시 기업 계약 길러의 월간 정산을 자동 처리합니다.
  *
  * 실행 일정: "0 0 5 * *" (매월 5일 00:00, Asia/Seoul)
  */
@@ -12,10 +12,10 @@ import * as admin from 'firebase-admin';
 /**
  * 매월 5일 길러 정산 스케줄러
  *
- * 1. B2B 길러 조회 (gillerProfile.tier: 'silver' | 'gold' | 'platinum')
+ * 1. 레거시 기업 계약 길러 조회 (gillerProfile.tier: 'silver' | 'gold' | 'platinum')
  * 2. 전월 배송 집계
  * 3. 등급별 수수료율 적용, 보너스 계산
- * 4. 정산 정보 생성 (B2BSettlement)
+ * 4. 정산 정보 생성
  * 5. 이체 실행 (또는 이체 정보 저장)
  */
 export const gillerSettlementScheduler = async (): Promise<{
@@ -43,13 +43,13 @@ export const gillerSettlementScheduler = async (): Promise<{
   let totalAmount = 0;
 
   try {
-    // 1. B2B 길러 조회 (등급별)
-    const b2bTiers: B2BGillerTier['tier'][] = ['silver', 'gold', 'platinum'];
+    // 1. 레거시 기업 계약 길러 조회 (등급별)
+    const enterpriseLegacyTiers = ['silver', 'gold', 'platinum'] as const;
 
     const batch = db.batch();
     let settlementsGenerated = 0;
 
-    for (const tier of b2bTiers) {
+    for (const tier of enterpriseLegacyTiers) {
       console.warn(`🔍 Processing tier: ${tier}`);
 
       // 해당 등급 길러 조회
@@ -65,7 +65,7 @@ export const gillerSettlementScheduler = async (): Promise<{
         const giller = userDoc.data();
 
         try {
-          // 2-1. 전월 B2B 배송 집계
+          // 2-1. 전월 배송 집계
           const startOfMonth = new Date(year, month - 1, 1);
           const endOfMonth = new Date(year, month, 0, 23, 59, 59);
 
@@ -77,10 +77,10 @@ export const gillerSettlementScheduler = async (): Promise<{
             .where('completedAt', '<=', endOfMonth)
             .get();
 
-          const deliveries = deliveriesSnapshot.docs.map((doc) => doc.data() as B2BDelivery);
+          const deliveries = deliveriesSnapshot.docs.map((doc) => doc.data() as Record<string, any>);
 
           if (deliveries.length === 0) {
-            console.warn(`⏭️ No B2B deliveries for giller ${gillerId} in ${year}-${month}`);
+            console.warn(`⏭️ No enterprise legacy deliveries for giller ${gillerId} in ${year}-${month}`);
             continue;
           }
 
@@ -114,7 +114,7 @@ export const gillerSettlementScheduler = async (): Promise<{
           // 2-6. 정산 정보 생성
           const settlementRef = db.collection('b2bSettlements').doc();
 
-          const settlement: B2BSettlement = {
+          const settlement = {
             settlementId: settlementRef.id,
             gillerId,
             gillerName: giller.name ?? '익명',

@@ -74,7 +74,7 @@ const CACHE_TTL = 60 * 1000;
 
 let identityCache: { data: IdentityIntegrationConfig; expiresAt: number } | null = null;
 let bankCache: { data: BankIntegrationConfig; expiresAt: number } | null = null;
-const _paymentCache: { data: PaymentIntegrationConfig; expiresAt: number } | null = null;
+let paymentCache: { data: PaymentIntegrationConfig; expiresAt: number } | null = null;
 let aiCache: { data: AIIntegrationConfig; expiresAt: number } | null = null;
 
 function getDefaultIdentityIntegrationConfig(): IdentityIntegrationConfig {
@@ -215,6 +215,39 @@ export async function getBankIntegrationConfig(): Promise<BankIntegrationConfig>
       statusMessage: String(data?.statusMessage ?? fallback.statusMessage),
     };
     bankCache = { data: config, expiresAt: Date.now() + CACHE_TTL };
+    return config;
+  } catch (error) {
+    console.error('[integration-config] 결제 설정 로드 실패:', error);
+    return fallback;
+  }
+}
+
+export async function getPaymentIntegrationConfig(): Promise<PaymentIntegrationConfig> {
+  if (paymentCache && Date.now() < paymentCache.expiresAt) {
+    return paymentCache.data;
+  }
+
+  const fallback = _getDefaultPaymentIntegrationConfig();
+
+  try {
+    const snap = await getDoc(doc(db, 'config_integrations', 'payment'));
+    const data = snap.exists() ? snap.data() : {};
+    const config: PaymentIntegrationConfig = {
+      enabled: Boolean(data?.enabled ?? fallback.enabled),
+      testMode: Boolean(data?.testMode ?? fallback.testMode),
+      allowTestBypass: Boolean(data?.allowTestBypass ?? fallback.allowTestBypass),
+      provider: String(data?.provider ?? fallback.provider),
+      liveReady: Boolean(data?.liveReady ?? fallback.liveReady),
+      clientKey: String(data?.clientKey ?? fallback.clientKey),
+      bankVerificationRequired: Boolean(
+        data?.bankVerificationRequired ?? fallback.bankVerificationRequired
+      ),
+      manualSettlementReview: Boolean(
+        data?.manualSettlementReview ?? fallback.manualSettlementReview
+      ),
+      statusMessage: String(data?.statusMessage ?? fallback.statusMessage),
+    };
+    paymentCache = { data: config, expiresAt: Date.now() + CACHE_TTL };
     return config;
   } catch (error) {
     console.error('[integration-config] 결제 설정 로드 실패:', error);

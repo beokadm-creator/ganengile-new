@@ -3,11 +3,16 @@ import { ActivityIndicator, ScrollView, StyleSheet, Text, TouchableOpacity, View
 import type { StackNavigationProp } from '@react-navigation/stack';
 import { NaverMapCard } from '../../components/maps/NaverMapCard';
 import { auth } from '../../services/firebase';
-import { b2bFirestoreService, type MonthlyStats, type Settlement, type TaxInvoice } from '../../services/b2b-firestore-service';
+import {
+  enterpriseLegacyFirestoreService,
+  type EnterpriseLegacyMonthlyStats as MonthlyStats,
+  type EnterpriseLegacySettlementPreview as Settlement,
+  type EnterpriseLegacyTaxInvoicePreview as TaxInvoice,
+} from '../../services/enterprise-legacy-firestore-service';
 import { BorderRadius, Colors, Shadows, Spacing, Typography } from '../../theme';
-import type { B2BStackParamList } from '../../types/navigation';
+import type { EnterpriseLegacyStackParamList } from '../../types/navigation';
 
-type NavigationProp = StackNavigationProp<B2BStackParamList, 'B2BDashboard'>;
+type NavigationProp = StackNavigationProp<EnterpriseLegacyStackParamList, 'EnterpriseLegacyDashboard'>;
 type Props = { navigation: NavigationProp };
 type RecentDeliveryMap = { id: string; pickup?: { latitude?: number; longitude?: number; station?: string }; dropoff?: { latitude?: number; longitude?: number; station?: string } };
 
@@ -15,7 +20,7 @@ function formatCurrency(amount: number): string { return `${amount.toLocaleStrin
 function getStatusColor(status: string): string { switch (status) { case 'issued': case 'pending': return Colors.warning; case 'paid': case 'completed': return Colors.success; case 'overdue': return Colors.error; default: return Colors.textSecondary; } }
 function getStatusText(status: string): string { switch (status) { case 'issued': return '발행 완료'; case 'paid': return '지급 완료'; case 'pending': return '검토 대기'; case 'completed': return '정산 완료'; case 'overdue': return '추가 확인'; default: return '상태 확인'; } }
 
-export default function B2BDashboardScreen({ navigation }: Props) {
+export default function EnterpriseLegacyDashboardScreen({ navigation }: Props) {
   const [loading, setLoading] = useState(true);
   const [stats, setStats] = useState<MonthlyStats>({ totalDeliveries: 0, totalAmount: 0, avgCostPerDelivery: 0 });
   const [taxInvoices, setTaxInvoices] = useState<TaxInvoice[]>([]);
@@ -29,15 +34,15 @@ export default function B2BDashboardScreen({ navigation }: Props) {
       const currentUser = auth.currentUser;
       if (!currentUser) { setLoading(false); return; }
       const businessId = currentUser.uid;
-      const { year, month } = b2bFirestoreService.getCurrentYearMonth();
-      setCurrentPeriod(b2bFirestoreService.getPeriodText(year, month));
-      const [statsData, invoicesData, settlementsData, deliveriesData] = await Promise.all([b2bFirestoreService.getMonthlyStats(businessId, year, month), b2bFirestoreService.getTaxInvoices(businessId, 10), b2bFirestoreService.getSettlements(businessId, 10), b2bFirestoreService.getRecentDeliveries(businessId, 6)]);
+      const { year, month } = enterpriseLegacyFirestoreService.getCurrentYearMonth();
+      setCurrentPeriod(enterpriseLegacyFirestoreService.getPeriodText(year, month));
+      const [statsData, invoicesData, settlementsData, deliveriesData] = await Promise.all([enterpriseLegacyFirestoreService.getMonthlyStats(businessId, year, month), enterpriseLegacyFirestoreService.getTaxInvoices(businessId, 10), enterpriseLegacyFirestoreService.getSettlements(businessId, 10), enterpriseLegacyFirestoreService.getRecentDeliveries(businessId, 6)]);
       if (statsData) setStats(statsData);
       setTaxInvoices(invoicesData);
       setSettlements(settlementsData);
       setRecentDeliveries(deliveriesData as RecentDeliveryMap[]);
     } catch (error) {
-      console.error('Failed to load B2B dashboard', error);
+      console.error('Failed to load enterprise legacy dashboard', error);
     } finally {
       setLoading(false);
     }
@@ -62,11 +67,11 @@ export default function B2BDashboardScreen({ navigation }: Props) {
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
-      <View style={styles.hero}><Text style={styles.kicker}>가는길에 기업 운영</Text><Text style={styles.title}>기업 배송 운영 홈</Text><Text style={styles.subtitle}>배송 요청, 세금계산서, 월 정산, 운영 검토를 한 화면에서 관리합니다.</Text></View>
+      <View style={styles.hero}><Text style={styles.kicker}>레거시 엔터프라이즈 운영</Text><Text style={styles.title}>기업 고객 배송 운영 홈</Text><Text style={styles.subtitle}>기존 기업 고객 계약 흐름의 배송 요청, 세금계산서, 월 정산을 한 화면에서 관리합니다.</Text></View>
       <NaverMapCard center={mapCenter} markers={mapMarkers.slice(0, 8)} title="최근 기업 배송 구간" subtitle="최근 배송 좌표가 있으면 실제 구간을 보여주고, 없으면 서울 기준으로 시작합니다." />
       <View style={styles.noticeCard}><Text style={styles.noticeTitle}>이번 달 운영 우선순위</Text><Text style={styles.noticeBody}>검토 대기 세금계산서 {pendingInvoiceCount}건, 검토 대기 정산 {pendingSettlementCount}건</Text><Text style={styles.noticeBody}>현재 구조는 자동 이체보다 운영 검토 후 지급하는 흐름을 기준으로 관리합니다.</Text></View>
       <View style={styles.card}><View style={styles.sectionHeader}><Text style={styles.sectionTitle}>이번 달 운영 현황</Text><Text style={styles.sectionMeta}>{currentPeriod || '현재 월'}</Text></View><View style={styles.statsRow}><StatCard label="배송 건수" value={`${stats.totalDeliveries}건`} /><StatCard label="총 배송 금액" value={formatCurrency(stats.totalAmount)} /><StatCard label="건당 평균" value={formatCurrency(stats.avgCostPerDelivery)} /></View></View>
-      <View style={styles.actionsRow}><ActionButton title="배송 요청" subtitle="기업 전용 배송 요청을 바로 생성합니다." onPress={() => navigation.navigate('B2BRequest')} /><ActionButton title="기업 프로필" subtitle="사업자 정보와 구독 상태를 확인합니다." onPress={() => navigation.navigate('BusinessProfile')} /></View>
+      <View style={styles.actionsRow}><ActionButton title="배송 요청" subtitle="기업 고객 계약 기준의 배송 요청을 바로 생성합니다." onPress={() => navigation.navigate('EnterpriseLegacyRequest')} /><ActionButton title="기업 프로필" subtitle="사업자 정보와 구독 상태를 확인합니다." onPress={() => navigation.navigate('BusinessProfile')} /></View>
       <View style={styles.actionsRow}><ActionButton title="세금계산서" subtitle="발행 요청과 최근 발행 상태를 확인합니다." onPress={() => navigation.navigate('TaxInvoiceRequest')} /><ActionButton title="월 정산" subtitle="지급 대기와 리포트형 정산 내역을 관리합니다." onPress={() => navigation.navigate('MonthlySettlement')} /></View>
       <View style={styles.card}><View style={styles.sectionHeader}><Text style={styles.sectionTitle}>최근 세금계산서</Text><TouchableOpacity onPress={() => navigation.navigate('TaxInvoiceRequest')}><Text style={styles.linkText}>발행 요청</Text></TouchableOpacity></View>{taxInvoices.length > 0 ? taxInvoices.slice(0, 3).map((invoice) => <View key={invoice.id} style={styles.listItem}><View style={styles.listRow}><Text style={styles.listTitle}>{invoice.invoiceNumber}</Text><Text style={[styles.statusText, { color: getStatusColor(invoice.status) }]}>{getStatusText(invoice.status)}</Text></View><Text style={styles.listMeta}>{invoice.period}</Text><Text style={styles.listAmount}>{formatCurrency(invoice.totalAmount)}</Text></View>) : <EmptyText text="아직 생성된 세금계산서가 없습니다." />}</View>
       <View style={styles.card}><View style={styles.sectionHeader}><Text style={styles.sectionTitle}>최근 정산</Text><TouchableOpacity onPress={() => navigation.navigate('MonthlySettlement')}><Text style={styles.linkText}>정산 보드</Text></TouchableOpacity></View>{settlements.length > 0 ? settlements.slice(0, 3).map((settlement) => <View key={settlement.id} style={styles.listItem}><View style={styles.listRow}><Text style={styles.listTitle}>{settlement.period}</Text><Text style={[styles.statusText, { color: getStatusColor(settlement.status) }]}>{getStatusText(settlement.status)}</Text></View><Text style={styles.listMeta}>운영 검토 후 지급 상태가 확정됩니다.</Text><Text style={styles.listAmount}>{formatCurrency(settlement.totalAmount)}</Text></View>) : <EmptyText text="아직 정산 이력이 없습니다." />}</View>
@@ -110,4 +115,3 @@ const styles = StyleSheet.create({
   statusText: { fontWeight: '700' },
   emptyText: { color: Colors.textTertiary, fontSize: Typography.fontSize.sm },
 });
-

@@ -15,12 +15,15 @@ import { BadgeService } from '../../services/BadgeService';
 import { acceptRequest, getMatchingResults } from '../../services/matching-service';
 import { calculateGrade, getGradeInfo } from '../../services/grade-service';
 import { BorderRadius, Colors, Spacing, Typography } from '../../theme';
-import type { B2BStackNavigationProp, B2BStackParamList } from '../../types/navigation';
+import type {
+  EnterpriseLegacyStackNavigationProp,
+  EnterpriseLegacyStackParamList,
+} from '../../types/navigation';
 import type { Badge } from '../../types/user';
 
 type MatchingStatus = 'searching' | 'found' | 'timeout' | 'failed';
 type MatchCandidate = Awaited<ReturnType<typeof getMatchingResults>>[number];
-type ScreenRoute = RouteProp<B2BStackParamList, 'B2BMatchingResult'>;
+type ScreenRoute = RouteProp<EnterpriseLegacyStackParamList, 'EnterpriseLegacyMatchingResult'>;
 
 const MATCH_TIMEOUT_MS = 30_000;
 
@@ -39,8 +42,8 @@ function SummaryCard({ label, value }: { label: string; value: string }) {
   );
 }
 
-export default function B2BMatchingResultScreen() {
-  const navigation = useNavigation<B2BStackNavigationProp>();
+export default function EnterpriseLegacyMatchingResultScreen() {
+  const navigation = useNavigation<EnterpriseLegacyStackNavigationProp>();
   const route = useRoute<ScreenRoute>();
   const requestId = route.params?.requestId;
 
@@ -94,7 +97,7 @@ export default function B2BMatchingResultScreen() {
           setStatus('found');
         }
       } catch (error) {
-        console.error('B2B matching error:', error);
+        console.error('Enterprise legacy matching error:', error);
         if (!cancelled) {
           setStatus('failed');
         }
@@ -128,7 +131,7 @@ export default function B2BMatchingResultScreen() {
           onPress: () => {
             navigation.reset({
               index: 0,
-              routes: [{ name: 'B2BDashboard' }],
+              routes: [{ name: 'EnterpriseLegacyDashboard' }],
             });
           },
         },

@@ -38,8 +38,9 @@ import type {
   UpdateRequestData,
   RequestFilterOptions,
   StationInfo,
+  PackageInfo,
 } from '../types/request';
-import { RequestStatus } from '../types/request';
+import { PackageSize, PackageWeight, RequestStatus } from '../types/request';
 
 type LegacyCreateFeeInfo = {
   totalFee?: number;
@@ -47,6 +48,11 @@ type LegacyCreateFeeInfo = {
 };
 
 type LegacyCreatePackageInfo = {
+  size?: PackageInfo['size'];
+  weight?: PackageInfo['weight'] | number | string;
+  weightKg?: number;
+  description?: string;
+  imageUrl?: string;
   [key: string]: unknown;
 };
 
@@ -77,6 +83,31 @@ type FeeSnapshot = {
 
 function getErrorMessage(error: unknown, fallback: string): string {
   return error instanceof Error ? error.message : fallback;
+}
+
+function toLegacyPackageInfo(packageInfo?: LegacyCreatePackageInfo): PackageInfo {
+  const size =
+    packageInfo?.size === PackageSize.SMALL ||
+    packageInfo?.size === PackageSize.MEDIUM ||
+    packageInfo?.size === PackageSize.LARGE ||
+    packageInfo?.size === PackageSize.EXTRA_LARGE
+      ? packageInfo.size
+      : PackageSize.MEDIUM;
+
+  const weight =
+    packageInfo?.weight === PackageWeight.LIGHT ||
+    packageInfo?.weight === PackageWeight.MEDIUM ||
+    packageInfo?.weight === PackageWeight.HEAVY
+      ? packageInfo.weight
+      : PackageWeight.MEDIUM;
+
+  return {
+    size,
+    weight,
+    weightKg: typeof packageInfo?.weightKg === 'number' ? packageInfo.weightKg : undefined,
+    description: typeof packageInfo?.description === 'string' ? packageInfo.description : '',
+    imageUrl: typeof packageInfo?.imageUrl === 'string' ? packageInfo.imageUrl : undefined,
+  };
 }
 
 function isTimestampLike(value: unknown): value is Timestamp {
@@ -124,9 +155,9 @@ export async function createRequest(
       requesterId: requestDataOrUserId,
       pickupStation: pickupStation!,
       deliveryStation: deliveryStation!,
-      packageInfo: packageInfo,
+      packageInfo: toLegacyPackageInfo(packageInfo),
       initialNegotiationFee: feeInfo?.totalFee ?? 0,
-      feeBreakdown: feeInfo,
+      feeBreakdown: feeInfo as CreateRequestData['feeBreakdown'],
       preferredTime: {
         departureTime: preferredTime ? preferredTime.toTimeString().slice(0, 5) : '09:00',
         arrivalTime: deadline ? deadline.toTimeString().slice(0, 5) : undefined,
@@ -354,7 +385,7 @@ async function updateRequestInternal(
       updatedAt: serverTimestamp(),
     };
 
-    await updateDoc(docRef, dataToUpdate);
+    await updateDoc(docRef, dataToUpdate as unknown as Record<string, unknown>);
 
     // Request updated
 

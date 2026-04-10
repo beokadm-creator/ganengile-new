@@ -312,7 +312,7 @@ export default function ProfileScreen({ navigation }: { navigation: MainStackNav
 
       {!canAccessGiller ? (
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>길러 시작</Text>
+          <Text style={styles.sectionTitle}>길러 전환</Text>
           <TouchableOpacity
             style={styles.linkCard}
             onPress={() =>
@@ -328,13 +328,13 @@ export default function ProfileScreen({ navigation }: { navigation: MainStackNav
               <MaterialIcons name="two-wheeler" size={20} color={Colors.primaryDark} />
             </View>
             <View style={styles.linkCopy}>
-              <Text style={styles.linkTitle}>길러를 시작해 보세요</Text>
+              <Text style={styles.linkTitle}>길러 역할로 전환해 보세요</Text>
               <Text style={styles.linkSubtitle}>
                 {applicationStatus === 'pending'
                   ? '현재 심사 상태를 확인할 수 있습니다.'
                   : user.isVerified
-                    ? '길러 신청 단계로 바로 이동합니다.'
-                    : '본인확인 후 길러 신청을 진행할 수 있습니다.'}
+                    ? '길러 신청 절차로 바로 이동합니다.'
+                    : '본인확인 후 길러 신청 절차를 진행할 수 있습니다.'}
               </Text>
             </View>
             <MaterialIcons name="chevron-right" size={22} color={Colors.gray400} />
@@ -351,7 +351,7 @@ export default function ProfileScreen({ navigation }: { navigation: MainStackNav
           activeOpacity={0.9}
         >
           <Text style={styles.actionButtonText}>
-            {user.isVerified ? '길러 신청하기' : '본인확인 하러 가기'}
+            {user.isVerified ? '길러 신청 절차로 이동' : '길러 전환을 위한 본인확인'}
           </Text>
         </TouchableOpacity>
       ) : null}

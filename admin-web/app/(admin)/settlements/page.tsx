@@ -245,10 +245,10 @@ export default function SettlementsPage(): JSX.Element {
           </div>
 
           <div className="rounded-[24px] bg-white p-6 shadow-sm">
-            <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-400">b2b billing</p>
-            <h3 className="mt-2 text-lg font-bold text-slate-900">기업/B2B 정산 기준</h3>
+            <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-400">enterprise legacy billing</p>
+            <h3 className="mt-2 text-lg font-bold text-slate-900">기업고객 레거시 정산 기준</h3>
             <ul className="mt-4 space-y-2 text-sm leading-6 text-slate-600">
-              <li>B2B는 개인 원천징수 정산과 분리해서 월 단위 청구, 세금계산서, 운영 확정 금액 흐름으로 관리합니다.</li>
+              <li>기업고객 레거시는 개인 원천징수 정산과 분리해서 월 단위 청구, 세금계산서, 운영 확정 금액 흐름으로 관리합니다.</li>
               <li>기업 청구는 공급가액과 VAT를 명시하고, 개인 길러 3.3% 규칙을 그대로 적용하지 않습니다.</li>
               <li>외부 세무 API 연동 전까지는 운영 검토와 관리자 확인으로 처리합니다.</li>
             </ul>

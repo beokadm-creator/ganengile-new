@@ -1,8 +1,8 @@
 /**
- * B2B 배송 타입 정의
+ * Legacy enterprise-facing B2B delivery type definitions.
  *
- * B2B 배송 요청과 진행 상태를 관리합니다.
- * 기획 문서: PLANNING_B2B_BUSINESS.md
+ * These types describe the older "business client contract/order" flow.
+ * They are not the source of truth for the external partner orchestration model.
  */
 
 /** 공통 위치 정보 */
@@ -29,11 +29,11 @@ export interface DeliveryPricing {
   gillerEarning: number;
 }
 
-/** B2B 배송 유형 */
-export type B2BDeliveryType = 'on-demand' | 'scheduled';
+/** Legacy enterprise customer delivery type */
+export type EnterpriseLegacyDeliveryType = 'on-demand' | 'scheduled';
 
-/** B2B 배송 상태 */
-export type B2BDeliveryStatus =
+/** Legacy enterprise customer delivery status */
+export type EnterpriseLegacyDeliveryStatus =
   | 'pending'      // 대기 중
   | 'matched'      // 매칭 완료
   | 'picked_up'    // 픽업 완료
@@ -41,13 +41,13 @@ export type B2BDeliveryStatus =
   | 'delivered'    // 배송 완료
   | 'cancelled';   // 취소됨
 
-/** B2B 배송 엔터티 */
-export interface B2BDelivery {
+/** Legacy enterprise customer delivery entity */
+export interface EnterpriseLegacyDelivery {
   /** 배송 ID */
   id: string;
   /** 계약 ID */
   contractId: string;
-  /** B2B 고객사 ID */
+  /** Enterprise customer ID */
   businessId: string;
   /** 길러 ID (매칭 후 채움) */
   gillerId?: string;
@@ -64,14 +64,14 @@ export interface B2BDelivery {
   notes?: string;
 
   /** 배송 유형 */
-  type: B2BDeliveryType;
+  type: EnterpriseLegacyDeliveryType;
   /** 매칭 시간 */
   matchedAt?: Date;
   /** 수락 시간 */
   acceptedAt?: Date;
 
   /** 배송 상태 */
-  status: B2BDeliveryStatus;
+  status: EnterpriseLegacyDeliveryStatus;
 
   /** 픽업 사진 URL */
   pickupPhoto?: string;
@@ -89,8 +89,8 @@ export interface B2BDelivery {
   updatedAt: Date;
 }
 
-/** B2B 배송 생성 데이터 */
-export interface CreateB2BDeliveryData {
+/** Legacy enterprise customer delivery creation data */
+export interface CreateEnterpriseLegacyDeliveryData {
   /** 계약 ID */
   contractId: string;
   businessId: string;
@@ -116,11 +116,11 @@ export const BASE_DELIVERY_FEES = {
   large: 9000,   // 10km 초과
 } as const;
 
-/** B2B 계약 정보 */
-export interface B2BContract {
+/** Legacy enterprise customer contract */
+export interface EnterpriseLegacyContract {
   /** 계약 ID */
   contractId: string;
-  /** B2B 고객사 ID */
+  /** Enterprise customer ID */
   businessId: string;
   /** 고객사명 */
   businessName: string;
@@ -146,9 +146,9 @@ export interface B2BContract {
   updatedAt?: Date;
 }
 
-/** B2B 계약 생성 데이터 */
-export interface CreateB2BContractData {
-  /** B2B 고객사 ID */
+/** Legacy enterprise customer contract creation data */
+export interface CreateEnterpriseLegacyContractData {
+  /** Enterprise customer ID */
   businessId: string;
   /** 고객사명 */
   businessName: string;
@@ -168,11 +168,11 @@ export interface CreateB2BContractData {
   pricePerDelivery: number;
 }
 
-/** B2B 요청 정보 */
-export interface B2BRequest {
+/** Legacy enterprise customer request */
+export interface EnterpriseLegacyRequest {
   /** 요청 ID */
   requestId: string;
-  /** B2B 고객사 ID */
+  /** Enterprise customer ID */
   businessId: string;
   /** 계약 ID */
   contractId: string;
@@ -206,9 +206,9 @@ export interface B2BRequest {
   updatedAt?: Date;
 }
 
-/** B2B 요청 생성 데이터 */
-export interface CreateB2BRequestData {
-  /** B2B 고객사 ID */
+/** Legacy enterprise customer request creation data */
+export interface CreateEnterpriseLegacyRequestData {
+  /** Enterprise customer ID */
   businessId: string;
   /** 계약 ID */
   contractId: string;
@@ -234,11 +234,15 @@ export interface CreateB2BRequestData {
   scheduledTime: Date;
 }
 
+export type EnterpriseLegacyDeliveryPricing = DeliveryPricing;
+export type EnterpriseLegacyLocation = Location;
+export type EnterpriseLegacyTaxInvoice = TaxInvoice;
+
 /** 세금계산서 데이터 */
 export interface TaxInvoice {
   /** 계산서 ID */
   invoiceId: string;
-  /** B2B 고객사 ID */
+  /** Enterprise customer ID */
   businessId: string;
   /** 계약 ID */
   contractId: string;

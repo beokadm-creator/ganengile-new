@@ -194,10 +194,10 @@ export function buildLinkingConfig(): LinkingOptions<RootStackParamList> {
             LockerMap: 'lockers',
           },
         },
-        B2B: {
+        EnterpriseLegacy: {
           screens: {
-            B2BDashboard: 'b2b',
-            B2BRequest: 'b2b/request',
+            EnterpriseLegacyDashboard: 'b2b',
+            EnterpriseLegacyRequest: 'b2b/request',
           },
         },
       },

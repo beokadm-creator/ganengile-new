@@ -195,7 +195,7 @@ export default function LevelBenefitsScreen() {
       <View style={styles.noticeCard}>
         <Text style={styles.noticeIcon}>💡</Text>
         <Text style={styles.noticeText}>
-          승급 기준을 충족하면 길러 승급 신청 화면에서 바로 다음 단계를 진행할 수 있어요.
+          기준을 충족하면 길러 전환 신청 화면에서 바로 다음 단계를 진행할 수 있어요.
         </Text>
       </View>
     </View>

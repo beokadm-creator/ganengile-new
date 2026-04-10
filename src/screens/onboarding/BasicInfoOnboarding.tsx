@@ -25,6 +25,17 @@ import { BorderRadius, Colors, Shadows, Spacing, Typography } from '../../theme'
 import { ConsentDisplayItem, ConsentKey, ConsentRecord } from '../../types/consent';
 import { UserRole } from '../../types/user';
 
+function buildRequesterAgreedTerms(consents: Record<string, boolean>) {
+  return {
+    giller: false,
+    gller: consents[ConsentKey.SERVICE_TERMS] === true,
+    privacy:
+      consents[ConsentKey.PRIVACY_COLLECTION] === true &&
+      consents[ConsentKey.PRIVACY_POLICY] === true,
+    marketing: consents[ConsentKey.MARKETING] === true,
+  };
+}
+
 export default function BasicInfoOnboarding() {
   const { user, completeOnboarding } = useUser();
   const [loading, setLoading] = useState(false);
@@ -94,6 +105,11 @@ export default function BasicInfoOnboarding() {
   }, []);
 
   function validate() {
+    if (loadingTemplates || consentTemplates.length === 0) {
+      Alert.alert('약관을 불러오는 중입니다', '약관 정보를 모두 불러온 뒤 다시 시도해 주세요.');
+      return false;
+    }
+
     if (!name.trim()) {
       Alert.alert('이름이 필요합니다', '이름을 입력해 주세요.');
       return false;
@@ -124,12 +140,7 @@ export default function BasicInfoOnboarding() {
 
     setLoading(true);
     try {
-      // Build backward-compatible agreedTerms
-      const agreedTerms = {
-        service: consents[ConsentKey.SERVICE_TERMS] === true,
-        privacy: consents[ConsentKey.PRIVACY_POLICY] === true,
-        marketing: consents[ConsentKey.MARKETING] === true,
-      };
+      const agreedTerms = buildRequesterAgreedTerms(consents);
 
       // Build consent history records
       const now = Timestamp.now();
@@ -177,10 +188,10 @@ export default function BasicInfoOnboarding() {
     >
       <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
         <View style={styles.hero}>
-          <Text style={styles.eyebrow}>가는길에 시작하기</Text>
-          <Text style={styles.title}>기본 정보만 먼저 확인합니다.</Text>
+          <Text style={styles.eyebrow}>첫 배송 요청 준비</Text>
+          <Text style={styles.title}>이용자 정보만 간단히 확인합니다.</Text>
           <Text style={styles.description}>
-            필요한 정보만 입력하면 바로 홈으로 이어집니다.
+            계정 생성은 이미 끝났습니다. 첫 배송 요청에 필요한 정보만 입력하면 바로 이용할 수 있습니다.
           </Text>
         </View>
 
@@ -246,7 +257,7 @@ export default function BasicInfoOnboarding() {
         <View style={styles.notice}>
           <Text style={styles.noticeTitle}>다음 단계</Text>
           <Text style={styles.noticeBody}>
-            길러 승급, 본인확인, 정산 계좌 연결은 홈과 프로필에서 이어집니다.
+            이 단계는 요청자 이용 시작 준비입니다. 길러 신청, 본인확인, 정산 계좌 연결은 별도 절차로 홈과 프로필에서 이어집니다.
           </Text>
         </View>
 
@@ -254,9 +265,9 @@ export default function BasicInfoOnboarding() {
           <TouchableOpacity
             style={[styles.submitButton, loading && styles.submitButtonDisabled]}
             onPress={() => void handleSubmit()}
-            disabled={loading}
+            disabled={loading || loadingTemplates}
           >
-            <Text style={styles.submitButtonText}>{loading ? '저장 중...' : '시작하기'}</Text>
+            <Text style={styles.submitButtonText}>{loading ? '저장 중...' : '배송 요청 준비 완료'}</Text>
           </TouchableOpacity>
         </View>
       </ScrollView>

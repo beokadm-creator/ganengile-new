@@ -24,14 +24,12 @@
 - [src/services/delivery-service.ts](/C:/Users/whhol/Documents/trae_projects/ganengile/src/services/delivery-service.ts#L246)
   - 수령 인증 코드 fallback으로 `000000`이 사용됩니다.
 
-### 2-2. B2B 전문 길러
+### 2-2. 레거시 기업 계약 길러
 
-- [src/services/b2b-delivery-service.ts](/C:/Users/whhol/Documents/trae_projects/ganengile/src/services/b2b-delivery-service.ts#L163)
+- `src/services/enterprise-legacy-delivery-service.ts`
   - `checkCompatibility()`가 현재 항상 `true`를 반환합니다.
-- [src/services/b2b-delivery-service.ts](/C:/Users/whhol/Documents/trae_projects/ganengile/src/services/b2b-delivery-service.ts#L151)
+- `src/services/enterprise-legacy-delivery-service.ts`
   - 상위 3명에게만 알림을 보내는 고정 정책입니다.
-- [src/services/b2b-delivery-service.ts](/C:/Users/whhol/Documents/trae_projects/ganengile/src/services/b2b-delivery-service.ts#L427)
-  - 계약/요청/세금계산서 ID 생성이 `Date.now()` + `Math.random()` 기반입니다.
 
 ### 2-3. 위치/실시간 추적
 
@@ -51,8 +49,6 @@
 
 ### 2-5. 지하철/동선 계산
 
-- [src/services/RealtimeSubwayService.ts](/C:/Users/whhol/Documents/trae_projects/ganengile/src/services/RealtimeSubwayService.ts#L224)
-  - 역 ID seed 기반으로 도착 예정 시간을 가짜 생성합니다.
 - [src/services/transfer-service.ts](/C:/Users/whhol/Documents/trae_projects/ganengile/src/services/transfer-service.ts#L86)
   - 이동 시간을 고정 `30분`으로 반환합니다.
 - [src/services/transfer-service.ts](/C:/Users/whhol/Documents/trae_projects/ganengile/src/services/transfer-service.ts#L97)
@@ -75,8 +71,7 @@
 
 - [src/services/realtime-delivery-tracking.ts](/C:/Users/whhol/Documents/trae_projects/ganengile/src/services/realtime-delivery-tracking.ts)
 - [src/services/transfer-service.ts](/C:/Users/whhol/Documents/trae_projects/ganengile/src/services/transfer-service.ts)
-- [src/services/RealtimeSubwayService.ts](/C:/Users/whhol/Documents/trae_projects/ganengile/src/services/RealtimeSubwayService.ts)
-- [src/services/b2b-delivery-service.ts](/C:/Users/whhol/Documents/trae_projects/ganengile/src/services/b2b-delivery-service.ts)
+- `src/services/enterprise-legacy-delivery-service.ts`
 
 ## 4. 우선순위
 

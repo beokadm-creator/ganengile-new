@@ -51,6 +51,17 @@ function getRequestRouteLabel(request: Request | null, pickupStationName?: strin
   return `${from} -> ${to}`;
 }
 
+function getProgressLabel(request: Request | null): string {
+  const beta1Status = request?.beta1RequestStatus;
+  if (beta1Status === 'match_pending') {
+    return '매칭 준비 중';
+  }
+  if (beta1Status === 'accepted') {
+    return '구간 확정';
+  }
+  return request?.status ?? 'pending';
+}
+
 export function MatchingResultScreen() {
   const navigation = useNavigation<MainStackNavigationProp>();
   const route = useRoute<RouteProp<MainStackParamList, 'MatchingResult'>>();
@@ -84,9 +95,9 @@ export function MatchingResultScreen() {
     void (async () => {
       try {
         const result = await notifyGillers(requestId);
-        const errorMessage = readStringField(result, 'message');
+        const errorMessage = readStringField(result, 'error');
         const nextMessage = result.success
-          ? '길러 후보에게 알림을 보냈습니다.'
+          ? '후보에게 알림을 보냈습니다.'
           : typeof errorMessage === 'string'
             ? errorMessage
             : null;
@@ -115,7 +126,7 @@ export function MatchingResultScreen() {
         return;
       }
 
-      Alert.alert('긴급 재매칭을 다시 시작합니다', `현재 제안 금액을 ${(newFee ?? currentFee).toLocaleString()}원으로 조정했습니다.`);
+      Alert.alert('금액을 올렸습니다', `${(newFee ?? currentFee).toLocaleString()}원으로 다시 요청합니다.`);
     } catch (error) {
       console.error('Failed to increase bid', error);
       Alert.alert('금액 조정 실패', '잠시 후 다시 시도해 주세요.');
@@ -128,8 +139,35 @@ export function MatchingResultScreen() {
     return (
       <View style={styles.centerState}>
         <ActivityIndicator size="large" color={Colors.primary} />
-        <Text style={styles.centerText}>매칭 진행 상황을 불러오는 중입니다.</Text>
+        <Text style={styles.centerText}>상태를 불러오는 중입니다.</Text>
       </View>
+    );
+  }
+
+  if (!request) {
+    return (
+      <ScrollView style={styles.container} contentContainerStyle={styles.content}>
+        <View style={styles.hero}>
+          <Text style={styles.kicker}>가는길에</Text>
+          <Text style={styles.title}>요청을 다시 확인해 주세요.</Text>
+          <Text style={styles.subtitle}>취소되었거나 아직 준비 중입니다.</Text>
+        </View>
+
+        <View style={styles.card}>
+          <Text style={styles.cardTitle}>다음 단계</Text>
+          <InfoRow label="1" value="요청 상세 보기" />
+          <InfoRow label="2" value="새 요청 만들기" />
+        </View>
+
+        <View style={styles.actionGroup}>
+          <TouchableOpacity style={styles.primaryButton} onPress={() => navigation.navigate('RequestDetail', { requestId })}>
+            <Text style={styles.primaryButtonText}>요청 상세 보기</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.secondaryButton} onPress={() => navigation.navigate('CreateRequest')}>
+            <Text style={styles.secondaryButtonText}>새 요청 만들기</Text>
+          </TouchableOpacity>
+        </View>
+      </ScrollView>
     );
   }
 
@@ -137,7 +175,7 @@ export function MatchingResultScreen() {
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
       <View style={styles.hero}>
         <Text style={styles.kicker}>가는길에</Text>
-        <Text style={styles.title}>{isMatchedState(request?.status ?? RequestStatus.PENDING) ? '연결이 진행되고 있습니다.' : '길러를 찾는 중입니다.'}</Text>
+        <Text style={styles.title}>{isMatchedState(request.status) ? '연결 중입니다.' : '길러를 찾고 있습니다.'}</Text>
         <Text style={styles.subtitle}>{notificationMessage ?? '응답을 기다리는 중입니다.'}</Text>
       </View>
 
@@ -145,12 +183,12 @@ export function MatchingResultScreen() {
         <Text style={styles.cardTitle}>요청 경로</Text>
         <InfoRow label="구간" value={routeLabel} />
         <InfoRow label="현재 제안 금액" value={`${currentFee.toLocaleString()}원`} />
-        <InfoRow label="현재 상태" value={request?.status ?? 'pending'} />
+        <InfoRow label="현재 상태" value={getProgressLabel(request)} />
       </View>
 
       {giller ? (
         <View style={styles.card}>
-          <Text style={styles.cardTitle}>현재 연결 후보</Text>
+          <Text style={styles.cardTitle}>현재 후보</Text>
           <InfoRow label="이름" value={giller.name ?? '길러'} />
           <InfoRow label="평점" value={typeof giller.rating === 'number' ? giller.rating.toFixed(1) : '-'} />
         </View>
@@ -158,13 +196,13 @@ export function MatchingResultScreen() {
 
       <View style={styles.actionGroup}>
         <TouchableOpacity style={styles.primaryButton} onPress={() => void handleIncreaseBid()} disabled={increasingBid}>
-          <Text style={styles.primaryButtonText}>{increasingBid ? '조정 중...' : 'AI 추천 금액 올리기'}</Text>
+          <Text style={styles.primaryButtonText}>{increasingBid ? '조정 중...' : '금액 1,000원 올리기'}</Text>
         </TouchableOpacity>
         <TouchableOpacity
           style={styles.secondaryButton}
           onPress={() => navigation.navigate('CreateRequest', { mode: 'reservation', sourceRequestId: requestId })}
         >
-          <Text style={styles.secondaryButtonText}>예약으로 전환하기</Text>
+          <Text style={styles.secondaryButtonText}>예약으로 바꾸기</Text>
         </TouchableOpacity>
         <TouchableOpacity style={styles.ghostButton} onPress={() => navigation.navigate('RequestDetail', { requestId })}>
           <Text style={styles.ghostButtonText}>요청 상세 보기</Text>

@@ -181,7 +181,7 @@ export default function HomeScreen({ navigation }: { navigation: MainStackNaviga
             <View style={styles.recommendationRow}>
               <MaterialIcons name="two-wheeler" size={18} color={Colors.primary} />
               <Text style={styles.recommendationText}>
-                길러 활동을 원하시면 프로필에서 본인인증과 승인 상태를 먼저 확인해 주세요.
+                길러 역할 전환을 원하시면 프로필에서 본인확인과 신청 상태를 먼저 확인해 주세요.
               </Text>
             </View>
           ) : null}

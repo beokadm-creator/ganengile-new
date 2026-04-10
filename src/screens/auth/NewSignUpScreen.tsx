@@ -49,7 +49,7 @@ const STEP_ORDER: Step[] = ['name', 'email', 'password', 'terms'];
 const STEP_COPY: Record<Step, { title: string; subtitle: string; cta: string }> = {
   name: {
     title: '이름만 먼저 알려주세요',
-    subtitle: '처음 가입은 가볍게 끝내고, 실제 배송 요청 전에 필요한 인증만 이어서 받겠습니다.',
+    subtitle: '지금은 계정만 빠르게 만들고, 실제 서비스 이용 준비는 첫 배송 요청 직전에 이어집니다.',
     cta: '다음',
   },
   email: {
@@ -59,15 +59,26 @@ const STEP_COPY: Record<Step, { title: string; subtitle: string; cta: string }> 
   },
   password: {
     title: '비밀번호를 설정해주세요',
-    subtitle: '가입 자체는 여기서 마무리됩니다. 휴대폰 확인은 배송 요청 직전에만 진행됩니다.',
+    subtitle: '계정 생성은 여기서 거의 끝납니다. 연락처 확인은 첫 배송 요청 직전에만 진행합니다.',
     cta: '다음',
   },
   terms: {
-    title: '필수 동의만 마치면 끝입니다',
-    subtitle: '지금은 최소 정보만 받고, 연락처와 인증은 실제 기능 사용 시점에 확인합니다.',
-    cta: '가입 완료',
+    title: '계정 생성에 필요한 동의만 마치면 됩니다',
+    subtitle: '이 단계는 계정 생성입니다. 요청자 이용 시작 준비와 길러 절차는 이후에 분리되어 진행됩니다.',
+    cta: '계정 만들기',
   },
 };
+
+function buildRequesterAgreedTerms(consents: Record<string, boolean>) {
+  return {
+    giller: false,
+    gller: consents[ConsentKey.SERVICE_TERMS] === true,
+    privacy:
+      consents[ConsentKey.PRIVACY_COLLECTION] === true &&
+      consents[ConsentKey.PRIVACY_POLICY] === true,
+    marketing: consents[ConsentKey.MARKETING] === true,
+  };
+}
 
 function getErrorMessage(error: unknown, fallback: string): string {
   if (error instanceof Error && error.message) {
@@ -220,9 +231,16 @@ export default function NewSignUpScreen({ navigation }: Props) {
       }
     }
 
-    if (step === 'terms' && !checkRequiredConsents(consents, consentTemplates)) {
-      Alert.alert('필수 약관 동의 필요', '모든 필수 약관에 동의해주세요.');
-      return false;
+    if (step === 'terms') {
+      if (loadingTemplates || consentTemplates.length === 0) {
+        Alert.alert('약관을 불러오는 중입니다', '약관 정보를 모두 불러온 뒤 다시 시도해 주세요.');
+        return false;
+      }
+
+      if (!checkRequiredConsents(consents, consentTemplates)) {
+        Alert.alert('필수 약관 동의 필요', '모든 필수 약관에 동의해주세요.');
+        return false;
+      }
     }
 
     return true;
@@ -260,13 +278,7 @@ export default function NewSignUpScreen({ navigation }: Props) {
       const userCredential = await createUserWithEmailAndPassword(auth, form.email.trim(), form.password);
       await sendEmailVerification(userCredential.user);
 
-      // Build backward-compatible agreedTerms
-      const agreedTerms = {
-        giller: false,
-        gller: consents[ConsentKey.SERVICE_TERMS] === true,
-        privacy: consents[ConsentKey.PRIVACY_POLICY] === true,
-        marketing: consents[ConsentKey.MARKETING] === true,
-      };
+      const agreedTerms = buildRequesterAgreedTerms(consents);
 
       // Build consent history records
       const now = Timestamp.now();
@@ -310,10 +322,9 @@ export default function NewSignUpScreen({ navigation }: Props) {
       );
 
       Alert.alert(
-        '가입이 완료되었습니다',
-        '가입은 바로 완료됐습니다. 이메일 인증 메일을 보냈고, 배송 요청 전에 휴대폰 확인만 진행하면 됩니다.',
+        '계정이 만들어졌습니다',
+        '이메일 인증 메일을 보냈습니다. 실제 배송 요청 전에는 이용자 정보 확인과 휴대폰 인증이 이어집니다.',
       );
-      navigation.navigate('Login');
     } catch (error) {
       Alert.alert('회원가입 실패', getSignUpErrorMessage(error));
     } finally {
@@ -392,14 +403,14 @@ export default function NewSignUpScreen({ navigation }: Props) {
         </View>
 
         <View style={styles.contextCard}>
-          <Text style={styles.contextTitle}>인증 흐름 안내</Text>
-          <Text style={styles.contextBody}>가입은 가볍게 끝내고, 배송 요청 전에 휴대폰 번호 확인을 진행합니다.</Text>
-          <Text style={styles.contextBody}>길러 승급이나 정산 단계의 본인확인은 기존 PASS/카카오 본인확인 흐름을 그대로 사용합니다.</Text>
+          <Text style={styles.contextTitle}>가입 이후 절차</Text>
+          <Text style={styles.contextBody}>지금은 계정만 만들고, 첫 배송 요청 전에 이용자 온보딩과 휴대폰 확인을 진행합니다.</Text>
+          <Text style={styles.contextBody}>길러 신청은 별도 절차입니다. 본인확인과 정산 정보 등록은 길러 전환 시점에만 진행합니다.</Text>
         </View>
 
         {step === 'name' ? (
           <View style={styles.socialCard}>
-            <Text style={styles.sectionTitle}>간편 가입도 가능합니다</Text>
+            <Text style={styles.sectionTitle}>소셜 계정으로도 바로 시작할 수 있습니다</Text>
             <TouchableOpacity style={styles.kakaoButton} onPress={() => void handleKakaoSignUpPress()} disabled={loading}>
               <Text style={styles.kakaoButtonText}>카카오로 가입</Text>
             </TouchableOpacity>
@@ -465,7 +476,7 @@ function renderStepContent(props: StepContentProps) {
             autoCapitalize="words"
             autoFocus
           />
-          <Text style={styles.helperText}>요청자 화면과 프로필에서 사용됩니다.</Text>
+          <Text style={styles.helperText}>계정 이름으로 저장되며, 이용자 프로필과 요청 화면에서 사용됩니다.</Text>
         </>
       );
     case 'email':
@@ -501,7 +512,7 @@ function renderStepContent(props: StepContentProps) {
             placeholder="같은 비밀번호를 다시 입력"
             secureTextEntry
           />
-          <Text style={styles.helperText}>배송 요청 전 연락처 확인은 따로 진행되니, 가입 단계에서는 여기까지만 받습니다.</Text>
+          <Text style={styles.helperText}>계정 생성은 여기까지입니다. 이용자 온보딩과 휴대폰 확인은 첫 요청 직전에 진행합니다.</Text>
         </>
       );
     case 'terms':

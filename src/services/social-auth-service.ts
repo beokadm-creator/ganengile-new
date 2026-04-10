@@ -42,7 +42,7 @@ export function buildUserAuthPatch(profile: SocialAuthProfile): Partial<User> {
 export function getSocialAuthActionMessage(provider: AuthProviderType): string {
   switch (provider) {
     case AuthProviderType.KAKAO:
-      return '카카오 간편가입을 우선 사용하고, 길러 승인과 위험 거래에서만 별도 본인인증을 진행합니다.';
+      return '카카오로 계정을 빠르게 만들고, 길러 전환이나 위험 거래에서만 별도 본인확인을 진행합니다.';
     case AuthProviderType.GOOGLE:
       return 'Google 로그인은 fallback 로그인 수단으로 유지합니다.';
     case AuthProviderType.EMAIL:

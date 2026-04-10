@@ -62,6 +62,18 @@ function readUserUpgradeState(data: Record<string, unknown> | undefined) {
   };
 }
 
+function readRequesterReadiness(data: Record<string, unknown> | undefined) {
+  const phoneVerification =
+    typeof data?.phoneVerification === 'object' && data.phoneVerification !== null
+      ? (data.phoneVerification as Record<string, unknown>)
+      : {};
+
+  return {
+    onboardingCompleted: data?.hasCompletedOnboarding === true,
+    phoneVerified: phoneVerification.verified === true,
+  };
+}
+
 export async function GET() {
   if (!(await isAdmin())) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
@@ -70,6 +82,7 @@ export async function GET() {
   const db = getAdminDb();
   const now = new Date();
   const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const requestDelayThreshold = new Date(now.getTime() - 15 * 60 * 1000);
 
   const [
     pendingWithdrawals,
@@ -90,6 +103,15 @@ export async function GET() {
     immediateDrafts,
     usersSnap,
     recentRequestsSnap,
+    deliveryPartnersCount,
+    activeDeliveryPartnersCount,
+    partnerDispatchQueuedCount,
+    partnerDispatchActiveCount,
+    enterpriseLegacyContractsCount,
+    enterpriseLegacyPendingContractsCount,
+    enterpriseLegacyDeliveriesCount,
+    enterpriseLegacyActiveDeliveriesCount,
+    delayedRequestCount,
   ] = await Promise.all([
     db.collection('withdraw_requests').where('status', '==', 'pending').count().get(),
     db.collection('disputes').where('status', '==', 'pending').count().get(),
@@ -115,6 +137,20 @@ export async function GET() {
     db.collection('request_drafts').where('requestMode', '==', 'immediate').count().get(),
     db.collection('users').limit(300).get(),
     db.collection('delivery_requests').orderBy('createdAt', 'desc').limit(12).get(),
+    db.collection('delivery_partners').count().get(),
+    db.collection('delivery_partners').where('status', '==', 'active').count().get(),
+    db.collection('partner_dispatches').where('status', 'in', ['queued', 'requested']).count().get(),
+    db.collection('partner_dispatches').where('status', 'in', ['accepted', 'in_progress']).count().get(),
+    db.collection('business_contracts').count().get(),
+    db.collection('business_contracts').where('status', '==', 'pending').count().get(),
+    db.collection('b2b_deliveries').count().get(),
+    db.collection('b2b_deliveries').where('status', 'in', ['pending', 'matched', 'picked_up', 'in_transit']).count().get(),
+    db
+      .collection('requests')
+      .where('status', 'in', ['pending', 'matched'])
+      .where('createdAt', '<=', requestDelayThreshold)
+      .count()
+      .get(),
   ]);
 
   const latestFareDoc = fareLatest.docs[0]?.data() as { updatedAt?: { toDate?: () => Date } } | undefined;
@@ -124,7 +160,12 @@ export async function GET() {
 
   const onboarding = usersSnap.docs.reduce(
     (acc, doc) => {
-      const state = readUserUpgradeState(doc.data());
+      const data = doc.data();
+      const state = readUserUpgradeState(data);
+      const readiness = readRequesterReadiness(data);
+
+      if (!readiness.onboardingCompleted) acc.onboardingIncomplete += 1;
+      if (readiness.onboardingCompleted && !readiness.phoneVerified) acc.requesterPhonePending += 1;
       if (state.gillerApplicationStatus === 'pending') acc.awaitingUpgradeReview += 1;
       if (state.identityApproved && !state.bankApproved) acc.identityDoneBankPending += 1;
       if (!state.identityApproved) acc.identityPending += 1;
@@ -138,6 +179,8 @@ export async function GET() {
       return acc;
     },
     {
+      onboardingIncomplete: 0,
+      requesterPhonePending: 0,
       identityPending: 0,
       identityDoneBankPending: 0,
       awaitingUpgradeReview: 0,
@@ -205,11 +248,23 @@ export async function GET() {
       manualReviewCount,
       reservationDraftCount: reservationDrafts.data().count,
       immediateDraftCount: immediateDrafts.data().count,
+      deliveryPartnersCount: deliveryPartnersCount.data().count,
+      activeDeliveryPartnersCount: activeDeliveryPartnersCount.data().count,
+      partnerDispatchQueuedCount: partnerDispatchQueuedCount.data().count,
+      partnerDispatchActiveCount: partnerDispatchActiveCount.data().count,
+      enterpriseLegacyContractsCount: enterpriseLegacyContractsCount.data().count,
+      enterpriseLegacyPendingContractsCount: enterpriseLegacyPendingContractsCount.data().count,
+      enterpriseLegacyDeliveriesCount: enterpriseLegacyDeliveriesCount.data().count,
+      enterpriseLegacyActiveDeliveriesCount: enterpriseLegacyActiveDeliveriesCount.data().count,
+      delayedRequestCount: delayedRequestCount.data().count,
       criticalQueue:
         pendingWithdrawals.data().count +
         pendingDisputes.data().count +
         manualReviewCount +
-        lowConfidenceCount,
+        lowConfidenceCount +
+        partnerDispatchQueuedCount.data().count +
+        enterpriseLegacyPendingContractsCount.data().count +
+        delayedRequestCount.data().count,
     },
     integrations: {
       identity: identityConfig,

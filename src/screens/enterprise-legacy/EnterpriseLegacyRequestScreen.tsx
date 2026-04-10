@@ -13,16 +13,16 @@ import type { StackNavigationProp } from '@react-navigation/stack';
 import OptimizedStationSelectModal from '../../components/OptimizedStationSelectModal';
 import { NaverMapCard } from '../../components/maps/NaverMapCard';
 import { getAllStations } from '../../services/config-service';
-import { B2BDeliveryService } from '../../services/b2b-delivery-service';
+import { EnterpriseLegacyDeliveryService } from '../../services/enterprise-legacy-delivery-service';
 import { requireUserId } from '../../services/firebase';
 import type { Station } from '../../types/config';
-import type { B2BStackParamList } from '../../types/navigation';
+import type { EnterpriseLegacyStackParamList } from '../../types/navigation';
 import { BorderRadius, Colors, Shadows, Spacing, Typography } from '../../theme';
 
-type NavigationProp = StackNavigationProp<B2BStackParamList, 'B2BRequest'>;
+type NavigationProp = StackNavigationProp<EnterpriseLegacyStackParamList, 'EnterpriseLegacyRequest'>;
 type RequestType = 'immediate' | 'reserved';
 
-export default function B2BRequestScreen({ navigation }: { navigation: NavigationProp }) {
+export default function EnterpriseLegacyRequestScreen({ navigation }: { navigation: NavigationProp }) {
   const [loading, setLoading] = useState(false);
   const [stations, setStations] = useState<Station[]>([]);
   const [pickupStation, setPickupStation] = useState<Station | null>(null);
@@ -118,7 +118,7 @@ export default function B2BRequestScreen({ navigation }: { navigation: Navigatio
     try {
       setLoading(true);
       const businessId = requireUserId();
-      const deliveryId = await B2BDeliveryService.createDelivery({
+      const deliveryId = await EnterpriseLegacyDeliveryService.createDelivery({
         contractId: contractId.trim() || 'default',
         businessId,
         pickupLocation: {
@@ -138,11 +138,11 @@ export default function B2BRequestScreen({ navigation }: { navigation: Navigatio
         notes: specialRequest.trim(),
       });
 
-      Alert.alert('요청 접수 완료', `기업 배송 요청이 접수되었습니다.\n요청 ID: ${deliveryId}`, [
+      Alert.alert('요청 접수 완료', `기업 고객 배송 요청이 접수되었습니다.\n요청 ID: ${deliveryId}`, [
         { text: '확인', onPress: () => navigation.goBack() },
       ]);
     } catch (error) {
-      console.error('B2B request creation failed:', error);
+      console.error('Enterprise legacy request creation failed:', error);
       Alert.alert('요청 실패', error instanceof Error ? error.message : '잠시 후 다시 시도해 주세요.');
     } finally {
       setLoading(false);
@@ -152,8 +152,8 @@ export default function B2BRequestScreen({ navigation }: { navigation: Navigatio
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
       <View style={styles.header}>
-        <Text style={styles.title}>기업 배송 요청</Text>
-        <Text style={styles.subtitle}>출발역과 도착역을 선택하고 바로 요청을 등록합니다.</Text>
+        <Text style={styles.title}>기업 고객 배송 요청</Text>
+        <Text style={styles.subtitle}>레거시 기업 고객 계약 기준으로 출발역과 도착역을 선택해 요청을 등록합니다.</Text>
       </View>
 
       {Boolean(pickupStation ?? deliveryStation) && (

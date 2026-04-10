@@ -14,9 +14,9 @@ import type { StackNavigationProp } from '@react-navigation/stack';
 import { addDoc, collection, serverTimestamp } from 'firebase/firestore';
 import { db, requireUserId } from '../../services/firebase';
 import { BorderRadius, Colors, Shadows, Spacing, Typography } from '../../theme';
-import type { B2BStackParamList } from '../../types/navigation';
+import type { EnterpriseLegacyStackParamList } from '../../types/navigation';
 
-type NavigationProp = StackNavigationProp<B2BStackParamList, 'B2BOnboarding'>;
+type NavigationProp = StackNavigationProp<EnterpriseLegacyStackParamList, 'EnterpriseLegacyOnboarding'>;
 
 type Props = {
   navigation: NavigationProp;
@@ -35,7 +35,7 @@ function isValidBusinessNumber(value: string): boolean {
   return /^\d{3}-\d{2}-\d{5}$/.test(value);
 }
 
-export default function B2BOnboardingScreen({ navigation }: Props) {
+export default function EnterpriseLegacyOnboardingScreen({ navigation }: Props) {
   const [loading, setLoading] = useState(false);
   const [agreed, setAgreed] = useState(false);
   const [formData, setFormData] = useState<FormData>({
@@ -106,7 +106,7 @@ export default function B2BOnboardingScreen({ navigation }: Props) {
         { text: '확인', onPress: () => navigation.goBack() },
       ]);
     } catch (error) {
-      console.error('Failed to create B2B contract request:', error);
+      console.error('Failed to create enterprise legacy contract request:', error);
       Alert.alert('요청 실패', '잠시 후 다시 시도해 주세요.');
     } finally {
       setLoading(false);
@@ -116,8 +116,8 @@ export default function B2BOnboardingScreen({ navigation }: Props) {
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
       <View style={styles.header}>
-        <Text style={styles.title}>B2B 계약 요청</Text>
-        <Text style={styles.subtitle}>기본 정보만 입력해 주세요.</Text>
+        <Text style={styles.title}>기업 고객 계약 요청</Text>
+        <Text style={styles.subtitle}>레거시 기업 고객 계약 흐름 등록을 위해 기본 정보만 입력해 주세요.</Text>
       </View>
 
       <View style={styles.card}>

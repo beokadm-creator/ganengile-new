@@ -21,7 +21,12 @@ import {
   getDeliveryByRequestId,
 } from '../../services/delivery-service';
 import { requireUserId } from '../../services/firebase';
-import { cancelRequest, getRequestById, increaseRequestBid } from '../../services/request-service';
+import {
+  cancelRequest,
+  getRequestById,
+  increaseRequestBid,
+  subscribeToRequest,
+} from '../../services/request-service';
 import { BorderRadius, Colors, Shadows, Spacing } from '../../theme';
 import type { MainStackNavigationProp, MainStackParamList } from '../../types/navigation';
 import { RequestStatus, type Request } from '../../types/request';
@@ -86,6 +91,18 @@ function getStatusLabel(status: RequestStatus): string {
     default:
       return '상태 확인 필요';
   }
+}
+
+function getRequestProgressDescription(request: Request): string {
+  if (request.beta1RequestStatus === 'match_pending' && request.status === RequestStatus.PENDING) {
+    return '후보를 찾는 중입니다.';
+  }
+
+  if (request.beta1RequestStatus === 'accepted') {
+    return '배송이 시작됐습니다.';
+  }
+
+  return '현재 상태입니다.';
 }
 
 function Panel({ title, children }: { title: string; children: React.ReactNode }) {
@@ -178,6 +195,16 @@ export default function RequestDetailScreen() {
     void loadRequest();
   }, [loadRequest]);
 
+  useEffect(() => {
+    const unsubscribe = subscribeToRequest(requestId, (nextRequest) => {
+      setRequest(nextRequest);
+      setLoading(false);
+      setRefreshing(false);
+    });
+
+    return unsubscribe;
+  }, [requestId]);
+
   async function onRefresh() {
     setRefreshing(true);
     await loadRequest();
@@ -203,7 +230,7 @@ export default function RequestDetailScreen() {
       }
 
       if (!room) {
-        Alert.alert('채팅방을 아직 열 수 없습니다', '매칭이 완료된 뒤 다시 시도해 주세요.');
+        Alert.alert('채팅방을 열 수 없습니다', '매칭 후 다시 시도해 주세요.');
         return;
       }
 
@@ -218,7 +245,7 @@ export default function RequestDetailScreen() {
       });
     } catch (error) {
       console.error('Failed to open chat', error);
-      Alert.alert('채팅방을 열지 못했습니다', '잠시 후 다시 시도해 주세요.');
+      Alert.alert('채팅방 오류', '잠시 후 다시 시도해 주세요.');
     }
   }
 
@@ -230,11 +257,11 @@ export default function RequestDetailScreen() {
       const result = await increaseRequestBid(request.requestId, requireUserId(), amount);
 
       if (!result.success) {
-        Alert.alert('재매칭 금액 조정 실패', result.message ?? '요청 금액을 조정하지 못했습니다.');
+        Alert.alert('금액 조정 실패', result.message ?? '지금은 조정할 수 없습니다.');
         return;
       }
 
-      Alert.alert('요청 금액을 올렸습니다', `현재 예상 금액은 ${(result.newFee ?? 0).toLocaleString()}원입니다.`);
+      Alert.alert('금액을 올렸습니다', `${(result.newFee ?? 0).toLocaleString()}원으로 다시 요청합니다.`);
       await loadRequest();
     } catch (error) {
       console.error('Failed to increase bid', error);
@@ -247,13 +274,13 @@ export default function RequestDetailScreen() {
   function handleRematchAction() {
     if (!request) return;
 
-    Alert.alert('다시 매칭하시겠어요?', '요청 금액을 조금 올리거나 예약 요청으로 다시 등록할 수 있습니다.', [
+    Alert.alert('다시 시도할까요?', '금액을 올리거나 예약으로 바꿀 수 있습니다.', [
       {
         text: '금액 1,000원 올리기',
         onPress: () => void handleIncreaseBid(1000),
       },
       {
-        text: '예약 요청으로 전환',
+        text: '예약으로 바꾸기',
         onPress: () =>
           navigation.navigate('CreateRequest', {
             mode: 'reservation',
@@ -416,7 +443,7 @@ export default function RequestDetailScreen() {
         <AppTopBar title="요청 상세" onBack={() => navigation.goBack()} />
         <View style={styles.centerState}>
           <ActivityIndicator size="large" color={Colors.primary} />
-          <Text style={styles.centerText}>요청 정보를 불러오는 중입니다.</Text>
+          <Text style={styles.centerText}>요청을 불러오는 중입니다.</Text>
         </View>
       </View>
     );
@@ -427,7 +454,13 @@ export default function RequestDetailScreen() {
       <View style={styles.container}>
         <AppTopBar title="요청 상세" onBack={() => navigation.goBack()} />
         <View style={styles.centerState}>
-          <Text style={styles.errorText}>요청 정보를 찾을 수 없습니다.</Text>
+          <Text style={styles.errorText}>요청을 찾을 수 없습니다.</Text>
+          <TouchableOpacity
+            style={styles.emptyStateButton}
+            onPress={() => navigation.navigate('Tabs', { screen: 'Home' })}
+          >
+            <Text style={styles.emptyStateButtonText}>홈으로 이동</Text>
+          </TouchableOpacity>
         </View>
       </View>
     );
@@ -461,11 +494,12 @@ export default function RequestDetailScreen() {
         <View style={styles.hero}>
           <Text style={styles.kicker}>가방까지 배송</Text>
           <Text style={styles.title}>{routeLabel}</Text>
-          <Text style={styles.subtitle}>{request.packageInfo.description || '물품 설명이 아직 없습니다.'}</Text>
+          <Text style={styles.subtitle}>{request.packageInfo.description || '물품 설명 없음'}</Text>
         </View>
 
         <Panel title="현재 상태">
           <InfoRow label="상태" value={getStatusLabel(request.status)} />
+          <InfoRow label="진행 설명" value={getRequestProgressDescription(request)} />
           <InfoRow label="요청 방식" value={request.requestMode === 'reservation' ? '예약' : '즉시'} />
           <InfoRow label="예상 금액" value={`${amount.toLocaleString()}원`} />
           <InfoRow label="마감 시간" value={formatDateTime(request.deadline)} />
@@ -556,6 +590,20 @@ const styles = StyleSheet.create({
     color: Colors.error,
     fontSize: 16,
     fontWeight: '700',
+  },
+  emptyStateButton: {
+    marginTop: Spacing.md,
+    minHeight: 48,
+    paddingHorizontal: Spacing.lg,
+    borderRadius: BorderRadius.full,
+    backgroundColor: Colors.primary,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  emptyStateButtonText: {
+    color: Colors.white,
+    fontSize: 15,
+    fontWeight: '800',
   },
   hero: {
     backgroundColor: Colors.primaryMint,
