@@ -116,18 +116,59 @@ export function UserProvider({ children }: UserProviderProps) {
       setLoading(true);
 
       try {
-        let userData = await getUserById(firebaseUser.uid);
+        const MAX_READ_RETRIES = 2;
+        const RETRY_DELAY_MS = 1000;
+
+        let userData: User | null = null;
+        let readAttempt = 0;
+
+        while (readAttempt <= MAX_READ_RETRIES) {
+          try {
+            userData = await getUserById(firebaseUser.uid);
+            if (userData) break;
+
+            if (readAttempt < MAX_READ_RETRIES) {
+              console.warn(`User profile not found (attempt ${readAttempt + 1}/${MAX_READ_RETRIES + 1}), retrying in ${RETRY_DELAY_MS}ms...`);
+              await new Promise(resolve => setTimeout(resolve, RETRY_DELAY_MS));
+            }
+          } catch (error) {
+            const errorCode = typeof error === 'object' && error != null && 'code' in error
+              ? (error as { code?: unknown }).code
+              : null;
+            const code = errorCode !== null && (typeof errorCode === 'string' || typeof errorCode === 'number')
+              ? String(errorCode)
+              : '';
+
+            if (code === 'permission-denied' || code === 'firestore/permission-denied') {
+              console.warn('User read blocked by Firestore rules, aborting sync.');
+              break;
+            }
+
+            if (readAttempt < MAX_READ_RETRIES) {
+              console.warn(`User read error (attempt ${readAttempt + 1}/${MAX_READ_RETRIES + 1}):`, error);
+              await new Promise(resolve => setTimeout(resolve, RETRY_DELAY_MS));
+            } else {
+              console.error('Error loading user after retries:', error);
+            }
+          }
+          readAttempt++;
+        }
 
         if (!userData) {
-          console.warn('User profile missing, creating bootstrap document:', firebaseUser.uid);
-          const authProvider = resolveAuthProviderFromFirebaseUser(firebaseUser);
-          userData = await createUser(
-            firebaseUser.uid,
-            firebaseUser.email ?? 'unknown@example.com',
-            firebaseUser.displayName ?? '사용자',
-            UserRole.GLER,
-            authProvider
-          );
+          const finalCheck = await getUserById(firebaseUser.uid);
+          if (finalCheck) {
+            userData = finalCheck;
+          } else {
+            console.warn('User profile missing after retries, creating bootstrap document:', firebaseUser.uid);
+            const authProvider = resolveAuthProviderFromFirebaseUser(firebaseUser);
+            userData = await createUser(
+              firebaseUser.uid,
+              firebaseUser.email ?? 'unknown@example.com',
+              firebaseUser.displayName ?? '사용자',
+              UserRole.GLER,
+              authProvider
+            );
+          }
         }
 
         setUser(userData);
