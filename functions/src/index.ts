@@ -804,6 +804,39 @@ export const onRequestStatusChanged = functions.firestore
 
       const requestId = context.params.requestId;
 
+      try {
+        const pickupStationId = String(after.pickupStation?.stationId ?? '');
+        const deliveryStationId = String(after.deliveryStation?.stationId ?? '');
+        const requestMode = after.requestMode === 'reservation' ? 'reservation' : 'immediate';
+        const totalFee = Number(after.fee?.totalFee ?? after.initialNegotiationFee ?? 0);
+        const routeKey = pickupStationId && deliveryStationId
+          ? `${pickupStationId}_${deliveryStationId}_${requestMode}`
+          : null;
+
+        if (routeKey && totalFee > 0) {
+          await db.collection('request_pricing_history').doc(requestId).set({
+            requestId,
+            routeKey,
+            requestMode,
+            pickupStationId,
+            pickupStationName: after.pickupStation?.stationName ?? null,
+            deliveryStationId,
+            deliveryStationName: after.deliveryStation?.stationName ?? null,
+            totalFee,
+            finalFee: totalFee,
+            itemValue: Number(after.itemValue ?? 0),
+            depositAmount: Number(after.depositAmount ?? 0),
+            urgency: after.urgency ?? 'medium',
+            matchedGillerId: gillerId || null,
+            primaryDeliveryId: after.primaryDeliveryId ?? null,
+            completedAt: admin.firestore.FieldValue.serverTimestamp(),
+            createdAt: admin.firestore.FieldValue.serverTimestamp(),
+          }, { merge: true });
+        }
+      } catch (error) {
+        console.error('Error storing request pricing history:', error);
+      }
+
       // 1. 湲몃윭 ?섏씡 ?덉퐫???앹꽦 (?뚮옯???섏닔猷?15% + ?먯쿇吏뺤닔??3.3%)
       if (gillerId) {
         try {

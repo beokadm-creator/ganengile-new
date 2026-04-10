@@ -78,6 +78,27 @@ type QuotePricingOverrides = Partial<
 
 type SupportedPackageSize = Exclude<PackageSizeType, 'extra_large'>;
 
+function sanitizeUserFacingCopy(text: string): string {
+  const normalized = text.replace(/\s+/g, ' ').trim();
+  const disallowedSignals = [
+    '사진이 제공되지 않았으나',
+    '추정하고 처리',
+    '추정',
+    '판단',
+    'actor',
+    '백그라운드',
+    '수하자 정보가 입력되지 않았음',
+    '소형 전자기기',
+    '긴급 서류',
+  ];
+
+  if (disallowedSignals.some((signal) => normalized.includes(signal))) {
+    return '입력한 요청 정보를 기준으로 현재 조건에 맞는 진행 방식을 안내합니다.';
+  }
+
+  return normalized;
+}
+
 export function normalizePackageSize(packageSize: PackageSizeType): SupportedPackageSize {
   return packageSize === 'extra_large' ? 'xl' : packageSize;
 }
@@ -190,12 +211,14 @@ export function buildBeta1QuoteCards(input: Beta1RequestCreateInput): Beta1Quote
     {
       quoteType: 'fastest',
       label: reservationMode ? '예약 우선 배정' : '가장 빠르게',
-      headline: reservationMode ? '예약 요청이지만 빠른 배정 가능성을 열어둡니다.' : '지금 바로 미션을 열어 가장 빠른 연결을 노립니다.',
+      headline: reservationMode ? '원하는 시간에 맞춰 빠르게 연결을 준비합니다.' : '가장 빠른 진행을 우선으로 안내합니다.',
       etaLabel: reservationMode ? '예약 시간 우선 배정' : '약 70분',
       priceLabel: `${fastestPricing.publicPrice.toLocaleString()}원`,
-      recommendationReason: reservationMode
-        ? '예약 시간대와 주소/역 혼합 조건을 함께 고려해 빠른 actor를 먼저 검토합니다.'
-        : '시간 제약과 주소/역 혼합 동선을 함께 반영해 가장 빠른 연결을 노립니다.',
+      recommendationReason: sanitizeUserFacingCopy(
+        reservationMode
+          ? '예약 시간에 맞춰 빠른 연결이 필요할 때 적합합니다.'
+          : '도착 시간을 우선할 때 선택하기 좋은 옵션입니다.'
+      ),
       includesLocker: false,
       includesAddressPickup: hasAddressPickup,
       includesAddressDropoff: hasAddressDropoff,
@@ -204,12 +227,14 @@ export function buildBeta1QuoteCards(input: Beta1RequestCreateInput): Beta1Quote
     {
       quoteType: 'balanced',
       label: reservationMode ? '예약 균형형' : '추천 균형형',
-      headline: reservationMode ? '동선 안정성과 시간대 적합성을 함께 맞춥니다.' : '미션 속도와 리스크를 균형 있게 맞춥니다.',
+      headline: reservationMode ? '시간 약속과 편의의 균형을 맞춘 옵션입니다.' : '속도와 비용의 균형이 좋은 옵션입니다.',
       etaLabel: reservationMode ? '예약 시간대 맞춤 배정' : hasAddressPickup || hasAddressDropoff ? '약 105분' : '약 95분',
       priceLabel: `${balancedPricing.publicPrice.toLocaleString()}원`,
-      recommendationReason: reservationMode
-        ? '예약 요청에서는 시간대 합의와 주소/역 인계 안정성이 더 중요합니다.'
-        : '주소 픽업이나 주소 도착이 포함돼도 가장 안정적인 균형을 제공합니다.',
+      recommendationReason: sanitizeUserFacingCopy(
+        reservationMode
+          ? '무리하지 않고 안정적으로 예약을 진행하고 싶을 때 적합합니다.'
+          : '대부분의 배송 요청에 무난하게 잘 맞는 기본 추천 옵션입니다.'
+      ),
       includesLocker: input.directParticipationMode === 'locker_assisted',
       includesAddressPickup: hasAddressPickup,
       includesAddressDropoff: hasAddressDropoff,
@@ -218,12 +243,14 @@ export function buildBeta1QuoteCards(input: Beta1RequestCreateInput): Beta1Quote
     {
       quoteType: 'lowest_price',
       label: '가장 저렴하게',
-      headline: reservationMode ? '여유 시간대와 직접 참여를 활용해 비용을 낮춥니다.' : '사용자 직접 참여와 사물함 경유를 우선 적용합니다.',
+      headline: reservationMode ? '비용을 아끼는 방향으로 예약을 진행합니다.' : '비용 부담을 줄이는 데 초점을 맞춘 옵션입니다.',
       etaLabel: reservationMode ? '여유 시간대 중심 배정' : hasAddressPickup || hasAddressDropoff ? '약 130분' : '약 120분',
       priceLabel: `${lowestPricePricing.publicPrice.toLocaleString()}원`,
-      recommendationReason: reservationMode
-        ? '급하지 않을수록 주소/역 혼합 요청도 예약 전환으로 비용 절감 효과가 커집니다.'
-        : '직접 참여와 거점 활용으로 주소 구간 비용을 최대한 낮춥니다.',
+      recommendationReason: sanitizeUserFacingCopy(
+        reservationMode
+          ? '시간 여유가 있다면 비용을 가장 아끼기 좋은 선택입니다.'
+          : '조금 더 여유 있게 진행해도 괜찮다면 비용 절감에 유리합니다.'
+      ),
       includesLocker: true,
       includesAddressPickup: hasAddressPickup,
       includesAddressDropoff: hasAddressDropoff,
@@ -232,12 +259,14 @@ export function buildBeta1QuoteCards(input: Beta1RequestCreateInput): Beta1Quote
     {
       quoteType: 'locker_included',
       label: reservationMode ? '예약 거점형' : '사물함 우선',
-      headline: reservationMode ? '사물함과 거점 중심으로 예약 실패 리스크를 줄입니다.' : '사물함과 거점 연계를 우선 적용해 매칭 리스크를 낮춥니다.',
+      headline: reservationMode ? '거점 중심으로 예약을 더 편하게 진행합니다.' : '사물함 활용이 편한 요청에 잘 맞는 옵션입니다.',
       etaLabel: reservationMode ? '거점 기준 예약 배정' : hasAddressPickup || hasAddressDropoff ? '약 110분' : '약 100분',
       priceLabel: `${lockerIncludedPricing.publicPrice.toLocaleString()}원`,
-      recommendationReason: reservationMode
-        ? '예약형에서는 거점 연계가 주소/역 혼합 요청의 시간 약속 유지에 유리합니다.'
-        : '사물함과 거점 연계로 주소 인계 실패율을 낮춥니다.',
+      recommendationReason: sanitizeUserFacingCopy(
+        reservationMode
+          ? '사물함이나 거점 활용을 선호할 때 편하게 선택할 수 있습니다.'
+          : '비대면 인계나 거점 이용이 편한 상황에서 적합합니다.'
+      ),
       includesLocker: true,
       includesAddressPickup: hasAddressPickup,
       includesAddressDropoff: hasAddressDropoff,

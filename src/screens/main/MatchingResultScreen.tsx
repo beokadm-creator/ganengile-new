@@ -1,7 +1,9 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
+  Animated,
   Alert,
+  Easing,
   ScrollView,
   StyleSheet,
   Text,
@@ -12,7 +14,13 @@ import { useNavigation, useRoute, type RouteProp } from '@react-navigation/nativ
 import { BorderRadius, Colors, Spacing } from '../../theme';
 import { fetchUserInfo } from '../../services/matching-service';
 import { requireUserId } from '../../services/firebase';
-import { increaseRequestBid, notifyGillers, subscribeToRequest } from '../../services/request-service';
+import {
+  getRoutePriceInsight,
+  increaseRequestBid,
+  notifyGillers,
+  subscribeToRequest,
+  type RoutePriceInsight,
+} from '../../services/request-service';
 import { RequestStatus, type Request } from '../../types/request';
 import type { MainStackNavigationProp, MainStackParamList } from '../../types/navigation';
 
@@ -72,8 +80,40 @@ export function MatchingResultScreen() {
   const [loading, setLoading] = useState(true);
   const [notificationMessage, setNotificationMessage] = useState<string | null>(null);
   const [increasingBid, setIncreasingBid] = useState(false);
+  const [priceInsight, setPriceInsight] = useState<RoutePriceInsight | null>(null);
+  const pulseAnim = useRef(new Animated.Value(0)).current;
+  const searchMessageIndex = useRef(0);
+  const [searchMessage, setSearchMessage] = useState('주변 길러와 전문 배송길러에게 요청을 보내고 있습니다.');
 
   useEffect(() => {
+    const loop = Animated.loop(
+      Animated.sequence([
+        Animated.timing(pulseAnim, {
+          toValue: 1,
+          duration: 1100,
+          easing: Easing.out(Easing.quad),
+          useNativeDriver: true,
+        }),
+        Animated.timing(pulseAnim, {
+          toValue: 0,
+          duration: 1100,
+          easing: Easing.in(Easing.quad),
+          useNativeDriver: true,
+        }),
+      ])
+    );
+    loop.start();
+
+    const messageRotation = [
+      '주변 길러와 전문 배송길러에게 요청을 보내고 있습니다.',
+      '응답 가능한 이동 경로를 계속 확인하고 있습니다.',
+      '조건이 맞는 후보를 찾는 동안 요청은 유지됩니다.',
+    ];
+    const intervalId = setInterval(() => {
+      searchMessageIndex.current = (searchMessageIndex.current + 1) % messageRotation.length;
+      setSearchMessage(messageRotation[searchMessageIndex.current]);
+    }, 2800);
+
     const unsubscribe = subscribeToRequest(requestId, (nextRequest) => {
       setRequest(nextRequest);
       setLoading(false);
@@ -107,18 +147,40 @@ export function MatchingResultScreen() {
       }
     })();
 
-    return unsubscribe;
-  }, [requestId]);
+    return () => {
+      unsubscribe();
+      clearInterval(intervalId);
+      loop.stop();
+    };
+  }, [pulseAnim, requestId]);
+
+  useEffect(() => {
+    if (!request?.pickupStation.stationId || !request.deliveryStation.stationId) {
+      return;
+    }
+
+    void getRoutePriceInsight({
+      pickupStationId: request.pickupStation.stationId,
+      deliveryStationId: request.deliveryStation.stationId,
+      requestMode: request.requestMode,
+    }).then((insight) => {
+      setPriceInsight(insight);
+    });
+  }, [request?.deliveryStation.stationId, request?.pickupStation.stationId, request?.requestMode]);
 
   const currentFee = request?.fee?.totalFee ?? request?.feeBreakdown?.totalFee ?? request?.initialNegotiationFee ?? 0;
   const routeLabel = getRequestRouteLabel(request, pickupStationName, deliveryStationName);
+  const recommendedRaise =
+    priceInsight && priceInsight.recommendedFee > currentFee
+      ? Math.max(1000, Math.ceil((priceInsight.recommendedFee - currentFee) / 1000) * 1000)
+      : 1000;
 
-  async function handleIncreaseBid() {
+  async function handleIncreaseBid(amount: number = 1000) {
     if (!request) return;
 
     try {
       setIncreasingBid(true);
-      const result = await increaseRequestBid(request.requestId, requireUserId(), 1000);
+      const result = await increaseRequestBid(request.requestId, requireUserId(), amount);
       const errorMessage = readStringField(result, 'error');
       const newFee = readNumberField(result, 'newFee');
       if (!result.success) {
@@ -136,7 +198,7 @@ export function MatchingResultScreen() {
   }
 
   if (loading) {
-    return (
+      return (
       <View style={styles.centerState}>
         <ActivityIndicator size="large" color={Colors.primary} />
         <Text style={styles.centerText}>상태를 불러오는 중입니다.</Text>
@@ -177,6 +239,28 @@ export function MatchingResultScreen() {
         <Text style={styles.kicker}>가는길에</Text>
         <Text style={styles.title}>{isMatchedState(request.status) ? '연결 중입니다.' : '길러를 찾고 있습니다.'}</Text>
         <Text style={styles.subtitle}>{notificationMessage ?? '응답을 기다리는 중입니다.'}</Text>
+        <View style={styles.searchPanel}>
+          <View style={styles.radarWrap}>
+            <Animated.View
+              style={[
+                styles.radarPulse,
+                {
+                  opacity: pulseAnim.interpolate({ inputRange: [0, 1], outputRange: [0.2, 0.6] }),
+                  transform: [
+                    {
+                      scale: pulseAnim.interpolate({ inputRange: [0, 1], outputRange: [0.9, 1.25] }),
+                    },
+                  ],
+                },
+              ]}
+            />
+            <View style={styles.radarCore} />
+          </View>
+          <View style={styles.searchCopy}>
+            <Text style={styles.searchTitle}>실시간으로 후보를 찾는 중</Text>
+            <Text style={styles.searchBody}>{searchMessage}</Text>
+          </View>
+        </View>
       </View>
 
       <View style={styles.card}>
@@ -185,6 +269,24 @@ export function MatchingResultScreen() {
         <InfoRow label="현재 제안 금액" value={`${currentFee.toLocaleString()}원`} />
         <InfoRow label="현재 상태" value={getProgressLabel(request)} />
       </View>
+
+      {priceInsight ? (
+        <View style={styles.card}>
+          <Text style={styles.cardTitle}>최근 완료 요금 참고</Text>
+          <Text style={styles.insightBody}>
+            비슷한 구간의 최근 완료 배송은 평균 {priceInsight.averageFee.toLocaleString()}원에 진행됐어요.
+          </Text>
+          <InfoRow label="최근 표본" value={`${priceInsight.sampleCount}건`} />
+          <InfoRow label="주요 구간" value={`${priceInsight.minFee.toLocaleString()}원 - ${priceInsight.maxFee.toLocaleString()}원`} />
+          {priceInsight.recommendedFee > currentFee ? (
+            <View style={styles.inlineHint}>
+              <Text style={styles.inlineHintText}>
+                현재 금액보다 {recommendedRaise.toLocaleString()}원 정도 올리면 응답 가능성이 더 좋아질 수 있어요.
+              </Text>
+            </View>
+          ) : null}
+        </View>
+      ) : null}
 
       {giller ? (
         <View style={styles.card}>
@@ -195,8 +297,14 @@ export function MatchingResultScreen() {
       ) : null}
 
       <View style={styles.actionGroup}>
-        <TouchableOpacity style={styles.primaryButton} onPress={() => void handleIncreaseBid()} disabled={increasingBid}>
-          <Text style={styles.primaryButtonText}>{increasingBid ? '조정 중...' : '금액 1,000원 올리기'}</Text>
+        <TouchableOpacity
+          style={styles.primaryButton}
+          onPress={() => void handleIncreaseBid(recommendedRaise)}
+          disabled={increasingBid}
+        >
+          <Text style={styles.primaryButtonText}>
+            {increasingBid ? '조정 중...' : `금액 ${recommendedRaise.toLocaleString()}원 올리기`}
+          </Text>
         </TouchableOpacity>
         <TouchableOpacity
           style={styles.secondaryButton}
@@ -230,8 +338,47 @@ const styles = StyleSheet.create({
   kicker: { color: Colors.primary, fontSize: 12, fontWeight: '800', textTransform: 'uppercase', letterSpacing: 1 },
   title: { color: Colors.textPrimary, fontSize: 24, fontWeight: '800', lineHeight: 32 },
   subtitle: { color: Colors.textSecondary, fontSize: 14, lineHeight: 22 },
+  searchPanel: {
+    marginTop: Spacing.md,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.md,
+    backgroundColor: 'rgba(255,255,255,0.75)',
+    borderRadius: BorderRadius.lg,
+    padding: Spacing.md,
+  },
+  radarWrap: {
+    width: 56,
+    height: 56,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  radarPulse: {
+    position: 'absolute',
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    backgroundColor: Colors.primary,
+  },
+  radarCore: {
+    width: 18,
+    height: 18,
+    borderRadius: 9,
+    backgroundColor: Colors.primary,
+  },
+  searchCopy: { flex: 1, gap: 4 },
+  searchTitle: { color: Colors.textPrimary, fontSize: 15, fontWeight: '800' },
+  searchBody: { color: Colors.textSecondary, fontSize: 13, lineHeight: 20 },
   card: { backgroundColor: Colors.surface, borderRadius: BorderRadius.xl, padding: Spacing.xl, gap: Spacing.md, borderWidth: 1, borderColor: Colors.border },
   cardTitle: { color: Colors.textPrimary, fontSize: 18, fontWeight: '800', marginBottom: 4 },
+  insightBody: { color: Colors.textSecondary, fontSize: 14, lineHeight: 22 },
+  inlineHint: {
+    marginTop: Spacing.xs,
+    borderRadius: BorderRadius.lg,
+    backgroundColor: Colors.gray50,
+    padding: Spacing.md,
+  },
+  inlineHintText: { color: Colors.textPrimary, fontSize: 14, fontWeight: '600', lineHeight: 20 },
   infoRow: { flexDirection: 'row', justifyContent: 'space-between', gap: Spacing.md },
   infoLabel: { color: Colors.textTertiary, fontSize: 14, fontWeight: '600' },
   infoValue: { color: Colors.textPrimary, fontSize: 16, fontWeight: '700' },

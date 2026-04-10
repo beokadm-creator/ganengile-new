@@ -98,8 +98,36 @@ function getRequestProgressDescription(request: Request): string {
     return '후보를 찾는 중입니다.';
   }
 
+  if (request.status === RequestStatus.MATCHED) {
+    return '길러 응답을 기다리는 중입니다.';
+  }
+
   if (request.beta1RequestStatus === 'accepted') {
     return '배송이 시작됐습니다.';
+  }
+
+  if (request.status === RequestStatus.ACCEPTED) {
+    return '픽업 준비가 진행 중입니다.';
+  }
+
+  if (request.status === RequestStatus.IN_TRANSIT) {
+    return '배송이 이동 중입니다.';
+  }
+
+  if (request.status === RequestStatus.ARRIVED || request.status === RequestStatus.AT_LOCKER) {
+    return '수령 또는 인계만 남아 있습니다.';
+  }
+
+  if (request.status === RequestStatus.DELIVERED) {
+    return '수령 확인을 하면 요청이 완료됩니다.';
+  }
+
+  if (request.status === RequestStatus.COMPLETED) {
+    return '배송이 정상적으로 완료되었습니다.';
+  }
+
+  if (request.status === RequestStatus.CANCELLED) {
+    return '취소된 요청입니다.';
   }
 
   return '현재 상태입니다.';
@@ -469,13 +497,25 @@ export default function RequestDetailScreen() {
   const canRematch = request.status === RequestStatus.PENDING || request.status === RequestStatus.MATCHED;
   const canCancel =
     request.status !== RequestStatus.CANCELLED && request.status !== RequestStatus.COMPLETED;
+  const canOpenChat = Boolean(request.matchedGillerId) && request.status !== RequestStatus.PENDING;
   const canDispute =
     request.status === RequestStatus.IN_TRANSIT ||
     request.status === RequestStatus.ARRIVED ||
     request.status === RequestStatus.AT_LOCKER ||
-    request.status === RequestStatus.DELIVERED;
+    request.status === RequestStatus.DELIVERED ||
+    request.status === RequestStatus.COMPLETED;
   const canConfirm =
     request.status === RequestStatus.DELIVERED || request.status === RequestStatus.AT_LOCKER;
+  const canTrackDelivery =
+    Boolean(request.primaryDeliveryId) &&
+    [
+      RequestStatus.ACCEPTED,
+      RequestStatus.IN_TRANSIT,
+      RequestStatus.ARRIVED,
+      RequestStatus.AT_LOCKER,
+      RequestStatus.DELIVERED,
+      RequestStatus.COMPLETED,
+    ].includes(request.status);
   const routeLabel = `${request.pickupStation.stationName} -> ${request.deliveryStation.stationName}`;
   const preferredTimeLabel = request.preferredTime
     ? `${request.preferredTime.departureTime ?? '-'}${
@@ -492,7 +532,7 @@ export default function RequestDetailScreen() {
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => void onRefresh()} />}
       >
         <View style={styles.hero}>
-          <Text style={styles.kicker}>가방까지 배송</Text>
+          <Text style={styles.kicker}>{request.requestMode === 'reservation' ? '예약 배송 요청' : '배송 요청 상세'}</Text>
           <Text style={styles.title}>{routeLabel}</Text>
           <Text style={styles.subtitle}>{request.packageInfo.description || '물품 설명 없음'}</Text>
         </View>
@@ -516,7 +556,9 @@ export default function RequestDetailScreen() {
         </Panel>
 
         <View style={styles.actionSection}>
-          <ActionButton primary icon="chat-bubble-outline" label="채팅 열기" onPress={() => void openChat()} />
+          {canOpenChat ? (
+            <ActionButton primary icon="chat-bubble-outline" label="채팅 열기" onPress={() => void openChat()} />
+          ) : null}
 
           {Boolean(request.matchedGillerId) && (request.itemValue ?? 0) > 0 ? (
             <ActionButton icon="lock" label="보증금 결제" onPress={handleDepositPayment} />
@@ -534,7 +576,13 @@ export default function RequestDetailScreen() {
           {canCancel ? (
             <ActionButton
               icon="cancel"
-              label={working === 'cancel' ? '처리 중...' : '배송 취소'}
+              label={
+                working === 'cancel'
+                  ? '처리 중...'
+                  : request.status === RequestStatus.PENDING || request.status === RequestStatus.MATCHED
+                    ? '요청 취소'
+                    : '배송 취소'
+              }
               onPress={handleCancel}
               disabled={working !== null}
               destructive
@@ -554,11 +602,13 @@ export default function RequestDetailScreen() {
             />
           ) : null}
 
-          <ActionButton
-            icon="map"
-            label="배송 추적으로 이동"
-            onPress={() => navigation.navigate('DeliveryTracking', { requestId: request.requestId })}
-          />
+          {canTrackDelivery ? (
+            <ActionButton
+              icon="map"
+              label={request.status === RequestStatus.COMPLETED ? '완료된 배송 보기' : '배송 추적으로 이동'}
+              onPress={() => navigation.navigate('DeliveryTracking', { requestId: request.requestId })}
+            />
+          ) : null}
         </View>
       </ScrollView>
     </View>

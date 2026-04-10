@@ -20,6 +20,7 @@ import {
   PhotoVerification,
 } from '../types/photo';
 import * as ImagePicker from 'expo-image-picker';
+import * as ImageManipulator from 'expo-image-manipulator';
 
 const PHOTOS_COLLECTION = 'photos';
 const DISPUTES_COLLECTION = 'disputes';
@@ -267,6 +268,24 @@ export function createPhotoService(): PhotoService {
   return new PhotoService();
 }
 
+async function optimizeUploadImage(uri: string): Promise<string> {
+  try {
+    const result = await ImageManipulator.manipulateAsync(
+      uri,
+      [{ resize: { width: 1280 } }],
+      {
+        compress: 0.6,
+        format: ImageManipulator.SaveFormat.JPEG,
+      }
+    );
+
+    return result.uri;
+  } catch (error) {
+    console.error('Failed to optimize upload image:', error);
+    return uri;
+  }
+}
+
 export async function takePhoto(): Promise<string | null> {
   const permission = await ImagePicker.requestCameraPermissionsAsync();
   if (!permission.granted) {
@@ -310,6 +329,7 @@ export async function uploadPhotoWithThumbnail(
   type: string
 ): Promise<{ url: string }> {
   const path = `photos/${userId}/${type}_${Date.now()}.jpg`;
-  const url = await uploadToStorage(path, uri);
+  const optimizedUri = await optimizeUploadImage(uri);
+  const url = await uploadToStorage(path, optimizedUri);
   return { url };
 }

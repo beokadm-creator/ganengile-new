@@ -81,8 +81,22 @@ type FeeSnapshot = {
   [key: string]: unknown;
 };
 
+export type RoutePriceInsight = {
+  averageFee: number;
+  minFee: number;
+  maxFee: number;
+  sampleCount: number;
+  recommendedFee: number;
+  routeKey: string;
+};
+
 function getErrorMessage(error: unknown, fallback: string): string {
   return error instanceof Error ? error.message : fallback;
+}
+
+function buildRouteKey(pickupStationId: string, deliveryStationId: string, requestMode?: string): string {
+  const mode = requestMode === 'reservation' ? 'reservation' : 'immediate';
+  return `${pickupStationId}_${deliveryStationId}_${mode}`;
 }
 
 function toLegacyPackageInfo(packageInfo?: LegacyCreatePackageInfo): PackageInfo {
@@ -913,6 +927,56 @@ export async function increaseRequestBid(
   } catch (error) {
     console.error('Error increasing request bid:', error);
     return { success: false, message: '금액 상향에 실패했습니다.' };
+  }
+}
+
+export async function getRoutePriceInsight(params: {
+  pickupStationId: string;
+  deliveryStationId: string;
+  requestMode?: 'immediate' | 'reservation';
+}): Promise<RoutePriceInsight | null> {
+  try {
+    const routeKey = buildRouteKey(params.pickupStationId, params.deliveryStationId, params.requestMode);
+    const snapshot = await getDocs(
+      query(
+        collection(db, 'request_pricing_history'),
+        where('routeKey', '==', routeKey),
+        limit(30)
+      )
+    );
+
+    const fees = snapshot.docs
+      .map((docSnapshot) => {
+        const data = docSnapshot.data() as {
+          totalFee?: unknown;
+          finalFee?: unknown;
+        };
+        const feeCandidate = typeof data.finalFee === 'number' ? data.finalFee : data.totalFee;
+        return typeof feeCandidate === 'number' && feeCandidate > 0 ? feeCandidate : null;
+      })
+      .filter((fee): fee is number => fee !== null);
+
+    if (fees.length === 0) {
+      return null;
+    }
+
+    const total = fees.reduce((sum, fee) => sum + fee, 0);
+    const averageFee = Math.round(total / fees.length);
+    const minFee = Math.min(...fees);
+    const maxFee = Math.max(...fees);
+    const recommendedFee = Math.max(averageFee, Math.ceil(averageFee / 1000) * 1000);
+
+    return {
+      averageFee,
+      minFee,
+      maxFee,
+      sampleCount: fees.length,
+      recommendedFee,
+      routeKey,
+    };
+  } catch (error) {
+    console.error('Error fetching route price insight:', error);
+    return null;
   }
 }
 

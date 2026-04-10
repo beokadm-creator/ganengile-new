@@ -295,6 +295,11 @@ service cloud.firestore {
       allow delete: if false;
     }
 
+    match /request_pricing_history/{historyId} {
+      allow read: if isAuthenticated();
+      allow create, update, delete: if false;
+    }
+
     match /delivery_legs/{deliveryLegId} {
       allow read: if isAuthenticated() &&
         (isAdmin() ||
