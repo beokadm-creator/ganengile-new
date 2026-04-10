@@ -397,7 +397,11 @@ async function runZaiChatCompletion(config: Beta1AIConfig, model: string, prompt
 }
 
 function buildAnalysisFallback(input: Beta1RequestDraftAnalysisInput, config: Beta1AIConfig): Beta1RequestDraftAnalysisResult {
-  const description = input.packageDraft?.description?.trim() ?? `${input.origin.stationName || '출발역'}에서 ${input.destination.stationName || '도착역'}까지 보내는 물품`;
+  const originName = input.origin.stationName ?? '출발역';
+  const destinationName = input.destination.stationName ?? '도착역';
+  const description =
+    input.packageDraft?.description?.trim() ??
+    `${originName}에서 ${destinationName}까지 보내는 물품`;
   const riskFlags: string[] = [];
   const handlingNotes: string[] = [];
   const reservationMode = isReservationMode(input.requestMode);
@@ -654,7 +658,7 @@ export async function executeRequestDraftAnalysis(
   input: Beta1RequestDraftAnalysisInput
 ): Promise<Beta1RequestDraftAnalysisResult> {
   const config = await getAIConfig(db);
-  if (!config.enabled ?? !config.apiKey) {
+  if (!config.enabled || !config.apiKey) {
     return buildAnalysisFallback(input, config);
   }
 
@@ -705,7 +709,7 @@ export async function executePricingQuoteGeneration(
   input: Beta1PricingQuoteInput
 ): Promise<Beta1PricingQuoteResult> {
   const config = await getAIConfig(db);
-  if (!config.enabled ?? !config.apiKey) {
+  if (!config.enabled || !config.apiKey) {
     return buildPricingFallback(input, config);
   }
 
@@ -720,8 +724,8 @@ export async function executePricingQuoteGeneration(
   try {
     const response = await runZaiChatCompletion(config, config.pricingModel, prompt, 900);
     const parsed = parseJson<Record<string, unknown>>(response.content);
-    const quoteList = Array.isArray(parsed?.quotes) ? parsed?.quotes : null;
-    if (!quoteList ?? quoteList.length === 0) {
+    const quoteList = Array.isArray(parsed?.quotes) ? parsed.quotes : [];
+    if (quoteList.length === 0) {
       return {
         ...buildPricingFallback(input, config),
         model: config.pricingModel,
@@ -794,7 +798,7 @@ export async function executeMissionPlanning(
   input: Beta1MissionPlanInput
 ): Promise<Beta1MissionPlanResult> {
   const config = await getAIConfig(db);
-  if (!config.enabled ?? !config.apiKey) {
+  if (!config.enabled || !config.apiKey) {
     return buildMissionFallback(input, config);
   }
 

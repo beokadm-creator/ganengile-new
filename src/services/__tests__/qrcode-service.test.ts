@@ -13,16 +13,9 @@ describe('QRCodeService', () => {
   describe('handleQRCodeScan', () => {
     it('유효한 QR 코드 데이터를 파싱해야 한다', () => {
       // Given
-      const validQRData: QRCodeData = {
-        type: 'pickup',
-        id: 'req-123',
-        timestamp: Date.now(),
-        metadata: {
-          gillerId: 'giller-456',
-        },
-      };
+      const validQRData = QRCodeService.generatePickupQRCode('req-123', 'giller-456');
       const mockScanResult = {
-        data: JSON.stringify(validQRData),
+        data: validQRData,
         type: 'org.iso.QRCode',
         cornerPoints: [],
         bounds: { origin: { x: 0, y: 0 }, size: { width: 100, height: 100 } },
@@ -165,11 +158,9 @@ describe('QRCodeService', () => {
   describe('validateQRCodeData', () => {
     it('모든 필수 필드가 있으면 true를 반환해야 한다', () => {
       // Given
-      const validData: QRCodeData = {
-        type: 'pickup',
-        id: 'req-123',
-        timestamp: Date.now(),
-      };
+      const validData = JSON.parse(
+        QRCodeService.generatePickupQRCode('req-123', 'giller-456')
+      ) as QRCodeData;
 
       // When
       const result = QRCodeService.validateQRCodeData(validData);
@@ -252,11 +243,9 @@ describe('QRCodeService', () => {
 
     it('24시간 이내의 QR 코드는 유효해야 한다', () => {
       // Given - 23시간 전
-      const recentData: QRCodeData = {
-        type: 'pickup',
-        id: 'req-123',
-        timestamp: Date.now() - 23 * 60 * 60 * 1000,
-      };
+      const recentData = JSON.parse(
+        QRCodeService.generatePickupQRCode('req-123', 'giller-456')
+      ) as QRCodeData;
 
       // When
       const result = QRCodeService.validateQRCodeData(recentData);
@@ -276,7 +265,7 @@ describe('QRCodeService', () => {
 
       // Then
       expect(imageUrl).toContain('https://api.qrserver.com/v1/create-qr-code/');
-      expect(imageUrl).toContain('size=200x200');
+      expect(imageUrl).toContain('size=240x240');
       expect(imageUrl).toContain(encodeURIComponent(testData));
     });
 

@@ -205,7 +205,7 @@ export class OneTimeMatchingService {
    */
   private static calculateRouteScore(giller: any, _request: DeliveryRequestP1): number {
     // 목적지까지 직행 여부, 환승 횟수 등 고려
-    const hasDirectRoute = !giller.transferCount ?? giller.transferCount === 0;
+    const hasDirectRoute = !giller.transferCount || giller.transferCount === 0;
     return hasDirectRoute ? 100 : Math.max(0, 100 - giller.transferCount * 20);
   }
 

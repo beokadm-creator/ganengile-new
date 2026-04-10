@@ -74,7 +74,7 @@ const CACHE_TTL = 60 * 1000;
 
 let identityCache: { data: IdentityIntegrationConfig; expiresAt: number } | null = null;
 let bankCache: { data: BankIntegrationConfig; expiresAt: number } | null = null;
-let paymentCache: { data: PaymentIntegrationConfig; expiresAt: number } | null = null;
+const _paymentCache: { data: PaymentIntegrationConfig; expiresAt: number } | null = null;
 let aiCache: { data: AIIntegrationConfig; expiresAt: number } | null = null;
 
 function getDefaultIdentityIntegrationConfig(): IdentityIntegrationConfig {
@@ -113,7 +113,7 @@ function getDefaultBankIntegrationConfig(): BankIntegrationConfig {
   };
 }
 
-function getDefaultPaymentIntegrationConfig(): PaymentIntegrationConfig {
+function _getDefaultPaymentIntegrationConfig(): PaymentIntegrationConfig {
   return {
     enabled: true,
     testMode: true,

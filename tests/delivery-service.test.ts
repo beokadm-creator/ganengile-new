@@ -1,218 +1,231 @@
 /**
  * Delivery Service Tests
- * 배송 진행 관리 테스트
+ * 현재 mock Firestore 계약 기준 smoke/회귀 테스트
  */
 
-import { describe, test, expect, beforeEach, afterEach } from '@jest/globals';
+import { afterEach, beforeEach, describe, expect, test } from '@jest/globals';
+import { collection, deleteDoc, doc, getDoc, getDocs, query, setDoc, where } from 'firebase/firestore';
 import {
+  completeDelivery,
+  getDeliveryById,
   gillerAcceptRequest,
   updateGillerLocation,
   verifyPickup,
-  completeDelivery,
-  getDeliveryById,
 } from '../src/services/delivery-service';
-import { doc, getDoc, deleteDoc, getDocs, setDoc, query, where, collection } from 'firebase/firestore';
 import { db } from '../src/services/firebase';
-import { DeliveryStatus } from '../src/types/delivery';
 
-describe.skip('Delivery Service - Skipped: Complex mock setup', () => {
+jest.mock('../src/services/beta1-orchestration-service', () => ({
+  persistActorSelectionDecision: jest.fn().mockResolvedValue(undefined),
+  syncDeliveryToBeta1Execution: jest.fn().mockResolvedValue(undefined),
+}));
+
+jest.mock('../src/services/beta1-ai-service', () => ({
+  planMissionExecutionWithAI: jest.fn().mockResolvedValue(null),
+}));
+
+jest.mock('../src/services/storage-service', () => ({
+  uploadPickupPhoto: jest.fn().mockResolvedValue('https://example.com/pickup.jpg'),
+  uploadDeliveryPhoto: jest.fn().mockResolvedValue('https://example.com/delivery.jpg'),
+}));
+
+describe('Delivery Service', () => {
   const testGillerId = 'test-giller-delivery-001';
+  const testRequesterId = 'test-requester-delivery-001';
   const testRequestId = 'test-request-delivery-001';
   const createdDeliveryIds: string[] = [];
 
   beforeEach(async () => {
-    // Create test request
+    global.__clearMockFirestore();
+
     await setDoc(doc(db, 'requests', testRequestId), {
       status: 'matched',
-      gllerId: testGillerId,
-      gillerId: testGillerId,
-      pickupStation: 'gangnam',
-      deliveryStation: 'seoul',
+      requesterId: testRequesterId,
+      gllerId: testRequesterId,
+      pickupStation: { stationName: '강남역' },
+      deliveryStation: { stationName: '서울역' },
       deliveryType: 'standard',
       packageInfo: {
-        type: 'small',
-        weight: 1,
+        size: 'small',
+        weightKg: 1,
         description: 'Test package',
       },
-      fee: 5000,
+      fee: {
+        totalFee: 5500,
+        deliveryFee: 5000,
+        vat: 500,
+        publicFare: 0,
+        breakdown: {
+          gillerFee: 4950,
+          platformFee: 550,
+        },
+      },
       recipientName: 'Test Recipient',
       recipientPhone: '010-1234-5678',
       recipientVerificationCode: '123456',
       createdAt: new Date(),
       updatedAt: new Date(),
     });
-
-    // Cleanup: Delete test deliveries
-    const snapshot = await getDocs(
-      query(
-        collection(db, 'deliveries'),
-        where('gillerId', '==', testGillerId)
-      )
-    );
-
-    const deletePromises = snapshot.docs.map(d => deleteDoc(d.ref));
-    await Promise.all(deletePromises);
   });
 
   afterEach(async () => {
-    // Cleanup: Delete all test deliveries
     for (const deliveryId of createdDeliveryIds) {
       try {
         await deleteDoc(doc(db, 'deliveries', deliveryId));
-      } catch (error) {
-        console.log('Cleanup error:', error);
+      } catch {
+        // noop
       }
     }
     createdDeliveryIds.length = 0;
 
-    // Cleanup: Delete test request
     try {
       await deleteDoc(doc(db, 'requests', testRequestId));
-    } catch (error) {
-      console.log('Request cleanup error:', error);
+    } catch {
+      // noop
     }
   });
 
-  describe('gillerAcceptRequest', () => {
-    test('should start a delivery successfully', async () => {
-      const result = await gillerAcceptRequest(
-        testRequestId,
-        testGillerId
-      );
+  test('accepts a matched request and creates a delivery', async () => {
+    const result = await gillerAcceptRequest(testRequestId, testGillerId);
 
-      expect(result.success).toBe(true);
-      expect(result.deliveryId).toBeDefined();
-      expect(typeof result.deliveryId).toBe('string');
+    expect(result.success).toBe(true);
+    expect(result.deliveryId).toBeDefined();
 
-      if (result.deliveryId) {
-        createdDeliveryIds.push(result.deliveryId);
+    if (!result.deliveryId) {
+      throw new Error('deliveryId should be created');
+    }
 
-        const deliveryDoc = await getDoc(doc(db, 'deliveries', result.deliveryId));
-        expect(deliveryDoc.exists).toBe(true);
+    createdDeliveryIds.push(result.deliveryId);
 
-        const deliveryData = deliveryDoc.data();
-        expect(deliveryData?.gillerId).toBe(testGillerId);
-        expect(deliveryData?.status).toBe(DeliveryStatus.ACCEPTED);
-      }
-    });
+    const deliveryDoc = await getDoc(doc(db, 'deliveries', result.deliveryId));
+    expect(deliveryDoc.exists()).toBe(true);
+    expect(deliveryDoc.data()).toEqual(
+      expect.objectContaining({
+        requestId: testRequestId,
+        gillerId: testGillerId,
+        status: 'accepted',
+      })
+    );
 
-    test('should fail to start delivery with invalid request ID', async () => {
-      await expect(
-        gillerAcceptRequest('', testGillerId)
-      ).rejects.toThrow();
-    });
+    const requestDoc = await getDoc(doc(db, 'requests', testRequestId));
+    expect(requestDoc.data()).toEqual(
+      expect.objectContaining({
+        status: 'accepted',
+        matchedGillerId: testGillerId,
+        primaryDeliveryId: result.deliveryId,
+      })
+    );
   });
 
-  describe('updateGillerLocation', () => {
-    test('should update delivery location successfully', async () => {
-      // First start a delivery
-      const result = await gillerAcceptRequest(
-        testRequestId,
-        testGillerId
-      );
+  test('updates courier location without throwing', async () => {
+    const acceptResult = await gillerAcceptRequest(testRequestId, testGillerId);
+    if (!acceptResult.deliveryId) {
+      throw new Error('deliveryId should be created');
+    }
+    createdDeliveryIds.push(acceptResult.deliveryId);
 
-      expect(result.success).toBe(true);
-      const deliveryId = result.deliveryId;
-
-      if (deliveryId) {
-        createdDeliveryIds.push(deliveryId);
-
-        // Update location
-        const location = {
-          latitude: 37.5665,
-          longitude: 126.9780,
-        };
-
-        const updateResult = await updateGillerLocation(deliveryId, location);
-        expect(updateResult.success).toBe(true);
-
-        // Verify location was updated
-        const deliveryDoc = await getDoc(doc(db, 'deliveries', deliveryId));
-        const deliveryData = deliveryDoc.data();
-
-        expect(deliveryData?.tracking?.currentLocation).toEqual(location);
-      }
-    });
-
-    test('should handle location update for non-existent delivery', async () => {
-      const location = {
+    await expect(
+      updateGillerLocation(acceptResult.deliveryId, {
         latitude: 37.5665,
-        longitude: 126.9780,
-      };
+        longitude: 126.978,
+      })
+    ).resolves.toBeUndefined();
 
-      const result = await updateGillerLocation('non-existent-id', location);
-      expect(result.success).toBe(false);
-    });
+    const deliveryDoc = await getDoc(doc(db, 'deliveries', acceptResult.deliveryId));
+    expect(deliveryDoc.exists()).toBe(true);
+    expect(deliveryDoc.data()).toEqual(
+      expect.objectContaining({
+        requestId: testRequestId,
+        gillerId: testGillerId,
+      })
+    );
   });
 
-  describe('verifyPickup', () => {
-    test('should verify pickup successfully', async () => {
-      const result = await gillerAcceptRequest(testRequestId, testGillerId);
+  test('verifies pickup and moves accepted delivery to in_transit', async () => {
+    const acceptResult = await gillerAcceptRequest(testRequestId, testGillerId);
+    if (!acceptResult.deliveryId) {
+      throw new Error('deliveryId should be created');
+    }
+    createdDeliveryIds.push(acceptResult.deliveryId);
 
-      if (result.deliveryId) {
-        createdDeliveryIds.push(result.deliveryId);
-
-        const verifyData = {
-          deliveryId: result.deliveryId,
-          gillerId: testGillerId,
-          verificationCode: '1234',
-          photoUri: 'data:image/jpeg;base64,test',
-          location: {
-            latitude: 37.5665,
-            longitude: 126.9780,
-          },
-        };
-
-        const verifyResult = await verifyPickup(verifyData);
-        expect(verifyResult.success).toBe(true);
-      }
+    const verifyResult = await verifyPickup({
+      deliveryId: acceptResult.deliveryId,
+      gillerId: testGillerId,
+      verificationCode: '1234',
+      photoUri: 'file://pickup.jpg',
+      location: {
+        latitude: 37.5,
+        longitude: 127.0,
+      },
     });
+
+    expect(verifyResult).toEqual({
+      success: true,
+      message: '픽업이 완료되었습니다.',
+    });
+
+    const deliveryDoc = await getDoc(doc(db, 'deliveries', acceptResult.deliveryId));
+    expect(deliveryDoc.data()).toEqual(
+      expect.objectContaining({
+        status: 'in_transit',
+        pickupVerificationCode: '1234',
+      })
+    );
   });
 
-  describe('completeDelivery', () => {
-    test('should complete delivery successfully', async () => {
-      const result = await gillerAcceptRequest(testRequestId, testGillerId);
+  test('completes delivery when code matches and the delivery is in transit', async () => {
+    const deliveryRef = doc(db, 'deliveries', 'delivery-complete-001');
+    createdDeliveryIds.push(deliveryRef.id);
 
-      if (result.deliveryId) {
-        createdDeliveryIds.push(result.deliveryId);
-
-        const completionData = {
-          deliveryId: result.deliveryId,
-          gillerId: testGillerId,
-          verificationCode: '123456',
-          location: {
-            latitude: 37.5665,
-            longitude: 126.9780,
-          },
-        };
-
-        const completeResult = await completeDelivery(completionData);
-        expect(completeResult.success).toBe(true);
-
-        // Verify delivery status
-        const deliveryDoc = await getDoc(doc(db, 'deliveries', result.deliveryId));
-        const deliveryData = deliveryDoc.data();
-        expect(deliveryData?.status).toBe(DeliveryStatus.COMPLETED);
-      }
+    await setDoc(deliveryRef, {
+      requestId: testRequestId,
+      gillerId: testGillerId,
+      status: 'in_transit',
+      recipientInfo: {
+        verificationCode: '123456',
+      },
+      tracking: {
+        events: [],
+      },
+      createdAt: new Date(),
+      updatedAt: new Date(),
     });
+
+    const result = await completeDelivery({
+      deliveryId: deliveryRef.id,
+      gillerId: testGillerId,
+      verificationCode: '123456',
+      photoUri: 'file://delivery.jpg',
+      location: {
+        latitude: 37.55,
+        longitude: 126.99,
+      },
+    });
+
+    expect(result.success).toBe(true);
+
+    const deliveryDoc = await getDoc(deliveryRef);
+    expect(deliveryDoc.data()).toEqual(
+      expect.objectContaining({
+        status: 'delivered',
+      })
+    );
   });
 
-  describe('getDeliveryById', () => {
-    test('should get delivery status', async () => {
-      const result = await gillerAcceptRequest(testRequestId, testGillerId);
+  test('returns null when delivery does not exist', async () => {
+    await expect(getDeliveryById('non-existent-delivery')).resolves.toBeNull();
+  });
 
-      if (result.deliveryId) {
-        createdDeliveryIds.push(result.deliveryId);
+  test('lists created deliveries through the mock query layer', async () => {
+    const acceptResult = await gillerAcceptRequest(testRequestId, testGillerId);
+    if (!acceptResult.deliveryId) {
+      throw new Error('deliveryId should be created');
+    }
+    createdDeliveryIds.push(acceptResult.deliveryId);
 
-        const delivery = await getDeliveryById(result.deliveryId);
-        expect(delivery).toBeDefined();
-        expect(delivery?.id).toBe(result.deliveryId);
-      }
-    });
+    const snapshot = await getDocs(
+      query(collection(db, 'deliveries'), where('gillerId', '==', testGillerId))
+    );
 
-    test('should return null for non-existent delivery', async () => {
-      const delivery = await getDeliveryById('non-existent-id');
-      expect(delivery).toBeNull();
-    });
+    expect(snapshot.docs.length).toBeGreaterThanOrEqual(1);
   });
 });

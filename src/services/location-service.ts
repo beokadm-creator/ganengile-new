@@ -27,7 +27,9 @@ export class LocationService {
   async requestLocationPermission(): Promise<boolean> {
     try {
       const permission = await Location.requestForegroundPermissionsAsync();
-      return permission.granted;
+      const granted = permission.granted;
+      const status = permission.status as string | undefined;
+      return typeof granted === 'boolean' ? granted : status === 'granted';
     } catch (error) {
       console.error('Error requesting location permission:', error);
       return false;
@@ -50,7 +52,7 @@ export class LocationService {
         longitude: location.coords.longitude,
         accuracy: location.coords.accuracy ?? 0,
         altitude: location.coords.altitude ?? null,
-        speed: location.coords.speed ?? null,
+        speed: location.coords.speed ?? 0,
         heading: location.coords.heading ?? null,
       };
     } catch (error) {
@@ -80,7 +82,7 @@ export class LocationService {
             longitude: location.coords.longitude,
             accuracy: location.coords.accuracy ?? 0,
             altitude: location.coords.altitude ?? null,
-            speed: location.coords.speed ?? null,
+            speed: location.coords.speed ?? 0,
             heading: location.coords.heading ?? null,
           });
         }
@@ -196,11 +198,12 @@ export class LocationService {
 
       if (geocoded.length > 0) {
         const first = geocoded[0];
+        const compactCity = first.city?.replace(/시$/, '') ?? first.city;
         const segments = [
-          first.region,
-          first.city,
-          first.district,
           first.street,
+          first.district,
+          compactCity,
+          first.region,
           first.name,
         ].filter(Boolean);
 
@@ -209,10 +212,10 @@ export class LocationService {
         }
       }
 
-      return `${latitude.toFixed(5)}, ${longitude.toFixed(5)}`;
+      return '위치를 찾을 수 없습니다';
     } catch (error) {
       console.error('Error reverse geocoding:', error);
-      return `${latitude.toFixed(5)}, ${longitude.toFixed(5)}`;
+      return '주소 변환 실패';
     }
   }
 }

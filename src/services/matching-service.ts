@@ -226,6 +226,14 @@ function getErrorMessage(error: unknown, fallback: string): string {
   return error instanceof Error ? error.message : fallback;
 }
 
+function snapshotExists(snapshot: { exists?: boolean | (() => boolean) }): boolean {
+  if (typeof snapshot.exists === 'function') {
+    return snapshot.exists();
+  }
+
+  return snapshot.exists === true;
+}
+
 function normalizeStationName(name?: string): string {
   return (name ?? '').replace(/\s+/g, '').replace(/\?/g, '').toLowerCase();
 }
@@ -261,7 +269,7 @@ function normalizeRouteForMatching(routeData: LooseRouteInput, routeId: string):
     lng: end.lng ?? end.longitude ?? 0,
   };
 
-  if (!startStation.stationName ?? !endStation.stationName) {
+  if (!startStation.stationName || !endStation.stationName) {
     return null;
   }
 
@@ -304,7 +312,7 @@ async function findMatchesByRouteHeuristic(
     const loosePickup = namesLooselyEqual(route.startStation.stationName, requestPickup);
     const looseDelivery = namesLooselyEqual(route.endStation.stationName, requestDelivery);
     const isTodayRoute = route.daysOfWeek.includes(dayOfWeek);
-    const adjustedScore = routeScore.score + (isTodayRoute ? 10 : 0) + ((loosePickup ?? looseDelivery) ? 5 : 0);
+    const adjustedScore = routeScore.score + (isTodayRoute ? 10 : 0) + ((loosePickup || looseDelivery) ? 5 : 0);
 
     if (adjustedScore < 10) return;
 
@@ -390,7 +398,7 @@ export async function calculateBadgeBonus(userId: string): Promise<{
   try {
     const userDoc = await getDoc(doc(db, 'users', userId));
 
-    if (!userDoc.exists()) {
+    if (!snapshotExists(userDoc)) {
       return { feeBonus: 0, priorityBoost: 0 };
     }
 
@@ -431,7 +439,7 @@ async function fetchUserStats(userId: string): Promise<{
   try {
     const userDoc = await getDoc(doc(db, 'users', userId));
 
-    if (!userDoc.exists()) {
+    if (!snapshotExists(userDoc)) {
       return {
         rating: 3.5,
         totalDeliveries: 0,
@@ -486,7 +494,7 @@ export async function fetchActiveGillerRoutes(): Promise<EngineGillerRoute[]> {
       const startStation = getStationByName(startStationName);
       const endStation = getStationByName(endStationName);
 
-      if (!startStation ?? !endStation) {
+      if (!startStation || !endStation) {
         console.warn(`Station not found for route ${docSnapshot.id}`);
         return;
       }
@@ -541,7 +549,7 @@ export async function fetchUserInfo(userId: string): Promise<{
   try {
     const userDoc = await getDoc(doc(db, 'users', userId));
 
-    if (!userDoc.exists()) {
+    if (!snapshotExists(userDoc)) {
       return {
         name: 'giller',
         rating: 3.5,
@@ -604,7 +612,7 @@ export async function findMatchesForRequest(
     // 1. Fetch request
     const requestDoc = await getDoc(doc(db, 'requests', requestId));
 
-    if (!requestDoc.exists()) {
+    if (!snapshotExists(requestDoc)) {
       throw new Error('Request not found');
     }
 
@@ -636,7 +644,7 @@ export async function findMatchesForRequest(
     // Engine exception fallback: request/route based heuristic
     try {
       const requestDoc = await getDoc(doc(db, 'requests', requestId));
-      if (!requestDoc.exists()) {
+      if (!snapshotExists(requestDoc)) {
         return [];
       }
       return await findMatchesByRouteHeuristic({ id: requestDoc.id, ...(requestDoc.data() as FirestoreMatchingRequestDoc) }, topN);
@@ -805,7 +813,7 @@ export async function acceptRequest(
     const requestRef = doc(db, 'requests', requestId);
     const requestDoc = await getDoc(requestRef);
 
-    if (!requestDoc.exists()) {
+    if (!snapshotExists(requestDoc)) {
       return { success: false, message: '요청을 찾을 수 없습니다.' };
     }
 
@@ -892,12 +900,12 @@ export async function declineRequest(
       return { success: false, message: '매칭 정보를 찾을 수 없습니다.' };
     }
 
-    matchSnapshot.forEach(async (matchDoc) => {
-      await updateDoc(doc(db, 'matches', matchDoc.id), {
+    await Promise.all(matchSnapshot.docs.map((matchDoc) =>
+      updateDoc(doc(db, 'matches', matchDoc.id), {
         status: 'declined',
         declinedAt: new Date(),
-      });
-    });
+      })
+    ));
 
     return { success: true, message: '요청을 거절했습니다.' };
   } catch (error) {
@@ -1273,7 +1281,7 @@ export async function fetchGillerStats(
   try {
     const userDoc = await getDoc(doc(db, 'users', gillerId));
 
-    if (!userDoc.exists()) {
+    if (!snapshotExists(userDoc)) {
       return {
         gillerId,
         gillerName: 'giller',
@@ -1340,7 +1348,7 @@ export function applyMatchingFilters<T extends LocationFilteredRequest | RouteFi
       const pickupLine = request.pickupStation.line;
       const deliveryLine = request.deliveryStation.line;
       return filters.lineFilter!.selectedLines.some(line =>
-        pickupLine?.includes(line) ?? deliveryLine?.includes(line)
+        (pickupLine?.includes(line) ?? false) || (deliveryLine?.includes(line) ?? false)
       );
     });
   }

@@ -421,6 +421,17 @@ service cloud.firestore {
       allow delete: if false;
     }
 
+    match /transfer_matches/{matchId} {
+      // 읽기: 인증된 사용자
+      allow read: if isAuthenticated();
+
+      // 쓰기: 본인(userId)만
+      allow create, update: if isOwner(request.resource.data.userId) || isOwner(resource.data.userId);
+
+      // 삭제: 시스템만
+      allow delete: if false;
+    }
+
     // ==================== Deliveries Collection ====================
 
     match /deliveries/{deliveryId} {
@@ -481,10 +492,21 @@ service cloud.firestore {
       allow delete: if false;
     }
 
+    // DEPRECATED: chatRooms 하위 컬렉션으로 이전됨. 기존 chats 컬렉션 호환성 유지용.
     match /chats/{chatId}/messages/{messageId} {
-      allow read: if isAuthenticated();
-      allow write: if isAuthenticated();
-      allow delete: if isOwner(resource.data.senderId);
+      // 읽기: 채팅방 참여자만
+      allow read: if isChatRoomParticipant(chatId);
+
+      // 생성: 참여자만 (발신자 검증)
+      allow create: if isChatRoomParticipant(chatId) &&
+                    request.resource.data.senderId == request.auth.uid;
+
+      // 업데이트: 불가
+      allow update: if false;
+
+      // 삭제: 발신자 본인만
+      allow delete: if isChatRoomParticipant(chatId) &&
+                    isOwner(resource.data.senderId);
     }
 
     // ==================== ChatRooms Collection ====================
@@ -526,6 +548,31 @@ service cloud.firestore {
       allow delete: if false;
     }
 
+    match /b2b_deliveries/{deliveryId} {
+      // 읽기: B2B 회사 또는 길러
+      allow read: if isAuthenticated() &&
+                  (isOwner(resource.data.companyId) ||
+                   (resource.data.gllerId != null && isOwner(resource.data.gllerId)));
+
+      // 쓰기: B2B 회사만
+      allow write: if isOwner(resource.data.companyId);
+
+      // 삭제: B2B 회사만
+      allow delete: if isOwner(resource.data.companyId);
+    }
+
+    match /b2b_tax_invoices/{invoiceId} {
+      // 읽기: B2B 회사 또는 관리자
+      allow read: if isAuthenticated() &&
+                  (isOwner(resource.data.companyId) || isAdmin());
+
+      // 쓰기: 관리자만 (Admin SDK)
+      allow write: if isAdmin();
+
+      // 삭제: 관리자만
+      allow delete: if isAdmin();
+    }
+
     // ==================== Lockers Collection ====================
 
     match /lockers/{lockerId} {
@@ -556,8 +603,9 @@ service cloud.firestore {
       // 읽기: 인증된 사용자
       allow read: if isAuthenticated();
 
-      // 생성: 인증된 사용자 (임시: 개발 테스트용)
-      allow create: if isAuthenticated();
+      // 생성: 길러 본인만 (gllerId 바인딩)
+      allow create: if isAuthenticated() &&
+                    request.resource.data.gllerId == request.auth.uid;
 
       // 업데이트: 생성자만
       allow update: if isOwner(resource.data.gllerId);
@@ -572,8 +620,9 @@ service cloud.firestore {
       // 읽기: 인증된 사용자
       allow read: if isAuthenticated();
 
-      // 생성: 인증된 사용자 (임시: 개발 테스트용)
-      allow create: if isAuthenticated();
+      // 생성: 입찰자 본인만 (gllerId 바인딩)
+      allow create: if isAuthenticated() &&
+                    request.resource.data.gllerId == request.auth.uid;
 
       // 업데이트: 입찰자만
       allow update: if isOwner(resource.data.gllerId);

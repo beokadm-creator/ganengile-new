@@ -138,7 +138,7 @@ export class LocationTrackingService {
    * 위치 업데이트 핸들러
    */
   private async handleLocationUpdate(location: Location.LocationObject): Promise<void> {
-    if (!this.deliveryId ?? !this.isTracking) {
+    if (!this.deliveryId || !this.isTracking) {
       return;
     }
 

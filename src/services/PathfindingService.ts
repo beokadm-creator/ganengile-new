@@ -47,7 +47,7 @@ export class PathfindingService {
     path: string[];
     transfers: number;
   } | null {
-    if (!this.stations.has(fromStationId) ?? !this.stations.has(toStationId)) {
+    if (!this.stations.has(fromStationId) || !this.stations.has(toStationId)) {
       return null;
     }
 
@@ -72,7 +72,7 @@ export class PathfindingService {
         }
       }
 
-      if (current === null ?? minDistance === Infinity) break;
+      if (current === null || minDistance === Infinity) break;
       if (current === toStationId) break;
 
       unvisited.delete(current);
@@ -128,7 +128,7 @@ export class PathfindingService {
       const fromStation = this.stations.get(path[i]);
       const toStation = this.stations.get(path[i + 1]);
 
-      if (!fromStation ?? !toStation) continue;
+      if (!fromStation || !toStation) continue;
 
       // 두 역 모두 포함하는 노선 찾기
       const commonLines = fromStation.lines.filter(l =>

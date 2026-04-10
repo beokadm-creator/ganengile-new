@@ -202,15 +202,17 @@ describe('MediaService', () => {
       (FileSystem.getInfoAsync as jest.Mock).mockResolvedValue(mockFileInfo);
 
       let uploadProgressCallback: ((progress: { bytesTransferred: number; totalBytes: number }) => void) | undefined;
-      (uploadBytesResumable as jest.Mock).mockImplementation((_ref, _blob, options) => {
-        if (options?.onProgress) {
-          uploadProgressCallback = options.onProgress;
-        }
-        return Promise.resolve({
-          bytesTransferred: 1024 * 1024,
-          totalBytes: 1024 * 1024,
-        });
-      });
+      (uploadBytesResumable as jest.Mock).mockImplementation(() => ({
+        on: (
+          _event: string,
+          onProgress?: (progress: { bytesTransferred: number; totalBytes: number }) => void,
+          _onError?: (error: Error) => void,
+          onComplete?: () => void
+        ) => {
+          uploadProgressCallback = onProgress;
+          onComplete?.();
+        },
+      }));
       (ref as jest.Mock).mockReturnValue({});
       (getDownloadURL as jest.Mock).mockResolvedValue('https://storage.url/image.jpg');
 

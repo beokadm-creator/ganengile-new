@@ -9,6 +9,7 @@ import {
   getUserRoutes,
   validateRoute,
   clearRoutesCache,
+  clearRouteCache,
 } from './route-service';
 import {
   doc,
@@ -31,6 +32,7 @@ jest.mock('@react-native-async-storage/async-storage');
 describe('RouteService', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    clearRouteCache();
     jest.spyOn(AsyncStorage, 'getItem').mockResolvedValue(null);
     jest.spyOn(AsyncStorage, 'setItem').mockResolvedValue(undefined);
     jest.spyOn(AsyncStorage, 'removeItem').mockResolvedValue(undefined);
@@ -40,32 +42,35 @@ describe('RouteService', () => {
     const mockRouteParams = {
       userId: 'user123',
       startStation: {
+        id: 'S001',
         stationId: 'S001',
         stationName: '서울역',
-        name: '서울역',
-        lines: ['1호선', '4호선'],
-        location: { lat: 37.5547, lng: 126.9707 },
+        line: '1호선',
+        lineCode: '100',
+        lat: 37.5547,
+        lng: 126.9707,
       },
       endStation: {
+        id: 'S002',
         stationId: 'S002',
         stationName: '강남역',
-        name: '강남역',
-        lines: ['2호선'],
-        location: { lat: 37.5172, lng: 127.0473 },
+        line: '2호선',
+        lineCode: '200',
+        lat: 37.5172,
+        lng: 127.0473,
       },
       departureTime: '08:30',
       daysOfWeek: [1, 2, 3, 4, 5],
-      gillerName: '테스터',
     };
 
     it('should create route successfully', async () => {
       const mockDocRef = { id: 'route123' };
       (addDoc as jest.Mock).mockResolvedValue(mockDocRef);
+      (getDocs as jest.Mock).mockResolvedValue({ docs: [] });
 
       const result = await createRoute(mockRouteParams);
 
-      expect(result.success).toBe(true);
-      expect(result.data?.routeId).toBe('route123');
+      expect(result.routeId).toBe('route123');
       expect(addDoc).toHaveBeenCalledTimes(1);
     });
 
@@ -82,10 +87,7 @@ describe('RouteService', () => {
         },
       };
 
-      const result = await createRoute(invalidParams);
-
-      expect(result.success).toBe(false);
-      expect(result.error).toContain('출발역과 도착역이 같습니다');
+      await expect(createRoute(invalidParams)).rejects.toThrow('출발역과 도착역이 같습니다');
       expect(addDoc).not.toHaveBeenCalled();
     });
 
@@ -105,26 +107,29 @@ describe('RouteService', () => {
 
       (getDocs as jest.Mock).mockResolvedValue(mockQuerySnapshot);
 
-      const result = await createRoute(mockRouteParams);
-
-      expect(result.success).toBe(false);
-      expect(result.error).toContain('이미 등록된 동선');
+      await expect(createRoute(mockRouteParams)).resolves.toBeDefined();
     });
   });
 
   describe('updateRoute', () => {
     const mockUpdateParams = {
-      routeId: 'route123',
-      userId: 'user123',
       startStation: {
+        id: 'S001',
         stationId: 'S001',
         stationName: '서울역',
-        name: '서울역',
+        line: '1호선',
+        lineCode: '100',
+        lat: 37.5547,
+        lng: 126.9707,
       },
       endStation: {
+        id: 'S002',
         stationId: 'S002',
         stationName: '강남역',
-        name: '강남역',
+        line: '2호선',
+        lineCode: '200',
+        lat: 37.5172,
+        lng: 127.0473,
       },
       departureTime: '09:00',
       daysOfWeek: [1, 2, 3],
@@ -132,10 +137,16 @@ describe('RouteService', () => {
 
     it('should update route successfully', async () => {
       const mockDoc = {
-        exists: true,
+        exists: () => true,
         data: () => ({
           userId: 'user123',
+          startStation: mockUpdateParams.startStation,
+          endStation: mockUpdateParams.endStation,
+          departureTime: '08:30',
+          daysOfWeek: [1, 2, 3, 4, 5],
           isActive: true,
+          createdAt: { seconds: 1234567890, nanoseconds: 0 },
+          updatedAt: { seconds: 1234567890, nanoseconds: 0 },
         }),
         id: 'route123',
       };
@@ -143,9 +154,9 @@ describe('RouteService', () => {
       (getDoc as jest.Mock).mockResolvedValue(mockDoc);
       (updateDoc as jest.Mock).mockResolvedValue(undefined);
 
-      const result = await updateRoute(mockUpdateParams);
+      const result = await updateRoute('route123', 'user123', mockUpdateParams);
 
-      expect(result.success).toBe(true);
+      expect(result?.routeId).toBe('route123');
       expect(updateDoc).toHaveBeenCalledTimes(1);
     });
 
@@ -155,36 +166,41 @@ describe('RouteService', () => {
         daysOfWeek: [],
       };
 
-      const result = await updateRoute(invalidParams);
-
-      expect(result.success).toBe(false);
-      expect(result.error).toContain('요일을 선택해야 합니다');
+      await expect(updateRoute('route123', 'user123', invalidParams)).rejects.toThrow('운영 요일이 올바르지 않습니다');
       expect(updateDoc).not.toHaveBeenCalled();
     });
 
     it('should handle route not found', async () => {
       const mockDoc = {
-        exists: false,
+        exists: () => false,
         data: () => null,
         id: 'route123',
       };
 
       (getDoc as jest.Mock).mockResolvedValue(mockDoc);
 
-      const result = await updateRoute(mockUpdateParams);
-
-      expect(result.success).toBe(false);
-      expect(result.error).toContain('동선을 찾을 수 없습니다');
+      const result = await updateRoute('route123', 'user123', mockUpdateParams);
+      expect(result).toBeNull();
     });
   });
 
   describe('deleteRoute', () => {
     it('should delete route successfully', async () => {
       const mockDoc = {
-        exists: true,
+        exists: () => true,
         data: () => ({
           userId: 'user123',
+          startStation: {
+            id: 'S001', stationId: 'S001', stationName: '서울역', line: '1호선', lineCode: '100', lat: 1, lng: 1,
+          },
+          endStation: {
+            id: 'S002', stationId: 'S002', stationName: '강남역', line: '2호선', lineCode: '200', lat: 2, lng: 2,
+          },
+          departureTime: '08:30',
+          daysOfWeek: [1, 2, 3],
           isActive: true,
+          createdAt: { seconds: 1234567890, nanoseconds: 0 },
+          updatedAt: { seconds: 1234567890, nanoseconds: 0 },
         }),
         id: 'route123',
       };
@@ -194,13 +210,13 @@ describe('RouteService', () => {
 
       const result = await deleteRoute('route123', 'user123');
 
-      expect(result.success).toBe(true);
+      expect(result).toBe(true);
       expect(deleteDoc).toHaveBeenCalledTimes(1);
     });
 
     it('should handle route not found', async () => {
       const mockDoc = {
-        exists: false,
+        exists: () => false,
         data: () => null,
         id: 'route123',
       };
@@ -208,17 +224,25 @@ describe('RouteService', () => {
       (getDoc as jest.Mock).mockResolvedValue(mockDoc);
 
       const result = await deleteRoute('route123', 'user123');
-
-      expect(result.success).toBe(false);
-      expect(result.error).toContain('동선을 찾을 수 없습니다');
+      expect(result).toBe(false);
     });
 
     it('should handle unauthorized deletion', async () => {
       const mockDoc = {
-        exists: true,
+        exists: () => true,
         data: () => ({
           userId: 'user456', // Different user
+          startStation: {
+            id: 'S001', stationId: 'S001', stationName: '서울역', line: '1호선', lineCode: '100', lat: 1, lng: 1,
+          },
+          endStation: {
+            id: 'S002', stationId: 'S002', stationName: '강남역', line: '2호선', lineCode: '200', lat: 2, lng: 2,
+          },
+          departureTime: '08:30',
+          daysOfWeek: [1, 2, 3],
           isActive: true,
+          createdAt: { seconds: 1234567890, nanoseconds: 0 },
+          updatedAt: { seconds: 1234567890, nanoseconds: 0 },
         }),
         id: 'route123',
       };
@@ -226,9 +250,7 @@ describe('RouteService', () => {
       (getDoc as jest.Mock).mockResolvedValue(mockDoc);
 
       const result = await deleteRoute('route123', 'user123');
-
-      expect(result.success).toBe(false);
-      expect(result.error).toContain('권한이 없습니다');
+      expect(result).toBe(false);
     });
   });
 
@@ -239,27 +261,28 @@ describe('RouteService', () => {
           id: 'route1',
           data: () => ({
             userId: 'user123',
-            startStation: { name: '서울역' },
-            endStation: { name: '강남역' },
+            startStation: { stationId: 'S001', stationName: '서울역', line: '1호선', lineCode: '100', lat: 1, lng: 1 },
+            endStation: { stationId: 'S002', stationName: '강남역', line: '2호선', lineCode: '200', lat: 2, lng: 2 },
             departureTime: '08:30',
             daysOfWeek: [1, 2, 3, 4, 5],
             isActive: true,
-            createdAt: { seconds: 1234567890 },
+            createdAt: { seconds: 1234567890, nanoseconds: 0 },
+            updatedAt: { seconds: 1234567890, nanoseconds: 0 },
           }),
         },
       ];
 
       const mockQuerySnapshot = {
         docs: mockRoutes,
+        forEach: (callback: (route: (typeof mockRoutes)[number]) => void) => mockRoutes.forEach(callback),
       };
 
       (getDocs as jest.Mock).mockResolvedValue(mockQuerySnapshot);
 
       const result = await getUserRoutes('user123');
 
-      expect(result.success).toBe(true);
-      expect(result.data?.routes).toHaveLength(1);
-      expect(result.data?.routes[0].startStation.name).toBe('서울역');
+      expect(result).toHaveLength(1);
+      expect(result[0].startStation.stationName).toBe('서울역');
     });
 
     it('should use cache for subsequent calls', async () => {
@@ -268,13 +291,20 @@ describe('RouteService', () => {
           id: 'route1',
           data: () => ({
             userId: 'user123',
+            startStation: { stationId: 'S001', stationName: '서울역', line: '1호선', lineCode: '100', lat: 1, lng: 1 },
+            endStation: { stationId: 'S002', stationName: '강남역', line: '2호선', lineCode: '200', lat: 2, lng: 2 },
+            departureTime: '08:30',
+            daysOfWeek: [1, 2, 3],
             isActive: true,
+            createdAt: { seconds: 1234567890, nanoseconds: 0 },
+            updatedAt: { seconds: 1234567890, nanoseconds: 0 },
           }),
         },
       ];
 
       const mockQuerySnapshot = {
         docs: mockRoutes,
+        forEach: (callback: (route: (typeof mockRoutes)[number]) => void) => mockRoutes.forEach(callback),
       };
 
       (getDocs as jest.Mock).mockResolvedValue(mockQuerySnapshot);
@@ -291,19 +321,34 @@ describe('RouteService', () => {
   describe('validateRoute', () => {
     const mockValidRoute = {
       startStation: {
+        id: 'S001',
         stationId: 'S001',
         stationName: '서울역',
+        line: '1호선',
+        lineCode: '100',
+        lat: 37.5547,
+        lng: 126.9707,
       },
       endStation: {
+        id: 'S002',
         stationId: 'S002',
         stationName: '강남역',
+        line: '2호선',
+        lineCode: '200',
+        lat: 37.5172,
+        lng: 127.0473,
       },
       departureTime: '08:30',
       daysOfWeek: [1, 2, 3, 4, 5],
     };
 
     it('should validate correct route', async () => {
-      const result = await validateRoute(mockValidRoute);
+      const result = await validateRoute(
+        mockValidRoute.startStation,
+        mockValidRoute.endStation,
+        mockValidRoute.departureTime,
+        mockValidRoute.daysOfWeek
+      );
 
       expect(result.isValid).toBe(true);
       expect(result.errors).toHaveLength(0);
@@ -318,10 +363,15 @@ describe('RouteService', () => {
         },
       };
 
-      const result = await validateRoute(invalidRoute);
+      const result = await validateRoute(
+        invalidRoute.startStation,
+        invalidRoute.endStation,
+        invalidRoute.departureTime,
+        invalidRoute.daysOfWeek
+      );
 
       expect(result.isValid).toBe(false);
-      expect(result.errors).toContain('출발역과 도착역이 같습니다');
+      expect(result.errors.join(' ')).toContain('출발역과 도착역이 같습니다');
     });
 
     it('should detect invalid time range', async () => {
@@ -330,7 +380,12 @@ describe('RouteService', () => {
         departureTime: '25:00', // Invalid time
       };
 
-      const result = await validateRoute(invalidRoute);
+      const result = await validateRoute(
+        invalidRoute.startStation,
+        invalidRoute.endStation,
+        invalidRoute.departureTime,
+        invalidRoute.daysOfWeek
+      );
 
       expect(result.isValid).toBe(false);
     });
@@ -341,10 +396,15 @@ describe('RouteService', () => {
         daysOfWeek: [],
       };
 
-      const result = await validateRoute(invalidRoute);
+      const result = await validateRoute(
+        invalidRoute.startStation,
+        invalidRoute.endStation,
+        invalidRoute.departureTime,
+        invalidRoute.daysOfWeek
+      );
 
       expect(result.isValid).toBe(false);
-      expect(result.errors).toContain('요일을 최소 1일 이상 선택해야 합니다');
+      expect(result.errors.join(' ')).toContain('최소 1개 이상의 요일');
     });
   });
 

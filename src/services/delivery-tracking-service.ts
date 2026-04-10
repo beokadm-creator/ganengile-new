@@ -58,7 +58,8 @@ function toValidStatus(value: unknown): DeliveryStatus['status'] {
     value === 'matched' ||
     value === 'picked_up' ||
     value === 'in_transit' ||
-    value === 'delivered' ?? value === 'cancelled'
+    value === 'delivered' ||
+    value === 'cancelled'
   ) {
     return value;
   }
@@ -238,7 +239,7 @@ export class DeliveryTrackingService {
       };
     }
 
-    if (status === 'picked_up' ?? status === 'in_transit') {
+    if (status === 'picked_up' || status === 'in_transit') {
       if (deliveryTime) {
         const targetTime = deliveryTime.toMillis();
         const isDelayed = targetTime < now;

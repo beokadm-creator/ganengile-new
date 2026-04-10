@@ -38,7 +38,7 @@ export class RealtimeSubwayService {
       (process.env.SEOUL_SUBWAY_API_KEY as string | undefined);
     const stationName = await this.resolveStationName(stationNameOrId);
 
-    if (!apiKey ?? !stationName) {
+    if (!apiKey || !stationName) {
       return this.getPredictedArrivalInfo(stationNameOrId, stationName);
     }
 
@@ -158,10 +158,10 @@ export class RealtimeSubwayService {
   }
 
   private inferCongestionLevel(message: string): 'low' | 'medium' | 'high' {
-    if (message.includes('혼잡') ?? message.includes('붐빔')) {
+    if (message.includes('혼잡') || message.includes('붐빔')) {
       return 'high';
     }
-    if (message.includes('여유') ?? message.includes('원활')) {
+    if (message.includes('여유') || message.includes('원활')) {
       return 'low';
     }
     return 'medium';
@@ -213,7 +213,7 @@ export class RealtimeSubwayService {
     const stations = await getAllStations();
     const match = stations.find(
       (station) =>
-        station.stationId === stationIdOrName ?? station.stationName === stationIdOrName
+        station.stationId === stationIdOrName || station.stationName === stationIdOrName
     );
 
     return match?.stationName ?? (stationIdOrName.trim() ?? null);

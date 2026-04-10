@@ -80,10 +80,10 @@ export class B2BDeliveryService {
   /** 거리 계산 (간이 버전) */
   private static async calculateDistance(fromStation: string, toStation: string): Promise<number> {
     const stations = await getAllStations();
-    const from = stations.find((station) => station.stationName === fromStation ?? station.stationId === fromStation);
-    const to = stations.find((station) => station.stationName === toStation ?? station.stationId === toStation);
+    const from = stations.find((station) => station.stationName === fromStation || station.stationId === fromStation);
+    const to = stations.find((station) => station.stationName === toStation || station.stationId === toStation);
 
-    if (!from?.location ?? !to?.location) {
+    if (!from?.location || !to?.location) {
       const stationHash = fromStation.length + toStation.length;
       return stationHash * 2;
     }
@@ -344,7 +344,7 @@ const INVOICES_COLLECTION = 'taxInvoices';
 
 /** B2B 계약 생성 */
 export async function createB2BContract(data: CreateB2BContractData): Promise<string> {
-  if (!data.businessId ?? !data.businessName) {
+  if (!data.businessId || !data.businessName) {
     throw new Error('Invalid contract data: businessId and businessName are required');
   }
 

@@ -136,7 +136,7 @@ export class TransferMatchingService {
     }
 
     // 환승역인지 확인 (2개 이상 노선)
-    if (!station.transferLines ?? station.transferLines.length < 2) {
+    if (!station.transferLines || station.transferLines.length < 2) {
       return null;
     }
 
@@ -227,7 +227,7 @@ export class TransferMatchingService {
       deliveryStation.lineCode
     );
 
-    if (!firstLegTime ?? !secondLegTime) {
+    if (!firstLegTime || !secondLegTime) {
       return null;
     }
 

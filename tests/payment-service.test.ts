@@ -66,7 +66,7 @@ describe('Payment Service', () => {
 
       // Verify payment was saved
       const paymentDoc = await getDoc(doc(db, 'payments', paymentId));
-      expect(paymentDoc.exists).toBe(true);
+      expect(paymentDoc.exists()).toBe(true);
 
       const paymentData = paymentDoc.data();
       expect(paymentData?.userId).toBe(testUserId);
@@ -112,7 +112,7 @@ describe('Payment Service', () => {
 
       // Verify payment was saved
       const paymentDoc = await getDoc(doc(db, 'payments', paymentId));
-      expect(paymentDoc.exists).toBe(true);
+      expect(paymentDoc.exists()).toBe(true);
 
       const paymentData = paymentDoc.data();
       expect(paymentData?.userId).toBe(testUserId);
@@ -137,9 +137,10 @@ describe('Payment Service', () => {
       const paymentData = paymentDoc.data();
 
       // Platform fee: 10% (500원)
-      // Net to giller: 4500원
+      // Taxable earning applies 3.3% withholding after platform fee
       expect(paymentData?.fee).toBe(500);
-      expect(paymentData?.netAmount).toBe(4500);
+      expect(paymentData?.tax).toBe(149);
+      expect(paymentData?.netAmount).toBe(4351);
     });
   });
 
@@ -189,8 +190,8 @@ describe('Payment Service', () => {
     test('should calculate total earnings correctly', async () => {
       const totalEarnings = await getUserTotalEarnings(testUserId);
 
-      // Sum of net amounts: (4500 + 2700 + 3600) = 10800
-      expect(totalEarnings).toBe(10800);
+      // Sum of net amounts after 3.3% withholding
+      expect(totalEarnings).toBe(10443);
     });
 
     test('should return zero for user with no earnings', async () => {
@@ -231,6 +232,9 @@ describe('Payment Service', () => {
 
   describe('requestWithdrawal', () => {
     test('should create withdrawal request', async () => {
+      const earningId = await createGillerEarning(testUserId, 'req-withdraw-balance', 20000);
+      createdPaymentIds.push(earningId);
+
       const amount = 10000;
       const bankInfo = {
         bankName: '국민은행',

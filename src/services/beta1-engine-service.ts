@@ -277,7 +277,7 @@ export async function bootstrapAcceptedDeliveryPlan(
     }))
     .sort((left, right) => left.sequence - right.sequence)[0];
 
-  if (!firstLeg ?? !firstMission) {
+  if (!firstLeg || !firstMission) {
     const originRef = mapLegacyStationToLocationRef(input.pickupStation);
     const destinationRef = mapLegacyStationToLocationRef(input.deliveryStation);
     const actorType: DeliveryActorType = input.assignedGillerUserId ? 'giller' : 'system';

@@ -206,7 +206,7 @@ export function deriveDraftStatus(params: {
 }): RequestDraftStatus {
   if (params.submitted) return RequestDraftStatus.SUBMITTED;
   if (params.quoteStatus === PricingQuoteStatus.SELECTED) return RequestDraftStatus.PRICING_READY;
-  if (params.aiStatus === AIAnalysisStatus.COMPLETED ?? params.aiStatus === AIAnalysisStatus.LOW_CONFIDENCE) {
+  if (params.aiStatus === AIAnalysisStatus.COMPLETED ?? params.aiStatus === AIAnalysisStatus.LOW_CONFIDENCE) { // eslint-disable-line no-constant-binary-expression, no-constant-condition
     return RequestDraftStatus.READY_FOR_REVIEW;
   }
   if (params.hasPhotos && params.aiStatus === AIAnalysisStatus.PROCESSING) {

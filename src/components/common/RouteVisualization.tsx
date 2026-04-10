@@ -73,7 +73,7 @@ export default function RouteVisualization({
   }, [stations, showEstimatedTime]);
 
   return (
-    // eslint-disable-next-line react-native/no-inline-styles
+     
     <Animated.View style={[styles.container, style, { opacity: fadeAnim }]}>
       {/* 총 예상 시간 헤더 */}
       {showEstimatedTime && totalEstimatedTime > 0 && (
@@ -96,7 +96,7 @@ export default function RouteVisualization({
             <View key={index} style={styles.stationContainer}>
               <View style={styles.stationInfo}>
                 <View
-                  // eslint-disable-next-line react-native/no-inline-styles
+                   
                   style={[
                     styles.stationDot,
                     {
@@ -116,7 +116,7 @@ export default function RouteVisualization({
                 <Text style={styles.stationName}>{station.name}</Text>
                   <View style={styles.lineInfo}>
                     <View
-                      // eslint-disable-next-line react-native/no-inline-styles
+                       
                       style={[
                         styles.lineBadge,
                         { backgroundColor: lineColor },
@@ -135,7 +135,7 @@ export default function RouteVisualization({
               {!isLast && (
                 <View style={styles.connector}>
                   <View
-                    // eslint-disable-next-line react-native/no-inline-styles
+                     
                     style={[
                       styles.connectorLine,
                       { backgroundColor: getLineColor(stations[index + 1].line) },

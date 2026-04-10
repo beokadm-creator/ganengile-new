@@ -288,7 +288,7 @@ export function toTrackingModel(data: TrackingInput): TrackingModel {
         : undefined,
     locationHistory: Array.isArray(data.tracking?.locationHistory)
       ? data.tracking.locationHistory.reduce<NonNullable<TrackingModel['locationHistory']>>((acc, item) => {
-          if (typeof item?.latitude !== 'number' ?? typeof item?.longitude !== 'number') {
+          if (typeof item?.latitude !== 'number' ?? typeof item?.longitude !== 'number') { // eslint-disable-line no-constant-binary-expression, no-constant-condition
             return acc;
           }
 

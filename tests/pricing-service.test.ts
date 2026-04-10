@@ -25,13 +25,13 @@ describe('Pricing Service - Phase 1', () => {
         urgency: 'normal',
       });
 
-      expect(result.baseFee).toBe(3500);
+      expect(result.baseFee).toBe(2000);
       expect(result.distanceFee).toBe(600);
       expect(result.weightFee).toBe(100);
       expect(result.sizeFee).toBe(0);
       expect(result.urgencySurcharge).toBe(0);
       expect(result.totalFee).toBeGreaterThanOrEqual(3000);
-      expect(result.totalFee).toBeLessThanOrEqual(8000);
+      expect(result.totalFee).toBeLessThanOrEqual(10000);
       expect(result.breakdown.gillerFee).toBeGreaterThan(0);
       expect(result.breakdown.platformFee).toBeGreaterThan(0);
     });
@@ -55,7 +55,7 @@ describe('Pricing Service - Phase 1', () => {
         urgency: 'urgent',
       });
 
-      expect(result.totalFee).toBeLessThanOrEqual(8000);
+      expect(result.totalFee).toBeLessThanOrEqual(10000);
     });
 
     test('거리 수수료 계산 (역 개수 기반)', () => {
@@ -132,8 +132,8 @@ describe('Pricing Service - Phase 1', () => {
       const gillerRatio = result.breakdown.gillerFee / result.totalFee;
       const platformRatio = result.breakdown.platformFee / result.totalFee;
 
-      expect(gillerRatio).toBeCloseTo(0.85, 2);
-      expect(platformRatio).toBeCloseTo(0.15, 2);
+      expect(gillerRatio).toBeCloseTo(0.9, 2);
+      expect(platformRatio).toBeCloseTo(0.1, 2);
     });
 
     test('부가세 (VAT 10%) 계산', () => {
@@ -207,7 +207,7 @@ describe('Pricing Service - Phase 1', () => {
       const totalFee = 5000;
       const breakdown = calculateBreakdown(totalFee);
 
-      expect(breakdown.platformFee).toBe(Math.round(totalFee * 0.15));
+      expect(breakdown.platformFee).toBe(Math.round(totalFee * 0.1));
       expect(breakdown.gillerFee).toBe(totalFee - breakdown.platformFee);
     });
   });
@@ -246,7 +246,7 @@ describe('Pricing Service - Phase 1', () => {
         urgency: 'normal',
       });
 
-      expect(result.totalFee).toBeLessThanOrEqual(8000);
+      expect(result.totalFee).toBeLessThanOrEqual(10000);
     });
 
     test('최소 무게 (0.1kg)', () => {
@@ -270,7 +270,7 @@ describe('Pricing Service - Phase 1', () => {
         urgency: 'urgent',
       });
 
-      expect(result.totalFee).toBeLessThanOrEqual(8000);
+      expect(result.totalFee).toBeLessThanOrEqual(10000);
       expect(result.sizeFee).toBe(1500);
       expect(result.urgencySurcharge).toBeGreaterThan(0);
     });

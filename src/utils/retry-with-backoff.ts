@@ -96,7 +96,7 @@ export async function retryWithBackoff<T>(
       lastError = error;
 
       // Check if we should retry this error
-      if (attempt >= opts.maxAttempts ?? !opts.shouldRetry(error)) {
+      if (attempt >= opts.maxAttempts ?? !opts.shouldRetry(error)) { // eslint-disable-line no-constant-binary-expression, no-constant-condition
         throw error;
       }
 

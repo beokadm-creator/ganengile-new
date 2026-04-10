@@ -49,6 +49,59 @@ interface CachedRoutesData {
   timestamp: number;
 }
 
+type TimestampLike = {
+  seconds: number;
+  nanoseconds?: number;
+};
+
+type StationInfoInput = Partial<StationInfo> & {
+  stationId?: string;
+  id?: string;
+};
+
+type RouteDocument = {
+  userId?: string;
+  startStation?: StationInfoInput;
+  endStation?: StationInfoInput;
+  startAddress?: DetailedAddress;
+  endAddress?: DetailedAddress;
+  departureTime?: string;
+  daysOfWeek?: number[];
+  isActive?: boolean;
+  createdAt?: TimestampLike;
+  updatedAt?: TimestampLike;
+};
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null;
+}
+
+function isTimestampLike(value: unknown): value is TimestampLike {
+  return (
+    isRecord(value) &&
+    typeof value.seconds === 'number' &&
+    (value.nanoseconds === undefined || typeof value.nanoseconds === 'number')
+  );
+}
+
+function parseCachedRoutesData(raw: string): CachedRoutesData | null {
+  const parsed: unknown = JSON.parse(raw);
+  if (!isRecord(parsed)) {
+    return null;
+  }
+
+  const { version, routes, timestamp } = parsed;
+  if (typeof version !== 'string' || !Array.isArray(routes) || typeof timestamp !== 'number') {
+    return null;
+  }
+
+  return {
+    version,
+    routes: routes as Route[],
+    timestamp,
+  };
+}
+
 /**
  * AsyncStorage에서 캐시된 동선 로드
  */
@@ -57,7 +110,11 @@ async function loadCachedRoutesFromStorage(userId: string): Promise<Route[] | nu
     const cachedData = await AsyncStorage.getItem(`${ROUTES_CACHE_KEY}_${userId}`);
     if (!cachedData) return null;
 
-    const parsed: CachedRoutesData = JSON.parse(cachedData);
+    const parsed = parseCachedRoutesData(cachedData);
+    if (!parsed) {
+      await AsyncStorage.removeItem(`${ROUTES_CACHE_KEY}_${userId}`);
+      return null;
+    }
 
     // 버전 확인
     if (parsed.version !== ROUTES_CACHE_VERSION) {
@@ -166,6 +223,29 @@ const cache = new RouteCache();
 
 // ==================== Helper Functions ====================
 
+function snapshotExists(snapshot: { exists?: boolean | (() => boolean) }): boolean {
+  if (typeof snapshot.exists === 'function') {
+    return snapshot.exists();
+  }
+
+  return snapshot.exists === true;
+}
+
+function getSnapshotDocs<T>(snapshot: {
+  docs?: T[];
+  forEach?: (callback: (doc: T) => void) => void;
+}): T[] {
+  if (Array.isArray(snapshot.docs)) {
+    return snapshot.docs;
+  }
+
+  const docs: T[] = [];
+  snapshot.forEach?.((doc) => {
+    docs.push(doc);
+  });
+  return docs;
+}
+
 function convertTimestampToDate(timestamp: { seconds: number; nanoseconds?: number }): Date {
   return new Date(timestamp.seconds * 1000 + (timestamp.nanoseconds ?? 0) / 1000000);
 }
@@ -177,31 +257,31 @@ function convertDateToTimestamp(date: Date): { seconds: number; nanoseconds: num
   };
 }
 
-function convertStationInfo(data: any): StationInfo {
+function convertStationInfo(data: StationInfoInput | undefined): StationInfo {
   return {
-    id: data.stationId,
-    stationId: data.stationId,
-    stationName: data.stationName,
-    line: data.line,
-    lineCode: data.lineCode,
-    lat: data.lat,
-    lng: data.lng,
+    id: data?.id ?? data?.stationId ?? '',
+    stationId: data?.stationId ?? data?.id ?? '',
+    stationName: data?.stationName ?? '',
+    line: data?.line ?? '',
+    lineCode: data?.lineCode ?? '',
+    lat: typeof data?.lat === 'number' ? data.lat : 0,
+    lng: typeof data?.lng === 'number' ? data.lng : 0,
   };
 }
 
-function convertRoute(data: any, docId: string): Route {
+function convertRoute(data: RouteDocument, docId: string): Route {
   return {
     routeId: docId,
-    userId: data.userId,
+    userId: data.userId ?? '',
     startStation: convertStationInfo(data.startStation),
     endStation: convertStationInfo(data.endStation),
     startAddress: data.startAddress,
     endAddress: data.endAddress,
-    departureTime: data.departureTime,
-    daysOfWeek: data.daysOfWeek,
+    departureTime: data.departureTime ?? '',
+    daysOfWeek: data.daysOfWeek ?? [],
     isActive: data.isActive ?? true,
-    createdAt: convertTimestampToDate(data.createdAt),
-    updatedAt: convertTimestampToDate(data.updatedAt),
+    createdAt: isTimestampLike(data.createdAt) ? convertTimestampToDate(data.createdAt) : new Date(),
+    updatedAt: isTimestampLike(data.updatedAt) ? convertTimestampToDate(data.updatedAt) : new Date(),
   };
 }
 
@@ -242,7 +322,7 @@ function validateTimeFormat(time: string): boolean {
 }
 
 function validateDaysOfWeek(days: number[]): boolean {
-  if (!Array.isArray(days) ?? days.length === 0) {
+  if (!Array.isArray(days) || days.length === 0) {
     return false;
   }
 
@@ -251,7 +331,6 @@ function validateDaysOfWeek(days: number[]): boolean {
 
 function validateStationInfo(station: StationInfo): boolean {
   return !!(
-    station &&
     station.stationId &&
     station.stationName &&
     station.line &&
@@ -306,7 +385,7 @@ function isCommuteTime(time: string): boolean {
   const minute = parseInt(minuteStr, 10);
 
   // 07:00 이전 또는 22:00 이후는 출퇴근 시간대 아님
-  if (hour < 7 ?? hour > 22) return false;
+  if (hour < 7 || hour > 22) return false;
   if (hour === 22 && minute > 0) return false;
 
   return true;
@@ -428,11 +507,11 @@ export function validateRoute(
     errors.push('🚫 요일 정보가 올바르지 않습니다.\n\n1(월)~7(일) 사이의 숫자를 선택해주세요.');
   }
 
-  if (!daysOfWeek ?? daysOfWeek.length === 0) {
+  if (!daysOfWeek || daysOfWeek.length === 0) {
     errors.push('🚫 운영 요일을 선택해주세요.\n\n최소 1개 이상의 요일을 선택해야 합니다.');
   }
 
-  const hasWeekend = daysOfWeek?.some(day => day === 6 ?? day === 7);
+  const hasWeekend = daysOfWeek?.some(day => day === 6 || day === 7);
   const hasWeekday = daysOfWeek?.some(day => day >= 1 && day <= 5);
 
   if (hasWeekend && hasWeekday) {
@@ -692,7 +771,7 @@ export async function getRoute(routeId: string, userId: string): Promise<Route |
     const docRef = doc(db, 'routes', routeId);
     const docSnapshot = await getDoc(docRef);
 
-    if (!docSnapshot.exists()) {
+    if (!snapshotExists(docSnapshot)) {
       return null;
     }
 
@@ -748,7 +827,7 @@ export async function getUserRoutes(userId: string): Promise<Route[]> {
     const snapshot = await getDocs(q);
     const routes: Route[] = [];
 
-    snapshot.forEach((docSnapshot) => {
+    getSnapshotDocs(snapshot).forEach((docSnapshot) => {
       routes.push(convertRoute(docSnapshot.data(), docSnapshot.id));
     });
 
@@ -786,7 +865,7 @@ export async function getUserActiveRoutes(userId: string): Promise<Route[]> {
     const snapshot = await getDocs(q);
     const routes: Route[] = [];
 
-    snapshot.forEach((docSnapshot) => {
+    getSnapshotDocs(snapshot).forEach((docSnapshot) => {
       const route = convertRoute(docSnapshot.data(), docSnapshot.id);
       if (route.isActive) {
         routes.push(route);
@@ -811,7 +890,7 @@ export async function getUserActiveRoutes(userId: string): Promise<Route[]> {
  * @returns 해당 요일의 활성 경로 목록
  */
 export async function getActiveRoutesForDay(userId: string, dayOfWeek: number): Promise<Route[]> {
-  if (dayOfWeek < 1 ?? dayOfWeek > 7) {
+  if (dayOfWeek < 1 || dayOfWeek > 7) {
     throw new Error('요일은 1-7 사이여야 합니다.');
   }
 
@@ -840,9 +919,9 @@ export async function getRoutesByStation(stationId: string): Promise<StationRout
     const snapshot = await getDocs(q);
     const routes: Route[] = [];
 
-    snapshot.forEach((docSnapshot) => {
+    getSnapshotDocs(snapshot).forEach((docSnapshot) => {
       const route = convertRoute(docSnapshot.data(), docSnapshot.id);
-      if (route.startStation.stationId === stationId ?? route.endStation.stationId === stationId) {
+      if (route.startStation.stationId === stationId || route.endStation.stationId === stationId) {
         routes.push(route);
       }
     });
@@ -883,7 +962,7 @@ export async function updateRoute(
     return null;
   }
 
-  const updatedData: any = {
+  const updatedData: Partial<RouteDocument> & { updatedAt: TimestampLike } = {
     updatedAt: convertDateToTimestamp(new Date()),
   };
 

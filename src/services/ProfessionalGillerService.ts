@@ -110,7 +110,7 @@ export class ProfessionalGillerService {
     const currentGrade = user.gillerProfile?.type ?? GillerType.REGULAR;
 
     // 이미 목표 등급 이상인 경우
-    if (currentGrade === targetGrade ?? currentGrade === GillerType.MASTER) {
+    if (currentGrade === targetGrade || currentGrade === GillerType.MASTER) {
       throw new Error('Already at or above target grade');
     }
 

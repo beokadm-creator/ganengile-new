@@ -87,6 +87,34 @@ const OTP_TTL_MS = 1000 * 60 * 5;
 const OTP_RESEND_MS = 1000 * 45;
 const OTP_MAX_ATTEMPTS = 5;
 
+type KakaoUserResponse = {
+  id?: string | number;
+  kakao_account?: Record<string, unknown>;
+  properties?: Record<string, unknown>;
+};
+
+type KakaoLinkedUserDoc = {
+  role?: 'gller' | 'giller' | 'both';
+  name?: string;
+  phoneNumber?: string;
+  gillerApplicationStatus?: string;
+  profilePhoto?: string;
+  isVerified?: boolean;
+  hasCompletedOnboarding?: boolean;
+  agreedTerms?: Record<string, unknown>;
+  stats?: Record<string, unknown>;
+  badges?: Record<string, unknown>;
+  badgeBenefits?: Record<string, unknown>;
+};
+
+function requireCallableAuth(context: functions.https.CallableContext, functionName: string): string {
+  const uid = context.auth?.uid;
+  if (!uid) {
+    throw new functions.https.HttpsError('unauthenticated', `${functionName} requires authentication`);
+  }
+  return uid;
+}
+
 function getRequestDayOfWeek(request: DeliveryRequest): string {
   const requestDate = request.requestTime?.toDate?.() ?? new Date();
   const weekday = requestDate.getDay();
@@ -117,7 +145,7 @@ function readFirstQueryValue(value: unknown): string {
 }
 
 function readObjectString(source: unknown, key: string): string {
-  if (typeof source !== 'object' ?? source === null) {
+  if (typeof source !== 'object' || source === null) {
     return '';
   }
 
@@ -161,8 +189,18 @@ function createOtpCode(): string {
 }
 
 function isOtpTestModeEnabled(): boolean {
-  const raw = (OTP_TEST_MODE_PARAM.value() || process.env.OTP_TEST_MODE || 'true').trim().toLowerCase();
+  const raw = getFirstNonEmptyString(
+    OTP_TEST_MODE_PARAM.value(),
+    process.env.OTP_TEST_MODE,
+    'true'
+  )
+    .trim()
+    .toLowerCase();
   return raw !== 'false';
+}
+
+function getFirstNonEmptyString(...values: Array<string | undefined>): string {
+  return values.find((value) => typeof value === 'string' && value.trim().length > 0) ?? '';
 }
 
 function buildNaverStaticMapUrl(query: {
@@ -236,7 +274,7 @@ function fetchBinary(url: string, headers: Record<string, string>): Promise<{ st
         headers,
       },
       (response) => {
-        const chunks: Buffer[] = [];
+        const chunks: Uint8Array[] = [];
         response.on('data', (chunk) => {
           chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
         });
@@ -264,7 +302,7 @@ function fetchJson(url: string, options?: { method?: string; headers?: Record<st
         headers: options?.headers,
       },
       (response) => {
-        const chunks: Buffer[] = [];
+        const chunks: Uint8Array[] = [];
         response.on('data', (chunk) => {
           chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
         });
@@ -273,7 +311,7 @@ function fetchJson(url: string, options?: { method?: string; headers?: Record<st
             const raw = Buffer.concat(chunks).toString('utf8');
             resolve(raw ? JSON.parse(raw) : {});
           } catch (error) {
-            reject(error);
+            reject(error instanceof Error ? error : new Error(String(error)));
           }
         });
       }
@@ -498,7 +536,7 @@ async function createMatchesForRequest(
   for (const scoredMatch of scoredMatches) {
     const route = routeMap.get(scoredMatch.gillerId);
     const giller = gillerMap.get(scoredMatch.gillerId);
-    if (!route ?? !giller) {
+    if (!route || !giller) {
       continue;
     }
 
@@ -705,7 +743,7 @@ export const onRequestStatusChanged = functions.firestore
     const before = change.before.data() as DeliveryRequest;
     const after = change.after.data() as CompletedRequestDoc;
 
-    if (!before ?? !after) {
+    if (!before || !after) {
       return null;
     }
 
@@ -713,7 +751,7 @@ export const onRequestStatusChanged = functions.firestore
     if (before.status === 'matched' && after.status === 'accepted') {
       const { gllerId, matchedDeliveryId } = after;
 
-      if (!matchedDeliveryId ?? !gllerId) {
+      if (!matchedDeliveryId || !gllerId) {
         console.warn('?좑툘 No matched delivery ID or gller ID');
         return null;
       }
@@ -1008,7 +1046,7 @@ export const beta1PlanMissionExecution = functions.https.onCall(
       const requestData = requestSnap.data() as Record<string, unknown> | undefined;
       const requesterUserId = typeof requestData?.requesterId === 'string' ? requestData.requesterId : '';
       const matchedGillerId = typeof requestData?.matchedGillerId === 'string' ? requestData.matchedGillerId : '';
-      const roleAllowed = context.auth.uid === requesterUserId ?? context.auth.uid === matchedGillerId;
+      const roleAllowed = context.auth.uid === requesterUserId || context.auth.uid === matchedGillerId;
 
       if (!roleAllowed) {
         const userDoc = await db.collection('users').doc(context.auth.uid).get();
@@ -1115,7 +1153,7 @@ export const onChatMessageCreated = functions.firestore
 
       const settings = recipientDoc.data() as NotificationSettings;
 
-      if (!settings?.enabled ?? !settings?.settings?.new_message) {
+      if (!settings?.enabled || !settings?.settings?.new_message) {
         console.warn('?좑툘 Notifications disabled for recipient:', recipientId);
         return null;
       }
@@ -1157,7 +1195,7 @@ export const sendPushNotification = functions.https.onCall(async (data: SendPush
 
   const { userId, notification } = data;
 
-  if (!userId ?? !notification) {
+  if (!userId || !notification) {
     throw new functions.https.HttpsError(
       'invalid-argument',
       'userId and notification are required'
@@ -1325,7 +1363,7 @@ export const onDeliveryCompleted = functions.firestore
     const after = change.after.data() as Match;
 
     // Only trigger when status changes to 'completed'
-    if (before.status === 'completed' ?? after.status !== 'completed') {
+    if (before.status === 'completed' || after.status !== 'completed') {
       return null;
     }
 
@@ -1424,7 +1462,7 @@ export const calculateDeliveryRate = functions.https.onCall(async (data: Calcula
 
   const { baseRate, gillerId } = data;
 
-  if (typeof baseRate !== 'number' ?? !gillerId) {
+  if (typeof baseRate !== 'number' || !gillerId) {
     throw new functions.https.HttpsError('invalid-argument', 'baseRate and gillerId are required');
   }
 
@@ -1475,7 +1513,9 @@ const PRICING_CONSTANTS = {
  * Calculates delivery pricing based on distance, time, and other factors
  */
 export const calculateDeliveryPricing = functions.https.onCall(
-  (data: CalculateDeliveryPricingData, _context): CalculateDeliveryPricingResult => {
+  (data: CalculateDeliveryPricingData, context): CalculateDeliveryPricingResult => {
+    requireCallableAuth(context, 'calculateDeliveryPricing');
+
     const {
       distance,
       travelTime,
@@ -2055,7 +2095,8 @@ export const triggerFareCacheSync = functions.https.onCall(async (_data, context
     throw new functions.https.HttpsError('unauthenticated', 'Authentication required.');
   }
   const userDoc = await admin.firestore().collection('users').doc(context.auth.uid).get();
-  const role = userDoc.data()?.role;
+  const userData = userDoc.data() as { role?: unknown } | undefined;
+  const role = typeof userData?.role === 'string' ? userData.role : undefined;
   if (role !== 'admin' && role !== 'superadmin') {
     throw new functions.https.HttpsError('permission-denied', 'Admin role required.');
   }
@@ -2313,10 +2354,51 @@ export const startCiVerificationSession = functions.https.onCall(
   }
 );
 
+// ---------------------------------------------------------------------------
+// Simple in-memory rate limiter (per IP + endpoint key)
+// ---------------------------------------------------------------------------
+const rateLimitMap = new Map<string, { count: number; resetTime: number }>();
+
+function checkRateLimit(
+  ip: string,
+  key: string,
+  maxRequests: number,
+  windowSeconds: number
+): boolean {
+  const now = Date.now();
+  const limitKey = `${ip}:${key}`;
+  const record = rateLimitMap.get(limitKey);
+
+  if (!record || now > record.resetTime) {
+    rateLimitMap.set(limitKey, { count: 1, resetTime: now + windowSeconds * 1000 });
+    return false; // under limit
+  }
+
+  if (record.count >= maxRequests) {
+    return true; // over limit
+  }
+
+  record.count++;
+  return false; // under limit
+}
+
+function getClientIp(req: { ip?: string; headers?: Record<string, string | string[] | undefined> }): string {
+  return req.ip || (typeof req.headers?.['x-forwarded-for'] === 'string'
+    ? req.headers['x-forwarded-for'].split(',')[0].trim()
+    : 'unknown');
+}
+
 /**
  * HTTP: ?뚯뒪?몄슜 CI mock ?붾㈃
  */
 export const ciMock = functions.https.onRequest((req, res) => {
+  // Rate limit: 1 request per minute per IP
+  const ip = getClientIp(req);
+  if (checkRateLimit(ip, 'ciMock', 1, 60)) {
+    console.warn(`[rate-limit] ciMock blocked for ip=${ip}`);
+    res.status(429).send('Too many requests');
+    return;
+  }
   const sessionId = readFirstQueryValue(req.query.sessionId);
   const provider = readFirstQueryValue(req.query.provider);
 
@@ -2355,7 +2437,8 @@ export const issueKakaoCustomToken = functions.https.onCall(
       role?: 'gller' | 'giller' | 'both';
       name?: string;
       phoneNumber?: string;
-    }
+    },
+    context
   ): Promise<{ customToken: string; uid: string; isNewUser: boolean }> => {
     const accessToken = typeof data?.accessToken === 'string' ? data.accessToken.trim() : '';
     const expectedKakaoId = typeof data?.expectedKakaoId === 'string' ? data.expectedKakaoId.trim() : '';
@@ -2365,6 +2448,10 @@ export const issueKakaoCustomToken = functions.https.onCall(
 
     if (!accessToken) {
       throw new functions.https.HttpsError('invalid-argument', 'accessToken is required');
+    }
+
+    if (!expectedKakaoId) {
+      throw new functions.https.HttpsError('invalid-argument', 'expectedKakaoId is required');
     }
 
     const kakaoResponse = await fetchJson('https://kapi.kakao.com/v2/user/me', {
@@ -2377,7 +2464,12 @@ export const issueKakaoCustomToken = functions.https.onCall(
       throw new functions.https.HttpsError('unauthenticated', 'Failed to verify Kakao access token');
     }
 
-    const kakaoId = String((kakaoResponse as { id: unknown }).id ?? '');
+    const kakaoUser = kakaoResponse as KakaoUserResponse;
+    const rawKakaoId = kakaoUser.id;
+    const kakaoId =
+      typeof rawKakaoId === 'string' || typeof rawKakaoId === 'number'
+        ? String(rawKakaoId)
+        : '';
     if (!kakaoId) {
       throw new functions.https.HttpsError('unauthenticated', 'Kakao user id is missing');
     }
@@ -2387,12 +2479,12 @@ export const issueKakaoCustomToken = functions.https.onCall(
     }
 
     const kakaoAccount =
-      'kakao_account' in kakaoResponse && typeof (kakaoResponse as { kakao_account?: unknown }).kakao_account === 'object'
-        ? ((kakaoResponse as { kakao_account?: Record<string, unknown> }).kakao_account ?? {})
+      typeof kakaoUser.kakao_account === 'object' && kakaoUser.kakao_account !== null
+        ? (kakaoUser.kakao_account ?? {})
         : {};
     const properties =
-      'properties' in kakaoResponse && typeof (kakaoResponse as { properties?: unknown }).properties === 'object'
-        ? ((kakaoResponse as { properties?: Record<string, unknown> }).properties ?? {})
+      typeof kakaoUser.properties === 'object' && kakaoUser.properties !== null
+        ? (kakaoUser.properties ?? {})
         : {};
 
     const email = typeof kakaoAccount.email === 'string' ? kakaoAccount.email : '';
@@ -2405,27 +2497,43 @@ export const issueKakaoCustomToken = functions.https.onCall(
           : '';
 
     const uid = `kakao_${kakaoId}`;
+    if (context.auth?.uid && context.auth.uid !== uid) {
+      throw new functions.https.HttpsError('permission-denied', 'Authenticated user does not match Kakao identity');
+    }
+
     const userRef = db.collection('users').doc(uid);
     const existing = await userRef.get();
-    const existingData = existing.data() ?? {};
+    const existingData = (existing.data() ?? {}) as KakaoLinkedUserDoc;
     const now = admin.firestore.FieldValue.serverTimestamp();
+    const userRole =
+      existing.exists && (existingData.role === 'gller' || existingData.role === 'giller' || existingData.role === 'both')
+        ? existingData.role
+        : role;
+    const userName =
+      existing.exists && typeof existingData.name === 'string' && existingData.name.trim()
+        ? existingData.name
+        : providedName || nickname;
+    const userPhoneNumber =
+      existing.exists && typeof existingData.phoneNumber === 'string' && existingData.phoneNumber.trim()
+        ? existingData.phoneNumber
+        : providedPhoneNumber;
 
     await userRef.set(
       {
         uid,
         email,
-        name: providedName ?? nickname,
-        phoneNumber: providedPhoneNumber || existingData.phoneNumber || '',
-          role,
-          gillerApplicationStatus: existingData.gillerApplicationStatus ?? 'none',
-          authProvider: 'kakao',
+        name: userName,
+        phoneNumber: userPhoneNumber,
+        role: userRole,
+        gillerApplicationStatus: existingData.gillerApplicationStatus ?? 'none',
+        authProvider: 'kakao',
         authProviderUserId: kakaoId,
         signupMethod: 'kakao',
         providerLinkedAt: now,
-        profilePhoto: profileImage || existingData.profilePhoto || '',
-          updatedAt: now,
-          isActive: true,
-          isVerified: existingData.isVerified ?? false,
+        profilePhoto: profileImage ?? existingData.profilePhoto ?? '',
+        updatedAt: now,
+        isActive: true,
+        isVerified: existingData.isVerified ?? false,
         hasCompletedOnboarding: existing.exists ? existingData.hasCompletedOnboarding ?? false : false,
         agreedTerms: existing.exists
           ? existingData.agreedTerms ?? { giller: false, gller: false, privacy: false, marketing: false }
@@ -2476,9 +2584,22 @@ export const issueKakaoCustomToken = functions.https.onCall(
  * Keeps the secret key on the server side while the app/web can request a rendered image.
  */
 export const naverStaticMapProxy = functions.https.onRequest(async (req, res) => {
+  const ip = getClientIp(req);
+  if (checkRateLimit(ip, 'naverStaticMapProxy', 10, 60)) {
+    console.warn(`[rate-limit] naverStaticMapProxy blocked for ip=${ip}`);
+    res.status(429).send('Too many requests');
+    return;
+  }
+
   try {
-    const clientId = NAVER_MAP_CLIENT_ID_PARAM.value() || process.env.NAVER_MAP_CLIENT_ID || '';
-    const clientSecret = NAVER_MAP_CLIENT_SECRET_PARAM.value() || process.env.NAVER_MAP_CLIENT_SECRET || '';
+    const clientId = getFirstNonEmptyString(
+      NAVER_MAP_CLIENT_ID_PARAM.value(),
+      process.env.NAVER_MAP_CLIENT_ID
+    );
+    const clientSecret = getFirstNonEmptyString(
+      NAVER_MAP_CLIENT_SECRET_PARAM.value(),
+      process.env.NAVER_MAP_CLIENT_SECRET
+    );
 
     if (!clientId || !clientSecret) {
       res.status(503).json({ ok: false, message: 'naver map credentials are not configured' });
@@ -2530,6 +2651,13 @@ export const naverStaticMapProxy = functions.https.onRequest(async (req, res) =>
  * Converts a selected road address into latitude/longitude on the server side.
  */
 export const naverGeocodeProxy = functions.https.onRequest(async (req, res) => {
+  const ip = getClientIp(req);
+  if (checkRateLimit(ip, 'naverGeocodeProxy', 10, 60)) {
+    console.warn(`[rate-limit] naverGeocodeProxy blocked for ip=${ip}`);
+    res.status(429).send('Too many requests');
+    return;
+  }
+
   try {
     res.set('Access-Control-Allow-Origin', '*');
     res.set('Access-Control-Allow-Methods', 'GET,OPTIONS');
@@ -2540,8 +2668,14 @@ export const naverGeocodeProxy = functions.https.onRequest(async (req, res) => {
       return;
     }
 
-    const clientId = NAVER_MAP_CLIENT_ID_PARAM.value() || process.env.NAVER_MAP_CLIENT_ID || '';
-    const clientSecret = NAVER_MAP_CLIENT_SECRET_PARAM.value() || process.env.NAVER_MAP_CLIENT_SECRET || '';
+    const clientId = getFirstNonEmptyString(
+      NAVER_MAP_CLIENT_ID_PARAM.value(),
+      process.env.NAVER_MAP_CLIENT_ID
+    );
+    const clientSecret = getFirstNonEmptyString(
+      NAVER_MAP_CLIENT_SECRET_PARAM.value(),
+      process.env.NAVER_MAP_CLIENT_SECRET
+    );
 
     if (!clientId || !clientSecret) {
       res.status(503).json({ ok: false, message: 'naver map credentials are not configured' });
@@ -2607,6 +2741,13 @@ export const naverGeocodeProxy = functions.https.onRequest(async (req, res) => {
  * Returns route coordinates between two points so the client can render an actual route line.
  */
 export const naverDirectionsProxy = functions.https.onRequest(async (req, res) => {
+  const ip = getClientIp(req);
+  if (checkRateLimit(ip, 'naverDirectionsProxy', 10, 60)) {
+    console.warn(`[rate-limit] naverDirectionsProxy blocked for ip=${ip}`);
+    res.status(429).send('Too many requests');
+    return;
+  }
+
   try {
     res.set('Access-Control-Allow-Origin', '*');
     res.set('Access-Control-Allow-Methods', 'GET,OPTIONS');
@@ -2617,8 +2758,14 @@ export const naverDirectionsProxy = functions.https.onRequest(async (req, res) =
       return;
     }
 
-    const clientId = NAVER_MAP_CLIENT_ID_PARAM.value() || process.env.NAVER_MAP_CLIENT_ID || '';
-    const clientSecret = NAVER_MAP_CLIENT_SECRET_PARAM.value() || process.env.NAVER_MAP_CLIENT_SECRET || '';
+    const clientId = getFirstNonEmptyString(
+      NAVER_MAP_CLIENT_ID_PARAM.value(),
+      process.env.NAVER_MAP_CLIENT_ID
+    );
+    const clientSecret = getFirstNonEmptyString(
+      NAVER_MAP_CLIENT_SECRET_PARAM.value(),
+      process.env.NAVER_MAP_CLIENT_SECRET
+    );
 
     if (!clientId || !clientSecret) {
       res.status(503).json({ ok: false, message: 'naver map credentials are not configured' });
@@ -2627,9 +2774,9 @@ export const naverDirectionsProxy = functions.https.onRequest(async (req, res) =
 
     const start = readFirstQueryValue(req.query.start).trim();
     const goal = readFirstQueryValue(req.query.goal).trim();
-    const option = readFirstQueryValue(req.query.option).trim() ?? 'trafast';
+    const option = readFirstQueryValue(req.query.option).trim() || 'trafast';
 
-    if (!start ?? !goal) {
+    if (!start || !goal) {
       res.status(400).json({ ok: false, message: 'start and goal are required' });
       return;
     }
@@ -2662,7 +2809,7 @@ export const naverDirectionsProxy = functions.https.onRequest(async (req, res) =
     const routeGroups = payload.route ?? {};
     const routeEntry = Object.values(routeGroups).find((items) => Array.isArray(items) && items.length > 0)?.[0];
 
-    if (!routeEntry?.path ?? routeEntry.path.length === 0) {
+    if (!routeEntry?.path || routeEntry.path.length === 0) {
       res.status(404).json({ ok: false, message: payload.message ?? 'route coordinates not found' });
       return;
     }
@@ -2671,7 +2818,7 @@ export const naverDirectionsProxy = functions.https.onRequest(async (req, res) =
       .map((point) => {
         const longitude = Number(point?.[0]);
         const latitude = Number(point?.[1]);
-        if (!Number.isFinite(latitude) ?? !Number.isFinite(longitude)) {
+        if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) {
           return null;
         }
 
@@ -2713,6 +2860,13 @@ export const naverDirectionsProxy = functions.https.onRequest(async (req, res) =
  * Keeps the confirmation key on the server while the client searches by keyword.
  */
 export const jusoAddressSearchProxy = functions.https.onRequest(async (req, res) => {
+  const ip = getClientIp(req);
+  if (checkRateLimit(ip, 'jusoAddressSearchProxy', 10, 60)) {
+    console.warn(`[rate-limit] jusoAddressSearchProxy blocked for ip=${ip}`);
+    res.status(429).send('Too many requests');
+    return;
+  }
+
   try {
     res.set('Access-Control-Allow-Origin', '*');
     res.set('Access-Control-Allow-Methods', 'GET,OPTIONS');
@@ -2723,7 +2877,7 @@ export const jusoAddressSearchProxy = functions.https.onRequest(async (req, res)
       return;
     }
 
-    const apiKey = JUSO_API_KEY_PARAM.value() || process.env.JUSO_API_KEY || '';
+    const apiKey = getFirstNonEmptyString(JUSO_API_KEY_PARAM.value(), process.env.JUSO_API_KEY);
     if (!apiKey) {
       res.status(503).json({ ok: false, message: 'juso api key is not configured' });
       return;
@@ -2763,6 +2917,13 @@ export const jusoAddressSearchProxy = functions.https.onRequest(async (req, res)
  * HTTP: CI ?몄쬆 肄쒕갚
  */
 export const ciVerificationCallback = functions.https.onRequest(async (req, res) => {
+  const ip = getClientIp(req);
+  if (checkRateLimit(ip, 'ciVerificationCallback', 10, 60)) {
+    console.warn(`[rate-limit] ciVerificationCallback blocked for ip=${ip}`);
+    res.status(429).send('Too many requests');
+    return;
+  }
+
   try {
     const sessionId = readFirstQueryValue(req.query.sessionId) ?? readObjectString(req.body, 'sessionId');
     const provider = readFirstQueryValue(req.query.provider) ?? readObjectString(req.body, 'provider');
@@ -2778,7 +2939,7 @@ export const ciVerificationCallback = functions.https.onRequest(async (req, res)
     const sessionSnap = await sessionRef.get();
     const session = sessionSnap.data() as { userId?: string; provider?: CiProvider } | undefined;
 
-    if (!sessionSnap.exists ?? !session?.userId) {
+    if (!sessionSnap.exists || !session?.userId) {
       res.status(404).json({ ok: false, message: 'session not found' });
       return;
     }
@@ -2885,7 +3046,8 @@ export const completeCiVerificationTest = functions.https.onCall(
 );
 
 export const requestPhoneOtp = functions.https.onCall(
-  async (data: RequestPhoneOtpData): Promise<RequestPhoneOtpResult> => {
+  async (data: RequestPhoneOtpData, context): Promise<RequestPhoneOtpResult> => {
+    requireCallableAuth(context, 'requestPhoneOtp');
     const phoneNumber = normalizePhoneNumber(data?.phoneNumber ?? '');
     if (!isValidKoreanMobileNumber(phoneNumber)) {
       throw new functions.https.HttpsError('invalid-argument', 'A valid Korean mobile number is required');
@@ -2902,8 +3064,10 @@ export const requestPhoneOtp = functions.https.onCall(
     if (!sessionQuery.empty) {
       const latestPending = sessionQuery.docs
         .sort((left, right) => {
-          const leftTime = left.get('createdAt')?.toDate?.().getTime?.() ?? 0;
-          const rightTime = right.get('createdAt')?.toDate?.().getTime?.() ?? 0;
+          const leftTimestamp = left.get('createdAt') as admin.firestore.Timestamp | undefined;
+          const rightTimestamp = right.get('createdAt') as admin.firestore.Timestamp | undefined;
+          const leftTime = leftTimestamp?.toDate().getTime() ?? 0;
+          const rightTime = rightTimestamp?.toDate().getTime() ?? 0;
           return rightTime - leftTime;
         })[0];
       const latestData = latestPending.data() as { resendAvailableAt?: admin.firestore.Timestamp };
@@ -2951,7 +3115,8 @@ export const requestPhoneOtp = functions.https.onCall(
 );
 
 export const confirmPhoneOtp = functions.https.onCall(
-  async (data: ConfirmPhoneOtpData): Promise<ConfirmPhoneOtpResult> => {
+  async (data: ConfirmPhoneOtpData, context): Promise<ConfirmPhoneOtpResult> => {
+    requireCallableAuth(context, 'confirmPhoneOtp');
     const sessionId = typeof data?.sessionId === 'string' ? data.sessionId.trim() : '';
     const phoneNumber = normalizePhoneNumber(data?.phoneNumber ?? '');
     const code = typeof data?.code === 'string' ? data.code.trim() : '';
@@ -2983,7 +3148,7 @@ export const confirmPhoneOtp = functions.https.onCall(
     }
 
     const expiresAt = session.expiresAt?.toDate().getTime() ?? 0;
-    if (!expiresAt ?? expiresAt < Date.now()) {
+    if (!expiresAt || expiresAt < Date.now()) {
       await sessionRef.set(
         {
           status: 'expired',
@@ -2995,7 +3160,7 @@ export const confirmPhoneOtp = functions.https.onCall(
     }
 
     const expectedHash = hashOtpCode(sessionId, code);
-    if (!session.codeHash ?? session.codeHash !== expectedHash) {
+    if (!session.codeHash || session.codeHash !== expectedHash) {
       const nextAttempts = Math.max((session.attemptsRemaining ?? OTP_MAX_ATTEMPTS) - 1, 0);
       await sessionRef.set(
         {
@@ -3033,5 +3198,3 @@ export const confirmPhoneOtp = functions.https.onCall(
 );
 
 export { syncConfigStationsFromSeoulApi };
-
-

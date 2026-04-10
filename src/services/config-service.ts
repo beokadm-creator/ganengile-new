@@ -107,6 +107,47 @@ function isPermissionDeniedError(error: unknown): boolean {
   return code === 'permission-denied' || code === 'firestore/permission-denied';
 }
 
+function asRecord(value: unknown): Record<string, unknown> {
+  return typeof value === 'object' && value != null ? (value as Record<string, unknown>) : {};
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value != null;
+}
+
+function readString(value: unknown, fallback: string = ''): string {
+  return typeof value === 'string' ? value : fallback;
+}
+
+function readNumber(value: unknown, fallback: number = 0): number {
+  return typeof value === 'number' && Number.isFinite(value) ? value : fallback;
+}
+
+function readBoolean(value: unknown, fallback: boolean = false): boolean {
+  return typeof value === 'boolean' ? value : fallback;
+}
+
+function readStringArray(value: unknown): string[] {
+  return Array.isArray(value) ? value.filter((item): item is string => typeof item === 'string') : [];
+}
+
+function readNumberMap(value: unknown): Record<string, number> {
+  if (!isRecord(value)) {
+    return {};
+  }
+
+  return Object.entries(value).reduce<Record<string, number>>((result, [key, entry]) => {
+    if (typeof entry === 'number' && Number.isFinite(entry)) {
+      result[key] = entry;
+    }
+    return result;
+  }, {});
+}
+
+function isTimestampRecord(value: unknown): value is { seconds: number; nanoseconds?: number } {
+  return typeof value === 'object' && value != null && typeof (value as { seconds?: unknown }).seconds === 'number';
+}
+
 function convertTimestampToDate(timestamp: { seconds: number; nanoseconds?: number }): Date {
   return new Date(timestamp.seconds * 1000 + (timestamp.nanoseconds ?? 0) / 1000000);
 }
@@ -142,7 +183,7 @@ function hasValidStationCoordinates(latitude: number | null, longitude: number |
 
 function convertDocument<T>(
   docSnapshot: DocumentSnapshot,
-  converter: (data: any, docId: string) => T
+  converter: (data: unknown, docId: string) => T
 ): T {
   const data = docSnapshot.data();
   const docId = docSnapshot.id;
@@ -172,6 +213,109 @@ function convertLocalStation(station: LocalStation): Station {
     priority: station.priority ?? 100,
     createdAt: toFallbackDate(),
     updatedAt: toFallbackDate(),
+  };
+}
+
+function readDate(value: unknown, fallback: Date = toFallbackDate()): Date {
+  return isTimestampRecord(value) ? convertTimestampToDate(value) : fallback;
+}
+
+function readNumberRecord<T extends string>(value: unknown, keys: readonly T[]): Record<T, number> {
+  const source = asRecord(value);
+  return keys.reduce<Record<T, number>>((result, key) => {
+    result[key] = readNumber(source[key]);
+    return result;
+  }, {} as Record<T, number>);
+}
+
+function normalizeCongestionTimeSlots(value: unknown): CongestionData['timeSlots'] {
+  return readNumberRecord(value, [
+    'earlyMorning',
+    'rushHourMorning',
+    'morning',
+    'lunch',
+    'afternoon',
+    'rushHourEvening',
+    'evening',
+  ] as const);
+}
+
+function normalizeCongestionSections(value: unknown): CongestionData['sections'] {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+
+  return value
+    .map((section) => {
+      const source = asRecord(section);
+      const stationId = readString(source.stationId);
+      const stationName = readString(source.stationName);
+
+      if (!stationId && !stationName) {
+        return null;
+      }
+
+      return {
+        stationId,
+        stationName,
+        congestionLevel: readNumber(source.congestionLevel),
+      };
+    })
+    .filter((section): section is CongestionData['sections'][number] => section != null);
+}
+
+function normalizeAlgorithmWeights(value: unknown): AlgorithmParams['weights'] {
+  return readNumberRecord(value, ['timeEfficiency', 'routeConvenience', 'gillerReliability'] as const);
+}
+
+function normalizeTimeEfficiency(value: unknown): AlgorithmParams['timeEfficiency'] {
+  return readNumberRecord(value, ['travelTime', 'waitingTime', 'scheduleMatch'] as const);
+}
+
+function normalizeRouteConvenience(value: unknown): AlgorithmParams['routeConvenience'] {
+  return readNumberRecord(value, ['transferPenalty', 'congestion', 'walkingDistance'] as const);
+}
+
+function normalizeGillerReliability(value: unknown): AlgorithmParams['gillerReliability'] {
+  return readNumberRecord(value, ['rating', 'responseTime'] as const);
+}
+
+function normalizeScoring(value: unknown): AlgorithmParams['scoring'] {
+  const source = asRecord(value);
+
+  return {
+    travelTime: readNumberRecord(source.travelTime, [
+      'excellentMargin',
+      'goodMargin',
+      'acceptableMargin',
+      'tightMargin',
+      'impossibleMargin',
+    ] as const),
+    waitingTime: readNumberRecord(source.waitingTime, ['maxWaitTime', 'pointsPer5Minutes'] as const),
+    transfer: readNumberRecord(source.transfer, ['penaltyPerTransfer', 'maxScore'] as const),
+    congestion: readNumberRecord(source.congestion, ['rushHourPenalty', 'maxScore'] as const),
+    walkingDistance: readNumberRecord(source.walkingDistance, ['penaltyPer100m', 'maxScore'] as const),
+    rating: readNumberRecord(source.rating, ['minRating', 'maxRating', 'maxScore'] as const),
+    responseTime: readNumberRecord(source.responseTime, ['excellent', 'good', 'fair', 'poor'] as const),
+  };
+}
+
+function normalizeLimits(value: unknown): AlgorithmParams['limits'] {
+  return readNumberRecord(value, ['maxMatchesPerRequest', 'matchTimeoutMinutes', 'maxRetryCount', 'minScore'] as const);
+}
+
+function normalizePriorities(value: unknown): AlgorithmParams['priorities'] {
+  return readNumberRecord(value, ['proGillerMultiplier', 'premiumBusinessMultiplier', 'newGillerPenalty'] as const);
+}
+
+function normalizeFeatures(value: unknown): AlgorithmParams['features'] {
+  const source = asRecord(value);
+  return {
+    enableExpressBonus: readBoolean(source.enableExpressBonus),
+    enableCongestionPenalty: readBoolean(source.enableCongestionPenalty),
+    enableRushHourPenalty: readBoolean(source.enableRushHourPenalty),
+    enableTransferPenalty: readBoolean(source.enableTransferPenalty),
+    enableProGillerPriority: readBoolean(source.enableProGillerPriority),
   };
 }
 
@@ -426,31 +570,43 @@ function getFallbackCongestionConfigs(): CongestionData[] {
 
 // ==================== Station Config ====================
 
-function convertStation(data: any, docId?: string): Station {
-  const stationId = data.stationId ?? data.id ?? docId ?? '';
-  const stationName = data.stationName ?? data.name ?? '';
+function convertStation(data: unknown, docId?: string): Station {
+  const source = asRecord(data);
+  const facilities = asRecord(source.facilities);
+  const stationId = readString(source.stationId, readString(source.id, docId ?? ''));
+  const stationName = readString(source.stationName, readString(source.name));
 
   return {
     stationId,
     stationName,
-    stationNameEnglish: data.stationNameEnglish ?? data.nameEnglish ?? '',
-    lines: normalizeStationLines(data.lines),
-    location: normalizeStationLocation(data.location, stationId, stationName),
-    isTransferStation: Boolean(data.isTransferStation),
-    isExpressStop: data.isExpressStop ?? false,
-    isTerminus: data.isTerminus ?? false,
+    stationNameEnglish: readString(source.stationNameEnglish, readString(source.nameEnglish)),
+    lines: normalizeStationLines(source.lines),
+    location: normalizeStationLocation(source.location, stationId, stationName),
+    isTransferStation: readBoolean(source.isTransferStation),
+    isExpressStop: readBoolean(source.isExpressStop),
+    isTerminus: readBoolean(source.isTerminus),
     facilities: {
-      hasElevator: Boolean(data.facilities?.hasElevator),
-      hasEscalator: Boolean(data.facilities?.hasEscalator),
-      wheelchairAccessible: Boolean(data.facilities?.wheelchairAccessible),
+      hasElevator: readBoolean(facilities.hasElevator),
+      hasEscalator: readBoolean(facilities.hasEscalator),
+      wheelchairAccessible: readBoolean(facilities.wheelchairAccessible),
     },
-    isActive: data.isActive !== false,
-    region: data.region ?? 'seoul',
-    priority: typeof data.priority === 'number' ? data.priority : 999,
-    kric: data.kric,
-    fare: data.fare,
-    createdAt: data.createdAt ? convertTimestampToDate(data.createdAt) : toFallbackDate(),
-    updatedAt: data.updatedAt ? convertTimestampToDate(data.updatedAt) : toFallbackDate(),
+    isActive: source.isActive !== false,
+    region: readString(source.region, 'seoul'),
+    priority: readNumber(source.priority, 999),
+    kric: isRecord(source.kric)
+      ? {
+          stationCode: readString(source.kric.stationCode),
+          lineCode: readString(source.kric.lineCode),
+          railOprIsttCd: readString(source.kric.railOprIsttCd),
+        }
+      : undefined,
+    fare: isRecord(source.fare)
+      ? {
+          stationCode: readString(source.fare.stationCode),
+        }
+      : undefined,
+    createdAt: isTimestampRecord(source.createdAt) ? convertTimestampToDate(source.createdAt) : toFallbackDate(),
+    updatedAt: isTimestampRecord(source.updatedAt) ? convertTimestampToDate(source.updatedAt) : toFallbackDate(),
   };
 }
 
@@ -565,26 +721,27 @@ export async function getStationsByLine(lineId: string): Promise<Station[]> {
 
 // ==================== Travel Time Config ====================
 
-function convertTravelTime(data: any, docId?: string): TravelTime {
+function convertTravelTime(data: unknown, docId?: string): TravelTime {
+  const source = asRecord(data);
   return {
-    travelTimeId: data.travelTimeId ?? docId ?? '',
-    fromStationId: data.fromStationId,
-    toStationId: data.toStationId,
-    fromStationName: data.fromStationName,
-    toStationName: data.toStationName,
-    normalTime: data.normalTime,
-    expressTime: data.expressTime,
-    transferCount: data.transferCount,
-    transferStations: data.transferStations,
-    hasExpress: data.hasExpress,
-    walkingDistance: data.walkingDistance,
-    distance: data.distance,
-    lineIds: data.lineIds,
-    reliability: data.reliability,
-    lastVerified: convertTimestampToDate(data.lastVerified),
-    isActive: data.isActive,
-    createdAt: convertTimestampToDate(data.createdAt),
-    updatedAt: convertTimestampToDate(data.updatedAt),
+    travelTimeId: readString(source.travelTimeId, docId ?? ''),
+    fromStationId: readString(source.fromStationId),
+    toStationId: readString(source.toStationId),
+    fromStationName: readString(source.fromStationName),
+    toStationName: readString(source.toStationName),
+    normalTime: readNumber(source.normalTime),
+    expressTime: typeof source.expressTime === 'number' ? source.expressTime : undefined,
+    transferCount: readNumber(source.transferCount),
+    transferStations: readStringArray(source.transferStations),
+    hasExpress: readBoolean(source.hasExpress),
+    walkingDistance: readNumber(source.walkingDistance),
+    distance: readNumber(source.distance),
+    lineIds: readStringArray(source.lineIds),
+    reliability: readNumber(source.reliability),
+    lastVerified: isTimestampRecord(source.lastVerified) ? convertTimestampToDate(source.lastVerified) : toFallbackDate(),
+    isActive: readBoolean(source.isActive, true),
+    createdAt: isTimestampRecord(source.createdAt) ? convertTimestampToDate(source.createdAt) : toFallbackDate(),
+    updatedAt: isTimestampRecord(source.updatedAt) ? convertTimestampToDate(source.updatedAt) : toFallbackDate(),
   };
 }
 
@@ -683,28 +840,31 @@ export async function getTravelTimesFromStation(stationId: string): Promise<Trav
 
 // ==================== Express Train Config ====================
 
-function convertExpressTrain(data: any, docId?: string): ExpressTrain {
+function convertExpressTrain(data: unknown, docId?: string): ExpressTrain {
+  const source = asRecord(data);
   return {
-    expressId: data.expressId ?? docId ?? '',
-    lineId: data.lineId,
-    lineName: data.lineName,
-    type: data.type,
-    typeName: data.typeName,
-    operatingDays: data.operatingDays,
-    firstTrain: data.firstTrain,
-    lastTrain: data.lastTrain,
-    rushHourMorningInterval: data.rushHourMorningInterval,
-    rushHourEveningInterval: data.rushHourEveningInterval,
-    daytimeInterval: data.daytimeInterval,
-    nightInterval: data.nightInterval,
-    stops: data.stops,
-    avgSpeed: data.avgSpeed,
-    timeSavings: data.timeSavings,
-    isActive: data.isActive,
-    seasonStart: data.seasonStart ? convertTimestampToDate(data.seasonStart) : undefined,
-    seasonEnd: data.seasonEnd ? convertTimestampToDate(data.seasonEnd) : undefined,
-    createdAt: convertTimestampToDate(data.createdAt),
-    updatedAt: convertTimestampToDate(data.updatedAt),
+    expressId: readString(source.expressId, docId ?? ''),
+    lineId: readString(source.lineId),
+    lineName: readString(source.lineName),
+    type: (readString(source.type) as ExpressTrain['type']) || 'express',
+    typeName: readString(source.typeName),
+    operatingDays: Array.isArray(source.operatingDays)
+      ? source.operatingDays.filter((day): day is number => typeof day === 'number')
+      : [],
+    firstTrain: readString(source.firstTrain),
+    lastTrain: readString(source.lastTrain),
+    rushHourMorningInterval: readNumber(source.rushHourMorningInterval),
+    rushHourEveningInterval: readNumber(source.rushHourEveningInterval),
+    daytimeInterval: readNumber(source.daytimeInterval),
+    nightInterval: readNumber(source.nightInterval),
+    stops: readStringArray(source.stops),
+    avgSpeed: readNumber(source.avgSpeed),
+    timeSavings: readNumberMap(source.timeSavings),
+    isActive: readBoolean(source.isActive, true),
+    seasonStart: isTimestampRecord(source.seasonStart) ? convertTimestampToDate(source.seasonStart) : undefined,
+    seasonEnd: isTimestampRecord(source.seasonEnd) ? convertTimestampToDate(source.seasonEnd) : undefined,
+    createdAt: isTimestampRecord(source.createdAt) ? convertTimestampToDate(source.createdAt) : toFallbackDate(),
+    updatedAt: isTimestampRecord(source.updatedAt) ? convertTimestampToDate(source.updatedAt) : toFallbackDate(),
   };
 }
 
@@ -794,18 +954,19 @@ export async function getExpressTrainsByLine(lineId: string): Promise<ExpressTra
 
 // ==================== Congestion Config ====================
 
-function convertCongestionData(data: any, docId?: string): CongestionData {
+function convertCongestionData(data: unknown, docId?: string): CongestionData {
+  const source = asRecord(data);
   return {
-    congestionId: data.congestionId ?? docId ?? '',
-    lineId: data.lineId,
-    lineName: data.lineName,
-    timeSlots: data.timeSlots,
-    sections: data.sections,
-    dataSource: data.dataSource,
-    lastUpdated: convertTimestampToDate(data.lastUpdated),
-    isValid: data.isValid,
-    createdAt: convertTimestampToDate(data.createdAt),
-    updatedAt: convertTimestampToDate(data.updatedAt),
+    congestionId: readString(source.congestionId, docId ?? ''),
+    lineId: readString(source.lineId),
+    lineName: readString(source.lineName),
+    timeSlots: normalizeCongestionTimeSlots(source.timeSlots),
+    sections: normalizeCongestionSections(source.sections),
+    dataSource: readString(source.dataSource),
+    lastUpdated: readDate(source.lastUpdated),
+    isValid: readBoolean(source.isValid, true),
+    createdAt: readDate(source.createdAt),
+    updatedAt: readDate(source.updatedAt),
   };
 }
 
@@ -871,23 +1032,24 @@ export async function getAllCongestionConfigs(): Promise<CongestionData[]> {
 
 // ==================== Algorithm Params ====================
 
-function convertAlgorithmParams(data: any, docId?: string): AlgorithmParams {
+function convertAlgorithmParams(data: unknown, docId?: string): AlgorithmParams {
+  const source = asRecord(data);
   return {
-    paramId: data.paramId ?? docId ?? '',
-    version: data.version,
-    weights: data.weights,
-    timeEfficiency: data.timeEfficiency,
-    routeConvenience: data.routeConvenience,
-    gillerReliability: data.gillerReliability,
-    scoring: data.scoring,
-    limits: data.limits,
-    priorities: data.priorities,
-    features: data.features,
-    isActive: data.isActive,
-    description: data.description,
-    createdBy: data.createdBy,
-    createdAt: convertTimestampToDate(data.createdAt),
-    updatedAt: convertTimestampToDate(data.updatedAt),
+    paramId: readString(source.paramId, docId ?? ''),
+    version: readString(source.version),
+    weights: normalizeAlgorithmWeights(source.weights),
+    timeEfficiency: normalizeTimeEfficiency(source.timeEfficiency),
+    routeConvenience: normalizeRouteConvenience(source.routeConvenience),
+    gillerReliability: normalizeGillerReliability(source.gillerReliability),
+    scoring: normalizeScoring(source.scoring),
+    limits: normalizeLimits(source.limits),
+    priorities: normalizePriorities(source.priorities),
+    features: normalizeFeatures(source.features),
+    isActive: readBoolean(source.isActive, true),
+    description: readString(source.description),
+    createdBy: readString(source.createdBy),
+    createdAt: readDate(source.createdAt),
+    updatedAt: readDate(source.updatedAt),
   };
 }
 
@@ -1052,19 +1214,20 @@ export function clearAlgorithmParamsCache(): void {
 
 // ==================== Policy Config ====================
 
-function convertPolicyConfig(data: any, docId?: string): PolicyConfig {
+function convertPolicyConfig(data: unknown, docId?: string): PolicyConfig {
+  const source = asRecord(data);
   return {
-    policyId: data.policyId ?? docId ?? '',
-    title: data.title ?? '정책',
-    content: Array.isArray(data.content) ? data.content : [],
-    effectiveDate: data.effectiveDate ?? '',
-    isActive: data.isActive !== false,
-    priority: typeof data.priority === 'number' ? data.priority : 999,
-    version: typeof data.version === 'string' ? data.version : undefined,
-    category: typeof data.category === 'string' ? data.category : undefined,
-    summary: typeof data.summary === 'string' ? data.summary : undefined,
-    required: typeof data.required === 'boolean' ? data.required : undefined,
-    targetFlow: typeof data.targetFlow === 'string' ? data.targetFlow : undefined,
+    policyId: readString(source.policyId, docId ?? ''),
+    title: readString(source.title, '정책'),
+    content: readStringArray(source.content),
+    effectiveDate: readString(source.effectiveDate),
+    isActive: source.isActive !== false,
+    priority: readNumber(source.priority, 999),
+    version: typeof source.version === 'string' ? source.version : undefined,
+    category: typeof source.category === 'string' ? source.category : undefined,
+    summary: typeof source.summary === 'string' ? source.summary : undefined,
+    required: typeof source.required === 'boolean' ? source.required : undefined,
+    targetFlow: typeof source.targetFlow === 'string' ? source.targetFlow : undefined,
   };
 }
 

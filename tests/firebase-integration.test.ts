@@ -59,7 +59,18 @@ describe('Firebase Integration Tests', () => {
           weight: 'light' as const,
           description: '테스트 물품',
         },
-        fee: 5300,
+        initialNegotiationFee: 5300,
+        feeBreakdown: {
+          baseFee: 2000,
+          distanceFee: 600,
+          sizeFee: 0,
+          weightFee: 100,
+          urgencySurcharge: 0,
+          manualAdjustment: 0,
+          serviceFee: 270,
+          vat: 297,
+          totalFee: 3267,
+        },
         preferredTime: {
           departureTime: '09:00',
           arrivalTime: '10:00',
@@ -137,8 +148,9 @@ describe('Firebase Integration Tests', () => {
   describe('Firestore - Auction Collection', () => {
     test('should create an auction', async () => {
       const auctionData = {
-        gllerId: 'test-user-integration',
-        gllerName: '테스트 사용자',
+        requestId: 'test-auction-request',
+        requesterId: 'test-user-integration',
+        requesterName: '테스트 사용자',
         pickupStation: {
           id: 'station-1',
           stationId: 'station-1',

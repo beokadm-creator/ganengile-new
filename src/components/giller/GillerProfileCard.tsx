@@ -74,7 +74,7 @@ export const GillerProfileCard: React.FC<GillerProfileCardProps> = ({
             style={styles.profileImage}
           />
         ) : (
-          <View style={styles.defaultAvatar}>
+          <View testID="default-avatar" style={styles.defaultAvatar}>
             <Icon name="person" size={48} color="#00BCD4" />
           </View>
         )}
@@ -92,7 +92,7 @@ export const GillerProfileCard: React.FC<GillerProfileCardProps> = ({
           <Icon name="star" size={20} color="#FFD700" />
           <Text style={styles.rating}>{giller.rating.toFixed(1)}</Text>
           <Text style={styles.deliveries}>
-            완료 {giller.completedDeliveries}건
+            완료 {giller.completedDeliveries.toLocaleString()}건
           </Text>
         </View>
 
@@ -300,3 +300,5 @@ const styles = StyleSheet.create({
     opacity: 0.6,
   },
 });
+
+export default GillerProfileCard;

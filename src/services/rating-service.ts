@@ -41,7 +41,7 @@ export async function submitRating(
   isAnonymous: boolean = false
 ): Promise<string> {
   try {
-    if (rating < 1 ?? rating > 5) {
+    if (rating < 1 || rating > 5) {
       throw new Error('Rating must be between 1 and 5');
     }
 

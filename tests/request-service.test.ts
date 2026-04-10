@@ -55,7 +55,9 @@ jest.mock('firebase/firestore', () => {
       this.nanoseconds = nanoseconds;
     }
     toDate() { return new Date(this.seconds * 1000); }
+    toMillis() { return this.seconds * 1000 + Math.floor(this.nanoseconds / 1_000_000); }
     static fromDate(date: Date) { return new MockTimestamp(Math.floor(date.getTime() / 1000), 0); }
+    static now() { return MockTimestamp.fromDate(new Date()); }
   }
 
   return {
@@ -312,7 +314,7 @@ describe('Request Service', () => {
 
       expect(fee).toBeDefined();
       expect(fee.totalFee).toBeGreaterThan(0);
-      expect(fee.baseFee).toBe(3000); // 기본 요금
+      expect(fee.baseFee).toBe(2000); // 현재 정책 기준 기본 요금
       expect(fee.vat).toBeGreaterThan(0); // 부가세
     });
   });

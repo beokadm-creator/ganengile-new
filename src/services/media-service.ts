@@ -32,6 +32,31 @@ export interface UploadProgress {
 
 export type UploadProgressCallback = (progress: UploadProgress) => void;
 
+type PermissionStatusLike = {
+  status?: string;
+};
+
+type EncodingTypeLike = {
+  Base64: string;
+};
+
+type UploadTaskLike = {
+  on?: (
+    event: string,
+    next?: (snapshot: { bytesTransferred: number; totalBytes: number }) => void,
+    error?: (error: unknown) => void,
+    complete?: () => void
+  ) => void;
+};
+
+function isUploadTaskLike(value: unknown): value is UploadTaskLike {
+  return typeof value === 'object' && value !== null && typeof (value as UploadTaskLike).on === 'function';
+}
+
+function isGrantedStatus(permission: PermissionStatusLike): boolean {
+  return permission.status === 'granted';
+}
+
 export class MediaService {
   private storage = getStorage(firebaseApp);
   private readonly MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
@@ -46,7 +71,7 @@ export class MediaService {
       const { status: cameraStatus } = await ImagePicker.requestCameraPermissionsAsync();
       const { status: libraryStatus } = await ImagePicker.requestMediaLibraryPermissionsAsync();
 
-       if (cameraStatus !== 'granted' ?? libraryStatus !== 'granted') {
+       if (!isGrantedStatus({ status: cameraStatus }) || !isGrantedStatus({ status: libraryStatus })) {
          console.warn('Camera or library permission denied');
          return false;
       }
@@ -193,20 +218,26 @@ export class MediaService {
       // 멀티파트 업로드 (진행률 지원)
       await new Promise<void>((resolve, reject) => {
         const task = uploadBytesResumable(storageRef, blob);
-        task.on(
-          'state_changed',
-          (snapshot) => {
-            if (onProgress) {
-              onProgress({
-                bytesTransferred: snapshot.bytesTransferred,
-                totalBytes: snapshot.totalBytes,
-                progress: Math.round((snapshot.bytesTransferred / snapshot.totalBytes) * 100),
-              });
-            }
-          },
-          reject,
-          () => resolve(),
-        );
+
+        if (isUploadTaskLike(task)) {
+          task.on(
+            'state_changed',
+            (snapshot) => {
+              if (onProgress) {
+                onProgress({
+                  bytesTransferred: snapshot.bytesTransferred,
+                  totalBytes: snapshot.totalBytes,
+                  progress: Math.round((snapshot.bytesTransferred / snapshot.totalBytes) * 100),
+                });
+              }
+            },
+            reject,
+            () => resolve(),
+          );
+          return;
+        }
+
+        Promise.resolve(task).then(() => resolve()).catch(reject);
       });
 
       // 다운로드 URL 가져오기
@@ -236,8 +267,9 @@ export class MediaService {
   private async uriToBlob(uri: string): Promise<Blob> {
     try {
       // 파일을 읽어서 ArrayBuffer로 변환
+      const encodingType = FileSystem.EncodingType as EncodingTypeLike;
       const fileData = await FileSystem.readAsStringAsync(uri, {
-        encoding: FileSystem.EncodingType.Base64,
+        encoding: encodingType.Base64,
       });
 
       // Base64를 Blob으로 변환

@@ -92,7 +92,7 @@ describe('B2B Services', () => {
       createdContractIds.push(contractId);
 
       const contractDoc = await getDoc(doc(db, 'businessContracts', contractId));
-      expect(contractDoc.exists).toBe(true);
+      expect(contractDoc.exists()).toBe(true);
 
       const contract = contractDoc.data();
       expect(contract?.businessId).toBe(testBusinessId);
@@ -228,7 +228,7 @@ describe('B2B Services', () => {
       createdRequestIds.push(requestId);
 
       const requestDoc = await getDoc(doc(db, 'b2bRequests', requestId));
-      expect(requestDoc.exists).toBe(true);
+      expect(requestDoc.exists()).toBe(true);
 
       const request = requestDoc.data();
       expect(request?.businessId).toBe(testBusinessId);

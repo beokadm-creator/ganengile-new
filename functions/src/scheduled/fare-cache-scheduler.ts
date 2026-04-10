@@ -10,7 +10,17 @@ import * as admin from 'firebase-admin';
 import * as https from 'https';
 import { defineString } from 'firebase-functions/params';
 
-type FareApiItem = Record<string, any>;
+type JsonPrimitive = string | number | boolean | null;
+type JsonValue = JsonPrimitive | JsonObject | JsonValue[];
+type JsonObject = { [key: string]: JsonValue | undefined };
+
+type FareApiItem = {
+  gnrlCardFare?: string | number;
+  gnrlCashFare?: string | number;
+  yungCardFare?: string | number;
+  yungCashFare?: string | number;
+  [key: string]: JsonValue | undefined;
+};
 
 interface SchedulerResult {
   processedRoutes: number;
@@ -36,6 +46,37 @@ type StationDoc = {
   kric?: { stationCode?: string };
 };
 
+type StationRef = {
+  stationId?: string;
+  id?: string;
+  stationName?: string;
+  name?: string;
+  lineCode?: string;
+  lineNumber?: string | number;
+  lineId?: string | number;
+  line?: string | number;
+  lineName?: string;
+};
+
+type TravelTimeDoc = {
+  fromStationId?: string | StationRef;
+  toStationId?: string | StationRef;
+};
+
+type RequestDoc = {
+  pickupStation?: string | StationRef;
+  deliveryStation?: string | StationRef;
+};
+
+type RouteDoc = {
+  startStation?: string | StationRef;
+  endStation?: string | StationRef;
+};
+
+type FareCacheDoc = {
+  updatedAt?: admin.firestore.Timestamp | null;
+};
+
 const DEFAULT_FARE_API_URL = 'https://apis.data.go.kr/B553766/fare';
 const CACHE_DOC_COLLECTION = 'config_fares';
 const STALE_DAYS_FOR_SKIP = 6; // 주간 배치 기준으로 6일 이내 갱신 데이터는 스킵
@@ -46,21 +87,26 @@ const SEOUL_FARE_SERVICE_KEY_PARAM = defineString('SEOUL_FARE_SERVICE_KEY', {
   default: '',
 });
 
+function getFirstNonEmptyString(...values: Array<string | undefined>): string {
+  return values.find((value) => typeof value === 'string' && value.trim().length > 0) ?? '';
+}
+
 function getFareApiBaseUrl(): string {
   const paramValue = SEOUL_FARE_API_URL_PARAM.value();
-  return (
-    paramValue ||
-    process.env.SEOUL_FARE_API_URL ||
-    process.env.EXPO_PUBLIC_SEOUL_FARE_API_URL || DEFAULT_FARE_API_URL
+  return getFirstNonEmptyString(
+    paramValue,
+    process.env.SEOUL_FARE_API_URL,
+    process.env.EXPO_PUBLIC_SEOUL_FARE_API_URL,
+    DEFAULT_FARE_API_URL
   ).replace(/\/$/, '');
 }
 
 function getFareServiceKey(): string {
   const paramValue = SEOUL_FARE_SERVICE_KEY_PARAM.value();
-  return (
-    paramValue ||
-    process.env.SEOUL_FARE_SERVICE_KEY ||
-    process.env.EXPO_PUBLIC_SEOUL_FARE_SERVICE_KEY || ''
+  return getFirstNonEmptyString(
+    paramValue,
+    process.env.SEOUL_FARE_SERVICE_KEY,
+    process.env.EXPO_PUBLIC_SEOUL_FARE_SERVICE_KEY
   ).trim();
 }
 
@@ -74,15 +120,37 @@ function normalizeServiceKey(rawKey: string): string {
   }
 }
 
-function normalizeItems(payload: any): FareApiItem[] {
+function isJsonObject(value: JsonValue | undefined): value is JsonObject {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+function getJsonPath(root: JsonValue | undefined, ...keys: string[]): JsonValue | undefined {
+  let current = root;
+  for (const key of keys) {
+    if (!isJsonObject(current)) return undefined;
+    current = current[key];
+  }
+  return current;
+}
+
+function asFareApiItemArray(value: JsonValue | undefined): FareApiItem[] {
+  if (Array.isArray(value)) {
+    return value.filter(isJsonObject) as FareApiItem[];
+  }
+
+  return isJsonObject(value) ? [value as FareApiItem] : [];
+}
+
+function normalizeItems(payload: JsonValue | undefined): FareApiItem[] {
   const candidates =
-    payload?.response?.body?.items?.item ||
-    payload?.body?.items?.item ||
-    payload?.getRltmFare?.row ||
-    payload?.row ||
-    payload?.items || [];
-  const items = Array.isArray(candidates) ? candidates : [candidates];
-  return items.filter(Boolean);
+    getJsonPath(payload, 'response', 'body', 'items', 'item') ??
+    getJsonPath(payload, 'body', 'items', 'item') ??
+    getJsonPath(payload, 'getRltmFare', 'row') ??
+    getJsonPath(payload, 'row') ??
+    getJsonPath(payload, 'items') ??
+    [];
+
+  return asFareApiItemArray(candidates);
 }
 
 function parseFareFromItems(items: FareApiItem[]): { fare?: number; raw?: FareApiItem } {
@@ -100,7 +168,7 @@ function parseFareFromItems(items: FareApiItem[]): { fare?: number; raw?: FareAp
   return { fare, raw: item };
 }
 
-function requestJson(url: string): Promise<any> {
+function requestJson(url: string): Promise<JsonValue> {
   return new Promise((resolve, reject) => {
     const req = https.get(url, (res) => {
       let body = '';
@@ -113,7 +181,7 @@ function requestJson(url: string): Promise<any> {
           return;
         }
         try {
-          resolve(JSON.parse(body));
+          resolve(JSON.parse(body) as JsonValue);
         } catch (error) {
           reject(new Error(`JSON parse failed: ${String(error)}`));
         }
@@ -162,6 +230,41 @@ function shouldSkipByUpdatedAt(updatedAt: admin.firestore.Timestamp | null | und
   return ageMs <= STALE_DAYS_FOR_SKIP * 24 * 60 * 60 * 1000;
 }
 
+function getFirstDefined<T>(...values: Array<T | null | undefined>): T | undefined {
+  return values.find((value): value is T => value !== null && value !== undefined);
+}
+
+function parseStationRef(value: unknown): StationRef | null {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
+  return value as StationRef;
+}
+
+function getStringField(value: unknown): string {
+  if (typeof value === 'string') return value;
+  if (typeof value === 'number' || typeof value === 'boolean') return String(value);
+  return '';
+}
+
+function getStationIdentifier(input: StationRef): string {
+  return getStringField(getFirstDefined(input.stationId, input.id)).trim();
+}
+
+function getStationDisplayName(input: StationRef): string {
+  return getStringField(getFirstDefined(input.stationName, input.name)).trim();
+}
+
+function getLineCandidate(input: StationRef): string | number {
+  return (
+    getFirstDefined(
+      input.lineCode,
+      input.lineNumber,
+      input.lineId,
+      input.line,
+      input.lineName
+    ) ?? ''
+  );
+}
+
 export const fareCacheScheduler = async (): Promise<SchedulerResult> => {
   const serviceKey = getFareServiceKey();
   if (!serviceKey) {
@@ -198,8 +301,11 @@ export const fareCacheScheduler = async (): Promise<SchedulerResult> => {
 
   const normalizeName = (value: string): string => value.replace(/\s+/g, '').trim();
   const normalizeLine = (value: unknown): string => {
-    if (value === null ?? value === undefined) return '';
-    const text = String(value).trim();
+    if (value === null || value === undefined) return '';
+    const text =
+      typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean'
+        ? String(value).trim()
+        : '';
     if (!text) return '';
     const numeric = text.replace(/[^\d]/g, '');
     if (numeric) return numeric;
@@ -219,7 +325,7 @@ export const fareCacheScheduler = async (): Promise<SchedulerResult> => {
   const setStationLineIndex = (name: string, line: unknown, stationId: string): void => {
     const nameKey = normalizeName(name);
     const lineKey = normalizeLine(line);
-    if (!nameKey ?? !lineKey) return;
+    if (!nameKey || !lineKey) return;
     stationIdByNameLine.set(`${nameKey}::${lineKey}`, stationId);
   };
 
@@ -237,14 +343,14 @@ export const fareCacheScheduler = async (): Promise<SchedulerResult> => {
       });
     }
 
-    const fareCode = station?.fare?.stationCode || station?.kric?.stationCode || '';
+    const fareCode = station.fare?.stationCode ?? station.kric?.stationCode ?? '';
     if (fareCode) {
       stationFareCodeMap.set(docSnap.id, String(fareCode));
     }
   });
 
   const routePairs = new Map<string, { fromStationId: string; toStationId: string }>();
-  const resolveStationId = (input: any): string | null => {
+  const resolveStationId = (input: string | StationRef | null | undefined): string | null => {
     if (!input) return null;
 
     if (typeof input === 'string') {
@@ -252,34 +358,38 @@ export const fareCacheScheduler = async (): Promise<SchedulerResult> => {
       if (!raw) return null;
       if (stationById.has(raw)) return raw;
       const byName = stationIdsByName.get(normalizeName(raw));
-      if (!byName ?? byName.length === 0) return null;
+      if (!byName || byName.length === 0) return null;
       if (byName.length === 1) return byName[0];
       return byName[0];
     }
 
-    const candidateId = String(input.stationId || input.id || '').trim();
+    const parsedInput = parseStationRef(input);
+    if (!parsedInput) return null;
+
+    const candidateId = getStationIdentifier(parsedInput);
     if (candidateId && stationById.has(candidateId)) return candidateId;
 
-    const stationName = String(input.stationName || input.name || '').trim();
+    const stationName = getStationDisplayName(parsedInput);
     if (!stationName) return null;
 
-    const lineCandidate =
-      input.lineCode ||
-      input.lineNumber ||
-      input.lineId ||
-      input.line ||
-      input.lineName || '';
+    const lineCandidate = getLineCandidate(parsedInput);
 
-    const byLineId = stationIdByNameLine.get(`${normalizeName(stationName)}::${normalizeLine(lineCandidate)}`);
+    const byLineId = stationIdByNameLine.get(
+      `${normalizeName(stationName)}::${normalizeLine(lineCandidate)}`
+    );
     if (byLineId) return byLineId;
 
     const byName = stationIdsByName.get(normalizeName(stationName));
-    if (!byName ?? byName.length === 0) return null;
+    if (!byName || byName.length === 0) return null;
     if (byName.length === 1) return byName[0];
     return byName[0];
   };
 
-  const addRoutePair = (fromInput: any, toInput: any, source?: 'travel' | 'request' | 'route') => {
+  const addRoutePair = (
+    fromInput: string | StationRef | null | undefined,
+    toInput: string | StationRef | null | undefined,
+    source?: 'travel' | 'request' | 'route'
+  ) => {
     const from = resolveStationId(fromInput) ?? '';
     const to = resolveStationId(toInput) ?? '';
     if (!from || !to || from === to) return;
@@ -293,8 +403,8 @@ export const fareCacheScheduler = async (): Promise<SchedulerResult> => {
   };
 
   travelTimesSnapshot.docs.forEach((docSnap) => {
-    const item = docSnap.data() as any;
-    addRoutePair(item?.fromStationId, item?.toStationId, 'travel');
+    const item = docSnap.data() as TravelTimeDoc;
+    addRoutePair(item.fromStationId, item.toStationId, 'travel');
   });
 
   // config_travel_times가 없는 운영 환경을 위해 최근 요청/경로에서 역쌍을 수집
@@ -305,15 +415,15 @@ export const fareCacheScheduler = async (): Promise<SchedulerResult> => {
     ]);
 
     requestsSnapshot.docs.forEach((docSnap) => {
-      const req = docSnap.data() as any;
-      addRoutePair(req?.pickupStation, req?.deliveryStation, 'request');
-      addRoutePair(req?.deliveryStation, req?.pickupStation, 'request');
+      const request = docSnap.data() as RequestDoc;
+      addRoutePair(request.pickupStation, request.deliveryStation, 'request');
+      addRoutePair(request.deliveryStation, request.pickupStation, 'request');
     });
 
     routesSnapshot.docs.forEach((docSnap) => {
-      const route = docSnap.data() as any;
-      addRoutePair(route?.startStation, route?.endStation, 'route');
-      addRoutePair(route?.endStation, route?.startStation, 'route');
+      const route = docSnap.data() as RouteDoc;
+      addRoutePair(route.startStation, route.endStation, 'route');
+      addRoutePair(route.endStation, route.startStation, 'route');
     });
   }
 
@@ -322,7 +432,7 @@ export const fareCacheScheduler = async (): Promise<SchedulerResult> => {
 
     const fromCode = stationFareCodeMap.get(route.fromStationId);
     const toCode = stationFareCodeMap.get(route.toStationId);
-    if (!fromCode ?? !toCode) {
+    if (!fromCode || !toCode) {
       result.missingMappingRoutes += 1;
       continue;
     }
@@ -331,7 +441,7 @@ export const fareCacheScheduler = async (): Promise<SchedulerResult> => {
     try {
       const existingSnap = await db.collection(CACHE_DOC_COLLECTION).doc(fareDocId).get();
       if (existingSnap.exists) {
-        const existing = existingSnap.data() as any;
+        const existing = existingSnap.data() as FareCacheDoc | undefined;
         if (shouldSkipByUpdatedAt(existing?.updatedAt ?? null)) {
           result.skippedRoutes += 1;
           continue;
@@ -342,7 +452,7 @@ export const fareCacheScheduler = async (): Promise<SchedulerResult> => {
       const payload = await requestJson(url);
       const parsed = parseFareFromItems(normalizeItems(payload));
 
-      if (!parsed.fare ?? parsed.fare <= 0) {
+      if (!parsed.fare || parsed.fare <= 0) {
         result.failedRoutes += 1;
         continue;
       }

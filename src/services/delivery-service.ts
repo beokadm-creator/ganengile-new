@@ -24,7 +24,11 @@ import { planMissionExecutionWithAI } from './beta1-ai-service';
 import { uploadPickupPhoto, uploadDeliveryPhoto } from './storage-service';
 import { DepositService } from './DepositService';
 import { createPenaltyService } from './penalty-service';
-import { calculatePhase1DeliveryFee, type PackageSizeType } from './pricing-service';
+import {
+  calculatePhase1DeliveryFee,
+  type DeliveryFeeBreakdown,
+  type PackageSizeType,
+} from './pricing-service';
 import {
   createGillerEarning,
   getGillerEarningForRequest,
@@ -53,6 +57,130 @@ type DeliveryCancellationResult = {
   requestStatus?: 'pending' | 'cancelled';
 };
 
+type LegacyFeeInput = {
+  totalFee?: number;
+  deliveryFee?: number;
+  baseFee?: number;
+  vat?: number;
+  publicFare?: number;
+  serviceFee?: number;
+  stationCount?: number;
+  breakdown?: DeliveryFeeBreakdown['breakdown'] | null;
+};
+
+type DeliveryRequestLike = {
+  status?: string;
+  requesterId?: string;
+  gllerId?: string;
+  pickupStation?: DeliveryRequest['pickupStation'];
+  deliveryStation?: DeliveryRequest['deliveryStation'];
+  deliveryType?: string;
+  packageInfo?: DeliveryRequest['packageInfo'];
+  fee?: LegacyFeeInput;
+  feeBreakdown?: LegacyFeeInput;
+  initialNegotiationFee?: number;
+  totalFee?: number;
+  stationCount?: number;
+  weight?: number;
+  urgency?: 'normal' | 'fast' | 'urgent';
+  itemValue?: number;
+  requestMode?: string;
+  preferredTime?: {
+    departureTime?: string;
+    arrivalTime?: string;
+  };
+  recipientName?: string;
+  receiverName?: string;
+  recipientPhone?: string;
+  receiverPhone?: string;
+  recipientVerificationCode?: string;
+  verificationCode?: string;
+  recipientCode?: string;
+};
+
+type NormalizedConfirmedFee = {
+  totalFee: number;
+  deliveryFee: number;
+  vat: number;
+  breakdown?: DeliveryFeeBreakdown['breakdown'];
+  publicFare?: number;
+};
+
+type DeliveryTrackingEvent = {
+  type: string;
+  timestamp: Date;
+  description: string;
+  actorId?: string;
+  location?: unknown;
+};
+
+type DeliveryTrackingPayload = {
+  events?: DeliveryTrackingEvent[];
+};
+
+type DeliveryDocLike = {
+  deliveryId?: string;
+  requestId?: string;
+  gillerId?: string;
+  gllerId?: string;
+  status?: string;
+  fee?: LegacyFeeInput;
+  recipientInfo?: {
+    verificationCode?: string;
+  };
+  requesterConfirmedAt?: unknown;
+  tracking?: DeliveryTrackingPayload;
+  createdAt?: {
+    toMillis?: () => number;
+  };
+};
+
+type RequestDocLike = DeliveryRequestLike & {
+  requesterId?: string;
+};
+
+type SettlementStatusDoc = {
+  status?: string;
+};
+
+function readStringField(value: unknown): string | undefined {
+  return typeof value === 'string' && value.length > 0 ? value : undefined;
+}
+
+function toErrorMessage(error: unknown, fallback: string): string {
+  if (typeof error === 'object' && error != null && 'message' in error) {
+    const message = (error as { message?: unknown }).message;
+    if (typeof message === 'string' && message.length > 0) {
+      return message;
+    }
+  }
+
+  return fallback;
+}
+
+function getTrackingEvents(delivery: DeliveryDocLike): DeliveryTrackingEvent[] {
+  return Array.isArray(delivery.tracking?.events) ? delivery.tracking.events : [];
+}
+
+function toDeliveryDoc(value: unknown, deliveryId?: string): DeliveryDocLike | null {
+  if (typeof value !== 'object' || value == null) {
+    return null;
+  }
+
+  return {
+    ...(value as DeliveryDocLike),
+    deliveryId,
+  };
+}
+
+function toRequestDoc(value: unknown): RequestDocLike | null {
+  return typeof value === 'object' && value != null ? (value as RequestDocLike) : null;
+}
+
+function toSettlementStatusDoc(value: unknown): SettlementStatusDoc | null {
+  return typeof value === 'object' && value != null ? (value as SettlementStatusDoc) : null;
+}
+
 function toActorSelectionType(value: unknown): ActorSelectionActorType {
   switch (value) {
     case ActorSelectionActorType.GILLER:
@@ -73,7 +201,7 @@ function toActorSelectionType(value: unknown): ActorSelectionActorType {
 }
 
 function toActorSelectionTypes(values: unknown[] | undefined): ActorSelectionActorType[] {
-  if (!Array.isArray(values) ?? values.length === 0) {
+  if (!Array.isArray(values) || values.length === 0) {
     return [
       ActorSelectionActorType.LOCKER,
       ActorSelectionActorType.EXTERNAL_PARTNER,
@@ -90,6 +218,73 @@ function isPrePickupStatus(status: unknown): boolean {
 
 function isPostPickupStatus(status: unknown): boolean {
   return status === 'in_transit' || status === 'arrived' || status === 'at_locker';
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null;
+}
+
+function toLegacyFeeInput(value: unknown): LegacyFeeInput | null {
+  if (!isRecord(value)) {
+    return null;
+  }
+
+  return {
+    totalFee: toPositiveNumber(value.totalFee),
+    deliveryFee: toPositiveNumber(value.deliveryFee),
+    baseFee: toPositiveNumber(value.baseFee),
+    vat: toPositiveNumber(value.vat),
+    publicFare: toPositiveNumber(value.publicFare),
+    serviceFee: toPositiveNumber(value.serviceFee),
+    stationCount: toPositiveNumber(value.stationCount),
+    breakdown: isRecord(value.breakdown)
+      ? {
+          gillerFee: toPositiveNumber(value.breakdown.gillerFee) ?? 0,
+          platformFee: toPositiveNumber(value.breakdown.platformFee) ?? 0,
+        }
+      : undefined,
+  };
+}
+
+function normalizeConfirmedFee(request: DeliveryRequestLike): NormalizedConfirmedFee | null {
+  const rawFee = toLegacyFeeInput(request.fee ?? request.feeBreakdown);
+
+  if (rawFee) {
+    const totalFee = rawFee.totalFee ?? request.initialNegotiationFee ?? 0;
+    const deliveryFee = rawFee.deliveryFee ?? rawFee.baseFee ?? 0;
+
+    if (totalFee > 0) {
+      return {
+        totalFee,
+        deliveryFee,
+        vat: rawFee.vat ?? 0,
+        breakdown:
+          rawFee.breakdown ??
+          (totalFee > 0
+            ? {
+                gillerFee: Math.floor(totalFee * 0.9),
+                platformFee: totalFee - Math.floor(totalFee * 0.9),
+              }
+            : undefined),
+        publicFare: rawFee.publicFare,
+      };
+    }
+  }
+
+  const totalAmount = request.initialNegotiationFee ?? request.totalFee ?? 0;
+  if (totalAmount > 0) {
+    return {
+      totalFee: totalAmount,
+      deliveryFee: Math.floor(totalAmount / 1.1),
+      vat: totalAmount - Math.floor(totalAmount / 1.1),
+      breakdown: {
+        gillerFee: Math.floor(totalAmount * 0.9),
+        platformFee: totalAmount - Math.floor(totalAmount * 0.9),
+      },
+    };
+  }
+
+  return null;
 }
 
 /**
@@ -152,7 +347,7 @@ export async function gillerAcceptRequest(
       return { success: false, message: '요청을 찾을 수 없습니다.' };
     }
 
-    const request = requestDoc.data();
+    const request = requestDoc.data() as DeliveryRequestLike | undefined;
     if (!request) {
       return { success: false, message: '요청 데이터를 찾을 수 없습니다.' };
     }
@@ -169,34 +364,10 @@ export async function gillerAcceptRequest(
     }
 
     // Extract fee information from various possible fields (for compatibility)
-    const rawFee = request.fee ?? request.feeBreakdown;
-    let confirmedFee: any = null;
-
-    if (rawFee && typeof rawFee === 'object') {
-      confirmedFee = {
-        totalFee: rawFee.totalFee || request.initialNegotiationFee || 0,
-        deliveryFee: rawFee.deliveryFee || rawFee.baseFee || 0,
-        vat: rawFee.vat ?? 0,
-        breakdown: rawFee.breakdown ?? (rawFee.totalFee ? {
-          gillerFee: Math.floor(rawFee.totalFee * 0.9),
-          platformFee: rawFee.totalFee - Math.floor(rawFee.totalFee * 0.9),
-        } : undefined)
-      };
-    } else if (request.initialNegotiationFee ?? request.totalFee) {
-      const totalAmount = request.initialNegotiationFee ?? request.totalFee;
-      confirmedFee = {
-        totalFee: totalAmount,
-        deliveryFee: Math.floor(totalAmount / 1.1),
-        vat: totalAmount - Math.floor(totalAmount / 1.1),
-        breakdown: {
-          gillerFee: Math.floor(totalAmount * 0.9),
-          platformFee: totalAmount - Math.floor(totalAmount * 0.9),
-        }
-      };
-    }
+    let confirmedFee = normalizeConfirmedFee(request);
 
     // 실시간 운임 미반영 등으로 금액이 0인 요청은 최소 계산식으로 보정
-    if (!confirmedFee?.totalFee ?? confirmedFee.totalFee <= 0) {
+    if (!confirmedFee?.totalFee || confirmedFee.totalFee <= 0) {
       const rawWeight = toPositiveNumber(
         request?.packageInfo?.weightKg,
         request?.packageInfo?.weight,
@@ -232,7 +403,7 @@ export async function gillerAcceptRequest(
     }
 
     // Block if no valid fee information is found
-    if (!confirmedFee?.totalFee ?? confirmedFee.totalFee <= 0) {
+    if (!confirmedFee?.totalFee || confirmedFee.totalFee <= 0) {
       console.error('Invalid fee information found for request:', requestId, request);
       return { success: false, message: '배송 요금 정보가 유효하지 않아 수락할 수 없습니다. 고객센터에 문의해주세요.' };
     }
@@ -595,7 +766,7 @@ export async function verifyPickup(data: PickupVerificationData): Promise<{ succ
       return { success: false, message: '배송 정보를 찾을 수 없습니다.' };
     }
 
-    const delivery = deliveryDoc.data();
+    const delivery = toDeliveryDoc(deliveryDoc.data(), data.deliveryId);
     if (!delivery) {
       return { success: false, message: '배송 데이터를 찾을 수 없습니다.' };
     }
@@ -615,9 +786,9 @@ export async function verifyPickup(data: PickupVerificationData): Promise<{ succ
     if (data.photoUri) {
       try {
         photoUrl = await uploadPickupPhoto(data.deliveryId, data.photoUri);
-      } catch (error: any) {
+      } catch (error) {
         console.error('Error uploading photo:', error);
-        return { success: false, message: error.message ?? '사진 업로드에 실패했습니다.' };
+        return { success: false, message: toErrorMessage(error, '사진 업로드에 실패했습니다.') };
       }
     }
 
@@ -629,7 +800,7 @@ export async function verifyPickup(data: PickupVerificationData): Promise<{ succ
       pickupVerificationCode: data.verificationCode,
       pickupLocation: data.location,
       'tracking.events': [
-        ...delivery.tracking.events,
+        ...getTrackingEvents(delivery),
         {
           type: 'picked_up',
           timestamp: new Date(),
@@ -709,7 +880,7 @@ export async function completeDelivery(data: DeliveryCompletionData): Promise<{ 
       return { success: false, message: '배송 정보를 찾을 수 없습니다.' };
     }
 
-    const delivery = deliveryDoc.data();
+    const delivery = toDeliveryDoc(deliveryDoc.data(), data.deliveryId);
     if (!delivery) {
       return { success: false, message: '배송 데이터를 찾을 수 없습니다.' };
     }
@@ -719,7 +890,7 @@ export async function completeDelivery(data: DeliveryCompletionData): Promise<{ 
     }
 
     // Verify recipient's 6-digit code
-    if (data.verificationCode !== delivery.recipientInfo.verificationCode) {
+    if (data.verificationCode !== delivery.recipientInfo?.verificationCode) {
       return { success: false, message: '인증 코드가 올바르지 않습니다.' };
     }
 
@@ -728,7 +899,7 @@ export async function completeDelivery(data: DeliveryCompletionData): Promise<{ 
     if (data.photoUri) {
       try {
         photoUrl = await uploadDeliveryPhoto(data.deliveryId, data.photoUri);
-      } catch (error: any) {
+      } catch (error) {
         console.error('Error uploading photo:', error);
         // Continue without photo (optional)
       }
@@ -743,7 +914,7 @@ export async function completeDelivery(data: DeliveryCompletionData): Promise<{ 
       completionNote: data.notes,
       deliveredAt: serverTimestamp(),
       'tracking.events': [
-        ...delivery.tracking.events,
+        ...getTrackingEvents(delivery),
         {
           type: 'delivered',
           timestamp: new Date(),
@@ -784,11 +955,11 @@ export async function confirmDeliveryByRequester(
     const deliveryRef = doc(db, 'deliveries', data.deliveryId);
     const deliveryDoc = await getDoc(deliveryRef);
 
-    if (!deliveryDoc.exists()()) {
+    if (!deliveryDoc.exists()) {
       return { success: false, message: '배송 정보를 찾을 수 없습니다.' };
     }
 
-    const delivery = deliveryDoc.data();
+    const delivery = toDeliveryDoc(deliveryDoc.data(), data.deliveryId);
     if (!delivery) {
       return { success: false, message: '배송 데이터를 찾을 수 없습니다.' };
     }
@@ -807,9 +978,11 @@ export async function confirmDeliveryByRequester(
     if (!requestDoc.exists()) {
       return { success: false, message: '요청 정보를 찾을 수 없습니다.' };
     }
-    const request = requestDoc.data();
+    const request = toRequestDoc(requestDoc.data());
+    const deliveryGllerId = readStringField(delivery.gllerId);
+    const deliveryGillerId = readStringField(delivery.gillerId);
 
-    const requesterId = request?.requesterId ?? delivery.gllerId;
+    const requesterId = request?.requesterId ?? deliveryGllerId;
     if (requesterId && requesterId !== data.requesterId) {
       return { success: false, message: '권한이 없습니다.' };
     }
@@ -823,7 +996,7 @@ export async function confirmDeliveryByRequester(
     if (data.photoUri) {
       try {
         photoUrl = await uploadDeliveryPhoto(data.deliveryId, data.photoUri);
-      } catch (error: any) {
+      } catch (error) {
         console.error('Error uploading confirmation photo:', error);
       }
     }
@@ -833,11 +1006,12 @@ export async function confirmDeliveryByRequester(
     }
 
     const settlementRef = doc(db, 'settlements', requestId);
-    const trackingEvents = Array.isArray(delivery.tracking?.events) ? delivery.tracking.events : [];
+    const trackingEvents = getTrackingEvents(delivery);
 
     const txResult = await runTransaction(db, async (tx) => {
       const settlementSnap = await tx.get(settlementRef);
-      if (settlementSnap.exists() && settlementSnap.data()?.status === 'completed') {
+      const settlementData = toSettlementStatusDoc(settlementSnap.data());
+      if (settlementSnap.exists() && settlementData?.status === 'completed') {
         return { alreadyCompleted: true };
       }
 
@@ -895,9 +1069,9 @@ export async function confirmDeliveryByRequester(
     }
 
     // Settlement: refund deposit and create earning (idempotent checks)
-    const feeSource = (request?.fee ?? request?.feeBreakdown ?? delivery?.fee ?? null);
+    const feeSource = toLegacyFeeInput(request?.fee ?? request?.feeBreakdown ?? delivery.fee);
     const feeAmount =
-      delivery?.fee?.totalFee ??
+      delivery.fee?.totalFee ??
       request?.fee?.totalFee ??
       request?.initialNegotiationFee ?? 0;
 
@@ -913,7 +1087,7 @@ export async function confirmDeliveryByRequester(
         if (deposit) {
           depositId = deposit.depositId;
           depositAmount = deposit.depositAmount;
-          if (deposit.status === 'paid') {
+          if (readStringField(deposit.status) === 'paid') {
             const refundResult = await DepositService.refundDeposit(deposit.depositId);
             refundStatus = refundResult.success ? 'refunded' : 'failed';
           } else {
@@ -938,11 +1112,11 @@ export async function confirmDeliveryByRequester(
         toPositiveNumber(feeSource?.breakdown?.gillerFee) ??
         Math.max(0, customerPaidAmount - platformFeeAmount);
 
-      if (delivery.gillerId && gillerGrossAmount > 0) {
-        const alreadyEarned = await hasGillerEarningForRequest(delivery.gillerId, requestId);
+      if (deliveryGillerId && gillerGrossAmount > 0) {
+        const alreadyEarned = await hasGillerEarningForRequest(deliveryGillerId, requestId);
         if (!alreadyEarned) {
           earningPaymentId = await createGillerEarning(
-            delivery.gillerId,
+            deliveryGillerId,
             requestId,
             gillerGrossAmount,
             true,
@@ -953,7 +1127,7 @@ export async function confirmDeliveryByRequester(
           );
           earningPayment = await getPayment(earningPaymentId);
         } else {
-          earningPayment = await getGillerEarningForRequest(delivery.gillerId, requestId);
+          earningPayment = await getGillerEarningForRequest(deliveryGillerId, requestId);
           earningPaymentId = earningPayment?.paymentId;
         }
       }
@@ -989,7 +1163,7 @@ export async function confirmDeliveryByRequester(
         settledAt: serverTimestamp(),
         updatedAt: serverTimestamp(),
       });
-    } catch (error: any) {
+    } catch (error) {
       await updateDoc(settlementRef, {
         status: 'failed',
         depositId: depositId ?? null,
@@ -997,7 +1171,7 @@ export async function confirmDeliveryByRequester(
         refundStatus,
         earningPaymentId: earningPaymentId ?? null,
         earningAmount: feeAmount ?? null,
-        errorMessage: error?.message ?? '정산 처리 실패',
+        errorMessage: toErrorMessage(error, '정산 처리 실패'),
         updatedAt: serverTimestamp(),
       });
       return { success: false, message: '정산 처리에 실패했습니다.' };
@@ -1022,7 +1196,7 @@ export async function markAsArrived(deliveryId: string): Promise<{ success: bool
       return { success: false, message: '배송 정보를 찾을 수 없습니다.' };
     }
 
-    const delivery = deliveryDoc.data();
+    const delivery = toDeliveryDoc(deliveryDoc.data(), deliveryId);
     if (!delivery) {
       return { success: false, message: '배송 데이터를 찾을 수 없습니다.' };
     }
@@ -1034,7 +1208,7 @@ export async function markAsArrived(deliveryId: string): Promise<{ success: bool
     await updateDoc(deliveryRef, {
       status: 'arrived' as DeliveryStatus,
       'tracking.events': [
-        ...delivery.tracking.events,
+        ...getTrackingEvents(delivery),
         {
           type: 'arrived',
           timestamp: new Date(),
@@ -1077,7 +1251,7 @@ export async function getDeliveryById(deliveryId: string): Promise<DeliveryReque
 /**
  * Get delivery by request ID
  */
-export async function getDeliveryByRequestId(requestId: string): Promise<Record<string, any> | null> {
+export async function getDeliveryByRequestId(requestId: string): Promise<DeliveryDocLike | null> {
   try {
     const q = query(
       collection(db, 'deliveries'),
@@ -1091,10 +1265,7 @@ export async function getDeliveryByRequestId(requestId: string): Promise<Record<
     }
 
     const doc = snapshot.docs[0];
-    return {
-      deliveryId: doc.id,
-      ...doc.data(),
-    };
+    return toDeliveryDoc(doc.data(), doc.id);
   } catch (error) {
     console.error('Error fetching delivery by request ID:', error);
     return null;
@@ -1104,19 +1275,16 @@ export async function getDeliveryByRequestId(requestId: string): Promise<Record<
 /**
  * Get giller's active deliveries
  */
-export async function getGillerDeliveries(gillerId: string, status?: DeliveryStatus): Promise<any[]> {
+export async function getGillerDeliveries(gillerId: string, status?: DeliveryStatus): Promise<DeliveryDocLike[]> {
   try {
     const q = query(collection(db, 'deliveries'), where('gillerId', '==', gillerId));
     const snapshot = await getDocs(q);
-    const deliveries: any[] = [];
+    const deliveries: DeliveryDocLike[] = [];
 
     snapshot.forEach((docSnapshot) => {
-      const data = docSnapshot.data();
+      const data = toDeliveryDoc(docSnapshot.data(), docSnapshot.id);
       if (status && data?.status !== status) return;
-      deliveries.push({
-        deliveryId: docSnapshot.id,
-        ...data,
-      });
+      if (data) deliveries.push(data);
     });
 
     deliveries.sort((a, b) => {
@@ -1134,19 +1302,16 @@ export async function getGillerDeliveries(gillerId: string, status?: DeliverySta
 /**
  * Get gller's active deliveries
  */
-export async function getGllerDeliveries(gllerId: string, status?: DeliveryStatus): Promise<any[]> {
+export async function getGllerDeliveries(gllerId: string, status?: DeliveryStatus): Promise<DeliveryDocLike[]> {
   try {
     const q = query(collection(db, 'deliveries'), where('gllerId', '==', gllerId));
     const snapshot = await getDocs(q);
-    const deliveries: any[] = [];
+    const deliveries: DeliveryDocLike[] = [];
 
     snapshot.forEach((docSnapshot) => {
-      const data = docSnapshot.data();
+      const data = toDeliveryDoc(docSnapshot.data(), docSnapshot.id);
       if (status && data?.status !== status) return;
-      deliveries.push({
-        deliveryId: docSnapshot.id,
-        ...data,
-      });
+      if (data) deliveries.push(data);
     });
 
     deliveries.sort((a, b) => {
@@ -1184,7 +1349,7 @@ export async function markAsDroppedAtLocker(
       return { success: false, message: '배송 정보를 찾을 수 없습니다.' };
     }
 
-    const delivery = deliveryDoc.data();
+    const delivery = toDeliveryDoc(deliveryDoc.data(), deliveryId);
     if (!delivery) {
       return { success: false, message: '배송 데이터를 찾을 수 없습니다.' };
     }
@@ -1199,7 +1364,7 @@ export async function markAsDroppedAtLocker(
       lockerId,
       reservationId,
       'tracking.events': [
-        ...delivery.tracking.events,
+        ...getTrackingEvents(delivery),
         {
           type: 'dropped_at_locker',
           timestamp: new Date(),
@@ -1235,7 +1400,7 @@ export async function markAsDroppedAtLocker(
  */
 export function subscribeToDeliveryByRequestId(
   requestId: string,
-  callback: (delivery: Record<string, any> | null) => void
+  callback: (delivery: DeliveryDocLike | null) => void
 ): () => void {
   const q = query(collection(db, 'deliveries'), where('requestId', '==', requestId));
 
@@ -1246,18 +1411,18 @@ export function subscribeToDeliveryByRequestId(
         callback(null);
       } else {
         const docSnap = snapshot.docs[0];
-        callback({ deliveryId: docSnap.id, ...docSnap.data() });
+        callback(toDeliveryDoc(docSnap.data(), docSnap.id));
       }
     },
     (error) => {
       const errorCode = typeof error === 'object' && error != null && 'code' in error
         ? (error as { code?: unknown }).code
         : null;
-      const code = errorCode !== null && (typeof errorCode === 'string' ?? typeof errorCode === 'number')
+      const code = errorCode !== null && (typeof errorCode === 'string' || typeof errorCode === 'number')
         ? String(errorCode)
         : '';
 
-      if (code === 'permission-denied' ?? code === 'firestore/permission-denied') {
+      if (code === 'permission-denied' || code === 'firestore/permission-denied') {
         console.warn('Delivery subscription denied by Firestore rules.');
       } else {
         console.error('Error subscribing to delivery:', error);

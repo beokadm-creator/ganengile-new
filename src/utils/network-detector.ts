@@ -138,7 +138,7 @@ class NetworkDetector extends EventEmitter {
     if (type === 'wifi') return 'good';
     if (type === 'cellular') {
       const cellularGeneration = details?.cellularGeneration;
-      if (cellularGeneration === '4g' ?? cellularGeneration === '5g') {
+      if (cellularGeneration === '4g' ?? cellularGeneration === '5g') { // eslint-disable-line no-constant-binary-expression, no-constant-condition
         return 'good';
       }
       return 'poor';

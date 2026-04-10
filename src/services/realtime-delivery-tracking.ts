@@ -24,6 +24,38 @@ export interface DeliveryTrackingData {
   status: 'pending' | 'in-transit' | 'delivered';
 }
 
+type TimestampLike = {
+  toDate?: () => Date;
+};
+
+type RealtimeLocationDoc = {
+  latitude?: number;
+  longitude?: number;
+  station?: string;
+  updatedAt?: TimestampLike;
+  status?: GillerLocation['status'];
+};
+
+type RealtimeDeliveryDoc = {
+  requestId?: string;
+  gillerId?: string;
+  currentLocation?: RealtimeLocationDoc;
+  estimatedArrival?: TimestampLike;
+  status?: DeliveryTrackingData['status'];
+  pickupStation?: unknown;
+  deliveryStation?: unknown;
+  pickupCompletedAt?: TimestampLike;
+  deliveryCompletedAt?: TimestampLike;
+};
+
+function toDate(value: TimestampLike | undefined, fallback: Date): Date {
+  return value?.toDate?.() ?? fallback;
+}
+
+function toRealtimeDeliveryDoc(value: unknown): RealtimeDeliveryDoc | null {
+  return typeof value === 'object' && value != null ? (value as RealtimeDeliveryDoc) : null;
+}
+
 /**
  * 실시간 배송 추적 리스너
  * @param requestId 배송 요청 ID
@@ -44,7 +76,7 @@ export function subscribeToDeliveryTracking(
         return;
       }
 
-      const data = docSnapshot.data();
+      const data = toRealtimeDeliveryDoc(docSnapshot.data());
       if (!data) {
         console.warn(`Delivery ${requestId} data is empty`);
         return;
@@ -57,10 +89,10 @@ export function subscribeToDeliveryTracking(
           latitude: data.currentLocation?.latitude ?? 37.5,
           longitude: data.currentLocation?.longitude ?? 127.0,
           station: data.currentLocation?.station ?? '위치 정보 없음',
-          updatedAt: data.currentLocation?.updatedAt?.toDate() ?? new Date(),
+          updatedAt: toDate(data.currentLocation?.updatedAt, new Date()),
           status: data.currentLocation?.status ?? 'moving',
         },
-        estimatedArrival: data.estimatedArrival?.toDate() ?? new Date(),
+        estimatedArrival: toDate(data.estimatedArrival, new Date()),
         progress: calculateProgress(data),
         status: data.status ?? 'in-transit',
       };
@@ -106,14 +138,16 @@ export async function updateGillerLocation(
   }
 }
 
-function calculateProgress(deliveryData: Record<string, any>): number {
-  if (!deliveryData.pickupStation ?? !deliveryData.deliveryStation) {
+function calculateProgress(deliveryData: RealtimeDeliveryDoc): number {
+  if (!deliveryData.pickupStation || !deliveryData.deliveryStation) {
     return 0;
   }
 
-  const pickupTime = deliveryData.pickupCompletedAt?.toDate?.() ?? new Date();
-  const deliveryTime =
-    deliveryData.deliveryCompletedAt?.toDate?.() ?? new Date(Date.now() + 30 * 60 * 1000);
+  const pickupTime = toDate(deliveryData.pickupCompletedAt, new Date());
+  const deliveryTime = toDate(
+    deliveryData.deliveryCompletedAt,
+    new Date(Date.now() + 30 * 60 * 1000)
+  );
   const currentTime = new Date();
 
   const totalDuration = deliveryTime.getTime() - pickupTime.getTime();
@@ -137,13 +171,12 @@ export function startLocationUpdates(
 ): ReturnType<typeof setInterval> {
   void updateGillerLocation(gillerId, requestId, initialLocation);
 
-  const intervalId = setInterval(async () => {
-    try {
-      const currentLocation = await getCurrentLocation();
-      await updateGillerLocation(gillerId, requestId, currentLocation);
-    } catch (error) {
-      console.error('Error in location update interval:', error);
-    }
+  const intervalId = setInterval(() => {
+    void getCurrentLocation()
+      .then((currentLocation) => updateGillerLocation(gillerId, requestId, currentLocation))
+      .catch((error) => {
+        console.error('Error in location update interval:', error);
+      });
   }, 10000);
 
   // Started location updates for request

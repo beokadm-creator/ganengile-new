@@ -68,7 +68,7 @@ function toDateValue(value: unknown): Date | undefined {
     }
   }
 
-  if (typeof value === 'string' ?? typeof value === 'number') {
+  if (typeof value === 'string' || typeof value === 'number') {
     const parsed = new Date(value);
     if (!Number.isNaN(parsed.getTime())) {
       return parsed;

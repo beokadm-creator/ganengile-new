@@ -295,7 +295,7 @@ export class SettlementService {
           }
 
           if (
-            !stats.lastSettlementDate ?? (settlement.completedAt &&
+            !stats.lastSettlementDate || (settlement.completedAt &&
               settlement.completedAt.toDate() > stats.lastSettlementDate)
           ) {
             stats.lastSettlementDate = settlement.completedAt?.toDate();

@@ -15,6 +15,7 @@ export default [
       'coverage/**',
       'functions/lib/**',
       'e2e/**',
+      'jest.setup.ts',
       '__tests__/**',
       'scripts/**',
       'data/**',
@@ -34,7 +35,7 @@ export default [
         ecmaFeatures: {
           jsx: true,
         },
-        project: './tsconfig.json',
+        project: ['./tsconfig.json', './functions/tsconfig.json'],
       },
       globals: {
         console: 'readonly',

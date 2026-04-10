@@ -70,7 +70,7 @@ function extractFare(
   departureStationCode?: string,
   arrivalStationCode?: string
 ): FareResult | null {
-  if (!items ?? items.length === 0) return null;
+  if (!items || items.length === 0) return null;
 
   const exactMatch = items.find(
     (it) =>
@@ -142,7 +142,7 @@ async function getCachedFare(
       }
       if (typeof data.fare === 'number' && data.fare > 0) {
         const updatedAtMs = data.updatedAt instanceof Timestamp ? data.updatedAt.toMillis() : 0;
-        if (!staleCandidate ?? updatedAtMs > staleCandidate.updatedAtMs) {
+        if (!staleCandidate || updatedAtMs > staleCandidate.updatedAtMs) {
           staleCandidate = { fare: data.fare, raw: data.raw, updatedAtMs };
         }
       }
@@ -186,7 +186,7 @@ async function getCachedFareByName(
       }
       if (typeof data.fare === 'number' && data.fare > 0) {
         const updatedAtMs = data.updatedAt instanceof Timestamp ? data.updatedAt.toMillis() : 0;
-        if (!staleCandidate ?? updatedAtMs > staleCandidate.updatedAtMs) {
+        if (!staleCandidate || updatedAtMs > staleCandidate.updatedAtMs) {
           staleCandidate = { fare: data.fare, raw: data.raw, updatedAtMs };
         }
       }
@@ -207,7 +207,7 @@ async function upsertFareCache(
   fareResult: FareResult
 ): Promise<void> {
   try {
-    if (!fareResult?.fare ?? fareResult.fare <= 0) return;
+    if (!fareResult?.fare || fareResult.fare <= 0) return;
     const ref = doc(db, 'config_fares', getFareDocId(departureStationCode, arrivalStationCode));
     await setDoc(ref, {
       departureStationCode,
@@ -228,7 +228,7 @@ async function upsertFareCacheByName(
   fareResult: FareResult
 ): Promise<void> {
   try {
-    if (!fareResult?.fare ?? fareResult.fare <= 0) return;
+    if (!fareResult?.fare || fareResult.fare <= 0) return;
     const ref = doc(db, 'config_fares', getFareNameDocId(departureStationName, arrivalStationName));
     await setDoc(ref, {
       departureStationName,

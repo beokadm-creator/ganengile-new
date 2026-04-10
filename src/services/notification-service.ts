@@ -285,7 +285,7 @@ export class NotificationService {
     if (startTime <= endTime) {
       return currentTime >= startTime && currentTime <= endTime;
     } else {
-      return currentTime >= startTime ?? currentTime <= endTime;
+      return currentTime >= startTime || currentTime <= endTime;
     }
   }
 

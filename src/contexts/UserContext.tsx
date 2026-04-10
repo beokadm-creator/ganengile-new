@@ -181,7 +181,8 @@ export function UserProvider({ children }: UserProviderProps) {
     );
 
     // 온보딩 전에 사용자가 가려던 URL 반환
-    const { consumePendingDeepLink } = require('../navigation/navigationRef');
+// eslint-disable-next-line @typescript-eslint/no-require-imports
+const { consumePendingDeepLink } = require('../navigation/navigationRef');
     return consumePendingDeepLink();
   };
 

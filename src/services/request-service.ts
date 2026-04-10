@@ -41,6 +41,52 @@ import type {
 } from '../types/request';
 import { RequestStatus } from '../types/request';
 
+type LegacyCreateFeeInfo = {
+  totalFee?: number;
+  [key: string]: unknown;
+};
+
+type LegacyCreatePackageInfo = {
+  [key: string]: unknown;
+};
+
+type RequestStatusUpdatePayload = {
+  status: RequestStatus;
+  updatedAt: ReturnType<typeof serverTimestamp>;
+  matchedGillerId?: string | ReturnType<typeof deleteField>;
+  matchedAt?: ReturnType<typeof serverTimestamp>;
+  acceptedAt?: ReturnType<typeof serverTimestamp>;
+  pickedUpAt?: ReturnType<typeof serverTimestamp>;
+  arrivedAt?: ReturnType<typeof serverTimestamp>;
+  deliveredAt?: ReturnType<typeof serverTimestamp>;
+  requesterConfirmedAt?: ReturnType<typeof serverTimestamp>;
+  cancelledAt?: ReturnType<typeof serverTimestamp>;
+  cancellationReason?: string;
+  cancelledBy?: 'requester' | 'giller' | 'system';
+  primaryDeliveryId?: ReturnType<typeof deleteField>;
+};
+
+type FeeSnapshot = {
+  totalFee?: number;
+  breakdown?: {
+    gillerFee?: number;
+    platformFee?: number;
+  };
+  [key: string]: unknown;
+};
+
+function getErrorMessage(error: unknown, fallback: string): string {
+  return error instanceof Error ? error.message : fallback;
+}
+
+function isTimestampLike(value: unknown): value is Timestamp {
+  return (
+    typeof value === 'object' &&
+    value !== null &&
+    typeof (value as { toDate?: unknown }).toDate === 'function'
+  );
+}
+
 /**
  * 배송 요청 생성
  * @param requestData 요청 데이터
@@ -53,8 +99,8 @@ export async function createRequest(
   pickupStation: StationInfo,
   deliveryStation: StationInfo,
   urgency: string,
-  packageInfo: any,
-  feeInfo: any,
+  packageInfo: LegacyCreatePackageInfo,
+  feeInfo: LegacyCreateFeeInfo,
   recipientName: string,
   recipientPhone: string,
   preferredTime: Date,
@@ -66,8 +112,8 @@ export async function createRequest(
   pickupStation?: StationInfo,
   deliveryStation?: StationInfo,
   urgency?: string,
-  packageInfo?: any,
-  feeInfo?: any,
+  packageInfo?: LegacyCreatePackageInfo,
+  feeInfo?: LegacyCreateFeeInfo,
   recipientName?: string,
   recipientPhone?: string,
   preferredTime?: Date,
@@ -106,7 +152,7 @@ export async function createRequest(
         // 길러 앱과의 호환성을 위해 fee 필드 추가
         fee: requestDataOrUserId.feeBreakdown,
         preferredTime: requestDataOrUserId.preferredTime,
-        deadline: requestDataOrUserId.deadline instanceof Timestamp
+        deadline: isTimestampLike(requestDataOrUserId.deadline)
           ? requestDataOrUserId.deadline
           : Timestamp.fromDate(requestDataOrUserId.deadline),
         urgency: requestDataOrUserId.urgency ?? 'medium',
@@ -303,7 +349,7 @@ async function updateRequestInternal(
   try {
     const docRef = doc(db, 'requests', requestId);
 
-    const dataToUpdate: any = {
+    const dataToUpdate: UpdateRequestData & { updatedAt: ReturnType<typeof serverTimestamp> } = {
       ...updateData,
       updatedAt: serverTimestamp(),
     };
@@ -343,26 +389,26 @@ export async function updateRequestStatus(
   try {
     const docRef = doc(db, 'requests', requestId);
 
-    const updateData: any = {
+    const updateData: RequestStatusUpdatePayload = {
       status,
       updatedAt: serverTimestamp(),
     };
 
     // 상태별 추가 정보
-    if (status === 'matched' && extras?.matchedGillerId) {
+    if (status === RequestStatus.MATCHED && extras?.matchedGillerId) {
       updateData.matchedGillerId = extras.matchedGillerId;
       updateData.matchedAt = serverTimestamp();
-    } else if (status === 'accepted') {
+    } else if (status === RequestStatus.ACCEPTED) {
       updateData.acceptedAt = serverTimestamp();
-    } else if (status === 'in_transit') {
+    } else if (status === RequestStatus.IN_TRANSIT) {
       updateData.pickedUpAt = serverTimestamp();
-    } else if (status === 'arrived') {
+    } else if (status === RequestStatus.ARRIVED) {
       updateData.arrivedAt = serverTimestamp();
-    } else if (status === 'delivered') {
+    } else if (status === RequestStatus.DELIVERED) {
       updateData.deliveredAt = serverTimestamp();
-    } else if (status === 'completed') {
+    } else if (status === RequestStatus.COMPLETED) {
       updateData.requesterConfirmedAt = serverTimestamp();
-    } else if (status === 'cancelled') {
+    } else if (status === RequestStatus.CANCELLED) {
       updateData.cancelledAt = serverTimestamp();
       updateData.cancellationReason = extras?.cancellationReason;
       updateData.cancelledBy = extras?.cancelledBy;
@@ -403,7 +449,8 @@ async function cancelRequestInternal(
       throw new Error('Request not found');
     }
 
-    if (request.status !== 'pending' && request.status !== 'matched') {
+    const currentStatus = request.status as RequestStatus | undefined;
+    if (currentStatus !== RequestStatus.PENDING && currentStatus !== RequestStatus.MATCHED) {
       throw new Error(`Cannot cancel request with status: ${request.status}`);
     }
 
@@ -428,7 +475,8 @@ async function deleteRequestInternal(requestId: string): Promise<void> {
       throw new Error('Request not found');
     }
 
-    if (request.status !== 'completed' && request.status !== 'cancelled') {
+    const currentStatus = request.status as RequestStatus | undefined;
+    if (currentStatus !== RequestStatus.COMPLETED && currentStatus !== RequestStatus.CANCELLED) {
       throw new Error(`Cannot delete request with status: ${request.status}`);
     }
 
@@ -471,7 +519,7 @@ function validateRequestData(data: CreateRequestData): void {
   }
 
   // 마감일은 미래여야 함
-  const deadlineTime = data.deadline instanceof Timestamp
+  const deadlineTime = isTimestampLike(data.deadline)
     ? data.deadline.toDate()
     : data.deadline;
 
@@ -504,10 +552,10 @@ export async function getRequestStats(requesterId: string): Promise<{
   try {
     const allRequests = await getRequestsByRequester(requesterId);
 
-    const completedRequests = allRequests.filter((r) => r.status === 'completed').length;
-    const cancelledRequests = allRequests.filter((r) => r.status === 'cancelled').length;
+    const completedRequests = allRequests.filter((r) => r.status === RequestStatus.COMPLETED).length;
+    const cancelledRequests = allRequests.filter((r) => r.status === RequestStatus.CANCELLED).length;
     const inProgressRequests = allRequests.filter(
-      (r) => r.status === 'matched' || r.status === 'in_transit'
+      (r) => r.status === RequestStatus.MATCHED || r.status === RequestStatus.IN_TRANSIT
     ).length;
 
     const totalFee = allRequests.reduce((sum, r) => sum + r.initialNegotiationFee, 0);
@@ -544,8 +592,8 @@ export function validateRequest(
   userId: string,
   pickupStation: StationInfo,
   deliveryStation: StationInfo,
-  packageInfo: any,
-  fee: any,
+  packageInfo: LegacyCreatePackageInfo | null | undefined,
+  _fee: LegacyCreateFeeInfo | null | undefined,
   recipientName: string,
   recipientPhone: string,
   _preferredTime?: Date,
@@ -568,9 +616,9 @@ export function validateRequest(
   }
 
   // 픽업과 배송 역이 같은지 확인
-  // if (pickupStation?.stationId === deliveryStation?.stationId) {
-  //   throw new Error('Pickup and delivery stations must be different');
-  // }
+  if (pickupStation?.stationId && deliveryStation?.stationId && pickupStation.stationId === deliveryStation.stationId) {
+    errors.push('픽업 역과 배송 역이 같을 수 없습니다.');
+  }
 
   // 수신자 정보 확인
   if (!recipientName || recipientName.trim().length === 0) {
@@ -799,7 +847,7 @@ export async function increaseRequestBid(
     if (request.requesterId !== requesterId) {
       return { success: false, message: '요청자만 금액을 변경할 수 있습니다.' };
     }
-    if (request.status !== 'pending' && request.status !== 'matched') {
+    if (request.status !== RequestStatus.PENDING && request.status !== RequestStatus.MATCHED) {
       return { success: false, message: '현재 상태에서는 금액을 변경할 수 없습니다.' };
     }
 
@@ -809,7 +857,7 @@ export async function increaseRequestBid(
       request.feeBreakdown?.totalFee ?? 3000;
     const nextFee = Math.min(PRICING_POLICY.MAX_FEE, currentFee + amount);
 
-    const feeSnapshot = (request.fee || request.feeBreakdown || {}) as Record<string, unknown>;
+    const feeSnapshot = (request.fee ?? request.feeBreakdown ?? {}) as FeeSnapshot;
     const nextFeeSnapshot = {
       ...feeSnapshot,
       totalFee: nextFee,
@@ -913,8 +961,8 @@ export async function notifyGillers(requestId: string): Promise<{ success: boole
     }
 
     return { success: true };
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Error notifying gillers:', error);
-    return { success: false, error: error.message };
+    return { success: false, error: getErrorMessage(error, '길러 알림 전송에 실패했습니다.') };
   }
 }

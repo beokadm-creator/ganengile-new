@@ -53,7 +53,7 @@ export async function getDrivingRoute(args: {
     throw new Error(payload.message ?? '경로 좌표를 불러오지 못했습니다.');
   }
 
-  if (!payload.ok ?? !payload.route) {
+  if (!payload.ok || !payload.route) {
     return null;
   }
 
@@ -61,7 +61,7 @@ export async function getDrivingRoute(args: {
 }
 
 export function formatRouteDistance(distanceMeters: number): string {
-  if (!Number.isFinite(distanceMeters) ?? distanceMeters <= 0) {
+  if (!Number.isFinite(distanceMeters) || distanceMeters <= 0) {
     return '-';
   }
 
@@ -73,7 +73,7 @@ export function formatRouteDistance(distanceMeters: number): string {
 }
 
 export function formatRouteDuration(durationMs: number): string {
-  if (!Number.isFinite(durationMs) ?? durationMs <= 0) {
+  if (!Number.isFinite(durationMs) || durationMs <= 0) {
     return '-';
   }
 
@@ -86,4 +86,3 @@ export function formatRouteDuration(durationMs: number): string {
   const minutes = totalMinutes % 60;
   return minutes > 0 ? `${hours}시간 ${minutes}분` : `${hours}시간`;
 }
-
