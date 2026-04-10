@@ -475,12 +475,14 @@ export default function CreateRequestScreen({ navigation, route }: Props) {
     aiResult,
   ]);
 
+  const hasItemValue = Number(itemValue || 0) > 0;
+
   const submitDisabled =
     !user?.uid ||
     !isOnboardingComplete ||
     !pickupStation ||
     !deliveryStation ||
-    photoRefs.length === 0 ||
+    (hasItemValue && photoRefs.length === 0) ||
     !packageDescription.trim() ||
     !recipientName.trim() ||
     !recipientPhone.trim() ||
@@ -496,7 +498,7 @@ export default function CreateRequestScreen({ navigation, route }: Props) {
     if (!isOnboardingComplete) items.push('이용자 정보 입력(온보딩)이 필요합니다');
     if (!pickupStation) items.push('출발역을 선택해 주세요');
     if (!deliveryStation) items.push('도착역을 선택해 주세요');
-    if (photoRefs.length === 0) items.push('물건 사진을 올려 주세요');
+    if (hasItemValue && photoRefs.length === 0) items.push('물품 가치를 입력하셨습니다. 보증금 적용을 위해 사진이 필요합니다');
     if (!packageDescription.trim()) items.push('물품 설명을 입력해 주세요');
     if (!recipientName.trim()) items.push('수령인 이름을 입력해 주세요');
     if (!recipientPhone.trim()) items.push('수령인 연락처를 입력해 주세요');
@@ -512,7 +514,7 @@ export default function CreateRequestScreen({ navigation, route }: Props) {
     return items;
   }, [
     user?.uid, isOnboardingComplete, pickupStation, deliveryStation,
-    photoRefs.length, packageDescription, recipientName, recipientPhone,
+    photoRefs.length, hasItemValue, packageDescription, recipientName, recipientPhone,
     pickupMode, pickupRoadAddress, pickupDetailAddress,
     deliveryMode, deliveryRoadAddress, deliveryDetailAddress,
     isPhoneVerified, recipientPrivacyConfig.thirdPartyConsentRequired, recipientConsentChecked,
@@ -1059,11 +1061,15 @@ export default function CreateRequestScreen({ navigation, route }: Props) {
           </TouchableOpacity>
         </Block>
 
-        <Block title="물건 사진">
-          <TouchableOpacity style={styles.primaryButton} onPress={() => void handleUploadPhoto()}>
+        <Block title={photoUrl ? '물건 사진 ✓' : hasItemValue ? '물건 사진 (필수)' : '물건 사진 (선택)'}>
+          <TouchableOpacity style={[styles.primaryButton, hasItemValue && !photoUrl && styles.disabled]} onPress={() => void handleUploadPhoto()}>
             <Text style={styles.primaryButtonText}>{photoUrl ? '사진 다시 올리기' : '물건 사진 올리기'}</Text>
           </TouchableOpacity>
-          <Text style={styles.muted}>배송 요청에는 물건 사진이 필요합니다.</Text>
+          {hasItemValue && !photoUrl ? (
+            <Text style={styles.muted}>⚠️ 물품 가치를 입력하셨습니다. 보증금 적용을 위해 사진이 필요합니다.</Text>
+          ) : !photoUrl ? (
+            <Text style={styles.muted}>사진을 올리면 AI가 물품 설명을 작성해 드립니다. 없이도 진행할 수 있습니다.</Text>
+          ) : null}
           {photoUrl ? <Image source={{ uri: photoUrl }} style={styles.previewImage} /> : null}
           <TouchableOpacity
             style={[styles.secondaryButton, !photoUrl && styles.disabled]}
@@ -1072,7 +1078,7 @@ export default function CreateRequestScreen({ navigation, route }: Props) {
           >
             <Text style={styles.secondaryButtonText}>AI에게 설명 맡기기</Text>
           </TouchableOpacity>
-          <Text style={styles.muted}>AI 분석은 선택 기능이며 직접 입력해서 진행할 수도 있습니다.</Text>
+          {photoUrl ? <Text style={styles.muted}>AI 분석은 선택 기능이며 직접 입력해서 진행할 수도 있습니다.</Text> : null}
         </Block>
 
         <Block title="물품 정보">
@@ -1316,14 +1322,6 @@ export default function CreateRequestScreen({ navigation, route }: Props) {
           </TouchableOpacity>
         ))}
 
-        <TouchableOpacity
-          style={[styles.primaryButton, submitDisabled && styles.disabled]}
-          onPress={() => void handleSubmit()}
-          disabled={submitDisabled || saving}
-        >
-          {saving ? <ActivityIndicator color={Colors.white} /> : <Text style={styles.primaryButtonText}>배송 요청하기</Text>}
-        </TouchableOpacity>
-
         {missingItems.length > 0 && (
           <View style={styles.missingCard}>
             <Text style={styles.missingTitle}>아래 항목을 완성하면 요청할 수 있습니다</Text>
@@ -1335,6 +1333,20 @@ export default function CreateRequestScreen({ navigation, route }: Props) {
             ))}
           </View>
         )}
+
+        <TouchableOpacity
+          style={[styles.primaryButton, submitDisabled && styles.disabled]}
+          onPress={() => void handleSubmit()}
+          disabled={submitDisabled || saving}
+        >
+          {saving ? (
+            <ActivityIndicator color={Colors.white} />
+          ) : submitDisabled ? (
+            <Text style={styles.primaryButtonText}>위 항목을 먼저 완성해 주세요</Text>
+          ) : (
+            <Text style={styles.primaryButtonText}>배송 요청하기</Text>
+          )}
+        </TouchableOpacity>
        </ScrollView>
 
       <OptimizedStationSelectModal
