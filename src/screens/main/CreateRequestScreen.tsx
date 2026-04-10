@@ -490,6 +490,35 @@ export default function CreateRequestScreen({ navigation, route }: Props) {
     (recipientPrivacyConfig.thirdPartyConsentRequired && !recipientConsentChecked) ||
     (requestMode === 'reservation' && (!preferredPickupDate.trim() || !preferredPickupTime.trim()));
 
+  const missingItems = useMemo(() => {
+    const items: string[] = [];
+    if (!user?.uid) items.push('로그인이 필요합니다');
+    if (!isOnboardingComplete) items.push('이용자 정보 입력(온보딩)이 필요합니다');
+    if (!pickupStation) items.push('출발역을 선택해 주세요');
+    if (!deliveryStation) items.push('도착역을 선택해 주세요');
+    if (photoRefs.length === 0) items.push('물건 사진을 올려 주세요');
+    if (!packageDescription.trim()) items.push('물품 설명을 입력해 주세요');
+    if (!recipientName.trim()) items.push('수령인 이름을 입력해 주세요');
+    if (!recipientPhone.trim()) items.push('수령인 연락처를 입력해 주세요');
+    if (pickupMode === 'address' && (!pickupRoadAddress.trim() || !pickupDetailAddress.trim()))
+      items.push('출발지 주소를 완성해 주세요');
+    if (deliveryMode === 'address' && (!deliveryRoadAddress.trim() || !deliveryDetailAddress.trim()))
+      items.push('도착지 주소를 완성해 주세요');
+    if (!isPhoneVerified) items.push('휴대폰 번호 인증을 완료해 주세요');
+    if (recipientPrivacyConfig.thirdPartyConsentRequired && !recipientConsentChecked)
+      items.push('수령인 정보 제공 동의에 체크해 주세요');
+    if (requestMode === 'reservation' && (!preferredPickupDate.trim() || !preferredPickupTime.trim()))
+      items.push('예약 날짜와 시간을 선택해 주세요');
+    return items;
+  }, [
+    user?.uid, isOnboardingComplete, pickupStation, deliveryStation,
+    photoRefs.length, packageDescription, recipientName, recipientPhone,
+    pickupMode, pickupRoadAddress, pickupDetailAddress,
+    deliveryMode, deliveryRoadAddress, deliveryDetailAddress,
+    isPhoneVerified, recipientPrivacyConfig.thirdPartyConsentRequired, recipientConsentChecked,
+    requestMode, preferredPickupDate, preferredPickupTime,
+  ]);
+
   function buildNearbyRecommendations(latitude: number, longitude: number): NearbyStationRecommendation[] {
     return locationService
       .findNearestStations(
@@ -1195,6 +1224,7 @@ export default function CreateRequestScreen({ navigation, route }: Props) {
               const formatted = formatPhoneDigits(value);
               setContactPhoneNumber(formatted);
               if (normalizePhoneNumber(formatted) !== normalizedVerifiedPhone) {
+                setVerifiedPhoneOverride(null);
                 setContactOtpSessionId(null);
                 setContactOtpCode('');
                 setContactOtpHintCode(null);
@@ -1293,7 +1323,19 @@ export default function CreateRequestScreen({ navigation, route }: Props) {
         >
           {saving ? <ActivityIndicator color={Colors.white} /> : <Text style={styles.primaryButtonText}>배송 요청하기</Text>}
         </TouchableOpacity>
-      </ScrollView>
+
+        {missingItems.length > 0 && (
+          <View style={styles.missingCard}>
+            <Text style={styles.missingTitle}>아래 항목을 완성하면 요청할 수 있습니다</Text>
+            {missingItems.map((item) => (
+              <View key={item} style={styles.missingRow}>
+                <Text style={styles.missingDot}>•</Text>
+                <Text style={styles.missingText}>{item}</Text>
+              </View>
+            ))}
+          </View>
+        )}
+       </ScrollView>
 
       <OptimizedStationSelectModal
         visible={pickerVisible}
@@ -1707,5 +1749,36 @@ const styles = StyleSheet.create({
     color: Colors.textSecondary,
     ...Typography.bodySmall,
     textAlign: 'center',
+  },
+  missingCard: {
+    borderRadius: BorderRadius.lg,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    backgroundColor: Colors.gray50,
+    padding: Spacing.lg,
+    gap: 6,
+    marginTop: Spacing.md,
+  },
+  missingTitle: {
+    color: Colors.error,
+    fontWeight: '800',
+    fontSize: Typography.fontSize.sm,
+    marginBottom: 4,
+  },
+  missingRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 6,
+  },
+  missingDot: {
+    color: Colors.error,
+    fontSize: Typography.fontSize.sm,
+    lineHeight: 18,
+  },
+  missingText: {
+    flex: 1,
+    color: Colors.textSecondary,
+    fontSize: Typography.fontSize.sm,
+    lineHeight: 18,
   },
 });
