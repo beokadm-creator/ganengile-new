@@ -15,6 +15,8 @@ import { RouteProp, useNavigation, useRoute } from '@react-navigation/native';
 import type { MainStackNavigationProp, MainStackParamList } from '../../types/navigation';
 import { requireUserId } from '../../services/firebase';
 import { verifyPickup, type PickupVerificationData } from '../../services/delivery-service';
+import { buildMissionExecutionGuideFromRequest } from '../../services/giller-mission-execution-service';
+import { getRequestById } from '../../services/request-service';
 import { takePhoto, uploadPhotoWithThumbnail } from '../../services/photo-service';
 import { getCurrentLocation } from '../../utils/permission-handler';
 import * as Location from 'expo-location';
@@ -30,8 +32,27 @@ export default function PickupVerificationScreen() {
   const [method, setMethod] = useState<VerificationMethod>('code');
   const [verificationCode, setVerificationCode] = useState('');
   const [photoUri, setPhotoUri] = useState<string | null>(null);
+  const [guide, setGuide] = useState(() => buildMissionExecutionGuideFromRequest(null));
   const [loading, setLoading] = useState(false);
   const [photoLoading, setPhotoLoading] = useState(false);
+
+  React.useEffect(() => {
+    let mounted = true;
+
+    const run = async () => {
+      const request = await getRequestById(requestId).catch(() => null);
+      if (!mounted) {
+        return;
+      }
+      setGuide(buildMissionExecutionGuideFromRequest(request));
+    };
+
+    void run();
+
+    return () => {
+      mounted = false;
+    };
+  }, [requestId]);
 
   const handleCapturePhoto = async (): Promise<void> => {
     try {
@@ -112,10 +133,27 @@ export default function PickupVerificationScreen() {
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
       <View style={styles.header}>
         <Text style={styles.title}>인수 확인</Text>
-        <Text style={styles.subtitle}>
-          길러가 물품을 넘겨받았는지 확인하고 배송 추적 단계로 이어집니다.
-        </Text>
+        <Text style={styles.subtitle}>코드와 사진만 확인하면 바로 출발할 수 있습니다.</Text>
       </View>
+
+      <View style={styles.summaryCard}>
+        <View style={styles.summaryRow}>
+          <SummaryChip label={verificationCode.trim().length === 4 ? '코드 준비' : '코드 입력'} active={verificationCode.trim().length === 4} />
+          <SummaryChip label={photoUri ? '사진 준비' : '사진 촬영'} active={Boolean(photoUri)} />
+          <SummaryChip label="위치 확인" active />
+        </View>
+        <Text style={styles.summaryText}>지금 필요한 것만 빠르게 끝내면 됩니다.</Text>
+      </View>
+
+      {guide.pickupGuide || guide.lockerGuide || guide.specialInstructions || guide.recipientSummary ? (
+        <View style={styles.card}>
+          <Text style={styles.sectionTitle}>인수 안내</Text>
+          {guide.pickupGuide ? <Text style={styles.helperText}>픽업 위치: {guide.pickupGuide}</Text> : null}
+          {guide.lockerGuide ? <Text style={styles.helperText}>사물함: {guide.lockerGuide}</Text> : null}
+          {guide.recipientSummary ? <Text style={styles.helperText}>수령인: {guide.recipientSummary}</Text> : null}
+          {guide.specialInstructions ? <Text style={styles.helperText}>요청: {guide.specialInstructions}</Text> : null}
+        </View>
+      ) : null}
 
       <View style={styles.card}>
         <Text style={styles.sectionTitle}>확인 방식</Text>
@@ -156,9 +194,7 @@ export default function PickupVerificationScreen() {
 
       <View style={styles.card}>
         <Text style={styles.sectionTitle}>인수 증빙 사진</Text>
-        <Text style={styles.helperText}>
-          물품과 전달 지점이 함께 보이도록 촬영하면 분쟁 대응과 운영 확인이 쉬워집니다.
-        </Text>
+        <Text style={styles.helperText}>물품이 보이게 한 장만 남기면 됩니다.</Text>
         {photoUri ? <Image source={{ uri: photoUri }} style={styles.previewImage} /> : null}
         <TouchableOpacity style={styles.photoButton} onPress={() => void handleCapturePhoto()} disabled={photoLoading}>
           {photoLoading ? (
@@ -173,6 +209,14 @@ export default function PickupVerificationScreen() {
         {loading ? <ActivityIndicator size="small" color={Colors.white} /> : <Text style={styles.primaryButtonText}>인수 확인하기</Text>}
       </TouchableOpacity>
     </ScrollView>
+  );
+}
+
+function SummaryChip({ label, active }: { label: string; active: boolean }) {
+  return (
+    <View style={[styles.summaryChip, active ? styles.summaryChipActive : undefined]}>
+      <Text style={[styles.summaryChipText, active ? styles.summaryChipTextActive : undefined]}>{label}</Text>
+    </View>
   );
 }
 
@@ -204,6 +248,41 @@ const styles = StyleSheet.create({
   subtitle: {
     fontSize: 15,
     lineHeight: 22,
+    color: Colors.textSecondary,
+  },
+  summaryCard: {
+    backgroundColor: Colors.surface,
+    borderRadius: 22,
+    padding: 18,
+    gap: 12,
+    borderWidth: 1,
+    borderColor: Colors.border,
+  },
+  summaryRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+  summaryChip: {
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 999,
+    backgroundColor: Colors.border,
+  },
+  summaryChipActive: {
+    backgroundColor: Colors.primaryMint,
+  },
+  summaryChipText: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: Colors.textSecondary,
+  },
+  summaryChipTextActive: {
+    color: Colors.primary,
+  },
+  summaryText: {
+    fontSize: 14,
+    lineHeight: 20,
     color: Colors.textSecondary,
   },
   card: {

@@ -190,10 +190,19 @@ export default function GillerPickupFromLockerScreen({ route, navigation }: Prop
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
       <View style={styles.heroCard}>
         <Text style={styles.stepPill}>STEP {getStepNumber(currentStep)}</Text>
-        <Text style={styles.heroTitle}>길러 보관함 수령</Text>
+        <Text style={styles.heroTitle}>사물함 수령 확인</Text>
         <Text style={styles.heroSubtitle}>
           {getReservationTitle(reservation)} · {locker.location.stationName} {locker.location.section}
         </Text>
+      </View>
+
+      <View style={styles.summaryCard}>
+        <View style={styles.summaryRow}>
+          <SummaryChip label="예약 확인" active />
+          <SummaryChip label={currentStep === 'open' ? '열기 필요' : '열기 확인'} active={currentStep === 'open'} />
+          <SummaryChip label={currentStep === 'confirm' ? '수령 확인 필요' : '수령 확인'} active={currentStep === 'confirm'} />
+        </View>
+        <Text style={styles.summaryText}>지금 필요한 단계만 진행하면 됩니다.</Text>
       </View>
 
       <View style={styles.card}>
@@ -208,16 +217,16 @@ export default function GillerPickupFromLockerScreen({ route, navigation }: Prop
 
       <View style={styles.card}>
         <Text style={styles.sectionTitle}>수령 순서</Text>
-        <TimelineRow active title="예약 확인" description="요청에 연결된 보관함과 예약 상태를 확인합니다." />
+        <TimelineRow active title="예약 확인" description="연결된 사물함과 상태를 확인합니다." />
         <TimelineRow
           active={currentStep === 'open' || currentStep === 'confirm' || currentStep === 'complete'}
           title="보관함 열기"
-          description="보관함 열기 버튼을 눌러 물품을 꺼낼 수 있도록 상태를 전환합니다."
+          description="문을 열고 물품을 꺼냅니다."
         />
         <TimelineRow
           active={currentStep === 'confirm' || currentStep === 'complete'}
           title="수령 완료"
-          description="물품을 확인한 뒤 수령 완료를 눌러 정산과 배송 완료 흐름을 이어갑니다."
+          description="물품 확인 후 수령 완료를 누릅니다."
         />
       </View>
 
@@ -258,6 +267,14 @@ export default function GillerPickupFromLockerScreen({ route, navigation }: Prop
         </View>
       )}
     </ScrollView>
+  );
+}
+
+function SummaryChip({ label, active }: { label: string; active: boolean }) {
+  return (
+    <View style={[styles.summaryChip, active ? styles.summaryChipActive : undefined]}>
+      <Text style={[styles.summaryChipText, active ? styles.summaryChipTextActive : undefined]}>{label}</Text>
+    </View>
   );
 }
 
@@ -355,6 +372,41 @@ const styles = StyleSheet.create({
     marginTop: 8,
     fontSize: 14,
     lineHeight: 21,
+    color: Colors.textSecondary,
+  },
+  summaryCard: {
+    backgroundColor: Colors.surface,
+    borderRadius: 22,
+    padding: 18,
+    gap: 12,
+    borderWidth: 1,
+    borderColor: Colors.border,
+  },
+  summaryRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+  summaryChip: {
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 999,
+    backgroundColor: Colors.border,
+  },
+  summaryChipActive: {
+    backgroundColor: Colors.primaryMint,
+  },
+  summaryChipText: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: Colors.textSecondary,
+  },
+  summaryChipTextActive: {
+    color: Colors.primary,
+  },
+  summaryText: {
+    fontSize: 14,
+    lineHeight: 20,
     color: Colors.textSecondary,
   },
   card: {

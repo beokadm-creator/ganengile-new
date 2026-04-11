@@ -156,14 +156,14 @@ export default function ProfileScreen({ navigation }: { navigation: MainStackNav
       {
         key: 'missions',
         title: '미션 보드',
-        subtitle: '수행 가능한 요청을 확인합니다.',
+        subtitle: '수행 가능한 미션을 확인합니다.',
         icon: 'two-wheeler',
         onPress: () => navigation.navigate('Tabs', { screen: 'GillerRequests' }),
       },
       {
         key: 'routes',
         title: '경로 관리',
-        subtitle: '등록한 동선을 관리합니다.',
+        subtitle: '권역과 등록한 동선을 관리합니다.',
         icon: 'alt-route',
         onPress: () => navigation.navigate('Tabs', { screen: 'RouteManagement' }),
       },

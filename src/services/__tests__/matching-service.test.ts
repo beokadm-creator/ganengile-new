@@ -9,6 +9,7 @@ import {
   declineRequest,
   findGiller,
   convertToDeliveryRequest,
+  getPendingGillerRequests,
 } from '../matching-service';
 
 // Mock Firebase Firestore
@@ -382,6 +383,28 @@ describe('Matching Service', () => {
       expect(result.success).toBe(false);
       expect(result.message).toContain('찾을 수 없습니다');
     });
+
+    it('미션 보드 요청은 레거시 수락 경로를 막아야 한다', async () => {
+      const requestId = 'req-beta1';
+      const gillerId = 'giller-456';
+      const mockRequestDoc = {
+        exists: () => true,
+        data: () => ({
+          status: 'pending',
+          beta1RequestStatus: 'match_pending',
+          missionProgress: { totalMissionCount: 3 },
+        }),
+      };
+
+      (doc as jest.Mock).mockReturnValue({});
+      (getDoc as jest.Mock).mockResolvedValue(mockRequestDoc);
+
+      const result = await acceptRequest(requestId, gillerId);
+
+      expect(result.success).toBe(false);
+      expect(result.message).toContain('미션 보드');
+      expect(gillerAcceptRequest).not.toHaveBeenCalled();
+    });
   });
 
   describe('declineRequest', () => {
@@ -644,6 +667,49 @@ describe('Matching Service', () => {
       // Then
       expect(result.success).toBe(true);
       expect(result.data?.giller.estimatedTime).toBeLessThan(20);
+    });
+  });
+
+  describe('getPendingGillerRequests', () => {
+    it('미션 보드 요청은 레거시 요청 목록에서 제외해야 한다', async () => {
+      const mockSnapshot = {
+        forEach: (callback: (docItem: { id: string; data: () => Record<string, unknown> }) => void) => {
+          [
+            {
+              id: 'legacy-request',
+              data: () => ({
+                status: 'pending',
+                requesterName: '레거시 요청',
+                fee: { totalFee: 5000 },
+                pickupStation: { stationName: '서울역' },
+                deliveryStation: { stationName: '강남역' },
+              }),
+            },
+            {
+              id: 'beta1-request',
+              data: () => ({
+                status: 'pending',
+                beta1RequestStatus: 'match_pending',
+                missionProgress: { totalMissionCount: 2 },
+                requesterName: '새 요청',
+                fee: { totalFee: 7000 },
+                pickupStation: { stationName: '시청역' },
+                deliveryStation: { stationName: '잠실역' },
+              }),
+            },
+          ].forEach(callback);
+        },
+      };
+
+      (collection as jest.Mock).mockReturnValue({});
+      (where as jest.Mock).mockReturnValue({});
+      (query as jest.Mock).mockReturnValue({});
+      (getDocs as jest.Mock).mockResolvedValue(mockSnapshot);
+
+      const result = await getPendingGillerRequests();
+
+      expect(result).toHaveLength(1);
+      expect(result[0].requestId).toBe('legacy-request');
     });
   });
 

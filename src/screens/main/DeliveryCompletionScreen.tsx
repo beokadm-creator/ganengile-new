@@ -20,6 +20,8 @@ import {
   markAsArrived,
   type DeliveryCompletionData,
 } from '../../services/delivery-service';
+import { buildMissionExecutionGuideFromRequest } from '../../services/giller-mission-execution-service';
+import { getRequestById } from '../../services/request-service';
 import { takePhoto, uploadPhotoWithThumbnail } from '../../services/photo-service';
 import { getCurrentLocation } from '../../utils/permission-handler';
 import * as Location from 'expo-location';
@@ -32,6 +34,7 @@ export default function DeliveryCompletionScreen() {
   const { deliveryId } = route.params;
 
   const [delivery, setDelivery] = useState<Record<string, unknown> | null>(null);
+  const [guide, setGuide] = useState(() => buildMissionExecutionGuideFromRequest(null));
   const [verificationCode, setVerificationCode] = useState('');
   const [photoUri, setPhotoUri] = useState<string | null>(null);
   const [notes, setNotes] = useState('');
@@ -45,6 +48,16 @@ export default function DeliveryCompletionScreen() {
       setLoadingDelivery(true);
       const result = await getDeliveryById(deliveryId);
       setDelivery((result as Record<string, unknown> | null) ?? null);
+      const requestId =
+        result && typeof (result as { requestId?: unknown }).requestId === 'string'
+          ? ((result as { requestId?: string }).requestId ?? '')
+          : '';
+      if (requestId) {
+        const request = await getRequestById(requestId).catch(() => null);
+        setGuide(buildMissionExecutionGuideFromRequest(request));
+      } else {
+        setGuide(buildMissionExecutionGuideFromRequest(null));
+      }
     } catch (error) {
       console.error('Failed to load delivery:', error);
       Alert.alert('배송 정보를 불러오지 못했어요', '잠시 후 다시 시도해 주세요.');
@@ -67,6 +80,8 @@ export default function DeliveryCompletionScreen() {
       : typeof delivery?.requesterId === 'string'
         ? delivery.requesterId
         : '';
+  const arrivalReady = deliveryStatus.toLowerCase().includes('arrival_pending');
+  const completionReady = verificationCode.trim().length === 6;
 
   const handleMarkArrived = async (): Promise<void> => {
     try {
@@ -178,14 +193,31 @@ export default function DeliveryCompletionScreen() {
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
       <View style={styles.header}>
         <Text style={styles.title}>배송 완료 처리</Text>
-        <Text style={styles.subtitle}>
-          수령 코드와 완료 사진을 확인해 배송을 마감합니다. 필요하면 먼저 도착 처리부터 진행할 수 있어요.
-        </Text>
+        <Text style={styles.subtitle}>도착 처리 후 수령 코드만 맞추면 완료됩니다.</Text>
       </View>
+
+      <View style={styles.summaryCard}>
+        <View style={styles.summaryRow}>
+          <SummaryChip label={arrivalReady ? '도착 확인 필요' : '도착 처리 확인'} active={arrivalReady} />
+          <SummaryChip label={completionReady ? '코드 준비' : '코드 입력'} active={completionReady} />
+          <SummaryChip label={photoUri ? '사진 준비' : '사진 선택'} active={Boolean(photoUri)} />
+        </View>
+        <Text style={styles.summaryText}>지금 필요한 것만 채우고 바로 마감하면 됩니다.</Text>
+      </View>
+
+      {guide.pickupGuide || guide.lockerGuide || guide.specialInstructions || guide.recipientSummary ? (
+        <View style={styles.card}>
+          <Text style={styles.sectionTitle}>전달 안내</Text>
+          {guide.pickupGuide ? <Text style={styles.helperText}>인계 위치: {guide.pickupGuide}</Text> : null}
+          {guide.lockerGuide ? <Text style={styles.helperText}>사물함: {guide.lockerGuide}</Text> : null}
+          {guide.recipientSummary ? <Text style={styles.helperText}>수령인: {guide.recipientSummary}</Text> : null}
+          {guide.specialInstructions ? <Text style={styles.helperText}>요청: {guide.specialInstructions}</Text> : null}
+        </View>
+      ) : null}
 
       <View style={styles.card}>
         <Text style={styles.sectionTitle}>현재 상태</Text>
-        <Text style={styles.statusText}>{deliveryStatus}</Text>
+        <Text style={styles.statusText}>{formatDeliveryStatus(deliveryStatus)}</Text>
         <TouchableOpacity
           style={styles.secondaryButton}
           onPress={() => void handleMarkArrived()}
@@ -223,7 +255,7 @@ export default function DeliveryCompletionScreen() {
 
         <View style={styles.block}>
           <Text style={styles.codeLabel}>완료 사진</Text>
-          <Text style={styles.helperText}>물품 인계가 끝난 상태와 수령 위치가 함께 보이도록 촬영해 주세요.</Text>
+          <Text style={styles.helperText}>전달이 끝난 상태가 보이게 한 장만 남기면 됩니다.</Text>
           {photoUri ? <Image source={{ uri: photoUri }} style={styles.previewImage} /> : null}
           <TouchableOpacity style={styles.photoButton} onPress={() => void handleCapturePhoto()} disabled={photoLoading}>
             {photoLoading ? (
@@ -238,7 +270,7 @@ export default function DeliveryCompletionScreen() {
           <Text style={styles.codeLabel}>운영 참고 메모</Text>
           <TextInput
             style={[styles.input, styles.notesInput]}
-            placeholder="선택 입력입니다. 지연 사유나 전달 특이사항이 있으면 남겨 주세요."
+            placeholder="필요할 때만 간단히 남겨 주세요."
             value={notes}
             onChangeText={setNotes}
             multiline
@@ -254,6 +286,36 @@ export default function DeliveryCompletionScreen() {
         )}
       </TouchableOpacity>
     </ScrollView>
+  );
+}
+
+function formatDeliveryStatus(status: string): string {
+  const normalized = status.toLowerCase();
+
+  if (normalized.includes('arrival_pending')) {
+    return '도착 확인 전';
+  }
+  if (normalized.includes('handover_pending')) {
+    return '인계 대기 중';
+  }
+  if (normalized.includes('in_progress')) {
+    return '이동 중';
+  }
+  if (normalized.includes('accepted')) {
+    return '출발 준비';
+  }
+  if (normalized.includes('completed')) {
+    return '완료됨';
+  }
+
+  return status;
+}
+
+function SummaryChip({ label, active }: { label: string; active: boolean }) {
+  return (
+    <View style={[styles.summaryChip, active ? styles.summaryChipActive : undefined]}>
+      <Text style={[styles.summaryChipText, active ? styles.summaryChipTextActive : undefined]}>{label}</Text>
+    </View>
   );
 }
 
@@ -288,6 +350,41 @@ const styles = StyleSheet.create({
   subtitle: {
     fontSize: 15,
     lineHeight: 22,
+    color: Colors.textSecondary,
+  },
+  summaryCard: {
+    backgroundColor: Colors.surface,
+    borderRadius: 22,
+    padding: 18,
+    gap: 12,
+    borderWidth: 1,
+    borderColor: Colors.border,
+  },
+  summaryRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+  summaryChip: {
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 999,
+    backgroundColor: Colors.border,
+  },
+  summaryChipActive: {
+    backgroundColor: Colors.primaryMint,
+  },
+  summaryChipText: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: Colors.textSecondary,
+  },
+  summaryChipTextActive: {
+    color: Colors.primary,
+  },
+  summaryText: {
+    fontSize: 14,
+    lineHeight: 20,
     color: Colors.textSecondary,
   },
   card: {

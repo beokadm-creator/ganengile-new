@@ -46,6 +46,19 @@ export enum GillerStatus {
   INACTIVE = 'inactive',
 }
 
+export interface GillerTerritory {
+  territoryId: string;
+  label: string;
+  stationId?: string;
+  stationName?: string;
+  region?: string;
+  latitude: number;
+  longitude: number;
+  radiusKm: number;
+  source: 'current_location' | 'manual';
+  verifiedAt?: Timestamp | string;
+}
+
 /**
  * 사용자 기본 정보 (P1 확장)
  */
@@ -164,6 +177,8 @@ export interface User {
       approvedAt?: Date;
       status: 'pending' | 'approved' | 'rejected';
     };
+    territories?: GillerTerritory[];
+    activeTerritoryId?: string;
   };
 
   // 통계 (확장)

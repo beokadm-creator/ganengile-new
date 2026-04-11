@@ -83,8 +83,8 @@ export async function sendMatchFoundNotification(
   deliveryStation: string,
   fee: number
 ): Promise<void> {
-  const title = '새 배송 요청이 도착했습니다';
-  const body = `${pickupStation} -> ${deliveryStation} (${fee.toLocaleString()}원)`;
+  const title = '새 미션이 도착했습니다';
+  const body = `${pickupStation} -> ${deliveryStation} · ${fee.toLocaleString()}원`;
 
   await saveNotification(gillerId, NotificationType.MATCH_FOUND, title, body, {
     requestId,
@@ -98,7 +98,7 @@ export async function sendMatchFoundNotification(
     await sendFCM(token, title, body, {
       type: NotificationType.MATCH_FOUND,
       requestId,
-      screen: 'RequestDetail',
+      screen: 'GillerRequests',
     });
   }
 }
@@ -145,6 +145,87 @@ export async function sendRequestAcceptedNotification(
   await saveNotification(gllerId, NotificationType.REQUEST_ACCEPTED, title, body, {
     requestId,
     gillerName,
+  });
+
+  const token = await getUserFCMToken(gllerId);
+  if (token) {
+    await sendFCM(token, title, body, {
+      type: NotificationType.REQUEST_ACCEPTED,
+      requestId,
+      screen: 'RequestDetail',
+    });
+  }
+}
+
+export async function sendRequestProgressNotification(
+  gllerId: string,
+  requestId: string,
+  acceptedMissionCount: number,
+  totalMissionCount: number,
+  fullyMatched: boolean
+): Promise<void> {
+  const title = fullyMatched ? '배송 연결이 완료되었습니다' : '일부 구간이 연결되었습니다';
+  const body = fullyMatched
+    ? '배송 준비가 시작됩니다.'
+    : `${acceptedMissionCount}/${totalMissionCount} 구간 연결 중`;
+
+  await saveNotification(gllerId, NotificationType.REQUEST_ACCEPTED, title, body, {
+    requestId,
+    acceptedMissionCount,
+    totalMissionCount,
+    fullyMatched,
+  });
+
+  const token = await getUserFCMToken(gllerId);
+  if (token) {
+    await sendFCM(token, title, body, {
+      type: NotificationType.REQUEST_ACCEPTED,
+      requestId,
+      screen: 'RequestDetail',
+    });
+  }
+}
+
+export async function sendRequestExecutionNotification(
+  userId: string,
+  requestId: string,
+  stage: 'picked_up' | 'arrived' | 'delivered',
+  title: string,
+  body: string
+): Promise<void> {
+  const notificationType =
+    stage === 'picked_up'
+      ? NotificationType.PICKUP_ARRIVED
+      : stage === 'arrived'
+        ? NotificationType.DELIVERY_ARRIVED
+        : NotificationType.DELIVERY_COMPLETED;
+
+  await saveNotification(userId, notificationType, title, body, {
+    requestId,
+    stage,
+  });
+
+  const token = await getUserFCMToken(userId);
+  if (token) {
+    await sendFCM(token, title, body, {
+      type: notificationType,
+      requestId,
+      screen: 'RequestDetail',
+      stage,
+    });
+  }
+}
+
+export async function sendMissionReturnedNotification(
+  gllerId: string,
+  requestId: string
+): Promise<void> {
+  const title = '구간이 다시 조정되고 있습니다';
+  const body = '남은 구간을 다시 찾고 있습니다.';
+
+  await saveNotification(gllerId, NotificationType.REQUEST_ACCEPTED, title, body, {
+    requestId,
+    mode: 'mission_returned',
   });
 
   const token = await getUserFCMToken(gllerId);

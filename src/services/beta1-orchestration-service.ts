@@ -2,6 +2,7 @@ import {
   Timestamp,
   addDoc,
   collection,
+  deleteField,
   getDoc,
   getDocs,
   query,
@@ -40,8 +41,13 @@ import {
 import { getAIIntegrationConfig } from './integration-config-service';
 import { buildRequestDraftFromLegacyInput, type LegacyStationInfo as StationInfo } from '../utils/request-draft-adapters';
 import { findMatchesForRequest } from './matching-service';
-import { sendMissionBundleAvailableNotification } from './matching-notification';
+import {
+  sendMissionBundleAvailableNotification,
+  sendMissionReturnedNotification,
+  sendRequestProgressNotification,
+} from './matching-notification';
 import { deliveryPartnerService } from './delivery-partner-service';
+import { getMissionExposurePricing } from './mission-exposure-pricing-service';
 import {
   buildMissionWindowLabel,
   buildSegmentedLegDefinitions,
@@ -55,13 +61,20 @@ import {
   toLocationRef,
 } from './beta1-orchestration-leg-service';
 import {
+  applyAIQuoteResponseToCards,
+  buildBeta1BasePricing,
   buildBeta1QuoteCards,
   normalizePackageSize,
   type Beta1QuoteCard,
   type Beta1RequestCreateInput,
 } from './beta1-orchestration-quote-service';
+import { generatePricingQuotesForBeta1Input } from './beta1-ai-service';
 import { getPricingPolicyConfig } from './pricing-policy-config-service';
 import { getRoutePricingOverrideByStations } from './route-pricing-override-service';
+import { getUserActiveRoutes } from './route-service';
+import { getUserById } from './user-service';
+import type { StationInfo as RequestStationInfo } from '../types/request';
+import type { GillerTerritory } from '../types/user';
 export {
   getBeta1AdminSnapshot,
   getBeta1ChatContext,
@@ -76,6 +89,10 @@ export { buildBeta1QuoteCards } from './beta1-orchestration-quote-service';
 export type {
   Beta1QuoteCard,
   Beta1RequestCreateInput,
+} from './beta1-orchestration-quote-service';
+export {
+  applyAIQuoteResponseToCards,
+  buildBeta1BasePricing,
 } from './beta1-orchestration-quote-service';
 export {
   buildSegmentedLegDefinitions,
@@ -118,6 +135,7 @@ type Beta1MissionDoc = {
   assignedGillerUserId?: string;
   originRef?: LocationRef;
   destinationRef?: LocationRef;
+  createdAt?: unknown;
 };
 
 type Beta1MissionBundleDoc = MissionBundle & {
@@ -133,7 +151,171 @@ type Beta1MissionBundleDoc = MissionBundle & {
   selectedGillerUserId?: string;
   requiresExternalPartner?: boolean;
   fallbackDeliveryIds?: string[];
+  createdAt?: unknown;
 };
+
+function normalizeLocationLabel(value?: string | null): string {
+  return String(value ?? '')
+    .trim()
+    .replace(/\s+/g, '')
+    .toLowerCase();
+}
+
+function resolveLocationLabel(ref?: LocationRef | null): string {
+  return normalizeLocationLabel(ref?.stationName ?? ref?.addressText ?? ref?.roadAddress ?? '');
+}
+
+function calculateDistanceMeters(lat1: number, lon1: number, lat2: number, lon2: number): number {
+  const earthRadius = 6371e3;
+  const phi1 = (lat1 * Math.PI) / 180;
+  const phi2 = (lat2 * Math.PI) / 180;
+  const deltaPhi = ((lat2 - lat1) * Math.PI) / 180;
+  const deltaLambda = ((lon2 - lon1) * Math.PI) / 180;
+
+  const a =
+    Math.sin(deltaPhi / 2) * Math.sin(deltaPhi / 2) +
+    Math.cos(phi1) * Math.cos(phi2) * Math.sin(deltaLambda / 2) * Math.sin(deltaLambda / 2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+
+  return earthRadius * c;
+}
+
+function computeTerritoryBonus(
+  territories: GillerTerritory[] | undefined,
+  originRef?: LocationRef,
+  destinationRef?: LocationRef
+): number {
+  if (!territories?.length) {
+    return 0;
+  }
+
+  const points = [originRef, destinationRef].filter((item): item is LocationRef => item != null);
+  if (!points.length) {
+    return 0;
+  }
+
+  let maxBonus = 0;
+
+  territories.forEach((territory, territoryIndex) => {
+    const radiusMeters = Math.max(1, territory.radiusKm) * 1000;
+    let coveredCount = 0;
+
+    points.forEach((point) => {
+      if (typeof point.latitude !== 'number' || typeof point.longitude !== 'number') {
+        return;
+      }
+
+      const distance = calculateDistanceMeters(
+        territory.latitude,
+        territory.longitude,
+        point.latitude,
+        point.longitude
+      );
+
+      if (distance <= radiusMeters) {
+        coveredCount += 1;
+      }
+    });
+
+    let territoryBonus = 0;
+    if (coveredCount >= 2) {
+      territoryBonus = 18;
+    } else if (coveredCount === 1) {
+      territoryBonus = 10;
+    }
+
+    if (territoryIndex === 0 && territoryBonus > 0) {
+      territoryBonus += 4;
+    }
+
+    maxBonus = Math.max(maxBonus, territoryBonus);
+  });
+
+  return maxBonus;
+}
+
+function computeRouteFitBonus(
+  routes: Awaited<ReturnType<typeof getUserActiveRoutes>>,
+  originRef?: LocationRef,
+  destinationRef?: LocationRef
+): number {
+  if (!routes.length) {
+    return 0;
+  }
+
+  const originLabel = resolveLocationLabel(originRef);
+  const destinationLabel = resolveLocationLabel(destinationRef);
+  if (!originLabel && !destinationLabel) {
+    return 0;
+  }
+
+  let bestBonus = 0;
+
+  routes.forEach((route) => {
+    const routeStart = normalizeLocationLabel(route.startStation?.stationName);
+    const routeEnd = normalizeLocationLabel(route.endStation?.stationName);
+
+    const exactForward = originLabel && destinationLabel && routeStart === originLabel && routeEnd === destinationLabel;
+    const exactReverse = originLabel && destinationLabel && routeStart === destinationLabel && routeEnd === originLabel;
+    const startHit = originLabel && (routeStart === originLabel || routeEnd === originLabel);
+    const endHit = destinationLabel && (routeStart === destinationLabel || routeEnd === destinationLabel);
+
+    let bonus = 0;
+    if (exactForward || exactReverse) {
+      bonus = 22;
+    } else if (startHit && endHit) {
+      bonus = 16;
+    } else if (startHit || endHit) {
+      bonus = 8;
+    }
+
+    bestBonus = Math.max(bestBonus, bonus);
+  });
+
+  return bestBonus;
+}
+
+async function rankCandidateGillersForBundle(params: {
+  requestId: string;
+  originRef?: LocationRef;
+  destinationRef?: LocationRef;
+  hasAddressLeg: boolean;
+  topN?: number;
+}): Promise<string[]> {
+  const baseMatches = await findMatchesForRequest(params.requestId, Math.max(5, (params.topN ?? 5) * 2));
+
+  const rescored = await Promise.all(
+    baseMatches.map(async (match) => {
+      const [routes, user] = await Promise.all([
+        getUserActiveRoutes(match.gillerId).catch(() => []),
+        getUserById(match.gillerId).catch(() => null),
+      ]);
+
+      const routeBonus = computeRouteFitBonus(routes, params.originRef, params.destinationRef);
+      const territoryBonus = computeTerritoryBonus(user?.gillerProfile?.territories, params.originRef, params.destinationRef);
+      const gillerType = user?.gillerProfile?.type;
+      const professionalismBonus =
+        params.hasAddressLeg && gillerType === 'master'
+          ? 10
+          : params.hasAddressLeg && gillerType === 'professional'
+            ? 6
+            : !params.hasAddressLeg && gillerType === 'master'
+              ? 4
+              : 0;
+
+      return {
+        gillerId: match.gillerId,
+        totalScore: match.totalScore + routeBonus + territoryBonus + professionalismBonus,
+      };
+    })
+  );
+
+  return rescored
+    .sort((left, right) => right.totalScore - left.totalScore)
+    .map((item) => item.gillerId)
+    .filter((gillerId, index, list) => list.indexOf(gillerId) === index)
+    .slice(0, params.topN ?? 5);
+}
 
 type Beta1AddressDetail = {
   roadAddress?: string;
@@ -207,6 +389,18 @@ function resolveRequestedHour(preferredPickupTime?: string): number {
   return Number.isFinite(hour) ? Math.max(0, Math.min(23, hour)) : new Date().getHours();
 }
 
+function toRequestStationInfo(station: StationInfo): RequestStationInfo {
+  return {
+    id: station.id ?? station.stationId,
+    stationId: station.stationId,
+    stationName: station.stationName,
+    line: station.line ?? '',
+    lineCode: station.lineCode ?? '',
+    lat: station.lat ?? 0,
+    lng: station.lng ?? 0,
+  };
+}
+
 function isPeakHour(hour: number): boolean {
   return (hour >= 7 && hour <= 9) || (hour >= 17 && hour <= 20);
 }
@@ -256,8 +450,44 @@ export async function createBeta1Request(input: Beta1RequestCreateInput): Promis
     deliveryStationId: input.deliveryStation.stationId,
     requestMode: input.requestMode,
   });
-  const quoteCards = buildBeta1QuoteCards(input, pricingPolicy, routeOverride);
-  const selectedCard = quoteCards.find((card) => card.quoteType === input.selectedQuoteType) ?? quoteCards[0];
+  let quoteCards = buildBeta1QuoteCards(input, pricingPolicy, routeOverride);
+  let recommendedQuoteType: Beta1QuoteCard['quoteType'] = input.selectedQuoteType;
+
+  const aiQuoteResponse =
+    input.aiQuoteOverride ??
+    (await (async () => {
+      try {
+        return await generatePricingQuotesForBeta1Input({
+          requesterUserId: input.requesterUserId,
+          pickupStation: toRequestStationInfo(input.pickupStation),
+          deliveryStation: toRequestStationInfo(input.deliveryStation),
+          packageDescription: input.packageDescription,
+          itemValue: input.itemValue,
+          weightKg: input.weightKg,
+          packageSize: normalizePackageSize(input.packageSize),
+          requestMode: input.requestMode,
+          preferredPickupTime: input.preferredPickupTime,
+          preferredArrivalTime: input.preferredArrivalTime,
+          urgency: input.urgency,
+          directParticipationMode: input.directParticipationMode,
+          basePricing: buildBeta1BasePricing(input, pricingPolicy),
+        });
+      } catch (error) {
+        console.error('[orchestration-service] pricing AI fallback to deterministic cards', error);
+        return null;
+      }
+    })());
+
+  if (aiQuoteResponse) {
+    const applied = applyAIQuoteResponseToCards(quoteCards, aiQuoteResponse);
+    quoteCards = applied.quoteCards;
+    recommendedQuoteType = applied.recommendedQuoteType;
+  }
+
+  const selectedCard =
+    quoteCards.find((card) => card.quoteType === input.selectedQuoteType) ??
+    quoteCards.find((card) => card.quoteType === recommendedQuoteType) ??
+    quoteCards[0];
   let requestDraftId = '';
   let selectedQuoteId = '';
 
@@ -405,6 +635,9 @@ export async function createBeta1Request(input: Beta1RequestCreateInput): Promis
     },
     recipientName: input.recipientName,
     recipientPhone: input.recipientPhone,
+    pickupLocationDetail: input.pickupLocationDetail?.trim() || null,
+    storageLocation: input.storageLocation?.trim() || null,
+    specialInstructions: input.specialInstructions?.trim() || null,
     deadline: Timestamp.fromDate(new Date(Date.now() + 1000 * 60 * 120)),
     preferredTime: {
       departureTime: input.preferredPickupTime ?? '지금 바로',
@@ -412,16 +645,26 @@ export async function createBeta1Request(input: Beta1RequestCreateInput): Promis
     },
     pricingContext: {
       requestMode: input.requestMode ?? 'immediate',
-      weather: 'clear',
-      isPeakTime: isPeakHour(requestedHour),
-      isProfessionalPeak: false,
-      nearbyGillerCount: null,
-      requestedHour,
-      urgencyBucket: input.urgency === 'urgent' ? 'urgent' : input.urgency === 'fast' ? 'fast' : 'normal',
+      weather: input.pricingContextOverride?.weather ?? 'clear',
+      isPeakTime: input.pricingContextOverride?.isPeakTime ?? isPeakHour(requestedHour),
+      isProfessionalPeak: input.pricingContextOverride?.isProfessionalPeak ?? false,
+      nearbyGillerCount: input.pricingContextOverride?.nearbyGillerCount ?? null,
+      requestedHour: input.pricingContextOverride?.requestedHour ?? requestedHour,
+      urgencyBucket:
+        input.pricingContextOverride?.urgencyBucket ??
+        (input.urgency === 'urgent' ? 'urgent' : input.urgency === 'fast' ? 'fast' : 'normal'),
     },
     pricingPolicyVersion: pricingPolicy.version,
     requestMode: input.requestMode ?? 'immediate',
     sourceRequestId: input.sourceRequestId ?? null,
+    missionProgress: {
+      acceptedMissionCount: 0,
+      totalMissionCount: 0,
+      partiallyMatched: false,
+      lastBundleId: null,
+      lastMatchedAt: null,
+      rewardBoostAmount: 0,
+    },
     status: 'pending',
     beta1RequestStatus: 'match_pending',
     beta1EngineVersion: 'beta1-v2',
@@ -443,6 +686,11 @@ export async function createBeta1Request(input: Beta1RequestCreateInput): Promis
     requesterId: input.requesterUserId,
     pickupStation: input.pickupStation,
     deliveryStation: input.deliveryStation,
+    pickupLocationDetail: input.pickupLocationDetail?.trim() || null,
+    storageLocation: input.storageLocation?.trim() || null,
+    specialInstructions: input.specialInstructions?.trim() || null,
+    recipientName: input.recipientName,
+    recipientPhone: input.recipientPhone,
     status: 'pending',
     beta1DeliveryStatus: 'created',
     fee: {
@@ -475,6 +723,17 @@ export async function createBeta1Request(input: Beta1RequestCreateInput): Promis
       deliveryAddress,
       deliveryRoadAddress: input.deliveryRoadAddress,
       deliveryDetailAddress: input.deliveryDetailAddress,
+    });
+    await updateDoc(doc(db, 'requests', requestRef.id), {
+      missionProgress: {
+        acceptedMissionCount: 0,
+        totalMissionCount: legDefinitions.length,
+        partiallyMatched: false,
+        lastBundleId: null,
+        lastMatchedAt: null,
+        rewardBoostAmount: 0,
+      },
+      updatedAt: serverTimestamp(),
     });
     const legRewards = splitRewardAcrossLegs(
       Math.max(0, Math.round(selectedCard.pricing.publicPrice * 0.7)),
@@ -616,15 +875,6 @@ export async function bundleMissionsForDelivery(deliveryId: string): Promise<Mis
   const requestId = String(deliveryMissions[0].requestId ?? '');
   const _deliveryData = (deliveryDoc.data() as Record<string, unknown> | undefined) ?? {};
 
-  let candidateGillerUserIds: string[] = [];
-  try {
-    const matches = await findMatchesForRequest(requestId, 5);
-    candidateGillerUserIds = matches.map((match) => match.gillerId);
-  } catch (error) {
-    console.error('[orchestration-service] 매칭 후보 조회 실패:', error);
-    candidateGillerUserIds = [];
-  }
-
   const bundles: MissionBundle[] = [];
   let bundleIndex = 0;
 
@@ -645,6 +895,26 @@ export async function bundleMissionsForDelivery(deliveryId: string): Promise<Mis
         : undefined;
       const title = `${describeLocationRef(firstMission.originRef ?? firstLeg?.originRef ?? { type: 'station' })} -> ${describeLocationRef(lastMission.destinationRef ?? lastLeg?.destinationRef ?? { type: 'station' })}`;
       const summary = legTypes.map((legType) => describeLegType(legType)).join(' · ');
+      let candidateGillerUserIds: string[] = [];
+
+      try {
+        candidateGillerUserIds = await rankCandidateGillersForBundle({
+          requestId,
+          originRef: firstMission.originRef ?? firstLeg?.originRef,
+          destinationRef: lastMission.destinationRef ?? lastLeg?.destinationRef,
+          hasAddressLeg,
+          topN: 5,
+        });
+      } catch (error) {
+        console.error('[orchestration-service] 번들별 매칭 후보 조회 실패:', {
+          requestId,
+          deliveryId,
+          bundleStart: start,
+          bundleEnd: end,
+          error,
+        });
+        candidateGillerUserIds = [];
+      }
 
       bundles.push({
         missionBundleId: `${deliveryId}-bundle-${bundleIndex}`,
@@ -816,15 +1086,29 @@ export async function acceptMissionBundleForGiller(bundleId: string, gillerUserI
     missionBundleId: snapshot.id,
     ...(snapshot.data() as Record<string, unknown>),
   })) as Beta1MissionBundleDoc[];
+  const baseSelectedRewardTotal = selectedMissions.reduce((sum, mission) => sum + Number(mission.currentReward ?? 0), 0);
+  const exposurePricing = getMissionExposurePricing(baseSelectedRewardTotal, bundle.createdAt);
+  const bonusAmount = exposurePricing.bonusAmount;
+  const perMissionBonus =
+    selectedMissions.length > 0 && bonusAmount > 0
+      ? Math.floor(bonusAmount / selectedMissions.length / 100) * 100
+      : 0;
+  const bonusRemainder = selectedMissions.length > 0 ? bonusAmount - perMissionBonus * selectedMissions.length : 0;
 
   await Promise.all(
-    selectedMissions.map((mission) =>
-      updateDoc(doc(db, 'missions', mission.id), {
+    selectedMissions.map((mission, index) => {
+      const rewardBonus = perMissionBonus + (index === 0 ? bonusRemainder : 0);
+      const nextReward = Number(mission.currentReward ?? 0) + rewardBonus;
+
+      return updateDoc(doc(db, 'missions', mission.id), {
         assignedGillerUserId: gillerUserId,
         status: MissionState.ACCEPTED,
+        currentReward: nextReward,
+        recommendedReward: nextReward,
+        minimumReward: Number(mission.currentReward ?? 0),
         updatedAt: serverTimestamp(),
-      })
-    )
+      });
+    })
   );
 
   const selectedLegIds = selectedMissions.map((mission) => String(mission.deliveryLegId ?? ''));
@@ -844,6 +1128,7 @@ export async function acceptMissionBundleForGiller(bundleId: string, gillerUserI
       ...bundle,
       selectedGillerUserId: gillerUserId,
       status: BundleStatus.ACTIVE,
+      rewardTotal: exposurePricing.adjustedReward,
       updatedAt: serverTimestamp(),
     },
     { merge: true }
@@ -930,6 +1215,11 @@ export async function acceptMissionBundleForGiller(bundleId: string, gillerUserI
   }
 
   const coversEntireDelivery = selectedMissions.length === allMissions.length;
+  const acceptedMissionCount = allMissions.filter(
+    (mission) => Boolean(mission.assignedGillerUserId) || selectedLegIds.includes(String(mission.deliveryLegId ?? ''))
+  ).length;
+  const totalMissionCount = allMissions.length;
+  const partiallyMatched = acceptedMissionCount > 0 && acceptedMissionCount < totalMissionCount;
   const deliveryUpdate: Record<string, unknown> = {
     beta1DeliveryStatus: coversEntireDelivery ? 'assigned' : 'created',
     updatedAt: serverTimestamp(),
@@ -944,6 +1234,14 @@ export async function acceptMissionBundleForGiller(bundleId: string, gillerUserI
       matchedGillerId: coversEntireDelivery ? gillerUserId : null,
       status: coversEntireDelivery ? 'accepted' : 'pending',
       beta1RequestStatus: coversEntireDelivery ? 'accepted' : 'match_pending',
+      missionProgress: {
+        acceptedMissionCount,
+        totalMissionCount,
+        partiallyMatched,
+        lastBundleId: bundle.missionBundleId,
+        lastMatchedAt: serverTimestamp(),
+        rewardBoostAmount: bonusAmount,
+      },
       updatedAt: serverTimestamp(),
     });
   }
@@ -961,6 +1259,35 @@ export async function acceptMissionBundleForGiller(bundleId: string, gillerUserI
       )
   );
 
+  const remainingBundles = siblingBundles
+    .filter((candidate) => candidate.missionBundleId !== bundle.missionBundleId)
+    .filter((candidate) => candidate.status === BundleStatus.ACTIVE)
+    .filter((candidate) => (candidate.missionIds ?? []).every((missionId) => !blockedMissionIds.has(missionId)));
+
+  if (partiallyMatched && bundle.requestId) {
+    const pickupStationRecord = (requestData.pickupStation as { stationName?: string } | undefined) ?? {};
+    const deliveryStationRecord = (requestData.deliveryStation as { stationName?: string } | undefined) ?? {};
+    const feeRecord = (requestData.fee as { totalFee?: number } | undefined) ?? {};
+    const remainingCandidateIds = Array.from(
+      new Set(
+        remainingBundles.flatMap((candidate) => candidate.candidateGillerUserIds ?? [])
+      )
+    ).filter((candidateId) => candidateId !== gillerUserId);
+
+    await Promise.all(
+      remainingCandidateIds.map((candidateId) =>
+        sendMissionBundleAvailableNotification(
+          candidateId,
+          bundle.requestId,
+          String(pickupStationRecord.stationName ?? '출발역'),
+          String(deliveryStationRecord.stationName ?? '도착역'),
+          Number(feeRecord.totalFee ?? 0),
+          remainingBundles.length
+        )
+      )
+    );
+  }
+
   if (fallbackDeliveryIds.length > 0) {
     await setDoc(
       bundleRef,
@@ -970,6 +1297,168 @@ export async function acceptMissionBundleForGiller(bundleId: string, gillerUserI
       },
       { merge: true }
     );
+  }
+
+  if (bundle.requestId && requestData.requesterId) {
+    await sendRequestProgressNotification(
+      String(requestData.requesterId),
+      bundle.requestId,
+      acceptedMissionCount,
+      totalMissionCount,
+      coversEntireDelivery
+    );
+  }
+}
+
+export async function releaseMissionBundleForGiller(bundleId: string, gillerUserId: string): Promise<void> {
+  const bundleRef = doc(db, 'mission_bundles', bundleId);
+  const bundleSnapshot = await getDoc(bundleRef);
+  if (!bundleSnapshot.exists()) {
+    throw new Error('Mission bundle not found');
+  }
+
+  const bundle = {
+    missionBundleId: bundleSnapshot.id,
+    ...(bundleSnapshot.data() as Record<string, unknown>),
+  } as Beta1MissionBundleDoc;
+
+  if (bundle.selectedGillerUserId !== gillerUserId) {
+    throw new Error('내가 맡은 미션만 반납할 수 있습니다.');
+  }
+
+  const missionDocs = await Promise.all(
+    (bundle.missionIds ?? []).map(async (missionId) => {
+      const snapshot = await getDoc(doc(db, 'missions', missionId));
+      return snapshot.exists()
+        ? ({ id: snapshot.id, ...(snapshot.data() as Record<string, unknown>) } as Beta1MissionDoc)
+        : null;
+    })
+  );
+  const selectedMissions = missionDocs.filter(Boolean) as Beta1MissionDoc[];
+
+  if (
+    selectedMissions.some((mission) =>
+      ['in_progress', 'arrival_pending', 'handover_pending', 'completed'].includes(String(mission.status ?? ''))
+    )
+  ) {
+    throw new Error('이미 진행된 구간은 반납할 수 없습니다.');
+  }
+
+  const legSnapshots = await Promise.all(
+    selectedMissions.map((mission) => getDoc(doc(db, 'delivery_legs', String(mission.deliveryLegId ?? ''))))
+  );
+  const selectedLegs = legSnapshots
+    .filter((snapshot) => snapshot.exists())
+    .map((snapshot) => ({ id: snapshot.id, ...(snapshot.data() as Record<string, unknown>) }) as Beta1LegDoc);
+
+  await Promise.all(
+    selectedMissions.map((mission) =>
+      updateDoc(doc(db, 'missions', mission.id), {
+        assignedGillerUserId: deleteField(),
+        status: MissionState.QUEUED,
+        updatedAt: serverTimestamp(),
+      })
+    )
+  );
+
+  await Promise.all(
+    selectedLegs.map((leg) =>
+      updateDoc(doc(db, 'delivery_legs', leg.deliveryLegId), {
+        actorType: requiresAddressHandling(leg.legType) ? 'external_partner' : 'giller',
+        status: DeliveryLegStatus.READY,
+        updatedAt: serverTimestamp(),
+      })
+    )
+  );
+
+  await setDoc(
+    bundleRef,
+    {
+      selectedGillerUserId: deleteField(),
+      updatedAt: serverTimestamp(),
+    },
+    { merge: true }
+  );
+
+  const siblingBundleSnapshots = await getDocs(query(collection(db, 'mission_bundles'), where('deliveryId', '==', bundle.deliveryId)));
+  const siblingBundles = siblingBundleSnapshots.docs.map((snapshot) => ({
+    missionBundleId: snapshot.id,
+    ...(snapshot.data() as Record<string, unknown>),
+  })) as Beta1MissionBundleDoc[];
+
+  await Promise.all(
+    siblingBundles
+      .filter((candidate) => (candidate.missionIds ?? []).some((missionId) => (bundle.missionIds ?? []).includes(missionId)))
+      .map((candidate) =>
+        updateDoc(doc(db, 'mission_bundles', candidate.missionBundleId), {
+          status: BundleStatus.ACTIVE,
+          updatedAt: serverTimestamp(),
+        })
+      )
+  );
+
+  const allMissionSnapshots = await getDocs(query(collection(db, 'missions'), where('deliveryId', '==', bundle.deliveryId)));
+  const allMissions = allMissionSnapshots.docs.map((snapshot) => ({
+    id: snapshot.id,
+    ...(snapshot.data() as Record<string, unknown>),
+  })) as Beta1MissionDoc[];
+  const acceptedMissionCount = allMissions.filter((mission) => Boolean(mission.assignedGillerUserId)).length;
+  const totalMissionCount = allMissions.length;
+  const coversEntireDelivery = acceptedMissionCount === totalMissionCount && totalMissionCount > 0;
+  const partiallyMatched = acceptedMissionCount > 0 && acceptedMissionCount < totalMissionCount;
+  const requestSnapshot = bundle.requestId ? await getDoc(doc(db, 'requests', bundle.requestId)) : null;
+  const requestData = (requestSnapshot?.data() as Record<string, unknown> | undefined) ?? {};
+
+  await updateDoc(doc(db, 'deliveries', bundle.deliveryId), {
+    gillerId: coversEntireDelivery ? gillerUserId : deleteField(),
+    beta1DeliveryStatus: coversEntireDelivery ? 'assigned' : 'created',
+    updatedAt: serverTimestamp(),
+  });
+
+  if (bundle.requestId) {
+    await updateDoc(doc(db, 'requests', bundle.requestId), {
+      matchedGillerId: coversEntireDelivery ? gillerUserId : deleteField(),
+      status: coversEntireDelivery ? 'accepted' : 'pending',
+      beta1RequestStatus: coversEntireDelivery ? 'accepted' : 'match_pending',
+      missionProgress: {
+        acceptedMissionCount,
+        totalMissionCount,
+        partiallyMatched,
+        lastBundleId: bundle.missionBundleId,
+        lastMatchedAt: serverTimestamp(),
+        rewardBoostAmount: 0,
+      },
+      updatedAt: serverTimestamp(),
+    });
+  }
+
+  if (bundle.requestId) {
+    const pickupStationRecord = (requestData.pickupStation as { stationName?: string } | undefined) ?? {};
+    const deliveryStationRecord = (requestData.deliveryStation as { stationName?: string } | undefined) ?? {};
+    const feeRecord = (requestData.fee as { totalFee?: number } | undefined) ?? {};
+    const reactivatedBundles = siblingBundles.filter((candidate) => candidate.status === BundleStatus.ACTIVE);
+    const candidateIds = Array.from(
+      new Set(
+        reactivatedBundles.flatMap((candidate) => candidate.candidateGillerUserIds ?? [])
+      )
+    ).filter((candidateId) => candidateId !== gillerUserId);
+
+    await Promise.all(
+      candidateIds.map((candidateId) =>
+        sendMissionBundleAvailableNotification(
+          candidateId,
+          bundle.requestId!,
+          String(pickupStationRecord.stationName ?? '출발역'),
+          String(deliveryStationRecord.stationName ?? '도착역'),
+          Number(feeRecord.totalFee ?? 0),
+          reactivatedBundles.length
+        )
+      )
+    );
+
+    if (requestData.requesterId) {
+      await sendMissionReturnedNotification(String(requestData.requesterId), bundle.requestId);
+    }
   }
 }
 

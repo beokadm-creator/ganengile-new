@@ -50,6 +50,9 @@ export type MainStackParamList = {
           photoRefs?: string[];
           recipientName?: string;
           recipientPhone?: string;
+          pickupLocationDetail?: string;
+          storageLocation?: string;
+          specialInstructions?: string;
           urgency?: 'normal' | 'fast' | 'urgent';
           directParticipationMode?: 'none' | 'requester_to_station' | 'locker_assisted';
           preferredPickupTime?: string;
@@ -72,6 +75,13 @@ export type MainStackParamList = {
   };
   DeliveryCompletion: {
     deliveryId: string;
+  };
+  ProfessionalMissionBridge: {
+    missionTitle: string;
+    missionWindow?: string;
+    reason?: string;
+    requestId?: string;
+    deliveryId?: string;
   };
   Rating: {
     deliveryId: string;

@@ -22,9 +22,20 @@ import NearbyStationRecommendationsModal, {
 import TimePicker from '../../components/common/TimePicker';
 import { OptimizedStationSelectModal } from '../../components/OptimizedStationSelectModal';
 import { useUser } from '../../contexts/UserContext';
-import { analyzeRequestDraftWithAI, type Beta1AIAnalysisResponse } from '../../services/beta1-ai-service';
+import {
+  analyzeRequestDraftWithAI,
+  generatePricingQuotesForBeta1Input,
+  type Beta1AIAnalysisResponse,
+  type Beta1AIQuoteResponse,
+} from '../../services/beta1-ai-service';
 import { geocodeRoadAddress } from '../../services/address-geocode-service';
-import { buildBeta1QuoteCards, createBeta1Request, type Beta1QuoteCard } from '../../services/beta1-orchestration-service';
+import {
+  buildBeta1BasePricing,
+  buildBeta1QuoteCards,
+  applyAIQuoteResponseToCards,
+  createBeta1Request,
+  type Beta1QuoteCard,
+} from '../../services/beta1-orchestration-service';
 import {
   getAllStations,
   getRecipientContactPrivacyConfig,
@@ -35,6 +46,7 @@ import { locationService } from '../../services/location-service';
 import { confirmPhoneOtp, requestPhoneOtp } from '../../services/otp-service';
 import { pickPhotoFromLibrary, takePhoto, uploadPhotoWithThumbnail } from '../../services/photo-service';
 import { getPricingPolicyConfig } from '../../services/pricing-policy-config-service';
+import { resolvePricingContextForRequest } from '../../services/pricing-context-service';
 import { getRoutePricingOverrideByStations } from '../../services/route-pricing-override-service';
 import { addRecentAddress, getRecentAddresses, getSavedAddresses } from '../../services/profile-service';
 import { BorderRadius, Colors, Shadows, Spacing, Typography } from '../../theme';
@@ -49,6 +61,7 @@ import {
   type CreateRequestDraft,
 } from '../../utils/draft-storage';
 import type { SharedPricingPolicyConfig } from '../../../shared/pricing-policy';
+import type { RequestPricingContext } from '../../types/request';
 
 type LocationMode = 'station' | 'address';
 type PackageSize = 'small' | 'medium' | 'large' | 'xl';
@@ -213,6 +226,9 @@ function hasDraftableContent(input: {
   packageDescription: string;
   recipientName: string;
   recipientPhone: string;
+  pickupLocationDetail: string;
+  storageLocation: string;
+  specialInstructions: string;
   itemValue: string;
   preferredPickupDate: string;
   preferredPickupTime: string;
@@ -229,6 +245,9 @@ function hasDraftableContent(input: {
       input.packageDescription.trim() ||
       input.recipientName.trim() ||
       input.recipientPhone.trim() ||
+      input.pickupLocationDetail.trim() ||
+      input.storageLocation.trim() ||
+      input.specialInstructions.trim() ||
       input.itemValue.trim() ||
       input.preferredPickupDate.trim() ||
       input.preferredPickupTime.trim()
@@ -360,6 +379,8 @@ export default function CreateRequestScreen({ navigation, route }: Props) {
   const [photoUrl, setPhotoUrl] = useState<string | null>(prefill?.photoRefs?.[0] ?? null);
   const [photoRefs, setPhotoRefs] = useState<string[]>(prefill?.photoRefs ?? []);
   const [aiResult, setAiResult] = useState<Beta1AIAnalysisResponse | null>(null);
+  const [aiQuoteResponse, setAiQuoteResponse] = useState<Beta1AIQuoteResponse | null>(null);
+  const [aiQuotesLoading, setAiQuotesLoading] = useState(false);
 
   const [requestMode, setRequestMode] = useState<'immediate' | 'reservation'>(
     params?.mode === 'reservation' ? 'reservation' : 'immediate'
@@ -372,6 +393,9 @@ export default function CreateRequestScreen({ navigation, route }: Props) {
   const [itemValue, setItemValue] = useState(prefill?.itemValue ? String(prefill.itemValue) : '');
   const [recipientName, setRecipientName] = useState(prefill?.recipientName ?? '');
   const [recipientPhone, setRecipientPhone] = useState(prefill?.recipientPhone ?? '');
+  const [pickupLocationDetail, setPickupLocationDetail] = useState(prefill?.pickupLocationDetail ?? '');
+  const [storageLocation, setStorageLocation] = useState(prefill?.storageLocation ?? '');
+  const [specialInstructions, setSpecialInstructions] = useState(prefill?.specialInstructions ?? '');
   const [directMode, setDirectMode] = useState<'none' | 'requester_to_station' | 'locker_assisted'>(
     prefill?.directParticipationMode ?? 'none'
   );
@@ -401,6 +425,9 @@ export default function CreateRequestScreen({ navigation, route }: Props) {
   const draftHydratedRef = useRef(false);
   const draftSaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const depositPhotoNoticeShownRef = useRef(false);
+  const quoteSelectionTouchedRef = useRef(false);
+  const aiQuoteTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const aiQuoteRequestIdRef = useRef(0);
 
   useEffect(() => {
     const run = async () => {
@@ -481,6 +508,9 @@ export default function CreateRequestScreen({ navigation, route }: Props) {
         setItemValue(draft.itemValue);
         setRecipientName(draft.recipientName);
         setRecipientPhone(draft.recipientPhone);
+        setPickupLocationDetail(draft.pickupLocationDetail);
+        setStorageLocation(draft.storageLocation);
+        setSpecialInstructions(draft.specialInstructions);
         setDirectMode(draft.directMode);
         setUrgency(draft.urgency);
         setPreferredPickupDate(draft.preferredPickupDate);
@@ -525,6 +555,7 @@ export default function CreateRequestScreen({ navigation, route }: Props) {
       : preferredPickupTime || 'now';
   const [pricingPolicy, setPricingPolicy] = useState<SharedPricingPolicyConfig | null>(null);
   const [routeOverride, setRouteOverride] = useState<Awaited<ReturnType<typeof getRoutePricingOverrideByStations>>>(null);
+  const [pricingContext, setPricingContext] = useState<RequestPricingContext | null>(null);
 
   useEffect(() => {
     void getPricingPolicyConfig().then(setPricingPolicy).catch((error) => {
@@ -548,7 +579,7 @@ export default function CreateRequestScreen({ navigation, route }: Props) {
     });
   }, [deliveryStation?.stationId, pickupStation?.stationId, requestMode]);
 
-  const quotes = useMemo(() => {
+  const deterministicQuotes = useMemo(() => {
     const origin = pickupStation ?? stations[0] ?? fallbackStation('pickup');
     const destination = deliveryStation ?? stations[1] ?? fallbackStation('delivery');
 
@@ -572,11 +603,15 @@ export default function CreateRequestScreen({ navigation, route }: Props) {
       itemValue: Number(itemValue || 0),
       recipientName: recipientName || '수령인',
       recipientPhone: recipientPhone || '010-0000-0000',
+      pickupLocationDetail: pickupLocationDetail || undefined,
+      storageLocation: storageLocation || undefined,
+      specialInstructions: specialInstructions || undefined,
       urgency: requestMode === 'reservation' ? 'normal' : urgency,
-      selectedQuoteType,
+      selectedQuoteType: 'balanced',
       directParticipationMode: directMode,
       preferredPickupTime: resolvedPreferredPickupTime,
       preferredArrivalTime: desiredArrivalSchedule,
+      pricingContextOverride: pricingContext ?? undefined,
       aiAnalysisOverride: aiResult
         ? {
             provider: aiResult.provider,
@@ -608,15 +643,195 @@ export default function CreateRequestScreen({ navigation, route }: Props) {
     itemValue,
     recipientName,
     recipientPhone,
+    pickupLocationDetail,
+    storageLocation,
+    specialInstructions,
     urgency,
-    selectedQuoteType,
     directMode,
     resolvedPreferredPickupTime,
     desiredArrivalSchedule,
     aiResult,
+    pricingContext,
     pricingPolicy,
     routeOverride,
   ]);
+
+  const quotes = useMemo(() => {
+    if (!aiQuoteResponse) {
+      return deterministicQuotes;
+    }
+
+    return applyAIQuoteResponseToCards(deterministicQuotes, aiQuoteResponse).quoteCards;
+  }, [aiQuoteResponse, deterministicQuotes]);
+
+  useEffect(() => {
+    if (!user?.uid || !pricingPolicy || !pickupStation || !deliveryStation) {
+      setAiQuoteResponse(null);
+      setAiQuotesLoading(false);
+      return;
+    }
+
+    if (aiQuoteTimerRef.current) {
+      clearTimeout(aiQuoteTimerRef.current);
+    }
+
+    aiQuoteTimerRef.current = setTimeout(() => {
+      const requestId = aiQuoteRequestIdRef.current + 1;
+      aiQuoteRequestIdRef.current = requestId;
+
+      const run = async () => {
+        try {
+          setAiQuotesLoading(true);
+          const response = await generatePricingQuotesForBeta1Input({
+            requesterUserId: user.uid,
+            pickupStation: toStationInfo(pickupStation),
+            deliveryStation: toStationInfo(deliveryStation),
+            packageDescription: packageDescription || '물품 설명',
+            itemValue: Number(itemValue || 0),
+            weightKg: Math.max(0.1, Number(weightKg || 0)),
+            packageSize,
+            requestMode,
+            preferredPickupTime: resolvedPreferredPickupTime,
+            preferredArrivalTime: desiredArrivalSchedule,
+            urgency: requestMode === 'reservation' ? 'normal' : urgency,
+            directParticipationMode: directMode,
+            basePricing: buildBeta1BasePricing(
+              {
+                requesterUserId: user.uid,
+                requestMode,
+                originType: pickupMode,
+                destinationType: deliveryMode,
+                pickupStation: toStationInfo(pickupStation),
+                deliveryStation: toStationInfo(deliveryStation),
+                pickupRoadAddress: pickupRoadAddress || undefined,
+                pickupDetailAddress: pickupDetailAddress || undefined,
+                deliveryRoadAddress: deliveryRoadAddress || undefined,
+                deliveryDetailAddress: deliveryDetailAddress || undefined,
+                selectedPhotoIds: photoRefs,
+                packageItemName: packageItemName || undefined,
+                packageCategory: packageCategory || undefined,
+                packageDescription: packageDescription || '물품 설명',
+                packageSize,
+                weightKg: Math.max(0.1, Number(weightKg || 0)),
+                itemValue: Number(itemValue || 0),
+                recipientName: recipientName || '수령인',
+                recipientPhone: recipientPhone || '010-0000-0000',
+                pickupLocationDetail: pickupLocationDetail || undefined,
+                storageLocation: storageLocation || undefined,
+                specialInstructions: specialInstructions || undefined,
+                urgency: requestMode === 'reservation' ? 'normal' : urgency,
+                selectedQuoteType: 'balanced',
+                directParticipationMode: directMode,
+                preferredPickupTime: resolvedPreferredPickupTime,
+                preferredArrivalTime: desiredArrivalSchedule,
+                pricingContextOverride: pricingContext ?? undefined,
+              },
+              pricingPolicy
+            ),
+          });
+
+          if (aiQuoteRequestIdRef.current !== requestId) {
+            return;
+          }
+
+          setAiQuoteResponse(response);
+
+          if (!quoteSelectionTouchedRef.current) {
+            const applied = applyAIQuoteResponseToCards(deterministicQuotes, response);
+            setSelectedQuoteType(applied.recommendedQuoteType);
+          }
+        } catch (error) {
+          console.error('Failed to generate AI pricing quotes', error);
+          if (aiQuoteRequestIdRef.current === requestId) {
+            setAiQuoteResponse(null);
+          }
+        } finally {
+          if (aiQuoteRequestIdRef.current === requestId) {
+            setAiQuotesLoading(false);
+          }
+        }
+      };
+
+      void run();
+    }, 500);
+
+    return () => {
+      aiQuoteRequestIdRef.current += 1;
+      if (aiQuoteTimerRef.current) {
+        clearTimeout(aiQuoteTimerRef.current);
+      }
+    };
+  }, [
+    user?.uid,
+    pricingPolicy,
+    pickupStation,
+    deliveryStation,
+    packageDescription,
+    itemValue,
+    weightKg,
+    packageSize,
+    requestMode,
+    resolvedPreferredPickupTime,
+    desiredArrivalSchedule,
+    urgency,
+    directMode,
+    pricingContext,
+    pickupMode,
+    deliveryMode,
+    pickupRoadAddress,
+    pickupDetailAddress,
+    deliveryRoadAddress,
+    deliveryDetailAddress,
+    photoRefs,
+    packageItemName,
+    packageCategory,
+    recipientName,
+    recipientPhone,
+    pickupLocationDetail,
+    storageLocation,
+    specialInstructions,
+    deterministicQuotes,
+  ]);
+
+  useEffect(() => {
+    if (!pickupStation || !deliveryStation) {
+      setPricingContext(null);
+      return;
+    }
+
+    let cancelled = false;
+
+    const run = async () => {
+      try {
+        const nextContext = await resolvePricingContextForRequest({
+          pickupStationName: pickupStation.stationName,
+          deliveryStationName: deliveryStation.stationName,
+          pickupLat: toStationInfo(pickupStation).lat,
+          pickupLng: toStationInfo(pickupStation).lng,
+          deliveryLat: toStationInfo(deliveryStation).lat,
+          deliveryLng: toStationInfo(deliveryStation).lng,
+          preferredPickupTime: resolvedPreferredPickupTime,
+          requestMode,
+          urgency: requestMode === 'reservation' ? 'normal' : urgency,
+        });
+
+        if (!cancelled) {
+          setPricingContext(nextContext);
+        }
+      } catch (error) {
+        console.error('Failed to resolve pricing context', error);
+        if (!cancelled) {
+          setPricingContext(null);
+        }
+      }
+    };
+
+    void run();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [deliveryStation, pickupStation, requestMode, resolvedPreferredPickupTime, urgency]);
 
   const hasItemValue = Number(itemValue || 0) > 0;
 
@@ -633,6 +848,10 @@ export default function CreateRequestScreen({ navigation, route }: Props) {
       depositPhotoNoticeShownRef.current = false;
     }
   }, [hasItemValue, photoRefs.length]);
+
+  useEffect(() => {
+    quoteSelectionTouchedRef.current = false;
+  }, [requestMode, pickupStation?.stationId, deliveryStation?.stationId]);
 
   const submitDisabled =
     !user?.uid ||
@@ -672,6 +891,7 @@ export default function CreateRequestScreen({ navigation, route }: Props) {
   }, [
     user?.uid, isOnboardingComplete, pickupStation, deliveryStation,
     photoRefs.length, hasItemValue, packageDescription, recipientName, recipientPhone,
+    pickupLocationDetail, storageLocation, specialInstructions,
     pickupMode, pickupRoadAddress, pickupDetailAddress,
     deliveryMode, deliveryRoadAddress, deliveryDetailAddress,
     isPhoneVerified, recipientPrivacyConfig.thirdPartyConsentRequired, recipientConsentChecked,
@@ -700,6 +920,9 @@ export default function CreateRequestScreen({ navigation, route }: Props) {
       itemValue,
       recipientName,
       recipientPhone,
+      pickupLocationDetail,
+      storageLocation,
+      specialInstructions,
       urgency,
       directMode,
       preferredPickupDate,
@@ -731,6 +954,9 @@ export default function CreateRequestScreen({ navigation, route }: Props) {
           packageDescription,
           recipientName,
           recipientPhone,
+          pickupLocationDetail,
+          storageLocation,
+          specialInstructions,
           itemValue,
           preferredPickupDate,
           preferredPickupTime,
@@ -772,6 +998,9 @@ export default function CreateRequestScreen({ navigation, route }: Props) {
     itemValue,
     recipientName,
     recipientPhone,
+    pickupLocationDetail,
+    storageLocation,
+    specialInstructions,
     urgency,
     directMode,
     preferredPickupDate,
@@ -801,6 +1030,9 @@ export default function CreateRequestScreen({ navigation, route }: Props) {
         packageDescription,
         recipientName,
         recipientPhone,
+        pickupLocationDetail,
+        storageLocation,
+        specialInstructions,
         itemValue,
         preferredPickupDate,
         preferredPickupTime,
@@ -1162,6 +1394,9 @@ export default function CreateRequestScreen({ navigation, route }: Props) {
         itemValue: Number(itemValue || 0),
         recipientName,
         recipientPhone,
+        pickupLocationDetail: pickupLocationDetail || undefined,
+        storageLocation: storageLocation || undefined,
+        specialInstructions: specialInstructions || undefined,
         urgency: requestMode === 'reservation' ? 'normal' : urgency,
         selectedQuoteType,
         directParticipationMode: directMode,
@@ -1176,6 +1411,8 @@ export default function CreateRequestScreen({ navigation, route }: Props) {
               result: aiResult.result,
             }
           : undefined,
+        aiQuoteOverride: aiQuoteResponse ?? undefined,
+        pricingContextOverride: pricingContext ?? undefined,
       });
 
       const selected = result.quoteCards.find((card) => card.quoteType === selectedQuoteType) ?? result.quoteCards[0];
@@ -1506,7 +1743,35 @@ export default function CreateRequestScreen({ navigation, route }: Props) {
           </View>
         </Block>
 
-        <Block title="수령인 정보">
+        <Block title="인계와 수령 정보">
+          <TextInput
+            style={styles.input}
+            value={pickupLocationDetail}
+            onChangeText={setPickupLocationDetail}
+            placeholder={
+              directMode === 'requester_to_station'
+                ? '만날 위치 안내'
+                : '픽업 위치 안내'
+            }
+            placeholderTextColor={Colors.gray400}
+          />
+          {directMode === 'locker_assisted' ? (
+            <TextInput
+              style={styles.input}
+              value={storageLocation}
+              onChangeText={setStorageLocation}
+              placeholder="사물함 위치 또는 번호"
+              placeholderTextColor={Colors.gray400}
+            />
+          ) : null}
+          <TextInput
+            style={[styles.input, styles.multilineInput]}
+            value={specialInstructions}
+            onChangeText={setSpecialInstructions}
+            placeholder="추가 요청사항"
+            placeholderTextColor={Colors.gray400}
+            multiline
+          />
           <TextInput
             style={styles.input}
             value={recipientName}
@@ -1631,12 +1896,16 @@ export default function CreateRequestScreen({ navigation, route }: Props) {
           <TouchableOpacity
             key={card.quoteType}
             style={[styles.quoteCard, selectedQuoteType === card.quoteType && styles.quoteCardSelected]}
-            onPress={() => setSelectedQuoteType(card.quoteType)}
+            onPress={() => {
+              quoteSelectionTouchedRef.current = true;
+              setSelectedQuoteType(card.quoteType);
+            }}
           >
             <View style={styles.quoteHeader}>
               <View style={styles.quoteTextWrap}>
                 <Text style={styles.quoteLabel}>{card.label}</Text>
                 <Text style={styles.quoteHeadline}>{card.headline}</Text>
+                {aiQuotesLoading ? <Text style={styles.quoteEngineHint}>추천 엔진 반영 중</Text> : null}
                 <Text style={styles.muted}>{card.recommendationReason}</Text>
               </View>
               <View style={styles.quotePriceWrap}>
@@ -1937,6 +2206,11 @@ const styles = StyleSheet.create({
     color: Colors.textSecondary,
     ...Typography.caption,
   },
+  multilineInput: {
+    minHeight: 92,
+    textAlignVertical: 'top',
+    paddingTop: Spacing.md,
+  },
   noticeBox: {
     gap: 6,
     borderRadius: BorderRadius.lg,
@@ -2045,6 +2319,11 @@ const styles = StyleSheet.create({
   quoteHeadline: {
     color: Colors.textPrimary,
     ...Typography.bodySmall,
+  },
+  quoteEngineHint: {
+    color: Colors.primary,
+    fontSize: Typography.fontSize.xs,
+    fontWeight: '700',
   },
   quotePriceWrap: {
     alignItems: 'flex-end',

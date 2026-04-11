@@ -2,72 +2,31 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useNavigation, useRoute, type RouteProp } from '@react-navigation/native';
+import { deliveryPartnerService } from '../../services/delivery-partner-service';
 import { getRequestById, subscribeToRequest } from '../../services/request-service';
+import { getRequesterStatusBody, getRequesterStatusLabel } from '../../services/request-status-presentation-service';
 import { BorderRadius, Colors, Shadows, Spacing, Typography } from '../../theme';
 import type { MainStackNavigationProp, MainStackParamList } from '../../types/navigation';
 import { RequestStatus, type Request } from '../../types/request';
 
-function getStatusLabel(status?: RequestStatus): string {
-  switch (status) {
-    case RequestStatus.MATCHED:
-      return '매칭 응답 대기';
-    case RequestStatus.ACCEPTED:
-      return '배송 준비 중';
-    case RequestStatus.IN_TRANSIT:
-      return '배송 이동 중';
-    case RequestStatus.ARRIVED:
-    case RequestStatus.AT_LOCKER:
-      return '인계 진행 중';
-    case RequestStatus.DELIVERED:
-      return '수령 확인 대기';
-    case RequestStatus.COMPLETED:
-      return '배송 완료';
-    case RequestStatus.CANCELLED:
-      return '요청 취소';
-    case RequestStatus.PENDING:
-    default:
-      return '매칭 시작';
-  }
-}
-
-function getStatusBody(request: Request | null): string {
-  if (!request) {
-    return '요청을 저장했고, 연결 상태를 불러오는 중입니다.';
+function formatStageTime(value?: Request['acceptedAt'] | Request['pickedUpAt'] | Request['arrivedAt'] | Request['deliveredAt']) {
+  if (!value) {
+    return null;
   }
 
-  if (request.status === RequestStatus.PENDING && request.beta1RequestStatus === 'match_pending') {
-    return '주변 길러와 배송 파트너를 찾고 있습니다.';
+  const maybeTimestamp = value as unknown as { toDate?: () => Date };
+  const resolved = typeof maybeTimestamp.toDate === 'function' ? maybeTimestamp.toDate() : new Date(value as unknown as Date);
+
+  if (!(resolved instanceof Date) || Number.isNaN(resolved.getTime())) {
+    return null;
   }
 
-  if (request.status === RequestStatus.MATCHED) {
-    return '응답 가능한 수행자를 찾았고 수락을 기다리는 중입니다.';
-  }
-
-  if (request.status === RequestStatus.ACCEPTED) {
-    return '배송 준비가 시작되었습니다.';
-  }
-
-  if (request.status === RequestStatus.IN_TRANSIT) {
-    return '실제 배송이 진행 중입니다.';
-  }
-
-  if (request.status === RequestStatus.ARRIVED || request.status === RequestStatus.AT_LOCKER) {
-    return '도착 후 인계 절차가 진행 중입니다.';
-  }
-
-  if (request.status === RequestStatus.DELIVERED) {
-    return '전달이 끝났고 수령 확인만 남았습니다.';
-  }
-
-  if (request.status === RequestStatus.COMPLETED) {
-    return '요청이 정상적으로 완료되었습니다.';
-  }
-
-  if (request.status === RequestStatus.CANCELLED) {
-    return '취소 처리된 요청입니다.';
-  }
-
-  return '요청 상세에서 최신 상태를 확인할 수 있습니다.';
+  return resolved.toLocaleString('ko-KR', {
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+  });
 }
 
 export default function RequestConfirmationScreen() {
@@ -76,14 +35,23 @@ export default function RequestConfirmationScreen() {
   const { requestId, pickupStationName, deliveryStationName, deliveryFee } = route.params;
   const [request, setRequest] = useState<Request | null>(null);
   const [loading, setLoading] = useState(true);
+  const [partnerDispatches, setPartnerDispatches] = useState<
+    Array<{
+      dispatchId: string;
+      partnerName: string;
+      status: string;
+      dispatchMethod: string;
+      updatedAt: Date;
+    }>
+  >([]);
 
   const routeLabel =
     pickupStationName && deliveryStationName
       ? `${pickupStationName} -> ${deliveryStationName}`
       : '경로는 다음 화면에서 확인할 수 있습니다.';
   const currentStatus = request?.status;
-  const statusLabel = getStatusLabel(request?.status);
-  const statusBody = getStatusBody(request);
+  const statusLabel = getRequesterStatusLabel(request?.status);
+  const statusBody = getRequesterStatusBody(request);
   const canTrack =
     Boolean(request?.primaryDeliveryId) &&
     Boolean(currentStatus) &&
@@ -100,11 +68,23 @@ export default function RequestConfirmationScreen() {
     void (async () => {
       const current = await getRequestById(requestId).catch(() => null);
       setRequest(current);
+      const dispatchSummary = await deliveryPartnerService.getDispatchSummary({
+        requestId,
+        ...(current?.primaryDeliveryId ? { deliveryId: current.primaryDeliveryId } : {}),
+      }).catch(() => []);
+      setPartnerDispatches(dispatchSummary);
       setLoading(false);
     })();
 
     const unsubscribe = subscribeToRequest(requestId, (nextRequest) => {
       setRequest(nextRequest);
+      void deliveryPartnerService
+        .getDispatchSummary({
+          requestId,
+          ...(nextRequest?.primaryDeliveryId ? { deliveryId: nextRequest.primaryDeliveryId } : {}),
+        })
+        .then(setPartnerDispatches)
+        .catch(() => setPartnerDispatches([]));
       setLoading(false);
     });
 
@@ -125,6 +105,13 @@ export default function RequestConfirmationScreen() {
     }),
     [deliveryFee, request]
   );
+  const missionProgressLabel = request?.missionProgress
+    ? `${request.missionProgress.acceptedMissionCount}/${request.missionProgress.totalMissionCount} 구간 연결`
+    : null;
+  const acceptedAtLabel = formatStageTime(request?.acceptedAt);
+  const pickedUpAtLabel = formatStageTime(request?.pickedUpAt);
+  const arrivedAtLabel = formatStageTime(request?.arrivedAt);
+  const deliveredAtLabel = formatStageTime(request?.deliveredAt);
 
   return (
     <View style={styles.container}>
@@ -150,6 +137,7 @@ export default function RequestConfirmationScreen() {
               <StepRow label="요청" body={stepState.draft ? '등록 완료' : '확인 중'} />
               <StepRow label="견적" body={stepState.quote ? '확정됨' : '준비 중'} />
               <StepRow label="배송" body={stepState.delivery ? (stepState.moving ? '진행 중' : '연결됨') : '연결 대기'} />
+              {missionProgressLabel ? <StepRow label="구간" body={missionProgressLabel} /> : null}
             </View>
           )}
         </View>
@@ -169,6 +157,11 @@ export default function RequestConfirmationScreen() {
           <InfoRow label="경로" value={routeLabel} />
           <InfoRow label="요청 ID" value={requestId} mono />
           {request?.recipientName ? <InfoRow label="수령인" value={request.recipientName} /> : null}
+          {missionProgressLabel ? <InfoRow label="구간 진행" value={missionProgressLabel} /> : null}
+          {acceptedAtLabel ? <InfoRow label="수락" value={acceptedAtLabel} /> : null}
+          {pickedUpAtLabel ? <InfoRow label="인수" value={pickedUpAtLabel} /> : null}
+          {arrivedAtLabel ? <InfoRow label="도착" value={arrivedAtLabel} /> : null}
+          {deliveredAtLabel ? <InfoRow label="전달" value={deliveredAtLabel} /> : null}
           {deliveryFee ? (
             <>
               <InfoRow label="제안 금액" value={`${deliveryFee.totalFee.toLocaleString()}원`} />
@@ -176,6 +169,19 @@ export default function RequestConfirmationScreen() {
             </>
           ) : null}
         </View>
+
+        {partnerDispatches.length > 0 ? (
+          <View style={styles.card}>
+            <Text style={styles.cardTitle}>업체 위임 상태</Text>
+            {partnerDispatches.slice(0, 2).map((item) => (
+              <InfoRow
+                key={item.dispatchId}
+                label={item.partnerName}
+                value={`${item.status} · ${item.dispatchMethod}`}
+              />
+            ))}
+          </View>
+        ) : null}
 
         <View style={styles.noticeCard}>
           <Text style={styles.noticeTitle}>참고</Text>

@@ -173,13 +173,13 @@ export default function HomeScreen({ navigation }: { navigation: MainStackNaviga
               <ActionCard
                 icon="pedal-bike"
                 title="미션 보드 보기"
-                subtitle="받을 미션 확인"
+                subtitle="지금 할 미션 확인"
                 onPress={() => navigation.navigate('Tabs', { screen: 'GillerRequests' })}
               />
               <ActionCard
                 icon="alt-route"
                 title="경로 관리"
-                subtitle="이동 동선 설정"
+                subtitle="권역과 동선 설정"
                 onPress={() => navigation.navigate('Tabs', { screen: 'RouteManagement' })}
               />
             </>
@@ -259,7 +259,7 @@ export default function HomeScreen({ navigation }: { navigation: MainStackNaviga
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>내 미션</Text>
           {(snapshot?.missionCards ?? []).length ? (
-            snapshot?.missionCards.map((card) => (
+            snapshot?.missionCards.slice(0, 3).map((card, index) => (
               <TouchableOpacity
                 key={card.id}
                 style={styles.boardCard}
@@ -269,6 +269,7 @@ export default function HomeScreen({ navigation }: { navigation: MainStackNaviga
                   <Text style={styles.boardTitle}>{card.title}</Text>
                   <StatusPill label={card.status} tone="mission" />
                 </View>
+                <Text style={styles.boardHint}>{index === 0 ? '지금 먼저 볼 미션' : '이어서 볼 미션'}</Text>
                 <Text style={styles.boardMeta}>{card.windowLabel}</Text>
                 <Text style={styles.rewardText}>{card.rewardLabel}</Text>
 
@@ -281,9 +282,18 @@ export default function HomeScreen({ navigation }: { navigation: MainStackNaviga
           ) : (
             <EmptyCard
               title="지금 바로 받을 수 있는 미션이 없습니다"
-              subtitle="조건에 맞는 미션이 올라오면 여기에서 바로 확인할 수 있습니다."
+              subtitle="조건에 맞는 미션이 올라오면 여기에서 바로 보고 선점할 수 있습니다."
             />
           )}
+          {(snapshot?.missionCards ?? []).length > 3 ? (
+            <TouchableOpacity
+              style={styles.moreLink}
+              onPress={() => navigation.navigate('Tabs', { screen: 'GillerRequests' })}
+              activeOpacity={0.88}
+            >
+              <Text style={styles.moreLinkText}>미션 보드 전체 보기</Text>
+            </TouchableOpacity>
+          ) : null}
         </View>
       ) : null}
 
@@ -603,6 +613,12 @@ const styles = StyleSheet.create({
     color: Colors.textTertiary,
     fontSize: Typography.fontSize.sm,
   },
+  boardHint: {
+    color: Colors.primary,
+    fontSize: Typography.fontSize.xs,
+    fontWeight: '700',
+    marginTop: 2,
+  },
   rewardText: {
     color: Colors.primary,
     fontSize: Typography.fontSize.lg,
@@ -639,6 +655,15 @@ const styles = StyleSheet.create({
     color: Colors.textTertiary,
     fontSize: Typography.fontSize.sm,
     lineHeight: 20,
+  },
+  moreLink: {
+    alignSelf: 'flex-start',
+    paddingVertical: 4,
+  },
+  moreLinkText: {
+    color: Colors.primary,
+    fontSize: Typography.fontSize.sm,
+    fontWeight: '700',
   },
   walletCard: {
     backgroundColor: Colors.surface,

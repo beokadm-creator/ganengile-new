@@ -290,6 +290,9 @@ export interface CreateRequestDraft {
   weightKg: string;
   itemValue: string;
   packageDescription: string;
+  pickupLocationDetail: string;
+  storageLocation: string;
+  specialInstructions: string;
   urgency: 'normal' | 'fast' | 'urgent';
   directMode: 'none' | 'requester_to_station' | 'locker_assisted';
   preferredPickupDate: string;

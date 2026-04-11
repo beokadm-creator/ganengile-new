@@ -47,6 +47,7 @@ interface UserDoc extends DocumentData {
   fcmToken?: string;
   isVerified?: boolean;
   gillerApplicationStatus?: User['gillerApplicationStatus'];
+  gillerProfile?: User['gillerProfile'];
   gillerInfo?: User['gillerInfo'];
   gllerInfo?: User['gllerInfo'];
   pointBalance?: number;
@@ -179,6 +180,7 @@ function mapUser(docId: string, data: UserDoc): User {
     fcmToken: data.fcmToken,
     isVerified: data.isVerified,
     gillerApplicationStatus: data.gillerApplicationStatus,
+    gillerProfile: data.gillerProfile,
     gillerInfo: data.gillerInfo,
     gllerInfo: data.gllerInfo,
     pointBalance: data.pointBalance ?? 0,

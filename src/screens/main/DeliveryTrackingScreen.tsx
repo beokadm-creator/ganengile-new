@@ -16,6 +16,7 @@ import { RouteProp, useNavigation, useRoute } from '@react-navigation/native';
 import AppTopBar from '../../components/common/AppTopBar';
 import { NaverMapCard } from '../../components/maps/NaverMapCard';
 import { ensureChatRoomForRequest, getChatRoomByRequestId } from '../../services/chat-service';
+import { deliveryPartnerService } from '../../services/delivery-partner-service';
 import {
   confirmDeliveryByRequester,
   getDeliveryByRequestId,
@@ -270,13 +271,34 @@ export default function DeliveryTrackingScreen(): JSX.Element {
   const [confirming, setConfirming] = useState(false);
   const [routeLoading, setRouteLoading] = useState(false);
   const [routeData, setRouteData] = useState<Awaited<ReturnType<typeof getDrivingRoute>>>(null);
+  const [partnerDispatches, setPartnerDispatches] = useState<
+    Array<{
+      dispatchId: string;
+      partnerName: string;
+      status: string;
+      dispatchMethod: string;
+      updatedAt: Date;
+      opsMemo?: string;
+    }>
+  >([]);
 
   useEffect(() => {
     let fallbackUnsubscribe: (() => void) | null = null;
 
+    const syncDispatches = (deliveryId?: string) => {
+      void deliveryPartnerService
+        .getDispatchSummary({
+          requestId,
+          ...(deliveryId ? { deliveryId } : {}),
+        })
+        .then(setPartnerDispatches)
+        .catch(() => setPartnerDispatches([]));
+    };
+
     const unsubscribeDelivery = subscribeToDeliveryByRequestId(requestId, (delivery) => {
       if (delivery) {
         setTrackingData(toTrackingModel(delivery));
+        syncDispatches(delivery.deliveryId);
         setLoading(false);
         return;
       }
@@ -285,6 +307,7 @@ export default function DeliveryTrackingScreen(): JSX.Element {
       fallbackUnsubscribe = subscribeToRequest(requestId, (request) => {
         if (request) {
           setTrackingData(toTrackingModel(request));
+          syncDispatches(request.primaryDeliveryId);
         }
         setLoading(false);
       });
@@ -301,12 +324,22 @@ export default function DeliveryTrackingScreen(): JSX.Element {
       const delivery = (await getDeliveryByRequestId(requestId)) as DeliveryLookup | null;
       if (delivery) {
         setTrackingData(toTrackingModel(delivery));
+        const dispatchSummary = await deliveryPartnerService.getDispatchSummary({
+          requestId,
+          ...(delivery.deliveryId ? { deliveryId: delivery.deliveryId } : {}),
+        }).catch(() => []);
+        setPartnerDispatches(dispatchSummary);
         return;
       }
 
       const request = await getRequestById(requestId);
       if (request) {
         setTrackingData(toTrackingModel(request));
+        const dispatchSummary = await deliveryPartnerService.getDispatchSummary({
+          requestId,
+          ...(request.primaryDeliveryId ? { deliveryId: request.primaryDeliveryId } : {}),
+        }).catch(() => []);
+        setPartnerDispatches(dispatchSummary);
       }
     } catch (error) {
       console.error('Failed to load tracking', error);
@@ -605,6 +638,29 @@ export default function DeliveryTrackingScreen(): JSX.Element {
           </View>
         ) : null}
 
+        {partnerDispatches.length > 0 ? (
+          <View style={styles.panel}>
+            <Text style={styles.panelTitle}>업체 위임 상태</Text>
+            {partnerDispatches.slice(0, 3).map((item) => (
+              <View key={item.dispatchId} style={styles.partnerRow}>
+                <View style={styles.partnerCopy}>
+                  <Text style={styles.partnerTitle}>{item.partnerName}</Text>
+                  <Text style={styles.partnerMeta}>
+                    {item.status} · {item.dispatchMethod} ·{' '}
+                    {item.updatedAt.toLocaleString('ko-KR', {
+                      month: '2-digit',
+                      day: '2-digit',
+                      hour: '2-digit',
+                      minute: '2-digit',
+                    })}
+                  </Text>
+                  {item.opsMemo ? <Text style={styles.partnerMemo}>{item.opsMemo}</Text> : null}
+                </View>
+              </View>
+            ))}
+          </View>
+        ) : null}
+
         <View style={styles.actionSection}>
           <TouchableOpacity style={styles.primaryAction} onPress={() => void openChat()}>
             <MaterialIcons name="chat-bubble-outline" size={18} color={Colors.white} />
@@ -747,6 +803,27 @@ const styles = StyleSheet.create({
     color: Colors.textPrimary,
     fontSize: 15,
     fontWeight: '700',
+  },
+  partnerRow: {
+    paddingVertical: 4,
+  },
+  partnerCopy: {
+    gap: 4,
+  },
+  partnerTitle: {
+    color: Colors.textPrimary,
+    fontSize: 14,
+    fontWeight: '800',
+  },
+  partnerMeta: {
+    color: Colors.textSecondary,
+    fontSize: 13,
+    lineHeight: 18,
+  },
+  partnerMemo: {
+    color: Colors.textSecondary,
+    fontSize: 13,
+    lineHeight: 18,
   },
   stepRow: {
     flexDirection: 'row',

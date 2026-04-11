@@ -198,6 +198,63 @@ export class DeliveryPartnerService {
     return this.listPartners({ status: 'active' });
   }
 
+  static async getBridgeSummary(): Promise<{
+    activePartnerCount: number;
+    connectedPartnerCount: number;
+    apiReadyPartnerCount: number;
+    fallbackOnlyPartnerCount: number;
+    topPartnerNames: string[];
+  }> {
+    const partners = await this.getActivePartners();
+
+    return {
+      activePartnerCount: partners.length,
+      connectedPartnerCount: partners.filter((partner) => partner.connectionStatus === 'connected').length,
+      apiReadyPartnerCount: partners.filter(
+        (partner) => partner.integrationMode === 'api' && partner.connectionStatus === 'connected'
+      ).length,
+      fallbackOnlyPartnerCount: partners.filter((partner) => Boolean(partner.orchestration?.fallbackOnly)).length,
+      topPartnerNames: partners.slice(0, 3).map((partner) => partner.partnerName).filter(Boolean),
+    };
+  }
+
+  static async getDispatchSummary(filters: {
+    requestId?: string;
+    deliveryId?: string;
+  }): Promise<
+    Array<{
+      dispatchId: string;
+      partnerId: string;
+      partnerName: string;
+      status: DeliveryPartnerDispatchStatusType;
+      dispatchMethod: DeliveryPartnerDispatch['dispatchMethod'];
+      updatedAt: Date;
+      opsMemo?: string;
+    }>
+  > {
+    const [dispatches, partners] = await Promise.all([
+      this.listDispatches({
+        ...(filters.requestId ? { requestId: filters.requestId } : {}),
+        ...(filters.deliveryId ? { deliveryId: filters.deliveryId } : {}),
+      }),
+      this.getActivePartners(),
+    ]);
+
+    const partnerNameMap = new Map(partners.map((partner) => [partner.partnerId, partner.partnerName] as const));
+
+    return dispatches
+      .sort((left, right) => right.updatedAt.getTime() - left.updatedAt.getTime())
+      .map((dispatch) => ({
+        dispatchId: dispatch.dispatchId,
+        partnerId: dispatch.partnerId,
+        partnerName: partnerNameMap.get(dispatch.partnerId) ?? dispatch.partnerId,
+        status: dispatch.status,
+        dispatchMethod: dispatch.dispatchMethod,
+        updatedAt: dispatch.updatedAt,
+        opsMemo: dispatch.opsMemo,
+      }));
+  }
+
   static async updatePartnerStatus(partnerId: string, status: DeliveryPartnerStatus): Promise<void> {
     await updateDoc(doc(db, DELIVERY_PARTNERS_COLLECTION, partnerId), {
       status,

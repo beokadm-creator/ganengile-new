@@ -10,101 +10,265 @@ import {
   View,
 } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
+import { useNavigation } from '@react-navigation/native';
 
+import { MissionGroupCard } from '../../components/giller/MissionGroupCard';
+import { MissionBoardHeader } from '../../components/giller/MissionBoardHeader';
+import { MissionBoardSection } from '../../components/giller/MissionBoardSection';
+import { MissionDetailSheet } from '../../components/giller/MissionDetailSheet';
+import type { MissionCard, MissionGroup } from '../../components/giller/mission-board-types';
+import {
+  buildComparisonHint,
+  buildFeaturedReason,
+  buildOptionLabel,
+  buildQuickFacts,
+  getNextActionLabel,
+  getPrimaryOption,
+  groupMissionCards,
+  isFullSpanOption,
+  isImmediateMission,
+  locationDistance,
+} from '../../components/giller/mission-board-utils';
 import { useUser } from '../../contexts/UserContext';
 import {
   acceptMissionBundleForGiller,
   getBeta1HomeSnapshot,
+  releaseMissionBundleForGiller,
   type Beta1HomeSnapshot,
 } from '../../services/beta1-orchestration-service';
+import {
+  buildProfessionalMissionBridgeReason,
+  resolveGillerMissionExecutionMode,
+} from '../../services/giller-mission-execution-service';
 import { BorderRadius, Colors, Shadows, Spacing, Typography } from '../../theme';
-
-type MissionCard = Beta1HomeSnapshot['missionCards'][number];
-
-function isImmediateMission(card: MissionCard): boolean {
-  return card.selectionState === 'available' || card.windowLabel.includes('지금');
-}
+import type { MainStackNavigationProp } from '../../types/navigation';
+import { GillerType } from '../../types/user';
 
 export default function GillerRequestsScreen() {
+  const navigation = useNavigation<MainStackNavigationProp>();
   const { user } = useUser();
   const [snapshot, setSnapshot] = useState<Beta1HomeSnapshot | null>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [submittingBundleId, setSubmittingBundleId] = useState<string | null>(null);
+  const [selectedGroup, setSelectedGroup] = useState<MissionGroup | null>(null);
 
-  const loadSnapshot = useCallback(async (mode: 'initial' | 'refresh' = 'initial') => {
-    if (!user?.uid) {
-      setSnapshot(null);
-      setLoading(false);
-      setRefreshing(false);
-      return;
-    }
+  const loadSnapshot = useCallback(
+    async (mode: 'initial' | 'refresh' = 'initial') => {
+      if (!user?.uid) {
+        setSnapshot(null);
+        setLoading(false);
+        setRefreshing(false);
+        return;
+      }
 
-    if (mode === 'initial') {
-      setLoading(true);
-    } else {
-      setRefreshing(true);
-    }
+      if (mode === 'initial') {
+        setLoading(true);
+      } else {
+        setRefreshing(true);
+      }
 
-    try {
-      const nextSnapshot = await getBeta1HomeSnapshot(user.uid, 'giller');
-      setSnapshot(nextSnapshot);
-    } finally {
-      setLoading(false);
-      setRefreshing(false);
-    }
-  }, [user?.uid]);
+      try {
+        const nextSnapshot = await getBeta1HomeSnapshot(user.uid, 'giller');
+        setSnapshot(nextSnapshot);
+      } finally {
+        setLoading(false);
+        setRefreshing(false);
+      }
+    },
+    [user?.uid]
+  );
 
   useEffect(() => {
     void loadSnapshot('initial');
   }, [loadSnapshot]);
 
-  const immediateMissions = useMemo(
-    () => (snapshot?.missionCards ?? []).filter((card) => card.selectionState === 'available' && isImmediateMission(card)),
-    [snapshot],
-  );
-  const ongoingMissions = useMemo(
-    () => (snapshot?.missionCards ?? []).filter((card) => card.selectionState === 'accepted'),
-    [snapshot],
-  );
-  const suggestedMissions = useMemo(
-    () =>
-      (snapshot?.missionCards ?? []).filter(
-        (card) => card.selectionState !== 'accepted' && !isImmediateMission(card)
-      ),
-    [snapshot],
-  );
-
-  const handleAccept = useCallback((card: MissionCard) => {
-    if (!user?.uid || !card.bundleId || card.selectionState === 'accepted') {
-      return;
+  const activeTerritory = useMemo(() => {
+    const territories = user?.gillerProfile?.territories ?? [];
+    const activeTerritoryId = user?.gillerProfile?.activeTerritoryId;
+    if (!territories.length) {
+      return null;
     }
 
-    Alert.alert(
-      '이 구간을 맡을까요?',
-      `${card.title}\n${card.legSummary ?? card.strategyBody}\n\n선택하지 않은 주소 구간은 external partner fallback으로 전환될 수 있습니다.`,
-      [
-        { text: '취소', style: 'cancel' },
-        {
-          text: '수행하기',
-          onPress: () => {
-            void (async () => {
-              try {
-                setSubmittingBundleId(card.bundleId ?? null);
-                await acceptMissionBundleForGiller(card.bundleId!, user.uid);
-                await loadSnapshot('refresh');
-              } catch (error) {
-                const message = error instanceof Error ? error.message : '구간 수락에 실패했습니다.';
-                Alert.alert('수락 실패', message);
-              } finally {
-                setSubmittingBundleId(null);
-              }
-            })();
-          },
-        },
-      ],
+    if (activeTerritoryId === '') {
+      return null;
+    }
+
+    return (
+      territories.find((territory) => territory.territoryId === activeTerritoryId) ??
+      territories[0]
     );
-  }, [loadSnapshot, user?.uid]);
+  }, [user?.gillerProfile?.activeTerritoryId, user?.gillerProfile?.territories]);
+
+  const filterByTerritory = useCallback(
+    (groups: MissionGroup[]) => {
+      if (!activeTerritory) {
+        return groups;
+      }
+
+      const radiusMeters = activeTerritory.radiusKm * 1000;
+      return groups.filter((group) => {
+        const points = [group.originPoint, group.destinationPoint].filter(
+          (point): point is NonNullable<MissionGroup['originPoint']> => point != null
+        );
+
+        if (!points.length) {
+          return true;
+        }
+
+        return points.some((point) => {
+          const distance = Math.min(
+            locationDistance(activeTerritory.latitude, activeTerritory.longitude, point.latitude, point.longitude),
+            Number.POSITIVE_INFINITY
+          );
+          return distance <= radiusMeters;
+        });
+      });
+    },
+    [activeTerritory]
+  );
+
+  const immediateMissionGroups = useMemo(
+    () =>
+      filterByTerritory(
+        groupMissionCards(
+        (snapshot?.missionCards ?? []).filter(
+          (card) => card.selectionState === 'available' && isImmediateMission(card)
+        )
+        )
+      ),
+    [filterByTerritory, snapshot]
+  );
+  const ongoingMissionGroups = useMemo(
+    () => filterByTerritory(groupMissionCards((snapshot?.missionCards ?? []).filter((card) => card.selectionState === 'accepted'))),
+    [filterByTerritory, snapshot]
+  );
+  const suggestedMissionGroups = useMemo(
+    () =>
+      filterByTerritory(
+        groupMissionCards(
+        (snapshot?.missionCards ?? []).filter(
+          (card) => card.selectionState !== 'accepted' && !isImmediateMission(card)
+        )
+        )
+      ),
+    [filterByTerritory, snapshot]
+  );
+  const featuredMissionGroup = immediateMissionGroups[0] ?? null;
+
+  const handleAccept = useCallback(
+    (card: MissionCard) => {
+      if (!user?.uid || !card.bundleId || card.selectionState === 'accepted') {
+        return;
+      }
+
+      Alert.alert(
+        '이 구간을 맡을까요?',
+        `${buildOptionLabel(card)} · ${card.rewardLabel}\n${card.legSummary ?? card.strategyBody}\n\n선택하지 않은 나머지 구간은 다른 길러나 배송 파트너에게 이어질 수 있습니다.`,
+        [
+          { text: '취소', style: 'cancel' },
+          {
+            text: '수행하기',
+            onPress: () => {
+              const bundleId = card.bundleId;
+              if (!bundleId) {
+                return;
+              }
+
+              void (async () => {
+                try {
+                  setSubmittingBundleId(bundleId);
+                  await acceptMissionBundleForGiller(bundleId, user.uid);
+                  await loadSnapshot('refresh');
+                } catch (error) {
+                  const message = error instanceof Error ? error.message : '구간 수락에 실패했습니다.';
+                  Alert.alert('수락 실패', message);
+                } finally {
+                  setSubmittingBundleId(null);
+                }
+              })();
+            },
+          },
+        ]
+      );
+    },
+    [loadSnapshot, user?.uid]
+  );
+
+  const handleRelease = useCallback(
+    (card: MissionCard) => {
+      if (!user?.uid || !card.bundleId || card.selectionState !== 'accepted') {
+        return;
+      }
+
+      Alert.alert(
+        '수락을 취소할까요?',
+        '아직 진행 전이라면 다시 미션 보드로 돌릴 수 있습니다.',
+        [
+          { text: '닫기', style: 'cancel' },
+          {
+            text: '수락 취소',
+            style: 'destructive',
+            onPress: () => {
+              void (async () => {
+                try {
+                  setSubmittingBundleId(card.bundleId ?? null);
+                  await releaseMissionBundleForGiller(card.bundleId!, user.uid);
+                  await loadSnapshot('refresh');
+                } catch (error) {
+                  const message = error instanceof Error ? error.message : '수락 취소에 실패했습니다.';
+                  Alert.alert('수락 취소 실패', message);
+                } finally {
+                  setSubmittingBundleId(null);
+                }
+              })();
+            },
+          },
+        ]
+      );
+    },
+    [loadSnapshot, user?.uid]
+  );
+
+  const handleNextAction = useCallback(
+    (group: MissionGroup) => {
+      const primaryCard = getPrimaryOption(group);
+      if (!primaryCard) {
+        return;
+      }
+
+      const executionMode = resolveGillerMissionExecutionMode(user?.gillerProfile?.type, group);
+      if (executionMode === 'external_bridge') {
+        navigation.navigate('ProfessionalMissionBridge', {
+          missionTitle: group.routeLabel,
+          missionWindow: group.windowLabel,
+          reason: buildProfessionalMissionBridgeReason(group),
+          requestId: primaryCard.requestId,
+          deliveryId: primaryCard.deliveryId,
+        });
+        return;
+      }
+
+      const requestId = primaryCard.requestId;
+      const deliveryId = primaryCard.deliveryId;
+      const status = group.status.toLowerCase();
+
+      if ((status.includes('accepted') || status.includes('queued')) && requestId && deliveryId) {
+        navigation.navigate('PickupVerification', { deliveryId, requestId });
+        return;
+      }
+
+      if ((status.includes('arrival_pending') || status.includes('handover_pending') || status.includes('in_progress')) && deliveryId) {
+        navigation.navigate('DeliveryCompletion', { deliveryId });
+        return;
+      }
+
+      if (requestId) {
+        navigation.navigate('DeliveryTracking', { requestId });
+      }
+    },
+    [navigation, user?.gillerProfile?.type]
+  );
 
   if (loading) {
     return (
@@ -120,122 +284,131 @@ export default function GillerRequestsScreen() {
       style={styles.container}
       contentContainerStyle={styles.content}
       showsVerticalScrollIndicator={false}
-      refreshControl={
-        <RefreshControl refreshing={refreshing} onRefresh={() => void loadSnapshot('refresh')} />
-      }
+      refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => void loadSnapshot('refresh')} />}
     >
       <View style={styles.header}>
         <Text style={styles.kicker}>GOING BOARD</Text>
         <Text style={styles.title}>미션 보드</Text>
-        <Text style={styles.subtitle}>어디서부터 어디까지 맡을지 구간 카드로 바로 선택하세요.</Text>
+        <Text style={styles.subtitle}>권역으로 보고, 동선이 맞는 미션을 먼저 잡는 화면입니다.</Text>
       </View>
+
+      <MissionBoardHeader
+        scopeTitle={activeTerritory ? `${activeTerritory.label} 기준` : '전체 권역 기준'}
+        scopeSubtitle={
+          user?.gillerProfile?.type === GillerType.PROFESSIONAL || user?.gillerProfile?.type === GillerType.MASTER
+            ? '권역 노출 후 동선 우선권을 보고, 일부 미션은 외부 연동으로 이어집니다.'
+            : '권역 노출 후 동선이 맞는 길러에게 먼저 기회가 갑니다.'
+        }
+        onPressScopeSettings={() => navigation.navigate('Tabs', { screen: 'RouteManagement' })}
+        featuredMission={
+          featuredMissionGroup && getPrimaryOption(featuredMissionGroup)
+            ? {
+                routeLabel: featuredMissionGroup.routeLabel,
+                featuredReason: buildFeaturedReason(featuredMissionGroup),
+                quickFacts: buildQuickFacts(featuredMissionGroup),
+                rewardLabel: getPrimaryOption(featuredMissionGroup)?.rewardLabel,
+                disabled: submittingBundleId === getPrimaryOption(featuredMissionGroup)?.bundleId,
+                onPress: () => {
+                  const primaryCard = getPrimaryOption(featuredMissionGroup);
+                  if (primaryCard) {
+                    handleAccept(primaryCard);
+                  }
+                },
+              }
+            : null
+        }
+      />
 
       <View style={styles.metricRow}>
-        <MetricCard label="진행 중" value={ongoingMissions.length} />
-        <MetricCard label="즉시 선택" value={immediateMissions.length} />
-        <MetricCard label="추가 제안" value={suggestedMissions.length} />
-        <MetricCard
-          label="예상 보상"
-          value={`${(snapshot?.pendingRewardTotal ?? 0).toLocaleString()}원`}
-        />
+        <MetricCard label="진행 중" value={ongoingMissionGroups.length} />
+        <MetricCard label="즉시 선택" value={immediateMissionGroups.length} />
+        <MetricCard label="추가 제안" value={suggestedMissionGroups.length} />
+        <MetricCard label="예상 보상" value={`${(snapshot?.pendingRewardTotal ?? 0).toLocaleString()}원`} />
       </View>
 
-      <Section
+      <MissionBoardSection
         title="내 진행 중"
-        subtitle="이미 맡은 구간과 진행 중인 배송입니다."
-        items={ongoingMissions}
-        emptyTitle="현재 진행 중인 구간이 없습니다"
-        emptySubtitle="수락한 미션이나 진행 중 배송이 생기면 가장 먼저 여기에서 보여드립니다."
-        submittingBundleId={submittingBundleId}
-        onPress={handleAccept}
+        subtitle="이미 맡은 배송과 현재 수행 중인 구간입니다."
+        items={ongoingMissionGroups}
+        emptyTitle="현재 진행 중인 배송이 없습니다"
+        emptySubtitle={activeTerritory ? '선택한 권역 안에서 수락한 배송이 가장 먼저 여기에서 보입니다.' : '수락한 구간과 연결된 배송은 가장 먼저 여기에서 보여드립니다.'}
+        getKey={(group) => group.id}
+        renderItem={(group) => (
+          <MissionGroupCard
+            group={group}
+            submittingBundleId={submittingBundleId}
+            onPress={handleAccept}
+            onRelease={handleRelease}
+            onNextAction={handleNextAction}
+            onOpenDetails={setSelectedGroup}
+            buildOptionLabel={buildOptionLabel}
+            buildQuickFacts={buildQuickFacts}
+            getNextActionLabel={getNextActionLabel}
+            isFullSpanOption={isFullSpanOption}
+            buildComparisonHint={buildComparisonHint}
+          />
+        )}
       />
 
-      <Section
+      <MissionBoardSection
         title="지금 선택 가능"
-        subtitle="바로 맡을 수 있는 구간 카드입니다."
-        items={immediateMissions}
-        emptyTitle="지금 바로 맡을 수 있는 구간이 없습니다"
-        emptySubtitle="새 카드가 도착하면 여기에서 가장 먼저 보여드립니다."
-        submittingBundleId={submittingBundleId}
-        onPress={handleAccept}
+        subtitle="지금 바로 맡을 수 있는 배송을 지도와 구간 옵션으로 확인하세요."
+        items={immediateMissionGroups}
+        emptyTitle="지금 바로 맡을 수 있는 배송이 없습니다"
+        emptySubtitle={activeTerritory ? '선택한 권역에 들어오는 새 배송은 여기에서 전체 구간과 부분 구간으로 보입니다.' : '새 배송이 들어오면 여기에서 전체 구간과 부분 구간을 함께 보여드립니다.'}
+        getKey={(group) => group.id}
+        renderItem={(group) => (
+          <MissionGroupCard
+            group={group}
+            submittingBundleId={submittingBundleId}
+            onPress={handleAccept}
+            onRelease={handleRelease}
+            onNextAction={handleNextAction}
+            onOpenDetails={setSelectedGroup}
+            buildOptionLabel={buildOptionLabel}
+            buildQuickFacts={buildQuickFacts}
+            getNextActionLabel={getNextActionLabel}
+            isFullSpanOption={isFullSpanOption}
+            buildComparisonHint={buildComparisonHint}
+          />
+        )}
       />
 
-      <Section
+      <MissionBoardSection
         title="검토해볼 제안"
-        subtitle="시간 확인이 필요하거나 fallback이 함께 걸린 카드입니다."
-        items={suggestedMissions}
+        subtitle="시간 조율이나 fallback이 걸린 배송을 따로 모아 보여드립니다."
+        items={suggestedMissionGroups}
         emptyTitle="검토할 제안이 없습니다"
-        emptySubtitle="현재는 바로 수락 가능한 카드만 열려 있습니다."
+        emptySubtitle="현재는 바로 수락 가능한 배송이 우선 열려 있습니다."
+        getKey={(group) => group.id}
+        renderItem={(group) => (
+          <MissionGroupCard
+            group={group}
+            submittingBundleId={submittingBundleId}
+            onPress={handleAccept}
+            onRelease={handleRelease}
+            onNextAction={handleNextAction}
+            onOpenDetails={setSelectedGroup}
+            buildOptionLabel={buildOptionLabel}
+            buildQuickFacts={buildQuickFacts}
+            getNextActionLabel={getNextActionLabel}
+            isFullSpanOption={isFullSpanOption}
+            buildComparisonHint={buildComparisonHint}
+          />
+        )}
+      />
+
+      <MissionDetailSheet
+        group={selectedGroup}
         submittingBundleId={submittingBundleId}
-        onPress={handleAccept}
+        onClose={() => setSelectedGroup(null)}
+        onAccept={handleAccept}
+        onRelease={handleRelease}
+        onNextAction={handleNextAction}
+        buildOptionLabel={buildOptionLabel}
+        getNextActionLabel={getNextActionLabel}
       />
     </ScrollView>
-  );
-}
-
-function Section({
-  title,
-  subtitle,
-  items,
-  emptyTitle,
-  emptySubtitle,
-  submittingBundleId,
-  onPress,
-}: {
-  title: string;
-  subtitle: string;
-  items: MissionCard[];
-  emptyTitle: string;
-  emptySubtitle: string;
-  submittingBundleId: string | null;
-  onPress: (card: MissionCard) => void;
-}) {
-  return (
-    <View style={styles.section}>
-      <View style={styles.sectionHeader}>
-        <Text style={styles.sectionTitle}>{title}</Text>
-        <Text style={styles.sectionSubtitle}>{subtitle}</Text>
-      </View>
-
-      {items.length ? (
-        items.map((card) => {
-          const disabled = card.selectionState === 'accepted' || !card.bundleId || submittingBundleId === card.bundleId;
-          const actionLabel =
-            submittingBundleId === card.bundleId
-              ? '처리 중...'
-              : card.actionLabel ?? (card.selectionState === 'accepted' ? '수락 완료' : '이 구간 수행하기');
-
-          return (
-            <View key={card.id} style={styles.card}>
-              <View style={styles.cardTop}>
-                <Text style={styles.cardTitle}>{card.title}</Text>
-                <StatusBadge label={card.status} />
-              </View>
-              <Text style={styles.windowLabel}>{card.windowLabel}</Text>
-              <Text style={styles.rewardLabel}>{card.rewardLabel}</Text>
-              <Text style={styles.cardBody}>{card.strategyTitle}</Text>
-              <Text style={styles.cardSummary}>{card.strategyBody}</Text>
-              {card.fallbackLabel ? <Text style={styles.fallbackLabel}>{card.fallbackLabel}</Text> : null}
-              <TouchableOpacity
-                style={[styles.actionButton, disabled && styles.actionButtonDisabled]}
-                activeOpacity={0.88}
-                disabled={disabled}
-                onPress={() => onPress(card)}
-              >
-                <Text style={[styles.actionButtonText, disabled && styles.actionButtonTextDisabled]}>
-                  {actionLabel}
-                </Text>
-              </TouchableOpacity>
-            </View>
-          );
-        })
-      ) : (
-        <View style={styles.emptyCard}>
-          <Text style={styles.emptyTitle}>{emptyTitle}</Text>
-          <Text style={styles.emptySubtitle}>{emptySubtitle}</Text>
-        </View>
-      )}
-    </View>
   );
 }
 
@@ -244,15 +417,6 @@ function MetricCard({ label, value }: { label: string; value: string | number })
     <View style={styles.metricCard}>
       <Text style={styles.metricLabel}>{label}</Text>
       <Text style={styles.metricValue}>{value}</Text>
-    </View>
-  );
-}
-
-function StatusBadge({ label }: { label: string }) {
-  return (
-    <View style={styles.statusBadge}>
-      <MaterialIcons name="bolt" size={14} color={Colors.primaryDark} />
-      <Text style={styles.statusBadgeText}>{label}</Text>
     </View>
   );
 }
@@ -335,98 +499,5 @@ const styles = StyleSheet.create({
   sectionSubtitle: {
     color: Colors.textSecondary,
     fontSize: Typography.fontSize.sm,
-  },
-  card: {
-    backgroundColor: Colors.surface,
-    borderRadius: BorderRadius.xl,
-    padding: Spacing.lg,
-    gap: Spacing.sm,
-    ...Shadows.sm,
-  },
-  cardTop: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    gap: Spacing.md,
-  },
-  cardTitle: {
-    flex: 1,
-    color: Colors.textPrimary,
-    fontSize: Typography.fontSize.lg,
-    fontWeight: Typography.fontWeight.bold,
-  },
-  windowLabel: {
-    color: Colors.primary,
-    fontSize: Typography.fontSize.sm,
-    fontWeight: Typography.fontWeight.medium,
-  },
-  rewardLabel: {
-    color: Colors.textPrimary,
-    fontSize: Typography.fontSize.lg,
-    fontWeight: Typography.fontWeight.bold,
-  },
-  cardBody: {
-    color: Colors.textPrimary,
-    fontSize: Typography.fontSize.base,
-    fontWeight: Typography.fontWeight.bold,
-  },
-  cardSummary: {
-    color: Colors.textSecondary,
-    fontSize: Typography.fontSize.sm,
-    lineHeight: 20,
-  },
-  fallbackLabel: {
-    color: Colors.warning,
-    fontSize: Typography.fontSize.sm,
-  },
-  actionButton: {
-    marginTop: Spacing.xs,
-    backgroundColor: Colors.primary,
-    borderRadius: BorderRadius.lg,
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: Spacing.md,
-  },
-  actionButtonDisabled: {
-    backgroundColor: Colors.border,
-  },
-  actionButtonText: {
-    color: Colors.white,
-    fontSize: Typography.fontSize.sm,
-    fontWeight: Typography.fontWeight.bold,
-  },
-  actionButtonTextDisabled: {
-    color: Colors.textSecondary,
-  },
-  statusBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    borderRadius: BorderRadius.full,
-    backgroundColor: Colors.primaryLight,
-    paddingHorizontal: Spacing.sm,
-    paddingVertical: 6,
-  },
-  statusBadgeText: {
-    color: Colors.primaryDark,
-    fontSize: Typography.fontSize.xs,
-    fontWeight: Typography.fontWeight.bold,
-  },
-  emptyCard: {
-    backgroundColor: Colors.surface,
-    borderRadius: BorderRadius.xl,
-    padding: Spacing.xl,
-    gap: Spacing.sm,
-    ...Shadows.sm,
-  },
-  emptyTitle: {
-    color: Colors.textPrimary,
-    fontSize: Typography.fontSize.base,
-    fontWeight: Typography.fontWeight.bold,
-  },
-  emptySubtitle: {
-    color: Colors.textSecondary,
-    fontSize: Typography.fontSize.sm,
-    lineHeight: 20,
   },
 });

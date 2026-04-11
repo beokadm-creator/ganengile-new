@@ -95,6 +95,10 @@ type RequestDocShape = Partial<Request> & {
   packageInfo?: Request['packageInfo'] & { imageUrl?: string };
   recipientName?: unknown;
   recipientPhone?: unknown;
+  pickupLocationDetail?: unknown;
+  storageLocation?: unknown;
+  specialInstructions?: unknown;
+  missionProgress?: Request['missionProgress'];
   createdAt?: TimestampLike;
   updatedAt?: TimestampLike;
 };
@@ -361,6 +365,9 @@ function normalizeRequestDoc(requestId: string, raw: RequestDocShape): Request {
     deliveryAddress,
     recipientName: readString(raw.recipientName),
     recipientPhone: readString(raw.recipientPhone),
+    pickupLocationDetail: readString(raw.pickupLocationDetail),
+    storageLocation: readString(raw.storageLocation),
+    specialInstructions: readString(raw.specialInstructions),
     selectedPhotoIds,
     packageInfo: {
       ...raw.packageInfo,

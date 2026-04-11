@@ -12,7 +12,12 @@ import {
 import { StackActions, useFocusEffect, useNavigation } from '@react-navigation/native';
 import { MaterialIcons } from '@expo/vector-icons';
 
+import { useUser } from '../../contexts/UserContext';
 import { requireUserId } from '../../services/firebase';
+import {
+  saveCurrentLocationAsGillerTerritory,
+  setActiveGillerTerritory,
+} from '../../services/giller-territory-service';
 import { deleteRoute, getUserRoutes } from '../../services/route-service';
 import { DAY_LABELS } from '../../components/common/DaySelector';
 import type { Route } from '../../types/route';
@@ -21,11 +26,14 @@ import { Colors, Spacing, BorderRadius, Typography, Shadows } from '../../theme'
 import AppTopBar from '../../components/common/AppTopBar';
 
 const MAX_ROUTES = 5;
+const MAX_TERRITORIES = 2;
 
 export default function RouteManagementScreen() {
   const navigation = useNavigation<MainStackNavigationProp>();
+  const { user, refreshUser } = useUser();
   const [routes, setRoutes] = useState<Route[]>([]);
   const [loading, setLoading] = useState(true);
+  const [territoryLoading, setTerritoryLoading] = useState(false);
 
   const loadRoutes = useCallback(async () => {
     try {
@@ -44,6 +52,47 @@ export default function RouteManagementScreen() {
       setLoading(false);
     }
   }, []);
+
+  const territories = user?.gillerProfile?.territories ?? [];
+  const activeTerritoryId = user?.gillerProfile?.activeTerritoryId ?? '';
+
+  const handleRegisterTerritory = () => {
+    if (!user?.uid) {
+      return;
+    }
+
+    void (async () => {
+      try {
+        setTerritoryLoading(true);
+        await saveCurrentLocationAsGillerTerritory(user.uid, user.gillerProfile);
+        await refreshUser();
+      } catch (error) {
+        console.error('Failed to register territory', error);
+        Alert.alert('권역 등록 실패', error instanceof Error ? error.message : '잠시 후 다시 시도해 주세요.');
+      } finally {
+        setTerritoryLoading(false);
+      }
+    })();
+  };
+
+  const handleActivateTerritory = (territoryId: string) => {
+    if (!user?.uid) {
+      return;
+    }
+
+    void (async () => {
+      try {
+        setTerritoryLoading(true);
+        await setActiveGillerTerritory(user.uid, territoryId, user.gillerProfile);
+        await refreshUser();
+      } catch (error) {
+        console.error('Failed to activate territory', error);
+        Alert.alert('권역 전환 실패', error instanceof Error ? error.message : '잠시 후 다시 시도해 주세요.');
+      } finally {
+        setTerritoryLoading(false);
+      }
+    })();
+  };
 
   useFocusEffect(
     useCallback(() => {
@@ -95,77 +144,172 @@ export default function RouteManagementScreen() {
 
   return (
     <View style={styles.container}>
-      <AppTopBar title="길러 동선 관리" onBack={() => navigation.goBack()} />
+      <AppTopBar title="권역과 동선" onBack={() => navigation.goBack()} />
 
-      {routes.length === 0 ? (
-        <View style={styles.contentInner}>
-          <View style={styles.emptyCard}>
-            <MaterialIcons name="alt-route" size={32} color={Colors.primary} style={styles.emptyIcon} />
-            <Text style={styles.emptyTitle}>등록한 동선이 없습니다</Text>
-            <Text style={styles.emptySubtitle}>
-              자주 이동하는 구간을 등록하면 미션 추천과 번들 제안이 더 빨라집니다.
-            </Text>
-            <TouchableOpacity
-              style={styles.addButton}
-              onPress={() => navigation.dispatch(StackActions.push('AddRoute'))}
-              activeOpacity={0.9}
-            >
-              <Text style={styles.addButtonText}>첫 동선 등록하기</Text>
-            </TouchableOpacity>
+      <ScrollView contentContainerStyle={styles.contentInner} showsVerticalScrollIndicator={false}>
+        <View style={styles.heroCard}>
+          <Text style={styles.heroKicker}>가는길에</Text>
+          <Text style={styles.heroTitle}>미션을 받는 기준</Text>
+          <Text style={styles.heroSubtitle}>
+            자주 가는 길을 등록하면 권역 안의 미션과 더 잘 이어집니다.
+          </Text>
+        </View>
+
+        <View style={styles.metricRow}>
+          <View style={styles.metricCard}>
+            <Text style={styles.metricLabel}>등록 동선</Text>
+            <Text style={styles.metricValue}>{routes.length}개</Text>
+          </View>
+          <View style={styles.metricCard}>
+            <Text style={styles.metricLabel}>남은 자리</Text>
+            <Text style={styles.metricValue}>{MAX_ROUTES - routes.length}개</Text>
           </View>
         </View>
-      ) : (
-        <ScrollView contentContainerStyle={styles.contentInner} showsVerticalScrollIndicator={false}>
-          <View style={styles.heroCard}>
-            <Text style={styles.heroKicker}>가는길에</Text>
-            <Text style={styles.heroTitle}>자주 가는 동선</Text>
-            <Text style={styles.heroSubtitle}>
-              {routes.length} / {MAX_ROUTES}개의 동선을 사용 중입니다.
-            </Text>
+
+        <TouchableOpacity
+          style={styles.boardShortcut}
+          activeOpacity={0.9}
+          onPress={() => navigation.navigate('Tabs', { screen: 'GillerRequests' })}
+        >
+          <View style={styles.boardShortcutCopy}>
+            <Text style={styles.boardShortcutTitle}>미션 보드 보기</Text>
+            <Text style={styles.boardShortcutBody}>지금 기준으로 어떤 미션이 보이는지 바로 확인합니다.</Text>
+          </View>
+          <MaterialIcons name="arrow-forward-ios" size={18} color={Colors.primary} />
+        </TouchableOpacity>
+
+        <View style={styles.sectionCard}>
+          <View style={styles.sectionHeader}>
+            <View style={styles.sectionHeaderCopy}>
+              <Text style={styles.sectionTitle}>권역</Text>
+              <Text style={styles.sectionSubtitle}>현재 위치 인증으로만 추가되고 최대 2개까지 관리합니다.</Text>
+            </View>
+            <TouchableOpacity
+              style={[styles.inlinePrimaryButton, territoryLoading && styles.inlineButtonDisabled]}
+              activeOpacity={0.9}
+              disabled={territoryLoading || territories.length >= MAX_TERRITORIES}
+              onPress={handleRegisterTerritory}
+            >
+              <Text style={styles.inlinePrimaryButtonText}>
+                {territoryLoading ? '확인 중...' : '현재 위치로 추가'}
+              </Text>
+            </TouchableOpacity>
           </View>
 
-          <View style={styles.listContainer}>
-            {routes.map((item) => {
-              const routeName = `${item.startStation.stationName} → ${item.endStation.stationName}`;
-              return (
-                <View key={item.routeId} style={styles.routeCard}>
-                  <View style={styles.routeHeader}>
-                    <Text style={styles.routeName}>{routeName}</Text>
-                    <Text style={styles.routeTime}>{item.departureTime} 출발</Text>
-                  </View>
+          <View style={styles.ruleList}>
+            <RulePill icon="my-location" label="현재 위치 인증 기반" />
+            <RulePill icon="train" label="역 중심 권역" />
+            <RulePill icon="filter-2" label="최대 2개" />
+          </View>
 
-                  <Text style={styles.routeDays}>
-                    {item.daysOfWeek.map((day) => DAY_LABELS[day]).join(', ')}
-                  </Text>
-
-                  <View style={styles.actionButtons}>
-                    <TouchableOpacity
-                      style={[styles.actionButton, styles.editActionButton]}
-                      onPress={() =>
-                        navigation.dispatch(StackActions.push('EditRoute', { routeId: item.routeId }))
-                      }
-                    >
-                      <Text style={styles.editActionButtonText}>수정</Text>
-                    </TouchableOpacity>
-                    <TouchableOpacity
-                      style={[styles.actionButton, styles.deleteActionButton]}
-                      onPress={() => handleDelete(item.routeId, routeName)}
-                    >
-                      <Text style={styles.deleteActionButtonText}>삭제</Text>
-                    </TouchableOpacity>
-                  </View>
+          {territories.length ? (
+            <View style={styles.territoryList}>
+              <TouchableOpacity
+                style={[styles.territoryCard, activeTerritoryId === '' && styles.territoryCardActive]}
+                activeOpacity={0.88}
+                disabled={territoryLoading}
+                onPress={() => handleActivateTerritory('')}
+              >
+                <View style={styles.territoryTop}>
+                  <Text style={styles.territoryName}>전체 보기</Text>
+                  {activeTerritoryId === '' ? <Text style={styles.territoryBadge}>활성</Text> : null}
                 </View>
-              );
-            })}
+                <Text style={styles.territoryMeta}>권역 밖 미션까지 함께 봅니다.</Text>
+              </TouchableOpacity>
 
-            {routes.length >= MAX_ROUTES ? (
-              <View style={styles.limitBanner}>
-                <Text style={styles.limitText}>동선은 최대 5개까지 등록할 수 있습니다.</Text>
-              </View>
-            ) : null}
+              {territories.map((territory) => {
+                const active = activeTerritoryId === territory.territoryId;
+                return (
+                  <TouchableOpacity
+                    key={territory.territoryId}
+                    style={[styles.territoryCard, active && styles.territoryCardActive]}
+                    activeOpacity={0.88}
+                    disabled={territoryLoading}
+                    onPress={() => handleActivateTerritory(territory.territoryId)}
+                  >
+                    <View style={styles.territoryTop}>
+                      <Text style={styles.territoryName}>{territory.label}</Text>
+                      {active ? <Text style={styles.territoryBadge}>활성</Text> : null}
+                    </View>
+                    <Text style={styles.territoryMeta}>
+                      {territory.stationName ?? '기준 역'} · 반경 {territory.radiusKm}km
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+          ) : (
+            <Text style={styles.emptyInlineText}>먼저 현재 위치로 권역을 추가하면 미션 리스트가 더 정확해집니다.</Text>
+          )}
+        </View>
+
+        <View style={styles.sectionCard}>
+          <View style={styles.sectionHeader}>
+            <View style={styles.sectionHeaderCopy}>
+              <Text style={styles.sectionTitle}>동선</Text>
+              <Text style={styles.sectionSubtitle}>등록한 길이 권역 안의 미션 추천과 우선 노출에 반영됩니다.</Text>
+            </View>
           </View>
-        </ScrollView>
-      )}
+
+          {routes.length === 0 ? (
+            <View style={styles.emptyCard}>
+              <MaterialIcons name="alt-route" size={32} color={Colors.primary} style={styles.emptyIcon} />
+              <Text style={styles.emptyTitle}>등록한 동선이 없습니다</Text>
+              <Text style={styles.emptySubtitle}>
+                자주 가는 길을 등록해 두면 맞는 미션이 더 빨리 올라옵니다.
+              </Text>
+              <TouchableOpacity
+                style={styles.addButton}
+                onPress={() => navigation.dispatch(StackActions.push('AddRoute'))}
+                activeOpacity={0.9}
+              >
+                <Text style={styles.addButtonText}>첫 동선 추가</Text>
+              </TouchableOpacity>
+            </View>
+          ) : (
+            <View style={styles.listContainer}>
+              {routes.map((item) => {
+                const routeName = `${item.startStation.stationName} → ${item.endStation.stationName}`;
+                return (
+                  <View key={item.routeId} style={styles.routeCard}>
+                    <View style={styles.routeHeader}>
+                      <Text style={styles.routeName}>{routeName}</Text>
+                      <Text style={styles.routeTime}>{item.departureTime} 출발</Text>
+                    </View>
+
+                    <Text style={styles.routeDays}>
+                      {item.daysOfWeek.map((day) => DAY_LABELS[day]).join(', ')}
+                    </Text>
+
+                    <View style={styles.actionButtons}>
+                      <TouchableOpacity
+                        style={[styles.actionButton, styles.editActionButton]}
+                        onPress={() =>
+                          navigation.dispatch(StackActions.push('EditRoute', { routeId: item.routeId }))
+                        }
+                      >
+                        <Text style={styles.editActionButtonText}>동선 수정</Text>
+                      </TouchableOpacity>
+                      <TouchableOpacity
+                        style={[styles.actionButton, styles.deleteActionButton]}
+                        onPress={() => handleDelete(item.routeId, routeName)}
+                      >
+                        <Text style={styles.deleteActionButtonText}>동선 삭제</Text>
+                      </TouchableOpacity>
+                    </View>
+                  </View>
+                );
+              })}
+
+              {routes.length >= MAX_ROUTES ? (
+                <View style={styles.limitBanner}>
+                  <Text style={styles.limitText}>동선은 최대 5개까지 등록할 수 있습니다.</Text>
+                </View>
+              ) : null}
+            </View>
+          )}
+        </View>
+      </ScrollView>
 
       {routes.length < MAX_ROUTES && routes.length > 0 ? (
         <TouchableOpacity
@@ -176,6 +320,15 @@ export default function RouteManagementScreen() {
           <Text style={styles.fabLabel}>+</Text>
         </TouchableOpacity>
       ) : null}
+    </View>
+  );
+}
+
+function RulePill({ icon, label }: { icon: keyof typeof MaterialIcons.glyphMap; label: string }) {
+  return (
+    <View style={styles.rulePill}>
+      <MaterialIcons name={icon} size={16} color={Colors.primary} />
+      <Text style={styles.rulePillText}>{label}</Text>
     </View>
   );
 }
@@ -212,6 +365,145 @@ const styles = StyleSheet.create({
     marginBottom: 6,
   },
   heroSubtitle: { color: Colors.textSecondary, ...Typography.body },
+  metricRow: {
+    flexDirection: 'row',
+    gap: Spacing.sm,
+  },
+  metricCard: {
+    flex: 1,
+    backgroundColor: Colors.surface,
+    borderRadius: BorderRadius.lg,
+    padding: Spacing.md,
+    ...Shadows.sm,
+  },
+  metricLabel: {
+    color: Colors.textTertiary,
+    fontSize: Typography.fontSize.sm,
+    marginBottom: 6,
+  },
+  metricValue: {
+    color: Colors.textPrimary,
+    fontSize: Typography.fontSize.lg,
+    fontWeight: '800',
+  },
+  boardShortcut: {
+    backgroundColor: Colors.surface,
+    borderRadius: BorderRadius.xl,
+    padding: Spacing.lg,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: Spacing.md,
+    ...Shadows.sm,
+  },
+  boardShortcutCopy: {
+    flex: 1,
+    gap: 4,
+  },
+  boardShortcutTitle: {
+    color: Colors.textPrimary,
+    fontSize: Typography.fontSize.base,
+    fontWeight: '800',
+  },
+  boardShortcutBody: {
+    color: Colors.textSecondary,
+    ...Typography.bodySmall,
+  },
+  sectionCard: {
+    backgroundColor: Colors.surface,
+    borderRadius: BorderRadius.xl,
+    padding: Spacing.lg,
+    gap: Spacing.md,
+    ...Shadows.sm,
+  },
+  sectionHeader: {
+    gap: Spacing.sm,
+  },
+  sectionHeaderCopy: {
+    gap: 4,
+  },
+  sectionTitle: {
+    color: Colors.textPrimary,
+    fontSize: Typography.fontSize.lg,
+    fontWeight: '800',
+  },
+  sectionSubtitle: {
+    color: Colors.textSecondary,
+    ...Typography.bodySmall,
+  },
+  inlinePrimaryButton: {
+    alignSelf: 'flex-start',
+    borderRadius: BorderRadius.full,
+    backgroundColor: Colors.primaryMint,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+  },
+  inlinePrimaryButtonText: {
+    color: Colors.primary,
+    fontSize: Typography.fontSize.sm,
+    fontWeight: '800',
+  },
+  inlineButtonDisabled: {
+    opacity: 0.6,
+  },
+  ruleList: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: Spacing.sm,
+  },
+  rulePill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: BorderRadius.full,
+    backgroundColor: Colors.gray50,
+  },
+  rulePillText: {
+    color: Colors.textSecondary,
+    fontSize: Typography.fontSize.xs,
+    fontWeight: '700',
+  },
+  territoryList: {
+    gap: Spacing.sm,
+  },
+  territoryCard: {
+    borderRadius: BorderRadius.lg,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    padding: Spacing.md,
+    gap: 6,
+  },
+  territoryCardActive: {
+    borderColor: Colors.primary,
+    backgroundColor: Colors.primaryMint,
+  },
+  territoryTop: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    gap: Spacing.sm,
+  },
+  territoryName: {
+    color: Colors.textPrimary,
+    fontSize: Typography.fontSize.base,
+    fontWeight: '800',
+    flex: 1,
+  },
+  territoryMeta: {
+    color: Colors.textSecondary,
+    fontSize: Typography.fontSize.sm,
+  },
+  territoryBadge: {
+    color: Colors.primary,
+    fontSize: Typography.fontSize.xs,
+    fontWeight: '800',
+  },
+  emptyInlineText: {
+    color: Colors.textSecondary,
+    ...Typography.bodySmall,
+  },
   emptyCard: {
     backgroundColor: Colors.surface,
     borderRadius: BorderRadius.xl,

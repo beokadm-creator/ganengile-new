@@ -3,6 +3,8 @@ import { calculatePhase1DeliveryFee, estimateStationCountFromCoords, type Packag
 import { type LegacyStationInfo as StationInfo } from '../utils/request-draft-adapters';
 import type { SharedPricingPolicyConfig } from '../../shared/pricing-policy';
 import type { RoutePricingOverrideConfig } from '../../shared/route-pricing-override';
+import type { Beta1AIQuoteResponse } from './beta1-ai-service';
+import type { RequestPricingContext } from '../types/request';
 
 export interface Beta1RequestCreateInput {
   requesterUserId: string;
@@ -25,6 +27,9 @@ export interface Beta1RequestCreateInput {
   itemValue?: number;
   recipientName: string;
   recipientPhone: string;
+  pickupLocationDetail?: string;
+  storageLocation?: string;
+  specialInstructions?: string;
   urgency?: 'normal' | 'fast' | 'urgent';
   selectedQuoteType: QuoteType;
   directParticipationMode: 'none' | 'requester_to_station' | 'locker_assisted';
@@ -46,6 +51,8 @@ export interface Beta1RequestCreateInput {
       handlingNotes: string[];
     };
   };
+  aiQuoteOverride?: Beta1AIQuoteResponse;
+  pricingContextOverride?: Partial<RequestPricingContext>;
 }
 
 export interface Beta1QuoteCard {
@@ -99,6 +106,10 @@ function sanitizeUserFacingCopy(text: string): string {
   }
 
   return normalized;
+}
+
+function toEtaLabel(minutes: number, fallback: string): string {
+  return Number.isFinite(minutes) && minutes > 0 ? `약 ${Math.round(minutes)}분` : fallback;
 }
 
 export function normalizePackageSize(packageSize: PackageSizeType): SupportedPackageSize {
@@ -179,6 +190,87 @@ function resolveRequestedHour(input: Beta1RequestCreateInput): number {
   return Number.isFinite(hour) ? Math.max(0, Math.min(23, hour)) : new Date().getHours();
 }
 
+export function buildBeta1BasePricing(
+  input: Beta1RequestCreateInput,
+  pricingPolicy?: Partial<SharedPricingPolicyConfig>
+): PricingQuote['finalPricing'] {
+  const requestedHour = input.pricingContextOverride?.requestedHour ?? resolveRequestedHour(input);
+  const base = calculatePhase1DeliveryFee(
+    {
+      stationCount: resolveEstimatedStationCount(input),
+      weight: input.weightKg,
+      packageSize: normalizePackageSize(input.packageSize),
+      urgency: input.urgency ?? 'normal',
+      context: {
+        requestedHour,
+        weather: input.pricingContextOverride?.weather,
+        isPeakTime:
+          input.pricingContextOverride?.isPeakTime ??
+          (input.requestMode === 'reservation' ? false : undefined),
+        isProfessionalPeak: input.pricingContextOverride?.isProfessionalPeak,
+        nearbyGillerCount: input.pricingContextOverride?.nearbyGillerCount ?? undefined,
+      },
+    },
+    pricingPolicy
+  );
+
+  return {
+    publicPrice: base.totalFee,
+    depositAmount: input.itemValue ? Math.round(input.itemValue) : 0,
+    baseFee: base.baseFee,
+    distanceFee: base.distanceFee,
+    weightFee: base.weightFee,
+    sizeFee: base.sizeFee,
+    urgencySurcharge: base.urgencySurcharge,
+    publicFare: base.publicFare,
+    lockerFee: 0,
+    addressPickupFee: 0,
+    addressDropoffFee: 0,
+    serviceFee: base.serviceFee,
+    vat: base.vat,
+  };
+}
+
+export function applyAIQuoteResponseToCards(
+  baseCards: Beta1QuoteCard[],
+  aiQuoteResponse: Beta1AIQuoteResponse
+): {
+  quoteCards: Beta1QuoteCard[];
+  recommendedQuoteType: Beta1QuoteCard['quoteType'];
+} {
+  const suggestions = new Map(aiQuoteResponse.quotes.map((quote) => [quote.quoteType, quote]));
+
+  const quoteCards = baseCards.map((card) => {
+    const suggestion = suggestions.get(card.quoteType);
+    if (!suggestion) {
+      return card;
+    }
+
+    return {
+      ...card,
+      label: suggestion.speedLabel || card.label,
+      headline: sanitizeUserFacingCopy(suggestion.headline || card.headline),
+      etaLabel: toEtaLabel(suggestion.etaMinutes, card.etaLabel),
+      priceLabel: `${suggestion.pricing.publicPrice.toLocaleString()}원`,
+      recommendationReason: sanitizeUserFacingCopy(
+        suggestion.recommendationReason || card.recommendationReason
+      ),
+      includesLocker: suggestion.includesLocker,
+      includesAddressPickup: suggestion.includesAddressPickup,
+      includesAddressDropoff: suggestion.includesAddressDropoff,
+      pricing: suggestion.pricing,
+    };
+  });
+
+  const recommendedQuoteType =
+    quoteCards.find((card) => card.quoteType === aiQuoteResponse.recommendedQuoteType)?.quoteType ??
+    quoteCards.find((card) => card.quoteType === 'balanced')?.quoteType ??
+    quoteCards[0]?.quoteType ??
+    'balanced';
+
+  return { quoteCards, recommendedQuoteType };
+}
+
 export function buildBeta1QuoteCards(
   input: Beta1RequestCreateInput,
   pricingPolicy?: Partial<SharedPricingPolicyConfig>,
@@ -193,14 +285,18 @@ export function buildBeta1QuoteCards(
   const addressPickupFee = hasAddressPickup ? (resolvedPolicy?.quoteAdjustments?.addressPickupFee ?? 900) : 0;
   const addressDropoffFee = hasAddressDropoff ? (resolvedPolicy?.quoteAdjustments?.addressDropoffFee ?? 800) : 0;
   const stationCount = resolveEstimatedStationCount(input);
+  const requestedHour = input.pricingContextOverride?.requestedHour ?? resolveRequestedHour(input);
   const base = calculatePhase1DeliveryFee({
     stationCount,
     weight: input.weightKg,
     packageSize: normalizePackageSize(input.packageSize),
     urgency: input.urgency ?? 'normal',
     context: {
-      requestedHour: resolveRequestedHour(input),
-      isPeakTime: reservationMode ? false : undefined,
+      requestedHour,
+      weather: input.pricingContextOverride?.weather,
+      isPeakTime: input.pricingContextOverride?.isPeakTime ?? (reservationMode ? false : undefined),
+      isProfessionalPeak: input.pricingContextOverride?.isProfessionalPeak,
+      nearbyGillerCount: input.pricingContextOverride?.nearbyGillerCount ?? undefined,
     },
   }, pricingPolicy);
 

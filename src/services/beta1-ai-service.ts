@@ -82,6 +82,12 @@ function stationPayload(station: StationInfo) {
   };
 }
 
+function toAIUrgency(value?: 'normal' | 'fast' | 'urgent' | 'low' | 'medium' | 'high'): 'low' | 'medium' | 'high' {
+  if (value === 'urgent' || value === 'high') return 'high';
+  if (value === 'fast' || value === 'medium') return 'medium';
+  return 'low';
+}
+
 export async function analyzeRequestDraftWithAI(
   requestDraft: Pick<RequestDraft, 'requesterUserId' | 'requestMode' | 'originRef' | 'destinationRef' | 'packageDraft' | 'recipient' | 'preferredSchedule'>
 ): Promise<Beta1AIAnalysisResponse> {
@@ -182,7 +188,7 @@ export async function generatePricingQuotesWithAI(requestData: CreateRequestData
     requestMode: requestData.requestMode,
     preferredPickupTime: requestData.preferredTime?.departureTime,
     preferredArrivalTime: requestData.preferredTime?.arrivalTime,
-    urgency: requestData.urgency,
+    urgency: toAIUrgency(requestData.urgency),
     directParticipationMode: requestData.storageLocation ? 'locker_assisted' : 'none',
     basePricing: {
       publicPrice: fee.totalFee,
@@ -196,6 +202,86 @@ export async function generatePricingQuotesWithAI(requestData: CreateRequestData
       serviceFee: fee.serviceFee,
       vat: fee.vat,
     },
+  });
+
+  return response.data;
+}
+
+export async function generatePricingQuotesForBeta1Input(input: {
+  requesterUserId: string;
+  pickupStation: StationInfo;
+  deliveryStation: StationInfo;
+  packageDescription?: string;
+  itemValue?: number;
+  weightKg?: number;
+  packageSize?: 'small' | 'medium' | 'large' | 'xl';
+  requestMode?: 'immediate' | 'reservation';
+  preferredPickupTime?: string;
+  preferredArrivalTime?: string;
+  urgency?: 'normal' | 'fast' | 'urgent';
+  directParticipationMode?: 'none' | 'requester_to_station' | 'locker_assisted';
+  basePricing: {
+    publicPrice: number;
+    depositAmount: number;
+    baseFee: number;
+    distanceFee: number;
+    weightFee: number;
+    sizeFee: number;
+    urgencySurcharge: number;
+    publicFare: number;
+    serviceFee: number;
+    vat: number;
+  };
+}): Promise<Beta1AIQuoteResponse> {
+  const functions = getFunctions();
+  const callable = httpsCallable<
+    {
+      requesterUserId: string;
+      pickupStation: ReturnType<typeof stationPayload>;
+      deliveryStation: ReturnType<typeof stationPayload>;
+      packageDraft: {
+        description?: string;
+        estimatedValue?: number;
+        estimatedWeightKg?: number;
+        estimatedSize?: 'small' | 'medium' | 'large' | 'xl';
+      };
+      requestMode?: 'immediate' | 'reservation';
+      preferredPickupTime?: string;
+      preferredArrivalTime?: string;
+      urgency?: 'low' | 'medium' | 'high';
+      directParticipationMode: 'none' | 'requester_to_station' | 'locker_assisted';
+      basePricing: {
+        publicPrice: number;
+        depositAmount: number;
+        baseFee: number;
+        distanceFee: number;
+        weightFee: number;
+        sizeFee: number;
+        urgencySurcharge: number;
+        publicFare: number;
+        serviceFee: number;
+        vat: number;
+      };
+    },
+    Beta1AIQuoteResponse
+  >(functions, 'beta1GeneratePricingQuotes');
+
+  const response = await callable({
+    requesterUserId: input.requesterUserId,
+    pickupStation: stationPayload(input.pickupStation),
+    deliveryStation: stationPayload(input.deliveryStation),
+    packageDraft: {
+      description: input.packageDescription,
+      estimatedValue: input.itemValue,
+      estimatedWeightKg: input.weightKg,
+      estimatedSize: input.packageSize,
+    },
+    requestMode: input.requestMode,
+    preferredPickupTime: input.preferredPickupTime,
+    preferredArrivalTime: input.preferredArrivalTime,
+    urgency: toAIUrgency(input.urgency),
+    directParticipationMode: input.directParticipationMode ?? 'none',
+    basePricing: input.basePricing,
   });
 
   return response.data;

@@ -187,6 +187,11 @@ type FirestoreTimestampLike = {
 type FirestoreMatchingRequestDoc = {
   id?: string;
   requesterId?: string;
+  beta1RequestStatus?: string;
+  requestDraftId?: string | null;
+  missionProgress?: {
+    totalMissionCount?: number | null;
+  } | null;
   pickupStation?: { stationName?: string };
   deliveryStation?: { stationName?: string };
   preferredTime?: {
@@ -207,11 +212,38 @@ type FirestoreMatchingRequestDoc = {
 type FirestorePendingRequestDoc = FilterRequestBase & {
   requestId?: string;
   requesterId?: string;
+  beta1RequestStatus?: string;
+  requestDraftId?: string | null;
+  missionProgress?: {
+    totalMissionCount?: number | null;
+  } | null;
   requesterName?: string;
   senderName?: string;
   matchedGillerId?: string;
   feeBreakdown?: { totalFee?: number };
 };
+
+function isMissionBoardManagedRequest(
+  request:
+    | Pick<FirestoreMatchingRequestDoc, 'beta1RequestStatus' | 'requestDraftId' | 'missionProgress'>
+    | Pick<FirestorePendingRequestDoc, 'beta1RequestStatus' | 'requestDraftId' | 'missionProgress'>
+    | undefined
+): boolean {
+  if (!request) {
+    return false;
+  }
+
+  if (typeof request.beta1RequestStatus === 'string' && request.beta1RequestStatus.length > 0) {
+    return true;
+  }
+
+  if (typeof request.requestDraftId === 'string' && request.requestDraftId.length > 0) {
+    return true;
+  }
+
+  const totalMissionCount = request.missionProgress?.totalMissionCount;
+  return typeof totalMissionCount === 'number' && totalMissionCount > 0;
+}
 
 function normalizeBadges(badges?: BadgeCollections): NormalizedBadgeCollections {
   return {
@@ -801,6 +833,7 @@ export async function getMatchingResults(requestId: string) {
 
 /**
  * Giller accepts a delivery request
+ * Legacy path only. New giller flows should accept mission bundles from the mission board.
  * @param requestId Request ID
  * @param gillerId Giller ID who is accepting
  * @returns Success status and deliveryId
@@ -819,6 +852,10 @@ export async function acceptRequest(
 
     const request = requestDoc.data() as FirestoreMatchingRequestDoc;
     const requesterId = request.requesterId ?? '';
+
+    if (isMissionBoardManagedRequest(request)) {
+      return { success: false, message: '이 요청은 미션 보드에서 수락해야 합니다.' };
+    }
 
     if (request.status !== 'matched' && request.status !== 'pending') {
       return { success: false, message: '현재 처리할 수 없는 요청입니다.' };
@@ -879,6 +916,7 @@ export async function acceptRequest(
 
 /**
  * Giller declines a delivery request
+ * Legacy path only. Mission-board based declines should stay at the bundle layer.
  * @param requestId Request ID
  * @param gillerId Giller ID who is declining
  * @returns Success status
@@ -916,6 +954,7 @@ export async function declineRequest(
 
 /**
  * Find a single best giller for a request (for UI display)
+ * Legacy helper kept for requester-facing compatibility. Giller-facing discovery should use mission bundles.
  * @param requestId Request ID
  * @returns Giller info or error
  */
@@ -1412,6 +1451,7 @@ function normalizeStation<T extends FilterStation>(station: T | undefined): T | 
 
 /**
  * 현재 대기 중인 요청 목록을 가져옵니다.
+ * Legacy request-board helper. New giller discovery should rely on mission bundles instead.
  * @returns 길러에게 노출할 대기 요청 목록
  */
 export async function getPendingGillerRequests(): Promise<FilterRequestBase[]> {
@@ -1441,6 +1481,10 @@ export async function getPendingGillerRequests(): Promise<FilterRequestBase[]> {
 
       // 이미 매칭된 요청은 제외
       if (data.matchedGillerId) {
+        return;
+      }
+
+      if (isMissionBoardManagedRequest(data)) {
         return;
       }
 

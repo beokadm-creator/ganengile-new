@@ -36,6 +36,7 @@ import {
   getPayment,
   hasGillerEarningForRequest,
 } from './payment-service';
+import { sendRequestExecutionNotification } from './matching-notification';
 import type { DeliveryStatus, DeliveryRequest } from '../types/delivery';
 import { ActorSelectionActorType } from '../types/beta1';
 
@@ -71,6 +72,11 @@ type LegacyFeeInput = {
 
 type DeliveryRequestLike = {
   status?: string;
+  beta1RequestStatus?: string;
+  requestDraftId?: string | null;
+  missionProgress?: {
+    totalMissionCount?: number | null;
+  } | null;
   requesterId?: string;
   gllerId?: string;
   pickupStation?: DeliveryRequest['pickupStation'];
@@ -99,6 +105,23 @@ type DeliveryRequestLike = {
   recipientCode?: string;
 };
 
+function isMissionBoardManagedRequest(request: DeliveryRequestLike | undefined): boolean {
+  if (!request) {
+    return false;
+  }
+
+  if (typeof request.beta1RequestStatus === 'string' && request.beta1RequestStatus.length > 0) {
+    return true;
+  }
+
+  if (typeof request.requestDraftId === 'string' && request.requestDraftId.length > 0) {
+    return true;
+  }
+
+  const totalMissionCount = request.missionProgress?.totalMissionCount;
+  return typeof totalMissionCount === 'number' && totalMissionCount > 0;
+}
+
 type NormalizedConfirmedFee = {
   totalFee: number;
   deliveryFee: number;
@@ -122,6 +145,7 @@ type DeliveryTrackingPayload = {
 type DeliveryDocLike = {
   deliveryId?: string;
   requestId?: string;
+  requesterId?: string;
   gillerId?: string;
   gllerId?: string;
   status?: string;
@@ -335,6 +359,7 @@ export interface RequesterConfirmationData {
 /**
  * Giller accepts a delivery request
  * Updates request status from 'matched' to 'accepted'
+ * Legacy request-based acceptance. Mission-board flows should accept mission bundles instead.
  */
 export async function gillerAcceptRequest(
   requestId: string,
@@ -351,6 +376,10 @@ export async function gillerAcceptRequest(
     const request = requestDoc.data() as DeliveryRequestLike | undefined;
     if (!request) {
       return { success: false, message: '요청 데이터를 찾을 수 없습니다.' };
+    }
+
+    if (isMissionBoardManagedRequest(request)) {
+      return { success: false, message: '이 요청은 미션 보드에서 수락해야 합니다.' };
     }
 
     if (request.status === 'accepted') {
@@ -834,6 +863,15 @@ export async function verifyPickup(data: PickupVerificationData): Promise<{ succ
         pickedUpAt: serverTimestamp(),
         updatedAt: serverTimestamp(),
       });
+      if (delivery.requesterId) {
+        await sendRequestExecutionNotification(
+          delivery.requesterId,
+          delivery.requestId,
+          'picked_up',
+          '물건 인수가 확인되었습니다',
+          '길러가 인수 확인을 마쳤습니다.'
+        );
+      }
     }
 
     return { success: true, message: '픽업이 완료되었습니다.' };
@@ -948,6 +986,15 @@ export async function completeDelivery(data: DeliveryCompletionData): Promise<{ 
         deliveredAt: serverTimestamp(),
         updatedAt: serverTimestamp(),
       });
+      if (delivery.requesterId) {
+        await sendRequestExecutionNotification(
+          delivery.requesterId,
+          delivery.requestId,
+          'delivered',
+          '전달 완료가 등록되었습니다',
+          '사진과 인증 정보가 함께 기록되었습니다.'
+        );
+      }
     }
 
     return { success: true, message: '배송 전달이 완료되었습니다. 수령자 확인을 기다립니다.' };
@@ -1231,6 +1278,24 @@ export async function markAsArrived(deliveryId: string): Promise<{ success: bool
       'tracking.progress': 80,
       updatedAt: serverTimestamp(),
     });
+
+    if (delivery.requestId) {
+      const requestRef = doc(db, 'requests', delivery.requestId);
+      await updateDoc(requestRef, {
+        status: 'arrived' as DeliveryStatus,
+        arrivedAt: serverTimestamp(),
+        updatedAt: serverTimestamp(),
+      });
+      if (delivery.requesterId) {
+        await sendRequestExecutionNotification(
+          delivery.requesterId,
+          delivery.requestId,
+          'arrived',
+          '목적지 도착이 확인되었습니다',
+          '이제 전달 마무리를 진행합니다.'
+        );
+      }
+    }
 
     return { success: true, message: '목적지에 도착했습니다.' };
   } catch (error) {

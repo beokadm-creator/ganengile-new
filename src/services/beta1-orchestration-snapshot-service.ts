@@ -1,6 +1,7 @@
 import { collection, getDocs } from 'firebase/firestore';
 import { db } from './firebase';
 import { getWalletLedger } from './beta1-wallet-service';
+import { getMissionExposurePricing } from './mission-exposure-pricing-service';
 import type { ActorSelectionActorType, LocationRef, MissionType, MissionBundle } from '../types/beta1';
 import { MissionBundleStatus as BundleStatus } from '../types/beta1';
 
@@ -24,6 +25,7 @@ export interface Beta1HomeSnapshot {
   }>;
   missionCards: Array<{
     id: string;
+    requestId?: string;
     title: string;
     status: string;
     windowLabel: string;
@@ -36,6 +38,25 @@ export interface Beta1HomeSnapshot {
     legSummary?: string;
     fallbackLabel?: string;
     selectionState?: 'available' | 'accepted' | 'fallback';
+    deliveryId?: string;
+    routeLabel?: string;
+    segmentLabel?: string;
+    startSequence?: number;
+    endSequence?: number;
+    rewardAmount?: number;
+    originPoint?: { latitude: number; longitude: number; label?: string } | null;
+    destinationPoint?: { latitude: number; longitude: number; label?: string } | null;
+    candidateCount?: number;
+    requiresExternalPartner?: boolean;
+    recommendedActorType?: ActorSelectionActorType;
+    bundleType?: 'single_leg' | 'contiguous_range';
+    ageMinutes?: number;
+    exposureLabel?: string;
+    rewardBoostLabel?: string;
+    recipientSummary?: string;
+    pickupLocationDetail?: string;
+    storageLocation?: string;
+    specialInstructions?: string;
   }>;
   wallet: {
     chargeBalance: number;
@@ -83,6 +104,11 @@ type Beta1RequestDoc = {
   preferredTime?: { departureTime?: string; arrivalTime?: string };
   beta1RequestStatus?: string;
   status?: string;
+  recipientName?: string;
+  recipientPhone?: string;
+  pickupLocationDetail?: string;
+  storageLocation?: string;
+  specialInstructions?: string;
   updatedAt?: { toMillis?: () => number };
   createdAt?: { toMillis?: () => number };
 };
@@ -99,6 +125,7 @@ type Beta1MissionDoc = {
   assignedGillerUserId?: string;
   originRef?: LocationRef;
   destinationRef?: LocationRef;
+  createdAt?: unknown;
 };
 
 type Beta1MissionBundleDoc = MissionBundle & {
@@ -114,6 +141,7 @@ type Beta1MissionBundleDoc = MissionBundle & {
   selectedGillerUserId?: string;
   requiresExternalPartner?: boolean;
   fallbackDeliveryIds?: string[];
+  createdAt?: unknown;
 };
 
 type Beta1DeliveryDoc = {
@@ -147,6 +175,30 @@ function asRecord(value: unknown): Record<string, unknown> {
   return typeof value === 'object' && value != null ? (value as Record<string, unknown>) : {};
 }
 
+function toMapPoint(ref?: LocationRef | null) {
+  const latitude = typeof ref?.latitude === 'number' ? ref.latitude : null;
+  const longitude = typeof ref?.longitude === 'number' ? ref.longitude : null;
+
+  if (latitude == null || longitude == null || latitude === 0 || longitude === 0) {
+    return null;
+  }
+
+  return {
+    latitude,
+    longitude,
+    label: ref?.stationName ?? ref?.addressText ?? undefined,
+  };
+}
+
+function buildMaskedRecipientSummary(request?: Beta1RequestDoc) {
+  if (!request?.recipientName) {
+    return undefined;
+  }
+
+  const phonePrefix = String(request.recipientPhone ?? '').replace(/\D/g, '').slice(0, 3);
+  return `${String(request.recipientName).slice(0, 1)}*${phonePrefix ? ` / ${phonePrefix}-****` : ''}`;
+}
+
 async function getUserWalletSummary(userId: string): Promise<Beta1HomeSnapshot['wallet']> {
   const walletLedger = await getWalletLedger(userId);
   return {
@@ -167,13 +219,19 @@ export async function getBeta1HomeSnapshot(userId: string, role: 'requester' | '
     getUserWalletSummary(userId),
   ]);
 
-  const requests = requestSnapshot.docs
-    .map((docItem) => ({ id: docItem.id, ...asRecord(docItem.data()) }) as Beta1RequestDoc)
+  const allMissionDocs = missionSnapshot.docs.map(
+    (docItem) => ({ id: docItem.id, ...asRecord(docItem.data()) }) as Beta1MissionDoc
+  );
+  const missionsById = new Map(allMissionDocs.map((mission) => [String(mission.id), mission] as const));
+
+  const allRequests = requestSnapshot.docs
+    .map((docItem) => ({ id: docItem.id, ...asRecord(docItem.data()) }) as Beta1RequestDoc);
+  const requestsById = new Map(allRequests.map((request) => [String(request.id), request] as const));
+
+  const requests = allRequests
     .filter((request) => request.requesterId === userId || request.requesterUserId === userId);
 
-  const missions = missionSnapshot.docs
-    .map((docItem) => ({ id: docItem.id, ...asRecord(docItem.data()) }) as Beta1MissionDoc)
-    .filter((mission) => mission.assignedGillerUserId === userId);
+  const missions = allMissionDocs.filter((mission) => mission.assignedGillerUserId === userId);
 
   const missionBundles = missionBundleSnapshot.docs
     .map((docItem) => ({
@@ -254,7 +312,16 @@ export async function getBeta1HomeSnapshot(userId: string, role: 'requester' | '
   });
 
   const missionCardsFromBundles = missionBundles.map((bundle) => {
-    const rewardTotal = Number(bundle.rewardTotal ?? 0);
+    const request = bundle.requestId ? requestsById.get(String(bundle.requestId)) : undefined;
+    const baseRewardTotal = Number(bundle.rewardTotal ?? 0);
+    const exposurePricing = getMissionExposurePricing(baseRewardTotal, bundle.createdAt);
+    const rewardTotal = exposurePricing.adjustedReward;
+    const bundleMissions = (bundle.missionIds ?? [])
+      .map((missionId) => missionsById.get(String(missionId)))
+      .filter((mission): mission is Beta1MissionDoc => mission != null)
+      .sort((left, right) => Number(left.sequence ?? 0) - Number(right.sequence ?? 0));
+    const firstMission = bundleMissions[0];
+    const lastMission = bundleMissions[bundleMissions.length - 1];
     const selectedByUser = bundle.selectedGillerUserId === userId;
     const selectionState: 'available' | 'accepted' | 'fallback' =
       selectedByUser ? 'accepted' : bundle.fallbackDeliveryIds?.length ? 'fallback' : 'available';
@@ -267,27 +334,49 @@ export async function getBeta1HomeSnapshot(userId: string, role: 'requester' | '
 
     return {
       id: bundle.missionBundleId,
+      requestId: bundle.requestId,
       bundleId: bundle.missionBundleId,
+      deliveryId: bundle.deliveryId,
       missionIds: bundle.missionIds,
       title: bundle.title ?? '구간 선택 미션',
+      routeLabel: bundle.title ?? '구간 선택 미션',
       status: selectedByUser ? 'accepted' : 'available',
       windowLabel: bundle.windowLabel ?? '연속 구간 선택 가능',
       rewardLabel: `${rewardTotal.toLocaleString()}원`,
+      rewardAmount: rewardTotal,
+      ageMinutes: exposurePricing.ageMinutes,
+      exposureLabel: exposurePricing.exposureLabel,
+      rewardBoostLabel: exposurePricing.rewardBoostLabel,
+      candidateCount: bundle.candidateGillerUserIds?.length ?? 0,
+      requiresExternalPartner: bundle.requiresExternalPartner,
+      recommendedActorType: bundle.recommendedActorType,
+      bundleType: bundle.bundleType,
+      recipientSummary: buildMaskedRecipientSummary(request),
+      pickupLocationDetail: request?.pickupLocationDetail,
+      storageLocation: request?.storageLocation,
+      specialInstructions: request?.specialInstructions,
       strategyTitle: selectedByUser ? '내가 맡은 구간' : '어디까지 수행할지 선택',
       strategyBody:
         bundle.summary ??
         '길러가 선택한 범위만 먼저 확정하고, 남는 주소 구간은 fallback actor를 붙입니다.',
       actionLabel: selectedByUser ? '수락 완료' : '이 구간 수행하기',
       legSummary: bundle.summary,
+      segmentLabel: `${bundle.startSequence ?? 1}-${bundle.endSequence ?? bundle.startSequence ?? 1}구간`,
+      startSequence: bundle.startSequence,
+      endSequence: bundle.endSequence,
+      originPoint: toMapPoint(firstMission?.originRef ?? null),
+      destinationPoint: toMapPoint(lastMission?.destinationRef ?? null),
       fallbackLabel,
       selectionState,
     };
   });
 
   const missionCardsFromMissions = activeMissions.map((mission) => {
+    const request = mission.requestId ? requestsById.get(String(mission.requestId)) : undefined;
     const missionType = String(mission.missionType ?? 'mission');
     const missionStatus = String(mission.status ?? 'queued');
-    const recommendedReward = Number(mission.currentReward ?? 0);
+    const exposurePricing = getMissionExposurePricing(Number(mission.currentReward ?? 0), mission.createdAt);
+    const recommendedReward = exposurePricing.adjustedReward;
     const isLockerMission = missionType === 'locker_dropoff' || missionType === 'locker_pickup';
     const isOpenMission = missionStatus === 'queued' || missionStatus === 'offered';
     const strategyTitle =
@@ -305,13 +394,33 @@ export async function getBeta1HomeSnapshot(userId: string, role: 'requester' | '
 
     return {
       id: String(mission.id),
+      requestId: mission.requestId,
+      deliveryId: mission.deliveryId,
       title: isLockerMission ? '거점 연계 미션' : '이동 구간 미션',
+      routeLabel: `${String(mission.originRef?.stationName ?? mission.originRef?.addressText ?? '출발')} -> ${String(mission.destinationRef?.stationName ?? mission.destinationRef?.addressText ?? '도착')}`,
       status: missionStatus,
       windowLabel: missionStatus === 'queued' ? '지금 수락 가능' : '시간 확인 필요',
       rewardLabel: `${recommendedReward.toLocaleString()}원`,
+      rewardAmount: recommendedReward,
+      ageMinutes: exposurePricing.ageMinutes,
+      exposureLabel: exposurePricing.exposureLabel,
+      rewardBoostLabel: exposurePricing.rewardBoostLabel,
+      candidateCount: 0,
+      requiresExternalPartner: false,
+      recommendedActorType: undefined,
+      bundleType: 'single_leg' as const,
+      recipientSummary: buildMaskedRecipientSummary(request),
+      pickupLocationDetail: request?.pickupLocationDetail,
+      storageLocation: request?.storageLocation,
+      specialInstructions: request?.specialInstructions,
       strategyTitle,
       strategyBody,
       actionLabel: '진행 상태 보기',
+      segmentLabel: `${mission.sequence ?? 1}구간`,
+      startSequence: mission.sequence,
+      endSequence: mission.sequence,
+      originPoint: toMapPoint(mission.originRef ?? null),
+      destinationPoint: toMapPoint(mission.destinationRef ?? null),
       selectionState: 'accepted' as const,
     };
   });
@@ -319,19 +428,38 @@ export async function getBeta1HomeSnapshot(userId: string, role: 'requester' | '
   const deliveryFallbackCards = activeDeliveries
     .filter((delivery) => !activeMissions.some((mission) => mission.deliveryId === delivery.id))
     .map((delivery) => {
+      const request = delivery.requestId ? requestsById.get(String(delivery.requestId)) : undefined;
       const deliveryStatus = String(delivery.beta1DeliveryStatus ?? delivery.status ?? 'accepted');
       const pickupName = String(delivery.pickupStation?.stationName ?? '출발역');
       const deliveryName = String(delivery.deliveryStation?.stationName ?? '도착역');
       const reward = Number(delivery.fee?.breakdown?.gillerFee ?? delivery.fee?.totalFee ?? 0);
       return {
         id: `delivery-${delivery.id}`,
+        requestId: delivery.requestId,
+        deliveryId: delivery.id,
         title: `${pickupName} -> ${deliveryName}`,
+        routeLabel: `${pickupName} -> ${deliveryName}`,
         status: deliveryStatus,
         windowLabel: deliveryStatus === 'accepted' ? '지금 진행 중' : '인계 일정 확인',
         rewardLabel: `${reward.toLocaleString()}원`,
+        rewardAmount: reward,
+        ageMinutes: 0,
+        exposureLabel: '진행 중 배송',
+        rewardBoostLabel: undefined,
+        candidateCount: 0,
+        requiresExternalPartner: false,
+        recommendedActorType: undefined,
+        bundleType: 'contiguous_range' as const,
+        recipientSummary: buildMaskedRecipientSummary(request),
+        pickupLocationDetail: request?.pickupLocationDetail,
+        storageLocation: request?.storageLocation,
+        specialInstructions: request?.specialInstructions,
         strategyTitle: '수락한 배송 유지',
         strategyBody: '미션 문서가 늦게 생성되더라도 수락한 배송이 홈 목록에서 사라지지 않도록 배송 문서를 함께 기준으로 보여줍니다.',
         actionLabel: '배송 보기',
+        segmentLabel: '전체 배송',
+        originPoint: null,
+        destinationPoint: null,
         selectionState: 'accepted' as const,
       };
     });

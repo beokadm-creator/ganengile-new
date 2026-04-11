@@ -28,6 +28,7 @@ import RouteManagementScreen from '../screens/main/RouteManagementScreen';
 import { MatchingResultScreen } from '../screens/main/MatchingResultScreen';
 import PickupVerificationScreen from '../screens/main/PickupVerificationScreen';
 import DeliveryCompletionScreen from '../screens/main/DeliveryCompletionScreen';
+import ProfessionalMissionBridgeScreen from '../screens/main/ProfessionalMissionBridgeScreen';
 import RatingScreen from '../screens/main/RatingScreen';
 import ChatListScreen from '../screens/main/ChatListScreen';
 import ChatScreen from '../screens/main/ChatScreen';
@@ -78,6 +79,7 @@ const SCREEN_TITLES: Record<string, string> = {
   MatchingResult: '매칭 진행',
   PickupVerification: '픽업 확인',
   DeliveryCompletion: '배송 완료',
+  ProfessionalMissionBridge: '전문 길러 연동',
   DepositPayment: '보증금 결제',
   PointHistory: '지갑 내역',
   PointWithdraw: '출금 요청',
@@ -295,6 +297,11 @@ export default function MainNavigator() {
       <Stack.Screen
         name="DeliveryCompletion"
         component={DeliveryCompletionScreen}
+        options={{ headerShown: true }}
+      />
+      <Stack.Screen
+        name="ProfessionalMissionBridge"
+        component={ProfessionalMissionBridgeScreen}
         options={{ headerShown: true }}
       />
       <Stack.Screen

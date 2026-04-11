@@ -95,6 +95,14 @@ export interface Request {
   sourceRequestId?: string | null;
   pricingPolicyVersion?: string;
   pricingContext?: RequestPricingContext;
+  missionProgress?: {
+    acceptedMissionCount: number;
+    totalMissionCount: number;
+    partiallyMatched: boolean;
+    lastBundleId?: string;
+    lastMatchedAt?: Timestamp;
+    rewardBoostAmount?: number;
+  };
 
   // 요청자 정보
   requesterId: string;
@@ -107,6 +115,9 @@ export interface Request {
   recipientName?: string;
   recipientPhone?: string;
   selectedPhotoIds?: string[];
+  pickupLocationDetail?: string;
+  storageLocation?: string;
+  specialInstructions?: string;
 
   // 패키지 정보
   packageInfo: PackageInfo;

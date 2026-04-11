@@ -156,7 +156,16 @@ export default function GillerDropoffAtLockerScreen() {
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
       <View style={styles.hero}>
         <Text style={styles.kicker}>사물함 보관</Text>
-        <Text style={styles.title}>선택한 사물함 예약, 보관 사진, 배송 상태 업데이트 순서로 진행합니다.</Text>
+        <Text style={styles.title}>선택, 예약, 사진, 완료 순서로 진행합니다.</Text>
+      </View>
+
+      <View style={styles.summaryCard}>
+        <View style={styles.summaryRow}>
+          <SummaryChip label={step === 'reserve' ? '예약 필요' : '예약 확인'} active={step === 'reserve'} />
+          <SummaryChip label={step === 'photo' ? '사진 필요' : '사진 확인'} active={step === 'photo'} />
+          <SummaryChip label={step === 'complete' ? '완료 처리' : '완료 대기'} active={step === 'complete'} />
+        </View>
+        <Text style={styles.summaryText}>지금 필요한 단계만 진행하면 됩니다.</Text>
       </View>
 
       <View style={styles.card}>
@@ -186,12 +195,27 @@ export default function GillerDropoffAtLockerScreen() {
   );
 }
 
+function SummaryChip({ label, active }: { label: string; active: boolean }) {
+  return (
+    <View style={[styles.summaryChip, active ? styles.summaryChipActive : undefined]}>
+      <Text style={[styles.summaryChipText, active ? styles.summaryChipTextActive : undefined]}>{label}</Text>
+    </View>
+  );
+}
+
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: Colors.background },
   content: { padding: Spacing.xl, gap: Spacing.lg },
   hero: { backgroundColor: Colors.primaryMint, borderRadius: BorderRadius.xl, padding: Spacing.xl, gap: Spacing.sm, ...Shadows.sm },
   kicker: { color: Colors.primary, fontSize: Typography.fontSize.xs, fontWeight: '800', textTransform: 'uppercase', letterSpacing: 1 },
   title: { color: Colors.textPrimary, fontSize: Typography.fontSize['2xl'], fontWeight: '800', lineHeight: 32 },
+  summaryCard: { backgroundColor: Colors.surface, borderRadius: BorderRadius.xl, padding: Spacing.lg, gap: Spacing.sm, borderWidth: 1, borderColor: Colors.border },
+  summaryRow: { flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.sm },
+  summaryChip: { paddingHorizontal: 12, paddingVertical: 8, borderRadius: BorderRadius.full, backgroundColor: Colors.border },
+  summaryChipActive: { backgroundColor: Colors.primaryMint },
+  summaryChipText: { color: Colors.textSecondary, fontSize: Typography.fontSize.xs, fontWeight: '800' },
+  summaryChipTextActive: { color: Colors.primary },
+  summaryText: { color: Colors.textSecondary, fontSize: Typography.fontSize.sm, lineHeight: 20 },
   card: { backgroundColor: Colors.surface, borderRadius: BorderRadius.xl, padding: Spacing.xl, gap: Spacing.md, borderWidth: 1, borderColor: Colors.border },
   sectionTitle: { color: Colors.textPrimary, fontSize: Typography.fontSize.lg, fontWeight: '800', marginBottom: 4 },
   bodyText: { color: Colors.textSecondary, fontSize: Typography.fontSize.base, fontWeight: '600' },

@@ -19,6 +19,7 @@ import { Timestamp } from 'firebase/firestore';
 
 import AppTopBar from '../../components/common/AppTopBar';
 import { ensureChatRoomForRequest, getChatRoomByRequestId } from '../../services/chat-service';
+import { deliveryPartnerService } from '../../services/delivery-partner-service';
 import {
   cancelDeliveryFlow,
   confirmDeliveryByRequester,
@@ -31,6 +32,10 @@ import {
   increaseRequestBid,
   subscribeToRequest,
 } from '../../services/request-service';
+import {
+  getRequesterProgressDescription,
+  getRequesterStatusLabel,
+} from '../../services/request-status-presentation-service';
 import { BorderRadius, Colors, Shadows, Spacing } from '../../theme';
 import type { MainStackNavigationProp, MainStackParamList } from '../../types/navigation';
 import { RequestStatus, type Request } from '../../types/request';
@@ -70,71 +75,6 @@ function getRequestAmount(request: Request): number {
   }
 
   return 0;
-}
-
-function getStatusLabel(status: RequestStatus): string {
-  switch (status) {
-    case RequestStatus.PENDING:
-      return '매칭 대기';
-    case RequestStatus.MATCHED:
-      return '길러 매칭 완료';
-    case RequestStatus.ACCEPTED:
-      return '배송 수락 완료';
-    case RequestStatus.IN_TRANSIT:
-      return '배송 이동 중';
-    case RequestStatus.ARRIVED:
-      return '도착 확인';
-    case RequestStatus.AT_LOCKER:
-      return '사물함 보관';
-    case RequestStatus.DELIVERED:
-      return '수령 확인 대기';
-    case RequestStatus.COMPLETED:
-      return '배송 완료';
-    case RequestStatus.CANCELLED:
-      return '요청 취소';
-    default:
-      return '상태 확인 필요';
-  }
-}
-
-function getRequestProgressDescription(request: Request): string {
-  if (request.beta1RequestStatus === 'match_pending' && request.status === RequestStatus.PENDING) {
-    return '후보를 찾는 중입니다.';
-  }
-
-  if (request.status === RequestStatus.MATCHED) {
-    return '길러 응답을 기다리는 중입니다.';
-  }
-
-  if (request.beta1RequestStatus === 'accepted') {
-    return '배송이 시작됐습니다.';
-  }
-
-  if (request.status === RequestStatus.ACCEPTED) {
-    return '픽업 준비가 진행 중입니다.';
-  }
-
-  if (request.status === RequestStatus.IN_TRANSIT) {
-    return '배송이 이동 중입니다.';
-  }
-
-  if (request.status === RequestStatus.ARRIVED || request.status === RequestStatus.AT_LOCKER) {
-    return '수령 또는 인계만 남아 있습니다.';
-  }
-
-  if (request.status === RequestStatus.DELIVERED) {
-    return '수령 확인을 하면 요청이 완료됩니다.';
-  }
-
-  if (request.status === RequestStatus.COMPLETED) {
-    return '배송이 정상적으로 완료되었습니다.';
-  }
-
-  if (request.status === RequestStatus.CANCELLED) {
-    return '취소된 요청입니다.';
-  }
-
-  return '현재 상태입니다.';
 }
 
 function Panel({ title, children }: { title: string; children: React.ReactNode }) {
@@ -209,13 +149,37 @@ export default function RequestDetailScreen() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [working, setWorking] = useState<WorkingState>(null);
+  const [partnerDispatches, setPartnerDispatches] = useState<
+    Array<{
+      dispatchId: string;
+      partnerName: string;
+      status: string;
+      dispatchMethod: string;
+      updatedAt: Date;
+      opsMemo?: string;
+    }>
+  >([]);
   const [showRematchOptions, setShowRematchOptions] = useState(false);
   const [showCancelOptions, setShowCancelOptions] = useState(false);
+
+  const handleBack = useCallback(() => {
+    if (navigation.canGoBack()) {
+      navigation.goBack();
+      return;
+    }
+
+    navigation.navigate('Tabs', { screen: 'Requests' });
+  }, [navigation]);
 
   const loadRequest = useCallback(async () => {
     try {
       const nextRequest = await getRequestById(requestId);
       setRequest(nextRequest);
+      const dispatchSummary = await deliveryPartnerService.getDispatchSummary({
+        requestId,
+        ...(nextRequest?.primaryDeliveryId ? { deliveryId: nextRequest.primaryDeliveryId } : {}),
+      }).catch(() => []);
+      setPartnerDispatches(dispatchSummary);
     } catch (error) {
       console.error('Failed to load request detail', error);
       Alert.alert('요청 정보를 불러오지 못했습니다', '잠시 후 다시 시도해 주세요.');
@@ -232,6 +196,13 @@ export default function RequestDetailScreen() {
   useEffect(() => {
     const unsubscribe = subscribeToRequest(requestId, (nextRequest) => {
       setRequest(nextRequest);
+      void deliveryPartnerService
+        .getDispatchSummary({
+          requestId,
+          ...(nextRequest?.primaryDeliveryId ? { deliveryId: nextRequest.primaryDeliveryId } : {}),
+        })
+        .then(setPartnerDispatches)
+        .catch(() => setPartnerDispatches([]));
       setLoading(false);
       setRefreshing(false);
     });
@@ -325,6 +296,9 @@ export default function RequestDetailScreen() {
         itemValue: request.itemValue,
         recipientName: request.recipientName,
         recipientPhone: request.recipientPhone,
+        pickupLocationDetail: request.pickupLocationDetail,
+        storageLocation: request.storageLocation,
+        specialInstructions: request.specialInstructions,
         pickupMode: request.pickupAddress ? 'address' : 'station',
         deliveryMode: request.deliveryAddress ? 'address' : 'station',
         pickupRoadAddress: request.pickupAddress?.roadAddress,
@@ -504,8 +478,8 @@ export default function RequestDetailScreen() {
 
   if (loading) {
     return (
-      <View style={styles.container}>
-        <AppTopBar title="요청 상세" onBack={() => navigation.goBack()} />
+        <View style={styles.container}>
+        <AppTopBar title="요청 상세" onBack={handleBack} />
         <View style={styles.centerState}>
           <ActivityIndicator size="large" color={Colors.primary} />
           <Text style={styles.centerText}>요청을 불러오는 중입니다.</Text>
@@ -517,7 +491,7 @@ export default function RequestDetailScreen() {
   if (!request) {
     return (
       <View style={styles.container}>
-        <AppTopBar title="요청 상세" onBack={() => navigation.goBack()} />
+        <AppTopBar title="요청 상세" onBack={handleBack} />
         <View style={styles.centerState}>
           <Text style={styles.errorText}>요청을 찾을 수 없습니다.</Text>
           <TouchableOpacity
@@ -562,7 +536,15 @@ export default function RequestDetailScreen() {
 
   return (
     <View style={styles.container}>
-      <AppTopBar title="요청 상세" onBack={() => navigation.goBack()} />
+      <AppTopBar
+        title="요청 상세"
+        onBack={handleBack}
+        rightSlot={
+          <TouchableOpacity style={styles.topShortcut} activeOpacity={0.85} onPress={handleBack}>
+            <Text style={styles.topShortcutText}>목록</Text>
+          </TouchableOpacity>
+        }
+      />
       <ScrollView
         contentContainerStyle={styles.content}
         showsVerticalScrollIndicator={false}
@@ -575,8 +557,14 @@ export default function RequestDetailScreen() {
         </View>
 
         <Panel title="현재 상태">
-          <InfoRow label="상태" value={getStatusLabel(request.status)} />
-          <InfoRow label="진행 설명" value={getRequestProgressDescription(request)} />
+          <InfoRow label="상태" value={getRequesterStatusLabel(request.status)} />
+          <InfoRow label="진행 설명" value={getRequesterProgressDescription(request)} />
+          {request.missionProgress ? (
+            <InfoRow
+              label="구간 연결"
+              value={`${request.missionProgress.acceptedMissionCount}/${request.missionProgress.totalMissionCount} 구간`}
+            />
+          ) : null}
           <InfoRow label="요청 방식" value={request.requestMode === 'reservation' ? '예약' : '즉시'} />
           <InfoRow label="예상 금액" value={`${amount.toLocaleString()}원`} />
           <InfoRow label="마감 시간" value={formatDateTime(request.deadline)} />
@@ -598,6 +586,9 @@ export default function RequestDetailScreen() {
           />
           <InfoRow label="수령인" value={request.recipientName ?? '-'} />
           <InfoRow label="수령 연락처" value={request.recipientPhone ?? '-'} />
+          {request.pickupLocationDetail ? <InfoRow label="픽업 안내" value={request.pickupLocationDetail} /> : null}
+          {request.storageLocation ? <InfoRow label="사물함 안내" value={request.storageLocation} /> : null}
+          {request.specialInstructions ? <InfoRow label="추가 요청" value={request.specialInstructions} /> : null}
           <InfoRow
             label="사진"
             value={
@@ -607,6 +598,17 @@ export default function RequestDetailScreen() {
             }
           />
         </Panel>
+
+        {partnerDispatches.length > 0 ? (
+          <Panel title="업체 위임 상태">
+            {partnerDispatches.slice(0, 3).map((item) => (
+              <React.Fragment key={item.dispatchId}>
+                <InfoRow label={item.partnerName} value={`${item.status} / ${item.dispatchMethod}`} />
+                {item.opsMemo ? <InfoRow label="운영 메모" value={item.opsMemo} /> : null}
+              </React.Fragment>
+            ))}
+          </Panel>
+        ) : null}
 
         {request.packageInfo.imageUrl ? (
           <Panel title="물건 사진">
@@ -968,6 +970,19 @@ const styles = StyleSheet.create({
   },
   actionButtonTextDanger: {
     color: Colors.error,
+  },
+  topShortcut: {
+    minHeight: 32,
+    borderRadius: BorderRadius.full,
+    backgroundColor: Colors.primaryMint,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 12,
+  },
+  topShortcutText: {
+    color: Colors.primary,
+    fontSize: 13,
+    fontWeight: '800',
   },
   modalBackdrop: {
     flex: 1,
