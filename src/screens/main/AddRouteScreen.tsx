@@ -335,11 +335,17 @@ export default function AddRouteScreen() {
       Alert.alert('동선이 등록되었습니다', `${routeSummary}\n${departureTime} 출발`, [
         {
           text: '확인',
-          onPress: () =>
+          onPress: () => {
+            if (navigation.canGoBack()) {
+              navigation.goBack();
+              return;
+            }
+
             navigation.navigate('Tabs', {
               screen: 'RouteManagement',
               params: { justAddedRouteId: createdRoute.routeId },
-            }),
+            });
+          },
         },
       ]);
     } catch (error) {
@@ -361,7 +367,16 @@ export default function AddRouteScreen() {
 
   return (
     <View style={styles.container}>
-      <AppTopBar title="길러 동선 등록" onBack={() => navigation.goBack()} />
+      <AppTopBar
+        title="길러 동선 등록"
+        onBack={() => {
+          if (navigation.canGoBack()) {
+            navigation.goBack();
+            return;
+          }
+          navigation.navigate('Tabs', { screen: 'RouteManagement' });
+        }}
+      />
 
       <ScrollView style={styles.content} contentContainerStyle={styles.contentInner} showsVerticalScrollIndicator={false}>
         <View style={styles.card}>

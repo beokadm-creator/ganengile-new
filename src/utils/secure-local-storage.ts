@@ -3,9 +3,6 @@ import * as Crypto from 'expo-crypto';
 const STORAGE_ENVELOPE_PREFIX = 'enc:v1';
 const STORAGE_ENCRYPTION_SECRET: string = (() => {
   const key = process.env.EXPO_PUBLIC_STORAGE_ENCRYPTION_KEY;
-  if (!key && typeof __DEV__ !== 'undefined' && __DEV__) {
-    console.warn('[secure-storage] encryption key missing, using local fallback key');
-  }
   return String(key ?? 'ganengile-beta1-local-storage-fallback-key');
 })();
 

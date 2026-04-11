@@ -30,10 +30,14 @@ const MAX_TERRITORIES = 2;
 
 export default function RouteManagementScreen() {
   const navigation = useNavigation<MainStackNavigationProp>();
-  const { user, refreshUser } = useUser();
+  const { user } = useUser();
   const [routes, setRoutes] = useState<Route[]>([]);
   const [loading, setLoading] = useState(true);
   const [territoryLoading, setTerritoryLoading] = useState(false);
+  const [localTerritories, setLocalTerritories] = useState(user?.gillerProfile?.territories ?? []);
+  const [localActiveTerritoryId, setLocalActiveTerritoryId] = useState(
+    user?.gillerProfile?.activeTerritoryId ?? ''
+  );
 
   const loadRoutes = useCallback(async () => {
     try {
@@ -53,8 +57,8 @@ export default function RouteManagementScreen() {
     }
   }, []);
 
-  const territories = user?.gillerProfile?.territories ?? [];
-  const activeTerritoryId = user?.gillerProfile?.activeTerritoryId ?? '';
+  const territories = localTerritories;
+  const activeTerritoryId = localActiveTerritoryId;
 
   const handleRegisterTerritory = () => {
     if (!user?.uid) {
@@ -64,8 +68,9 @@ export default function RouteManagementScreen() {
     void (async () => {
       try {
         setTerritoryLoading(true);
-        await saveCurrentLocationAsGillerTerritory(user.uid, user.gillerProfile);
-        await refreshUser();
+        const nextTerritories = await saveCurrentLocationAsGillerTerritory(user.uid, user.gillerProfile);
+        setLocalTerritories(nextTerritories);
+        setLocalActiveTerritoryId(nextTerritories[0]?.territoryId ?? '');
       } catch (error) {
         console.error('Failed to register territory', error);
         Alert.alert('권역 등록 실패', error instanceof Error ? error.message : '잠시 후 다시 시도해 주세요.');
@@ -84,7 +89,7 @@ export default function RouteManagementScreen() {
       try {
         setTerritoryLoading(true);
         await setActiveGillerTerritory(user.uid, territoryId, user.gillerProfile);
-        await refreshUser();
+        setLocalActiveTerritoryId(territoryId);
       } catch (error) {
         console.error('Failed to activate territory', error);
         Alert.alert('권역 전환 실패', error instanceof Error ? error.message : '잠시 후 다시 시도해 주세요.');
@@ -97,7 +102,9 @@ export default function RouteManagementScreen() {
   useFocusEffect(
     useCallback(() => {
       void loadRoutes();
-    }, [loadRoutes]),
+      setLocalTerritories(user?.gillerProfile?.territories ?? []);
+      setLocalActiveTerritoryId(user?.gillerProfile?.activeTerritoryId ?? '');
+    }, [loadRoutes, user?.gillerProfile?.activeTerritoryId, user?.gillerProfile?.territories]),
   );
 
   const handleDelete = (routeId: string, routeName: string) => {

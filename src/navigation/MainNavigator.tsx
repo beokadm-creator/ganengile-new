@@ -272,7 +272,7 @@ export default function MainNavigator() {
         component={RequestConfirmationScreen}
         options={{ headerShown: true }}
       />
-      <Stack.Screen name="AddRoute" component={AddRouteScreen} options={{ headerShown: true }} />
+      <Stack.Screen name="AddRoute" component={AddRouteScreen} options={{ headerShown: false }} />
       <Stack.Screen name="EditRoute" component={EditRouteScreen} options={{ headerShown: false }} />
       <Stack.Screen
         name="RequestDetail"
