@@ -6,6 +6,7 @@
 import {
   addDoc,
   collection,
+  deleteField,
   deleteDoc,
   doc,
   getDoc,
@@ -234,6 +235,7 @@ function mapSavedAddress(addressId: string, data: Record<string, any>): SavedAdd
     detailAddress: data.detailAddress ?? '',
     fullAddress: data.fullAddress ?? '',
     isDefault: Boolean(data.isDefault ?? false),
+    isFavorite: Boolean(data.isFavorite ?? false),
     lastUsedAt: data.lastUsedAt,
     createdAt: data.createdAt,
     updatedAt: data.updatedAt,
@@ -258,6 +260,7 @@ export async function saveAddress(
     roadAddress: string;
     detailAddress: string;
     isDefault?: boolean;
+    isFavorite?: boolean;
   }
 ): Promise<string> {
   const fullAddress = `${input.roadAddress.trim()} ${input.detailAddress.trim()}`.trim();
@@ -267,6 +270,7 @@ export async function saveAddress(
     detailAddress: input.detailAddress.trim(),
     fullAddress,
     isDefault: Boolean(input.isDefault),
+    isFavorite: Boolean(input.isFavorite),
     lastUsedAt: serverTimestamp(),
     updatedAt: serverTimestamp(),
   };
@@ -300,7 +304,53 @@ export async function saveAddress(
 }
 
 export async function deleteSavedAddress(userId: string, addressId: string): Promise<void> {
+  const addressRef = doc(savedAddressCollection(userId), addressId);
+  const snapshot = await getDoc(addressRef);
+  const data = snapshot.exists() ? (snapshot.data() as Record<string, any>) : null;
   await deleteDoc(doc(savedAddressCollection(userId), addressId));
+
+  if (data?.isDefault) {
+    await updateDoc(profileDocRef(userId), {
+      defaultAddress: deleteField(),
+      updatedAt: serverTimestamp(),
+    });
+  }
+}
+
+export async function setDefaultSavedAddress(userId: string, addressId: string): Promise<void> {
+  const existing = await getSavedAddresses(userId);
+  const target = existing.find((address) => address.addressId === addressId);
+  if (!target) {
+    throw new Error('기본 주소로 지정할 대상을 찾을 수 없습니다.');
+  }
+
+  await Promise.all(
+    existing.map((address) =>
+      updateDoc(doc(savedAddressCollection(userId), address.addressId), {
+        isDefault: address.addressId === addressId,
+        updatedAt: serverTimestamp(),
+      })
+    )
+  );
+
+  await updateUserProfile(userId, {
+    defaultAddress: {
+      roadAddress: target.roadAddress,
+      detailAddress: target.detailAddress,
+      fullAddress: target.fullAddress,
+    },
+  } as Partial<ProfileFormData>);
+}
+
+export async function toggleFavoriteSavedAddress(
+  userId: string,
+  addressId: string,
+  isFavorite: boolean
+): Promise<void> {
+  await updateDoc(doc(savedAddressCollection(userId), addressId), {
+    isFavorite,
+    updatedAt: serverTimestamp(),
+  });
 }
 
 export async function addRecentAddress(

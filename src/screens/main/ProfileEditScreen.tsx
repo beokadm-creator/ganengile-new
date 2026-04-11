@@ -31,7 +31,7 @@ function formatPhoneDigits(value: string): string {
 }
 
 export default function ProfileEditScreen({ navigation }: { navigation: MainStackNavigationProp }) {
-  const { user, refreshUser } = useUser();
+  const { user, refreshUser, deactivateAccount } = useUser();
   const [name, setName] = useState(user?.name ?? '');
   const [phoneNumber, setPhoneNumber] = useState(
     formatPhoneDigits(user?.phoneVerification?.phoneNumber ?? user?.phoneNumber ?? '')
@@ -43,6 +43,7 @@ export default function ProfileEditScreen({ navigation }: { navigation: MainStac
   const [otpSending, setOtpSending] = useState(false);
   const [otpVerifying, setOtpVerifying] = useState(false);
   const [verifiedPhoneOverride, setVerifiedPhoneOverride] = useState<string | null>(null);
+  const [deactivating, setDeactivating] = useState(false);
 
   const normalizedInputPhone = normalizePhoneNumber(phoneNumber);
   const normalizedVerifiedPhone = normalizePhoneNumber(
@@ -154,6 +155,30 @@ export default function ProfileEditScreen({ navigation }: { navigation: MainStac
     }
   }
 
+  function handleDeactivateAccount() {
+    Alert.alert('회원 탈퇴', '탈퇴하면 계정이 비활성화되고 바로 로그아웃됩니다.', [
+      { text: '닫기', style: 'cancel' },
+      {
+        text: '탈퇴 진행',
+        style: 'destructive',
+        onPress: () => {
+          void confirmDeactivateAccount();
+        },
+      },
+    ]);
+  }
+
+  async function confirmDeactivateAccount() {
+    setDeactivating(true);
+    try {
+      await deactivateAccount('profile_edit_withdrawal');
+    } catch (error) {
+      Alert.alert('탈퇴 실패', error instanceof Error ? error.message : '잠시 후 다시 시도해 주세요.');
+    } finally {
+      setDeactivating(false);
+    }
+  }
+
   return (
     <KeyboardAvoidingView style={styles.container} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
       <AppTopBar title="프로필 정보 변경" onBack={() => navigation.goBack()} />
@@ -208,6 +233,14 @@ export default function ProfileEditScreen({ navigation }: { navigation: MainStac
         <TouchableOpacity style={styles.primaryButton} onPress={() => void handleSave()} disabled={saving}>
           {saving ? <ActivityIndicator color={Colors.white} /> : <Text style={styles.primaryButtonText}>저장하기</Text>}
         </TouchableOpacity>
+
+        <View style={styles.dangerCard}>
+          <Text style={styles.dangerTitle}>계정 정리</Text>
+          <Text style={styles.dangerBody}>필요할 때만 탈퇴할 수 있습니다. 탈퇴는 이 화면에서만 진행됩니다.</Text>
+          <TouchableOpacity style={styles.dangerButton} onPress={handleDeactivateAccount} disabled={deactivating}>
+            {deactivating ? <ActivityIndicator color={Colors.error} /> : <Text style={styles.dangerButtonText}>회원 탈퇴</Text>}
+          </TouchableOpacity>
+        </View>
       </ScrollView>
     </KeyboardAvoidingView>
   );
@@ -267,6 +300,33 @@ const styles = StyleSheet.create({
   },
   secondaryButtonText: {
     color: Colors.primary,
+    fontWeight: '800',
+  },
+  dangerCard: {
+    backgroundColor: Colors.surface,
+    borderRadius: BorderRadius.xl,
+    padding: Spacing.lg,
+    gap: 10,
+    ...Shadows.sm,
+  },
+  dangerTitle: {
+    color: Colors.textPrimary,
+    fontSize: Typography.fontSize.base,
+    fontWeight: '800',
+  },
+  dangerBody: {
+    color: Colors.textSecondary,
+    ...Typography.caption,
+  },
+  dangerButton: {
+    minHeight: 44,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: BorderRadius.full,
+    backgroundColor: Colors.errorBackground,
+  },
+  dangerButtonText: {
+    color: Colors.error,
     fontWeight: '800',
   },
 });

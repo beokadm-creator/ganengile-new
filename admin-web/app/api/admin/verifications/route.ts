@@ -2,6 +2,25 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getAdminDb } from '@/lib/firebase-admin';
 import { isAdmin } from '@/lib/auth';
 
+function toMillis(value: unknown): number {
+  if (value instanceof Date) {
+    return value.getTime();
+  }
+  if (typeof value === 'object' && value !== null && 'toDate' in value) {
+    const maybe = value as { toDate?: () => Date };
+    if (typeof maybe.toDate === 'function') {
+      return maybe.toDate().getTime();
+    }
+  }
+  if (typeof value === 'string' || typeof value === 'number') {
+    const parsed = new Date(value);
+    if (!Number.isNaN(parsed.getTime())) {
+      return parsed.getTime();
+    }
+  }
+  return 0;
+}
+
 export async function GET(req: NextRequest) {
   if (!(await isAdmin())) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
@@ -9,16 +28,26 @@ export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url);
   const status = searchParams.get('status') ?? 'pending';
 
-  const snap = await db
-    .collectionGroup('verification')
-    .where('status', '==', status)
-    .orderBy('submittedAt', 'desc')
-    .get();
+  let snap;
+  try {
+    snap = await db
+      .collectionGroup('verification')
+      .where('status', '==', status)
+      .orderBy('submittedAt', 'desc')
+      .get();
+  } catch (error) {
+    console.error('Verification query with submittedAt ordering failed, falling back to local sort', error);
+    snap = await db.collectionGroup('verification').where('status', '==', status).get();
+  }
 
   const items = snap.docs.map((doc) => {
     const data = doc.data();
     const userId = doc.ref.parent.parent?.id ?? doc.id;
-    return { id: doc.id, userId, ...data };
+    return { id: doc.id, userId, ...data } as Record<string, unknown> & { id: string; userId: string };
+  }).sort((left, right) => {
+    const rightTime = toMillis(right['submittedAt'] ?? right['updatedAt'] ?? right['reviewedAt']);
+    const leftTime = toMillis(left['submittedAt'] ?? left['updatedAt'] ?? left['reviewedAt']);
+    return rightTime - leftTime;
   });
 
   const userIds = Array.from(new Set(items.map((item) => item.userId).filter(Boolean)));

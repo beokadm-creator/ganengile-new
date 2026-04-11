@@ -59,6 +59,7 @@ export interface SavedAddress {
   detailAddress: string;
   fullAddress: string;
   isDefault?: boolean;
+  isFavorite?: boolean;
   lastUsedAt?: Timestamp;
   createdAt: Timestamp;
   updatedAt: Timestamp;

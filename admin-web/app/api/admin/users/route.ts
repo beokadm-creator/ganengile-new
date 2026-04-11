@@ -170,3 +170,51 @@ export async function PATCH(req: NextRequest) {
 
   return NextResponse.json({ ok: true });
 }
+
+export async function DELETE(req: NextRequest) {
+  if (!(await isAdmin())) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  }
+
+  const body: unknown = await req.json();
+  const userId =
+    typeof body === 'object' && body !== null && typeof (body as { userId?: unknown }).userId === 'string'
+      ? (body as { userId: string }).userId
+      : null;
+
+  if (!userId) {
+    return NextResponse.json({ error: 'Missing userId' }, { status: 400 });
+  }
+
+  const db: Firestore = getAdminDb();
+  const userRef = db.collection('users').doc(userId);
+  const userSnap = await userRef.get();
+
+  if (!userSnap.exists) {
+    return NextResponse.json({ error: 'Not found' }, { status: 404 });
+  }
+
+  const userData = userSnap.data() as UserDoc;
+  if (userData.isActive !== false) {
+    return NextResponse.json({ error: 'Deactivate the user first' }, { status: 400 });
+  }
+
+  const profileRef = userRef.collection('profile').doc(userId);
+  const [savedAddresses, recentAddresses, verifications] = await Promise.all([
+    profileRef.collection('saved_addresses').get(),
+    profileRef.collection('recent_addresses').get(),
+    userRef.collection('verification').get(),
+  ]);
+
+  const deletions = [
+    ...savedAddresses.docs.map((doc) => doc.ref.delete()),
+    ...recentAddresses.docs.map((doc) => doc.ref.delete()),
+    ...verifications.docs.map((doc) => doc.ref.delete()),
+    profileRef.delete().catch(() => undefined),
+    userRef.delete(),
+  ];
+
+  await Promise.all(deletions);
+
+  return NextResponse.json({ ok: true });
+}

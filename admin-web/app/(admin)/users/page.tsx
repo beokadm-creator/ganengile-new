@@ -147,6 +147,23 @@ export default function UsersPage() {
     }
   }
 
+  async function deleteInactiveUser(userId: string) {
+    const confirmed = window.confirm('비활성화된 회원만 정리 삭제할 수 있습니다. 계속할까요?');
+    if (!confirmed) return;
+
+    setProcessing(userId);
+    try {
+      await fetch('/api/admin/users', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId }),
+      });
+      await loadData();
+    } finally {
+      setProcessing(null);
+    }
+  }
+
   return (
     <div className="min-h-screen bg-stone-50 p-6">
       <div className="mx-auto max-w-7xl space-y-6">
@@ -306,17 +323,28 @@ export default function UsersPage() {
                         </div>
                       </td>
                       <td className="px-4 py-4 align-top">
-                        <button
-                          onClick={() => void toggleActive(item.id, item.isActive)}
-                          disabled={processing === item.id}
-                          className={`rounded-md px-3 py-1.5 text-xs font-semibold disabled:opacity-50 ${
-                            item.isActive
-                              ? 'bg-rose-50 text-rose-700 hover:bg-rose-100'
-                              : 'bg-emerald-50 text-emerald-700 hover:bg-emerald-100'
-                          }`}
-                        >
-                          {item.isActive ? '비활성화' : '활성화'}
-                        </button>
+                        <div className="flex flex-col gap-2">
+                          <button
+                            onClick={() => void toggleActive(item.id, item.isActive)}
+                            disabled={processing === item.id}
+                            className={`rounded-md px-3 py-1.5 text-xs font-semibold disabled:opacity-50 ${
+                              item.isActive
+                                ? 'bg-rose-50 text-rose-700 hover:bg-rose-100'
+                                : 'bg-emerald-50 text-emerald-700 hover:bg-emerald-100'
+                            }`}
+                          >
+                            {item.isActive ? '비활성화' : '활성화'}
+                          </button>
+                          {!item.isActive ? (
+                            <button
+                              onClick={() => void deleteInactiveUser(item.id)}
+                              disabled={processing === item.id}
+                              className="rounded-md bg-slate-900 px-3 py-1.5 text-xs font-semibold text-white disabled:opacity-50"
+                            >
+                              정리 삭제
+                            </button>
+                          ) : null}
+                        </div>
                       </td>
                     </tr>
                   ))}

@@ -16,6 +16,7 @@ interface UserContextType {
   refreshUser: () => Promise<void>;
   completeOnboarding: () => Promise<string | null>;
   logout: () => Promise<void>;
+  deactivateAccount: (reason?: string) => Promise<void>;
 }
 
 export type { UserContextType };
@@ -291,6 +292,31 @@ const { consumePendingDeepLink } = require('../navigation/navigationRef');
     }
   };
 
+  const deactivateAccount = async (reason?: string) => {
+    const activeUser = auth.currentUser;
+    if (!activeUser) {
+      throw new Error('로그인이 필요합니다.');
+    }
+
+    await updateDoc(doc(db, 'users', activeUser.uid), {
+      isActive: false,
+      deactivatedAt: serverTimestamp(),
+      deactivationReason: reason?.trim() || 'user_requested',
+      updatedAt: serverTimestamp(),
+    });
+
+    try {
+      await updateDoc(doc(db, 'users', activeUser.uid, 'profile', activeUser.uid), {
+        updatedAt: serverTimestamp(),
+        accountStatus: 'deactivated',
+      });
+    } catch (error) {
+      console.warn('Profile deactivation update skipped:', error);
+    }
+
+    await logout();
+  };
+
   return (
     <UserContext.Provider
       value={{
@@ -301,6 +327,7 @@ const { consumePendingDeepLink } = require('../navigation/navigationRef');
         refreshUser,
         completeOnboarding,
         logout,
+        deactivateAccount,
       }}
     >
       {children}
