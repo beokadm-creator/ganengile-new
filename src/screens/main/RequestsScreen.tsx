@@ -204,9 +204,9 @@ export default function RequestsScreen({ navigation }: { navigation: MainStackNa
       return;
     }
 
-    Alert.alert('취소 전에 다른 방법도 있습니다', '금액을 올리거나 예약으로 바꾸면 연결 가능성을 더 볼 수 있습니다.', [
+    Alert.alert('취소 전에 다른 방법도 있습니다', '금액을 올리거나 예약 보내기로 바꾸면 연결 가능성을 더 볼 수 있습니다.', [
       { text: '1,000원 올리기', onPress: () => void handleIncreaseBid(request, 1000) },
-      { text: '예약형으로 전환', onPress: () => navigateToReservation(request) },
+      { text: '예약 보내기로 바꾸기', onPress: () => navigateToReservation(request) },
       { text: '그래도 취소', style: 'destructive', onPress: () => void executeCancel(request) },
     ]);
   }
@@ -239,7 +239,7 @@ export default function RequestsScreen({ navigation }: { navigation: MainStackNa
 
     Alert.alert(
       '지금 바로 다시 보낼까요?',
-      '급하면 금액을 조금 올려 빠르게 다시 찾고, 급하지 않으면 예약형으로 전환해 안정적으로 연결할 수 있습니다.',
+      '급하면 금액을 조금 올려 빠르게 다시 찾고, 급하지 않으면 예약 보내기로 바꿔 안정적으로 연결할 수 있습니다.',
       [
         {
           text: 'AI 추천 금액 올리기',
@@ -248,7 +248,7 @@ export default function RequestsScreen({ navigation }: { navigation: MainStackNa
           },
         },
         {
-          text: '예약형으로 전환',
+          text: '예약 보내기로 바꾸기',
           onPress: () => navigateToReservation(request),
         },
         { text: '그대로 기다리기', style: 'cancel' },
@@ -390,7 +390,7 @@ export default function RequestsScreen({ navigation }: { navigation: MainStackNa
       <ChoiceModal
         visible={Boolean(rematchTarget)}
         title="지금 바로 다시 보낼까요?"
-        message="급하면 금액을 조금 올려 빠르게 다시 찾고, 급하지 않으면 예약으로 전환해 안정적으로 연결할 수 있습니다."
+        message="급하면 금액을 조금 올려 빠르게 다시 찾고, 급하지 않으면 예약 보내기로 바꿔 안정적으로 연결할 수 있습니다."
         onClose={() => setRematchTarget(null)}
         actions={[
           {
@@ -404,7 +404,7 @@ export default function RequestsScreen({ navigation }: { navigation: MainStackNa
             },
           },
           {
-            label: '예약형으로 전환',
+            label: '예약 보내기로 바꾸기',
             onPress: () => {
               const target = rematchTarget;
               setRematchTarget(null);
@@ -422,7 +422,7 @@ export default function RequestsScreen({ navigation }: { navigation: MainStackNa
         message={
           cancelTarget?.status === RequestStatus.ACCEPTED
             ? '상세 화면이나 분쟁 접수로 먼저 정리할 수도 있습니다.'
-            : '금액을 올리거나 예약으로 바꾸면 연결 가능성을 더 볼 수 있습니다.'
+            : '금액을 올리거나 예약 보내기로 바꾸면 연결 가능성을 더 볼 수 있습니다.'
         }
         onClose={() => setCancelTarget(null)}
         actions={
@@ -472,7 +472,7 @@ export default function RequestsScreen({ navigation }: { navigation: MainStackNa
                   },
                 },
                 {
-                  label: '예약형으로 전환',
+                  label: '예약 보내기로 바꾸기',
                   onPress: () => {
                     const target = cancelTarget;
                     setCancelTarget(null);

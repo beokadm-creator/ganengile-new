@@ -416,7 +416,7 @@ export function MatchingResultScreen() {
             })
           }
         >
-          <Text style={styles.secondaryButtonText}>예약으로 바꾸기</Text>
+          <Text style={styles.secondaryButtonText}>예약 보내기로 바꾸기</Text>
         </TouchableOpacity>
         <TouchableOpacity style={styles.ghostButton} onPress={() => navigation.navigate('RequestDetail', { requestId })}>
           <Text style={styles.ghostButtonText}>요청 상세 보기</Text>

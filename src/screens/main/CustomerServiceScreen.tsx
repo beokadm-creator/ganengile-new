@@ -21,13 +21,13 @@ const FAQS: FaqItem[] = [
   {
     id: 'request-1',
     question: '배송 요청은 어떻게 만들어요?',
-    answer: '요청 화면에서 즉시형 또는 예약형으로 배송 요청을 만들 수 있어요.',
+    answer: '배송 요청 화면 하나에서 지금 보내기와 예약 보내기를 선택할 수 있어요.',
     category: 'request',
   },
   {
     id: 'request-2',
     question: '매칭이 안 되면 어떻게 하나요?',
-    answer: '긴급 재매칭으로 금액을 조정하거나 예약형으로 전환해 다시 잡을 수 있어요.',
+    answer: '긴급 재매칭으로 금액을 조정하거나 예약 보내기로 바꿔 다시 잡을 수 있어요.',
     category: 'request',
   },
   {

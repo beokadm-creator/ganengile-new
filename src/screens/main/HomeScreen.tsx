@@ -154,7 +154,7 @@ export default function HomeScreen({ navigation }: { navigation: MainStackNaviga
               <ActionCard
                 icon="add-box"
                 title="배송 요청 만들기"
-                subtitle="지금 보내기 또는 예약 보내기"
+                subtitle="한 화면에서 지금 또는 예약으로 보낼 수 있어요"
                 onPress={() => navigation.navigate('CreateRequest')}
               />
             </>

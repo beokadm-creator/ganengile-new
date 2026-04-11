@@ -97,7 +97,7 @@ export default function ModeToggleSwitch({ mode, onModeChange, style }: Props) {
         <Text style={styles.headerTitle}>길러 모드</Text>
         <Text style={styles.headerSubtitle}>
           {mode === 'onetime'
-            ? '현재 위치 주변 즉시 요청을 빠르게 확인합니다.'
+            ? '현재 위치 주변 미션을 빠르게 확인합니다.'
             : '등록한 이동 경로를 기준으로 미션을 추천받습니다.'}
         </Text>
       </View>
@@ -111,7 +111,7 @@ export default function ModeToggleSwitch({ mode, onModeChange, style }: Props) {
           >
             <View style={styles.modeContent}>
               <Text style={[styles.modeIcon, mode === 'onetime' && styles.modeIconActive]}>번개</Text>
-              <Text style={[styles.modeTitle, mode === 'onetime' && styles.modeTitleActive]}>즉시형</Text>
+              <Text style={[styles.modeTitle, mode === 'onetime' && styles.modeTitleActive]}>바로 보기</Text>
               <Text style={[styles.modeDescription, mode === 'onetime' && styles.modeDescriptionActive]}>
                 현재 위치 기준으로 바로 수락
               </Text>

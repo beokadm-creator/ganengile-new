@@ -322,13 +322,13 @@ export default function RequestDetailScreen() {
       return;
     }
 
-    Alert.alert('다시 시도할까요?', '금액을 올리거나 예약으로 바꿀 수 있습니다.', [
+    Alert.alert('다시 시도할까요?', '금액을 올리거나 예약 보내기로 바꿀 수 있습니다.', [
       {
         text: '금액 1,000원 올리기',
         onPress: () => void handleIncreaseBid(1000),
       },
       {
-        text: '예약으로 바꾸기',
+        text: '예약 보내기로 바꾸기',
         onPress: navigateToReservation,
       },
       { text: '닫기', style: 'cancel' },
@@ -378,9 +378,9 @@ export default function RequestDetailScreen() {
       return;
     }
 
-    Alert.alert('취소 전에 다른 방법도 있습니다', '매칭을 조금 더 붙이거나 예약으로 바꿔볼 수 있습니다.', [
+    Alert.alert('취소 전에 다른 방법도 있습니다', '매칭을 조금 더 붙이거나 예약 보내기로 바꿔볼 수 있습니다.', [
       { text: '1,000원 올리기', onPress: () => void handleIncreaseBid(1000) },
-      { text: '예약으로 바꾸기', onPress: navigateToReservation },
+      { text: '예약 보내기로 바꾸기', onPress: navigateToReservation },
       { text: '그래도 취소', style: 'destructive', onPress: () => void executeCancel() },
     ]);
   }
@@ -551,7 +551,7 @@ export default function RequestDetailScreen() {
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => void onRefresh()} />}
       >
         <View style={styles.hero}>
-          <Text style={styles.kicker}>{request.requestMode === 'reservation' ? '예약 배송 요청' : '배송 요청 상세'}</Text>
+          <Text style={styles.kicker}>배송 요청 상세</Text>
           <Text style={styles.title}>{routeLabel}</Text>
           <Text style={styles.subtitle}>{request.packageInfo.description || '물품 설명 없음'}</Text>
         </View>
@@ -565,7 +565,7 @@ export default function RequestDetailScreen() {
               value={`${request.missionProgress.acceptedMissionCount}/${request.missionProgress.totalMissionCount} 구간`}
             />
           ) : null}
-          <InfoRow label="요청 방식" value={request.requestMode === 'reservation' ? '예약' : '즉시'} />
+          <InfoRow label="보내기 방식" value={request.requestMode === 'reservation' ? '예약 보내기' : '지금 보내기'} />
           <InfoRow label="예상 금액" value={`${amount.toLocaleString()}원`} />
           <InfoRow label="마감 시간" value={formatDateTime(request.deadline)} />
         </Panel>
@@ -676,7 +676,7 @@ export default function RequestDetailScreen() {
       <ChoiceModal
         visible={showRematchOptions}
         title="다시 시도할까요?"
-        message="금액을 올리거나 예약으로 바꿀 수 있습니다."
+        message="금액을 올리거나 예약 보내기로 바꿀 수 있습니다."
         onClose={() => setShowRematchOptions(false)}
         actions={[
           {
@@ -687,7 +687,7 @@ export default function RequestDetailScreen() {
             },
           },
           {
-            label: '예약으로 바꾸기',
+            label: '예약 보내기로 바꾸기',
             onPress: () => {
               setShowRematchOptions(false);
               navigateToReservation();
@@ -714,7 +714,7 @@ export default function RequestDetailScreen() {
           request.status === RequestStatus.AT_LOCKER ||
           request.status === RequestStatus.DELIVERED
             ? '진행 상태에 따라 바로 취소되지 않을 수 있습니다.'
-            : '취소 전에 매칭을 조금 더 붙이거나 예약으로 바꿔볼 수 있습니다.'
+            : '취소 전에 매칭을 조금 더 붙이거나 예약 보내기로 바꿔볼 수 있습니다.'
         }
         onClose={() => setShowCancelOptions(false)}
         actions={
@@ -756,7 +756,7 @@ export default function RequestDetailScreen() {
                   },
                 },
                 {
-                  label: '예약으로 바꾸기',
+                  label: '예약 보내기로 바꾸기',
                   onPress: () => {
                     setShowCancelOptions(false);
                     navigateToReservation();
