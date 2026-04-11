@@ -32,6 +32,8 @@ import {
   type Phase1PricingParams,
   type PackageSizeType,
 } from './pricing-service';
+import { getPricingPolicyConfig } from './pricing-policy-config-service';
+import { getRoutePricingOverride } from './route-pricing-override-service';
 import type {
   Request,
   CreateRequestData,
@@ -39,6 +41,7 @@ import type {
   RequestFilterOptions,
   StationInfo,
   PackageInfo,
+  RequestPricingContext,
 } from '../types/request';
 import { PackageSize, PackageWeight, RequestStatus } from '../types/request';
 
@@ -81,6 +84,21 @@ type FeeSnapshot = {
   [key: string]: unknown;
 };
 
+type TimestampLike = Timestamp | { toDate?: () => Date; toMillis?: () => number };
+
+type RequestDocShape = Partial<Request> & {
+  pickupAddress?: Request['pickupAddress'] | string | null;
+  deliveryAddress?: Request['deliveryAddress'] | string | null;
+  pickupAddressDetail?: Request['pickupAddress'] | null;
+  deliveryAddressDetail?: Request['deliveryAddress'] | null;
+  selectedPhotoIds?: unknown;
+  packageInfo?: Request['packageInfo'] & { imageUrl?: string };
+  recipientName?: unknown;
+  recipientPhone?: unknown;
+  createdAt?: TimestampLike;
+  updatedAt?: TimestampLike;
+};
+
 export type RoutePriceInsight = {
   averageFee: number;
   minFee: number;
@@ -88,6 +106,17 @@ export type RoutePriceInsight = {
   sampleCount: number;
   recommendedFee: number;
   routeKey: string;
+  averageDynamicAdjustment: number;
+  contextSummary: string;
+  recommendationReason: string;
+  policyVersion: string | null;
+  routeOverride: {
+    enabled: boolean;
+    fixedAdjustment: number;
+    multiplier: number;
+    minCompletedCount: number;
+    applied: boolean;
+  } | null;
 };
 
 function getErrorMessage(error: unknown, fallback: string): string {
@@ -97,6 +126,159 @@ function getErrorMessage(error: unknown, fallback: string): string {
 function buildRouteKey(pickupStationId: string, deliveryStationId: string, requestMode?: string): string {
   const mode = requestMode === 'reservation' ? 'reservation' : 'immediate';
   return `${pickupStationId}_${deliveryStationId}_${mode}`;
+}
+
+function resolveUrgencyBucket(urgency?: CreateRequestData['urgency']): RequestPricingContext['urgencyBucket'] {
+  if (urgency === 'high') {
+    return 'urgent';
+  }
+  if (urgency === 'medium') {
+    return 'fast';
+  }
+  return 'normal';
+}
+
+function inferRequestedHour(requestData: CreateRequestData): number {
+  const departureTime = requestData.preferredTime?.departureTime;
+  if (typeof departureTime === 'string') {
+    const [hourText] = departureTime.split(':');
+    const hour = Number(hourText);
+    if (Number.isFinite(hour) && hour >= 0 && hour <= 23) {
+      return hour;
+    }
+  }
+
+  return new Date().getHours();
+}
+
+function isPeakHour(hour: number): boolean {
+  return (hour >= 7 && hour <= 9) || (hour >= 17 && hour <= 20);
+}
+
+function buildRequestPricingContext(requestData: CreateRequestData): RequestPricingContext {
+  const requestMode = requestData.requestMode === 'reservation' ? 'reservation' : 'immediate';
+  const requestedHour = inferRequestedHour(requestData);
+
+  return {
+    requestMode,
+    weather: requestData.pricingContext?.weather ?? 'clear',
+    isPeakTime: requestData.pricingContext?.isPeakTime ?? isPeakHour(requestedHour),
+    isProfessionalPeak: requestData.pricingContext?.isProfessionalPeak ?? false,
+    nearbyGillerCount: requestData.pricingContext?.nearbyGillerCount ?? null,
+    requestedHour,
+    urgencyBucket: requestData.pricingContext?.urgencyBucket ?? resolveUrgencyBucket(requestData.urgency),
+  };
+}
+
+function summarizeInsightContext(input: {
+  requestMode?: 'immediate' | 'reservation';
+  peakSamples: number;
+  immediateSamples: number;
+  reservationSamples: number;
+  sampleCount: number;
+  averageDynamicAdjustment: number;
+  currentWeather?: 'clear' | 'rain' | 'snow';
+  nearbyGillerCount?: number | null;
+  isProfessionalPeak?: boolean;
+}): { contextSummary: string; recommendationReason: string } {
+  const modeLabel = input.requestMode === 'reservation' ? '예약 요청' : '즉시 요청';
+  const dominantMode =
+    input.immediateSamples >= input.reservationSamples ? '즉시 요청 비중이 높고' : '예약 요청 비중이 높고';
+  const peakShare = input.sampleCount > 0 ? input.peakSamples / input.sampleCount : 0;
+
+  const contextSummary =
+    input.averageDynamicAdjustment > 0
+      ? `${modeLabel} 기준 최근 완료 이력에서 환경 가산이 반영된 구간입니다.`
+      : `${modeLabel} 기준 최근 완료 이력을 바탕으로 계산했습니다.`;
+
+  let recommendationReason = `${dominantMode} 최근 완료 요금 흐름을 기준으로 추천 금액을 만들었습니다.`;
+
+  if (peakShare >= 0.4) {
+    recommendationReason = `피크 시간대 완료 비중이 높아 ${dominantMode} 추천 금액을 조금 보수적으로 잡았습니다.`;
+  } else if (input.averageDynamicAdjustment < 0) {
+    recommendationReason = `공급이 넉넉했던 완료 이력이 많아 ${dominantMode} 추천 금액을 완만하게 유지했습니다.`;
+  }
+
+  if (input.currentWeather === 'snow') {
+    recommendationReason = '눈 오는 상황까지 반영해 추천 금액을 조금 더 높게 잡았습니다.';
+  } else if (input.currentWeather === 'rain') {
+    recommendationReason = '비 오는 상황을 반영해 추천 금액을 소폭 높게 잡았습니다.';
+  } else if (typeof input.nearbyGillerCount === 'number' && input.nearbyGillerCount <= 3) {
+    recommendationReason = '주변 길러 수가 적은 편이라 응답 가능성을 높이도록 추천 금액을 조정했습니다.';
+  } else if (input.isProfessionalPeak) {
+    recommendationReason = '전문 길러 피크 시간대를 반영해 추천 금액을 보수적으로 잡았습니다.';
+  }
+
+  return {
+    contextSummary,
+    recommendationReason,
+  };
+}
+
+function calculateInsightRecommendation(input: {
+  averageFee: number;
+  requestMode?: 'immediate' | 'reservation';
+  peakSamples: number;
+  immediateSamples: number;
+  reservationSamples: number;
+  sampleCount: number;
+  currentWeather?: 'clear' | 'rain' | 'snow';
+  nearbyGillerCount?: number | null;
+  isProfessionalPeak?: boolean;
+  pricingPolicy: Awaited<ReturnType<typeof getPricingPolicyConfig>>;
+  routeOverride?: {
+    enabled: boolean;
+    fixedAdjustment: number;
+    multiplier: number;
+    minCompletedCount: number;
+  } | null;
+}): number {
+  const { pricingPolicy } = input;
+  let multiplier = pricingPolicy.recommendationMultiplier;
+
+  if (input.sampleCount > 0 && input.peakSamples / input.sampleCount >= 0.4) {
+    multiplier += pricingPolicy.recommendationRules.peakTimeMultiplier;
+  }
+
+  if (input.isProfessionalPeak) {
+    multiplier += pricingPolicy.recommendationRules.professionalPeakMultiplier;
+  }
+
+  if (input.currentWeather === 'rain') {
+    multiplier += pricingPolicy.recommendationRules.rainMultiplier;
+  } else if (input.currentWeather === 'snow') {
+    multiplier += pricingPolicy.recommendationRules.snowMultiplier;
+  }
+
+  if (typeof input.nearbyGillerCount === 'number') {
+    if (input.nearbyGillerCount <= pricingPolicy.dynamicRules.lowSupplyThreshold) {
+      multiplier += pricingPolicy.recommendationRules.lowSupplyMultiplier;
+    } else if (input.nearbyGillerCount >= pricingPolicy.dynamicRules.highSupplyThreshold) {
+      multiplier += pricingPolicy.recommendationRules.highSupplyDiscountMultiplier;
+    }
+  }
+
+  if (input.requestMode === 'reservation') {
+    multiplier += pricingPolicy.recommendationRules.reservationDiscountMultiplier;
+  }
+
+  multiplier = Math.max(1, Math.min(pricingPolicy.recommendationRules.maxRecommendationMultiplier, multiplier));
+  let recommendedFee = Math.max(
+    input.averageFee,
+    Math.ceil((input.averageFee * multiplier) / pricingPolicy.bidStep) * pricingPolicy.bidStep
+  );
+
+  if (
+    input.routeOverride?.enabled &&
+    input.sampleCount >= input.routeOverride.minCompletedCount
+  ) {
+    recommendedFee = Math.ceil(
+      ((recommendedFee * input.routeOverride.multiplier) + input.routeOverride.fixedAdjustment) /
+        pricingPolicy.bidStep
+    ) * pricingPolicy.bidStep;
+  }
+
+  return recommendedFee;
 }
 
 function toLegacyPackageInfo(packageInfo?: LegacyCreatePackageInfo): PackageInfo {
@@ -130,6 +312,61 @@ function isTimestampLike(value: unknown): value is Timestamp {
     value !== null &&
     typeof (value as { toDate?: unknown }).toDate === 'function'
   );
+}
+
+function readString(value: unknown): string | undefined {
+  return typeof value === 'string' && value.trim().length > 0 ? value : undefined;
+}
+
+function readDetailedAddress(value: unknown): Request['pickupAddress'] | undefined {
+  if (typeof value !== 'object' || value == null) {
+    return undefined;
+  }
+
+  const roadAddress = readString((value as { roadAddress?: unknown }).roadAddress);
+  const detailAddress = readString((value as { detailAddress?: unknown }).detailAddress) ?? '';
+  const fullAddress = readString((value as { fullAddress?: unknown }).fullAddress);
+
+  if (!roadAddress) {
+    return undefined;
+  }
+
+  return {
+    roadAddress,
+    detailAddress,
+    fullAddress: fullAddress ?? [roadAddress, detailAddress].filter(Boolean).join(' '),
+  };
+}
+
+function readStringArray(value: unknown): string[] | undefined {
+  if (!Array.isArray(value)) {
+    return undefined;
+  }
+
+  const items = value.filter((item): item is string => typeof item === 'string' && item.trim().length > 0);
+  return items.length > 0 ? items : undefined;
+}
+
+function normalizeRequestDoc(requestId: string, raw: RequestDocShape): Request {
+  const pickupAddress = readDetailedAddress(raw.pickupAddressDetail) ?? readDetailedAddress(raw.pickupAddress);
+  const deliveryAddress =
+    readDetailedAddress(raw.deliveryAddressDetail) ?? readDetailedAddress(raw.deliveryAddress);
+  const selectedPhotoIds = readStringArray(raw.selectedPhotoIds);
+  const imageUrl = raw.packageInfo?.imageUrl ?? selectedPhotoIds?.[0];
+
+  return {
+    ...raw,
+    requestId,
+    pickupAddress,
+    deliveryAddress,
+    recipientName: readString(raw.recipientName),
+    recipientPhone: readString(raw.recipientPhone),
+    selectedPhotoIds,
+    packageInfo: {
+      ...raw.packageInfo,
+      imageUrl,
+    },
+  } as Request;
 }
 
 /**
@@ -186,9 +423,12 @@ export async function createRequest(
 
       const requestsRef = collection(db, 'requests');
       const beta1Bootstrap = await bootstrapRequestCreationEngine(requestDataOrUserId);
+      const pricingPolicy = await getPricingPolicyConfig();
+      const pricingContext = buildRequestPricingContext(requestDataOrUserId);
 
       const newRequest: Omit<Request, 'requestId'> = {
         requesterId: requestDataOrUserId.requesterId,
+        requestMode: pricingContext.requestMode,
         pickupStation: requestDataOrUserId.pickupStation,
         deliveryStation: requestDataOrUserId.deliveryStation,
         packageInfo: requestDataOrUserId.packageInfo,
@@ -196,6 +436,8 @@ export async function createRequest(
         feeBreakdown: requestDataOrUserId.feeBreakdown,
         // 길러 앱과의 호환성을 위해 fee 필드 추가
         fee: requestDataOrUserId.feeBreakdown,
+        pricingPolicyVersion: requestDataOrUserId.pricingPolicyVersion ?? pricingPolicy.version,
+        pricingContext,
         preferredTime: requestDataOrUserId.preferredTime,
         deadline: isTimestampLike(requestDataOrUserId.deadline)
           ? requestDataOrUserId.deadline
@@ -238,10 +480,7 @@ export async function getRequestById(requestId: string): Promise<Request | null>
     }
 
     const data = docSnapshot.data();
-    return {
-      requestId: docSnapshot.id,
-      ...data,
-    } as Request;
+    return normalizeRequestDoc(docSnapshot.id, data as RequestDocShape);
   } catch (error) {
     console.error('Error fetching request:', error);
     throw error;
@@ -279,10 +518,7 @@ export async function getRequestsByRequester(
 
     snapshot.forEach((docSnapshot) => {
       const data = docSnapshot.data();
-      requests.push({
-        requestId: docSnapshot.id,
-        ...data,
-      } as Request);
+      requests.push(normalizeRequestDoc(docSnapshot.id, data as RequestDocShape));
     });
 
     // 정렬은 클라이언트 측에서 수행 (인덱스 불필요)
@@ -333,10 +569,7 @@ export async function getRequestsByGiller(
 
     snapshot.forEach((docSnapshot) => {
       const data = docSnapshot.data();
-      requests.push({
-        requestId: docSnapshot.id,
-        ...data,
-      } as Request);
+      requests.push(normalizeRequestDoc(docSnapshot.id, data as RequestDocShape));
     });
 
     return requests;
@@ -710,6 +943,7 @@ export async function calculateDeliveryFee(
   sizeFee: number;
   weightFee: number;
   urgencySurcharge: number;
+  dynamicAdjustment?: number;
   manualAdjustment: number;
   serviceFee: number;
   subtotal: number;
@@ -722,6 +956,7 @@ export async function calculateDeliveryFee(
   };
 }> {
   try{
+    const pricingPolicy = await getPricingPolicyConfig();
     const travelTimeData = await getTravelTimeConfig(
       pickupStation.stationId,
       deliveryStation.stationId
@@ -739,17 +974,17 @@ export async function calculateDeliveryFee(
       urgency: 'normal',
     };
 
-    const feeResult = calculatePhase1DeliveryFee(pricingParams);
+    const feeResult = calculatePhase1DeliveryFee(pricingParams, pricingPolicy);
 
     const subtotal = feeResult.baseFee + feeResult.distanceFee + feeResult.weightFee +
-                     feeResult.sizeFee + feeResult.serviceFee + urgencySurcharge + manualAdjustment;
-    const vat = Math.round(subtotal * 0.1);
+                     feeResult.sizeFee + feeResult.dynamicAdjustment + feeResult.serviceFee + urgencySurcharge + manualAdjustment;
+    const vat = Math.round(subtotal * pricingPolicy.vatRate);
     let totalFee = subtotal + vat;
 
-    if (totalFee < PRICING_POLICY.MIN_FEE) totalFee = PRICING_POLICY.MIN_FEE;
-    if (totalFee > PRICING_POLICY.MAX_FEE) totalFee = PRICING_POLICY.MAX_FEE;
+    if (totalFee < pricingPolicy.minFee) totalFee = pricingPolicy.minFee;
+    if (totalFee > pricingPolicy.maxFee) totalFee = pricingPolicy.maxFee;
 
-    const platformFee = Math.round(totalFee * PRICING_POLICY.PLATFORM_FEE_RATE);
+    const platformFee = Math.round(totalFee * pricingPolicy.platformFeeRate);
     const gillerFee = totalFee - platformFee;
 
     return {
@@ -758,6 +993,7 @@ export async function calculateDeliveryFee(
       sizeFee: feeResult.sizeFee,
       weightFee: feeResult.weightFee,
       urgencySurcharge,
+      dynamicAdjustment: feeResult.dynamicAdjustment,
       manualAdjustment,
       serviceFee: feeResult.serviceFee,
       subtotal,
@@ -773,6 +1009,7 @@ export async function calculateDeliveryFee(
     console.error('Error calculating delivery fee:', error);
 
     const stationCount = 5;
+    const pricingPolicy = await getPricingPolicyConfig();
     const pricingParams: Phase1PricingParams = {
       stationCount,
       weight,
@@ -780,7 +1017,7 @@ export async function calculateDeliveryFee(
       urgency: 'normal',
     };
 
-    const feeResult = calculatePhase1DeliveryFee(pricingParams);
+    const feeResult = calculatePhase1DeliveryFee(pricingParams, pricingPolicy);
 
     return {
       baseFee: feeResult.baseFee,
@@ -788,6 +1025,7 @@ export async function calculateDeliveryFee(
       sizeFee: feeResult.sizeFee,
       weightFee: feeResult.weightFee,
       urgencySurcharge,
+      dynamicAdjustment: feeResult.dynamicAdjustment,
       manualAdjustment,
       serviceFee: feeResult.serviceFee,
       subtotal: feeResult.subtotal,
@@ -900,7 +1138,8 @@ export async function increaseRequestBid(
       request.fee?.totalFee ??
       request.initialNegotiationFee ??
       request.feeBreakdown?.totalFee ?? 3000;
-    const nextFee = Math.min(PRICING_POLICY.MAX_FEE, currentFee + amount);
+    const pricingPolicy = await getPricingPolicyConfig();
+    const nextFee = Math.min(pricingPolicy.maxFee, currentFee + amount);
 
     const feeSnapshot = (request.fee ?? request.feeBreakdown ?? {}) as FeeSnapshot;
     const nextFeeSnapshot = {
@@ -934,8 +1173,10 @@ export async function getRoutePriceInsight(params: {
   pickupStationId: string;
   deliveryStationId: string;
   requestMode?: 'immediate' | 'reservation';
+  pricingContext?: Partial<RequestPricingContext>;
 }): Promise<RoutePriceInsight | null> {
   try {
+    const pricingPolicy = await getPricingPolicyConfig();
     const routeKey = buildRouteKey(params.pickupStationId, params.deliveryStationId, params.requestMode);
     const snapshot = await getDocs(
       query(
@@ -950,21 +1191,74 @@ export async function getRoutePriceInsight(params: {
         const data = docSnapshot.data() as {
           totalFee?: unknown;
           finalFee?: unknown;
+          dynamicAdjustment?: unknown;
+          policyVersion?: unknown;
+          pricingContext?: {
+            isPeakTime?: unknown;
+            requestMode?: unknown;
+          };
         };
         const feeCandidate = typeof data.finalFee === 'number' ? data.finalFee : data.totalFee;
-        return typeof feeCandidate === 'number' && feeCandidate > 0 ? feeCandidate : null;
+        if (typeof feeCandidate !== 'number' || feeCandidate <= 0) {
+          return null;
+        }
+
+        return {
+          fee: feeCandidate,
+          dynamicAdjustment: typeof data.dynamicAdjustment === 'number' ? data.dynamicAdjustment : 0,
+          isPeakTime: Boolean(data.pricingContext?.isPeakTime),
+          requestMode: data.pricingContext?.requestMode === 'reservation' ? 'reservation' : 'immediate',
+          policyVersion: typeof data.policyVersion === 'string' ? data.policyVersion : null,
+        };
       })
-      .filter((fee): fee is number => fee !== null);
+      .filter((item): item is {
+        fee: number;
+        dynamicAdjustment: number;
+        isPeakTime: boolean;
+        requestMode: 'immediate' | 'reservation';
+        policyVersion: string | null;
+      } => item !== null);
 
     if (fees.length === 0) {
       return null;
     }
 
-    const total = fees.reduce((sum, fee) => sum + fee, 0);
+    const total = fees.reduce((sum, item) => sum + item.fee, 0);
     const averageFee = Math.round(total / fees.length);
-    const minFee = Math.min(...fees);
-    const maxFee = Math.max(...fees);
-    const recommendedFee = Math.max(averageFee, Math.ceil(averageFee / 1000) * 1000);
+    const minFee = Math.min(...fees.map((item) => item.fee));
+    const maxFee = Math.max(...fees.map((item) => item.fee));
+    const averageDynamicAdjustment = Math.round(
+      fees.reduce((sum, item) => sum + item.dynamicAdjustment, 0) / fees.length
+    );
+    const peakSamples = fees.filter((item) => item.isPeakTime).length;
+    const immediateSamples = fees.filter((item) => item.requestMode === 'immediate').length;
+    const reservationSamples = fees.length - immediateSamples;
+    const routeOverride = await getRoutePricingOverride(routeKey);
+    const recommendedFee = calculateInsightRecommendation({
+      averageFee,
+      requestMode: params.requestMode,
+      peakSamples,
+      immediateSamples,
+      reservationSamples,
+      sampleCount: fees.length,
+      currentWeather: params.pricingContext?.weather,
+      nearbyGillerCount: params.pricingContext?.nearbyGillerCount,
+      isProfessionalPeak: params.pricingContext?.isProfessionalPeak,
+      pricingPolicy,
+      routeOverride,
+    });
+    const latestPolicyVersion = fees.find((item) => item.policyVersion)?.policyVersion ?? null;
+    const { contextSummary, recommendationReason } = summarizeInsightContext({
+      requestMode: params.requestMode,
+      peakSamples,
+      immediateSamples,
+      reservationSamples,
+      sampleCount: fees.length,
+      averageDynamicAdjustment,
+      currentWeather: params.pricingContext?.weather,
+      nearbyGillerCount: params.pricingContext?.nearbyGillerCount,
+      isProfessionalPeak: params.pricingContext?.isProfessionalPeak,
+    });
 
     return {
       averageFee,
@@ -973,6 +1267,19 @@ export async function getRoutePriceInsight(params: {
       sampleCount: fees.length,
       recommendedFee,
       routeKey,
+      averageDynamicAdjustment,
+      contextSummary,
+      recommendationReason,
+      policyVersion: latestPolicyVersion,
+      routeOverride: routeOverride
+        ? {
+            enabled: routeOverride.enabled,
+            fixedAdjustment: routeOverride.fixedAdjustment,
+            multiplier: routeOverride.multiplier,
+            minCompletedCount: routeOverride.minCompletedCount,
+            applied: routeOverride.enabled && fees.length >= routeOverride.minCompletedCount,
+          }
+        : null,
     };
   } catch (error) {
     console.error('Error fetching route price insight:', error);
@@ -1012,10 +1319,7 @@ export function subscribeToRequest(
   const unsubscribe = onSnapshot(docRef, (docSnapshot) => {
     if (docSnapshot.exists()) {
       const data = docSnapshot.data();
-      callback({
-        requestId: docSnapshot.id,
-        ...data,
-      } as Request);
+      callback(normalizeRequestDoc(docSnapshot.id, data as RequestDocShape));
     } else {
       callback(null);
     }

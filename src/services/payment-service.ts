@@ -29,23 +29,9 @@ import {
 } from 'firebase/firestore';
 import { db } from './firebase';
 import { calculateBadgeBonus } from './matching-service';
-import {
-  SETTLEMENT_POLICY,
-  calculateWithholdingBreakdown,
-  calculateWithholdingTax,
-} from '../constants/settlementPolicy';
+import { getRuntimeSettlementPolicy } from './settlement-policy-service';
 
 // ==================== Constants ====================
-
-/**
- * 세금율 상수
- */
-export const TAX_RATES = {
-  BUSINESS_INCOME_TAX: SETTLEMENT_POLICY.combinedWithholdingRate, // 사업소득 원천징수 3.3% (지방소득세 포함)
-  BUSINESS_INCOME_TAX_NATIONAL: SETTLEMENT_POLICY.businessIncomeTaxRate, // 사업소득세 3.0%
-  LOCAL_INCOME_TAX: SETTLEMENT_POLICY.localIncomeTaxRate,   // 지방소득세 0.3%
-  PLATFORM_FEE: SETTLEMENT_POLICY.platformFeeRate,          // 플랫폼 수수료 10%
-} as const;
 
 /**
  * 세금 신고 기준
@@ -166,18 +152,19 @@ export async function createRequestPayment(
   amount: number
 ): Promise<string> {
   try {
+    const settlementPolicy = await getRuntimeSettlementPolicy();
     const paymentData = {
       userId,
       type: PaymentType.REQUEST_FEE,
       amount,
-      fee: Math.round(amount * TAX_RATES.PLATFORM_FEE), // 10% platform fee
+      fee: Math.round(amount * settlementPolicy.platformFeeRate),
       tax: 0, // 글러는 세금 없음 (요청자)
-      netAmount: Math.round(amount * (1 - TAX_RATES.PLATFORM_FEE)), // 90% to giller
+      netAmount: Math.round(amount * (1 - settlementPolicy.platformFeeRate)),
       status: PaymentStatus.PENDING,
       requestId,
       description: '배송 요청 수수료',
       metadata: {
-        platformFeeRate: TAX_RATES.PLATFORM_FEE,
+        platformFeeRate: settlementPolicy.platformFeeRate,
         taxRate: 0,
         isTaxable: false,
       },
@@ -217,6 +204,7 @@ export async function createGillerEarning(
   options?: CreateGillerEarningOptions
 ): Promise<string> {
   try {
+    const settlementPolicy = await getRuntimeSettlementPolicy();
     // 0. 배지 보너스 계산 (P2-9)
     const { feeBonus: badgeBonus } = await calculateBadgeBonus(userId);
     const baseAmount = amount;
@@ -231,7 +219,7 @@ export async function createGillerEarning(
     // - 신규: 정산단에서 이미 차감된 금액이면 추가 차감 금지
     const platformFee = platformFeeAlreadyDeducted
       ? 0
-      : Math.round(totalAmount * TAX_RATES.PLATFORM_FEE);
+      : Math.round(totalAmount * settlementPolicy.platformFeeRate);
     const afterFee = totalAmount - platformFee;
 
     // 2. 세금 계산 (수수료 차감 후 금액 기준)
@@ -239,11 +227,14 @@ export async function createGillerEarning(
     let netAmount = afterFee;
 
     if (isTaxable) {
-      tax = calculateWithholdingTax(afterFee);
+      tax = Math.round(afterFee * settlementPolicy.combinedWithholdingRate);
       netAmount = afterFee - tax;
     }
 
-    const withholdingBreakdown = calculateWithholdingBreakdown(afterFee);
+    const withholdingBreakdown = {
+      businessIncomeTax: Math.round(afterFee * settlementPolicy.businessIncomeTaxRate),
+      localIncomeTax: Math.round(afterFee * settlementPolicy.localIncomeTaxRate),
+    };
 
     const paymentData = {
       userId,
@@ -256,12 +247,12 @@ export async function createGillerEarning(
       requestId,
       description: `배송 완료 수익${badgeBonus > 0 ? ` (배지 보너스 ${(badgeBonus * 100).toFixed(0)}%)` : ''}`,
       metadata: {
-        platformFeeRate: TAX_RATES.PLATFORM_FEE,
+        platformFeeRate: settlementPolicy.platformFeeRate,
         platformFeeAlreadyDeducted,
         platformFeeSnapshot,
-        taxRate: isTaxable ? TAX_RATES.BUSINESS_INCOME_TAX : 0,
-        taxRateBusinessIncome: isTaxable ? TAX_RATES.BUSINESS_INCOME_TAX_NATIONAL : 0,
-        taxRateLocalIncome: isTaxable ? TAX_RATES.LOCAL_INCOME_TAX : 0,
+        taxRate: isTaxable ? settlementPolicy.combinedWithholdingRate : 0,
+        taxRateBusinessIncome: isTaxable ? settlementPolicy.businessIncomeTaxRate : 0,
+        taxRateLocalIncome: isTaxable ? settlementPolicy.localIncomeTaxRate : 0,
         taxWithheld: tax,
         taxWithheldBusinessIncome: isTaxable ? withholdingBreakdown.businessIncomeTax : 0,
         taxWithheldLocalIncome: isTaxable ? withholdingBreakdown.localIncomeTax : 0,

@@ -7,7 +7,7 @@ type Beta1AreaCard = {
   status: 'live' | 'planned';
 };
 
-const beta1Areas: Beta1AreaCard[] = [
+const orchestrationAreas: Beta1AreaCard[] = [
   {
     title: 'AI Review',
     description: 'AI 분석, 가격 제안, 수동 검토가 필요한 요청을 운영 기준으로 확인합니다.',
@@ -44,11 +44,11 @@ export default function Beta1OverviewPage() {
         <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
           <div className="space-y-2">
             <p className="text-sm font-semibold uppercase tracking-[0.24em] text-sky-600">
-              Beta1 Ops
+              Delivery Ops
             </p>
-            <h1 className="text-3xl font-semibold text-slate-900">beta1 운영 허브</h1>
+            <h1 className="text-3xl font-semibold text-slate-900">배송 운영 허브</h1>
             <p className="max-w-3xl text-sm leading-6 text-slate-600">
-              현재 운영 가능한 beta1 영역과 다음 확장 후보를 한곳에서 확인할 수 있도록
+              현재 운영 가능한 배송 관제 영역과 다음 확장 후보를 한곳에서 확인할 수 있도록
               정리한 시작 화면입니다.
             </p>
           </div>
@@ -62,7 +62,7 @@ export default function Beta1OverviewPage() {
       </section>
 
       <section className="grid gap-4 lg:grid-cols-2">
-        {beta1Areas.map((area) => {
+        {orchestrationAreas.map((area) => {
           const cardBody = (
             <article className="flex h-full flex-col gap-4 rounded-3xl border border-slate-200 bg-white p-6 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md">
               <div className="flex items-center justify-between gap-3">

@@ -1,5 +1,22 @@
-export type SharedPackageSize = 'small' | 'medium' | 'large' | 'xl' | 'extra_large';
-export type SharedUrgency = 'normal' | 'fast' | 'urgent';
+import {
+  DEFAULT_SHARED_PRICING_POLICY,
+  normalizeSharedPricingPolicy,
+  type SharedPackageSize,
+  type SharedPricingPolicyConfig,
+  type SharedUrgency,
+  type SharedWeatherCondition,
+} from './pricing-config';
+
+export type { SharedPackageSize, SharedPricingPolicyConfig, SharedUrgency, SharedWeatherCondition };
+export { DEFAULT_SHARED_PRICING_POLICY };
+
+export interface SharedPricingContext {
+  weather?: SharedWeatherCondition;
+  isPeakTime?: boolean;
+  isProfessionalPeak?: boolean;
+  nearbyGillerCount?: number;
+  requestedHour?: number;
+}
 
 export interface SharedPricingParams {
   stationCount: number;
@@ -8,6 +25,7 @@ export interface SharedPricingParams {
   urgency?: SharedUrgency;
   publicFare?: number;
   manualAdjustment?: number;
+  context?: SharedPricingContext;
 }
 
 export interface SharedDeliveryFeeBreakdown {
@@ -18,6 +36,7 @@ export interface SharedDeliveryFeeBreakdown {
   urgencySurcharge: number;
   publicFare: number;
   manualAdjustment: number;
+  dynamicAdjustment: number;
   serviceFee: number;
   subtotal: number;
   vat: number;
@@ -39,70 +58,119 @@ export interface SharedSettlementBreakdown {
   platformNetEarnings: number;
 }
 
-export const SHARED_PRICING_POLICY = {
-  BASE_FEE: 2000,
-  MIN_FEE: 3000,
-  MAX_FEE: 10000,
-  PLATFORM_FEE_RATE: 0.1,
-  VAT_RATE: 0.1,
-  PG_FEE_RATE: 0.03,
-  WITHHOLDING_TAX_RATE: 0.033,
-  BASE_STATIONS: 5,
-  BASE_DISTANCE_FEE: 600,
-  FEE_PER_STATION: 120,
-  BASE_WEIGHT: 1,
-  MIN_WEIGHT_FEE: 100,
-  FEE_PER_KG: 100,
-  SIZE_FEES: {
-    small: 0,
-    medium: 400,
-    large: 800,
-    xl: 1500,
-    extra_large: 1500,
-  } satisfies Record<SharedPackageSize, number>,
-  URGENCY_MULTIPLIERS: {
-    normal: 0,
-    fast: 0.1,
-    urgent: 0.2,
-  } satisfies Record<SharedUrgency, number>,
-} as const;
+export const SHARED_PRICING_POLICY = DEFAULT_SHARED_PRICING_POLICY;
 
-export function calculateSharedDistanceFee(stationCount: number): number {
-  if (stationCount <= SHARED_PRICING_POLICY.BASE_STATIONS) {
-    return SHARED_PRICING_POLICY.BASE_DISTANCE_FEE;
-  }
-
-  return (
-    SHARED_PRICING_POLICY.BASE_DISTANCE_FEE +
-    (stationCount - SHARED_PRICING_POLICY.BASE_STATIONS) * SHARED_PRICING_POLICY.FEE_PER_STATION
-  );
+function resolvePolicy(policy?: Partial<SharedPricingPolicyConfig>): SharedPricingPolicyConfig {
+  return normalizeSharedPricingPolicy(policy);
 }
 
-export function calculateSharedWeightFee(weight: number): number {
-  if (weight <= SHARED_PRICING_POLICY.BASE_WEIGHT) {
-    return SHARED_PRICING_POLICY.MIN_WEIGHT_FEE;
+export function calculateSharedDistanceFee(
+  stationCount: number,
+  policy?: Partial<SharedPricingPolicyConfig>
+): number {
+  const resolved = resolvePolicy(policy);
+  if (stationCount <= resolved.baseStations) {
+    return resolved.baseDistanceFee;
   }
 
-  return Math.round(weight * SHARED_PRICING_POLICY.FEE_PER_KG);
+  return resolved.baseDistanceFee + (stationCount - resolved.baseStations) * resolved.feePerStation;
 }
 
-export function calculateSharedSizeFee(packageSize: SharedPackageSize): number {
-  return SHARED_PRICING_POLICY.SIZE_FEES[packageSize];
+export function calculateSharedWeightFee(
+  weight: number,
+  policy?: Partial<SharedPricingPolicyConfig>
+): number {
+  const resolved = resolvePolicy(policy);
+  if (weight <= resolved.baseWeight) {
+    return resolved.minWeightFee;
+  }
+
+  return Math.round(weight * resolved.feePerKg);
+}
+
+export function calculateSharedSizeFee(
+  packageSize: SharedPackageSize,
+  policy?: Partial<SharedPricingPolicyConfig>
+): number {
+  return resolvePolicy(policy).sizeFees[packageSize];
 }
 
 export function calculateSharedUrgencySurcharge(
   urgency: SharedUrgency,
-  baseAndDistanceFee: number
+  baseAndDistanceFee: number,
+  policy?: Partial<SharedPricingPolicyConfig>
 ): number {
-  return Math.round(baseAndDistanceFee * SHARED_PRICING_POLICY.URGENCY_MULTIPLIERS[urgency]);
+  const resolved = resolvePolicy(policy);
+  return Math.round(baseAndDistanceFee * resolved.urgencyMultipliers[urgency]);
 }
 
-export function calculateSharedServiceFee(amount: number): number {
-  return Math.round(amount * SHARED_PRICING_POLICY.PLATFORM_FEE_RATE);
+export function calculateSharedDynamicAdjustment(
+  baseAmount: number,
+  context?: SharedPricingContext,
+  policy?: Partial<SharedPricingPolicyConfig>
+): number {
+  if (!context) {
+    return 0;
+  }
+
+  const resolved = resolvePolicy(policy);
+  let adjustment = 0;
+
+  if (context.weather === 'rain') {
+    adjustment += Math.round(baseAmount * resolved.dynamicRules.rainMultiplier);
+  } else if (context.weather === 'snow') {
+    adjustment += Math.round(baseAmount * resolved.dynamicRules.snowMultiplier);
+  }
+
+  if (context.isPeakTime) {
+    adjustment += Math.round(baseAmount * resolved.dynamicRules.peakTimeMultiplier);
+  }
+
+  if (context.isProfessionalPeak) {
+    adjustment += Math.round(baseAmount * resolved.dynamicRules.professionalPeakMultiplier);
+  }
+
+  if (typeof context.nearbyGillerCount === 'number') {
+    if (context.nearbyGillerCount <= resolved.dynamicRules.lowSupplyThreshold) {
+      adjustment += Math.round(baseAmount * resolved.dynamicRules.lowSupplyMultiplier);
+    } else if (context.nearbyGillerCount >= resolved.dynamicRules.highSupplyThreshold) {
+      adjustment += Math.round(baseAmount * resolved.dynamicRules.highSupplyDiscountMultiplier);
+    }
+  }
+
+  if (typeof context.requestedHour === 'number') {
+    for (const rule of resolved.timeRules) {
+      if (!rule.enabled) continue;
+
+      const inRange =
+        rule.startHour <= rule.endHour
+          ? context.requestedHour >= rule.startHour && context.requestedHour <= rule.endHour
+          : context.requestedHour >= rule.startHour || context.requestedHour <= rule.endHour;
+
+      if (!inRange) continue;
+
+      adjustment += Math.round(baseAmount * (rule.multiplier - 1));
+      adjustment += rule.fixedAdjustment;
+    }
+  }
+
+  return adjustment;
 }
 
-export function calculateSharedBreakdown(totalFee: number) {
-  const platformFee = Math.round(totalFee * SHARED_PRICING_POLICY.PLATFORM_FEE_RATE);
+export function calculateSharedServiceFee(
+  amount: number,
+  policy?: Partial<SharedPricingPolicyConfig>
+): number {
+  const resolved = resolvePolicy(policy);
+  return Math.round(amount * resolved.platformFeeRate);
+}
+
+export function calculateSharedBreakdown(
+  totalFee: number,
+  policy?: Partial<SharedPricingPolicyConfig>
+) {
+  const resolved = resolvePolicy(policy);
+  const platformFee = Math.round(totalFee * resolved.platformFeeRate);
   const gillerFee = totalFee - platformFee;
 
   return {
@@ -112,8 +180,10 @@ export function calculateSharedBreakdown(totalFee: number) {
 }
 
 export function calculateSharedDeliveryFee(
-  params: SharedPricingParams
+  params: SharedPricingParams,
+  policy?: Partial<SharedPricingPolicyConfig>
 ): SharedDeliveryFeeBreakdown {
+  const resolved = resolvePolicy(policy);
   const stationCount = Math.max(2, Math.round(params.stationCount));
   const weight = Math.max(0.1, params.weight ?? 1);
   const packageSize = params.packageSize ?? 'small';
@@ -121,27 +191,25 @@ export function calculateSharedDeliveryFee(
   const publicFare = Math.max(0, params.publicFare ?? 0);
   const manualAdjustment = params.manualAdjustment ?? 0;
 
-  const baseFee = SHARED_PRICING_POLICY.BASE_FEE;
-  const distanceFee = calculateSharedDistanceFee(stationCount);
-  const weightFee = calculateSharedWeightFee(weight);
-  const sizeFee = calculateSharedSizeFee(packageSize);
-  const urgencySurcharge = calculateSharedUrgencySurcharge(urgency, baseFee + distanceFee);
-  const feeBeforeService = baseFee + distanceFee + weightFee + sizeFee;
-  const serviceFee = calculateSharedServiceFee(feeBeforeService);
-  const subtotal =
-    baseFee +
-    distanceFee +
-    weightFee +
-    sizeFee +
-    urgencySurcharge +
-    publicFare +
-    manualAdjustment +
-    serviceFee;
-  const vat = Math.round(subtotal * SHARED_PRICING_POLICY.VAT_RATE);
+  const baseFee = resolved.baseFee;
+  const distanceFee = calculateSharedDistanceFee(stationCount, resolved);
+  const weightFee = calculateSharedWeightFee(weight, resolved);
+  const sizeFee = calculateSharedSizeFee(packageSize, resolved);
+  const urgencySurcharge = calculateSharedUrgencySurcharge(urgency, baseFee + distanceFee, resolved);
+  const dynamicAdjustment = calculateSharedDynamicAdjustment(
+    baseFee + distanceFee + weightFee + sizeFee + urgencySurcharge,
+    params.context,
+    resolved
+  );
+  const feeBeforeService =
+    baseFee + distanceFee + weightFee + sizeFee + urgencySurcharge + publicFare + manualAdjustment + dynamicAdjustment;
+  const serviceFee = calculateSharedServiceFee(feeBeforeService, resolved);
+  const subtotal = feeBeforeService + serviceFee;
+  const vat = Math.round(subtotal * resolved.vatRate);
 
   let totalFee = subtotal + vat;
-  totalFee = Math.max(SHARED_PRICING_POLICY.MIN_FEE, totalFee);
-  totalFee = Math.min(SHARED_PRICING_POLICY.MAX_FEE, totalFee);
+  totalFee = Math.max(resolved.minFee, totalFee);
+  totalFee = Math.min(resolved.maxFee, totalFee);
 
   return {
     baseFee,
@@ -151,25 +219,26 @@ export function calculateSharedDeliveryFee(
     urgencySurcharge,
     publicFare,
     manualAdjustment,
+    dynamicAdjustment,
     serviceFee,
     subtotal,
     vat,
     totalFee,
-    breakdown: calculateSharedBreakdown(totalFee),
+    breakdown: calculateSharedBreakdown(totalFee, resolved),
   };
 }
 
 export function calculateSharedSettlementBreakdown(
   totalFare: number,
-  gillerBonus: number = 0
+  gillerBonus: number = 0,
+  policy?: Partial<SharedPricingPolicyConfig>
 ): SharedSettlementBreakdown {
-  const pgFee = Math.round(totalFare * SHARED_PRICING_POLICY.PG_FEE_RATE);
+  const resolved = resolvePolicy(policy);
+  const pgFee = Math.round(totalFare * resolved.pgFeeRate);
   const platformRevenue = totalFare - pgFee;
-  const serviceFee = Math.round(platformRevenue * SHARED_PRICING_POLICY.PLATFORM_FEE_RATE);
+  const serviceFee = Math.round(platformRevenue * resolved.platformFeeRate);
   const gillerPreTaxEarnings = platformRevenue - serviceFee + gillerBonus;
-  const withholdingTax = Math.round(
-    gillerPreTaxEarnings * SHARED_PRICING_POLICY.WITHHOLDING_TAX_RATE
-  );
+  const withholdingTax = Math.round(gillerPreTaxEarnings * resolved.withholdingTaxRate);
   const gillerNetEarnings = gillerPreTaxEarnings - withholdingTax;
   const platformNetEarnings = serviceFee;
 

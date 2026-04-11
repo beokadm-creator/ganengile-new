@@ -183,7 +183,7 @@ export function useNotifications(handlers?: NotificationHandlers) {
    * Set badge count
    */
   const setBadgeCount = useCallback(async (count: number): Promise<void> => {
-    if (Platform.OS === 'android' ?? Platform.OS === 'web') { // eslint-disable-line no-constant-binary-expression, no-constant-condition
+    if (Platform.OS === 'android' || Platform.OS === 'web') {
       return; // Badge not supported on Android or web
     }
 

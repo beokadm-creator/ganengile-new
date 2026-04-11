@@ -107,10 +107,6 @@ export async function GET() {
     activeDeliveryPartnersCount,
     partnerDispatchQueuedCount,
     partnerDispatchActiveCount,
-    enterpriseLegacyContractsCount,
-    enterpriseLegacyPendingContractsCount,
-    enterpriseLegacyDeliveriesCount,
-    enterpriseLegacyActiveDeliveriesCount,
     delayedRequestCount,
   ] = await Promise.all([
     db.collection('withdraw_requests').where('status', '==', 'pending').count().get(),
@@ -141,10 +137,6 @@ export async function GET() {
     db.collection('delivery_partners').where('status', '==', 'active').count().get(),
     db.collection('partner_dispatches').where('status', 'in', ['queued', 'requested']).count().get(),
     db.collection('partner_dispatches').where('status', 'in', ['accepted', 'in_progress']).count().get(),
-    db.collection('business_contracts').count().get(),
-    db.collection('business_contracts').where('status', '==', 'pending').count().get(),
-    db.collection('b2b_deliveries').count().get(),
-    db.collection('b2b_deliveries').where('status', 'in', ['pending', 'matched', 'picked_up', 'in_transit']).count().get(),
     db
       .collection('requests')
       .where('status', 'in', ['pending', 'matched'])
@@ -252,10 +244,6 @@ export async function GET() {
       activeDeliveryPartnersCount: activeDeliveryPartnersCount.data().count,
       partnerDispatchQueuedCount: partnerDispatchQueuedCount.data().count,
       partnerDispatchActiveCount: partnerDispatchActiveCount.data().count,
-      enterpriseLegacyContractsCount: enterpriseLegacyContractsCount.data().count,
-      enterpriseLegacyPendingContractsCount: enterpriseLegacyPendingContractsCount.data().count,
-      enterpriseLegacyDeliveriesCount: enterpriseLegacyDeliveriesCount.data().count,
-      enterpriseLegacyActiveDeliveriesCount: enterpriseLegacyActiveDeliveriesCount.data().count,
       delayedRequestCount: delayedRequestCount.data().count,
       criticalQueue:
         pendingWithdrawals.data().count +
@@ -263,7 +251,6 @@ export async function GET() {
         manualReviewCount +
         lowConfidenceCount +
         partnerDispatchQueuedCount.data().count +
-        enterpriseLegacyPendingContractsCount.data().count +
         delayedRequestCount.data().count,
     },
     integrations: {

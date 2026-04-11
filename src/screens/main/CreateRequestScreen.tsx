@@ -34,6 +34,8 @@ import { requireUserId } from '../../services/firebase';
 import { locationService } from '../../services/location-service';
 import { confirmPhoneOtp, requestPhoneOtp } from '../../services/otp-service';
 import { pickPhotoFromLibrary, takePhoto, uploadPhotoWithThumbnail } from '../../services/photo-service';
+import { getPricingPolicyConfig } from '../../services/pricing-policy-config-service';
+import { getRoutePricingOverrideByStations } from '../../services/route-pricing-override-service';
 import { addRecentAddress, getRecentAddresses, getSavedAddresses } from '../../services/profile-service';
 import { BorderRadius, Colors, Shadows, Spacing, Typography } from '../../theme';
 import type { Station } from '../../types/config';
@@ -46,6 +48,7 @@ import {
   saveCreateRequestProgress,
   type CreateRequestDraft,
 } from '../../utils/draft-storage';
+import type { SharedPricingPolicyConfig } from '../../../shared/pricing-policy';
 
 type LocationMode = 'station' | 'address';
 type PackageSize = 'small' | 'medium' | 'large' | 'xl';
@@ -520,6 +523,30 @@ export default function CreateRequestScreen({ navigation, route }: Props) {
     requestMode === 'reservation'
       ? combineReservationSchedule(preferredPickupDate, preferredPickupTime)
       : preferredPickupTime || 'now';
+  const [pricingPolicy, setPricingPolicy] = useState<SharedPricingPolicyConfig | null>(null);
+  const [routeOverride, setRouteOverride] = useState<Awaited<ReturnType<typeof getRoutePricingOverrideByStations>>>(null);
+
+  useEffect(() => {
+    void getPricingPolicyConfig().then(setPricingPolicy).catch((error) => {
+      console.error('Failed to load pricing policy config', error);
+    });
+  }, []);
+
+  useEffect(() => {
+    if (!pickupStation?.stationId || !deliveryStation?.stationId) {
+      setRouteOverride(null);
+      return;
+    }
+
+    void getRoutePricingOverrideByStations({
+      pickupStationId: pickupStation.stationId,
+      deliveryStationId: deliveryStation.stationId,
+      requestMode,
+    }).then(setRouteOverride).catch((error) => {
+      console.error('Failed to load route pricing override', error);
+      setRouteOverride(null);
+    });
+  }, [deliveryStation?.stationId, pickupStation?.stationId, requestMode]);
 
   const quotes = useMemo(() => {
     const origin = pickupStation ?? stations[0] ?? fallbackStation('pickup');
@@ -559,7 +586,7 @@ export default function CreateRequestScreen({ navigation, route }: Props) {
             result: aiResult.result,
           }
         : undefined,
-    });
+    }, pricingPolicy ?? undefined, routeOverride);
   }, [
     stations,
     user?.uid,
@@ -587,6 +614,8 @@ export default function CreateRequestScreen({ navigation, route }: Props) {
     resolvedPreferredPickupTime,
     desiredArrivalSchedule,
     aiResult,
+    pricingPolicy,
+    routeOverride,
   ]);
 
   const hasItemValue = Number(itemValue || 0) > 0;

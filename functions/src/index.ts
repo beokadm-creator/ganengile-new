@@ -54,12 +54,12 @@ import { gillerSettlementScheduler } from './scheduled/settlement-scheduler';
 import { fareCacheScheduler } from './scheduled/fare-cache-scheduler';
 import { syncConfigStationsFromSeoulApi } from './station-sync';
 import {
-  SHARED_PRICING_POLICY,
   calculateSharedDeliveryFee,
   calculateSharedSettlementBreakdown,
   estimateStationCountFromDistanceKm,
   estimateStationCountFromTravelTimeMinutes,
 } from '../../shared/pricing-policy';
+import { getFunctionsPricingPolicyConfig } from './pricing-policy-config';
 import {
   getTopMatches as getTopSharedMatches,
   matchGillersToRequest as runSharedMatchingEngine,
@@ -331,9 +331,49 @@ interface RequestAcceptedDeliveryDoc {
   gillerName?: string;
 }
 
-interface CompletedRequestDoc extends DeliveryRequest {
+type CompletedRequestDoc = Partial<DeliveryRequest> & {
   matchedGillerId?: string;
-}
+  requestMode?: 'immediate' | 'reservation';
+  initialNegotiationFee?: number;
+  itemValue?: number;
+  depositAmount?: number;
+  urgency?: 'low' | 'medium' | 'high' | 'normal' | 'fast' | 'urgent';
+  primaryDeliveryId?: string;
+  pricingPolicyVersion?: string;
+  pricingContext?: {
+    requestMode?: 'immediate' | 'reservation';
+    weather?: 'clear' | 'rain' | 'snow';
+    isPeakTime?: boolean;
+    isProfessionalPeak?: boolean;
+    nearbyGillerCount?: number | null;
+    requestedHour?: number | null;
+    urgencyBucket?: 'normal' | 'fast' | 'urgent';
+  };
+  fee?: {
+    baseFee?: number;
+    distanceFee?: number;
+    weightFee?: number;
+    sizeFee?: number;
+    urgencySurcharge?: number;
+    serviceFee?: number;
+    vat?: number;
+    dynamicAdjustment?: number;
+    totalFee?: number;
+  };
+  feeBreakdown?: {
+    baseFee?: number;
+    distanceFee?: number;
+    weightFee?: number;
+    sizeFee?: number;
+    urgencySurcharge?: number;
+    serviceFee?: number;
+    vat?: number;
+    dynamicAdjustment?: number;
+    totalFee?: number;
+  };
+  pickupStation?: { stationId?: string; stationName?: string };
+  deliveryStation?: { stationId?: string; stationName?: string };
+};
 
 interface BadgeStats {
   completedDeliveries?: number;
@@ -814,6 +854,19 @@ export const onRequestStatusChanged = functions.firestore
           : null;
 
         if (routeKey && totalFee > 0) {
+          const pricingContext =
+            after.pricingContext && typeof after.pricingContext === 'object'
+              ? after.pricingContext
+              : {
+                  requestMode,
+                  weather: 'clear',
+                  isPeakTime: false,
+                  isProfessionalPeak: false,
+                  nearbyGillerCount: null,
+                  requestedHour: null,
+                  urgencyBucket: 'normal',
+                };
+
           await db.collection('request_pricing_history').doc(requestId).set({
             requestId,
             routeKey,
@@ -824,9 +877,22 @@ export const onRequestStatusChanged = functions.firestore
             deliveryStationName: after.deliveryStation?.stationName ?? null,
             totalFee,
             finalFee: totalFee,
+            baseFee: Number(after.fee?.baseFee ?? after.feeBreakdown?.baseFee ?? 0),
+            distanceFee: Number(after.fee?.distanceFee ?? after.feeBreakdown?.distanceFee ?? 0),
+            weightFee: Number(after.fee?.weightFee ?? after.feeBreakdown?.weightFee ?? 0),
+            sizeFee: Number(after.fee?.sizeFee ?? after.feeBreakdown?.sizeFee ?? 0),
+            urgencySurcharge: Number(after.fee?.urgencySurcharge ?? after.feeBreakdown?.urgencySurcharge ?? 0),
+            serviceFee: Number(after.fee?.serviceFee ?? after.feeBreakdown?.serviceFee ?? 0),
+            vat: Number(after.fee?.vat ?? after.feeBreakdown?.vat ?? 0),
+            dynamicAdjustment: Number(after.fee?.dynamicAdjustment ?? after.feeBreakdown?.dynamicAdjustment ?? 0),
             itemValue: Number(after.itemValue ?? 0),
             depositAmount: Number(after.depositAmount ?? 0),
             urgency: after.urgency ?? 'medium',
+            policyVersion:
+              typeof after.pricingPolicyVersion === 'string' && after.pricingPolicyVersion.length > 0
+                ? after.pricingPolicyVersion
+                : null,
+            pricingContext,
             matchedGillerId: gillerId || null,
             primaryDeliveryId: after.primaryDeliveryId ?? null,
             completedAt: admin.firestore.FieldValue.serverTimestamp(),
@@ -843,8 +909,9 @@ export const onRequestStatusChanged = functions.firestore
           const totalFee: number = after.fee?.totalFee ?? 0;
 
           if (totalFee > 0) {
-            const PLATFORM_FEE_RATE = 0.15;
-            const TAX_RATE = 0.033;
+            const pricingPolicy = await getFunctionsPricingPolicyConfig();
+            const PLATFORM_FEE_RATE = pricingPolicy.platformFeeRate;
+            const TAX_RATE = pricingPolicy.withholdingTaxRate;
 
             const platformFee = Math.round(totalFee * PLATFORM_FEE_RATE);
             const afterFee = totalFee - platformFee;
@@ -1528,25 +1595,12 @@ export const calculateDeliveryRate = functions.https.onCall(async (data: Calcula
 /**
  * Pricing Constants (Updated with actual costs)
  */
-const PRICING_CONSTANTS = {
-  TRANSFER_BONUS: 500,
-  TRANSFER_DISCOUNT: 500,
-  RUSH_HOUR_SURCHARGE_RATE: 0.15,
-  URGENCY_SURCHARGE_RATES: {
-    normal: 0,
-    fast: 0.10,
-    urgent: 0.20,
-  },
-  PROFESSIONAL_BONUS_RATE: 0.25,
-  MASTER_BONUS_RATE: 0.35,
-} as const;
-
 /**
  * HTTP Function: Calculate delivery pricing *
  * Calculates delivery pricing based on distance, time, and other factors
  */
 export const calculateDeliveryPricing = functions.https.onCall(
-  (data: CalculateDeliveryPricingData, context): CalculateDeliveryPricingResult => {
+  async (data: CalculateDeliveryPricingData, context): Promise<CalculateDeliveryPricingResult> => {
     requireCallableAuth(context, 'calculateDeliveryPricing');
 
     const {
@@ -1557,11 +1611,15 @@ export const calculateDeliveryPricing = functions.https.onCall(
       isTransferRoute = false,
       transferCount = 0,
       gillerLevel = 'regular',
+      weather = 'clear',
+      nearbyGillerCount,
+      isProfessionalPeak = false,
     } = data;
 
     console.warn('Pricing calculation requested:', data);
 
     try {
+      const pricingPolicy = await getFunctionsPricingPolicyConfig();
       const estimatedStationCount =
         typeof distance === 'number' && distance > 0
           ? estimateStationCountFromDistanceKm(distance)
@@ -1570,7 +1628,13 @@ export const calculateDeliveryPricing = functions.https.onCall(
       const sharedFee = calculateSharedDeliveryFee({
         stationCount: estimatedStationCount,
         urgency: urgency ?? 'normal',
-      });
+        context: {
+          weather,
+          isPeakTime: isRushHour,
+          nearbyGillerCount,
+          isProfessionalPeak,
+        },
+      }, pricingPolicy);
 
       const breakdown: PricingBreakdown[] = [
         {
@@ -1613,11 +1677,11 @@ export const calculateDeliveryPricing = functions.https.onCall(
       if (isTransferRoute) {
         discounts.push({
           type: 'transfer_bonus',
-          amount: -PRICING_CONSTANTS.TRANSFER_DISCOUNT,
+          amount: -(pricingPolicy.incentiveRules.transferDiscount ?? 500),
           description: '환승 구간 할인',
         });
 
-        const transferBonus = transferCount * PRICING_CONSTANTS.TRANSFER_BONUS;
+        const transferBonus = transferCount * (pricingPolicy.incentiveRules.transferBonusPerHop ?? 500);
         if (transferBonus > 0) {
           discounts.push({
             type: 'transfer_bonus',
@@ -1628,21 +1692,25 @@ export const calculateDeliveryPricing = functions.https.onCall(
       }
 
       let totalFare = sharedFee.totalFee + discounts.reduce((sum, item) => sum + item.amount, 0);
-      totalFare = Math.max(SHARED_PRICING_POLICY.MIN_FEE, totalFare);
-      totalFare = Math.min(SHARED_PRICING_POLICY.MAX_FEE, totalFare);
+      totalFare = Math.max(pricingPolicy.minFee, totalFare);
+      totalFare = Math.min(pricingPolicy.maxFee, totalFare);
 
-      const baseSettlement = calculateSharedSettlementBreakdown(totalFare, 0);
+      const baseSettlement = calculateSharedSettlementBreakdown(totalFare, 0, pricingPolicy);
 
       let gillerBonus = 0;
       if (gillerLevel === 'professional') {
-        gillerBonus = Math.round(baseSettlement.platformRevenue * PRICING_CONSTANTS.PROFESSIONAL_BONUS_RATE);
+        gillerBonus = Math.round(
+          baseSettlement.platformRevenue * (pricingPolicy.incentiveRules.professionalBonusRate ?? 0.25)
+        );
         discounts.push({
           type: 'professional_bonus',
           amount: gillerBonus,
           description: '전문 길러 보너스',
         });
       } else if (gillerLevel === 'master') {
-        gillerBonus = Math.round(baseSettlement.platformRevenue * PRICING_CONSTANTS.MASTER_BONUS_RATE);
+        gillerBonus = Math.round(
+          baseSettlement.platformRevenue * (pricingPolicy.incentiveRules.masterBonusRate ?? 0.35)
+        );
         discounts.push({
           type: 'master_bonus',
           amount: gillerBonus,
@@ -1650,7 +1718,7 @@ export const calculateDeliveryPricing = functions.https.onCall(
         });
       }
 
-      const finalPricing = calculateSharedSettlementBreakdown(totalFare, gillerBonus);
+      const finalPricing = calculateSharedSettlementBreakdown(totalFare, gillerBonus, pricingPolicy);
 
       const result: CalculateDeliveryPricingResult = {
         baseFare: sharedFee.baseFee,
@@ -1975,7 +2043,8 @@ export const completeMatch = functions.https.onCall(
 
       // 3. Calculate final earnings
       const totalFare = match.fee.totalFee;
-      const settlementBreakdown = calculateSharedSettlementBreakdown(totalFare, 0);
+      const pricingPolicy = await getFunctionsPricingPolicyConfig();
+      const settlementBreakdown = calculateSharedSettlementBreakdown(totalFare, 0, pricingPolicy);
       const baseEarnings = settlementBreakdown.gillerPreTaxEarnings;
 
       // Get giller level for bonus
@@ -1985,9 +2054,13 @@ export const completeMatch = functions.https.onCall(
 
       let bonus = 0;
       if (gillerLevel === 'professional') {
-        bonus = Math.round(settlementBreakdown.platformRevenue * PRICING_CONSTANTS.PROFESSIONAL_BONUS_RATE);
+        bonus = Math.round(
+          settlementBreakdown.platformRevenue * (pricingPolicy.incentiveRules.professionalBonusRate ?? 0.25)
+        );
       } else if (gillerLevel === 'master') {
-        bonus = Math.round(settlementBreakdown.platformRevenue * PRICING_CONSTANTS.MASTER_BONUS_RATE);
+        bonus = Math.round(
+          settlementBreakdown.platformRevenue * (pricingPolicy.incentiveRules.masterBonusRate ?? 0.35)
+        );
       }
 
       const totalEarnings = baseEarnings + bonus;

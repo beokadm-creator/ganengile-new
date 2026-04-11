@@ -29,6 +29,7 @@ import {
   type DeliveryFeeBreakdown,
   type PackageSizeType,
 } from './pricing-service';
+import { getPricingPolicyConfig } from './pricing-policy-config-service';
 import {
   createGillerEarning,
   getGillerEarningForRequest,
@@ -58,13 +59,13 @@ type DeliveryCancellationResult = {
 };
 
 type LegacyFeeInput = {
-  totalFee?: number;
-  deliveryFee?: number;
-  baseFee?: number;
-  vat?: number;
-  publicFare?: number;
-  serviceFee?: number;
-  stationCount?: number;
+  totalFee?: number | null;
+  deliveryFee?: number | null;
+  baseFee?: number | null;
+  vat?: number | null;
+  publicFare?: number | null;
+  serviceFee?: number | null;
+  stationCount?: number | null;
   breakdown?: DeliveryFeeBreakdown['breakdown'] | null;
 };
 
@@ -128,7 +129,7 @@ type DeliveryDocLike = {
   recipientInfo?: {
     verificationCode?: string;
   };
-  requesterConfirmedAt?: unknown;
+  requesterConfirmedAt?: Date | { toDate?: () => Date; toMillis?: () => number } | null;
   tracking?: DeliveryTrackingPayload;
   createdAt?: {
     toMillis?: () => number;
@@ -266,7 +267,7 @@ function normalizeConfirmedFee(request: DeliveryRequestLike): NormalizedConfirme
                 platformFee: totalFee - Math.floor(totalFee * 0.9),
               }
             : undefined),
-        publicFare: rawFee.publicFare,
+        publicFare: rawFee.publicFare ?? undefined,
       };
     }
   }
@@ -385,13 +386,14 @@ export async function gillerAcceptRequest(
         request?.feeBreakdown?.publicFare
       ) ?? 0;
 
+      const pricingPolicy = await getPricingPolicyConfig();
       const fallbackFee = calculatePhase1DeliveryFee({
         stationCount,
         weight: rawWeight,
         packageSize,
         urgency,
         publicFare,
-      });
+      }, pricingPolicy);
 
       confirmedFee = {
         totalFee: fallbackFee.totalFee,
@@ -405,7 +407,11 @@ export async function gillerAcceptRequest(
     // Block if no valid fee information is found
     if (!confirmedFee?.totalFee || confirmedFee.totalFee <= 0) {
       console.error('Invalid fee information found for request:', requestId, request);
-      return { success: false, message: '배송 요금 정보가 유효하지 않아 수락할 수 없습니다. 고객센터에 문의해주세요.' };
+    return { success: false, message: '배송 요금 정보가 유효하지 않아 수락할 수 없습니다. 고객센터에 문의해주세요.' };
+  }
+
+    if (!request.pickupStation || !request.deliveryStation) {
+      return { success: false, message: '출발지 또는 도착지 정보가 없어 배송을 생성할 수 없습니다.' };
     }
 
     const recipientName = request.recipientName ?? request.receiverName ?? '수령인';
@@ -456,7 +462,10 @@ export async function gillerAcceptRequest(
         itemDescription: request.packageInfo?.description,
         itemValue: request.itemValue,
         urgency: request.urgency,
-        requestMode: request.requestMode,
+        requestMode:
+          request.requestMode === 'immediate' || request.requestMode === 'reservation'
+            ? request.requestMode
+            : undefined,
         preferredPickupTime: request.preferredTime?.departureTime,
         preferredArrivalTime: request.preferredTime?.arrivalTime,
       },
@@ -596,6 +605,10 @@ export async function cancelDeliveryFlow(args: {
         requestStatus: 'cancelled',
         depositStatus: 'not_found',
       };
+    }
+
+    if (!delivery.deliveryId) {
+      return { success: false, message: '배송 식별자가 없어 취소할 수 없습니다.' };
     }
 
     const deliveryRef = doc(db, 'deliveries', delivery.deliveryId);
@@ -988,7 +1001,7 @@ export async function confirmDeliveryByRequester(
     }
 
     const confirmableStatuses = new Set(['delivered', 'at_locker', 'completed']);
-    if (!confirmableStatuses.has(delivery.status)) {
+    if (!delivery.status || !confirmableStatuses.has(delivery.status)) {
       return { success: false, message: '수령 확인 대기 상태가 아닙니다.' };
     }
 
@@ -1241,7 +1254,7 @@ export async function getDeliveryById(deliveryId: string): Promise<DeliveryReque
     return {
       deliveryId,
       ...deliveryDoc.data(),
-    } as DeliveryRequest;
+    } as unknown as DeliveryRequest;
   } catch (error) {
     console.error('Error fetching delivery:', error);
     return null;

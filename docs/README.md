@@ -19,7 +19,7 @@
 | 매칭/동선 | [docs/core/matching-and-routing.md](docs/core/matching-and-routing.md) | `src/services/matching-service.ts`, `src/services/route-service.ts`, `src/screens/main/AddRouteScreen.tsx` |
 | 요금/운임/정산 | [docs/core/pricing-and-fares.md](docs/core/pricing-and-fares.md) | `src/services/pricing-service.ts`, `src/services/fare-service.ts`, `src/services/payment-service.ts` |
 | 사물함/전달 방식 | [docs/core/lockers-and-handover.md](docs/core/lockers-and-handover.md) | `src/services/locker-service.ts`, `src/screens/main/LockerMapScreen.tsx`, `src/screens/giller/` |
-| 레거시 기업고객 흐름 | [docs/features/b2b-service.md](docs/features/b2b-service.md) | `src/screens/enterprise-legacy/`, `src/services/enterprise-legacy-*` |
+| 배송 파트너/B2B 오케스트레이션 | [docs/CLOUD-DELIVERY-ACTOR-STANDARD.md](docs/CLOUD-DELIVERY-ACTOR-STANDARD.md) | `src/services/beta1-orchestration-service.ts`, `src/services/request-service.ts`, `admin-web/app/(admin)/delivery-partners/` |
 | 보증금/패널티 | [docs/features/deposit-and-penalty.md](docs/features/deposit-and-penalty.md) | `src/services/DepositService.ts`, `src/services/penalty-service.ts` |
 
 ## 3. 앱 동선

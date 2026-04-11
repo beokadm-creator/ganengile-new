@@ -1,6 +1,8 @@
 import type { PricingQuote, QuoteType } from '../types/beta1';
 import { calculatePhase1DeliveryFee, estimateStationCountFromCoords, type PackageSizeType } from './pricing-service';
 import { type LegacyStationInfo as StationInfo } from '../utils/request-draft-adapters';
+import type { SharedPricingPolicyConfig } from '../../shared/pricing-policy';
+import type { RoutePricingOverrideConfig } from '../../shared/route-pricing-override';
 
 export interface Beta1RequestCreateInput {
   requesterUserId: string;
@@ -162,50 +164,110 @@ function resolveEstimatedStationCount(input: Beta1RequestCreateInput) {
   return 5;
 }
 
-export function buildBeta1QuoteCards(input: Beta1RequestCreateInput): Beta1QuoteCard[] {
+function resolveRequestedHour(input: Beta1RequestCreateInput): number {
+  const value = input.preferredPickupTime?.trim();
+  if (!value || value === 'now' || value === '지금 바로') {
+    return new Date().getHours();
+  }
+
+  const matched = value.match(/(\d{1,2}):(\d{2})/);
+  if (!matched) {
+    return new Date().getHours();
+  }
+
+  const hour = Number(matched[1]);
+  return Number.isFinite(hour) ? Math.max(0, Math.min(23, hour)) : new Date().getHours();
+}
+
+export function buildBeta1QuoteCards(
+  input: Beta1RequestCreateInput,
+  pricingPolicy?: Partial<SharedPricingPolicyConfig>,
+  routeOverride?: RoutePricingOverrideConfig | null
+): Beta1QuoteCard[] {
+  const resolvedPolicy = pricingPolicy;
   const reservationMode = input.requestMode === 'reservation';
   const originType = input.originType ?? 'station';
   const destinationType = input.destinationType ?? 'station';
   const hasAddressPickup = originType === 'address';
   const hasAddressDropoff = destinationType === 'address';
-  const addressPickupFee = hasAddressPickup ? 900 : 0;
-  const addressDropoffFee = hasAddressDropoff ? 800 : 0;
+  const addressPickupFee = hasAddressPickup ? (resolvedPolicy?.quoteAdjustments?.addressPickupFee ?? 900) : 0;
+  const addressDropoffFee = hasAddressDropoff ? (resolvedPolicy?.quoteAdjustments?.addressDropoffFee ?? 800) : 0;
   const stationCount = resolveEstimatedStationCount(input);
   const base = calculatePhase1DeliveryFee({
     stationCount,
     weight: input.weightKg,
     packageSize: normalizePackageSize(input.packageSize),
     urgency: input.urgency ?? 'normal',
-  });
+    context: {
+      requestedHour: resolveRequestedHour(input),
+      isPeakTime: reservationMode ? false : undefined,
+    },
+  }, pricingPolicy);
 
   const fastestPricing = buildQuotePricing(base, input, {
-    urgencySurcharge: reservationMode ? base.urgencySurcharge + 900 : base.urgencySurcharge + 2500,
+    urgencySurcharge: reservationMode
+      ? base.urgencySurcharge + (resolvedPolicy?.quoteAdjustments?.fastestReservationSurcharge ?? 900)
+      : base.urgencySurcharge + (resolvedPolicy?.quoteAdjustments?.fastestImmediateSurcharge ?? 2500),
     addressPickupFee,
     addressDropoffFee,
   });
 
   const balancedPricing = buildQuotePricing(base, input, {
-    urgencySurcharge: reservationMode ? Math.max(0, base.urgencySurcharge - 200) : base.urgencySurcharge,
-    lockerFee: input.directParticipationMode === 'locker_assisted' ? 1000 : 0,
+    urgencySurcharge: reservationMode
+      ? Math.max(0, base.urgencySurcharge + (resolvedPolicy?.quoteAdjustments?.balancedReservationUrgencyOffset ?? -200))
+      : base.urgencySurcharge,
+    lockerFee:
+      input.directParticipationMode === 'locker_assisted'
+        ? (resolvedPolicy?.quoteAdjustments?.balancedLockerAssistedFee ?? 1000)
+        : 0,
     addressPickupFee,
     addressDropoffFee,
   });
 
   const lowestPricePricing = buildQuotePricing(base, input, {
-    distanceFee: Math.max(0, base.distanceFee - 300),
-    urgencySurcharge: Math.max(0, base.urgencySurcharge - (reservationMode ? 600 : 200)),
-    lockerFee: 700,
-    addressPickupFee: Math.round(addressPickupFee * 0.6),
-    addressDropoffFee: Math.round(addressDropoffFee * 0.6),
-    serviceFee: Math.max(0, base.serviceFee - 150),
+    distanceFee: Math.max(0, base.distanceFee - (resolvedPolicy?.quoteAdjustments?.lowestPriceDistanceDiscount ?? 300)),
+    urgencySurcharge: Math.max(
+      0,
+      base.urgencySurcharge -
+        (reservationMode
+          ? (resolvedPolicy?.quoteAdjustments?.lowestPriceReservationUrgencyDiscount ?? 600)
+          : (resolvedPolicy?.quoteAdjustments?.lowestPriceImmediateUrgencyDiscount ?? 200))
+    ),
+    lockerFee: resolvedPolicy?.quoteAdjustments?.lowestPriceLockerFee ?? 700,
+    addressPickupFee: Math.round(addressPickupFee * (resolvedPolicy?.quoteAdjustments?.lowestPriceAddressPickupDiscountRate ?? 0.6)),
+    addressDropoffFee: Math.round(addressDropoffFee * (resolvedPolicy?.quoteAdjustments?.lowestPriceAddressDropoffDiscountRate ?? 0.6)),
+    serviceFee: Math.max(0, base.serviceFee - (resolvedPolicy?.quoteAdjustments?.lowestPriceServiceFeeDiscount ?? 150)),
   });
-  lowestPricePricing.publicPrice = Math.max(3000, lowestPricePricing.publicPrice);
+  lowestPricePricing.publicPrice = Math.max(
+    resolvedPolicy?.quoteAdjustments?.lowestPriceMinPublicPrice ?? 3000,
+    lowestPricePricing.publicPrice
+  );
 
   const lockerIncludedPricing = buildQuotePricing(base, input, {
-    lockerFee: 1200 + (reservationMode ? 200 : 500),
-    addressPickupFee: Math.round(addressPickupFee * 0.7),
-    addressDropoffFee: Math.round(addressDropoffFee * 0.7),
+    lockerFee:
+      (resolvedPolicy?.quoteAdjustments?.lockerIncludedBaseFee ?? 1200) +
+      (reservationMode
+        ? (resolvedPolicy?.quoteAdjustments?.lockerIncludedReservationExtraFee ?? 200)
+        : (resolvedPolicy?.quoteAdjustments?.lockerIncludedImmediateExtraFee ?? 500)),
+    addressPickupFee: Math.round(addressPickupFee * (resolvedPolicy?.quoteAdjustments?.lockerIncludedAddressPickupDiscountRate ?? 0.7)),
+    addressDropoffFee: Math.round(addressDropoffFee * (resolvedPolicy?.quoteAdjustments?.lockerIncludedAddressDropoffDiscountRate ?? 0.7)),
   });
+
+  const applyRouteOverride = (pricing: PricingQuote['finalPricing']): PricingQuote['finalPricing'] => {
+    if (!routeOverride?.enabled) {
+      return pricing;
+    }
+
+    const nextPublicPrice = Math.max(
+      0,
+      Math.round(pricing.publicPrice * routeOverride.multiplier) + routeOverride.fixedAdjustment
+    );
+
+    return {
+      ...pricing,
+      publicPrice: nextPublicPrice,
+    };
+  };
 
   return [
     {
@@ -222,7 +284,7 @@ export function buildBeta1QuoteCards(input: Beta1RequestCreateInput): Beta1Quote
       includesLocker: false,
       includesAddressPickup: hasAddressPickup,
       includesAddressDropoff: hasAddressDropoff,
-      pricing: fastestPricing,
+      pricing: applyRouteOverride(fastestPricing),
     },
     {
       quoteType: 'balanced',
@@ -238,7 +300,7 @@ export function buildBeta1QuoteCards(input: Beta1RequestCreateInput): Beta1Quote
       includesLocker: input.directParticipationMode === 'locker_assisted',
       includesAddressPickup: hasAddressPickup,
       includesAddressDropoff: hasAddressDropoff,
-      pricing: balancedPricing,
+      pricing: applyRouteOverride(balancedPricing),
     },
     {
       quoteType: 'lowest_price',
@@ -254,7 +316,7 @@ export function buildBeta1QuoteCards(input: Beta1RequestCreateInput): Beta1Quote
       includesLocker: true,
       includesAddressPickup: hasAddressPickup,
       includesAddressDropoff: hasAddressDropoff,
-      pricing: lowestPricePricing,
+      pricing: applyRouteOverride(lowestPricePricing),
     },
     {
       quoteType: 'locker_included',
@@ -270,7 +332,7 @@ export function buildBeta1QuoteCards(input: Beta1RequestCreateInput): Beta1Quote
       includesLocker: true,
       includesAddressPickup: hasAddressPickup,
       includesAddressDropoff: hasAddressDropoff,
-      pricing: lockerIncludedPricing,
+      pricing: applyRouteOverride(lockerIncludedPricing),
     },
   ];
 }

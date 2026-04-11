@@ -16,6 +16,7 @@ import {
   Unsubscribe,
 } from 'firebase/firestore';
 import { db } from './firebase';
+import { getPricingPolicyConfig } from './pricing-policy-config-service';
 import type {
   Auction,
   Bid,
@@ -36,6 +37,7 @@ const DEFAULT_AUCTION_CONFIG: AuctionConfig = {
 
 export async function createAuction(data: CreateAuctionData): Promise<Auction> {
   validateAuctionData(data);
+  const pricingPolicy = await getPricingPolicyConfig();
 
   const now = new Date();
   const durationMinutes = data.durationMinutes ?? 30;
@@ -64,7 +66,7 @@ export async function createAuction(data: CreateAuctionData): Promise<Auction> {
     weightFee: data.weightFee ?? 0,
     sizeFee: data.sizeFee ?? 0,
     serviceFee: data.serviceFee ?? 0,
-    vat: Math.round((data.baseFee + (data.distanceFee ?? 0)) * 0.1),
+    vat: Math.round((data.baseFee + (data.distanceFee ?? 0)) * pricingPolicy.vatRate),
     currentHighestBid: data.baseFee,
     startedAt: Timestamp.fromDate(now),
     endsAt: Timestamp.fromDate(endsAt),

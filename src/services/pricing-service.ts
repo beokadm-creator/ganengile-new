@@ -7,6 +7,8 @@ import {
   calculateSharedSizeFee,
   calculateSharedUrgencySurcharge,
   calculateSharedWeightFee,
+  type SharedPricingContext,
+  type SharedPricingPolicyConfig,
 } from '../../shared/pricing-policy';
 
 export type PackageSizeType = 'small' | 'medium' | 'large' | 'xl' | 'extra_large';
@@ -17,6 +19,7 @@ export interface Phase1PricingParams {
   packageSize?: PackageSizeType;
   urgency?: 'normal' | 'fast' | 'urgent';
   publicFare?: number;
+  context?: SharedPricingContext;
 }
 
 export interface DeliveryFeeBreakdown {
@@ -26,6 +29,7 @@ export interface DeliveryFeeBreakdown {
   sizeFee: number;
   urgencySurcharge: number;
   publicFare: number;
+  dynamicAdjustment: number;
   serviceFee: number;
   subtotal: number;
   vat: number;
@@ -38,21 +42,24 @@ export interface DeliveryFeeBreakdown {
 }
 
 export const PRICING_POLICY = {
-  BASE_FEE: SHARED_PRICING_POLICY.BASE_FEE,
-  MIN_FEE: SHARED_PRICING_POLICY.MIN_FEE,
-  MAX_FEE: SHARED_PRICING_POLICY.MAX_FEE,
-  PLATFORM_FEE_RATE: SHARED_PRICING_POLICY.PLATFORM_FEE_RATE,
+  BASE_FEE: SHARED_PRICING_POLICY.baseFee,
+  MIN_FEE: SHARED_PRICING_POLICY.minFee,
+  MAX_FEE: SHARED_PRICING_POLICY.maxFee,
+  PLATFORM_FEE_RATE: SHARED_PRICING_POLICY.platformFeeRate,
 } as const;
 
 const PRICING_CONFIG = {
-  BASE_FEE: SHARED_PRICING_POLICY.BASE_FEE,
-  MIN_FEE: SHARED_PRICING_POLICY.MIN_FEE,
-  MAX_FEE: SHARED_PRICING_POLICY.MAX_FEE,
-  PLATFORM_FEE_RATE: SHARED_PRICING_POLICY.PLATFORM_FEE_RATE,
-  VAT_RATE: SHARED_PRICING_POLICY.VAT_RATE,
+  BASE_FEE: SHARED_PRICING_POLICY.baseFee,
+  MIN_FEE: SHARED_PRICING_POLICY.minFee,
+  MAX_FEE: SHARED_PRICING_POLICY.maxFee,
+  PLATFORM_FEE_RATE: SHARED_PRICING_POLICY.platformFeeRate,
+  VAT_RATE: SHARED_PRICING_POLICY.vatRate,
 } as const;
 
-export function calculatePhase1DeliveryFee(params: Phase1PricingParams): DeliveryFeeBreakdown {
+export function calculatePhase1DeliveryFee(
+  params: Phase1PricingParams,
+  policy?: Partial<SharedPricingPolicyConfig>
+): DeliveryFeeBreakdown {
   const stationCount = params.stationCount ?? 5;
   const packageSize = params.packageSize ?? 'small';
   const urgency = params.urgency ?? 'normal';
@@ -63,7 +70,8 @@ export function calculatePhase1DeliveryFee(params: Phase1PricingParams): Deliver
     packageSize,
     urgency,
     publicFare: params.publicFare,
-  });
+    context: params.context,
+  }, policy);
 
   return {
     baseFee: result.baseFee,
@@ -72,6 +80,7 @@ export function calculatePhase1DeliveryFee(params: Phase1PricingParams): Deliver
     sizeFee: result.sizeFee,
     urgencySurcharge: result.urgencySurcharge,
     publicFare: result.publicFare,
+    dynamicAdjustment: result.dynamicAdjustment,
     serviceFee: result.serviceFee,
     subtotal: result.subtotal,
     vat: result.vat,
@@ -81,41 +90,52 @@ export function calculatePhase1DeliveryFee(params: Phase1PricingParams): Deliver
   };
 }
 
-export function calculateDistanceFee(stationCount: number): number {
-  return calculateSharedDistanceFee(stationCount);
+export function calculateDistanceFee(
+  stationCount: number,
+  policy?: Partial<SharedPricingPolicyConfig>
+): number {
+  return calculateSharedDistanceFee(stationCount, policy);
 }
 
-export function calculateWeightFee(weight: number): number {
-  return calculateSharedWeightFee(weight);
+export function calculateWeightFee(
+  weight: number,
+  policy?: Partial<SharedPricingPolicyConfig>
+): number {
+  return calculateSharedWeightFee(weight, policy);
 }
 
-export function calculateSizeFee(packageSize: PackageSizeType): number {
-  return calculateSharedSizeFee(packageSize);
+export function calculateSizeFee(
+  packageSize: PackageSizeType,
+  policy?: Partial<SharedPricingPolicyConfig>
+): number {
+  return calculateSharedSizeFee(packageSize, policy);
 }
 
 export function calculateUrgencySurcharge(
   urgency: 'normal' | 'fast' | 'urgent',
-  baseAndDistanceFee: number
+  baseAndDistanceFee: number,
+  policy?: Partial<SharedPricingPolicyConfig>
 ): number {
-  return calculateSharedUrgencySurcharge(urgency, baseAndDistanceFee);
+  return calculateSharedUrgencySurcharge(urgency, baseAndDistanceFee, policy);
 }
 
 export function calculateServiceFee(
   feeBeforeService: number,
-  rate: number = SHARED_PRICING_POLICY.PLATFORM_FEE_RATE
+  rate: number = SHARED_PRICING_POLICY.platformFeeRate,
+  policy?: Partial<SharedPricingPolicyConfig>
 ): number {
-  if (rate === SHARED_PRICING_POLICY.PLATFORM_FEE_RATE) {
-    return calculateSharedServiceFee(feeBeforeService);
+  if (rate === SHARED_PRICING_POLICY.platformFeeRate) {
+    return calculateSharedServiceFee(feeBeforeService, policy);
   }
 
   return Math.round(feeBeforeService * rate);
 }
 
-export function calculateBreakdown(totalFee: number): {
-  gillerFee: number;
-  platformFee: number;
-} {
-  return calculateSharedBreakdown(totalFee);
+export function calculateBreakdown(
+  totalFee: number,
+  policy?: Partial<SharedPricingPolicyConfig>
+): { gillerFee: number; platformFee: number } {
+  return calculateSharedBreakdown(totalFee, policy);
 }
 
 function generateDescription(
@@ -142,8 +162,11 @@ function generateDescription(
   })`;
 }
 
-export function estimateDeliveryFee(params: Phase1PricingParams): number {
-  return calculatePhase1DeliveryFee(params).totalFee;
+export function estimateDeliveryFee(
+  params: Phase1PricingParams,
+  policy?: Partial<SharedPricingPolicyConfig>
+): number {
+  return calculatePhase1DeliveryFee(params, policy).totalFee;
 }
 
 export function calculateStraightLineDistance(
@@ -180,6 +203,10 @@ export function estimateStationCountFromCoords(
   return Math.max(2, Math.min(50, estimatedStations));
 }
 
-export function isMaxFeeReached(params: Phase1PricingParams): boolean {
-  return calculatePhase1DeliveryFee(params).totalFee >= PRICING_CONFIG.MAX_FEE;
+export function isMaxFeeReached(
+  params: Phase1PricingParams,
+  policy?: Partial<SharedPricingPolicyConfig>
+): boolean {
+  const maxFee = policy?.maxFee ?? PRICING_CONFIG.MAX_FEE;
+  return calculatePhase1DeliveryFee(params, policy).totalFee >= maxFee;
 }

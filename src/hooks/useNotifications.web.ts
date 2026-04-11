@@ -141,7 +141,7 @@ export function useNotifications(handlers?: NotificationHandlers) {
     };
 
     const handleStorage = (event: StorageEvent): void => {
-      if (event.key !== WEB_NOTIFICATION_STORAGE_KEY ?? !event.newValue) { // eslint-disable-line no-constant-binary-expression, no-constant-condition
+      if (event.key !== WEB_NOTIFICATION_STORAGE_KEY || !event.newValue) {
         return;
       }
 
@@ -202,7 +202,7 @@ export function useNotifications(handlers?: NotificationHandlers) {
       pushInboxItem(payload);
       handlers?.onNotificationReceived?.({ title, body, data: payload });
 
-      if (!canUseBrowserNotifications() ?? Notification.permission !== 'granted') { // eslint-disable-line no-constant-binary-expression, no-constant-condition
+      if (!canUseBrowserNotifications() || Notification.permission !== 'granted') {
         return;
       }
 

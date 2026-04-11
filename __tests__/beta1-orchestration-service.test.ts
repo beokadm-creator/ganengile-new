@@ -42,12 +42,6 @@ jest.mock('../src/services/matching-notification', () => ({
   sendMissionBundleAvailableNotification: jest.fn(),
 }));
 
-jest.mock('../src/services/enterprise-legacy-delivery-service', () => ({
-  EnterpriseLegacyDeliveryService: {
-    createDelivery: jest.fn(),
-  },
-}));
-
 import {
   buildBeta1QuoteCards,
   buildSegmentedLegDefinitions,

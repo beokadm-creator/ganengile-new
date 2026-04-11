@@ -24,12 +24,10 @@
 - [src/services/delivery-service.ts](/C:/Users/whhol/Documents/trae_projects/ganengile/src/services/delivery-service.ts#L246)
   - 수령 인증 코드 fallback으로 `000000`이 사용됩니다.
 
-### 2-2. 레거시 기업 계약 길러
+### 2-2. 제거된 레거시 경로
 
-- `src/services/enterprise-legacy-delivery-service.ts`
-  - `checkCompatibility()`가 현재 항상 `true`를 반환합니다.
-- `src/services/enterprise-legacy-delivery-service.ts`
-  - 상위 3명에게만 알림을 보내는 고정 정책입니다.
+- 기존 구형 기업배송 경로는 제거되었습니다.
+- 관련 fallback 점검 대상은 현재 `src/services/beta1-orchestration-service.ts`와 `delivery_partners` 기반 흐름으로 이관되었습니다.
 
 ### 2-3. 위치/실시간 추적
 
@@ -71,7 +69,7 @@
 
 - [src/services/realtime-delivery-tracking.ts](/C:/Users/whhol/Documents/trae_projects/ganengile/src/services/realtime-delivery-tracking.ts)
 - [src/services/transfer-service.ts](/C:/Users/whhol/Documents/trae_projects/ganengile/src/services/transfer-service.ts)
-- `src/services/enterprise-legacy-delivery-service.ts`
+- 제거된 enterprise legacy 경로
 
 ## 4. 우선순위
 

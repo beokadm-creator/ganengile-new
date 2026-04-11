@@ -55,7 +55,8 @@ function normalizeItems(payload: any): FareResponseItem[] {
     payload?.response?.body?.items?.item ||
     payload?.body?.items?.item ||
     payload?.row ||
-    payload?.items ?? [];
+    payload?.items ||
+    [];
   const items = Array.isArray(candidates) ? candidates : [candidates];
   return items.filter(Boolean);
 }

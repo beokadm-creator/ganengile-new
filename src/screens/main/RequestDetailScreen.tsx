@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
+  Image,
   RefreshControl,
   ScrollView,
   StyleSheet,
@@ -325,8 +326,8 @@ export default function RequestDetailScreen() {
                     ? request.packageInfo.weight
                     : 1,
               itemValue: request.itemValue,
-              recipientName: undefined,
-              recipientPhone: undefined,
+              recipientName: request.recipientName,
+              recipientPhone: request.recipientPhone,
               urgency: 'normal',
               directParticipationMode: 'none',
               preferredPickupTime: request.preferredTime?.departureTime,
@@ -548,12 +549,34 @@ export default function RequestDetailScreen() {
         <Panel title="배송 정보">
           <InfoRow label="출발역" value={`${request.pickupStation.stationName} / ${request.pickupStation.line}`} />
           <InfoRow label="도착역" value={`${request.deliveryStation.stationName} / ${request.deliveryStation.line}`} />
+          {request.pickupAddress ? (
+            <InfoRow label="출발지 주소" value={request.pickupAddress.fullAddress} />
+          ) : null}
+          {request.deliveryAddress ? (
+            <InfoRow label="도착지 주소" value={request.deliveryAddress.fullAddress} />
+          ) : null}
           <InfoRow label="희망 시간" value={preferredTimeLabel} />
           <InfoRow
             label="물품 가치"
             value={typeof request.itemValue === 'number' ? `${request.itemValue.toLocaleString()}원` : '-'}
           />
+          <InfoRow label="수령인" value={request.recipientName ?? '-'} />
+          <InfoRow label="수령 연락처" value={request.recipientPhone ?? '-'} />
+          <InfoRow
+            label="사진"
+            value={
+              request.selectedPhotoIds && request.selectedPhotoIds.length > 0
+                ? `${request.selectedPhotoIds.length}장 등록`
+                : '없음'
+            }
+          />
         </Panel>
+
+        {request.packageInfo.imageUrl ? (
+          <Panel title="물건 사진">
+            <Image source={{ uri: request.packageInfo.imageUrl }} style={styles.photoPreview} />
+          </Panel>
+        ) : null}
 
         <View style={styles.actionSection}>
           {canOpenChat ? (
@@ -714,6 +737,12 @@ const styles = StyleSheet.create({
   actionSection: {
     gap: 10,
     paddingBottom: Spacing.xl,
+  },
+  photoPreview: {
+    width: '100%',
+    height: 220,
+    borderRadius: BorderRadius.lg,
+    backgroundColor: Colors.gray100,
   },
   actionButton: {
     minHeight: 54,

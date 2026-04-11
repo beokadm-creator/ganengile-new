@@ -16,10 +16,11 @@ import type {
   TaxInvoice,
   TaxInvoiceItems,
   TaxInvoiceRecipient,
+  SettlementPeriod,
   TaxInvoiceStatus,
 } from '../types/tax-invoice';
-import { PLATFORM_INFO, TAX_RATE } from '../types/tax-invoice';
-import type { SettlementPeriod } from '../types/enterprise-legacy-settlement';
+import { PLATFORM_INFO } from '../types/tax-invoice';
+import { getPricingPolicyConfig } from './pricing-policy-config-service';
 
 const INVOICE_COLLECTION = 'tax_invoices';
 
@@ -89,9 +90,9 @@ function buildRecipient(data: IssueTaxInvoiceInput): TaxInvoiceRecipient {
   };
 }
 
-function buildItems(data: IssueTaxInvoiceInput): TaxInvoiceItems {
+function buildItems(data: IssueTaxInvoiceInput, vatRate: number): TaxInvoiceItems {
   const amount = data.amount;
-  const tax = data.tax > 0 ? data.tax : Math.round(amount * TAX_RATE);
+  const tax = data.tax > 0 ? data.tax : Math.round(amount * vatRate);
 
   return {
     subscriptionFee: amount,
@@ -168,6 +169,7 @@ function mapInvoiceDocument(invoiceId: string, raw: FirestoreTaxInvoiceDoc): Tax
 
 export class TaxInvoiceService {
   async issueTaxInvoice(businessId: string, data: IssueTaxInvoiceInput): Promise<string> {
+    const pricingPolicy = await getPricingPolicyConfig();
     const period: SettlementPeriod = {
       start: data.period.startDate ?? new Date(),
       end: data.period.endDate ?? new Date(),
@@ -178,7 +180,7 @@ export class TaxInvoiceService {
       businessId,
       issueDate: new Date(),
       period,
-      items: buildItems(data),
+      items: buildItems(data, pricingPolicy.vatRate),
       recipient: buildRecipient(data),
       supplier: PLATFORM_INFO,
       status: 'issued' as TaxInvoiceStatus,
@@ -265,10 +267,11 @@ export class TaxInvoiceService {
     }
   }
 
-  calculateInvoiceItems(params: { subscriptionFee: number; deliveryCount: number; perDeliveryFee: number }): TaxInvoiceItems {
+  async calculateInvoiceItems(params: { subscriptionFee: number; deliveryCount: number; perDeliveryFee: number }): Promise<TaxInvoiceItems> {
+    const pricingPolicy = await getPricingPolicyConfig();
     const deliveryFee = params.deliveryCount * params.perDeliveryFee;
     const subtotal = params.subscriptionFee + deliveryFee;
-    const tax = Math.round(subtotal * TAX_RATE);
+    const tax = Math.round(subtotal * pricingPolicy.vatRate);
 
     return {
       subscriptionFee: params.subscriptionFee,

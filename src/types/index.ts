@@ -1,23 +1,6 @@
 export * from './business-contract';
 export * from './delivery-partner';
-export {
-  BASE_DELIVERY_FEES,
-  WEIGHT_SURCHARGE_RATE,
-  type DeliveryPricing,
-  type EnterpriseLegacyContract,
-  type EnterpriseLegacyDelivery,
-  type EnterpriseLegacyDeliveryPricing,
-  type EnterpriseLegacyDeliveryStatus,
-  type EnterpriseLegacyDeliveryType,
-  type EnterpriseLegacyRequest,
-  type CreateEnterpriseLegacyContractData,
-  type CreateEnterpriseLegacyDeliveryData,
-  type CreateEnterpriseLegacyRequestData,
-  type EnterpriseLegacyLocation,
-} from './enterprise-legacy-delivery';
 export * from './tax-invoice';
-export * from './enterprise-legacy-giller-tier';
-export * from './enterprise-legacy-settlement';
 export * from './point';
 export {
   PackageWeight,

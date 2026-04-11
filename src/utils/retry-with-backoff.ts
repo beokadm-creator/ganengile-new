@@ -96,7 +96,7 @@ export async function retryWithBackoff<T>(
       lastError = error;
 
       // Check if we should retry this error
-      if (attempt >= opts.maxAttempts ?? !opts.shouldRetry(error)) { // eslint-disable-line no-constant-binary-expression, no-constant-condition
+      if (attempt >= opts.maxAttempts || !opts.shouldRetry(error)) {
         throw error;
       }
 
@@ -159,7 +159,8 @@ export async function retryFirebaseQuery<T>(
 
       return (
         isNetworkError(error) ||
-        isTimeoutError(error) ?? retryableCodes.some(code => errorCode.includes(code))
+        isTimeoutError(error) ||
+        retryableCodes.some((code) => errorCode.includes(code))
       );
     },
   });
@@ -182,7 +183,8 @@ export async function retryTransaction<T>(
       return (
         errorCode.includes('aborted') ||
         errorCode.includes('deadline-exceeded') ||
-        errorCode.includes('unavailable') ?? isNetworkError(error)
+        errorCode.includes('unavailable') ||
+        isNetworkError(error)
       );
     },
   });

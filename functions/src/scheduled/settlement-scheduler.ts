@@ -2,17 +2,18 @@
 /**
  * Giller Settlement Scheduler
  *
- * 매월 5일 00:00에 실행되어 레거시 기업 계약 길러의 월간 정산을 자동 처리합니다.
+ * 매월 5일 00:00에 실행되어 전문 길러/B2B 수행 건의 월간 정산을 자동 처리합니다.
  *
  * 실행 일정: "0 0 5 * *" (매월 5일 00:00, Asia/Seoul)
  */
 
 import * as admin from 'firebase-admin';
+import { getFunctionsPricingPolicyConfig } from '../pricing-policy-config';
 
 /**
  * 매월 5일 길러 정산 스케줄러
  *
- * 1. 레거시 기업 계약 길러 조회 (gillerProfile.tier: 'silver' | 'gold' | 'platinum')
+ * 1. 정산 대상 길러 조회 (gillerProfile.tier: 'silver' | 'gold' | 'platinum')
  * 2. 전월 배송 집계
  * 3. 등급별 수수료율 적용, 보너스 계산
  * 4. 정산 정보 생성
@@ -43,13 +44,14 @@ export const gillerSettlementScheduler = async (): Promise<{
   let totalAmount = 0;
 
   try {
-    // 1. 레거시 기업 계약 길러 조회 (등급별)
-    const enterpriseLegacyTiers = ['silver', 'gold', 'platinum'] as const;
+    const pricingPolicy = await getFunctionsPricingPolicyConfig();
+    // 1. 정산 대상 길러 조회 (등급별)
+    const settlementTiers = ['silver', 'gold', 'platinum'] as const;
 
     const batch = db.batch();
     let settlementsGenerated = 0;
 
-    for (const tier of enterpriseLegacyTiers) {
+    for (const tier of settlementTiers) {
       console.warn(`🔍 Processing tier: ${tier}`);
 
       // 해당 등급 길러 조회
@@ -80,7 +82,7 @@ export const gillerSettlementScheduler = async (): Promise<{
           const deliveries = deliveriesSnapshot.docs.map((doc) => doc.data() as Record<string, any>);
 
           if (deliveries.length === 0) {
-            console.warn(`⏭️ No enterprise legacy deliveries for giller ${gillerId} in ${year}-${month}`);
+            console.warn(`⏭️ No partner deliveries for giller ${gillerId} in ${year}-${month}`);
             continue;
           }
 
@@ -104,7 +106,7 @@ export const gillerSettlementScheduler = async (): Promise<{
           const totalEarnings = baseEarnings + bonusTotal;
 
           // 2-5. 세금 계산 (3.3% 원천징수)
-          const withholdingTax = Math.round(totalEarnings * 0.033);
+          const withholdingTax = Math.round(totalEarnings * pricingPolicy.withholdingTaxRate);
           const netAmount = totalEarnings - withholdingTax;
 
           console.warn(

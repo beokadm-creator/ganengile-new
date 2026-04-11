@@ -23,10 +23,6 @@ interface DashboardPayload {
     activeDeliveryPartnersCount: number;
     partnerDispatchQueuedCount: number;
     partnerDispatchActiveCount: number;
-    enterpriseLegacyContractsCount: number;
-    enterpriseLegacyPendingContractsCount: number;
-    enterpriseLegacyDeliveriesCount: number;
-    enterpriseLegacyActiveDeliveriesCount: number;
     delayedRequestCount: number;
     criticalQueue: number;
   };
@@ -255,13 +251,6 @@ export default function DashboardPage(): ReactElement {
         tone: dashboard.metrics.partnerDispatchQueuedCount > 0 ? 'warning' : 'neutral',
       },
       {
-        title: '레거시 계약 대기',
-        count: dashboard.metrics.enterpriseLegacyPendingContractsCount,
-        description: '이전 기업고객 계약 흐름에서 아직 승인 또는 정리되지 않은 계약 대기 건입니다.',
-        href: '/enterprise-legacy',
-        tone: dashboard.metrics.enterpriseLegacyPendingContractsCount > 0 ? 'warning' : 'neutral',
-      },
-      {
         title: '길러 승급 병목',
         count: dashboard.metrics.pendingGillerApps,
         description: '공급 병목으로 이어질 수 있는 길러 승급 심사 대기 건입니다.',
@@ -325,13 +314,6 @@ export default function DashboardPage(): ReactElement {
           <MetricCard title="등록 업체" value={dashboard?.metrics.deliveryPartnersCount ?? 0} hint="external partner로 등록된 업체 수" tone="neutral" />
           <MetricCard title="활성 업체" value={dashboard?.metrics.activeDeliveryPartnersCount ?? 0} hint="오케스트레이션 참여 가능 상태의 업체 수" tone="positive" />
           <MetricCard title="진행 중 위임" value={dashboard?.metrics.partnerDispatchActiveCount ?? 0} hint="업체가 수락했거나 진행 중인 위임 건수" tone="positive" />
-        </section>
-
-        <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-          <MetricCard title="레거시 계약" value={dashboard?.metrics.enterpriseLegacyContractsCount ?? 0} hint="기업고객 레거시 계약 전체 건수" tone="neutral" />
-          <MetricCard title="레거시 계약 대기" value={dashboard?.metrics.enterpriseLegacyPendingContractsCount ?? 0} hint="운영 승인이 남은 기업고객 레거시 계약" tone="warning" />
-          <MetricCard title="레거시 배송" value={dashboard?.metrics.enterpriseLegacyDeliveriesCount ?? 0} hint="기업고객 레거시 배송 요청 전체 건수" tone="neutral" />
-          <MetricCard title="레거시 배송 진행" value={dashboard?.metrics.enterpriseLegacyActiveDeliveriesCount ?? 0} hint="기업고객 레거시 배송 진행 건수" tone="positive" />
         </section>
 
         <section className="grid gap-4 xl:grid-cols-3">
@@ -427,10 +409,9 @@ export default function DashboardPage(): ReactElement {
               <TaskCard title="AI 관제" body="분석, 견적, 결정, 미션" href="/beta1/ai-review" />
               <TaskCard title="분쟁 처리" body="책임 주체, 보상 금액, 보증금 환불·차감 판단을 바로 진행합니다." href="/disputes" />
               <TaskCard title="보증금 운영" body="요청자 보호 환불과 길러 책임 차감을 운영 체크리스트로 마감합니다." href="/deposits" />
-              <TaskCard title="정산 운영" body="개인 3.3% 정산과 레거시 기업고객 월 청구를 다른 규칙으로 관리합니다." href="/settlements" />
+              <TaskCard title="정산 운영" body="개인 3.3% 정산과 지급 흐름을 관리합니다." href="/settlements" />
               <TaskCard title="배송업체 관리" body="external partner 등록, API 키, 오케스트레이션 우선순위를 관리합니다." href="/delivery-partners" />
               <TaskCard title="업체 위임 현황" body="partner_dispatches 상태 전이와 수동 운영 메모를 관리합니다." href="/partner-dispatches" />
-              <TaskCard title="기업고객 레거시" body="이전 기업고객 계약과 b2b_deliveries 데이터를 외부 배송업체 운영과 분리해 확인합니다." href="/enterprise-legacy" />
             </div>
           </div>
         </section>

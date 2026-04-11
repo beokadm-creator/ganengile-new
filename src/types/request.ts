@@ -5,6 +5,19 @@
 
 import { Timestamp } from 'firebase/firestore';
 
+export type RequestPricingWeather = 'clear' | 'rain' | 'snow';
+export type RequestPricingUrgencyBucket = 'normal' | 'fast' | 'urgent';
+
+export interface RequestPricingContext {
+  requestMode: 'immediate' | 'reservation';
+  weather: RequestPricingWeather;
+  isPeakTime: boolean;
+  isProfessionalPeak: boolean;
+  nearbyGillerCount?: number | null;
+  requestedHour: number;
+  urgencyBucket: RequestPricingUrgencyBucket;
+}
+
 /**
  * 요청 상태
  */
@@ -80,6 +93,8 @@ export interface Request {
   beta1RequestStatus?: string;
   requestMode?: 'immediate' | 'reservation';
   sourceRequestId?: string | null;
+  pricingPolicyVersion?: string;
+  pricingContext?: RequestPricingContext;
 
   // 요청자 정보
   requesterId: string;
@@ -89,6 +104,9 @@ export interface Request {
   deliveryStation: StationInfo;
   pickupAddress?: DetailedAddress;
   deliveryAddress?: DetailedAddress;
+  recipientName?: string;
+  recipientPhone?: string;
+  selectedPhotoIds?: string[];
 
   // 패키지 정보
   packageInfo: PackageInfo;
@@ -106,6 +124,7 @@ export interface Request {
     weightFee: number;
     urgencySurcharge: number;
     publicFare?: number;
+    dynamicAdjustment?: number;
     manualAdjustment: number;
     serviceFee: number;
     vat: number;
@@ -118,6 +137,7 @@ export interface Request {
     weightFee: number;
     urgencySurcharge: number;
     publicFare?: number;
+    dynamicAdjustment?: number;
     manualAdjustment: number;
     serviceFee: number;
     vat: number;
@@ -192,6 +212,7 @@ export interface CreateRequestData {
     sizeFee: number;
     weightFee: number;
     urgencySurcharge: number;
+    dynamicAdjustment?: number;
     manualAdjustment: number;
     serviceFee: number;
     vat: number;
@@ -203,6 +224,7 @@ export interface CreateRequestData {
     sizeFee: number;
     weightFee: number;
     urgencySurcharge: number;
+    dynamicAdjustment?: number;
     manualAdjustment: number;
     serviceFee: number;
     vat: number;
@@ -213,6 +235,8 @@ export interface CreateRequestData {
     };
   };
   itemValue?: number;
+  pricingPolicyVersion?: string;
+  pricingContext?: RequestPricingContext;
   preferredTime?: {
     departureTime: string;
     arrivalTime?: string;

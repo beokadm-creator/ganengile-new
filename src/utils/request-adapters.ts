@@ -93,14 +93,14 @@ interface TrackingInput {
   };
   recipientName?: string;
   recipientVerificationCode?: string;
-  createdAt?: Date | Timestamp | null;
-  updatedAt?: Date | Timestamp | null;
-  matchedAt?: Date | Timestamp | null;
-  acceptedAt?: Date | Timestamp | null;
-  pickedUpAt?: Date | Timestamp | null;
-  arrivedAt?: Date | Timestamp | null;
-  deliveredAt?: Date | Timestamp | null;
-  requesterConfirmedAt?: Date | Timestamp | null;
+  createdAt?: Date | Timestamp | { toDate?: () => Date; toMillis?: () => number } | null;
+  updatedAt?: Date | Timestamp | { toDate?: () => Date; toMillis?: () => number } | null;
+  matchedAt?: Date | Timestamp | { toDate?: () => Date; toMillis?: () => number } | null;
+  acceptedAt?: Date | Timestamp | { toDate?: () => Date; toMillis?: () => number } | null;
+  pickedUpAt?: Date | Timestamp | { toDate?: () => Date; toMillis?: () => number } | null;
+  arrivedAt?: Date | Timestamp | { toDate?: () => Date; toMillis?: () => number } | null;
+  deliveredAt?: Date | Timestamp | { toDate?: () => Date; toMillis?: () => number } | null;
+  requesterConfirmedAt?: Date | Timestamp | { toDate?: () => Date; toMillis?: () => number } | null;
   tracking?: {
     events?: TrackingEventInput[];
     courierLocation?: {
@@ -288,7 +288,7 @@ export function toTrackingModel(data: TrackingInput): TrackingModel {
         : undefined,
     locationHistory: Array.isArray(data.tracking?.locationHistory)
       ? data.tracking.locationHistory.reduce<NonNullable<TrackingModel['locationHistory']>>((acc, item) => {
-          if (typeof item?.latitude !== 'number' ?? typeof item?.longitude !== 'number') { // eslint-disable-line no-constant-binary-expression, no-constant-condition
+          if (typeof item?.latitude !== 'number' || typeof item?.longitude !== 'number') {
             return acc;
           }
 
@@ -348,7 +348,20 @@ function eventTitle(type: string): string {
   }
 }
 
-function toDateOrUndefined(value: Date | Timestamp | undefined | null): Date | undefined {
+function toDateOrUndefined(
+  value:
+    | Date
+    | Timestamp
+    | { toDate?: () => Date; toMillis?: () => number }
+    | undefined
+    | null
+): Date | undefined {
   if (!value) return undefined;
-  return value instanceof Timestamp ? value.toDate() : value;
+  if (value instanceof Date) return value;
+  if (value instanceof Timestamp) return value.toDate();
+  if (typeof value.toDate === 'function') return value.toDate();
+  if (typeof value.toMillis === 'function') {
+    return new Date(value.toMillis());
+  }
+  return undefined;
 }

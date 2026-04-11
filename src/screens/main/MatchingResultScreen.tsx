@@ -163,10 +163,11 @@ export function MatchingResultScreen() {
       pickupStationId: request.pickupStation.stationId,
       deliveryStationId: request.deliveryStation.stationId,
       requestMode: request.requestMode,
+      pricingContext: request.pricingContext,
     }).then((insight) => {
       setPriceInsight(insight);
     });
-  }, [request?.deliveryStation.stationId, request?.pickupStation.stationId, request?.requestMode]);
+  }, [request?.deliveryStation.stationId, request?.pickupStation.stationId, request?.pricingContext, request?.requestMode]);
 
   const currentFee = request?.fee?.totalFee ?? request?.feeBreakdown?.totalFee ?? request?.initialNegotiationFee ?? 0;
   const routeLabel = getRequestRouteLabel(request, pickupStationName, deliveryStationName);
@@ -272,19 +273,31 @@ export function MatchingResultScreen() {
 
       {priceInsight ? (
         <View style={styles.card}>
-          <Text style={styles.cardTitle}>최근 완료 요금 참고</Text>
+          <Text style={styles.cardTitle}>요금 참고</Text>
+          <Text style={styles.insightBody}>{priceInsight.contextSummary}</Text>
           <Text style={styles.insightBody}>
-            비슷한 구간의 최근 완료 배송은 평균 {priceInsight.averageFee.toLocaleString()}원에 진행됐어요.
+            평균 {priceInsight.averageFee.toLocaleString()}원
           </Text>
           <InfoRow label="최근 표본" value={`${priceInsight.sampleCount}건`} />
           <InfoRow label="주요 구간" value={`${priceInsight.minFee.toLocaleString()}원 - ${priceInsight.maxFee.toLocaleString()}원`} />
+          {priceInsight.averageDynamicAdjustment !== 0 ? (
+            <InfoRow
+              label="환경 보정 평균"
+              value={`${priceInsight.averageDynamicAdjustment > 0 ? '+' : ''}${priceInsight.averageDynamicAdjustment.toLocaleString()}원`}
+            />
+          ) : null}
           {priceInsight.recommendedFee > currentFee ? (
             <View style={styles.inlineHint}>
               <Text style={styles.inlineHintText}>
                 현재 금액보다 {recommendedRaise.toLocaleString()}원 정도 올리면 응답 가능성이 더 좋아질 수 있어요.
               </Text>
+              <Text style={styles.inlineHintSubtext}>{priceInsight.recommendationReason}</Text>
             </View>
-          ) : null}
+          ) : (
+            <View style={styles.inlineHint}>
+              <Text style={styles.inlineHintText}>{priceInsight.recommendationReason}</Text>
+            </View>
+          )}
         </View>
       ) : null}
 
@@ -379,6 +392,7 @@ const styles = StyleSheet.create({
     padding: Spacing.md,
   },
   inlineHintText: { color: Colors.textPrimary, fontSize: 14, fontWeight: '600', lineHeight: 20 },
+  inlineHintSubtext: { color: Colors.textSecondary, fontSize: 12, lineHeight: 18, marginTop: 6 },
   infoRow: { flexDirection: 'row', justifyContent: 'space-between', gap: Spacing.md },
   infoLabel: { color: Colors.textTertiary, fontSize: 14, fontWeight: '600' },
   infoValue: { color: Colors.textPrimary, fontSize: 16, fontWeight: '700' },

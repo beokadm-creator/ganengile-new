@@ -305,7 +305,8 @@ export function isNetworkError(error: any): boolean {
     errorMessage.includes('network') ||
     errorMessage.includes('fetch failed') ||
     errorMessage.includes('request failed') ||
-    errorCode.includes('network') ?? errorCode.includes('offline')
+    errorCode.includes('network') ||
+    errorCode.includes('offline')
   );
 }
 
@@ -321,7 +322,8 @@ export function isTimeoutError(error: any): boolean {
   return (
     errorMessage.includes('timeout') ||
     errorMessage.includes('timed out') ||
-    errorCode.includes('timeout') ?? errorCode.includes('deadline-exceeded')
+    errorCode.includes('timeout') ||
+    errorCode.includes('deadline-exceeded')
   );
 }
 
@@ -336,7 +338,8 @@ export function isPermissionError(error: any): boolean {
 
   return (
     errorMessage.includes('permission') ||
-    errorCode.includes('permission') ?? errorCode.includes('auth/') && errorMessage.includes('denied')
+    errorCode.includes('permission') ||
+    (errorCode.includes('auth/') && errorMessage.includes('denied'))
   );
 }
 
@@ -350,7 +353,8 @@ export function isFirebaseError(error: any): boolean {
 
   return (
     errorCode.startsWith('auth/') ||
-    errorCode.startsWith('firestore/') ?? errorCode.startsWith('firebase/')
+    errorCode.startsWith('firestore/') ||
+    errorCode.startsWith('firebase/')
   );
 }
 

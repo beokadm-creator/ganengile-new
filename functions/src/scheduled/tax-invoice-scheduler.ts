@@ -8,6 +8,7 @@
  */
 
 import * as admin from 'firebase-admin';
+import { getFunctionsPricingPolicyConfig } from '../pricing-policy-config';
 
 interface PlatformInfo {
   name: string;
@@ -69,6 +70,7 @@ export const taxInvoiceScheduler = async (): Promise<{
   const errors: string[] = [];
 
   try {
+    const pricingPolicy = await getFunctionsPricingPolicyConfig();
     // 1. 활성 레거시 기업 계약 조회
     const contractsSnapshot = await db
       .collection('businessContracts')
@@ -113,7 +115,7 @@ export const taxInvoiceScheduler = async (): Promise<{
         // 2-2. 금액 집계
         const totalDeliveries = deliveries.length;
         const subtotal = deliveries.reduce((sum, d) => sum + (d.fee?.total ?? 0), 0);
-        const tax = Math.round(subtotal * 0.1); // 부가세 10%
+        const tax = Math.round(subtotal * pricingPolicy.vatRate);
         const totalAmount = subtotal + tax;
 
         console.warn(`💰 Contract ${contractId}: ${totalDeliveries} deliveries, ${subtotal}원 (tax: ${tax}원)`);

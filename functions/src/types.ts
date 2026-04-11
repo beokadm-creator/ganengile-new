@@ -272,6 +272,9 @@ export interface CalculateDeliveryPricingData {
   isTransferRoute?: boolean;
   transferCount?: number;
   gillerLevel?: 'regular' | 'professional' | 'master';
+  weather?: 'clear' | 'rain' | 'snow';
+  nearbyGillerCount?: number;
+  isProfessionalPeak?: boolean;
 }
 
 export interface CalculateDeliveryPricingResult {

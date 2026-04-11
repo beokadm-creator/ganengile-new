@@ -83,8 +83,8 @@ export function subscribeToDeliveryTracking(
       }
 
       const trackingData: DeliveryTrackingData = {
-        requestId: data.requestId,
-        gillerId: data.gillerId,
+        requestId: data.requestId ?? requestId,
+        gillerId: data.gillerId ?? '',
         currentLocation: {
           latitude: data.currentLocation?.latitude ?? 37.5,
           longitude: data.currentLocation?.longitude ?? 127.0,

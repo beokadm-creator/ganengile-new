@@ -267,9 +267,8 @@ export class MediaService {
   private async uriToBlob(uri: string): Promise<Blob> {
     try {
       // 파일을 읽어서 ArrayBuffer로 변환
-      const encodingType = FileSystem.EncodingType as EncodingTypeLike;
       const fileData = await FileSystem.readAsStringAsync(uri, {
-        encoding: encodingType.Base64,
+        encoding: 'base64',
       });
 
       // Base64를 Blob으로 변환

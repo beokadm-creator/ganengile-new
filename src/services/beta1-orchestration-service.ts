@@ -42,7 +42,6 @@ import { buildRequestDraftFromLegacyInput, type LegacyStationInfo as StationInfo
 import { findMatchesForRequest } from './matching-service';
 import { sendMissionBundleAvailableNotification } from './matching-notification';
 import { deliveryPartnerService } from './delivery-partner-service';
-import { EnterpriseLegacyDeliveryService } from './enterprise-legacy-delivery-service';
 import {
   buildMissionWindowLabel,
   buildSegmentedLegDefinitions,
@@ -61,6 +60,8 @@ import {
   type Beta1QuoteCard,
   type Beta1RequestCreateInput,
 } from './beta1-orchestration-quote-service';
+import { getPricingPolicyConfig } from './pricing-policy-config-service';
+import { getRoutePricingOverrideByStations } from './route-pricing-override-service';
 export {
   getBeta1AdminSnapshot,
   getBeta1ChatContext,
@@ -191,6 +192,25 @@ async function createDeliveryLegRecord(params: {
   };
 }
 
+function resolveRequestedHour(preferredPickupTime?: string): number {
+  const value = preferredPickupTime?.trim();
+  if (!value || value === 'now' || value === '지금 바로') {
+    return new Date().getHours();
+  }
+
+  const matched = value.match(/(\d{1,2}):(\d{2})/);
+  if (!matched) {
+    return new Date().getHours();
+  }
+
+  const hour = Number(matched[1]);
+  return Number.isFinite(hour) ? Math.max(0, Math.min(23, hour)) : new Date().getHours();
+}
+
+function isPeakHour(hour: number): boolean {
+  return (hour >= 7 && hour <= 9) || (hour >= 17 && hour <= 20);
+}
+
 function pricingCardToQuote(
   card: Beta1QuoteCard,
   requestDraftId: string,
@@ -229,7 +249,14 @@ export async function createBeta1Request(input: Beta1RequestCreateInput): Promis
 }> {
   const pickupAddress = formatDetailedAddress(input.pickupRoadAddress, input.pickupDetailAddress);
   const deliveryAddress = formatDetailedAddress(input.deliveryRoadAddress, input.deliveryDetailAddress);
-  const quoteCards = buildBeta1QuoteCards(input);
+  const pricingPolicy = await getPricingPolicyConfig();
+  const requestedHour = resolveRequestedHour(input.preferredPickupTime);
+  const routeOverride = await getRoutePricingOverrideByStations({
+    pickupStationId: input.pickupStation.stationId,
+    deliveryStationId: input.deliveryStation.stationId,
+    requestMode: input.requestMode,
+  });
+  const quoteCards = buildBeta1QuoteCards(input, pricingPolicy, routeOverride);
   const selectedCard = quoteCards.find((card) => card.quoteType === input.selectedQuoteType) ?? quoteCards[0];
   let requestDraftId = '';
   let selectedQuoteId = '';
@@ -372,6 +399,7 @@ export async function createBeta1Request(input: Beta1RequestCreateInput): Promis
       weight: input.weightKg,
       weightKg: input.weightKg,
       description: input.packageDescription,
+      imageUrl: input.selectedPhotoIds?.[0] ?? undefined,
       isFragile: false,
       isPerishable: false,
     },
@@ -382,6 +410,16 @@ export async function createBeta1Request(input: Beta1RequestCreateInput): Promis
       departureTime: input.preferredPickupTime ?? '지금 바로',
       arrivalTime: input.preferredArrivalTime ?? '협의 가능',
     },
+    pricingContext: {
+      requestMode: input.requestMode ?? 'immediate',
+      weather: 'clear',
+      isPeakTime: isPeakHour(requestedHour),
+      isProfessionalPeak: false,
+      nearbyGillerCount: null,
+      requestedHour,
+      urgencyBucket: input.urgency === 'urgent' ? 'urgent' : input.urgency === 'fast' ? 'fast' : 'normal',
+    },
+    pricingPolicyVersion: pricingPolicy.version,
     requestMode: input.requestMode ?? 'immediate',
     sourceRequestId: input.sourceRequestId ?? null,
     status: 'pending',
@@ -701,41 +739,9 @@ async function dispatchMissionToB2BFallback(params: {
   }
 
   try {
-    const requestData = params.requestDoc ?? {};
-    const pickupStationName =
-      String(
-        (requestData.pickupStation as { stationName?: string } | undefined)?.stationName ??
-          params.leg.originRef.stationName ??
-          '출발역'
-      );
-    const deliveryStationName =
-      String(
-        (requestData.deliveryStation as { stationName?: string } | undefined)?.stationName ??
-          params.leg.destinationRef.stationName ??
-          '도착역'
-      );
-
-    return await EnterpriseLegacyDeliveryService.createDelivery({
-      contractId: 'beta1-fallback-contract',
-      businessId: 'beta1-fallback',
-      pickupLocation: {
-        station: pickupStationName,
-        address: describeLocationRef(params.leg.originRef),
-        latitude: params.leg.originRef.latitude,
-        longitude: params.leg.originRef.longitude,
-      },
-      dropoffLocation: {
-        station: deliveryStationName,
-        address: describeLocationRef(params.leg.destinationRef),
-        latitude: params.leg.destinationRef.latitude,
-        longitude: params.leg.destinationRef.longitude,
-      },
-      scheduledTime: new Date(Date.now() + 1000 * 60 * 15),
-      weight: Number((requestData.packageInfo as { weightKg?: number; weight?: number } | undefined)?.weightKg ?? (requestData.packageInfo as { weight?: number } | undefined)?.weight ?? 1),
-      notes: `beta1 mission fallback:${params.requestId}:${params.mission.id}`,
-    });
+    return `beta1-fallback:${params.requestId}:${params.mission.id}`;
   } catch (error) {
-    console.warn('Unable to create enterprise legacy fallback delivery', error);
+    console.warn('Unable to prepare fallback plan id', error);
     return null;
   }
 }

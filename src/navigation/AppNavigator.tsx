@@ -10,7 +10,6 @@ import type { RootStackParamList } from '../types/navigation';
 import AuthNavigator from './AuthNavigator';
 import BasicInfoOnboarding from '../screens/onboarding/BasicInfoOnboarding';
 import MainNavigator from './MainNavigator';
-import EnterpriseLegacyNavigator from './EnterpriseLegacyNavigator';
 import { AppDownloadBanner } from '../components/AppDownloadBanner';
 import { navigationRef, savePendingDeepLink, consumePendingDeepLink } from './navigationRef';
 import { getInitialNotification, handleNotificationResponse } from './notificationHandler';
@@ -140,7 +139,6 @@ function AppNavigatorContent() {
         ) : (
           <>
             <Stack.Screen name="Main" component={MainNavigator} />
-            <Stack.Screen name="EnterpriseLegacy" component={EnterpriseLegacyNavigator} />
           </>
         )}
       </Stack.Navigator>

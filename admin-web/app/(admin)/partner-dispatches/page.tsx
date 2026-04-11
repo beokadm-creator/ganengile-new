@@ -83,7 +83,7 @@ export default function PartnerDispatchesPage() {
         <section className="rounded-[28px] bg-white p-6 shadow-sm">
           <h1 className="text-2xl font-bold text-slate-900">외부 배송업체 위임 현황</h1>
           <p className="mt-2 max-w-4xl text-sm leading-6 text-slate-500">
-            beta1 오케스트레이션이 외부 배송업체로 넘긴 미션과 레그의 진행 상태를 운영자가 추적하고,
+            배송 오케스트레이션이 외부 배송업체로 넘긴 미션과 레그의 진행 상태를 운영자가 추적하고,
             수동 dispatch 흐름도 같은 보드에서 관리합니다.
           </p>
         </section>

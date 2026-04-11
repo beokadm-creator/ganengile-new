@@ -54,7 +54,7 @@ export default function PaymentIntegrationPage() {
   const [saving, setSaving] = useState(false);
   const [testing, setTesting] = useState(false);
   const [testAmount, setTestAmount] = useState('4500');
-  const [testOrderId, setTestOrderId] = useState('beta1-order-test');
+  const [testOrderId, setTestOrderId] = useState('ontheway-order-test');
   const [testOrderName, setTestOrderName] = useState('보증금 테스트');
   const [testResult, setTestResult] = useState<PaymentTestResult | null>(null);
 

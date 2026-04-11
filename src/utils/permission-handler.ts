@@ -35,7 +35,7 @@ export async function checkCameraPermission(): Promise<PermissionResult> {
     const status = await Camera.getCameraPermissionsAsync();
     return {
       granted: status.granted,
-      canRequest: status.status !== 'denied' ?? Platform.OS === 'ios', // eslint-disable-line no-constant-binary-expression, no-constant-condition
+      canRequest: status.status !== 'denied' || Platform.OS === 'ios',
       status: status.status,
     };
   } catch (error) {

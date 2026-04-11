@@ -2,20 +2,12 @@ import { NextRequest, NextResponse } from 'next/server';
 import type { Firestore } from 'firebase-admin/firestore';
 import { getAdminDb } from '@/lib/firebase-admin';
 import { isAdmin } from '@/lib/auth';
+import {
+  DEFAULT_SHARED_PRICING_POLICY,
+  normalizeSharedPricingPolicy,
+} from '../../../../../shared/pricing-config';
 
 type UnknownRecord = Record<string, unknown>;
-
-const TAX_POLICY = {
-  businessIncomeRate: 0.03,
-  localIncomeTaxRate: 0.003,
-  combinedWithholdingRate: 0.033,
-  combinedWithholdingPercentLabel: '3.3%',
-  annualFilingWindow: '5월 1일 ~ 5월 31일',
-  withholdingRemitDueRule: '원천세 신고·납부는 일반적으로 지급월 다음 달 10일까지 진행합니다.',
-  simpleStatementDueRule: '사업소득 간이지급명세서는 지급월 다음 달 말일까지 제출합니다.',
-  caution:
-    '실제 신고 주체와 제출 책임, 인적용역 해당 여부는 운영 정책과 세무 검토를 함께 확인해야 합니다.',
-};
 
 function getDb(): Firestore {
   return getAdminDb() as unknown as Firestore;
@@ -34,11 +26,32 @@ export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url);
   const status = searchParams.get('status');
 
-  const [settlementsSnap, paymentConfigSnap, bankConfigSnap] = await Promise.all([
+  const [settlementsSnap, paymentConfigSnap, bankConfigSnap, pricingPolicySnap] = await Promise.all([
     db.collection('settlements').orderBy('createdAt', 'desc').limit(100).get(),
     db.collection('config_integrations').doc('payment').get(),
     db.collection('config_integrations').doc('bank').get(),
+    db.collection('config_pricing').doc('default').get(),
   ]);
+
+  const pricingPolicy = normalizeSharedPricingPolicy(
+    pricingPolicySnap.exists
+      ? ((pricingPolicySnap.data() as UnknownRecord | undefined) ?? DEFAULT_SHARED_PRICING_POLICY)
+      : DEFAULT_SHARED_PRICING_POLICY
+  );
+  const businessIncomeRate =
+    Math.round((pricingPolicy.withholdingTaxRate * (10 / 11)) * 10000) / 10000;
+  const localIncomeTaxRate = Math.max(0, pricingPolicy.withholdingTaxRate - businessIncomeRate);
+  const taxPolicy = {
+    businessIncomeRate,
+    localIncomeTaxRate,
+    combinedWithholdingRate: pricingPolicy.withholdingTaxRate,
+    combinedWithholdingPercentLabel: `${Math.round(pricingPolicy.withholdingTaxRate * 1000) / 10}%`,
+    annualFilingWindow: '5월 1일 ~ 5월 31일',
+    withholdingRemitDueRule: '원천세 신고·납부는 일반적으로 지급월 다음 달 10일까지 진행합니다.',
+    simpleStatementDueRule: '사업소득 간이지급명세서는 지급월 다음 달 말일까지 제출합니다.',
+    caution:
+      '실제 신고 주체와 제출 책임, 인적용역 해당 여부는 운영 정책과 세무 검토를 함께 확인해야 합니다.',
+  };
 
   const settlementDocs = settlementsSnap.docs
     .map((doc) => ({ id: doc.id, raw: (doc.data() as UnknownRecord) ?? {} }))
@@ -127,7 +140,7 @@ export async function GET(req: NextRequest) {
 
     const expectedWithholdingTaxAmount =
       typeof gillerGrossAmount === 'number'
-        ? Math.round(gillerGrossAmount * TAX_POLICY.combinedWithholdingRate)
+        ? Math.round(gillerGrossAmount * taxPolicy.combinedWithholdingRate)
         : null;
 
     const taxDifference =
@@ -219,7 +232,7 @@ export async function GET(req: NextRequest) {
   return NextResponse.json({
     items,
     summary,
-    taxPolicy: TAX_POLICY,
+    taxPolicy,
     integration: {
       paymentLiveReady: Boolean(paymentConfig.liveReady ?? false),
       paymentTestMode: Boolean(paymentConfig.testMode ?? true),

@@ -775,7 +775,12 @@ export async function getRoute(routeId: string, userId: string): Promise<Route |
       return null;
     }
 
-    const route = convertRoute(docSnapshot.data(), docSnapshot.id);
+    const routeData = docSnapshot.data();
+    if (!routeData) {
+      return null;
+    }
+
+    const route = convertRoute(routeData, docSnapshot.id);
 
     if (route.userId !== userId) {
       return null;

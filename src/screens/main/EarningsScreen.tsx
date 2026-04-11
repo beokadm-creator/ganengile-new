@@ -18,7 +18,11 @@ import {
   PaymentStatus,
   PaymentType,
 } from '../../services/payment-service';
-import { SETTLEMENT_POLICY, SETTLEMENT_POLICY_LABELS } from '../../constants/settlementPolicy';
+import {
+  formatPercentLabel,
+  getRuntimeSettlementPolicy,
+  type RuntimeSettlementPolicy,
+} from '../../services/settlement-policy-service';
 import { BorderRadius, Colors, Shadows, Spacing, Typography } from '../../theme';
 
 type NavigationProp = StackNavigationProp<ParamListBase>;
@@ -27,19 +31,12 @@ interface Props {
   navigation: NavigationProp;
 }
 
-const TAX_GUIDE = {
-  platformFeeRateLabel: SETTLEMENT_POLICY_LABELS.platformFee,
-  withholdingRateLabel: SETTLEMENT_POLICY_LABELS.combinedWithholding,
-  annualFilingLabel: '종합소득세 신고 안내',
-  annualFilingBody: `연간 지급 내역은 ${SETTLEMENT_POLICY.annualFilingWindowLabel} 종합소득세 신고 때 참고해야 합니다. 최종 신고 의무와 필요 서류는 개인 상황에 따라 달라질 수 있습니다.`,
-  taxCaution: SETTLEMENT_POLICY.caution,
-};
-
 export default function EarningsScreen({ navigation }: Props) {
   const { user } = useUser();
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [payments, setPayments] = useState<Payment[]>([]);
+  const [settlementPolicy, setSettlementPolicy] = useState<RuntimeSettlementPolicy | null>(null);
   const [monthlySummary, setMonthlySummary] = useState<{
     total: number;
     platformFee: number;
@@ -57,9 +54,10 @@ export default function EarningsScreen({ navigation }: Props) {
 
     try {
       const now = new Date();
-      const [allPayments, monthly] = await Promise.all([
+      const [allPayments, monthly, policy] = await Promise.all([
         getUserPayments(user.uid, 30),
         getUserMonthlyEarnings(user.uid, now.getFullYear(), now.getMonth() + 1),
+        getRuntimeSettlementPolicy(),
       ]);
 
       const earningPayments = allPayments.filter(
@@ -69,6 +67,7 @@ export default function EarningsScreen({ navigation }: Props) {
       );
 
       setPayments(earningPayments);
+      setSettlementPolicy(policy);
       setMonthlySummary({
         total: monthly.total,
         platformFee: monthly.platformFee,
@@ -106,6 +105,17 @@ export default function EarningsScreen({ navigation }: Props) {
     );
   }, [payments]);
 
+  const taxGuide = useMemo(() => {
+    const policy = settlementPolicy;
+    return {
+      platformFeeRateLabel: `플랫폼 수수료 ${formatPercentLabel(policy?.platformFeeRate ?? 0.1)}`,
+      withholdingRateLabel: `사업소득 원천징수 ${formatPercentLabel(policy?.combinedWithholdingRate ?? 0.033)}`,
+      annualFilingLabel: '종합소득세 신고 안내',
+      annualFilingBody: `연간 지급 내역은 ${policy?.annualFilingWindowLabel ?? '다음 해 5월 1일 ~ 5월 31일'} 종합소득세 신고 때 참고해야 합니다. 최종 신고 의무와 필요 서류는 개인 상황에 따라 달라질 수 있습니다.`,
+      taxCaution: policy?.caution ?? '실제 세무 신고와 원천세 납부 의무는 운영 정책과 개별 상황을 함께 확인해야 합니다.',
+    };
+  }, [settlementPolicy]);
+
   if (loading) {
     return (
       <View style={styles.loadingContainer}>
@@ -142,8 +152,8 @@ export default function EarningsScreen({ navigation }: Props) {
             <Text style={styles.heroTitle}>이번 달 정산 요약</Text>
             <Text style={styles.heroCount}>완료 건수 {monthlySummary.count}건</Text>
             <SettlementRow label="세전 수익" value={monthlySummary.total} />
-            <SettlementRow label={TAX_GUIDE.platformFeeRateLabel} value={monthlySummary.platformFee} negative />
-            <SettlementRow label={TAX_GUIDE.withholdingRateLabel} value={monthlySummary.taxWithheld} negative />
+            <SettlementRow label={taxGuide.platformFeeRateLabel} value={monthlySummary.platformFee} negative />
+            <SettlementRow label={taxGuide.withholdingRateLabel} value={monthlySummary.taxWithheld} negative />
             <SettlementRow label="실수령 예정액" value={monthlySummary.netIncome} strong />
           </View>
         ) : null}
@@ -166,20 +176,20 @@ export default function EarningsScreen({ navigation }: Props) {
         <View style={styles.policyCard}>
           <Text style={styles.sectionTitle}>세금과 정산 안내</Text>
           <PolicyItem
-            title={TAX_GUIDE.platformFeeRateLabel}
+            title={taxGuide.platformFeeRateLabel}
             body="배송 수익 정산 전 플랫폼 수수료가 먼저 반영됩니다."
           />
           <PolicyItem
-            title={TAX_GUIDE.withholdingRateLabel}
+            title={taxGuide.withholdingRateLabel}
             body="길러 지급액은 사업소득 원천징수 기준을 반영해 실수령액으로 표시됩니다."
           />
           <PolicyItem
-            title={TAX_GUIDE.annualFilingLabel}
-            body={TAX_GUIDE.annualFilingBody}
+            title={taxGuide.annualFilingLabel}
+            body={taxGuide.annualFilingBody}
           />
           <View style={styles.noticeBox}>
             <Text style={styles.noticeTitle}>안내</Text>
-            <Text style={styles.noticeText}>{TAX_GUIDE.taxCaution}</Text>
+            <Text style={styles.noticeText}>{taxGuide.taxCaution}</Text>
           </View>
         </View>
 

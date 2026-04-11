@@ -24,6 +24,21 @@ type DelayedRequestItem = {
 
 const PRIORITY_OPTIONS = ['normal', 'watch', 'urgent'] as const;
 
+function orchestrationStatusLabel(value: string): string {
+  switch (value) {
+    case 'match_pending':
+      return '매칭 탐색 중';
+    case 'accepted':
+      return '배송 연결됨';
+    case 'completed':
+      return '완료';
+    case 'cancelled':
+      return '취소';
+    default:
+      return value || '-';
+  }
+}
+
 function formatDate(value: string | null): string {
   if (!value) return '-';
   const resolved = new Date(value);
@@ -170,7 +185,7 @@ export default function DelayedRequestsPage() {
                         <span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${statusColor(item.status)}`}>
                           {statusLabel(item.status)}
                         </span>
-                        <p className="mt-2 text-xs text-slate-500">{item.beta1RequestStatus || '-'}</p>
+                        <p className="mt-2 text-xs text-slate-500">{orchestrationStatusLabel(item.beta1RequestStatus)}</p>
                         <p className="mt-1 text-xs text-slate-400">{item.requestMode === 'reservation' ? '예약' : '즉시'}</p>
                       </td>
                       <td className="px-4 py-4 align-top text-slate-700">

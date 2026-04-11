@@ -1,4 +1,7 @@
-import type { SettlementPeriod } from './enterprise-legacy-settlement';
+export interface SettlementPeriod {
+  start: Date;
+  end: Date;
+}
 
 export type TaxInvoiceStatus = 'issued' | 'sent' | 'paid' | 'overdue';
 
@@ -40,8 +43,6 @@ export interface TaxInvoice {
   status: TaxInvoiceStatus;
   pdfUrl: string;
 }
-
-export const TAX_RATE = 0.1;
 
 export const PLATFORM_INFO: TaxInvoiceSupplier = {
   companyName: '가는길에 주식회사',
