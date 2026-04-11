@@ -33,6 +33,7 @@ function formatPhoneDigits(value: string): string {
 export default function ProfileEditScreen({ navigation }: { navigation: MainStackNavigationProp }) {
   const { user, refreshUser, deactivateAccount } = useUser();
   const [name, setName] = useState(user?.name ?? '');
+  const [email] = useState(user?.email ?? '');
   const [phoneNumber, setPhoneNumber] = useState(
     formatPhoneDigits(user?.phoneVerification?.phoneNumber ?? user?.phoneNumber ?? '')
   );
@@ -43,25 +44,32 @@ export default function ProfileEditScreen({ navigation }: { navigation: MainStac
   const [otpSending, setOtpSending] = useState(false);
   const [otpVerifying, setOtpVerifying] = useState(false);
   const [verifiedPhoneOverride, setVerifiedPhoneOverride] = useState<string | null>(null);
+  const [profileChangeVerified, setProfileChangeVerified] = useState(false);
   const [deactivating, setDeactivating] = useState(false);
 
   const normalizedInputPhone = normalizePhoneNumber(phoneNumber);
+  const normalizedCurrentPhone = normalizePhoneNumber(user?.phoneVerification?.phoneNumber ?? user?.phoneNumber ?? '');
   const normalizedVerifiedPhone = normalizePhoneNumber(
     verifiedPhoneOverride ?? user?.phoneVerification?.phoneNumber ?? ''
   );
-  const phoneChanged = normalizedInputPhone !== normalizePhoneNumber(user?.phoneVerification?.phoneNumber ?? user?.phoneNumber ?? '');
+  const phoneChanged = normalizedInputPhone !== normalizedCurrentPhone;
+  const nameChanged = name.trim() !== (user?.name ?? '').trim();
+  const hasChanges = nameChanged || phoneChanged;
   const isPhoneVerified =
     normalizedVerifiedPhone.length > 0 && normalizedInputPhone.length > 0 && normalizedVerifiedPhone === normalizedInputPhone;
+  const canRequestOtpForChanges = normalizedInputPhone.length > 0 && /^010\d{8}$/.test(normalizedInputPhone);
 
   const helperText = useMemo(() => {
-    if (!phoneChanged) {
-      return '현재 인증된 번호를 유지합니다.';
+    if (!hasChanges) {
+      return '수정할 내용을 바꾸면 인증 후 저장할 수 있습니다.';
     }
-    if (isPhoneVerified) {
-      return '새 번호 인증이 완료되었습니다.';
+    if (profileChangeVerified) {
+      return phoneChanged ? '새 번호 확인이 끝났습니다.' : '변경 확인이 끝났습니다.';
     }
-    return '번호를 바꾸려면 이 화면에서 인증을 다시 완료해야 합니다.';
-  }, [isPhoneVerified, phoneChanged]);
+    return phoneChanged
+      ? '휴대폰 번호를 바꾸려면 새 번호 확인이 필요합니다.'
+      : '이름이나 기타 정보를 바꿀 때도 본인 확인 후 저장합니다.';
+  }, [hasChanges, phoneChanged, profileChangeVerified]);
 
   async function handleRequestOtp() {
     if (!/^010\d{8}$/.test(normalizedInputPhone)) {
@@ -74,6 +82,7 @@ export default function ProfileEditScreen({ navigation }: { navigation: MainStac
       const result = await requestPhoneOtp(normalizedInputPhone);
       if (result.alreadyVerified) {
         setVerifiedPhoneOverride(normalizedInputPhone);
+        setProfileChangeVerified(true);
         Alert.alert('이미 인증된 번호입니다', '이 계정에서 이미 인증한 번호입니다.');
         return;
       }
@@ -111,6 +120,7 @@ export default function ProfileEditScreen({ navigation }: { navigation: MainStac
         code: otpCode,
       });
       setVerifiedPhoneOverride(normalizedInputPhone);
+      setProfileChangeVerified(true);
       setOtpSessionId(null);
       setOtpCode('');
       setOtpHintCode(null);
@@ -134,8 +144,13 @@ export default function ProfileEditScreen({ navigation }: { navigation: MainStac
       return;
     }
 
-    if (phoneChanged && !isPhoneVerified) {
-      Alert.alert('휴대폰 인증 필요', '새 번호를 저장하려면 이 화면에서 인증을 완료해 주세요.');
+    if (!hasChanges) {
+      Alert.alert('변경 사항 없음', '수정한 내용이 없습니다.');
+      return;
+    }
+
+    if (!profileChangeVerified || (phoneChanged && !isPhoneVerified)) {
+      Alert.alert('변경 확인 필요', '정보를 저장하려면 이 화면에서 인증을 완료해 주세요.');
       return;
     }
 
@@ -186,9 +201,19 @@ export default function ProfileEditScreen({ navigation }: { navigation: MainStac
         <View style={styles.card}>
           <Text style={styles.title}>사용자 정보</Text>
           <TextInput
+            style={[styles.input, styles.readonlyInput]}
+            value={email}
+            editable={false}
+            placeholder="이메일"
+            placeholderTextColor={Colors.gray400}
+          />
+          <TextInput
             style={styles.input}
             value={name}
-            onChangeText={setName}
+            onChangeText={(value) => {
+              setName(value);
+              setProfileChangeVerified(false);
+            }}
             placeholder="이름"
             placeholderTextColor={Colors.gray400}
           />
@@ -198,6 +223,7 @@ export default function ProfileEditScreen({ navigation }: { navigation: MainStac
             onChangeText={(value) => {
               setPhoneNumber(formatPhoneDigits(value));
               setVerifiedPhoneOverride(null);
+              setProfileChangeVerified(false);
               setOtpSessionId(null);
               setOtpCode('');
               setOtpHintCode(null);
@@ -207,7 +233,7 @@ export default function ProfileEditScreen({ navigation }: { navigation: MainStac
             placeholderTextColor={Colors.gray400}
           />
           <Text style={styles.helper}>{helperText}</Text>
-          {phoneChanged ? (
+          {hasChanges ? (
             <>
               <View style={styles.row}>
                 <TextInput
@@ -218,7 +244,11 @@ export default function ProfileEditScreen({ navigation }: { navigation: MainStac
                   placeholder="인증번호 6자리"
                   placeholderTextColor={Colors.gray400}
                 />
-                <TouchableOpacity style={[styles.secondaryButton, styles.inlineButton]} onPress={() => void handleRequestOtp()}>
+                <TouchableOpacity
+                  style={[styles.secondaryButton, styles.inlineButton]}
+                  onPress={() => void handleRequestOtp()}
+                  disabled={otpSending || !canRequestOtpForChanges}
+                >
                   {otpSending ? <ActivityIndicator color={Colors.primary} /> : <Text style={styles.secondaryButtonText}>인증번호</Text>}
                 </TouchableOpacity>
               </View>
@@ -228,6 +258,16 @@ export default function ProfileEditScreen({ navigation }: { navigation: MainStac
               {otpHintCode ? <Text style={styles.helper}>개발용 코드: {otpHintCode}</Text> : null}
             </>
           ) : null}
+        </View>
+
+        <View style={styles.card}>
+          <Text style={styles.title}>기본 정보 바로가기</Text>
+          <Text style={styles.helper}>
+            자주 쓰는 주소와 기본주소는 주소록에서 관리합니다.
+          </Text>
+          <TouchableOpacity style={styles.secondaryButton} onPress={() => navigation.navigate('AddressBook')}>
+            <Text style={styles.secondaryButtonText}>주소록 관리</Text>
+          </TouchableOpacity>
         </View>
 
         <TouchableOpacity style={styles.primaryButton} onPress={() => void handleSave()} disabled={saving}>
@@ -269,6 +309,10 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.surface,
     paddingHorizontal: Spacing.md,
     color: Colors.textPrimary,
+  },
+  readonlyInput: {
+    backgroundColor: Colors.gray50,
+    color: Colors.textSecondary,
   },
   helper: {
     color: Colors.textSecondary,

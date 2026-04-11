@@ -141,16 +141,12 @@ export default function HomeScreen({ navigation }: { navigation: MainStackNaviga
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>빠른 실행</Text>
         {isRequesterView && hasRequestDraft ? (
-          <TouchableOpacity
-            style={styles.resumeCard}
-            onPress={() => navigation.navigate('CreateRequest')}
-          >
-            <View style={styles.resumeCopy}>
-              <Text style={styles.resumeTitle}>이전 작성 이어쓰기</Text>
-              <Text style={styles.resumeBody}>임시 저장된 배송 요청을 이어서 작성할 수 있습니다.</Text>
-            </View>
-            <MaterialIcons name="arrow-forward-ios" size={18} color={Colors.primary} />
-          </TouchableOpacity>
+          <View style={styles.resumeInline}>
+            <Text style={styles.resumeInlineText}>임시 저장된 요청이 있습니다.</Text>
+            <TouchableOpacity onPress={() => navigation.navigate('CreateRequest')}>
+              <Text style={styles.resumeInlineAction}>이어서 작성</Text>
+            </TouchableOpacity>
+          </View>
         ) : null}
         <View style={styles.actionGrid}>
           {isRequesterView ? (
@@ -467,30 +463,22 @@ const styles = StyleSheet.create({
   section: {
     gap: Spacing.md,
   },
-  resumeCard: {
-    borderRadius: BorderRadius.xl,
-    backgroundColor: Colors.surface,
-    borderWidth: 1,
-    borderColor: Colors.primary,
-    padding: Spacing.lg,
+  resumeInline: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    gap: Spacing.md,
-    ...Shadows.sm,
+    gap: Spacing.sm,
+    paddingHorizontal: 4,
   },
-  resumeCopy: {
+  resumeInlineText: {
     flex: 1,
-    gap: 4,
-  },
-  resumeTitle: {
-    color: Colors.textPrimary,
-    fontSize: Typography.fontSize.base,
-    fontWeight: '800',
-  },
-  resumeBody: {
     color: Colors.textSecondary,
     ...Typography.bodySmall,
+  },
+  resumeInlineAction: {
+    color: Colors.primary,
+    fontSize: Typography.fontSize.sm,
+    fontWeight: '800',
   },
   sectionTitle: {
     color: Colors.textPrimary,
