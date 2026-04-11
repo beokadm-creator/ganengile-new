@@ -158,14 +158,8 @@ export default function HomeScreen({ navigation }: { navigation: MainStackNaviga
               <ActionCard
                 icon="add-box"
                 title="배송 요청 만들기"
-                subtitle="즉시 요청"
+                subtitle="지금 보내기 또는 예약 보내기"
                 onPress={() => navigation.navigate('CreateRequest')}
-              />
-              <ActionCard
-                icon="schedule-send"
-                title="예약 요청 만들기"
-                subtitle="예약 접수"
-                onPress={() => navigation.navigate('CreateRequest', { mode: 'reservation' })}
               />
             </>
           ) : (

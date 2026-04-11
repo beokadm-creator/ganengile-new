@@ -1458,13 +1458,13 @@ export default function CreateRequestScreen({ navigation, route }: Props) {
 
   return (
     <KeyboardAvoidingView style={styles.container} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-      <AppTopBar title={requestMode === 'reservation' ? '예약 요청' : '배송 요청'} onBack={handleBack} />
+      <AppTopBar title="배송 요청 만들기" onBack={handleBack} />
 
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
-        <Block title="요청 방식">
+        <Block title="보내기 방식">
           <View style={styles.row}>
-            <Chip label="지금 바로" active={requestMode === 'immediate'} onPress={() => setRequestMode('immediate')} />
-            <Chip label="예약하기" active={requestMode === 'reservation'} onPress={() => setRequestMode('reservation')} />
+            <Chip label="지금 보내기" active={requestMode === 'immediate'} onPress={() => setRequestMode('immediate')} />
+            <Chip label="예약 보내기" active={requestMode === 'reservation'} onPress={() => setRequestMode('reservation')} />
           </View>
         </Block>
 
@@ -1698,11 +1698,11 @@ export default function CreateRequestScreen({ navigation, route }: Props) {
           {requestMode === 'reservation' ? (
             <>
               <TouchableOpacity style={styles.selector} onPress={() => setReservationCalendarVisible(true)}>
-                <Text style={styles.selectorLabel}>물건 희망 도착 날짜</Text>
+                <Text style={styles.selectorLabel}>희망 도착 날짜</Text>
                 <Text style={styles.selectorValue}>{preferredPickupDate || '날짜 선택'}</Text>
               </TouchableOpacity>
               <TimePicker
-                label="물건 희망 도착 시간"
+                label="희망 도착 시간"
                 value={preferredPickupTime}
                 onChange={setPreferredPickupTime}
                 placeholder="시간 선택"
@@ -1961,7 +1961,9 @@ export default function CreateRequestScreen({ navigation, route }: Props) {
           ) : submitDisabled ? (
             <Text style={styles.primaryButtonText}>부족한 항목 확인하기</Text>
           ) : (
-            <Text style={styles.primaryButtonText}>배송 요청하기</Text>
+            <Text style={styles.primaryButtonText}>
+              {requestMode === 'reservation' ? '예약 요청하기' : '배송 요청하기'}
+            </Text>
           )}
         </TouchableOpacity>
         <TouchableOpacity style={styles.secondaryButton} onPress={() => void handleSaveDraftNow()} disabled={saving || draftSaving}>
@@ -2023,7 +2025,7 @@ export default function CreateRequestScreen({ navigation, route }: Props) {
       <DatePickerModal
         visible={reservationCalendarVisible}
         value={preferredPickupDate}
-        title="물건 희망 도착 날짜"
+        title="희망 도착 날짜"
         onClose={() => setReservationCalendarVisible(false)}
         onSelect={setPreferredPickupDate}
       />

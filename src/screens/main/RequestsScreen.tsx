@@ -293,7 +293,7 @@ export default function RequestsScreen({ navigation }: { navigation: MainStackNa
         onPress={() => navigation.navigate('CreateRequest')}
       >
         <MaterialIcons name="add-box" size={20} color={Colors.white} />
-        <Text style={styles.primaryActionText}>새 요청 만들기</Text>
+        <Text style={styles.primaryActionText}>배송 요청 만들기</Text>
       </TouchableOpacity>
 
       {requests.length === 0 ? (

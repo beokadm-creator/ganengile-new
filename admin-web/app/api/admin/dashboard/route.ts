@@ -2,6 +2,36 @@ import { NextResponse } from 'next/server';
 import { getAdminDb } from '@/lib/firebase-admin';
 import { isAdmin } from '@/lib/auth';
 
+async function getCount(collectionPath: string, field: string, value: unknown) {
+  const db = getAdminDb();
+  return db.collection(collectionPath).where(field, '==', value).count().get();
+}
+
+async function getCombinedCount(
+  collectionPath: string,
+  field: string,
+  values: string[]
+) {
+  const snapshots = await Promise.all(values.map((value) => getCount(collectionPath, field, value)));
+  return snapshots.reduce((sum, snapshot) => sum + snapshot.data().count, 0);
+}
+
+async function getDelayedRequestCount(requestDelayThreshold: Date) {
+  const db = getAdminDb();
+  const [pendingSnap, matchedSnap] = await Promise.all([
+    db.collection('requests').where('status', '==', 'pending').get(),
+    db.collection('requests').where('status', '==', 'matched').get(),
+  ]);
+
+  return [...pendingSnap.docs, ...matchedSnap.docs].filter((doc) => {
+    const createdAt = doc.data().createdAt;
+    if (createdAt && typeof createdAt.toDate === 'function') {
+      return createdAt.toDate() <= requestDelayThreshold;
+    }
+    return false;
+  }).length;
+}
+
 function readConfig(
   data: Record<string, unknown> | undefined,
   type: 'identity' | 'bank' | 'payment' | 'ai'
@@ -79,193 +109,190 @@ export async function GET() {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
-  const db = getAdminDb();
-  const now = new Date();
-  const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-  const requestDelayThreshold = new Date(now.getTime() - 15 * 60 * 1000);
+  try {
+    const db = getAdminDb();
+    const now = new Date();
+    const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const requestDelayThreshold = new Date(now.getTime() - 15 * 60 * 1000);
 
-  const [
-    pendingWithdrawals,
-    pendingDisputes,
-    pendingGillerApps,
-    activeDeliveries,
-    todayRequests,
-    totalUsers,
-    fareCount,
-    fareLatest,
-    identityConfigSnap,
-    bankConfigSnap,
-    paymentConfigSnap,
-    aiConfigSnap,
-    lowConfidenceAnalyses,
-    manualReviewDecisions,
-    reservationDrafts,
-    immediateDrafts,
-    usersSnap,
-    recentRequestsSnap,
-    deliveryPartnersCount,
-    activeDeliveryPartnersCount,
-    partnerDispatchQueuedCount,
-    partnerDispatchActiveCount,
-    delayedRequestCount,
-  ] = await Promise.all([
-    db.collection('withdraw_requests').where('status', '==', 'pending').count().get(),
-    db.collection('disputes').where('status', '==', 'pending').count().get(),
-    db.collection('giller_applications').where('status', '==', 'pending').count().get(),
-    db.collection('delivery_requests')
-      .where('status', 'in', ['matched', 'picked_up', 'in_locker'])
-      .count()
-      .get(),
-    db.collection('delivery_requests').where('createdAt', '>=', todayStart).count().get(),
-    db.collection('users').count().get(),
-    db.collection('config_fares').count().get(),
-    db.collection('config_fares').orderBy('updatedAt', 'desc').limit(1).get(),
-    db.collection('config_integrations').doc('identity').get(),
-    db.collection('config_integrations').doc('bank').get(),
-    db.collection('config_integrations').doc('payment').get(),
-    db.collection('config_integrations').doc('ai').get(),
-    db.collection('ai_analyses').where('status', '==', 'low_confidence').count().get(),
-    db.collection('actor_selection_decisions')
-      .where('manualReviewRequired', '==', true)
-      .count()
-      .get(),
-    db.collection('request_drafts').where('requestMode', '==', 'reservation').count().get(),
-    db.collection('request_drafts').where('requestMode', '==', 'immediate').count().get(),
-    db.collection('users').limit(300).get(),
-    db.collection('delivery_requests').orderBy('createdAt', 'desc').limit(12).get(),
-    db.collection('delivery_partners').count().get(),
-    db.collection('delivery_partners').where('status', '==', 'active').count().get(),
-    db.collection('partner_dispatches').where('status', 'in', ['queued', 'requested']).count().get(),
-    db.collection('partner_dispatches').where('status', 'in', ['accepted', 'in_progress']).count().get(),
-    db
-      .collection('requests')
-      .where('status', 'in', ['pending', 'matched'])
-      .where('createdAt', '<=', requestDelayThreshold)
-      .count()
-      .get(),
-  ]);
+    const [
+      pendingWithdrawals,
+      pendingDisputes,
+      pendingGillerApps,
+      activeDeliveryCount,
+      todayRequests,
+      totalUsers,
+      fareCount,
+      fareLatest,
+      identityConfigSnap,
+      bankConfigSnap,
+      paymentConfigSnap,
+      aiConfigSnap,
+      lowConfidenceAnalyses,
+      manualReviewDecisions,
+      reservationDrafts,
+      immediateDrafts,
+      usersSnap,
+      recentRequestsSnap,
+      deliveryPartnersCount,
+      activeDeliveryPartnersCount,
+      partnerDispatchQueuedCount,
+      partnerDispatchActiveCount,
+      delayedRequestCount,
+    ] = await Promise.all([
+      db.collection('withdraw_requests').where('status', '==', 'pending').count().get(),
+      db.collection('disputes').where('status', '==', 'pending').count().get(),
+      db.collection('giller_applications').where('status', '==', 'pending').count().get(),
+      getCombinedCount('delivery_requests', 'status', ['matched', 'picked_up', 'in_locker']),
+      db.collection('delivery_requests').where('createdAt', '>=', todayStart).count().get(),
+      db.collection('users').count().get(),
+      db.collection('config_fares').count().get(),
+      db.collection('config_fares').orderBy('updatedAt', 'desc').limit(1).get(),
+      db.collection('config_integrations').doc('identity').get(),
+      db.collection('config_integrations').doc('bank').get(),
+      db.collection('config_integrations').doc('payment').get(),
+      db.collection('config_integrations').doc('ai').get(),
+      db.collection('ai_analyses').where('status', '==', 'low_confidence').count().get(),
+      db.collection('actor_selection_decisions')
+        .where('manualReviewRequired', '==', true)
+        .count()
+        .get(),
+      db.collection('request_drafts').where('requestMode', '==', 'reservation').count().get(),
+      db.collection('request_drafts').where('requestMode', '==', 'immediate').count().get(),
+      db.collection('users').limit(300).get(),
+      db.collection('delivery_requests').orderBy('createdAt', 'desc').limit(12).get(),
+      db.collection('delivery_partners').count().get(),
+      db.collection('delivery_partners').where('status', '==', 'active').count().get(),
+      getCombinedCount('partner_dispatches', 'status', ['queued', 'requested']),
+      getCombinedCount('partner_dispatches', 'status', ['accepted', 'in_progress']),
+      getDelayedRequestCount(requestDelayThreshold),
+    ]);
 
-  const latestFareDoc = fareLatest.docs[0]?.data() as { updatedAt?: { toDate?: () => Date } } | undefined;
-  const latestUpdatedAt = latestFareDoc?.updatedAt?.toDate
-    ? latestFareDoc.updatedAt.toDate().toISOString()
-    : null;
+    const latestFareDoc = fareLatest.docs[0]?.data() as { updatedAt?: { toDate?: () => Date } } | undefined;
+    const latestUpdatedAt = latestFareDoc?.updatedAt?.toDate
+      ? latestFareDoc.updatedAt.toDate().toISOString()
+      : null;
 
-  const onboarding = usersSnap.docs.reduce(
-    (acc, doc) => {
-      const data = doc.data();
-      const state = readUserUpgradeState(data);
-      const readiness = readRequesterReadiness(data);
+    const onboarding = usersSnap.docs.reduce(
+      (acc, doc) => {
+        const data = doc.data();
+        const state = readUserUpgradeState(data);
+        const readiness = readRequesterReadiness(data);
 
-      if (!readiness.onboardingCompleted) acc.onboardingIncomplete += 1;
-      if (readiness.onboardingCompleted && !readiness.phoneVerified) acc.requesterPhonePending += 1;
-      if (state.gillerApplicationStatus === 'pending') acc.awaitingUpgradeReview += 1;
-      if (state.identityApproved && !state.bankApproved) acc.identityDoneBankPending += 1;
-      if (!state.identityApproved) acc.identityPending += 1;
-      if (
-        state.identityApproved &&
-        state.bankApproved &&
-        state.gillerApplicationStatus !== 'approved'
-      ) {
-        acc.readyForUpgradeReview += 1;
-      }
-      return acc;
-    },
-    {
-      onboardingIncomplete: 0,
-      requesterPhonePending: 0,
-      identityPending: 0,
-      identityDoneBankPending: 0,
-      awaitingUpgradeReview: 0,
-      readyForUpgradeReview: 0,
-    }
-  );
-
-  const identityConfig = readConfig(identityConfigSnap.data(), 'identity');
-  const bankConfig = readConfig(bankConfigSnap.data(), 'bank');
-  const paymentConfig = readConfig(paymentConfigSnap.data(), 'payment');
-  const aiConfig = readConfig(aiConfigSnap.data(), 'ai');
-  const manualReviewCount = manualReviewDecisions.data().count;
-  const lowConfidenceCount = lowConfidenceAnalyses.data().count;
-  const geoMarkers: Array<{
-    type: 'pickup' | 'dropoff';
-    label: string;
-    latitude: number;
-    longitude: number;
-  }> = [];
-
-  recentRequestsSnap.docs.forEach((doc) => {
-    if (geoMarkers.length >= 8) {
-      return;
-    }
-
-    const data = doc.data() as {
-      pickupStation?: { lat?: number; lng?: number };
-      deliveryStation?: { lat?: number; lng?: number };
-    };
-
-    if (typeof data.pickupStation?.lat === 'number' && typeof data.pickupStation?.lng === 'number') {
-      geoMarkers.push({
-        type: 'pickup',
-        label: 'P',
-        latitude: data.pickupStation.lat,
-        longitude: data.pickupStation.lng,
-      });
-    }
-
-    if (
-      geoMarkers.length < 8 &&
-      typeof data.deliveryStation?.lat === 'number' &&
-      typeof data.deliveryStation?.lng === 'number'
-    ) {
-      geoMarkers.push({
-        type: 'dropoff',
-        label: 'D',
-        latitude: data.deliveryStation.lat,
-        longitude: data.deliveryStation.lng,
-      });
-    }
-  });
-
-  return NextResponse.json({
-    metrics: {
-      pendingWithdrawals: pendingWithdrawals.data().count,
-      pendingDisputes: pendingDisputes.data().count,
-      pendingGillerApps: pendingGillerApps.data().count,
-      activeDeliveries: activeDeliveries.data().count,
-      todayRequests: todayRequests.data().count,
-      totalUsers: totalUsers.data().count,
-      fareCount: fareCount.data().count,
-      fareLatestUpdatedAt: latestUpdatedAt,
-      lowConfidenceCount,
-      manualReviewCount,
-      reservationDraftCount: reservationDrafts.data().count,
-      immediateDraftCount: immediateDrafts.data().count,
-      deliveryPartnersCount: deliveryPartnersCount.data().count,
-      activeDeliveryPartnersCount: activeDeliveryPartnersCount.data().count,
-      partnerDispatchQueuedCount: partnerDispatchQueuedCount.data().count,
-      partnerDispatchActiveCount: partnerDispatchActiveCount.data().count,
-      delayedRequestCount: delayedRequestCount.data().count,
-      criticalQueue:
-        pendingWithdrawals.data().count +
-        pendingDisputes.data().count +
-        manualReviewCount +
-        lowConfidenceCount +
-        partnerDispatchQueuedCount.data().count +
-        delayedRequestCount.data().count,
-    },
-    integrations: {
-      identity: identityConfig,
-      bank: bankConfig,
-      payment: paymentConfig,
-      ai: {
-        ...aiConfig,
-        model: typeof aiConfigSnap.data()?.model === 'string' ? aiConfigSnap.data()?.model : 'unknown',
-        disableThinking: Boolean(aiConfigSnap.data()?.disableThinking ?? true),
+        if (!readiness.onboardingCompleted) acc.onboardingIncomplete += 1;
+        if (readiness.onboardingCompleted && !readiness.phoneVerified) acc.requesterPhonePending += 1;
+        if (state.gillerApplicationStatus === 'pending') acc.awaitingUpgradeReview += 1;
+        if (state.identityApproved && !state.bankApproved) acc.identityDoneBankPending += 1;
+        if (!state.identityApproved) acc.identityPending += 1;
+        if (
+          state.identityApproved &&
+          state.bankApproved &&
+          state.gillerApplicationStatus !== 'approved'
+        ) {
+          acc.readyForUpgradeReview += 1;
+        }
+        return acc;
       },
-    },
-    onboarding,
-    geo: {
-      recentMarkers: geoMarkers,
-    },
-  });
+      {
+        onboardingIncomplete: 0,
+        requesterPhonePending: 0,
+        identityPending: 0,
+        identityDoneBankPending: 0,
+        awaitingUpgradeReview: 0,
+        readyForUpgradeReview: 0,
+      }
+    );
+
+    const identityConfig = readConfig(identityConfigSnap.data(), 'identity');
+    const bankConfig = readConfig(bankConfigSnap.data(), 'bank');
+    const paymentConfig = readConfig(paymentConfigSnap.data(), 'payment');
+    const aiConfig = readConfig(aiConfigSnap.data(), 'ai');
+    const manualReviewCount = manualReviewDecisions.data().count;
+    const lowConfidenceCount = lowConfidenceAnalyses.data().count;
+    const geoMarkers: Array<{
+      type: 'pickup' | 'dropoff';
+      label: string;
+      latitude: number;
+      longitude: number;
+    }> = [];
+
+    recentRequestsSnap.docs.forEach((doc) => {
+      if (geoMarkers.length >= 8) {
+        return;
+      }
+
+      const data = doc.data() as {
+        pickupStation?: { lat?: number; lng?: number };
+        deliveryStation?: { lat?: number; lng?: number };
+      };
+
+      if (typeof data.pickupStation?.lat === 'number' && typeof data.pickupStation?.lng === 'number') {
+        geoMarkers.push({
+          type: 'pickup',
+          label: 'P',
+          latitude: data.pickupStation.lat,
+          longitude: data.pickupStation.lng,
+        });
+      }
+
+      if (
+        geoMarkers.length < 8 &&
+        typeof data.deliveryStation?.lat === 'number' &&
+        typeof data.deliveryStation?.lng === 'number'
+      ) {
+        geoMarkers.push({
+          type: 'dropoff',
+          label: 'D',
+          latitude: data.deliveryStation.lat,
+          longitude: data.deliveryStation.lng,
+        });
+      }
+    });
+
+    return NextResponse.json({
+      metrics: {
+        pendingWithdrawals: pendingWithdrawals.data().count,
+        pendingDisputes: pendingDisputes.data().count,
+        pendingGillerApps: pendingGillerApps.data().count,
+        activeDeliveries: activeDeliveryCount,
+        todayRequests: todayRequests.data().count,
+        totalUsers: totalUsers.data().count,
+        fareCount: fareCount.data().count,
+        fareLatestUpdatedAt: latestUpdatedAt,
+        lowConfidenceCount,
+        manualReviewCount,
+        reservationDraftCount: reservationDrafts.data().count,
+        immediateDraftCount: immediateDrafts.data().count,
+        deliveryPartnersCount: deliveryPartnersCount.data().count,
+        activeDeliveryPartnersCount: activeDeliveryPartnersCount.data().count,
+        partnerDispatchQueuedCount,
+        partnerDispatchActiveCount,
+        delayedRequestCount,
+        criticalQueue:
+          pendingWithdrawals.data().count +
+          pendingDisputes.data().count +
+          manualReviewCount +
+          lowConfidenceCount +
+          partnerDispatchQueuedCount +
+          delayedRequestCount,
+      },
+      integrations: {
+        identity: identityConfig,
+        bank: bankConfig,
+        payment: paymentConfig,
+        ai: {
+          ...aiConfig,
+          model: typeof aiConfigSnap.data()?.model === 'string' ? aiConfigSnap.data()?.model : 'unknown',
+          disableThinking: Boolean(aiConfigSnap.data()?.disableThinking ?? true),
+        },
+      },
+      onboarding,
+      geo: {
+        recentMarkers: geoMarkers,
+      },
+    });
+  } catch (error) {
+    console.error('Failed to build admin dashboard payload', error);
+    return NextResponse.json({ error: 'Dashboard payload failed' }, { status: 500 });
+  }
 }

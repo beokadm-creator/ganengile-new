@@ -2,6 +2,7 @@ import {
   addDoc,
   collection,
   doc,
+  type FirestoreError,
   getDoc,
   getDocs,
   query,
@@ -131,6 +132,15 @@ function mapDispatch(snapshot: { id: string; data(): DocumentData }): DeliveryPa
   };
 }
 
+function isPermissionDenied(error: unknown): boolean {
+  return (
+    typeof error === 'object' &&
+    error !== null &&
+    'code' in error &&
+    (error as FirestoreError).code === 'permission-denied'
+  );
+}
+
 export class DeliveryPartnerService {
   static async createPartner(data: CreateDeliveryPartnerData): Promise<string> {
     const partnerRef = await addDoc(collection(db, DELIVERY_PARTNERS_COLLECTION), {
@@ -205,7 +215,21 @@ export class DeliveryPartnerService {
     fallbackOnlyPartnerCount: number;
     topPartnerNames: string[];
   }> {
-    const partners = await this.getActivePartners();
+    let partners: DeliveryPartner[] = [];
+    try {
+      partners = await this.getActivePartners();
+    } catch (error) {
+      if (!isPermissionDenied(error)) {
+        throw error;
+      }
+      return {
+        activePartnerCount: 0,
+        connectedPartnerCount: 0,
+        apiReadyPartnerCount: 0,
+        fallbackOnlyPartnerCount: 0,
+        topPartnerNames: [],
+      };
+    }
 
     return {
       activePartnerCount: partners.length,
@@ -232,13 +256,23 @@ export class DeliveryPartnerService {
       opsMemo?: string;
     }>
   > {
-    const [dispatches, partners] = await Promise.all([
-      this.listDispatches({
-        ...(filters.requestId ? { requestId: filters.requestId } : {}),
-        ...(filters.deliveryId ? { deliveryId: filters.deliveryId } : {}),
-      }),
-      this.getActivePartners(),
-    ]);
+    let dispatches: DeliveryPartnerDispatch[] = [];
+    let partners: DeliveryPartner[] = [];
+
+    try {
+      [dispatches, partners] = await Promise.all([
+        this.listDispatches({
+          ...(filters.requestId ? { requestId: filters.requestId } : {}),
+          ...(filters.deliveryId ? { deliveryId: filters.deliveryId } : {}),
+        }),
+        this.getActivePartners(),
+      ]);
+    } catch (error) {
+      if (!isPermissionDenied(error)) {
+        throw error;
+      }
+      return [];
+    }
 
     const partnerNameMap = new Map(partners.map((partner) => [partner.partnerId, partner.partnerName] as const));
 
