@@ -21,7 +21,7 @@ export default function AppTopBar({ title, onBack, rightSlot, style }: AppTopBar
         style={styles.backButton}
         accessibilityRole="button"
         accessibilityLabel="뒤로 가기"
-        hitSlop={10}
+        hitSlop={16}
       >
         <MaterialIcons name="arrow-back-ios-new" size={22} color={Colors.textPrimary} />
       </Pressable>
@@ -53,6 +53,7 @@ const styles = StyleSheet.create({
     height: 36,
     justifyContent: 'center',
     width: 36,
+    zIndex: 2,
   },
   rightSlot: {
     alignItems: 'flex-end',
@@ -64,6 +65,7 @@ const styles = StyleSheet.create({
     flex: 1,
     fontSize: 19,
     fontWeight: '800',
+    marginHorizontal: 12,
     textAlign: 'center',
   },
 });

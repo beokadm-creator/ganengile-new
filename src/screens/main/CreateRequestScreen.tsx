@@ -346,19 +346,19 @@ export default function CreateRequestScreen({ navigation, route }: Props) {
   const [resolvingLocation, setResolvingLocation] = useState<PickerType | null>(null);
   const [resolvingAddressStation, setResolvingAddressStation] = useState<PickerType | null>(null);
 
-  const [pickupMode, setPickupMode] = useState<LocationMode>('station');
-  const [deliveryMode, setDeliveryMode] = useState<LocationMode>('station');
+  const [pickupMode, setPickupMode] = useState<LocationMode>(prefill?.pickupMode ?? 'station');
+  const [deliveryMode, setDeliveryMode] = useState<LocationMode>(prefill?.deliveryMode ?? 'station');
   const [pickupStation, setPickupStation] = useState<Station | null>(() => fromPrefillStation(prefill?.pickupStation));
   const [deliveryStation, setDeliveryStation] = useState<Station | null>(() => fromPrefillStation(prefill?.deliveryStation));
-  const [pickupRoadAddress, setPickupRoadAddress] = useState('');
-  const [pickupDetailAddress, setPickupDetailAddress] = useState('');
-  const [deliveryRoadAddress, setDeliveryRoadAddress] = useState('');
-  const [deliveryDetailAddress, setDeliveryDetailAddress] = useState('');
+  const [pickupRoadAddress, setPickupRoadAddress] = useState(prefill?.pickupRoadAddress ?? '');
+  const [pickupDetailAddress, setPickupDetailAddress] = useState(prefill?.pickupDetailAddress ?? '');
+  const [deliveryRoadAddress, setDeliveryRoadAddress] = useState(prefill?.deliveryRoadAddress ?? '');
+  const [deliveryDetailAddress, setDeliveryDetailAddress] = useState(prefill?.deliveryDetailAddress ?? '');
   const [savedAddresses, setSavedAddresses] = useState<SavedAddress[]>([]);
   const [recentAddresses, setRecentAddresses] = useState<SavedAddress[]>([]);
 
-  const [photoUrl, setPhotoUrl] = useState<string | null>(null);
-  const [photoRefs, setPhotoRefs] = useState<string[]>([]);
+  const [photoUrl, setPhotoUrl] = useState<string | null>(prefill?.photoRefs?.[0] ?? null);
+  const [photoRefs, setPhotoRefs] = useState<string[]>(prefill?.photoRefs ?? []);
   const [aiResult, setAiResult] = useState<Beta1AIAnalysisResponse | null>(null);
 
   const [requestMode, setRequestMode] = useState<'immediate' | 'reservation'>(

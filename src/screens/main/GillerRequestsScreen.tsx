@@ -60,11 +60,18 @@ export default function GillerRequestsScreen() {
   }, [loadSnapshot]);
 
   const immediateMissions = useMemo(
-    () => (snapshot?.missionCards ?? []).filter(isImmediateMission),
+    () => (snapshot?.missionCards ?? []).filter((card) => card.selectionState === 'available' && isImmediateMission(card)),
+    [snapshot],
+  );
+  const ongoingMissions = useMemo(
+    () => (snapshot?.missionCards ?? []).filter((card) => card.selectionState === 'accepted'),
     [snapshot],
   );
   const suggestedMissions = useMemo(
-    () => (snapshot?.missionCards ?? []).filter((card) => !isImmediateMission(card)),
+    () =>
+      (snapshot?.missionCards ?? []).filter(
+        (card) => card.selectionState !== 'accepted' && !isImmediateMission(card)
+      ),
     [snapshot],
   );
 
@@ -124,6 +131,7 @@ export default function GillerRequestsScreen() {
       </View>
 
       <View style={styles.metricRow}>
+        <MetricCard label="진행 중" value={ongoingMissions.length} />
         <MetricCard label="즉시 선택" value={immediateMissions.length} />
         <MetricCard label="추가 제안" value={suggestedMissions.length} />
         <MetricCard
@@ -131,6 +139,16 @@ export default function GillerRequestsScreen() {
           value={`${(snapshot?.pendingRewardTotal ?? 0).toLocaleString()}원`}
         />
       </View>
+
+      <Section
+        title="내 진행 중"
+        subtitle="이미 맡은 구간과 진행 중인 배송입니다."
+        items={ongoingMissions}
+        emptyTitle="현재 진행 중인 구간이 없습니다"
+        emptySubtitle="수락한 미션이나 진행 중 배송이 생기면 가장 먼저 여기에서 보여드립니다."
+        submittingBundleId={submittingBundleId}
+        onPress={handleAccept}
+      />
 
       <Section
         title="지금 선택 가능"

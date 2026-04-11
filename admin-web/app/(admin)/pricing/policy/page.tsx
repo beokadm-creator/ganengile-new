@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import type { ChangeEvent, ReactNode } from 'react';
 import { calculateSharedDeliveryFee } from '../../../../../shared/pricing-policy';
+import { MAJOR_STATIONS } from '../../../../../data/subway-stations';
 
 type PricingPolicy = {
   version: string;
@@ -199,25 +200,81 @@ export default function PricingPolicyPage() {
   const [policy, setPolicy] = useState<PricingPolicy>(emptyPolicy);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [previewStationCount, setPreviewStationCount] = useState(8);
+  const [previewPickupStationId, setPreviewPickupStationId] = useState('150');
+  const [previewDeliveryStationId, setPreviewDeliveryStationId] = useState('222');
   const [previewWeight, setPreviewWeight] = useState(2);
+  const [previewPackageSize, setPreviewPackageSize] = useState<'small' | 'medium' | 'large' | 'xl'>('medium');
+  const [previewRequestMode, setPreviewRequestMode] = useState<'immediate' | 'reservation'>('immediate');
   const [previewUrgency, setPreviewUrgency] = useState<'normal' | 'fast' | 'urgent'>('fast');
   const [previewWeather, setPreviewWeather] = useState<'clear' | 'rain' | 'snow'>('clear');
   const [previewNearbyGillerCount, setPreviewNearbyGillerCount] = useState(3);
   const [previewPeakTime, setPreviewPeakTime] = useState(true);
+  const [previewAddressPickup, setPreviewAddressPickup] = useState(false);
+  const [previewAddressDropoff, setPreviewAddressDropoff] = useState(false);
+  const [previewRequestedHour, setPreviewRequestedHour] = useState(8);
+
+  const stationOptions = useMemo(
+    () => [...MAJOR_STATIONS].sort((a, b) => a.stationName.localeCompare(b.stationName, 'ko-KR')),
+    []
+  );
+
+  const previewPickupStation =
+    stationOptions.find((station) => station.stationId === previewPickupStationId) ?? stationOptions[0];
+  const previewDeliveryStation =
+    stationOptions.find((station) => station.stationId === previewDeliveryStationId) ?? stationOptions[1] ?? stationOptions[0];
+
+  const estimatedStationCount = useMemo(() => {
+    return estimateStationCountBetweenStations(previewPickupStation, previewDeliveryStation);
+  }, [previewDeliveryStation, previewPickupStation]);
+
+  const stationDistanceKm = useMemo(() => {
+    if (!previewPickupStation || !previewDeliveryStation) {
+      return 0;
+    }
+
+    return calculateDistanceKm(previewPickupStation, previewDeliveryStation);
+  }, [previewDeliveryStation, previewPickupStation]);
 
   const previewResult = useMemo(() => calculateSharedDeliveryFee({
-    stationCount: previewStationCount,
+    stationCount: estimatedStationCount,
     weight: previewWeight,
-    packageSize: 'medium',
+    packageSize: previewPackageSize,
     urgency: previewUrgency,
     context: {
       weather: previewWeather,
       isPeakTime: previewPeakTime,
       nearbyGillerCount: previewNearbyGillerCount,
       isProfessionalPeak: previewPeakTime,
+      requestedHour: previewRequestedHour,
     },
-  }, policy), [policy, previewNearbyGillerCount, previewPeakTime, previewStationCount, previewUrgency, previewWeather, previewWeight]);
+  }, policy), [estimatedStationCount, policy, previewNearbyGillerCount, previewPackageSize, previewPeakTime, previewRequestedHour, previewUrgency, previewWeather, previewWeight]);
+
+  const baselineRecommendation = useMemo(
+    () => calculateRecommendationPrice({
+      policy,
+      baseTotalFee: previewResult.totalFee,
+      weather: previewWeather,
+      isPeakTime: previewPeakTime,
+      isProfessionalPeak: previewPeakTime,
+      nearbyGillerCount: previewNearbyGillerCount,
+      requestMode: previewRequestMode,
+    }),
+    [policy, previewNearbyGillerCount, previewPeakTime, previewRequestMode, previewResult.totalFee, previewWeather]
+  );
+
+  const scenarioSummary = useMemo(
+    () =>
+      buildScenarioSummary({
+        previewResult,
+        policy,
+        requestMode: previewRequestMode,
+        hasAddressPickup: previewAddressPickup,
+        hasAddressDropoff: previewAddressDropoff,
+        recommendationPrice: baselineRecommendation,
+        requestedHour: previewRequestedHour,
+      }),
+    [baselineRecommendation, policy, previewAddressDropoff, previewAddressPickup, previewRequestMode, previewRequestedHour, previewResult]
+  );
 
   useEffect(() => {
     void load();
@@ -358,6 +415,21 @@ export default function PricingPolicyPage() {
         <p className="mt-2 text-sm text-slate-500">운영 기준</p>
       </div>
 
+      <div className="mb-4 grid gap-4 lg:grid-cols-2">
+        <section className="rounded-2xl border border-cyan-200 bg-cyan-50 p-5">
+          <h2 className="text-base font-semibold text-slate-900">정책 역할</h2>
+          <p className="mt-2 text-sm text-slate-600">
+            기본요금, 환경 가중치, 수수료, 추천가 한계를 정하는 기준선입니다.
+          </p>
+        </section>
+        <section className="rounded-2xl border border-slate-200 bg-white p-5">
+          <h2 className="text-base font-semibold text-slate-900">엔진 역할</h2>
+          <p className="mt-2 text-sm text-slate-600">
+            이 기준선을 바탕으로 실제 요청 상황, 공급 상태, 학습 데이터까지 반영해 사용자 제시가를 만듭니다.
+          </p>
+        </section>
+      </div>
+
       <div className="grid gap-4 lg:grid-cols-2">
         <Section title="기본 요금">
           <NumberField label="기본요금" value={policy.baseFee} onChange={(value) => updateField('baseFee', value)} />
@@ -484,10 +556,58 @@ export default function PricingPolicyPage() {
 
       <div className="mt-4 rounded-2xl border border-slate-200 bg-white p-5">
         <h2 className="text-base font-semibold text-slate-900">시나리오 미리보기</h2>
-        <p className="mt-2 text-sm text-slate-500">현재 정책 기준</p>
-        <div className="mt-4 grid gap-4 lg:grid-cols-3">
-          <NumberField label="예상 역 수" value={previewStationCount} onChange={setPreviewStationCount} />
+        <p className="mt-2 text-sm text-slate-500">실제 역 기준 데모</p>
+        <div className="mt-4 grid gap-4 lg:grid-cols-4">
+          <Field label="출발역">
+            <select
+              className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm"
+              value={previewPickupStationId}
+              onChange={(event) => setPreviewPickupStationId(event.target.value)}
+            >
+              {stationOptions.map((station) => (
+                <option key={station.stationId} value={station.stationId}>
+                  {station.stationName} · {station.lines[0]?.lineName ?? '-'}
+                </option>
+              ))}
+            </select>
+          </Field>
+          <Field label="도착역">
+            <select
+              className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm"
+              value={previewDeliveryStationId}
+              onChange={(event) => setPreviewDeliveryStationId(event.target.value)}
+            >
+              {stationOptions.map((station) => (
+                <option key={station.stationId} value={station.stationId}>
+                  {station.stationName} · {station.lines[0]?.lineName ?? '-'}
+                </option>
+              ))}
+            </select>
+          </Field>
+          <Field label="요청 방식">
+            <select
+              className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm"
+              value={previewRequestMode}
+              onChange={(event) => setPreviewRequestMode(event.target.value as 'immediate' | 'reservation')}
+            >
+              <option value="immediate">즉시</option>
+              <option value="reservation">예약</option>
+            </select>
+          </Field>
+          <NumberField label="적용 시간" value={previewRequestedHour} onChange={setPreviewRequestedHour} />
           <NumberField label="무게(kg)" value={previewWeight} step="0.1" onChange={setPreviewWeight} />
+          <Field label="크기">
+            <select
+              className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm"
+              value={previewPackageSize}
+              onChange={(event) => setPreviewPackageSize(event.target.value as 'small' | 'medium' | 'large' | 'xl')}
+            >
+              <option value="small">소형</option>
+              <option value="medium">중형</option>
+              <option value="large">대형</option>
+              <option value="xl">특대형</option>
+            </select>
+          </Field>
           <Field label="긴급도">
             <select className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm" value={previewUrgency} onChange={(event) => setPreviewUrgency(event.target.value as 'normal' | 'fast' | 'urgent')}>
               <option value="normal">보통</option>
@@ -509,14 +629,33 @@ export default function PricingPolicyPage() {
               <option value="peak">피크 시간대</option>
             </select>
           </Field>
+          <label className="flex items-center gap-2 rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-700">
+            <input type="checkbox" checked={previewAddressPickup} onChange={(event) => setPreviewAddressPickup(event.target.checked)} />
+            주소 픽업 포함
+          </label>
+          <label className="flex items-center gap-2 rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-700">
+            <input type="checkbox" checked={previewAddressDropoff} onChange={(event) => setPreviewAddressDropoff(event.target.checked)} />
+            주소 도착 포함
+          </label>
+        </div>
+        <div className="mt-4 grid gap-3 rounded-xl bg-slate-50 p-4 lg:grid-cols-4">
+          <PreviewMetric label="직선 거리" value={`${stationDistanceKm.toFixed(1)}km`} />
+          <PreviewMetric label="추정 역 수" value={`${estimatedStationCount}역`} />
+          <PreviewMetric label="기준 요금" value={`${previewResult.totalFee.toLocaleString()}원`} />
+          <PreviewMetric label="엔진 추천 기준" value={`${baselineRecommendation.toLocaleString()}원`} />
         </div>
         <div className="mt-4 grid gap-3 rounded-xl bg-slate-50 p-4 lg:grid-cols-3">
           <PreviewMetric label="기본 + 거리" value={`${(previewResult.baseFee + previewResult.distanceFee).toLocaleString()}원`} />
           <PreviewMetric label="환경 보정" value={`${previewResult.dynamicAdjustment >= 0 ? '+' : ''}${previewResult.dynamicAdjustment.toLocaleString()}원`} />
-          <PreviewMetric label="최종 요금" value={`${previewResult.totalFee.toLocaleString()}원`} />
+          <PreviewMetric label="시간 할증" value={`${scenarioSummary.timeAdjustment >= 0 ? '+' : ''}${scenarioSummary.timeAdjustment.toLocaleString()}원`} />
           <PreviewMetric label="플랫폼 몫" value={`${previewResult.breakdown.platformFee.toLocaleString()}원`} />
           <PreviewMetric label="길러 몫" value={`${previewResult.breakdown.gillerFee.toLocaleString()}원`} />
           <PreviewMetric label="부가세" value={`${previewResult.vat.toLocaleString()}원`} />
+        </div>
+        <div className="mt-4 grid gap-3 lg:grid-cols-3">
+          <PreviewMetric label="주소 픽업 기준" value={`${scenarioSummary.addressPickupFee.toLocaleString()}원`} />
+          <PreviewMetric label="주소 도착 기준" value={`${scenarioSummary.addressDropoffFee.toLocaleString()}원`} />
+          <PreviewMetric label="추천가 보정분" value={`${scenarioSummary.recommendationDelta >= 0 ? '+' : ''}${scenarioSummary.recommendationDelta.toLocaleString()}원`} />
         </div>
       </div>
 
@@ -605,4 +744,125 @@ function RateField({
       />
     </Field>
   );
+}
+
+function calculateDistanceKm(
+  from: (typeof MAJOR_STATIONS)[number],
+  to: (typeof MAJOR_STATIONS)[number]
+) {
+  const toRadians = (value: number) => (value * Math.PI) / 180;
+  const earthRadiusKm = 6371;
+  const dLat = toRadians(to.location.latitude - from.location.latitude);
+  const dLng = toRadians(to.location.longitude - from.location.longitude);
+  const lat1 = toRadians(from.location.latitude);
+  const lat2 = toRadians(to.location.latitude);
+
+  const a =
+    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+    Math.sin(dLng / 2) * Math.sin(dLng / 2) * Math.cos(lat1) * Math.cos(lat2);
+
+  return earthRadiusKm * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+}
+
+function estimateStationCountBetweenStations(
+  from: (typeof MAJOR_STATIONS)[number],
+  to: (typeof MAJOR_STATIONS)[number]
+) {
+  const distanceKm = calculateDistanceKm(from, to);
+  return Math.max(2, Math.round(distanceKm / 1.8) + 1);
+}
+
+function calculateRecommendationPrice({
+  policy,
+  baseTotalFee,
+  weather,
+  isPeakTime,
+  isProfessionalPeak,
+  nearbyGillerCount,
+  requestMode,
+}: {
+  policy: PricingPolicy;
+  baseTotalFee: number;
+  weather: 'clear' | 'rain' | 'snow';
+  isPeakTime: boolean;
+  isProfessionalPeak: boolean;
+  nearbyGillerCount: number;
+  requestMode: 'immediate' | 'reservation';
+}) {
+  let multiplier = policy.recommendationMultiplier;
+
+  if (weather === 'rain') {
+    multiplier += policy.recommendationRules.rainMultiplier;
+  } else if (weather === 'snow') {
+    multiplier += policy.recommendationRules.snowMultiplier;
+  }
+
+  if (isPeakTime) {
+    multiplier += policy.recommendationRules.peakTimeMultiplier;
+  }
+
+  if (isProfessionalPeak) {
+    multiplier += policy.recommendationRules.professionalPeakMultiplier;
+  }
+
+  if (nearbyGillerCount <= policy.dynamicRules.lowSupplyThreshold) {
+    multiplier += policy.recommendationRules.lowSupplyMultiplier;
+  } else if (nearbyGillerCount >= policy.dynamicRules.highSupplyThreshold) {
+    multiplier += policy.recommendationRules.highSupplyDiscountMultiplier;
+  }
+
+  if (requestMode === 'reservation') {
+    multiplier += policy.recommendationRules.reservationDiscountMultiplier;
+  }
+
+  const boundedMultiplier = Math.max(0, Math.min(policy.recommendationRules.maxRecommendationMultiplier, multiplier));
+  return Math.round((baseTotalFee * boundedMultiplier) / 100) * 100;
+}
+
+function buildScenarioSummary({
+  previewResult,
+  policy,
+  requestMode,
+  hasAddressPickup,
+  hasAddressDropoff,
+  recommendationPrice,
+  requestedHour,
+}: {
+  previewResult: ReturnType<typeof calculateSharedDeliveryFee>;
+  policy: PricingPolicy;
+  requestMode: 'immediate' | 'reservation';
+  hasAddressPickup: boolean;
+  hasAddressDropoff: boolean;
+  recommendationPrice: number;
+  requestedHour: number;
+}) {
+  const baseAmount =
+    previewResult.baseFee +
+    previewResult.distanceFee +
+    previewResult.weightFee +
+    previewResult.sizeFee +
+    previewResult.urgencySurcharge;
+
+  return {
+    addressPickupFee: hasAddressPickup ? policy.quoteAdjustments.addressPickupFee : 0,
+    addressDropoffFee: hasAddressDropoff ? policy.quoteAdjustments.addressDropoffFee : 0,
+    timeAdjustment: calculateTimeRuleAdjustment(baseAmount, requestedHour, policy),
+    recommendationDelta: recommendationPrice - previewResult.totalFee,
+    requestMode,
+  };
+}
+
+function calculateTimeRuleAdjustment(
+  baseAmount: number,
+  requestedHour: number,
+  policy: PricingPolicy
+) {
+  return policy.timeRules
+    .filter((rule) => rule.enabled)
+    .filter((rule) =>
+      rule.startHour <= rule.endHour
+        ? requestedHour >= rule.startHour && requestedHour <= rule.endHour
+        : requestedHour >= rule.startHour || requestedHour <= rule.endHour
+    )
+    .reduce((sum, rule) => sum + Math.round(baseAmount * (rule.multiplier - 1)) + rule.fixedAdjustment, 0);
 }

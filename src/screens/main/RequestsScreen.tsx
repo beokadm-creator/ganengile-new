@@ -2,6 +2,9 @@ import React, { useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
+  Modal,
+  Platform,
+  Pressable,
   RefreshControl,
   ScrollView,
   StyleSheet,
@@ -24,6 +27,8 @@ export default function RequestsScreen({ navigation }: { navigation: MainStackNa
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [workingRequestId, setWorkingRequestId] = useState<string | null>(null);
+  const [rematchTarget, setRematchTarget] = useState<Request | null>(null);
+  const [cancelTarget, setCancelTarget] = useState<Request | null>(null);
 
   useEffect(() => {
     void loadRequests();
@@ -77,6 +82,95 @@ export default function RequestsScreen({ navigation }: { navigation: MainStackNa
     navigation.navigate('RequestDetail', { requestId: request.requestId });
   }
 
+  async function executeCancel(request: Request) {
+    const canCancelDraft = [RequestStatus.PENDING, RequestStatus.MATCHED].includes(request.status);
+    const canCancelAccepted = request.status === RequestStatus.ACCEPTED;
+
+    try {
+      setWorkingRequestId(request.requestId);
+      const userId = requireUserId();
+
+      if (canCancelAccepted) {
+        const result = await cancelDeliveryFlow({
+          requestId: request.requestId,
+          actorId: userId,
+          actorType: 'requester',
+          reason: 'requester_cancelled_before_pickup_from_request_board',
+        });
+
+        if (!result.success) {
+          Alert.alert('취소를 진행할 수 없습니다', result.message, [
+            { text: '분쟁 접수', onPress: () => openDispute(request) },
+            { text: '닫기', style: 'cancel' },
+          ]);
+          return;
+        }
+
+        const completionMessage =
+          result.depositStatus === 'refunded'
+            ? '배송 취소와 보증금 환불까지 처리했습니다.'
+            : result.depositStatus === 'failed'
+              ? '배송 취소는 처리했지만 보증금 환불은 운영 확인이 필요합니다.'
+              : result.message;
+
+        Alert.alert('배송 취소 완료', completionMessage);
+      } else if (canCancelDraft) {
+        const cancelled = await cancelRequest(
+          request.requestId,
+          userId,
+          'requester cancelled from request board'
+        );
+
+        if (!cancelled) {
+          Alert.alert('취소를 진행할 수 없습니다', '요청 소유자 정보가 맞는지 다시 확인해 주세요.');
+          return;
+        }
+
+        Alert.alert('요청 취소 완료', '요청을 취소했습니다.');
+      }
+
+      await loadRequests();
+    } catch (error) {
+      console.error('Failed to cancel request', error);
+      Alert.alert('취소에 실패했습니다', '잠시 후 다시 시도해 주세요.');
+    } finally {
+      setWorkingRequestId(null);
+    }
+  }
+
+  function navigateToReservation(request: Request) {
+    navigation.navigate('CreateRequest', {
+      mode: 'reservation',
+      sourceRequestId: request.requestId,
+      prefill: {
+        pickupStation: request.pickupStation,
+        deliveryStation: request.deliveryStation,
+        packageDescription: request.packageInfo.description,
+        packageSize: request.packageInfo.size as 'small' | 'medium' | 'large' | 'xl',
+        weightKg:
+          typeof request.packageInfo.weightKg === 'number'
+            ? request.packageInfo.weightKg
+            : typeof request.packageInfo.weight === 'number'
+              ? request.packageInfo.weight
+              : 1,
+        itemValue: request.itemValue,
+        recipientName: request.recipientName,
+        recipientPhone: request.recipientPhone,
+        pickupMode: request.pickupAddress ? 'address' : 'station',
+        deliveryMode: request.deliveryAddress ? 'address' : 'station',
+        pickupRoadAddress: request.pickupAddress?.roadAddress,
+        pickupDetailAddress: request.pickupAddress?.detailAddress,
+        deliveryRoadAddress: request.deliveryAddress?.roadAddress,
+        deliveryDetailAddress: request.deliveryAddress?.detailAddress,
+        photoRefs: request.selectedPhotoIds,
+        urgency: 'normal',
+        directParticipationMode: 'none',
+        preferredPickupTime: request.preferredTime?.departureTime,
+        preferredArrivalTime: request.preferredTime?.arrivalTime,
+      },
+    });
+  }
+
   function handleCancel(request: Request) {
     const canCancelDraft = [RequestStatus.PENDING, RequestStatus.MATCHED].includes(request.status);
     const canCancelAccepted = request.status === RequestStatus.ACCEPTED;
@@ -93,74 +187,24 @@ export default function RequestsScreen({ navigation }: { navigation: MainStackNa
       return;
     }
 
-    const title = canCancelAccepted ? '수락된 배송을 취소할까요?' : '요청을 취소할까요?';
-    const message = canCancelAccepted
-      ? '픽업 전 취소라면 보증금 환불과 배송 취소를 함께 처리합니다.'
-      : '지금 취소해도 요청 정보는 다음 요청의 참고값으로만 남습니다.';
+    if (Platform.OS === 'web') {
+      setCancelTarget(request);
+      return;
+    }
 
-    Alert.alert(title, message, [
-      { text: '계속 유지', style: 'cancel' },
-      {
-        text: '취소하기',
-        style: 'destructive',
-        onPress: () => {
-          void (async () => {
-            try {
-              setWorkingRequestId(request.requestId);
-              const userId = requireUserId();
+    if (canCancelAccepted) {
+      Alert.alert('바로 취소보다 먼저 확인해 볼까요?', '상세 화면이나 분쟁 접수로 먼저 정리할 수 있습니다.', [
+        { text: '상세 보기', onPress: () => openRequestDetail(request) },
+        { text: '분쟁 접수', onPress: () => openDispute(request) },
+        { text: '그래도 취소', style: 'destructive', onPress: () => void executeCancel(request) },
+      ]);
+      return;
+    }
 
-              if (canCancelAccepted) {
-                const result = await cancelDeliveryFlow({
-                  requestId: request.requestId,
-                  actorId: userId,
-                  actorType: 'requester',
-                  reason: 'requester_cancelled_before_pickup_from_request_board',
-                });
-
-                if (!result.success) {
-                  Alert.alert('취소를 진행할 수 없습니다', result.message, [
-                    { text: '분쟁 접수', onPress: () => openDispute(request) },
-                    { text: '닫기', style: 'cancel' },
-                  ]);
-                  return;
-                }
-
-                const completionMessage =
-                  result.depositStatus === 'refunded'
-                    ? '배송 취소와 보증금 환불까지 처리했습니다.'
-                    : result.depositStatus === 'failed'
-                      ? '배송 취소는 처리했지만 보증금 환불은 운영 확인이 필요합니다.'
-                      : result.message;
-
-                Alert.alert('배송 취소 완료', completionMessage);
-              } else {
-                const cancelled = await cancelRequest(
-                  request.requestId,
-                  userId,
-                  'requester cancelled from request board'
-                );
-
-                if (!cancelled) {
-                  Alert.alert(
-                    '취소를 진행할 수 없습니다',
-                    '요청 소유자 정보가 맞는지 다시 확인해 주세요.'
-                  );
-                  return;
-                }
-
-                Alert.alert('요청 취소 완료', '요청을 취소했습니다.');
-              }
-
-              await loadRequests();
-            } catch (error) {
-              console.error('Failed to cancel request', error);
-              Alert.alert('취소에 실패했습니다', '잠시 후 다시 시도해 주세요.');
-            } finally {
-              setWorkingRequestId(null);
-            }
-          })();
-        },
-      },
+    Alert.alert('취소 전에 다른 방법도 있습니다', '금액을 올리거나 예약으로 바꾸면 연결 가능성을 더 볼 수 있습니다.', [
+      { text: '1,000원 올리기', onPress: () => void handleIncreaseBid(request, 1000) },
+      { text: '예약형으로 전환', onPress: () => navigateToReservation(request) },
+      { text: '그래도 취소', style: 'destructive', onPress: () => void executeCancel(request) },
     ]);
   }
 
@@ -185,6 +229,11 @@ export default function RequestsScreen({ navigation }: { navigation: MainStackNa
   }
 
   function handleRematchAction(request: Request) {
+    if (Platform.OS === 'web') {
+      setRematchTarget(request);
+      return;
+    }
+
     Alert.alert(
       '지금 바로 다시 보낼까요?',
       '급하면 금액을 조금 올려 빠르게 다시 찾고, 급하지 않으면 예약형으로 전환해 안정적으로 연결할 수 있습니다.',
@@ -197,29 +246,7 @@ export default function RequestsScreen({ navigation }: { navigation: MainStackNa
         },
         {
           text: '예약형으로 전환',
-          onPress: () => {
-            navigation.navigate('CreateRequest', {
-              mode: 'reservation',
-              sourceRequestId: request.requestId,
-              prefill: {
-                pickupStation: request.pickupStation,
-                deliveryStation: request.deliveryStation,
-                packageDescription: request.packageInfo.description,
-                packageSize: request.packageInfo.size as 'small' | 'medium' | 'large' | 'xl',
-                weightKg:
-                  typeof request.packageInfo.weightKg === 'number'
-                    ? request.packageInfo.weightKg
-                    : typeof request.packageInfo.weight === 'number'
-                      ? request.packageInfo.weight
-                      : 1,
-                itemValue: request.itemValue,
-                urgency: 'normal',
-                directParticipationMode: 'none',
-                preferredPickupTime: request.preferredTime?.departureTime,
-                preferredArrivalTime: request.preferredTime?.arrivalTime,
-              },
-            });
-          },
+          onPress: () => navigateToReservation(request),
         },
         { text: '그대로 기다리기', style: 'cancel' },
       ]
@@ -356,6 +383,115 @@ export default function RequestsScreen({ navigation }: { navigation: MainStackNa
           );
         })
       )}
+
+      <ChoiceModal
+        visible={Boolean(rematchTarget)}
+        title="지금 바로 다시 보낼까요?"
+        message="급하면 금액을 조금 올려 빠르게 다시 찾고, 급하지 않으면 예약으로 전환해 안정적으로 연결할 수 있습니다."
+        onClose={() => setRematchTarget(null)}
+        actions={[
+          {
+            label: 'AI 추천 금액 올리기',
+            onPress: () => {
+              const target = rematchTarget;
+              setRematchTarget(null);
+              if (target) {
+                void handleIncreaseBid(target, 1000);
+              }
+            },
+          },
+          {
+            label: '예약형으로 전환',
+            onPress: () => {
+              const target = rematchTarget;
+              setRematchTarget(null);
+              if (target) {
+                navigateToReservation(target);
+              }
+            },
+          },
+        ]}
+      />
+
+      <ChoiceModal
+        visible={Boolean(cancelTarget)}
+        title={cancelTarget?.status === RequestStatus.ACCEPTED ? '배송을 바로 취소할까요?' : '요청을 바로 취소할까요?'}
+        message={
+          cancelTarget?.status === RequestStatus.ACCEPTED
+            ? '상세 화면이나 분쟁 접수로 먼저 정리할 수도 있습니다.'
+            : '금액을 올리거나 예약으로 바꾸면 연결 가능성을 더 볼 수 있습니다.'
+        }
+        onClose={() => setCancelTarget(null)}
+        actions={
+          cancelTarget?.status === RequestStatus.ACCEPTED
+            ? [
+                {
+                  label: '상세 보기',
+                  onPress: () => {
+                    const target = cancelTarget;
+                    setCancelTarget(null);
+                    if (target) {
+                      openRequestDetail(target);
+                    }
+                  },
+                },
+                {
+                  label: '분쟁 접수',
+                  onPress: () => {
+                    const target = cancelTarget;
+                    setCancelTarget(null);
+                    if (target) {
+                      openDispute(target);
+                    }
+                  },
+                },
+                {
+                  label: '그래도 취소',
+                  destructive: true,
+                  onPress: () => {
+                    const target = cancelTarget;
+                    setCancelTarget(null);
+                    if (target) {
+                      void executeCancel(target);
+                    }
+                  },
+                },
+              ]
+            : [
+                {
+                  label: '1,000원 올리기',
+                  onPress: () => {
+                    const target = cancelTarget;
+                    setCancelTarget(null);
+                    if (target) {
+                      void handleIncreaseBid(target, 1000);
+                    }
+                  },
+                },
+                {
+                  label: '예약형으로 전환',
+                  onPress: () => {
+                    const target = cancelTarget;
+                    setCancelTarget(null);
+                    if (target) {
+                      navigateToReservation(target);
+                    }
+                  },
+                },
+                {
+                  label: '그래도 취소',
+                  destructive: true,
+                  onPress: () => {
+                    const target = cancelTarget;
+                    setCancelTarget(null);
+                    if (target) {
+                      void executeCancel(target);
+                    }
+                  },
+                },
+              ]
+        }
+      />
     </ScrollView>
   );
 }
@@ -415,6 +551,60 @@ function MiniAction({
       <MaterialIcons name={icon} size={18} color={warning ? Colors.error : Colors.primary} />
       <Text style={[styles.secondaryActionText, warning && styles.warningText]}>{label}</Text>
     </TouchableOpacity>
+  );
+}
+
+function ChoiceModal({
+  visible,
+  title,
+  message,
+  onClose,
+  actions,
+}: {
+  visible: boolean;
+  title: string;
+  message: string;
+  onClose: () => void;
+  actions: Array<{ label: string; onPress: () => void; destructive?: boolean }>;
+}) {
+  return (
+    <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
+      <Pressable style={styles.modalBackdrop} onPress={onClose}>
+        <Pressable style={styles.modalCard} onPress={() => undefined}>
+          <Text style={styles.modalTitle}>{title}</Text>
+          <Text style={styles.modalMessage}>{message}</Text>
+          <View style={styles.modalActions}>
+            {actions.map((action) => (
+              <TouchableOpacity
+                key={action.label}
+                style={[
+                  styles.modalActionButton,
+                  action.destructive && styles.modalActionButtonDanger,
+                ]}
+                activeOpacity={0.85}
+                onPress={action.onPress}
+              >
+                <Text
+                  style={[
+                    styles.modalActionText,
+                    action.destructive && styles.modalActionTextDanger,
+                  ]}
+                >
+                  {action.label}
+                </Text>
+              </TouchableOpacity>
+            ))}
+            <TouchableOpacity
+              style={[styles.modalActionButton, styles.modalSecondaryButton]}
+              activeOpacity={0.85}
+              onPress={onClose}
+            >
+              <Text style={styles.modalSecondaryText}>닫기</Text>
+            </TouchableOpacity>
+          </View>
+        </Pressable>
+      </Pressable>
+    </Modal>
   );
 }
 
@@ -729,5 +919,60 @@ const styles = StyleSheet.create({
   },
   disabledAction: {
     opacity: 0.5,
+  },
+  modalBackdrop: {
+    flex: 1,
+    backgroundColor: 'rgba(17, 24, 39, 0.46)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: Spacing.lg,
+  },
+  modalCard: {
+    width: '100%',
+    maxWidth: 420,
+    borderRadius: BorderRadius.xl,
+    backgroundColor: Colors.surface,
+    padding: Spacing.xl,
+    gap: Spacing.md,
+    ...Shadows.sm,
+  },
+  modalTitle: {
+    color: Colors.textPrimary,
+    fontSize: Typography.fontSize.lg,
+    fontWeight: '800',
+  },
+  modalMessage: {
+    color: Colors.textSecondary,
+    ...Typography.body,
+  },
+  modalActions: {
+    gap: 10,
+  },
+  modalActionButton: {
+    minHeight: 48,
+    borderRadius: BorderRadius.lg,
+    backgroundColor: Colors.primaryMint,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: Spacing.md,
+  },
+  modalActionButtonDanger: {
+    backgroundColor: '#FEE2E2',
+  },
+  modalActionText: {
+    color: Colors.primary,
+    fontSize: Typography.fontSize.base,
+    fontWeight: '800',
+  },
+  modalActionTextDanger: {
+    color: Colors.error,
+  },
+  modalSecondaryButton: {
+    backgroundColor: Colors.gray100,
+  },
+  modalSecondaryText: {
+    color: Colors.textPrimary,
+    fontSize: Typography.fontSize.base,
+    fontWeight: '700',
   },
 });

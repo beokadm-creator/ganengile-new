@@ -11,9 +11,11 @@ import {
   View,
 } from 'react-native';
 import { useNavigation, useRoute, type RouteProp } from '@react-navigation/native';
+import { NaverMapCard } from '../../components/maps/NaverMapCard';
 import { BorderRadius, Colors, Spacing } from '../../theme';
 import { fetchUserInfo } from '../../services/matching-service';
 import { requireUserId } from '../../services/firebase';
+import { getDrivingRoute, type RouteCoordinate } from '../../services/naver-route-service';
 import {
   getRoutePriceInsight,
   increaseRequestBid,
@@ -81,6 +83,7 @@ export function MatchingResultScreen() {
   const [notificationMessage, setNotificationMessage] = useState<string | null>(null);
   const [increasingBid, setIncreasingBid] = useState(false);
   const [priceInsight, setPriceInsight] = useState<RoutePriceInsight | null>(null);
+  const [mapPath, setMapPath] = useState<RouteCoordinate[]>([]);
   const pulseAnim = useRef(new Animated.Value(0)).current;
   const searchMessageIndex = useRef(0);
   const [searchMessage, setSearchMessage] = useState('주변 길러와 전문 배송길러에게 요청을 보내고 있습니다.');
@@ -153,6 +156,35 @@ export function MatchingResultScreen() {
       loop.stop();
     };
   }, [pulseAnim, requestId]);
+
+  useEffect(() => {
+    if (
+      typeof request?.pickupStation.lat !== 'number' ||
+      typeof request?.pickupStation.lng !== 'number' ||
+      typeof request?.deliveryStation.lat !== 'number' ||
+      typeof request?.deliveryStation.lng !== 'number'
+    ) {
+      setMapPath([]);
+      return;
+    }
+
+    void getDrivingRoute({
+      start: {
+        latitude: request.pickupStation.lat,
+        longitude: request.pickupStation.lng,
+      },
+      goal: {
+        latitude: request.deliveryStation.lat,
+        longitude: request.deliveryStation.lng,
+      },
+    })
+      .then((routeResult: { coordinates: RouteCoordinate[] } | null) => {
+        setMapPath(routeResult?.coordinates ?? []);
+      })
+      .catch(() => {
+        setMapPath([]);
+      });
+  }, [request?.deliveryStation.lat, request?.deliveryStation.lng, request?.pickupStation.lat, request?.pickupStation.lng]);
 
   useEffect(() => {
     if (!request?.pickupStation.stationId || !request.deliveryStation.stationId) {
@@ -271,6 +303,35 @@ export function MatchingResultScreen() {
         <InfoRow label="현재 상태" value={getProgressLabel(request)} />
       </View>
 
+      {typeof request.pickupStation.lat === 'number' &&
+      typeof request.pickupStation.lng === 'number' &&
+      typeof request.deliveryStation.lat === 'number' &&
+      typeof request.deliveryStation.lng === 'number' ? (
+        <NaverMapCard
+          title="현재 찾고 있는 구간"
+          subtitle="출발역과 도착역 기준으로 실제 지도 위에서 매칭 구간을 보여줍니다."
+          center={{
+            latitude: request.pickupStation.lat,
+            longitude: request.pickupStation.lng,
+            label: '출발',
+          }}
+          markers={[
+            {
+              latitude: request.pickupStation.lat,
+              longitude: request.pickupStation.lng,
+              label: '출발',
+            },
+            {
+              latitude: request.deliveryStation.lat,
+              longitude: request.deliveryStation.lng,
+              label: '도착',
+            },
+          ]}
+          path={mapPath}
+          height={220}
+        />
+      ) : null}
+
       {priceInsight ? (
         <View style={styles.card}>
           <Text style={styles.cardTitle}>요금 참고</Text>
@@ -321,7 +382,36 @@ export function MatchingResultScreen() {
         </TouchableOpacity>
         <TouchableOpacity
           style={styles.secondaryButton}
-          onPress={() => navigation.navigate('CreateRequest', { mode: 'reservation', sourceRequestId: requestId })}
+          onPress={() =>
+            navigation.navigate('CreateRequest', {
+              mode: 'reservation',
+              sourceRequestId: requestId,
+              prefill: {
+                pickupMode: request.pickupAddress ? 'address' : 'station',
+                deliveryMode: request.deliveryAddress ? 'address' : 'station',
+                pickupStation: request.pickupStation,
+                deliveryStation: request.deliveryStation,
+                pickupRoadAddress: request.pickupAddress?.roadAddress,
+                pickupDetailAddress: request.pickupAddress?.detailAddress,
+                deliveryRoadAddress: request.deliveryAddress?.roadAddress,
+                deliveryDetailAddress: request.deliveryAddress?.detailAddress,
+                packageDescription: request.packageInfo.description,
+                packageSize: request.packageInfo.size as 'small' | 'medium' | 'large' | 'xl',
+                weightKg:
+                  typeof request.packageInfo.weightKg === 'number'
+                    ? request.packageInfo.weightKg
+                    : 1,
+                itemValue: request.itemValue,
+                photoRefs: request.selectedPhotoIds,
+                recipientName: request.recipientName,
+                recipientPhone: request.recipientPhone,
+                urgency: 'normal',
+                directParticipationMode: 'none',
+                preferredPickupTime: request.preferredTime?.departureTime,
+                preferredArrivalTime: request.preferredTime?.arrivalTime,
+              },
+            })
+          }
         >
           <Text style={styles.secondaryButtonText}>예약으로 바꾸기</Text>
         </TouchableOpacity>

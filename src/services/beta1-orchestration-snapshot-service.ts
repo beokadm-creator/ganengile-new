@@ -83,6 +83,8 @@ type Beta1RequestDoc = {
   preferredTime?: { departureTime?: string; arrivalTime?: string };
   beta1RequestStatus?: string;
   status?: string;
+  updatedAt?: { toMillis?: () => number };
+  createdAt?: { toMillis?: () => number };
 };
 
 type Beta1MissionDoc = {
@@ -194,9 +196,17 @@ export async function getBeta1HomeSnapshot(userId: string, role: 'requester' | '
     .map((docItem) => ({ id: docItem.id, ...asRecord(docItem.data()) }) as Beta1DeliveryDoc)
     .filter((delivery) => delivery.gillerId === userId);
 
-  const activeRequests = requests.filter((request) =>
-    ['pending', 'accepted', 'in_transit', 'delivered'].includes(String(request.status ?? ''))
-  );
+  const activeRequests = requests
+    .filter((request) =>
+      ['pending', 'matched', 'accepted', 'in_transit', 'arrived', 'at_locker', 'delivered'].includes(
+        String(request.status ?? '')
+      )
+    )
+    .sort((left, right) => {
+      const leftTime = left.updatedAt?.toMillis?.() ?? left.createdAt?.toMillis?.() ?? 0;
+      const rightTime = right.updatedAt?.toMillis?.() ?? right.createdAt?.toMillis?.() ?? 0;
+      return rightTime - leftTime;
+    });
   const activeMissions = missions.filter((mission) =>
     ['queued', 'offered', 'accepted', 'arrival_pending', 'handover_pending', 'in_progress'].includes(String(mission.status ?? ''))
   );

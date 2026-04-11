@@ -35,12 +35,19 @@ export type MainStackParamList = {
         mode?: 'new' | 'reservation';
         sourceRequestId?: string;
         prefill?: {
+          pickupMode?: 'station' | 'address';
+          deliveryMode?: 'station' | 'address';
           pickupStation?: import('./request').StationInfo;
           deliveryStation?: import('./request').StationInfo;
+          pickupRoadAddress?: string;
+          pickupDetailAddress?: string;
+          deliveryRoadAddress?: string;
+          deliveryDetailAddress?: string;
           packageDescription?: string;
           packageSize?: 'small' | 'medium' | 'large' | 'xl';
           weightKg?: number;
           itemValue?: number;
+          photoRefs?: string[];
           recipientName?: string;
           recipientPhone?: string;
           urgency?: 'normal' | 'fast' | 'urgent';
