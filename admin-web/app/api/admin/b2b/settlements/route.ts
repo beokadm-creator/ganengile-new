@@ -1,32 +1,64 @@
 import { NextResponse } from 'next/server';
 import { getAdminDb } from '@/lib/firebase-admin';
-import { requireAdmin } from '@/lib/auth';
+import { isAdmin } from '@/lib/auth';
 
 export async function GET(request: Request) {
+  if (!(await isAdmin())) {
+    return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 });
+  }
+
   try {
-    await requireAdmin();
     const adminDb = getAdminDb();
 
     const { searchParams } = new URL(request.url);
     const status = searchParams.get('status') || 'pending';
 
-    // Fetch from partner_settlements
-    const settlementsRef = adminDb.collection('partner_settlements')
-      .where('status', '==', status)
-      .orderBy('createdAt', 'desc')
-      .limit(100);
+    let items: Record<string, any>[] = [];
 
-    const snapshot = await settlementsRef.get();
+    try {
+      // Fetch from partner_settlements with order
+      const settlementsRef = adminDb.collection('partner_settlements')
+        .where('status', '==', status)
+        .orderBy('createdAt', 'desc')
+        .limit(100);
 
-    const items: Record<string, any>[] = snapshot.docs.map(doc => {
-      const data = doc.data() as Record<string, any>;
-      return {
-        id: doc.id,
-        ...data,
-        createdAt: data.createdAt?.toDate?.()?.toISOString() || null,
-        settledAt: data.settledAt?.toDate?.()?.toISOString() || null,
-      };
-    });
+      const snapshot = await settlementsRef.get();
+      items = snapshot.docs.map(doc => {
+        const data = doc.data() as Record<string, any>;
+        return {
+          id: doc.id,
+          ...data,
+          createdAt: data.createdAt?.toDate?.()?.toISOString() || null,
+          settledAt: data.settledAt?.toDate?.()?.toISOString() || null,
+        };
+      });
+    } catch (dbError: any) {
+      // Handle missing index error by falling back to client-side sort
+      if (dbError.message?.includes('FAILED_PRECONDITION') && dbError.message?.includes('requires an index')) {
+        console.warn('B2B Settlements: Missing index for status + createdAt, falling back to client-side sort');
+        
+        const fallbackRef = adminDb.collection('partner_settlements')
+          .where('status', '==', status)
+          .limit(100);
+          
+        const snapshot = await fallbackRef.get();
+        items = snapshot.docs.map(doc => {
+          const data = doc.data() as Record<string, any>;
+          return {
+            id: doc.id,
+            ...data,
+            createdAt: data.createdAt?.toDate?.()?.toISOString() || null,
+            settledAt: data.settledAt?.toDate?.()?.toISOString() || null,
+          };
+        }).sort((a, b) => {
+          const timeA = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+          const timeB = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+          return timeB - timeA;
+        });
+      } else {
+        throw dbError;
+      }
+    }
 
     // Summary calculation
     const summary = {
