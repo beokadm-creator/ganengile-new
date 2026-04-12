@@ -2307,6 +2307,25 @@ export const scheduledGillerSettlement = functions.pubsub
   });
 
 /**
+ * Scheduled Function: Partner Settlement Scheduler
+ * 매월 5일 01:00에 실행되어 외부 B2B 배송업체의 월간 정산을 자동 처리합니다.
+ */
+export const scheduledPartnerSettlement = functions.pubsub
+  .schedule('0 1 5 * *')
+  .timeZone('Asia/Seoul')
+  .onRun(async (_context) => {
+    console.warn('🏢 [Scheduled Partner Settlement] Triggered at:', new Date().toISOString());
+    try {
+      const result = await partnerSettlementScheduler();
+      console.warn('✅ Partner settlement scheduler completed:', result);
+      return null;
+    } catch (error) {
+      console.error('❌ Partner settlement scheduler error:', error);
+      return null;
+    }
+  });
+
+/**
  * Scheduled Function: Fare Cache Scheduler
  * 留ㅼ＜ ?붿슂??03:00???ㅽ뻾?섏뼱 ??컙 ?댁엫 罹먯떆(config_fares)瑜?媛깆떊?⑸땲??
  */
