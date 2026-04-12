@@ -530,6 +530,17 @@ export default function CreateRequestScreen({ navigation, route }: Props) {
     }
   };
   useEffect(() => {
+    const unsubscribe = navigation.addListener('beforeRemove', (e) => {
+      // 1단계보다 더 진행된 상태라면 화면이 닫히는 것을 막고 이전 단계로 이동
+      if (activeStep > 1) {
+        e.preventDefault();
+        store.setActiveStep(activeStep - 1);
+      }
+    });
+    return unsubscribe;
+  }, [navigation, activeStep, store]);
+
+  useEffect(() => {
     // 활성화된 스텝이 변경될 때 스크롤을 맨 위로 이동
     setTimeout(() => {
       scrollViewRef.current?.scrollTo({ y: 0, animated: true });
@@ -824,7 +835,7 @@ export default function CreateRequestScreen({ navigation, route }: Props) {
        </ScrollView>
 
        {/* 하단 실시간 예상 요금바 */}
-       {minQuotePrice > 0 && (
+       {minQuotePrice > 0 && activeStep < 4 && (
         <View style={[styles.floatingPriceBar, { paddingBottom: Math.max(insets.bottom, Spacing.md) }]}>
           <Text style={styles.floatingPriceLabel}>최소 예상 요금</Text>
           <Text style={styles.floatingPriceValue}>{minQuotePrice.toLocaleString()}원~</Text>
