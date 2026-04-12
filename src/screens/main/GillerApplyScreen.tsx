@@ -86,7 +86,7 @@ export default function GillerApplyScreen({ navigation }: { navigation: MainStac
   );
 
   useEffect(() => {
-    if (step === 2 && verification?.status === 'approved') {
+    if (step === 2 && (verification?.status === 'approved' || verification?.status === 'pending' || verification?.status === 'under_review')) {
       setStep(3);
     }
   }, [step, verification?.status]);
@@ -98,7 +98,9 @@ export default function GillerApplyScreen({ navigation }: { navigation: MainStac
       return true;
     }
 
-    if (verification?.status !== 'approved') {
+    // Allow proceeding if verification is already approved, OR if it's currently pending/under review.
+    // This allows the admin to approve both Identity and Giller Application at the same time.
+    if (verification?.status !== 'approved' && verification?.status !== 'pending' && verification?.status !== 'under_review') {
       if (identityTestMode && identityConfig?.allowTestBypass) {
         Alert.alert(
           '테스트 모드 우회',
@@ -110,7 +112,7 @@ export default function GillerApplyScreen({ navigation }: { navigation: MainStac
         );
         return false;
       }
-      Alert.alert('본인확인 필요', '본인확인을 완료해 주세요.');
+      Alert.alert('본인확인 필요', '본인확인(신분증 제출 등)을 먼저 완료해 주세요.');
       return false;
     }
 

@@ -375,17 +375,35 @@ export default function GillerApplicationsPage() {
                   <h3 className="mb-3 font-semibold text-slate-900">본인 확인 상태</h3>
                   <ReviewRow
                     label="상태"
-                    value={statusLabel(selected.verificationStatus ?? 'not_submitted')}
+                    value={statusLabel(selected.actualVerificationStatus ?? selected.verificationStatus ?? 'not_submitted')}
                   />
+                  <ReviewRow label="실명" value={selected.realName ?? '-'} />
+                  <ReviewRow label="생년월일" value={selected.birthDate ?? '-'} />
                   <ReviewRow
                     label="테스트 우회"
                     value={selected.identityTestMode ? '사용함' : '실서비스 기준'}
                   />
-                  <ReviewRow
-                    label="실서비스 준비"
-                    value={selected.identityLiveReady ? 'ready' : 'pending'}
-                  />
                 </section>
+
+                {selected.idCardFrontUrl || selected.idCardBackUrl ? (
+                  <section className="col-span-1 md:col-span-2 rounded-xl bg-slate-50 p-4 text-sm">
+                    <h3 className="mb-3 font-semibold text-slate-900">신분증 사진</h3>
+                    <div className="grid gap-4 sm:grid-cols-2">
+                      {selected.idCardFrontUrl && (
+                        <div>
+                          <p className="mb-1 text-xs text-slate-500">앞면</p>
+                          <img src={selected.idCardFrontUrl} alt="ID Front" className="w-full rounded-lg border border-slate-200 object-contain max-h-48" />
+                        </div>
+                      )}
+                      {selected.idCardBackUrl && (
+                        <div>
+                          <p className="mb-1 text-xs text-slate-500">뒷면</p>
+                          <img src={selected.idCardBackUrl} alt="ID Back" className="w-full rounded-lg border border-slate-200 object-contain max-h-48" />
+                        </div>
+                      )}
+                    </div>
+                  </section>
+                ) : null}
 
                 <section className="rounded-xl bg-slate-50 p-4 text-sm">
                   <h3 className="mb-3 font-semibold text-slate-900">계좌 정보</h3>

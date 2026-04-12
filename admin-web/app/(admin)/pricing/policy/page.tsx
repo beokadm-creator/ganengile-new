@@ -195,7 +195,7 @@ export default function PricingPolicyPage() {
     }));
   }
 
-  function updateTimeRule(index: number, key: keyof PricingPolicy['timeRules'][number], value: string | number | boolean) {
+  function updateTimeRule(index: number, key: keyof SharedPricingPolicyConfig['timeRules'][number], value: string | number | boolean) {
     setPolicy((prev) => ({
       ...prev,
       timeRules: prev.timeRules.map((rule, ruleIndex) =>
@@ -616,7 +616,7 @@ function calculateRecommendationPrice({
   nearbyGillerCount,
   requestMode,
 }: {
-  policy: PricingPolicy;
+  policy: SharedPricingPolicyConfig;
   baseTotalFee: number;
   weather: 'clear' | 'rain' | 'snow';
   isPeakTime: boolean;
@@ -664,7 +664,7 @@ function buildScenarioSummary({
   requestedHour,
 }: {
   previewResult: ReturnType<typeof calculateSharedDeliveryFee>;
-  policy: PricingPolicy;
+  policy: SharedPricingPolicyConfig;
   requestMode: 'immediate' | 'reservation';
   hasAddressPickup: boolean;
   hasAddressDropoff: boolean;
@@ -690,7 +690,7 @@ function buildScenarioSummary({
 function calculateTimeRuleAdjustment(
   baseAmount: number,
   requestedHour: number,
-  policy: PricingPolicy
+  policy: SharedPricingPolicyConfig
 ) {
   return policy.timeRules
     .filter((rule) => rule.enabled)
