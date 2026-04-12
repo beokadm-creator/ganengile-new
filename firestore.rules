@@ -113,8 +113,21 @@ service cloud.firestore {
       allow get: if isAuthenticated();
       allow list: if false;
       
-      // 쓰기: 본인만
-      allow create, update: if isOwner(userId);
+      // 쓰기: 본인만. 단, 관리자 권한 상승이나 잔액 임의 조작 방지.
+      // role, pointBalance, totalEarnedPoints, totalSpentPoints, isVerified, admin, status 필드는 수정 금지.
+      allow create: if isOwner(userId) &&
+                    (!request.resource.data.keys().hasAny(['role', 'pointBalance', 'totalEarnedPoints', 'totalSpentPoints', 'isVerified', 'admin', 'status']) || 
+                     (request.resource.data.role == 'user' && request.resource.data.pointBalance == 0 && request.resource.data.isVerified == false));
+                     
+      allow update: if isOwner(userId) &&
+                    (!request.resource.data.keys().hasAny(['role', 'pointBalance', 'totalEarnedPoints', 'totalSpentPoints', 'isVerified', 'admin', 'status']) ||
+                     (request.resource.data.role == resource.data.role && 
+                      request.resource.data.pointBalance == resource.data.pointBalance &&
+                      request.resource.data.totalEarnedPoints == resource.data.totalEarnedPoints &&
+                      request.resource.data.totalSpentPoints == resource.data.totalSpentPoints &&
+                      request.resource.data.isVerified == resource.data.isVerified &&
+                      request.resource.data.admin == resource.data.admin &&
+                      request.resource.data.status == resource.data.status));
       
       // 삭제: 본인만
       allow delete: if isOwner(userId);
@@ -482,11 +495,12 @@ service cloud.firestore {
     // ==================== Ratings Collection ====================
 
     match /ratings/{ratingId} {
-      // 읽기: 인증된 사용자
+      // 읽기: 관련된 사용자(fromUserId, toUserId) 또는 인증된 사용자
       allow read: if isAuthenticated();
 
       // 쓰기: 본인(fromUserId)만 (delete 방어를 위해 create, update로 명시적 분리)
-      allow create, update: if isOwner(resource.data.fromUserId);
+      allow create: if isOwner(request.resource.data.fromUserId);
+      allow update: if isOwner(resource.data.fromUserId);
 
       // 삭제: 시스템만
       allow delete: if false;

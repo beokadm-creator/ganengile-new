@@ -124,13 +124,25 @@ export async function updateUserProfile(
 ): Promise<UserProfile> {
   try {
     const profileRef = doc(db, 'users', userId, PROFILE_COLLECTION, userId);
+    const userRef = doc(db, 'users', userId);
 
     const updateData: any = {
       ...data,
       updatedAt: serverTimestamp(),
     };
 
-    await updateDoc(profileRef, updateData);
+    await runTransaction(db, async (transaction) => {
+      transaction.update(profileRef, updateData);
+      
+      // name, phoneNumber 등 users 메인 문서와 동기화가 필요한 필드가 있다면 함께 업데이트
+      const userUpdate: any = { updatedAt: serverTimestamp() };
+      if (data.name) userUpdate.nickname = data.name;
+      if (data.profilePhotoUrl) userUpdate.profileImage = data.profilePhotoUrl;
+      
+      if (Object.keys(userUpdate).length > 1) {
+        transaction.update(userRef, userUpdate);
+      }
+    });
 
     const updated = await getUserProfile(userId);
     if (!updated) {
@@ -199,16 +211,16 @@ export async function updateVerificationStatus(
     const profileRef = doc(db, 'users', userId, PROFILE_COLLECTION, userId);
     const userRef = doc(db, 'users', userId);
 
-    await Promise.all([
-      updateDoc(profileRef, {
+    await runTransaction(db, async (transaction) => {
+      transaction.update(profileRef, {
         isVerified,
         updatedAt: serverTimestamp(),
-      }),
-      updateDoc(userRef, {
+      });
+      transaction.update(userRef, {
         isVerified,
         updatedAt: serverTimestamp(),
-      }),
-    ]);
+      });
+    });
   } catch (error) {
     console.error('Error updating verification status:', error);
     throw error;
@@ -277,18 +289,41 @@ export async function saveAddress(
 
   if (input.isDefault) {
     const existing = await getSavedAddresses(userId);
-    await Promise.all(
+    
+    await runTransaction(db, async (transaction) => {
+      // 다른 주소들의 기본 설정을 해제
       existing
         .filter((address) => address.addressId !== input.addressId && address.isDefault)
-        .map((address) => updateDoc(doc(savedAddressCollection(userId), address.addressId), { isDefault: false, updatedAt: serverTimestamp() }))
-    );
-    await updateUserProfile(userId, {
-      defaultAddress: {
-        roadAddress: input.roadAddress.trim(),
-        detailAddress: input.detailAddress.trim(),
-        fullAddress,
-      },
-    } as Partial<ProfileFormData>);
+        .forEach((address) => {
+          transaction.update(doc(savedAddressCollection(userId), address.addressId), { 
+            isDefault: false, 
+            updatedAt: serverTimestamp() 
+          });
+        });
+
+      // 현재 입력된 주소 문서를 업데이트 또는 생성 (미리 Ref를 잡아둠)
+      const currentAddressRef = input.addressId 
+        ? doc(savedAddressCollection(userId), input.addressId) 
+        : doc(savedAddressCollection(userId));
+
+      transaction.set(currentAddressRef, {
+        ...payload,
+        createdAt: input.addressId ? undefined : serverTimestamp(),
+      }, { merge: true });
+
+      // userProfile 문서에 기본 주소 반영
+      const pRef = profileDocRef(userId);
+      transaction.set(pRef, {
+        defaultAddress: {
+          roadAddress: input.roadAddress.trim(),
+          detailAddress: input.detailAddress.trim(),
+          fullAddress,
+        },
+        updatedAt: serverTimestamp()
+      }, { merge: true });
+    });
+
+    return input.addressId || 'new-address-created';
   }
 
   if (input.addressId) {
@@ -324,22 +359,23 @@ export async function setDefaultSavedAddress(userId: string, addressId: string):
     throw new Error('기본 주소로 지정할 대상을 찾을 수 없습니다.');
   }
 
-  await Promise.all(
-    existing.map((address) =>
-      updateDoc(doc(savedAddressCollection(userId), address.addressId), {
+  await runTransaction(db, async (transaction) => {
+    existing.forEach((address) => {
+      transaction.update(doc(savedAddressCollection(userId), address.addressId), {
         isDefault: address.addressId === addressId,
         updatedAt: serverTimestamp(),
-      })
-    )
-  );
+      });
+    });
 
-  await updateUserProfile(userId, {
-    defaultAddress: {
-      roadAddress: target.roadAddress,
-      detailAddress: target.detailAddress,
-      fullAddress: target.fullAddress,
-    },
-  } as Partial<ProfileFormData>);
+    transaction.set(profileDocRef(userId), {
+      defaultAddress: {
+        roadAddress: target.roadAddress,
+        detailAddress: target.detailAddress,
+        fullAddress: target.fullAddress,
+      },
+      updatedAt: serverTimestamp(),
+    }, { merge: true });
+  });
 }
 
 export async function toggleFavoriteSavedAddress(

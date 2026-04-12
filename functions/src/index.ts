@@ -54,6 +54,7 @@ import { gillerSettlementScheduler } from './scheduled/settlement-scheduler';
 import { partnerSettlementScheduler } from './scheduled/partner-settlement-scheduler';
 import { fareCacheScheduler } from './scheduled/fare-cache-scheduler';
 export { onNotificationCreated } from './notifications';
+export { onRatingCreated } from './ratings';
 export { tossWebhook } from './webhooks/toss-webhook';
 export { partnerWebhook } from './webhooks/partner-webhook';
 import { syncConfigStationsFromSeoulApi } from './station-sync';
@@ -2793,68 +2794,71 @@ export const issueKakaoCustomToken = functions.https.onCall(
 
     const userRef = db.collection('users').doc(uid);
     const existing = await userRef.get();
-    const existingData = (existing.data() ?? {}) as KakaoLinkedUserDoc;
     const now = admin.firestore.FieldValue.serverTimestamp();
-    const userRole =
-      existing.exists && (existingData.role === 'gller' || existingData.role === 'giller' || existingData.role === 'both')
-        ? existingData.role
+    await db.runTransaction(async (transaction) => {
+      const userRefTx = db.collection('users').doc(uid);
+      const existingTx = await transaction.get(userRefTx);
+      const existingDataTx = (existingTx.data() ?? {}) as KakaoLinkedUserDoc;
+      
+      const userRoleTx = existingTx.exists && (existingDataTx.role === 'gller' || existingDataTx.role === 'giller' || existingDataTx.role === 'both')
+        ? existingDataTx.role
         : role;
-    const userName =
-      existing.exists && typeof existingData.name === 'string' && existingData.name.trim()
-        ? existingData.name
+      const userNameTx = existingTx.exists && typeof existingDataTx.name === 'string' && existingDataTx.name.trim()
+        ? existingDataTx.name
         : providedName || nickname;
-    const userPhoneNumber =
-      existing.exists && typeof existingData.phoneNumber === 'string' && existingData.phoneNumber.trim()
-        ? existingData.phoneNumber
+      const userPhoneNumberTx = existingTx.exists && typeof existingDataTx.phoneNumber === 'string' && existingDataTx.phoneNumber.trim()
+        ? existingDataTx.phoneNumber
         : providedPhoneNumber;
 
-    await userRef.set(
-      {
-        uid,
-        email,
-        name: userName,
-        phoneNumber: userPhoneNumber,
-        role: userRole,
-        gillerApplicationStatus: existingData.gillerApplicationStatus ?? 'none',
-        authProvider: 'kakao',
-        authProviderUserId: kakaoId,
-        signupMethod: 'kakao',
-        providerLinkedAt: now,
-        profilePhoto: profileImage ?? existingData.profilePhoto ?? '',
-        updatedAt: now,
-        isActive: true,
-        isVerified: existingData.isVerified ?? false,
-        hasCompletedOnboarding: existing.exists ? existingData.hasCompletedOnboarding ?? false : false,
-        agreedTerms: existing.exists
-          ? existingData.agreedTerms ?? { giller: false, gller: false, privacy: false, marketing: false }
-          : { giller: false, gller: false, privacy: false, marketing: false },
-        stats: existing.exists
-          ? existingData.stats ?? {
-              completedDeliveries: 0,
-              totalEarnings: 0,
-              rating: 0,
-              recentPenalties: 0,
-              accountAgeDays: 0,
-              recent30DaysDeliveries: 0,
-            }
-          : {
-              completedDeliveries: 0,
-              totalEarnings: 0,
-              rating: 0,
-              recentPenalties: 0,
-              accountAgeDays: 0,
-              recent30DaysDeliveries: 0,
-            },
-        badges: existing.exists
-          ? existingData.badges ?? { activity: [], quality: [], expertise: [], community: [] }
-          : { activity: [], quality: [], expertise: [], community: [] },
-        badgeBenefits: existing.exists
-          ? existingData.badgeBenefits ?? { profileFrame: 'none', totalBadges: 0, currentTier: 'none' }
-          : { profileFrame: 'none', totalBadges: 0, currentTier: 'none' },
-        ...(existing.exists ? {} : { createdAt: now }),
-      },
-      { merge: true }
-    );
+      transaction.set(
+        userRefTx,
+        {
+          uid,
+          email,
+          name: userNameTx,
+          phoneNumber: userPhoneNumberTx,
+          role: userRoleTx,
+          gillerApplicationStatus: existingDataTx.gillerApplicationStatus ?? 'none',
+          authProvider: 'kakao',
+          authProviderUserId: kakaoId,
+          signupMethod: 'kakao',
+          providerLinkedAt: now,
+          profilePhoto: profileImage ?? existingDataTx.profilePhoto ?? '',
+          updatedAt: now,
+          isActive: true,
+          isVerified: existingDataTx.isVerified ?? false,
+          hasCompletedOnboarding: existingTx.exists ? existingDataTx.hasCompletedOnboarding ?? false : false,
+          agreedTerms: existingTx.exists
+            ? existingDataTx.agreedTerms ?? { giller: false, gller: false, privacy: false, marketing: false }
+            : { giller: false, gller: false, privacy: false, marketing: false },
+          stats: existingTx.exists
+            ? existingDataTx.stats ?? {
+                completedDeliveries: 0,
+                totalEarnings: 0,
+                rating: 0,
+                recentPenalties: 0,
+                accountAgeDays: 0,
+                recent30DaysDeliveries: 0,
+              }
+            : {
+                completedDeliveries: 0,
+                totalEarnings: 0,
+                rating: 0,
+                recentPenalties: 0,
+                accountAgeDays: 0,
+                recent30DaysDeliveries: 0,
+              },
+          badges: existingTx.exists
+            ? existingDataTx.badges ?? { activity: [], quality: [], expertise: [], community: [] }
+            : { activity: [], quality: [], expertise: [], community: [] },
+          badgeBenefits: existingTx.exists
+            ? existingDataTx.badgeBenefits ?? { profileFrame: 'none', totalBadges: 0, currentTier: 'none' }
+            : { profileFrame: 'none', totalBadges: 0, currentTier: 'none' },
+          ...(existingTx.exists ? {} : { createdAt: now }),
+        },
+        { merge: true }
+      );
+    });
 
     const customToken = await admin.auth().createCustomToken(uid, {
       provider: 'kakao',

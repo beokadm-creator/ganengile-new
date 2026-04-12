@@ -1,6 +1,12 @@
 rules_version = '2';
 service firebase.storage {
   match /b/{bucket}/o {
+    // ==================== Helper Functions ====================
+    function isValidImage() {
+      return request.resource.contentType.matches('image/.*')
+             && request.resource.size < 10 * 1024 * 1024; // 10MB limit
+    }
+
     // ==================== User Files ====================
 
     match /users/{userId}/{allPaths=**} {
@@ -26,17 +32,15 @@ service firebase.storage {
     // ==================== Delivery Photos ====================
 
     match /pickup-photos/{deliveryId}/{allPaths=**} {
-      // 픽업 사진은 기러기와 요청자가 읽을 수 있음
       allow read: if request.auth != null;
-      // 기러기만 업로드 가능
-      allow write: if request.auth != null;
+      // 이미지이고 10MB 이하일 때만 업로드 허용
+      allow write: if request.auth != null && isValidImage();
     }
 
     match /delivery-photos/{deliveryId}/{allPaths=**} {
-      // 배송 완료 사진은 기러기와 요청자가 읽을 수 있음
       allow read: if request.auth != null;
-      // 기러기만 업로드 가능
-      allow write: if request.auth != null;
+      // 이미지이고 10MB 이하일 때만 업로드 허용
+      allow write: if request.auth != null && isValidImage();
     }
 
     // ==================== Profile Photos ====================

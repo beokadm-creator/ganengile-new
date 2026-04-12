@@ -70,9 +70,9 @@ export async function submitRating(
 
     const docRef = await addDoc(collection(db, 'ratings'), ratingData);
 
-    // Rating submitted
-
-    await updateUserRatingStats(toUserId);
+    // 상대방 프로필(users)에 평점을 업데이트하는 로직은 Cloud Functions(functions/src/ratings.ts)로 위임하여
+    // Permission Denied 에러를 방지하고 보안 규칙을 준수합니다.
+    
     await notifyDeliveryEvent(toUserId, NotificationType.RATING_RECEIVED, {
       rating: rating.toString(),
     });
