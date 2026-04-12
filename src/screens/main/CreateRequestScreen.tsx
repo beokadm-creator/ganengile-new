@@ -328,12 +328,14 @@ function StepContainer({
   step,
   currentStep,
   onNext,
+  onPrev,
   nextLabel = '다음 단계로',
   children,
 }: {
   step: number;
   currentStep: number;
   onNext?: () => void;
+  onPrev?: () => void;
   nextLabel?: string;
   children: React.ReactNode;
 }) {
@@ -343,6 +345,11 @@ function StepContainer({
     <View style={[styles.stepContainer, currentStep < step && { display: 'none' }]}>
       <View style={currentStep > step ? { opacity: 0.6, pointerEvents: 'none' } : undefined}>
         {children}
+        {currentStep > step && onPrev && (
+          <TouchableOpacity style={styles.editStepButton} onPress={onPrev}>
+            <Text style={styles.editStepButtonText}>수정하기</Text>
+          </TouchableOpacity>
+        )}
       </View>
       {currentStep === step && onNext && (
         <TouchableOpacity style={styles.nextStepButton} onPress={onNext}>
@@ -552,6 +559,27 @@ export default function CreateRequestScreen({ navigation, route }: Props) {
         setContactPhoneNumber(draft.contactPhoneNumber);
         setRecipientConsentChecked(draft.recipientConsentChecked);
         setDraftRestored(true);
+
+        // Auto-advance step if draft is partially filled
+        let restoredStep = draft.step ?? 1;
+        // Make sure we never regress the step if it was saved at a higher step
+        // However, if the user manually changed something that invalidates a future step,
+        // we might want to drop them to the lowest incomplete step. 
+        // For now, respect the saved draft step up to 4.
+        if (restoredStep === 1) {
+          if (draft.pickupStation && draft.deliveryStation) {
+            restoredStep = 2;
+            if (draft.packageSize && draft.weightKg && draft.itemValue) {
+              restoredStep = 3;
+              if (draft.recipientName && draft.recipientPhone && draft.recipientConsentChecked) {
+                restoredStep = 4;
+              }
+            }
+          }
+        }
+        
+        // Final bounds check
+        setActiveStep(Math.min(Math.max(1, restoredStep), 4));
       }
 
       draftHydratedRef.current = true;
@@ -935,7 +963,7 @@ export default function CreateRequestScreen({ navigation, route }: Props) {
 
   function buildDraftPayload(): CreateRequestDraft {
     return {
-      step: 1,
+      step: activeStep,
       requestMode,
       pickupMode,
       deliveryMode,
@@ -1498,13 +1526,18 @@ export default function CreateRequestScreen({ navigation, route }: Props) {
       <AppTopBar title="배송 요청 만들기" onBack={handleBack} />
 
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
-        <StepContainer step={1} currentStep={activeStep} onNext={() => {
-          if (!pickupStation || !deliveryStation) {
-            Alert.alert('확인 필요', '출발역과 도착역을 모두 선택해 주세요.');
-            return;
-          }
-          setActiveStep(2);
-        }}>
+        <StepContainer 
+          step={1} 
+          currentStep={activeStep} 
+          onNext={() => {
+            if (!pickupStation || !deliveryStation) {
+              Alert.alert('확인 필요', '출발역과 도착역을 모두 선택해 주세요.');
+              return;
+            }
+            setActiveStep(2);
+          }}
+          onPrev={() => setActiveStep(1)}
+        >
           <Block title="보내기 방식">
             <View style={styles.row}>
               <Chip label="지금 보내기" active={requestMode === 'immediate'} onPress={() => setRequestMode('immediate')} />
@@ -1665,13 +1698,18 @@ export default function CreateRequestScreen({ navigation, route }: Props) {
         </Block>
         </StepContainer>
 
-        <StepContainer step={2} currentStep={activeStep} onNext={() => {
-          if (!packageSize || !weightKg || !itemValue) {
-            Alert.alert('확인 필요', '물품 정보를 모두 입력해 주세요.');
-            return;
-          }
-          setActiveStep(3);
-        }}>
+        <StepContainer 
+          step={2} 
+          currentStep={activeStep} 
+          onNext={() => {
+            if (!packageSize || !weightKg || !itemValue) {
+              Alert.alert('확인 필요', '물품 정보를 모두 입력해 주세요.');
+              return;
+            }
+            setActiveStep(3);
+          }}
+          onPrev={() => setActiveStep(2)}
+        >
           <Block title={photoUrl ? '물건 사진 ✓' : hasItemValue ? '물건 사진 (필수)' : '물건 사진 (선택)'}>
           <View style={styles.row}>
             <TouchableOpacity style={[styles.primaryButton, styles.flexButton]} onPress={() => void handleUploadPhotoFromCamera()}>
@@ -1796,17 +1834,23 @@ export default function CreateRequestScreen({ navigation, route }: Props) {
         </Block>
         </StepContainer>
 
-        <StepContainer step={3} currentStep={activeStep} onNext={() => {
-          if (!recipientName || !recipientPhone || !recipientConsentChecked) {
-            Alert.alert('확인 필요', '수령인 정보와 개인정보 제공 동의를 완료해 주세요.');
-            return;
-          }
-          if (!isPhoneVerified) {
-            Alert.alert('인증 필요', '휴대폰 본인 인증을 완료해 주세요.');
-            return;
-          }
-          setActiveStep(4);
-        }} nextLabel="견적 확인하기">
+        <StepContainer 
+          step={3} 
+          currentStep={activeStep} 
+          onNext={() => {
+            if (!recipientName || !recipientPhone || !recipientConsentChecked) {
+              Alert.alert('확인 필요', '수령인 정보와 개인정보 제공 동의를 완료해 주세요.');
+              return;
+            }
+            if (!isPhoneVerified) {
+              Alert.alert('인증 필요', '휴대폰 본인 인증을 완료해 주세요.');
+              return;
+            }
+            setActiveStep(4);
+          }} 
+          onPrev={() => setActiveStep(3)}
+          nextLabel="견적 확인하기"
+        >
           <Block title="인계와 수령 정보">
           <TextInput
             style={styles.input}
@@ -2550,6 +2594,21 @@ const styles = StyleSheet.create({
   stepContainer: {
     gap: Spacing.xl,
     paddingBottom: Spacing.xl,
+  },
+  editStepButton: {
+    position: 'absolute',
+    top: -10,
+    right: 0,
+    padding: Spacing.sm,
+    backgroundColor: Colors.white,
+    borderRadius: BorderRadius.full,
+    ...Shadows.sm,
+    zIndex: 10,
+  },
+  editStepButtonText: {
+    color: Colors.primary,
+    fontSize: Typography.fontSize.sm,
+    fontWeight: '700',
   },
   nextStepButton: {
     minHeight: 56,
