@@ -70,7 +70,7 @@ import { Step1Location } from './create-request/steps/Step1Location';
 import { Step2Item } from './create-request/steps/Step2Item';
 import { Step3Recipient } from './create-request/steps/Step3Recipient';
 import { Step4Quote } from './create-request/steps/Step4Quote';
-import type { LocationMode, PackageSize, PickerType, AddressTarget, NearbyStationRecommendation, NearbyPickerState } from './create-request/types';
+import type { LocationMode, PackageSize, PickerType, AddressTarget, NearbyPickerState } from './create-request/types';
 
 type Props = {
   navigation: MainStackNavigationProp;

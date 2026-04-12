@@ -4,7 +4,7 @@ import { Image } from 'expo-image';
 import { StepContainer } from '../components/StepContainer';
 import { Block } from '../components/Block';
 import { Chip } from '../components/Chip';
-import { TimePicker } from '../../../../components/ui/TimePicker';
+import TimePicker from '../../../../components/common/TimePicker';
 import { Colors, Spacing, BorderRadius, Typography } from '../../../../theme';
 import { useCreateRequestStore } from '../store/useCreateRequestStore';
 import type { PackageSize } from '../types';
