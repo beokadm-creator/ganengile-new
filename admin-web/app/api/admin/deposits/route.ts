@@ -46,58 +46,83 @@ export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url);
   const status = searchParams.get('status') ?? 'paid';
 
-  const snap = await db
-    .collection('deposits')
-    .where('status', '==', status)
-    .orderBy('createdAt', 'desc')
-    .limit(100)
-    .get();
+  try {
+    const snap = await db
+      .collection('deposits')
+      .where('status', '==', status)
+      .orderBy('createdAt', 'desc')
+      .limit(100)
+      .get();
 
-  const entries = snap.docs.map((doc) => ({
-    id: doc.id,
-    data: doc.data() as DepositDoc,
-  }));
+    const entries = snap.docs.map((doc) => ({
+      id: doc.id,
+      data: doc.data() as DepositDoc,
+    }));
 
-  const requestIds = Array.from(
-    new Set(
-      entries
-        .map((entry) => entry.data.requestId)
-        .filter((value): value is string => typeof value === 'string' && value.length > 0)
-    )
-  );
+    const requestIds = Array.from(
+      new Set(
+        entries
+          .map((entry) => entry.data.requestId)
+          .filter((value): value is string => typeof value === 'string' && value.length > 0)
+      )
+    );
 
-  const requestEntries = await Promise.all(
-    requestIds.map(async (requestId) => {
-        const requestSnap = await db.collection('requests').doc(requestId).get();
-        return [requestId, (requestSnap.data() as RequestDoc | undefined) ?? undefined] as const;
-      })
-  );
+    const requestEntries = await Promise.all(
+      requestIds.map(async (requestId) => {
+          const requestSnap = await db.collection('requests').doc(requestId).get();
+          return [requestId, (requestSnap.data() as RequestDoc | undefined) ?? undefined] as const;
+        })
+    );
 
-  const requestMap = new Map(requestEntries);
-  const items = entries.map((entry) => {
-    const requestData = entry.data.requestId ? requestMap.get(entry.data.requestId) : undefined;
+    const requestMap = new Map(requestEntries);
+    const items = entries.map((entry) => {
+      const requestData = entry.data.requestId ? requestMap.get(entry.data.requestId) : undefined;
 
-    return {
-      id: entry.id,
-      userId: entry.data.userId ?? '',
-      requestId: entry.data.requestId ?? '',
-      depositAmount: entry.data.depositAmount ?? 0,
-      pointAmount: entry.data.pointAmount ?? 0,
-      tossAmount: entry.data.tossAmount ?? 0,
-      paymentMethod: entry.data.paymentMethod ?? 'unknown',
-      status: entry.data.status ?? status,
-      createdAt: entry.data.createdAt ?? new Date().toISOString(),
-      geo:
-        requestData?.fromLocation && requestData?.toLocation
-          ? {
-              pickup: requestData.fromLocation,
-              dropoff: requestData.toLocation,
-            }
-          : null,
-    };
-  });
+      return {
+        id: entry.id,
+        userId: entry.data.userId ?? '',
+        requestId: entry.data.requestId ?? '',
+        depositAmount: entry.data.depositAmount ?? 0,
+        pointAmount: entry.data.pointAmount ?? 0,
+        tossAmount: entry.data.tossAmount ?? 0,
+        paymentMethod: entry.data.paymentMethod ?? 'unknown',
+        status: entry.data.status ?? status,
+        createdAt: entry.data.createdAt ?? new Date().toISOString(),
+        geo:
+          requestData?.fromLocation && requestData?.toLocation
+            ? {
+                pickup: requestData.fromLocation,
+                dropoff: requestData.toLocation,
+              }
+            : null,
+      };
+    });
 
-  return NextResponse.json({ items });
+    return NextResponse.json({ items });
+  } catch (error: any) {
+    console.error('Failed to fetch deposits:', error);
+    
+    // Check if this is an index error from Firestore
+    if (error.message?.includes('FAILED_PRECONDITION') && error.message?.includes('requires an index')) {
+      // Extract the link from the error message if possible to show to the user
+      const linkMatch = error.message.match(/https:\/\/console\.firebase\.google\.com[^\s]*/);
+      const indexLink = linkMatch ? linkMatch[0] : null;
+      
+      return NextResponse.json(
+        { 
+          error: '데이터베이스 색인(Index) 생성이 필요합니다.', 
+          details: 'Firestore 복합 색인이 아직 생성되지 않았거나 빌드 중입니다. 백엔드 로그에 출력된 링크를 클릭하여 색인을 생성해주세요.',
+          indexLink
+        }, 
+        { status: 500 }
+      );
+    }
+    
+    return NextResponse.json(
+      { error: '데이터를 불러오는데 실패했습니다.', details: error.message }, 
+      { status: 500 }
+    );
+  }
 }
 
 export async function PATCH(req: NextRequest) {

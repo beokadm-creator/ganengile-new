@@ -10,7 +10,9 @@ import {
   limit,
 } from 'firebase/firestore';
 import { db } from '../../config/firebase';
-import { DeliveryDoc } from '../../types/delivery';
+import { Delivery } from '../../types/delivery';
+
+export type DeliveryDoc = Delivery & { id: string };
 
 export const deliveryRepository = {
   async getDeliveryById(deliveryId: string): Promise<DeliveryDoc | null> {

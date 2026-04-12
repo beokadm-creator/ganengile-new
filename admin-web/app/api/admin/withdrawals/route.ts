@@ -66,75 +66,98 @@ export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url);
   const status = searchParams.get('status') ?? 'pending';
 
-  const [withdrawalsSnap, bankConfigSnap] = await Promise.all([
-    db.collection('withdraw_requests').where('status', '==', status).orderBy('createdAt', 'desc').get(),
-    db.collection('config_integrations').doc('bank').get(),
-  ]);
+  try {
+    const [withdrawalsSnap, bankConfigSnap] = await Promise.all([
+      db.collection('withdraw_requests').where('status', '==', status).orderBy('createdAt', 'desc').get(),
+      db.collection('config_integrations').doc('bank').get(),
+    ]);
 
-  const userIds = new Set<string>();
-  withdrawalsSnap.docs.forEach((doc) => {
-    const data = doc.data() as UnknownRecord;
-    if (typeof data.userId === 'string' && data.userId) userIds.add(data.userId);
-  });
+    const userIds = new Set<string>();
+    withdrawalsSnap.docs.forEach((doc) => {
+      const data = doc.data() as UnknownRecord;
+      if (typeof data.userId === 'string' && data.userId) userIds.add(data.userId);
+    });
 
-  const userEntries = await Promise.all(
-    Array.from(userIds).map(async (userId) => {
-      const userSnap = await db.collection('users').doc(userId).get();
-      return [userId, userSnap.exists ? ((userSnap.data() as UnknownRecord) ?? {}) : null] as const;
-    })
-  );
-  const userMap = new Map(userEntries);
+    const userEntries = await Promise.all(
+      Array.from(userIds).map(async (userId) => {
+        const userSnap = await db.collection('users').doc(userId).get();
+        return [userId, userSnap.exists ? ((userSnap.data() as UnknownRecord) ?? {}) : null] as const;
+      })
+    );
+    const userMap = new Map(userEntries);
 
-  const bankConfig = bankConfigSnap.exists ? ((bankConfigSnap.data() as UnknownRecord) ?? {}) : {};
-  const items = withdrawalsSnap.docs.map((doc) => {
-    const data = doc.data() as UnknownRecord;
-    const user = typeof data.userId === 'string' ? userMap.get(data.userId) ?? null : null;
-    const bankSnapshot = readBankSnapshot(data);
-    const verification = readUserVerification(user);
+    const bankConfig = bankConfigSnap.exists ? ((bankConfigSnap.data() as UnknownRecord) ?? {}) : {};
+    const items = withdrawalsSnap.docs.map((doc) => {
+      const data = doc.data() as UnknownRecord;
+      const user = typeof data.userId === 'string' ? userMap.get(data.userId) ?? null : null;
+      const bankSnapshot = readBankSnapshot(data);
+      const verification = readUserVerification(user);
 
-    return {
-      id: doc.id,
-      ...data,
-      accountNumberMasked:
-        typeof data.accountNumberMasked === 'string'
-          ? data.accountNumberMasked
-          : readMaskedAccountNumber(data),
-      accountLast4:
-        typeof data.accountLast4 === 'string' ? data.accountLast4 : readAccountLast4(data),
-      ...bankSnapshot,
-      ...verification,
-      reviewChecklist: {
-        identityReady:
-          verification.identityVerificationStatus === 'approved' || verification.identityVerificationStatus === 'approved_test_bypass',
-        bankReady:
-          verification.bankVerificationStatus === 'verified' ||
-          verification.bankVerificationStatus === 'approved' ||
-          verification.bankVerificationStatus === 'approved_test_bypass',
-        gillerApproved: verification.gillerApplicationStatus === 'approved',
-        liveTransferReady: Boolean(bankConfig.liveReady ?? false),
-        manualReviewRequired:
-          (bankSnapshot.manualReviewFallback ?? true) || !(bankConfig.liveReady ?? false),
+      return {
+        id: doc.id,
+        ...data,
+        accountNumberMasked:
+          typeof data.accountNumberMasked === 'string'
+            ? data.accountNumberMasked
+            : readMaskedAccountNumber(data),
+        accountLast4:
+          typeof data.accountLast4 === 'string' ? data.accountLast4 : readAccountLast4(data),
+        ...bankSnapshot,
+        ...verification,
+        reviewChecklist: {
+          identityReady:
+            verification.identityVerificationStatus === 'approved' || verification.identityVerificationStatus === 'approved_test_bypass',
+          bankReady:
+            verification.bankVerificationStatus === 'verified' ||
+            verification.bankVerificationStatus === 'approved' ||
+            verification.bankVerificationStatus === 'approved_test_bypass',
+          gillerApproved: verification.gillerApplicationStatus === 'approved',
+          liveTransferReady: Boolean(bankConfig.liveReady ?? false),
+          manualReviewRequired:
+            (bankSnapshot.manualReviewFallback ?? true) || !(bankConfig.liveReady ?? false),
+        },
+        bankConfigLiveReady: Boolean(bankConfig.liveReady ?? false),
+        bankConfigTestMode: Boolean(bankConfig.testMode ?? true),
+        bankConfigStatusMessage:
+          typeof bankConfig.statusMessage === 'string'
+            ? bankConfig.statusMessage
+            : '계좌 인증 API 준비 전에는 운영 수동 검토를 함께 진행합니다.',
+      };
+    });
+
+    return NextResponse.json({
+      items,
+      integration: {
+        liveReady: Boolean(bankConfig.liveReady ?? false),
+        testMode: Boolean(bankConfig.testMode ?? true),
+        statusMessage:
+          typeof bankConfig.statusMessage === 'string'
+            ? bankConfig.statusMessage
+            : '계좌 인증 API 준비 전에는 운영 수동 검토를 함께 진행합니다.',
       },
-      bankConfigLiveReady: Boolean(bankConfig.liveReady ?? false),
-      bankConfigTestMode: Boolean(bankConfig.testMode ?? true),
-      bankConfigStatusMessage:
-        typeof bankConfig.statusMessage === 'string'
-          ? bankConfig.statusMessage
-          : '계좌 인증 API 준비 전에는 운영 수동 검토를 함께 진행합니다.',
-    };
-  });
-
-  return NextResponse.json({
-    items,
-    integration: {
-      liveReady: Boolean(bankConfig.liveReady ?? false),
-      testMode: Boolean(bankConfig.testMode ?? true),
-      statusMessage:
-        typeof bankConfig.statusMessage === 'string'
-          ? bankConfig.statusMessage
-          : '계좌 인증 API 준비 전에는 운영 수동 검토를 함께 진행합니다.',
-    },
-  });
+    });
+  } catch (error: any) {
+    console.error('Failed to fetch withdrawals:', error);
+    
+    if (error.message?.includes('FAILED_PRECONDITION') && error.message?.includes('requires an index')) {
+      const linkMatch = error.message.match(/https:\/\/console\.firebase\.google\.com[^\s]*/);
+      const indexLink = linkMatch ? linkMatch[0] : null;
+      
+      return NextResponse.json(
+        { 
+          error: '데이터베이스 색인(Index) 생성이 필요합니다.', 
+          details: 'Firestore 복합 색인이 아직 생성되지 않았거나 빌드 중입니다. 백엔드 로그에 출력된 링크를 클릭하여 색인을 생성해주세요.',
+          indexLink
+        }, 
+        { status: 500 }
+      );
+    }
+    
+    return NextResponse.json(
+      { error: '데이터를 불러오는데 실패했습니다.', details: error.message }, 
+      { status: 500 }
+    );
+  }
 }
 
 export async function PATCH(req: NextRequest) {

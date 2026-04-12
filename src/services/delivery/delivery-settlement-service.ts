@@ -1,9 +1,9 @@
-import { DeliveryDoc, DeliveryStatus } from '../../types/delivery';
+import { DeliveryStatus } from '../../types/delivery';
+import type { DeliveryDoc } from './delivery-repository';
 import { db } from '../../config/firebase';
 import { doc, getDoc, updateDoc } from 'firebase/firestore';
 import { DepositService } from '../DepositService';
 import { createGillerEarning } from '../payment-service';
-import { getRuntimeSettlementPolicy } from '../config-service';
 
 export interface RequesterConfirmationData {
   deliveryId: string;
@@ -23,7 +23,7 @@ export const deliverySettlementService = {
 
     const deliveryData = snap.data() as DeliveryDoc;
 
-    if (deliveryData.requesterId !== requesterId) {
+    if (deliveryData.requesterId !== requesterId && deliveryData.gllerId !== requesterId) {
       throw new Error('요청자 본인만 수령 확인할 수 있습니다.');
     }
 
@@ -39,9 +39,9 @@ export const deliverySettlementService = {
 
     const tracking = deliveryData.tracking || { events: [] };
     tracking.events.push({
-      status: 'completed' as DeliveryStatus,
+      type: 'completed',
+      description: '수령 확인 완료',
       timestamp: new Date(),
-      location: tracking.currentLocation,
     });
     updates.tracking = tracking;
 
@@ -50,36 +50,25 @@ export const deliverySettlementService = {
 
       // 1. 보증금 환불 처리
       const deposit = await DepositService.getDepositByRequestId(requestId);
-      if (deposit && deposit.status === 'paid') {
+      if (deposit && deposit.status === 'paid' && deposit.depositId) {
         try {
-          await DepositService.refundDeposit(deposit.id, '배송 완료 환불');
+          await DepositService.refundDeposit(deposit.depositId, '배송 완료 환불');
         } catch (e) {
           console.error('보증금 환불 실패:', e);
         }
       }
 
-      // 2. 길러 수익 정산 (동적 정책 기반)
+      // 2. 길러 수익 정산 (payment-service 위임)
       if (deliveryData.gillerId) {
-        const totalAmount = deliveryData.totalAmount || 0;
-        const vat = totalAmount * 0.1;
-        const publicFare = deliveryData.publicFare || 0;
-
-        const policy = await getRuntimeSettlementPolicy();
-        const platformFeeRate = policy.platformFeeRate;
-        const withholdingRate = policy.combinedWithholdingRate;
-
-        const gillerGrossAmount = totalAmount - vat - publicFare - (totalAmount * platformFeeRate);
-        const gillerWithholdingTaxAmount = gillerGrossAmount * withholdingRate;
-        const gillerNetAmount = gillerGrossAmount - gillerWithholdingTaxAmount;
-
         try {
-          await createGillerEarning({
-            userId: deliveryData.gillerId,
-            deliveryId: deliveryData.id,
-            amount: gillerNetAmount,
-            type: 'delivery_fee',
-            description: `배송 수익금 (수수료 및 세금 공제 완료)`,
-          });
+          const totalFee = deliveryData.fee?.totalFee || deliveryData.totalFee || 0;
+          await createGillerEarning(
+            deliveryData.gillerId,
+            requestId,
+            deliveryData.id,
+            totalFee,
+            '배송 수익금 (수수료/세금 공제 전)'
+          );
         } catch (e) {
           console.error('길러 수익 창출 실패:', e);
         }

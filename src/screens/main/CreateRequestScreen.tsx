@@ -46,6 +46,7 @@ import { confirmPhoneOtp, requestPhoneOtp } from '../../services/otp-service';
 import { pickPhotoFromLibrary, takePhoto, uploadPhotoWithThumbnail } from '../../services/photo-service';
 import { getPricingPolicyConfig } from '../../services/pricing-policy-config-service';
 import { resolvePricingContextForRequest } from '../../services/pricing-context-service';
+import LockerLocator from '../../components/delivery/LockerLocator';
 import { getRoutePricingOverrideByStations } from '../../services/route-pricing-override-service';
 import { addRecentAddress, getRecentAddresses, getSavedAddresses } from '../../services/profile-service';
 import { BorderRadius, Colors, Shadows, Spacing, Typography } from '../../theme';
@@ -399,6 +400,7 @@ export default function CreateRequestScreen({ navigation, route }: Props) {
   const [directMode, setDirectMode] = useState<'none' | 'requester_to_station' | 'locker_assisted'>(
     prefill?.directParticipationMode ?? 'none'
   );
+  const [showLockerLocator, setShowLockerLocator] = useState(false);
   const [urgency, setUrgency] = useState<'normal' | 'fast' | 'urgent'>(prefill?.urgency ?? 'fast');
   const [preferredPickupDate, setPreferredPickupDate] = useState(prefilledReservation.date);
   const [preferredPickupTime, setPreferredPickupTime] = useState(prefilledReservation.time);
@@ -1757,13 +1759,14 @@ export default function CreateRequestScreen({ navigation, route }: Props) {
             placeholderTextColor={Colors.gray400}
           />
           {directMode === 'locker_assisted' ? (
-            <TextInput
-              style={styles.input}
-              value={storageLocation}
-              onChangeText={setStorageLocation}
-              placeholder="사물함 위치 또는 번호"
-              placeholderTextColor={Colors.gray400}
-            />
+            <TouchableOpacity
+              style={[styles.input, { justifyContent: 'center' }]}
+              onPress={() => setShowLockerLocator(true)}
+            >
+              <Text style={{ color: storageLocation ? Colors.gray900 : Colors.gray400 }}>
+                {storageLocation || '보관할 사물함을 선택해 주세요'}
+              </Text>
+            </TouchableOpacity>
           ) : null}
           <TextInput
             style={[styles.input, styles.multilineInput]}
@@ -2045,6 +2048,20 @@ export default function CreateRequestScreen({ navigation, route }: Props) {
             <Text style={styles.modalBody}>
               사진과 주소, 지하철 조건을 바탕으로 물품 설명과 예상 정보를 정리하고 있습니다. 잠시만 기다려 주세요.
             </Text>
+          </View>
+        </View>
+      </Modal>
+      <Modal visible={showLockerLocator} animationType="slide" transparent>
+        <View style={styles.modalBackdrop}>
+          <View style={[styles.modalCard, { width: '90%', height: '80%', padding: 0, overflow: 'hidden' }]}>
+            <LockerLocator
+              selectedStationId={pickupStation?.stationId}
+              onLockerSelect={(locker) => {
+                setStorageLocation(`${locker.stationName} ${locker.lockerId} (상태: ${locker.status})`);
+                setShowLockerLocator(false);
+              }}
+              onClose={() => setShowLockerLocator(false)}
+            />
           </View>
         </View>
       </Modal>

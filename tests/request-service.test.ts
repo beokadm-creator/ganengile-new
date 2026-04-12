@@ -70,6 +70,7 @@ const mockCollection = jest.fn();
 const mockDoc = jest.fn();
 const mockGetDoc = jest.fn();
 const mockAddDoc = jest.fn();
+const mockSetDoc = jest.fn();
 const mockUpdateDoc = jest.fn();
 const mockDeleteDoc = jest.fn();
 const mockGetDocs = jest.fn();
@@ -84,6 +85,7 @@ jest.mock('firebase/firestore', () => {
     doc: (...args: any[]) => mockDoc(...args),
     getDoc: (...args: any[]) => mockGetDoc(...args),
     addDoc: (...args: any[]) => mockAddDoc(...args),
+    setDoc: (...args: any[]) => mockSetDoc(...args),
     updateDoc: (...args: any[]) => mockUpdateDoc(...args),
     deleteDoc: (...args: any[]) => mockDeleteDoc(...args),
     getDocs: (...args: any[]) => mockGetDocs(...args),
@@ -143,10 +145,17 @@ describe('Request Service', () => {
     jest.spyOn(require('../src/services/firebase'), 'requireUserId').mockReturnValue(testUserId);
 
     mockRequests = {};
-    mockDoc.mockImplementation(((db: any, collectionPath: string, docId: string) => ({
-      id: docId,
-      path: `${collectionPath}/${docId}`,
-    })) as any);
+    mockDoc.mockImplementation(((...args: any[]) => {
+      console.log('mockDoc args:', args);
+      // args can be (db, collectionPath, docId) OR (collectionRef, docId)
+      if (args.length === 2) {
+        const [collectionRef, docId] = args;
+        return { id: docId, path: `${collectionRef?.path || 'unknown'}/${docId}` };
+      } else {
+        const [db, collectionPath, docId] = args;
+        return { id: docId, path: `${collectionPath}/${docId}` };
+      }
+    }) as any);
 
     mockGetDoc.mockImplementation(async (docRef: any) => {
       const docId = docRef.id;
@@ -161,6 +170,12 @@ describe('Request Service', () => {
       const newDoc = { ...data, createdAt: { seconds: Date.now() / 1000 }, updatedAt: { seconds: Date.now() / 1000 } };
       mockRequests[docId] = newDoc;
       return { id: docId };
+    });
+
+    mockSetDoc.mockImplementation(async (docRef: any, data: any) => {
+      const docId = docRef.id;
+      const newDoc = { ...data, createdAt: { seconds: Date.now() / 1000 }, updatedAt: { seconds: Date.now() / 1000 } };
+      mockRequests[docId] = newDoc;
     });
 
     mockUpdateDoc.mockImplementation(async (docRef: any, data: any) => {
