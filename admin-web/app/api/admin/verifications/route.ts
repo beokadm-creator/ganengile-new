@@ -98,14 +98,43 @@ export async function PATCH(req: NextRequest) {
     updatedAt: new Date(),
   });
 
-  const appSnap = await db
-    .collection('giller_applications')
-    .where('userId', '==', userId)
-    .orderBy('createdAt', 'desc')
-    .limit(1)
-    .get();
-  if (!appSnap.empty) {
-    await appSnap.docs[0].ref.update({ verificationStatus: status });
+  try {
+    let appSnap = await db
+      .collection('giller_applications')
+      .where('userId', '==', userId)
+      .orderBy('createdAt', 'desc')
+      .limit(1)
+      .get();
+
+    if (!appSnap.empty) {
+      await appSnap.docs[0].ref.update({ verificationStatus: status });
+    }
+  } catch (error: any) {
+    console.warn('Giller application query with orderBy failed, falling back to local sort', error);
+    
+    // Check if this is an index error from Firestore
+    if (error.message?.includes('FAILED_PRECONDITION') && error.message?.includes('requires an index')) {
+      const linkMatch = error.message.match(/https:\/\/console\.firebase\.google\.com[^\s]*/);
+      if (linkMatch) {
+        console.info('Please create the missing index using this link:', linkMatch[0]);
+      }
+    }
+    
+    // Fallback: get all for user and sort in memory
+    const fallbackSnap = await db
+      .collection('giller_applications')
+      .where('userId', '==', userId)
+      .get();
+      
+    if (!fallbackSnap.empty) {
+      const sortedDocs = fallbackSnap.docs.sort((a, b) => {
+        const aTime = a.data().createdAt?.toDate?.()?.getTime() || 0;
+        const bTime = b.data().createdAt?.toDate?.()?.getTime() || 0;
+        return bTime - aTime;
+      });
+      
+      await sortedDocs[0].ref.update({ verificationStatus: status });
+    }
   }
 
   return NextResponse.json({ ok: true, status });
