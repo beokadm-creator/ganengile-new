@@ -158,33 +158,50 @@ export async function PATCH(req: NextRequest) {
       }
     }
 
-    // 2. 상태 업데이트 및 포인트 환불
-    await ref.update({ status: 'refunded', refundedAt: new Date(), updatedAt: new Date() });
+    // 2. 상태 업데이트 및 포인트 환불 (트랜잭션 적용)
+    try {
+      await db.runTransaction(async (transaction) => {
+        const depositDoc = await transaction.get(ref);
+        if (!depositDoc.exists || depositDoc.data()?.status !== 'paid') {
+          throw new Error('Deposit status changed during transaction');
+        }
 
-    if ((data.pointAmount ?? 0) > 0 && data.userId) {
-      const userRef = db.collection('users').doc(data.userId);
-      const userSnap = await userRef.get();
-      const userData = userSnap.data() as { pointBalance?: number; totalEarnedPoints?: number } | undefined;
-      if (userSnap.exists) {
-        const current = userData?.pointBalance ?? 0;
-        const currentEarned = userData?.totalEarnedPoints ?? 0;
-        await userRef.update({
-          pointBalance: current + (data.pointAmount ?? 0),
-          totalEarnedPoints: currentEarned + (data.pointAmount ?? 0),
-        });
-        await db.collection('point_transactions').add({
-          userId: data.userId,
-          amount: data.pointAmount ?? 0,
-          type: 'earn',
-          category: 'deposit_refund',
-          description: `보증금 환급 (${(data.depositAmount ?? 0).toLocaleString()}원)`,
-          balanceBefore: current,
-          balanceAfter: current + (data.pointAmount ?? 0),
-          status: 'completed',
-          createdAt: new Date(),
-          completedAt: new Date(),
-        });
-      }
+        transaction.update(ref, { status: 'refunded', refundedAt: new Date(), updatedAt: new Date() });
+
+        if ((data.pointAmount ?? 0) > 0 && data.userId) {
+          const userRef = db.collection('users').doc(data.userId);
+          const userSnap = await transaction.get(userRef);
+          
+          if (userSnap.exists) {
+            const userData = userSnap.data() as { pointBalance?: number; totalEarnedPoints?: number } | undefined;
+            const current = userData?.pointBalance ?? 0;
+            const currentEarned = userData?.totalEarnedPoints ?? 0;
+            const pointAmount = data.pointAmount ?? 0;
+            
+            transaction.update(userRef, {
+              pointBalance: current + pointAmount,
+              totalEarnedPoints: currentEarned + pointAmount,
+            });
+
+            const txRef = db.collection('point_transactions').doc();
+            transaction.set(txRef, {
+              userId: data.userId,
+              amount: pointAmount,
+              type: 'earn',
+              category: 'deposit_refund',
+              description: `보증금 환급 (${(data.depositAmount ?? 0).toLocaleString()}원)`,
+              balanceBefore: current,
+              balanceAfter: current + pointAmount,
+              status: 'completed',
+              createdAt: new Date(),
+              completedAt: new Date(),
+            });
+          }
+        }
+      });
+    } catch (error: any) {
+      console.error('Transaction failed during deposit refund:', error);
+      return NextResponse.json({ error: `포인트 환급 트랜잭션 실패: ${error.message}` }, { status: 500 });
     }
   } else if (payload.action === 'deduct') {
     await ref.update({ status: 'deducted', deductedAt: new Date(), updatedAt: new Date() });

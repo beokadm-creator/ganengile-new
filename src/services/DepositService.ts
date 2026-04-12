@@ -21,7 +21,8 @@ export class DepositService {
     gillerId: string,
     requesterId: string,
     requestId: string,
-    itemValue: number
+    itemValue: number,
+    paymentKey?: string
   ): Promise<{
     success: boolean;
     deposit?: Deposit;
@@ -44,10 +45,14 @@ export class DepositService {
         pointAmount = pointBalance;
         tossAmount = depositAmount - pointBalance;
 
+        if (!paymentKey) {
+          return { success: false, error: '외부 결제 금액이 필요하나 paymentKey가 제공되지 않았습니다.' };
+        }
+
         const tossResult = await TossPaymentService.chargePayment(
-          tossAmount,
+          paymentKey,
           `deposit_${requestId}`,
-          `보증금 결제 (${depositAmount.toLocaleString()}원)`
+          tossAmount
         );
 
         if (!tossResult.success) {
@@ -77,16 +82,36 @@ export class DepositService {
         updatedAt: Timestamp.now(),
       };
 
-      const depositRef = await addDoc(collection(db, DEPOSITS_COLLECTION), depositPayload);
-      await updateDoc(depositRef, { depositId: depositRef.id });
+      let depositRef;
+      try {
+        depositRef = await addDoc(collection(db, DEPOSITS_COLLECTION), depositPayload);
+        await updateDoc(depositRef, { depositId: depositRef.id });
+      } catch (dbError) {
+        // DB 저장 실패 시, 이미 승인된 Toss 결제가 있다면 취소(롤백) 시도
+        if (paymentId && tossAmount > 0) {
+          console.error('DB save failed after Toss charge. Attempting to refund...', dbError);
+          await TossPaymentService.refundPayment(paymentId, tossAmount, '시스템 오류 자동 취소');
+        }
+        throw dbError;
+      }
 
       if (pointAmount > 0) {
-        await PointService.spendPoints(
-          gillerId,
-          pointAmount,
-          PointCategory.DEPOSIT_PAYMENT,
-          `보증금 결제 (${depositAmount.toLocaleString()}원)`
-        );
+        try {
+          await PointService.spendPoints(
+            gillerId,
+            pointAmount,
+            PointCategory.DEPOSIT_PAYMENT,
+            `보증금 결제 (${depositAmount.toLocaleString()}원)`
+          );
+        } catch (pointError) {
+          // 포인트 차감 실패 시, DB 문서는 실패 상태로 롤백하고 Toss 결제도 취소
+          console.error('Point spend failed after DB save. Rolling back...', pointError);
+          await updateDoc(depositRef, { status: 'failed' as DepositStatus });
+          if (paymentId && tossAmount > 0) {
+            await TossPaymentService.refundPayment(paymentId, tossAmount, '시스템 오류 자동 취소 (포인트 차감 실패)');
+          }
+          throw pointError;
+        }
       }
 
       return {

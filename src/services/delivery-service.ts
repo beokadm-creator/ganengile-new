@@ -540,48 +540,54 @@ export async function gillerAcceptRequest(
         matchedGillerId: gillerId,
         primaryDeliveryId: deliveryRef.id,
         fee: {
-          totalFee: confirmedFee.totalFee,
-          deliveryFee: confirmedFee.deliveryFee ?? 0,
-          vat: confirmedFee.vat ?? 0,
-          publicFare: confirmedFee.publicFare ?? 0,
-          breakdown: confirmedFee.breakdown ?? null,
+          totalFee: confirmedFee!.totalFee,
+          deliveryFee: confirmedFee!.deliveryFee ?? 0,
+          vat: confirmedFee!.vat ?? 0,
+          publicFare: confirmedFee!.publicFare ?? 0,
+          breakdown: confirmedFee!.breakdown ?? null,
         },
         acceptedAt: serverTimestamp(),
         updatedAt: serverTimestamp(),
       });
     });
 
-    await syncDeliveryToBeta1Execution(deliveryRef.id);
-    const missionPlan = await planMissionExecutionWithAI({
-      requestId,
-      deliveryId: deliveryRef.id,
-      assignedGillerUserId: gillerId,
-      pickupStation: request.pickupStation,
-      deliveryStation: request.deliveryStation,
-      requestContext: {
-        itemDescription: request.packageInfo?.description,
-        itemValue: request.itemValue,
-        urgency: request.urgency,
-        requestMode:
-          request.requestMode === 'immediate' || request.requestMode === 'reservation'
-            ? request.requestMode
-            : undefined,
-        preferredPickupTime: request.preferredTime?.departureTime,
-        preferredArrivalTime: request.preferredTime?.arrivalTime,
-      },
-    }).catch(() => null);
-    await persistActorSelectionDecision({
-      requestId,
-      deliveryId: deliveryRef.id,
-      interventionLevel: missionPlan?.actorSelection.interventionLevel ?? 'guarded_execute',
-      selectedActorType: toActorSelectionType(missionPlan?.actorSelection.selectedActorType),
-      selectionReason: '길러가 직접 수락한 미션이므로 사람 actor를 우선 확정합니다.',
-      selectedPartnerId: missionPlan?.actorSelection.selectedPartnerId,
-      fallbackActorTypes: toActorSelectionTypes(missionPlan?.actorSelection.fallbackActorTypes),
-      fallbackPartnerIds: missionPlan?.actorSelection.fallbackPartnerIds ?? ['partner-a', 'partner-b'],
-      manualReviewRequired: missionPlan?.actorSelection.manualReviewRequired ?? false,
-      riskFlags: missionPlan?.actorSelection.riskFlags ?? [],
-    });
+    try {
+      await syncDeliveryToBeta1Execution(deliveryRef.id);
+      const missionPlan = await planMissionExecutionWithAI({
+        requestId,
+        deliveryId: deliveryRef.id,
+        assignedGillerUserId: gillerId,
+        pickupStation: request.pickupStation,
+        deliveryStation: request.deliveryStation,
+        requestContext: {
+          itemDescription: request.packageInfo?.description,
+          itemValue: request.itemValue,
+          urgency: request.urgency,
+          requestMode:
+            request.requestMode === 'immediate' || request.requestMode === 'reservation'
+              ? request.requestMode
+              : undefined,
+          preferredPickupTime: request.preferredTime?.departureTime,
+          preferredArrivalTime: request.preferredTime?.arrivalTime,
+        },
+      });
+      await persistActorSelectionDecision({
+        requestId,
+        deliveryId: deliveryRef.id,
+        interventionLevel: missionPlan?.actorSelection.interventionLevel ?? 'guarded_execute',
+        selectedActorType: toActorSelectionType(missionPlan?.actorSelection.selectedActorType),
+        selectionReason: '길러가 직접 수락한 미션이므로 사람 actor를 우선 확정합니다.',
+        selectedPartnerId: missionPlan?.actorSelection.selectedPartnerId,
+        fallbackActorTypes: toActorSelectionTypes(missionPlan?.actorSelection.fallbackActorTypes),
+        fallbackPartnerIds: missionPlan?.actorSelection.fallbackPartnerIds ?? [],
+        manualReviewRequired: missionPlan?.actorSelection.manualReviewRequired ?? false,
+        riskFlags: missionPlan?.actorSelection.riskFlags ?? [],
+      });
+    } catch (syncError) {
+      console.error(`AI sync failed for delivery ${deliveryRef.id}, but transaction committed successfully:`, syncError);
+      // We don't throw here because the main delivery acceptance transaction was already successful.
+      // This prevents the UI from showing an error when the delivery is actually accepted.
+    }
 
     return {
       success: true,

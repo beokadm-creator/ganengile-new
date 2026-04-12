@@ -51,12 +51,18 @@ export class DepositCompensationService {
       }
 
       if (deposit.pointAmount && deposit.pointAmount > 0) {
-        await PointService.earnPoints(
-          deposit.userId,
-          deposit.pointAmount,
-          PointCategory.DEPOSIT_REFUND,
-          `보증금 환급 (${deposit.pointAmount.toLocaleString()}원)`
-        );
+        try {
+          await PointService.earnPoints(
+            deposit.userId,
+            deposit.pointAmount,
+            PointCategory.DEPOSIT_REFUND,
+            `보증금 환급 (${deposit.pointAmount.toLocaleString()}원)`
+          );
+        } catch (pointError) {
+          // 포인트 환급 실패 시, 토스 결제 취소도 롤백할 수 없으므로(이미 완료됨) 
+          // 치명적 에러로 로깅하고 DB 상태 업데이트를 중단하여 관리자 개입을 유도합니다.
+          throw new Error(`포인트 환급 실패 (PG 환불은 완료됨): ${pointError}`);
+        }
       }
 
       await updateDoc(ref, {

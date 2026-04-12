@@ -131,7 +131,12 @@ export default function ChatScreen() {
                   text: '신고하기',
                   style: 'destructive',
                   onPress: () => {
-                    navigation.navigate('DisputeReport', { deliveryId: route.params.chatRoomId });
+                    const deliveryId = chatRoom?.matchId || route.params.chatRoomId;
+                  if (deliveryId) {
+                    navigation.navigate('DisputeReport', { deliveryId });
+                  } else {
+                    Alert.alert('오류', '배송 정보를 찾을 수 없어 신고 화면으로 이동할 수 없습니다.');
+                  }
                   },
                 },
               ]);
