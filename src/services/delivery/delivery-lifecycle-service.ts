@@ -430,10 +430,13 @@ export const deliveryLifecycleService = {
         return { success: false, message: '출발지 또는 도착지 정보가 없어 배송을 생성할 수 없습니다.' };
       }
 
+      const fallbackPickupCode = Math.floor(1000 + Math.random() * 9000).toString();
+      const fallbackRecipientCode = Math.floor(100000 + Math.random() * 900000).toString();
+
       const recipientName = request.recipientName ?? request.receiverName ?? '수령인';
       const recipientPhone = request.recipientPhone ?? request.receiverPhone ?? '';
       const recipientVerificationCode =
-        request.recipientVerificationCode ?? request.verificationCode ?? request.recipientCode ?? '000000';
+        request.recipientVerificationCode ?? request.verificationCode ?? request.recipientCode ?? fallbackRecipientCode;
 
       const deliveryRef = doc(collection(db, 'deliveries'));
       const deliveryData = {
@@ -448,7 +451,7 @@ export const deliveryLifecycleService = {
         packageInfo: request.packageInfo,
         fee: confirmedFee,
         pricingPolicyVersion: request.pricingPolicyVersion ?? null,
-        pickupVerificationCode: request.verificationCode ?? '0000',
+        pickupVerificationCode: request.verificationCode ?? fallbackPickupCode,
         recipientInfo: {
           name: recipientName,
           phone: recipientPhone,
@@ -531,7 +534,22 @@ export const deliveryLifecycleService = {
           riskFlags: missionPlan?.actorSelection.riskFlags ?? [],
         });
       } catch (syncError) {
-        console.error(`AI sync failed for delivery ${deliveryRef.id}, but transaction committed successfully:`, syncError);
+        console.error(`AI sync failed for delivery ${deliveryRef.id}. Rolling back acceptance:`, syncError);
+        
+        // 보상 트랜잭션 (롤백): AI 동기화 실패 시 배송 수락을 취소하고 다시 매칭 대기 상태로 돌림
+        await runTransaction(db, async (rollbackTransaction) => {
+          rollbackTransaction.delete(deliveryRef);
+          rollbackTransaction.update(requestRef, {
+            status: 'pending',
+            matchedGillerId: deleteField(),
+            primaryDeliveryId: deleteField(),
+            fee: deleteField(),
+            acceptedAt: deleteField(),
+            updatedAt: serverTimestamp(),
+          });
+        });
+
+        return { success: false, message: '배송 동기화에 실패하여 수락이 취소되었습니다. 다시 시도해주세요.' };
       }
 
       return {
@@ -566,9 +584,12 @@ export const deliveryLifecycleService = {
       }
 
       const penaltyService = createPenaltyService(gillerId);
-      await penaltyService.applyCancellationPenalty(false, requestId).catch((error) => {
-        console.warn('Failed to apply pre-pickup cancellation penalty:', error);
-      });
+      try {
+        await penaltyService.applyCancellationPenalty(false, requestId);
+      } catch (error) {
+        console.error('Failed to apply pre-pickup cancellation penalty:', error);
+        return { success: false, message: '패널티 적용에 실패하여 취소할 수 없습니다. 다시 시도해주세요.' };
+      }
 
       const deliveriesQ = query(collection(db, 'deliveries'), where('requestId', '==', requestId));
       const deliveriesSnap = await getDocs(deliveriesQ);
@@ -693,9 +714,12 @@ export const deliveryLifecycleService = {
         const penaltyService = createPenaltyService(args.actorId);
 
         if (isPrePickupStatus(deliveryStatus)) {
-          await penaltyService.applyCancellationPenalty(false, args.requestId).catch((error) => {
+          try {
+            await penaltyService.applyCancellationPenalty(false, args.requestId);
+          } catch (error) {
             console.error('Failed to apply pre-pickup cancellation penalty:', error);
-          });
+            return { success: false, message: '패널티 적용에 실패하여 취소할 수 없습니다. 다시 시도해주세요.', requestStatus: 'unchanged', depositStatus: 'unchanged' };
+          }
 
           await updateDoc(deliveryRef, {
             status: 'cancelled',
@@ -725,9 +749,12 @@ export const deliveryLifecycleService = {
         }
 
         if (isPostPickupStatus(deliveryStatus)) {
-          await penaltyService.applyCancellationPenalty(true, args.requestId).catch((error) => {
+          try {
+            await penaltyService.applyCancellationPenalty(true, args.requestId);
+          } catch (error) {
             console.error('Failed to apply post-pickup cancellation penalty:', error);
-          });
+            return { success: false, message: '패널티 적용에 실패하여 취소할 수 없습니다. 다시 시도해주세요.', requestStatus: 'unchanged', depositStatus: 'unchanged' };
+          }
 
           let depositStatus: DeliveryCancellationResult['depositStatus'] = deposit ? 'unchanged' : 'not_found';
           if (deposit?.depositId) {

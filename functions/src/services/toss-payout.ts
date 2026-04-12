@@ -8,7 +8,8 @@ export async function executeTossPayout(
   bankCode: string,
   accountNumber: string,
   amount: number,
-  transferMemo: string
+  transferMemo: string,
+  idempotencyKey?: string
 ): Promise<{ success: boolean; transactionId?: string; error?: string }> {
   try {
     const db = admin.firestore();
@@ -41,14 +42,20 @@ export async function executeTossPayout(
 
     const encodedKey = Buffer.from(`${secretKey}:`).toString('base64');
     
+    const headers: Record<string, string> = {
+      Authorization: `Basic ${encodedKey}`,
+      'Content-Type': 'application/json',
+    };
+
+    if (idempotencyKey) {
+      headers['Idempotency-Key'] = idempotencyKey;
+    }
+    
     // Toss Payments Payouts API
     // https://docs.tosspayments.com/reference/payout
     const response = await fetch(`${TOSS_API_URL}/payouts`, {
       method: 'POST',
-      headers: {
-        Authorization: `Basic ${encodedKey}`,
-        'Content-Type': 'application/json',
-      },
+      headers,
       body: JSON.stringify({
         bank: bankCode,
         accountNumber,

@@ -13,10 +13,12 @@ import { getDeliveryById } from '../../services/delivery-service';
 import { requireUserId } from '../../services/firebase';
 import {
   addReservationPhotos,
+  completeLockerReservation,
+  createLockerReservation,
   getDeliveryReservations,
   updateReservationStatus,
 } from '../../services/locker-service';
-import { getQRCodeRemainingTime, verifyQRCode } from '../../services/qrcode-service';
+import { getQRCodeRemainingTime, verifyQRCode, QRCodeService } from '../../services/qrcode-service';
 import { takePhoto, uploadPhotoWithThumbnail } from '../../services/photo-service';
 import type { LockerReservation } from '../../types/locker';
 import type { MainStackNavigationProp, MainStackParamList } from '../../types/navigation';
@@ -40,20 +42,41 @@ export default function GillerPickupAtLockerScreen() {
   const loadReservation = useCallback(async (): Promise<void> => {
     try {
       setLoading(true);
-      const reservations = await getDeliveryReservations(deliveryId);
-      const pickupReservation = reservations.find((item) => item.type === 'giller_pickup') ?? reservations[0] ?? null;
-
-      if (!pickupReservation) {
-        Alert.alert('사물함 예약을 찾지 못했어요', '사용자에게 다시 QR을 요청한 뒤 시도해 주세요.', [
+      
+      const delivery = await getDeliveryById(deliveryId);
+      if (!delivery || !delivery.lockerId || !delivery.requestId) {
+        Alert.alert('배송 정보 오류', '사물함 정보를 찾을 수 없습니다.', [
           { text: '닫기', onPress: () => navigation.goBack() },
         ]);
         return;
       }
 
+      const reservations = await getDeliveryReservations(deliveryId);
+      let pickupReservation = reservations.find((item) => item.type === 'giller_pickup') ?? null;
+
+      if (!pickupReservation) {
+        // Create giller_pickup reservation if it doesn't exist
+        const userId = requireUserId();
+        const qrCode = QRCodeService.generatePickupQRCode(deliveryId, userId);
+        const startTime = new Date();
+        const endTime = new Date(startTime.getTime() + 4 * 60 * 60 * 1000);
+
+        pickupReservation = await createLockerReservation(
+          delivery.lockerId,
+          delivery.requestId,
+          deliveryId,
+          userId,
+          'giller_pickup',
+          startTime,
+          endTime,
+          qrCode
+        );
+      }
+
       setReservation(pickupReservation);
       setRemainingMinutes(getQRCodeRemainingTime(pickupReservation.qrCode));
     } catch (error) {
-      console.error('Failed to load pickup reservation:', error);
+      console.error('Failed to load or create pickup reservation:', error);
       Alert.alert('사물함 예약 확인 실패', '잠시 후 다시 시도해 주세요.');
     } finally {
       setLoading(false);
@@ -111,7 +134,7 @@ export default function GillerPickupAtLockerScreen() {
         await addReservationPhotos(reservation.reservationId, pickupPhotoUrl, undefined);
       }
 
-      await updateReservationStatus(reservation.reservationId, 'completed');
+      await completeLockerReservation(reservation.reservationId);
 
       const delivery = await getDeliveryById(deliveryId);
       const requestId = typeof delivery?.requestId === 'string' ? delivery.requestId : '';

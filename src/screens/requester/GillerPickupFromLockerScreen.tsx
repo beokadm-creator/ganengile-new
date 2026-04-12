@@ -157,6 +157,14 @@ export default function GillerPickupFromLockerScreen({ route, navigation }: Prop
 
       setCurrentStep('complete');
       setReservation((current) => (current ? { ...current, status: 'completed' } : current));
+      
+      // Update locker status to AVAILABLE
+      try {
+        await completeLockerReservation(reservation.reservationId);
+      } catch (e) {
+        console.warn('Failed to mark locker as available:', e);
+      }
+
       Alert.alert('수령 완료', '보관함 수령이 확인되었습니다.');
     } catch (error) {
       console.error('Failed to confirm locker pickup:', error);

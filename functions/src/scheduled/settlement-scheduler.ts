@@ -212,7 +212,8 @@ export const gillerSettlementScheduler = async (): Promise<{
               bankAccount.bank,
               bankAccount.accountNumber,
               netAmount,
-              `${month}월 크라우드 배송 정산금`
+              `${month}월 크라우드 배송 정산금`,
+              `giller_settlement_${settlementId}` // 멱등키(Idempotency Key) 추가
             );
 
             if (payoutResult.success) {

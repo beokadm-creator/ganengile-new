@@ -24,6 +24,7 @@ import {
   confirmDeliveryByRequester,
   getDeliveryByRequestId,
 } from '../../services/delivery-service';
+import { createLockerService } from '../../services/locker-service';
 import { requireUserId } from '../../services/firebase';
 import {
   cancelRequest,
@@ -150,6 +151,7 @@ export default function RequestDetailScreen() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [working, setWorking] = useState<WorkingState>(null);
+  const [hasRequesterDroppedOff, setHasRequesterDroppedOff] = useState(false);
   const [partnerDispatches, setPartnerDispatches] = useState<
     Array<{
       dispatchId: string;
@@ -190,6 +192,13 @@ export default function RequestDetailScreen() {
       }).catch(() => []);
       if (!isMounted.current) return;
       setPartnerDispatches(dispatchSummary);
+
+      if (nextRequest?.lockerId && nextRequest.requestMode !== 'reservation') {
+        const reservations = await createLockerService().getReservationByRequestId(requestId);
+        if (!isMounted.current) return;
+        const hasDropoff = reservations.some(r => r.type === 'requester_dropoff' && r.status === 'completed');
+        setHasRequesterDroppedOff(hasDropoff);
+      }
     } catch (error) {
       if (!isMounted.current) return;
       console.error('Failed to load request detail', error);
@@ -553,6 +562,15 @@ export default function RequestDetailScreen() {
       RequestStatus.DELIVERED,
       RequestStatus.COMPLETED,
     ].includes(request.status);
+  
+  const canRequesterDropoffAtLocker =
+    request.directParticipationMode === 'locker_assisted' &&
+    request.lockerId &&
+    (request.status === RequestStatus.PENDING ||
+      request.status === RequestStatus.MATCHED ||
+      request.status === RequestStatus.ACCEPTED) &&
+    !hasRequesterDroppedOff;
+
   const routeLabel = `${request.pickupStation.stationName} -> ${request.deliveryStation.stationName}`;
   const preferredTimeLabel = request.preferredTime
     ? `${request.preferredTime.departureTime ?? '-'}${
@@ -686,6 +704,14 @@ export default function RequestDetailScreen() {
               label={working === 'confirm' ? '확인 중...' : '수령 확인'}
               onPress={() => void handleConfirmDelivery()}
               disabled={working !== null}
+            />
+          ) : null}
+
+          {canRequesterDropoffAtLocker ? (
+            <ActionButton
+              icon="lock"
+              label="사물함에 물품 보관"
+              onPress={() => navigation.navigate('RequesterDropoffLocker', { requestId: request.requestId })}
             />
           ) : null}
 

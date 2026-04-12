@@ -15,6 +15,7 @@ import {
   addReservationPhotos,
   getDeliveryReservations,
   updateReservationStatus,
+  completeLockerReservation,
 } from '../../services/locker-service';
 import { confirmDeliveryByRequester } from '../../services/delivery-service';
 import { getQRCodeRemainingTime, verifyQRCode } from '../../services/qrcode-service';
@@ -119,7 +120,7 @@ export default function UnlockLockerScreen() {
         await addReservationPhotos(reservation.reservationId, undefined, collectPhotoUrl);
       }
 
-      await updateReservationStatus(reservation.reservationId, 'completed');
+      await completeLockerReservation(reservation.reservationId);
 
       const requesterId = requireUserId();
       const result = await confirmDeliveryByRequester({

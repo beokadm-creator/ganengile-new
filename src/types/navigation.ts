@@ -62,6 +62,7 @@ export type MainStackParamList = {
     | undefined;
   AddRoute: { selectedStation?: import('../types/config').Station };
   EditRoute: { routeId: string };
+  RequesterDropoffLocker: { requestId: string };
   RequestDetail: { requestId: string; gillerId?: string };
   DeliveryTracking: { requestId?: string; matchId?: string };
   MatchingResult: {
