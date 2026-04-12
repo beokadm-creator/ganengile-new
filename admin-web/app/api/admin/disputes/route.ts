@@ -37,7 +37,7 @@ function getDb(): Firestore {
   return getAdminDb() as unknown as Firestore;
 }
 
-function normalizeDisputeItem(id: string, data: DisputeDoc, requestData?: DeliveryRequestDoc) {
+function normalizeDisputeItem(id: string, data: DisputeDoc, requestData?: any) {
   return {
     id,
     reporterId: data.reporterId ?? '',

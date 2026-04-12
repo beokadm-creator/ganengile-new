@@ -73,8 +73,6 @@ function asGillerApplication(value: unknown): GillerApplication | null {
     phone: typeof record.phone === 'string' ? record.phone : undefined,
     verificationStatus:
       typeof record.verificationStatus === 'string' ? record.verificationStatus : undefined,
-    verificationProvider:
-      typeof record.verificationProvider === 'string' ? record.verificationProvider : undefined,
     bankAccount: asBankAccount(record.bankAccount),
     status: record.status,
     createdAt:

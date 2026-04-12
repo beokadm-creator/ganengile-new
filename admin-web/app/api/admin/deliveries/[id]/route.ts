@@ -4,20 +4,22 @@ import { isAdmin } from '@/lib/auth';
 
 export async function PATCH(
   req: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
+  // 관리자 권한 확인
   if (!(await isAdmin())) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
   try {
+    const { id } = await params;
     const { status } = await req.json();
     if (!status) {
       return NextResponse.json({ error: 'Status is required' }, { status: 400 });
     }
 
     const db = getAdminDb();
-    const deliveryRef = db.collection('deliveries').doc(params.id);
+    const deliveryRef = db.collection('deliveries').doc(id);
     const snap = await deliveryRef.get();
 
     if (!snap.exists) {

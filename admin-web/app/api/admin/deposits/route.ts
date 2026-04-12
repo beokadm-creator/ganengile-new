@@ -14,6 +14,12 @@ interface DepositDoc {
   createdAt?: unknown;
 }
 
+interface LocationData {
+  address?: string;
+  detail?: string;
+  [key: string]: any;
+}
+
 interface RequestDoc {
   fromLocation?: LocationData;
   toLocation?: LocationData;
