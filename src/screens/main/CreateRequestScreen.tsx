@@ -324,6 +324,35 @@ function fallbackStation(kind: PickerType): Station {
   };
 }
 
+function StepContainer({
+  step,
+  currentStep,
+  onNext,
+  nextLabel = '다음 단계로',
+  children,
+}: {
+  step: number;
+  currentStep: number;
+  onNext?: () => void;
+  nextLabel?: string;
+  children: React.ReactNode;
+}) {
+  if (currentStep < step) return null;
+
+  return (
+    <View style={[styles.stepContainer, currentStep < step && { display: 'none' }]}>
+      <View style={currentStep > step ? { opacity: 0.6, pointerEvents: 'none' } : undefined}>
+        {children}
+      </View>
+      {currentStep === step && onNext && (
+        <TouchableOpacity style={styles.nextStepButton} onPress={onNext}>
+          <Text style={styles.nextStepButtonText}>{nextLabel}</Text>
+        </TouchableOpacity>
+      )}
+    </View>
+  );
+}
+
 function Block({ title, children }: { title: string; children: React.ReactNode }) {
   return (
     <View style={styles.card}>
@@ -357,6 +386,7 @@ export default function CreateRequestScreen({ navigation, route }: Props) {
 
   const [stations, setStations] = useState<Station[]>([]);
   const [loading, setLoading] = useState(true);
+  const [activeStep, setActiveStep] = useState(1);
   const [pickerVisible, setPickerVisible] = useState(false);
   const [pickerType, setPickerType] = useState<PickerType>('pickup');
   const [nearbyPicker, setNearbyPicker] = useState<NearbyPickerState | null>(null);
@@ -396,7 +426,7 @@ export default function CreateRequestScreen({ navigation, route }: Props) {
   const [recipientPhone, setRecipientPhone] = useState(prefill?.recipientPhone ?? '');
   const [pickupLocationDetail, setPickupLocationDetail] = useState(prefill?.pickupLocationDetail ?? '');
   const [storageLocation, setStorageLocation] = useState(prefill?.storageLocation ?? '');
-  const [lockerId, setLockerId] = useState<string | null>(prefill?.lockerId ?? null);
+  const [lockerId, setLockerId] = useState<string | null>(null);
   const [specialInstructions, setSpecialInstructions] = useState(prefill?.specialInstructions ?? '');
   const [directMode, setDirectMode] = useState<'none' | 'requester_to_station' | 'locker_assisted'>(
     prefill?.directParticipationMode ?? 'none'
@@ -1468,12 +1498,19 @@ export default function CreateRequestScreen({ navigation, route }: Props) {
       <AppTopBar title="배송 요청 만들기" onBack={handleBack} />
 
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
-        <Block title="보내기 방식">
-          <View style={styles.row}>
-            <Chip label="지금 보내기" active={requestMode === 'immediate'} onPress={() => setRequestMode('immediate')} />
-            <Chip label="예약 보내기" active={requestMode === 'reservation'} onPress={() => setRequestMode('reservation')} />
-          </View>
-        </Block>
+        <StepContainer step={1} currentStep={activeStep} onNext={() => {
+          if (!pickupStation || !deliveryStation) {
+            Alert.alert('확인 필요', '출발역과 도착역을 모두 선택해 주세요.');
+            return;
+          }
+          setActiveStep(2);
+        }}>
+          <Block title="보내기 방식">
+            <View style={styles.row}>
+              <Chip label="지금 보내기" active={requestMode === 'immediate'} onPress={() => setRequestMode('immediate')} />
+              <Chip label="예약 보내기" active={requestMode === 'reservation'} onPress={() => setRequestMode('reservation')} />
+            </View>
+          </Block>
 
         <Block title="출발 정보">
           <View style={styles.row}>
@@ -1626,8 +1663,16 @@ export default function CreateRequestScreen({ navigation, route }: Props) {
             )}
           </TouchableOpacity>
         </Block>
+        </StepContainer>
 
-        <Block title={photoUrl ? '물건 사진 ✓' : hasItemValue ? '물건 사진 (필수)' : '물건 사진 (선택)'}>
+        <StepContainer step={2} currentStep={activeStep} onNext={() => {
+          if (!packageSize || !weightKg || !itemValue) {
+            Alert.alert('확인 필요', '물품 정보를 모두 입력해 주세요.');
+            return;
+          }
+          setActiveStep(3);
+        }}>
+          <Block title={photoUrl ? '물건 사진 ✓' : hasItemValue ? '물건 사진 (필수)' : '물건 사진 (선택)'}>
           <View style={styles.row}>
             <TouchableOpacity style={[styles.primaryButton, styles.flexButton]} onPress={() => void handleUploadPhotoFromCamera()}>
               <Text style={styles.primaryButtonText}>{photoUrl ? '다시 촬영' : '사진 찍기'}</Text>
@@ -1749,8 +1794,20 @@ export default function CreateRequestScreen({ navigation, route }: Props) {
             />
           </View>
         </Block>
+        </StepContainer>
 
-        <Block title="인계와 수령 정보">
+        <StepContainer step={3} currentStep={activeStep} onNext={() => {
+          if (!recipientName || !recipientPhone || !recipientConsentChecked) {
+            Alert.alert('확인 필요', '수령인 정보와 개인정보 제공 동의를 완료해 주세요.');
+            return;
+          }
+          if (!isPhoneVerified) {
+            Alert.alert('인증 필요', '휴대폰 본인 인증을 완료해 주세요.');
+            return;
+          }
+          setActiveStep(4);
+        }} nextLabel="견적 확인하기">
+          <Block title="인계와 수령 정보">
           <TextInput
             style={styles.input}
             value={pickupLocationDetail}
@@ -1898,8 +1955,10 @@ export default function CreateRequestScreen({ navigation, route }: Props) {
             </>
           )}
         </Block>
+        </StepContainer>
 
-        <Text style={styles.sectionHeader}>예상 금액</Text>
+        <StepContainer step={4} currentStep={activeStep}>
+          <Text style={styles.sectionHeader}>예상 금액</Text>
         {quotes.map((card) => (
           <TouchableOpacity
             key={card.quoteType}
@@ -1983,6 +2042,7 @@ export default function CreateRequestScreen({ navigation, route }: Props) {
         <TouchableOpacity style={styles.secondaryButton} onPress={() => void handleSaveDraftNow()} disabled={saving || draftSaving}>
           <Text style={styles.secondaryButtonText}>{draftSaving ? '저장 중...' : '임시 저장하기'}</Text>
         </TouchableOpacity>
+        </StepContainer>
        </ScrollView>
 
       <OptimizedStationSelectModal
@@ -2486,6 +2546,24 @@ const styles = StyleSheet.create({
     color: Colors.textPrimary,
     fontWeight: '800',
     fontSize: Typography.fontSize.sm,
+  },
+  stepContainer: {
+    gap: Spacing.xl,
+    paddingBottom: Spacing.xl,
+  },
+  nextStepButton: {
+    minHeight: 56,
+    borderRadius: BorderRadius.full,
+    backgroundColor: Colors.primary,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: Spacing.md,
+    ...Shadows.md,
+  },
+  nextStepButtonText: {
+    color: Colors.white,
+    fontSize: 18,
+    fontWeight: '800',
   },
   draftAction: {
     alignSelf: 'flex-start',
