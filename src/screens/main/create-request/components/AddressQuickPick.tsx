@@ -1,7 +1,7 @@
 import React from 'react';
 import { View, Text, ScrollView, TouchableOpacity, StyleSheet } from 'react-native';
-import { BorderRadius, Colors, Spacing, Typography } from '../../../theme';
-import type { SavedAddress } from '../../../types/profile';
+import { BorderRadius, Colors, Spacing, Typography } from '../../../../theme';
+import type { SavedAddress } from '../../../../types/profile';
 
 type Props = {
   title: string;

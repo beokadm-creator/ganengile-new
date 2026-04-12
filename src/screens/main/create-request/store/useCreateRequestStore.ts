@@ -1,6 +1,8 @@
 import { create } from 'zustand';
-import type { StationInfo } from '../../../../types/request';
-import type { RequestDraft } from '../../../../types/beta1';
+import type { Station } from '../../../../types/config';
+import type { CreateRequestDraft } from '../../../../utils/draft-storage';
+
+import type { Beta1QuoteCard } from '../../../../services/beta1-orchestration-service';
 
 export type RequestMode = 'immediate' | 'reservation';
 export type LocationMode = 'station' | 'address';
@@ -20,8 +22,8 @@ export interface CreateRequestState {
   // Origin (Step 1)
   pickupMode: LocationMode;
   setPickupMode: (mode: LocationMode) => void;
-  pickupStation: StationInfo | null;
-  setPickupStation: (station: StationInfo | null) => void;
+  pickupStation: Station | null;
+  setPickupStation: (station: Station | null) => void;
   pickupRoadAddress: string;
   setPickupRoadAddress: (address: string) => void;
   pickupDetailAddress: string;
@@ -30,8 +32,8 @@ export interface CreateRequestState {
   // Destination (Step 1)
   deliveryMode: LocationMode;
   setDeliveryMode: (mode: LocationMode) => void;
-  deliveryStation: StationInfo | null;
-  setDeliveryStation: (station: StationInfo | null) => void;
+  deliveryStation: Station | null;
+  setDeliveryStation: (station: Station | null) => void;
   deliveryRoadAddress: string;
   setDeliveryRoadAddress: (address: string) => void;
   deliveryDetailAddress: string;
@@ -92,15 +94,16 @@ export interface CreateRequestState {
   // AI & Pricing (Step 4 / Global)
   aiQuotesLoading: boolean;
   setAiQuotesLoading: (loading: boolean) => void;
-  selectedQuoteType: 'balanced' | 'cheapest' | 'fastest';
-  setSelectedQuoteType: (type: 'balanced' | 'cheapest' | 'fastest') => void;
+  selectedQuoteType: Beta1QuoteCard['quoteType'];
+  setSelectedQuoteType: (type: Beta1QuoteCard['quoteType']) => void;
 
   // Draft Management
   draftRestored: boolean;
   setDraftRestored: (restored: boolean) => void;
   draftSaving: boolean;
   setDraftSaving: (saving: boolean) => void;
-  hydrateFromDraft: (draft: Partial<RequestDraft>) => void;
+  hydrateFromDraft: (draft: CreateRequestDraft) => void;
+  hydrateFromPrefill: (prefill: any, prefilledReservation: any) => void;
   clearForm: () => void;
 }
 
@@ -138,7 +141,7 @@ const initialState = {
   contactPhoneNumber: '',
   verifiedPhoneOverride: null,
   aiQuotesLoading: false,
-  selectedQuoteType: 'balanced' as const,
+  selectedQuoteType: 'balanced' as Beta1QuoteCard['quoteType'],
   draftRestored: false,
   draftSaving: false,
 };
@@ -190,24 +193,12 @@ export const useCreateRequestStore = create<CreateRequestState>((set) => ({
   setDraftSaving: (saving) => set({ draftSaving: saving }),
 
   hydrateFromDraft: (draft) => set((state) => {
+    // Note: Station conversion logic should be handled by the caller 
+    // since this store doesn't know about `fromDraftStation` utility yet.
     return {
-      requestMode: draft.requestMode as RequestMode ?? 'immediate',
-      pickupMode: draft.pickupLocation?.type === 'address' ? 'address' : 'station',
-      deliveryMode: draft.deliveryLocation?.type === 'address' ? 'address' : 'station',
-      
-      pickupStation: draft.pickupLocation?.type === 'station' ? {
-        stationId: draft.pickupLocation.stationId!,
-        stationName: draft.pickupLocation.stationName!,
-        lat: draft.pickupLocation.lat,
-        lng: draft.pickupLocation.lng,
-      } : null,
-      
-      deliveryStation: draft.deliveryLocation?.type === 'station' ? {
-        stationId: draft.deliveryLocation.stationId!,
-        stationName: draft.deliveryLocation.stationName!,
-        lat: draft.deliveryLocation.lat,
-        lng: draft.deliveryLocation.lng,
-      } : null,
+      requestMode: draft.requestMode,
+      pickupMode: draft.pickupMode,
+      deliveryMode: draft.deliveryMode,
       pickupRoadAddress: draft.pickupRoadAddress,
       pickupDetailAddress: draft.pickupDetailAddress,
       deliveryRoadAddress: draft.deliveryRoadAddress,
@@ -233,6 +224,35 @@ export const useCreateRequestStore = create<CreateRequestState>((set) => ({
       contactPhoneNumber: draft.contactPhoneNumber,
       recipientConsentChecked: draft.recipientConsentChecked,
       draftRestored: true,
+    };
+  }),
+
+  hydrateFromPrefill: (prefill, prefilledReservation) => set((state) => {
+    return {
+      requestMode: prefill?.preferredPickupTime ? 'reservation' : 'immediate',
+      pickupMode: prefill?.pickupMode ?? 'station',
+      deliveryMode: prefill?.deliveryMode ?? 'station',
+      pickupRoadAddress: prefill?.pickupRoadAddress ?? '',
+      pickupDetailAddress: prefill?.pickupDetailAddress ?? '',
+      deliveryRoadAddress: prefill?.deliveryRoadAddress ?? '',
+      deliveryDetailAddress: prefill?.deliveryDetailAddress ?? '',
+      photoUrl: prefill?.photoRefs?.[0] ?? null,
+      photoRefs: prefill?.photoRefs ?? [],
+      packageDescription: prefill?.packageDescription ?? '',
+      packageSize: prefill?.packageSize ?? 'small',
+      weightKg: String(prefill?.weightKg ?? 1),
+      itemValue: prefill?.itemValue ? String(prefill.itemValue) : '',
+      recipientName: prefill?.recipientName ?? '',
+      recipientPhone: prefill?.recipientPhone ?? '',
+      pickupLocationDetail: prefill?.pickupLocationDetail ?? '',
+      storageLocation: prefill?.storageLocation ?? '',
+      lockerId: prefill?.lockerId ?? null,
+      specialInstructions: prefill?.specialInstructions ?? '',
+      directMode: prefill?.directParticipationMode ?? 'none',
+      urgency: prefill?.urgency ?? 'fast',
+      preferredPickupDate: prefilledReservation.date,
+      preferredPickupTime: prefilledReservation.time,
+      preferredArrivalTime: prefill?.preferredArrivalTime ?? '',
     };
   }),
 

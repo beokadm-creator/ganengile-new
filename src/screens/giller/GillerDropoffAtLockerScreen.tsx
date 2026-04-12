@@ -50,14 +50,7 @@ export default function GillerDropoffAtLockerScreen() {
           if (delivery.lockerId) {
             const lockerDetail = await getLocker(delivery.lockerId);
             if (lockerDetail) {
-              setSelectedLocker({
-                lockerId: lockerDetail.lockerId,
-                stationId: lockerDetail.location.stationId,
-                stationName: lockerDetail.location.stationName,
-                size: lockerDetail.size,
-                status: lockerDetail.status,
-                available: lockerDetail.availability.available > 0,
-              });
+              setSelectedLocker(lockerDetail as any);
               setStep('reserve');
               return;
             }

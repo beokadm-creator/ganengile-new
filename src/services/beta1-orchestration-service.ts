@@ -1090,7 +1090,7 @@ export async function acceptMissionBundleForGiller(bundleId: string, gillerUserI
   
   let result;
   try {
-    result = await runTransaction(db, async (transaction: any) => {
+    result = await runTransaction(db, async (transaction: any): Promise<any> => {
       const bundleSnapshot = await transaction.get(bundleRef);
       if (!bundleSnapshot.exists()) {
         throw new Error('Mission bundle not found');
@@ -1292,7 +1292,7 @@ export async function releaseMissionBundleForGiller(bundleId: string, gillerUser
   
   let result;
   try {
-    result = await runTransaction(db, async (transaction: any) => {
+    result = await runTransaction(db, async (transaction: any): Promise<any> => {
       const bundleSnapshot = await transaction.get(bundleRef);
       if (!bundleSnapshot.exists()) {
         throw new Error('Mission bundle not found');

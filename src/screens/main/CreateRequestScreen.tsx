@@ -60,6 +60,7 @@ import {
   saveCreateRequestProgress,
   type CreateRequestDraft,
 } from '../../utils/draft-storage';
+import { useCreateRequestStore } from './create-request/store/useCreateRequestStore';
 import { StepContainer } from './create-request/components/StepContainer';
 import { Block } from './create-request/components/Block';
 import { Chip } from './create-request/components/Chip';
@@ -329,66 +330,7 @@ function fallbackStation(kind: PickerType): Station {
   };
 }
 
-function StepContainer({
-  step,
-  currentStep,
-  onNext,
-  onPrev,
-  nextLabel = '다음 단계로',
-  children,
-}: {
-  step: number;
-  currentStep: number;
-  onNext?: () => void;
-  onPrev?: () => void;
-  nextLabel?: string;
-  children: React.ReactNode;
-}) {
-  if (currentStep < step) return null;
 
-  return (
-    <View style={[styles.stepContainer, currentStep < step && { display: 'none' }]}>
-      <View style={currentStep > step ? { opacity: 0.6, pointerEvents: 'none' } : undefined}>
-        {children}
-        {currentStep > step && onPrev && (
-          <TouchableOpacity style={styles.editStepButton} onPress={onPrev}>
-            <Text style={styles.editStepButtonText}>수정하기</Text>
-          </TouchableOpacity>
-        )}
-      </View>
-      {currentStep === step && onNext && (
-        <TouchableOpacity style={styles.nextStepButton} onPress={onNext}>
-          <Text style={styles.nextStepButtonText}>{nextLabel}</Text>
-        </TouchableOpacity>
-      )}
-    </View>
-  );
-}
-
-function Block({ title, children }: { title: string; children: React.ReactNode }) {
-  return (
-    <View style={styles.card}>
-      <Text style={styles.cardTitle}>{title}</Text>
-      {children}
-    </View>
-  );
-}
-
-function Chip({
-  label,
-  active,
-  onPress,
-}: {
-  label: string;
-  active: boolean;
-  onPress: () => void;
-}) {
-  return (
-    <TouchableOpacity style={[styles.chip, active && styles.chipActive]} onPress={onPress}>
-      <Text style={[styles.chipText, active && styles.chipTextActive]}>{label}</Text>
-    </TouchableOpacity>
-  );
-}
 
 export default function CreateRequestScreen({ navigation, route }: Props) {
   const { user, refreshUser } = useUser();
@@ -398,7 +340,6 @@ export default function CreateRequestScreen({ navigation, route }: Props) {
 
   const [stations, setStations] = useState<Station[]>([]);
   const [loading, setLoading] = useState(true);
-  const [activeStep, setActiveStep] = useState(1);
   const [pickerVisible, setPickerVisible] = useState(false);
   const [pickerType, setPickerType] = useState<PickerType>('pickup');
   const [nearbyPicker, setNearbyPicker] = useState<NearbyPickerState | null>(null);
@@ -407,52 +348,13 @@ export default function CreateRequestScreen({ navigation, route }: Props) {
   const [aiLoading, setAiLoading] = useState(false);
   const [resolvingLocation, setResolvingLocation] = useState<PickerType | null>(null);
   const [resolvingAddressStation, setResolvingAddressStation] = useState<PickerType | null>(null);
-
-  const [pickupMode, setPickupMode] = useState<LocationMode>(prefill?.pickupMode ?? 'station');
-  const [deliveryMode, setDeliveryMode] = useState<LocationMode>(prefill?.deliveryMode ?? 'station');
-  const [pickupStation, setPickupStation] = useState<Station | null>(() => fromPrefillStation(prefill?.pickupStation));
-  const [deliveryStation, setDeliveryStation] = useState<Station | null>(() => fromPrefillStation(prefill?.deliveryStation));
-  const [pickupRoadAddress, setPickupRoadAddress] = useState(prefill?.pickupRoadAddress ?? '');
-  const [pickupDetailAddress, setPickupDetailAddress] = useState(prefill?.pickupDetailAddress ?? '');
-  const [deliveryRoadAddress, setDeliveryRoadAddress] = useState(prefill?.deliveryRoadAddress ?? '');
-  const [deliveryDetailAddress, setDeliveryDetailAddress] = useState(prefill?.deliveryDetailAddress ?? '');
   const [savedAddresses, setSavedAddresses] = useState<SavedAddress[]>([]);
   const [recentAddresses, setRecentAddresses] = useState<SavedAddress[]>([]);
-
-  const [photoUrl, setPhotoUrl] = useState<string | null>(prefill?.photoRefs?.[0] ?? null);
-  const [photoRefs, setPhotoRefs] = useState<string[]>(prefill?.photoRefs ?? []);
   const [aiResult, setAiResult] = useState<Beta1AIAnalysisResponse | null>(null);
   const [aiQuoteResponse, setAiQuoteResponse] = useState<Beta1AIQuoteResponse | null>(null);
-  const [aiQuotesLoading, setAiQuotesLoading] = useState(false);
-
-  const [requestMode, setRequestMode] = useState<'immediate' | 'reservation'>(
-    params?.mode === 'reservation' ? 'reservation' : 'immediate'
-  );
-  const [packageItemName, setPackageItemName] = useState('');
-  const [packageCategory, _setPackageCategory] = useState('');
-  const [packageDescription, setPackageDescription] = useState(prefill?.packageDescription ?? '');
-  const [packageSize, setPackageSize] = useState<PackageSize>(prefill?.packageSize ?? 'small');
-  const [weightKg, setWeightKg] = useState(String(prefill?.weightKg ?? 1));
-  const [itemValue, setItemValue] = useState(prefill?.itemValue ? String(prefill.itemValue) : '');
-  const [recipientName, setRecipientName] = useState(prefill?.recipientName ?? '');
-  const [recipientPhone, setRecipientPhone] = useState(prefill?.recipientPhone ?? '');
-  const [pickupLocationDetail, setPickupLocationDetail] = useState(prefill?.pickupLocationDetail ?? '');
-  const [storageLocation, setStorageLocation] = useState(prefill?.storageLocation ?? '');
-  const [lockerId, setLockerId] = useState<string | null>(null);
-  const [specialInstructions, setSpecialInstructions] = useState(prefill?.specialInstructions ?? '');
-  const [directMode, setDirectMode] = useState<'none' | 'requester_to_station' | 'locker_assisted'>(
-    prefill?.directParticipationMode ?? 'none'
-  );
   const [showLockerLocator, setShowLockerLocator] = useState(false);
-  const [urgency, setUrgency] = useState<'normal' | 'fast' | 'urgent'>(prefill?.urgency ?? 'fast');
-  const [preferredPickupDate, setPreferredPickupDate] = useState(prefilledReservation.date);
-  const [preferredPickupTime, setPreferredPickupTime] = useState(prefilledReservation.time);
-  const [preferredArrivalTime, _setPreferredArrivalTime] = useState(prefill?.preferredArrivalTime ?? '');
   const [reservationCalendarVisible, setReservationCalendarVisible] = useState(false);
-  const [selectedQuoteType, setSelectedQuoteType] = useState<Beta1QuoteCard['quoteType']>('balanced');
-  const [contactPhoneNumber, setContactPhoneNumber] = useState(
-    formatPhoneDigits(user?.phoneVerification?.phoneNumber ?? user?.phoneNumber ?? '')
-  );
+  
   const [contactOtpSessionId, setContactOtpSessionId] = useState<string | null>(null);
   const [contactOtpCode, setContactOtpCode] = useState('');
   const [contactOtpHintCode, setContactOtpHintCode] = useState<string | null>(null);
@@ -460,13 +362,58 @@ export default function CreateRequestScreen({ navigation, route }: Props) {
   const [contactOtpExpiresAt, setContactOtpExpiresAt] = useState<string | null>(null);
   const [contactOtpSending, setContactOtpSending] = useState(false);
   const [contactOtpVerifying, setContactOtpVerifying] = useState(false);
-  const [verifiedPhoneOverride, setVerifiedPhoneOverride] = useState<string | null>(null);
+  
   const [recipientPrivacyConfig, setRecipientPrivacyConfig] = useState<RecipientContactPrivacyConfig>(
     FALLBACK_RECIPIENT_PRIVACY_CONFIG
   );
-  const [recipientConsentChecked, setRecipientConsentChecked] = useState(false);
-  const [draftRestored, setDraftRestored] = useState(false);
-  const [draftSaving, setDraftSaving] = useState(false);
+
+  const {
+    activeStep, setActiveStep,
+    requestMode, setRequestMode,
+    pickupMode, setPickupMode,
+    pickupStation, setPickupStation,
+    pickupRoadAddress, setPickupRoadAddress,
+    pickupDetailAddress, setPickupDetailAddress,
+    deliveryMode, setDeliveryMode,
+    deliveryStation, setDeliveryStation,
+    deliveryRoadAddress, setDeliveryRoadAddress,
+    deliveryDetailAddress, setDeliveryDetailAddress,
+    packageItemName, setPackageItemName,
+    packageCategory, setPackageCategory: _setPackageCategory,
+    packageDescription, setPackageDescription,
+    packageSize, setPackageSize,
+    weightKg, setWeightKg,
+    itemValue, setItemValue,
+    photoUrl, setPhotoUrl,
+    photoRefs, setPhotoRefs,
+    preferredPickupDate, setPreferredPickupDate,
+    preferredPickupTime, setPreferredPickupTime,
+    preferredArrivalTime, setPreferredArrivalTime: _setPreferredArrivalTime,
+    urgency, setUrgency,
+    recipientName, setRecipientName,
+    recipientPhone, setRecipientPhone,
+    recipientConsentChecked, setRecipientConsentChecked,
+    pickupLocationDetail, setPickupLocationDetail,
+    specialInstructions, setSpecialInstructions,
+    directMode, setDirectMode,
+    storageLocation, setStorageLocation,
+    lockerId, setLockerId,
+    contactPhoneNumber, setContactPhoneNumber,
+    verifiedPhoneOverride, setVerifiedPhoneOverride,
+    aiQuotesLoading, setAiQuotesLoading,
+    selectedQuoteType, setSelectedQuoteType,
+    draftRestored, setDraftRestored,
+    draftSaving, setDraftSaving,
+    hydrateFromDraft, hydrateFromPrefill, clearForm
+  } = useCreateRequestStore();
+
+  useEffect(() => {
+    if (prefill || params?.mode === 'reservation') {
+      hydrateFromPrefill(prefill, prefilledReservation);
+    }
+    return () => clearForm();
+  }, []);
+
   const draftHydratedRef = useRef(false);
   const draftSaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const depositPhotoNoticeShownRef = useRef(false);
@@ -534,36 +481,10 @@ export default function CreateRequestScreen({ navigation, route }: Props) {
       if (!mounted) return;
 
       if (draft) {
-        setRequestMode(draft.requestMode);
-        setPickupMode(draft.pickupMode);
-        setDeliveryMode(draft.deliveryMode);
         setPickupStation(fromDraftStation(draft.pickupStation));
         setDeliveryStation(fromDraftStation(draft.deliveryStation));
-        setPickupRoadAddress(draft.pickupRoadAddress);
-        setPickupDetailAddress(draft.pickupDetailAddress);
-        setDeliveryRoadAddress(draft.deliveryRoadAddress);
-        setDeliveryDetailAddress(draft.deliveryDetailAddress);
-        setPhotoUrl(draft.photoUrl);
-        setPhotoRefs(draft.photoRefs);
-        setPackageItemName(draft.packageItemName);
-        _setPackageCategory(draft.packageCategory);
-        setPackageDescription(draft.packageDescription);
-        setPackageSize(draft.packageSize);
-        setWeightKg(draft.weightKg);
-        setItemValue(draft.itemValue);
-        setRecipientName(draft.recipientName);
-        setRecipientPhone(draft.recipientPhone);
-        setPickupLocationDetail(draft.pickupLocationDetail);
-        setStorageLocation(draft.storageLocation);
-        setSpecialInstructions(draft.specialInstructions);
-        setDirectMode(draft.directMode);
-        setUrgency(draft.urgency);
-        setPreferredPickupDate(draft.preferredPickupDate);
-        setPreferredPickupTime(draft.preferredPickupTime);
-        _setPreferredArrivalTime(draft.preferredArrivalTime);
-        setContactPhoneNumber(draft.contactPhoneNumber);
-        setRecipientConsentChecked(draft.recipientConsentChecked);
-        setDraftRestored(true);
+        
+        hydrateFromDraft(draft);
 
         // Auto-advance step if draft is partially filled
         let restoredStep = draft.step ?? 1;
@@ -1241,7 +1162,7 @@ export default function CreateRequestScreen({ navigation, route }: Props) {
       const requesterUserId = user?.uid ?? requireUserId();
       const uploaded = await uploadPhotoWithThumbnail(localUri, requesterUserId, 'request-item');
       setPhotoUrl(uploaded.url);
-      setPhotoRefs((prev) => [uploaded.url, ...prev.filter((item) => item !== uploaded.url)]);
+      setPhotoRefs([uploaded.url, ...photoRefs.filter((item) => item !== uploaded.url)]);
       setAiResult(null);
     } catch (error) {
       console.error(error);
@@ -1913,7 +1834,7 @@ export default function CreateRequestScreen({ navigation, route }: Props) {
           </View>
           <TouchableOpacity
             style={styles.checkboxRow}
-            onPress={() => setRecipientConsentChecked((current) => !current)}
+            onPress={() => setRecipientConsentChecked(!recipientConsentChecked)}
             activeOpacity={0.8}
           >
             <View style={[styles.checkbox, recipientConsentChecked && styles.checkboxChecked]}>
@@ -2183,52 +2104,7 @@ export default function CreateRequestScreen({ navigation, route }: Props) {
   );
 }
 
-function AddressQuickPick({
-  title,
-  addresses,
-  onSelect,
-}: {
-  title: string;
-  addresses: SavedAddress[];
-  onSelect: (address: SavedAddress) => void;
-}) {
-  if (addresses.length === 0) return null;
 
-  return (
-    <View style={styles.quickPickWrap}>
-      <Text style={styles.quickPickTitle}>{title}</Text>
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.quickPickRow}>
-        {addresses.slice(0, 5).map((address) => (
-          <TouchableOpacity key={`${title}-${address.addressId}`} style={styles.quickPickChip} onPress={() => onSelect(address)}>
-            <Text style={styles.quickPickLabel}>{address.label}</Text>
-            <Text numberOfLines={1} style={styles.quickPickText}>{address.fullAddress}</Text>
-          </TouchableOpacity>
-        ))}
-      </ScrollView>
-    </View>
-  );
-}
-
-function QuoteBreakdownRow({
-  label,
-  value,
-  strong,
-}: {
-  label: string;
-  value: number;
-  strong?: boolean;
-}) {
-  if (value === 0 && !strong) return null;
-
-  return (
-    <View style={styles.quoteBreakdownRow}>
-      <Text style={[styles.quoteBreakdownLabel, strong && styles.quoteBreakdownLabelStrong]}>{label}</Text>
-      <Text style={[styles.quoteBreakdownValue, strong && styles.quoteBreakdownValueStrong]}>
-        {value.toLocaleString()}원
-      </Text>
-    </View>
-  );
-}
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: Colors.background },

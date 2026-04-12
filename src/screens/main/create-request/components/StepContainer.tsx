@@ -1,6 +1,6 @@
 import React from 'react';
 import { View, TouchableOpacity, Text, StyleSheet } from 'react-native';
-import { BorderRadius, Colors, Shadows, Spacing, Typography } from '../../../theme';
+import { BorderRadius, Colors, Shadows, Spacing, Typography } from '../../../../theme';
 
 type Props = {
   step: number;
