@@ -125,7 +125,9 @@ export function Step2Item({
               key={size.value}
               label={size.label}
               active={store.packageSize === size.value}
-              onPress={() => store.setPackageSize(size.value)}
+              onPress={() => {
+                store.setPackageSize(size.value);
+              }}
             />
           ))}
         </View>
@@ -176,22 +178,24 @@ export function Step2Item({
                 key={level.value}
                 label={level.label}
                 active={store.urgency === level.value}
-                onPress={() => store.setUrgency(level.value)}
+                onPress={() => {
+                  store.setUrgency(level.value);
+                }}
               />
             ))}
           </View>
         )}
         <View style={styles.column}>
-          <Chip label="길러에게 맡기기" active={store.directMode === 'none'} onPress={() => store.setDirectMode('none')} />
+          <Chip label="길러에게 맡기기" active={store.directMode === 'none'} onPress={() => { store.setDirectMode('none'); }} />
           <Chip
             label="출발역까지 직접 전달"
             active={store.directMode === 'requester_to_station'}
-            onPress={() => store.setDirectMode('requester_to_station')}
+            onPress={() => { store.setDirectMode('requester_to_station'); }}
           />
           <Chip
             label="사물함 포함"
             active={store.directMode === 'locker_assisted'}
-            onPress={() => store.setDirectMode('locker_assisted')}
+            onPress={() => { store.setDirectMode('locker_assisted'); }}
           />
         </View>
       </Block>

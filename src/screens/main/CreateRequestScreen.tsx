@@ -12,6 +12,7 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import AppTopBar from '../../components/common/AppTopBar';
 import AddressSearchModal from '../../components/common/AddressSearchModal';
 import DatePickerModal from '../../components/common/DatePickerModal';
@@ -251,6 +252,8 @@ function fallbackStation(kind: PickerType): Station {
 
 
 export default function CreateRequestScreen({ navigation, route }: Props) {
+  const insets = useSafeAreaInsets();
+  const scrollViewRef = useRef<ScrollView>(null);
   const { user, refreshUser } = useUser();
   const params = route?.params;
   const prefill = params?.prefill;
@@ -539,6 +542,13 @@ export default function CreateRequestScreen({ navigation, route }: Props) {
       resetOtpState();
     }
   };
+  useEffect(() => {
+    // 활성화된 스텝이 변경될 때 약간의 딜레이를 두고 스크롤 이동
+    setTimeout(() => {
+      scrollViewRef.current?.scrollToEnd({ animated: true });
+    }, 100);
+  }, [activeStep]);
+
   function handleBack() {
     if (navigation.canGoBack()) {
       navigation.goBack();
@@ -762,11 +772,13 @@ export default function CreateRequestScreen({ navigation, route }: Props) {
     );
   }
 
+  const minQuotePrice = quotes.length > 0 ? Math.min(...quotes.map((q) => q.pricing.publicPrice)) : 0;
+
   return (
     <KeyboardAvoidingView style={styles.container} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
       <AppTopBar title="배송 요청 만들기" onBack={handleBack} />
 
-      <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+      <ScrollView ref={scrollViewRef} contentContainerStyle={[styles.content, { paddingBottom: 100 }]} showsVerticalScrollIndicator={false}>
         <Step1Location
           savedAddresses={savedAddresses}
           recentAddresses={recentAddresses}
@@ -818,6 +830,14 @@ export default function CreateRequestScreen({ navigation, route }: Props) {
           handleSaveDraftNow={handleSaveDraftNow}
         />
        </ScrollView>
+
+       {/* 하단 실시간 예상 요금바 */}
+       {minQuotePrice > 0 && (
+        <View style={[styles.floatingPriceBar, { paddingBottom: Math.max(insets.bottom, Spacing.md) }]}>
+          <Text style={styles.floatingPriceLabel}>최소 예상 요금</Text>
+          <Text style={styles.floatingPriceValue}>{minQuotePrice.toLocaleString()}원~</Text>
+        </View>
+       )}
 
       <OptimizedStationSelectModal
         visible={pickerVisible}
@@ -948,5 +968,30 @@ const styles = StyleSheet.create({
     ...Typography.body,
     color: Colors.textSecondary,
     textAlign: 'center',
+  },
+  floatingPriceBar: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    backgroundColor: Colors.surface,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: Spacing.xl,
+    paddingTop: Spacing.lg,
+    borderTopWidth: 1,
+    borderTopColor: Colors.border,
+    ...Shadows.lg,
+  },
+  floatingPriceLabel: {
+    color: Colors.textSecondary,
+    fontSize: Typography.fontSize.lg,
+    fontWeight: Typography.fontWeight.bold,
+  },
+  floatingPriceValue: {
+    color: Colors.primary,
+    fontSize: Typography.fontSize['2xl'],
+    fontWeight: Typography.fontWeight.extrabold,
   },
 });
