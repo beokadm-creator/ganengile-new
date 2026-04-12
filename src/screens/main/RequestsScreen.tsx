@@ -53,19 +53,32 @@ export default function RequestsScreen({ navigation }: { navigation: MainStackNa
     };
   }, [requests]);
 
-  async function loadRequests() {
+  const isMounted = React.useRef(true);
+
+  React.useEffect(() => {
+    isMounted.current = true;
+    return () => {
+      isMounted.current = false;
+    };
+  }, []);
+
+  const loadRequests = React.useCallback(async () => {
     try {
       const userId = requireUserId();
       const nextRequests = await getUserRequests(userId);
-      setRequests(nextRequests);
+      if (isMounted.current) setRequests(nextRequests);
     } catch (error) {
-      console.error('Failed to load requests', error);
-      Alert.alert('요청을 불러오지 못했습니다', '잠시 후 다시 시도해 주세요.');
+      if (isMounted.current) {
+        console.error('Failed to load requests', error);
+        Alert.alert('요청을 불러오지 못했습니다', '잠시 후 다시 시도해 주세요.');
+      }
     } finally {
-      setLoading(false);
-      setRefreshing(false);
+      if (isMounted.current) {
+        setLoading(false);
+        setRefreshing(false);
+      }
     }
-  }
+  }, [requireUserId]);
 
   async function onRefresh() {
     setRefreshing(true);
@@ -132,9 +145,9 @@ export default function RequestsScreen({ navigation }: { navigation: MainStackNa
       await loadRequests();
     } catch (error) {
       console.error('Failed to cancel request', error);
-      Alert.alert('취소에 실패했습니다', '잠시 후 다시 시도해 주세요.');
+      if (isMounted.current) Alert.alert('취소에 실패했습니다', '잠시 후 다시 시도해 주세요.');
     } finally {
-      setWorkingRequestId(null);
+      if (isMounted.current) setWorkingRequestId(null);
     }
   }
 

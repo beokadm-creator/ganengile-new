@@ -144,6 +144,7 @@ export default function RequestDetailScreen() {
   const navigation = useNavigation<MainStackNavigationProp>();
   const route = useRoute<RequestDetailRoute>();
   const { requestId } = route.params;
+  const isMounted = useRef(true);
 
   const [request, setRequest] = useState<Request | null>(null);
   const [loading, setLoading] = useState(true);
@@ -171,21 +172,33 @@ export default function RequestDetailScreen() {
     navigation.navigate('Tabs', { screen: 'Requests' });
   }, [navigation]);
 
+  useEffect(() => {
+    isMounted.current = true;
+    return () => {
+      isMounted.current = false;
+    };
+  }, []);
+
   const loadRequest = useCallback(async () => {
     try {
       const nextRequest = await getRequestById(requestId);
+      if (!isMounted.current) return;
       setRequest(nextRequest);
       const dispatchSummary = await deliveryPartnerService.getDispatchSummary({
         requestId,
         ...(nextRequest?.primaryDeliveryId ? { deliveryId: nextRequest.primaryDeliveryId } : {}),
       }).catch(() => []);
+      if (!isMounted.current) return;
       setPartnerDispatches(dispatchSummary);
     } catch (error) {
+      if (!isMounted.current) return;
       console.error('Failed to load request detail', error);
       Alert.alert('요청 정보를 불러오지 못했습니다', '잠시 후 다시 시도해 주세요.');
     } finally {
-      setLoading(false);
-      setRefreshing(false);
+      if (isMounted.current) {
+        setLoading(false);
+        setRefreshing(false);
+      }
     }
   }, [requestId]);
 
@@ -195,16 +208,23 @@ export default function RequestDetailScreen() {
 
   useEffect(() => {
     const unsubscribe = subscribeToRequest(requestId, (nextRequest) => {
+      if (!isMounted.current) return;
       setRequest(nextRequest);
       void deliveryPartnerService
         .getDispatchSummary({
           requestId,
           ...(nextRequest?.primaryDeliveryId ? { deliveryId: nextRequest.primaryDeliveryId } : {}),
         })
-        .then(setPartnerDispatches)
-        .catch(() => setPartnerDispatches([]));
-      setLoading(false);
-      setRefreshing(false);
+        .then((data) => {
+          if (isMounted.current) setPartnerDispatches(data);
+        })
+        .catch(() => {
+          if (isMounted.current) setPartnerDispatches([]);
+        });
+      if (isMounted.current) {
+        setLoading(false);
+        setRefreshing(false);
+      }
     });
 
     return unsubscribe;

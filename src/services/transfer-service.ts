@@ -8,6 +8,8 @@ import { db } from './firebase';
 import type { TransferPossibility, TransferPricing, TransferMatch, Route } from '../types/transfer';
 import type { Station } from '../types/config';
 
+import { getPricingPolicyConfig } from './pricing-policy-config-service';
+
 const TRANSFER_MATCHES_COLLECTION = 'transfer_matches';
 
 export class TransferService {
@@ -118,27 +120,31 @@ export class TransferService {
    * @param totalTravelTime 총 소요 시간 (분)
    * @returns 환승 배송비 정보
    */
-  calculateTransferPricing(
+  async calculateTransferPricing(
     baseFee: number,
     totalTravelTime?: number
-  ): TransferPricing {
-    // 1. 기본 배송비
-    const transferBonus = 1000; // 환승 보너스 (고정 1,000원)
+  ): Promise<TransferPricing> {
+    const policy = await getPricingPolicyConfig();
 
-    // 2. 지하첗 요금 (거리 기반)
-    let subwayFee = 1400;
+    // 1. 기본 배송비 (정책에서 보너스 가져오기, 없으면 기본값 1000)
+    const transferBonus = policy.incentiveRules?.transferBonusPerHop ?? 1000;
+
+    // 2. 지하철 요금 (거리/시간 기반 추정)
+    // 정책에 명시된 기본 대중교통 요금 사용
+    let subwayFee = policy.publicFare ?? 1400;
     if (totalTravelTime && totalTravelTime > 30) {
-      subwayFee = 1600;
+      subwayFee += 200; // 단순 예시: 30분 초과 시 200원 추가
     }
     if (totalTravelTime && totalTravelTime > 50) {
-      subwayFee = 1800;
+      subwayFee += 200; // 단순 예시: 50분 초과 시 200원 추가
     }
 
     // 3. 최종 배송비
     const totalFee = baseFee + transferBonus;
 
-    // 4. 길러 수익 (90%)
-    const gillerEarning = (totalFee - subwayFee) * 0.9;
+    // 4. 길러 수익 (플랫폼 수수료율 기반 차감)
+    // gillerFee = (totalFee - subwayFee) * (1 - platformFeeRate)
+    const gillerEarning = Math.round((totalFee - subwayFee) * (1 - policy.platformFeeRate));
 
     return {
       baseFee,

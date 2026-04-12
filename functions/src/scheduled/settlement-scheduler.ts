@@ -8,6 +8,7 @@
  */
 
 import * as admin from 'firebase-admin';
+import { executeTossPayout } from '../services/toss-payout';
 import { getFunctionsPricingPolicyConfig } from '../pricing-policy-config';
 
 /**
@@ -178,12 +179,26 @@ export const gillerSettlementScheduler = async (): Promise<{
 
           console.warn(`✅ Settlement created: ${settlement.settlementId}`);
 
-          // TODO: 2-7. 이체 실행 (또는 이체 요청)
-          // await executeTransfer(settlement);
-          // batch.update(settlementRef, {
-          //   status: 'completed',
-          //   transferredAt: admin.firestore.Timestamp.now(),
-          // });
+          // 2-7. 이체 실행
+          if (netAmount > 0 && giller.bankAccount?.bank && giller.bankAccount?.accountNumber) {
+            const payoutResult = await executeTossPayout(
+              giller.bankAccount.bank,
+              giller.bankAccount.accountNumber,
+              netAmount,
+              `${month}월 크라우드 배송 정산금`
+            );
+
+            if (payoutResult.success) {
+              settlement.status = 'completed';
+              settlement.transferredAt = admin.firestore.Timestamp.now();
+              batch.set(settlementRef, settlement);
+            } else {
+              settlement.status = 'failed';
+              settlement.transferError = payoutResult.error;
+              batch.set(settlementRef, settlement);
+              console.error(`❌ Payout failed for giller ${gillerId}: ${payoutResult.error}`);
+            }
+          }
 
           // TODO: 2-8. 길러에게 푸시 알림
           // await sendSettlementNotification(gillerId, settlement);

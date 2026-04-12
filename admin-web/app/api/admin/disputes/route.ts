@@ -125,6 +125,43 @@ export async function PATCH(req: NextRequest) {
     return NextResponse.json({ error: 'Not found' }, { status: 404 });
   }
 
+  const disputeData = snap.data() as DisputeDoc;
+  if (disputeData.status === 'resolved') {
+    return NextResponse.json({ error: 'Already resolved' }, { status: 400 });
+  }
+
+  const compensationAmount = payload.compensation ?? 0;
+
+  // 보상금이 설정된 경우, 요청자(또는 신고자)에게 포인트 지급 처리
+  if (compensationAmount > 0 && disputeData.reporterId) {
+    const userRef = db.collection('users').doc(disputeData.reporterId);
+    const userSnap = await userRef.get();
+    
+    if (userSnap.exists) {
+      const userData = userSnap.data() as { pointBalance?: number; totalEarnedPoints?: number };
+      const current = userData?.pointBalance ?? 0;
+      const currentEarned = userData?.totalEarnedPoints ?? 0;
+      
+      await userRef.update({
+        pointBalance: current + compensationAmount,
+        totalEarnedPoints: currentEarned + compensationAmount,
+      });
+
+      await db.collection('point_transactions').add({
+        userId: disputeData.reporterId,
+        amount: compensationAmount,
+        type: 'earn',
+        category: 'dispute_compensation',
+        description: `분쟁 조정에 따른 보상금 지급 (${compensationAmount.toLocaleString()}원)`,
+        balanceBefore: current,
+        balanceAfter: current + compensationAmount,
+        status: 'completed',
+        createdAt: new Date(),
+        completedAt: new Date(),
+      });
+    }
+  }
+
   await ref.update({
     status: 'resolved',
     resolution: {

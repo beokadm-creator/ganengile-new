@@ -49,11 +49,14 @@ export class DepositCompensationService {
       }
 
       if (deposit.tossAmount && deposit.tossAmount > 0 && deposit.paymentId) {
-        TossPaymentService.refundPayment(
+        const refundResult = await TossPaymentService.refundPayment(
           deposit.paymentId,
           deposit.tossAmount,
           '배송 완료에 따른 보증금 환급'
         );
+        if (!refundResult.success) {
+          throw new Error(`보증금 환급(결제 취소) 실패: ${refundResult.error}`);
+        }
       }
 
       await updateDoc(ref, {

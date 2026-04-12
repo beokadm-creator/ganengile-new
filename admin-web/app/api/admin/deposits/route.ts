@@ -10,6 +10,7 @@ interface DepositDoc {
   pointAmount?: number;
   tossAmount?: number;
   paymentMethod?: string;
+  paymentId?: string;
   status?: string;
   createdAt?: unknown;
 }
@@ -122,6 +123,42 @@ export async function PATCH(req: NextRequest) {
   }
 
   if (payload.action === 'refund') {
+    // 1. Toss Payments 환불 처리 (tossAmount가 있는 경우)
+    if (data.tossAmount && data.tossAmount > 0 && data.paymentId) {
+      const configDoc = await db.collection('config_integrations').doc('payment').get();
+      const privateConfigDoc = await db.collection('config_private').doc('payment').get();
+      
+      const config = configDoc.data() || {};
+      const privateConfig = privateConfigDoc.data() || {};
+      
+      if (!config.testMode && config.liveReady && !data.paymentId.startsWith('test_')) {
+        const secretKey = privateConfig.secretKey;
+        if (!secretKey) {
+          return NextResponse.json({ error: 'Toss Payments 시크릿 키가 설정되지 않았습니다.' }, { status: 500 });
+        }
+
+        const encodedKey = Buffer.from(`${secretKey}:`).toString('base64');
+        const response = await fetch(`https://api.tosspayments.com/v1/payments/${data.paymentId}/cancel`, {
+          method: 'POST',
+          headers: {
+            Authorization: `Basic ${encodedKey}`,
+            'Content-Type': 'application/json',
+            'Idempotency-Key': `cancel_admin_${data.paymentId}_${Date.now()}`
+          },
+          body: JSON.stringify({
+            cancelReason: '관리자 직권 환불',
+            cancelAmount: data.tossAmount,
+          }),
+        });
+
+        if (!response.ok) {
+          const errorData = await response.json();
+          return NextResponse.json({ error: `결제 취소 실패: ${errorData.message}` }, { status: 500 });
+        }
+      }
+    }
+
+    // 2. 상태 업데이트 및 포인트 환불
     await ref.update({ status: 'refunded', refundedAt: new Date(), updatedAt: new Date() });
 
     if ((data.pointAmount ?? 0) > 0 && data.userId) {

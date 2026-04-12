@@ -432,8 +432,8 @@ service cloud.firestore {
                    isOwner(resource.data.gllerId) ||
                    isOwner(resource.data.gillerId));
 
-      // 쓰기: 시스템 또는 본인
-      allow write: if isOwner(resource.data.userId);
+      // 쓰기: 시스템 또는 본인 (delete 방어를 위해 create, update로 명시적 분리)
+      allow create, update: if isOwner(resource.data.userId);
 
       // 삭제: 시스템만
       allow delete: if false;
@@ -485,8 +485,8 @@ service cloud.firestore {
       // 읽기: 인증된 사용자
       allow read: if isAuthenticated();
 
-      // 쓰기: 본인(fromUserId)만
-      allow write: if isOwner(resource.data.fromUserId);
+      // 쓰기: 본인(fromUserId)만 (delete 방어를 위해 create, update로 명시적 분리)
+      allow create, update: if isOwner(resource.data.fromUserId);
 
       // 삭제: 시스템만
       allow delete: if false;
@@ -512,8 +512,8 @@ service cloud.firestore {
       allow read: if isAuthenticated() &&
                   (request.auth.uid in resource.data.participants);
 
-      // 쓰기: 참여자만
-      allow write: if isAuthenticated() &&
+      // 쓰기: 참여자만 (delete 방어를 위해 create, update로 명시적 분리)
+      allow create, update: if isAuthenticated() &&
                    (request.auth.uid in resource.data.participants);
 
       // 삭제: 참여자 모두 or 시스템
@@ -547,8 +547,10 @@ service cloud.firestore {
                   (isOwner(resource.data.companyId) ||
                    request.auth.uid in resource.data.availableGillers);
 
-      // 쓰기: B2B 회사만
-      allow write: if isOwner(resource.data.companyId);
+      // 쓰기: B2B 회사만 (delete 방어를 위해 create, update로 명시적 분리)
+      allow create, update: if isOwner(resource.data.companyId) &&
+                    // 보안: 임의로 완료 상태 변경 불가 (결제 우회 방지)
+                    request.resource.data.status != 'completed';
 
       // 삭제: B2B 회사만
       allow delete: if isOwner(resource.data.companyId);
@@ -582,8 +584,10 @@ service cloud.firestore {
                   (isOwner(resource.data.companyId) ||
                    (resource.data.gllerId != null && isOwner(resource.data.gllerId)));
 
-      // 쓰기: B2B 회사만
-      allow write: if isOwner(resource.data.companyId);
+      // 쓰기: B2B 회사만 (delete 방어를 위해 명시적 분리)
+      allow create, update: if isOwner(resource.data.companyId) &&
+                    // 보안: 임의로 완료 상태 변경 불가 (결제 우회 방지)
+                    request.resource.data.status != 'completed';
 
       // 삭제: B2B 회사만
       allow delete: if isOwner(resource.data.companyId);

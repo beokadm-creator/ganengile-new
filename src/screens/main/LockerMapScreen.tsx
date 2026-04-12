@@ -1,9 +1,9 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState, useRef } from 'react';
 import type { JSX } from 'react';
 import {
   ActivityIndicator,
   Alert,
-  ScrollView,
+  FlatList,
   StyleSheet,
   Text,
   TouchableOpacity,
@@ -54,8 +54,10 @@ export default function LockerMapScreen(): JSX.Element {
   const [stations, setStations] = useState<Station[]>([]);
   const [currentLocation, setCurrentLocation] = useState<LocationData | null>(null);
   const [loading, setLoading] = useState(true);
+  const isMounted = useRef(true);
 
   useEffect(() => {
+    isMounted.current = true;
     const load = async (): Promise<void> => {
       try {
         setLoading(true);
@@ -65,18 +67,24 @@ export default function LockerMapScreen(): JSX.Element {
           locationService.getCurrentLocation(),
         ]);
 
+        if (!isMounted.current) return;
         setLockers(nextLockers);
         setStations(nextStations);
         setCurrentLocation(nextLocation);
       } catch (error) {
+        if (!isMounted.current) return;
         console.error('Failed to load locker map data:', error);
         Alert.alert('보관함 정보를 불러오지 못했어요', '잠시 후 다시 시도해 주세요.');
       } finally {
-        setLoading(false);
+        if (isMounted.current) setLoading(false);
       }
     };
 
     void load();
+    
+    return () => {
+      isMounted.current = false;
+    };
   }, []);
 
   const mapItems = useMemo<LockerMapItem[]>(() => {
@@ -124,47 +132,53 @@ export default function LockerMapScreen(): JSX.Element {
   }
 
   return (
-    <ScrollView style={styles.container} contentContainerStyle={styles.content}>
-      <View style={styles.hero}>
-        <Text style={styles.title}>보관함 지도</Text>
-        <Text style={styles.subtitle}>
-          가까운 보관함 위치를 먼저 지도 기준으로 보여주고, 바로 예약 화면으로 이어집니다.
-        </Text>
-      </View>
+    <FlatList
+      style={styles.container}
+      contentContainerStyle={styles.content}
+      data={mapItems}
+      keyExtractor={(item) => item.locker.lockerId}
+      ListHeaderComponent={
+        <>
+          <View style={styles.hero}>
+            <Text style={styles.title}>보관함 지도</Text>
+            <Text style={styles.subtitle}>
+              가까운 보관함 위치를 먼저 지도 기준으로 보여주고, 바로 예약 화면으로 이어집니다.
+            </Text>
+          </View>
 
-      <NaverMapCard
-        center={mapCenter}
-        markers={featured.map((item, index) => ({
-          latitude: item.station!.location.latitude,
-          longitude: item.station!.location.longitude,
-          label: String(index + 1),
-        }))}
-        title="가까운 보관함 지도"
-        subtitle={currentLocation ? '현재 위치를 기준으로 가까운 순서를 반영합니다.' : '위치 권한이 없으면 역 기준 목록으로 정렬합니다.'}
-      />
-
-      {mapItems.length === 0 ? (
+          <NaverMapCard
+            center={mapCenter}
+            markers={featured.map((item, index) => ({
+              latitude: item.station!.location.latitude,
+              longitude: item.station!.location.longitude,
+              label: String(index + 1),
+            }))}
+            title="가까운 보관함 지도"
+            subtitle={currentLocation ? '현재 위치를 기준으로 가까운 순서를 반영합니다.' : '위치 권한이 없으면 역 기준 목록으로 정렬합니다.'}
+          />
+        </>
+      }
+      ListEmptyComponent={
         <View style={styles.emptyCard}>
           <Text style={styles.emptyTitle}>지금 선택 가능한 보관함이 없어요.</Text>
           <Text style={styles.emptyBody}>다른 시간대에 다시 확인하거나 일반 배송 흐름으로 진행해 주세요.</Text>
         </View>
-      ) : (
-        mapItems.map((item) => (
-          <TouchableOpacity key={item.locker.lockerId} style={styles.card} onPress={() => handleSelect(item)}>
-            <View style={styles.cardHeader}>
-              <Text style={styles.cardTitle}>{item.locker.location.stationName}</Text>
-              <Text style={styles.badge}>{formatDistance(item.distanceMeters)}</Text>
-            </View>
-            <Text style={styles.cardBody}>
-              {item.locker.location.line ?? '노선 정보 없음'} · {item.locker.location.floor}층 · {item.locker.location.section}
-            </Text>
-            <Text style={styles.cardMeta}>
-              기본 {item.locker.pricing.base.toLocaleString()}원 / {item.locker.pricing.baseDuration}분
-            </Text>
-          </TouchableOpacity>
-        ))
+      }
+      renderItem={({ item }) => (
+        <TouchableOpacity style={styles.card} onPress={() => handleSelect(item)}>
+          <View style={styles.cardHeader}>
+            <Text style={styles.cardTitle}>{item.locker.location.stationName}</Text>
+            <Text style={styles.badge}>{formatDistance(item.distanceMeters)}</Text>
+          </View>
+          <Text style={styles.cardBody}>
+            {item.locker.location.line ?? '노선 정보 없음'} · {item.locker.location.floor}층 · {item.locker.location.section}
+          </Text>
+          <Text style={styles.cardMeta}>
+            기본 {item.locker.pricing.base.toLocaleString()}원 / {item.locker.pricing.baseDuration}분
+          </Text>
+        </TouchableOpacity>
       )}
-    </ScrollView>
+    />
   );
 }
 

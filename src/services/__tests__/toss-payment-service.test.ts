@@ -133,20 +133,20 @@ describe('TossPaymentService', () => {
   });
 
   describe('refundPayment', () => {
-    it('환불을 성공해야 한다', () => {
-      const result = TossPaymentService.refundPayment('pay-1', 5000, '사용자 요청');
+    it('환불을 성공해야 한다', async () => {
+      const result = await TossPaymentService.refundPayment('pay-1', 5000, '사용자 요청');
 
       expect(result.success).toBe(true);
     });
 
-    it('환불 사유 없이도 성공해야 한다', () => {
-      const result = TossPaymentService.refundPayment('pay-1', 5000);
+    it('환불 사유 없이도 성공해야 한다', async () => {
+      const result = await TossPaymentService.refundPayment('pay-1', 5000);
 
       expect(result.success).toBe(true);
     });
 
-    it('환불 금액이 0이어도 성공해야 한다', () => {
-      const result = TossPaymentService.refundPayment('pay-1', 0, '전액 환불');
+    it('환불 금액이 0이어도 성공해야 한다', async () => {
+      const result = await TossPaymentService.refundPayment('pay-1', 0, '전액 환불');
 
       expect(result.success).toBe(true);
     });

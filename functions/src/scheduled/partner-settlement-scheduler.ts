@@ -8,6 +8,7 @@
  */
 
 import * as admin from 'firebase-admin';
+import { executeTossPayout } from '../services/toss-payout';
 
 export const partnerSettlementScheduler = async (): Promise<{
   processedPartners: number;
@@ -127,6 +128,29 @@ export const partnerSettlementScheduler = async (): Promise<{
         batch.set(settlementRef, settlement);
         settlementsGenerated++;
         totalAmount += netAmount;
+
+        // 실제 이체 실행
+        if (netAmount > 0 && settlementConfig.bankAccount?.bank && settlementConfig.bankAccount?.accountNumber) {
+          const payoutResult = await executeTossPayout(
+            settlementConfig.bankAccount.bank,
+            settlementConfig.bankAccount.accountNumber,
+            netAmount,
+            `${month}월 크라우드 파트너 정산금`
+          );
+
+          if (payoutResult.success) {
+            settlement.status = 'completed';
+            settlement.settledAt = admin.firestore.Timestamp.now();
+            settlement.transactionId = payoutResult.transactionId;
+            batch.set(settlementRef, settlement);
+            console.warn(`✅ Partner payout success for ${partnerId}`);
+          } else {
+            settlement.status = 'failed';
+            settlement.transferError = payoutResult.error;
+            batch.set(settlementRef, settlement);
+            console.error(`❌ Partner payout failed for ${partnerId}: ${payoutResult.error}`);
+          }
+        }
 
       } catch (error) {
         const errMsg = `Error processing partner ${partnerId}: ${error}`;

@@ -53,6 +53,7 @@ import { taxInvoiceScheduler } from './scheduled/tax-invoice-scheduler';
 import { gillerSettlementScheduler } from './scheduled/settlement-scheduler';
 import { partnerSettlementScheduler } from './scheduled/partner-settlement-scheduler';
 import { fareCacheScheduler } from './scheduled/fare-cache-scheduler';
+export { tossWebhook } from './webhooks/toss-webhook';
 import { syncConfigStationsFromSeoulApi } from './station-sync';
 import {
   calculateSharedDeliveryFee,
@@ -2086,28 +2087,41 @@ export const rejectMatch = functions.https.onCall(
         return { success: false, message: '?대? 泥섎━???붿껌?낅땲??' };
       }
 
-      // 2. Update match status
-      await matchDoc.ref.update({
-        status: 'rejected',
-        rejectionReason: reason ?? 'Giller rejected',
-        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
-      });
+      // 2. Transactionally update match and check if request needs reset
+      await db.runTransaction(async (tx) => {
+        const matchRef = db.collection('matches').doc(matchId);
+        const matchDocTx = await tx.get(matchRef);
+        if (!matchDocTx.exists) return;
+        
+        const currentMatch = matchDocTx.data() as Match;
+        if (currentMatch.status !== 'pending') return;
 
-      // 3. Check if there are other pending matches for this request
-      const otherMatchesSnapshot = await db
-        .collection('matches')
-        .where('requestId', '==', match.requestId)
-        .where('status', '==', 'pending')
-        .get();
-
-      if (otherMatchesSnapshot.empty) {
-        // No more matches available, reset request to pending
-        await db.collection('requests').doc(match.requestId).update({
-          status: 'pending',
+        tx.update(matchRef, {
+          status: 'rejected',
+          rejectionReason: reason ?? 'Giller rejected',
           updatedAt: admin.firestore.FieldValue.serverTimestamp(),
         });
-        console.warn('No more matches, request reset to pending');
-      }
+
+        // 3. Check if there are other pending matches for this request
+        const otherMatchesSnapshot = await tx.get(
+          db.collection('matches')
+            .where('requestId', '==', match.requestId)
+            .where('status', '==', 'pending')
+        );
+
+        // If this was the last pending match (it will be empty because we just rejected it in our logic, 
+        // but since we query pending matches, we need to see if there are others besides this one)
+        const otherPendingCount = otherMatchesSnapshot.docs.filter(doc => doc.id !== matchId).length;
+        
+        if (otherPendingCount === 0) {
+          // No more matches available, reset request to pending
+          tx.update(db.collection('requests').doc(match.requestId), {
+            status: 'pending',
+            updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+          });
+          console.warn('No more matches, request reset to pending');
+        }
+      });
 
       console.warn(`Match rejected: ${matchId}`);
 
