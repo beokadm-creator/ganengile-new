@@ -56,7 +56,7 @@ type DeliveryCancellationResult = {
   message: string;
   penaltyApplied?: boolean;
   depositStatus?: 'unchanged' | 'refunded' | 'deducted' | 'failed' | 'not_found';
-  requestStatus?: 'pending' | 'cancelled';
+  requestStatus?: 'pending' | 'cancelled' | 'unchanged';
 };
 
 type LegacyFeeInput = {

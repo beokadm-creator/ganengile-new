@@ -11,6 +11,7 @@ import {
   doc,
   setDoc,
   where,
+  runTransaction,
 } from 'firebase/firestore';
 import { db } from './firebase';
 import { generateShortId } from '../utils/id-generator';
@@ -602,7 +603,7 @@ export async function createBeta1Request(input: Beta1RequestCreateInput): Promis
   }
 
   // 기본 마감기한 정책: 예약 모드면 예약시간 기준 + 2시간, 즉시 모드면 현재 + 2시간
-  const deadlineHours = pricingPolicy.baseDeadlineHours ?? 2;
+  const deadlineHours = 2;
   let deadlineTimestamp = Timestamp.fromDate(new Date(Date.now() + 1000 * 60 * 60 * deadlineHours));
   if (input.requestMode === 'reservation' && input.preferredPickupTime) {
     const pickupDate = new Date(input.preferredPickupTime);
@@ -1089,7 +1090,7 @@ export async function acceptMissionBundleForGiller(bundleId: string, gillerUserI
   
   let result;
   try {
-    result = await runTransaction(db, async (transaction) => {
+    result = await runTransaction(db, async (transaction: any) => {
       const bundleSnapshot = await transaction.get(bundleRef);
       if (!bundleSnapshot.exists()) {
         throw new Error('Mission bundle not found');
@@ -1248,23 +1249,23 @@ export async function acceptMissionBundleForGiller(bundleId: string, gillerUserI
   // 알림 등 트랜잭션 외부 작업 수행
   if (partiallyMatched && bundle.requestId) {
     const remainingBundles = siblingBundles
-      .filter((candidate) => candidate.missionBundleId !== bundle.missionBundleId)
-      .filter((candidate) => candidate.status === BundleStatus.ACTIVE)
-      .filter((candidate) => (candidate.missionIds ?? []).every((missionId) => !blockedMissionIds.has(missionId)));
+      .filter((candidate: any) => candidate.missionBundleId !== bundle.missionBundleId)
+      .filter((candidate: any) => candidate.status === BundleStatus.ACTIVE)
+      .filter((candidate: any) => (candidate.missionIds ?? []).every((missionId: string) => !blockedMissionIds.has(missionId)));
 
     const pickupStationRecord = (requestData.pickupStation as { stationName?: string } | undefined) ?? {};
     const deliveryStationRecord = (requestData.deliveryStation as { stationName?: string } | undefined) ?? {};
     const feeRecord = (requestData.fee as { totalFee?: number } | undefined) ?? {};
     const remainingCandidateIds = Array.from(
       new Set(
-        remainingBundles.flatMap((candidate) => candidate.candidateGillerUserIds ?? [])
+        remainingBundles.flatMap((candidate: any) => candidate.candidateGillerUserIds ?? [])
       )
     ).filter((candidateId) => candidateId !== gillerUserId);
 
     await Promise.all(
       remainingCandidateIds.map((candidateId) =>
         sendMissionBundleAvailableNotification(
-          candidateId,
+          candidateId as string,
           bundle.requestId,
           String(pickupStationRecord.stationName ?? '출발역'),
           String(deliveryStationRecord.stationName ?? '도착역'),
@@ -1291,7 +1292,7 @@ export async function releaseMissionBundleForGiller(bundleId: string, gillerUser
   
   let result;
   try {
-    result = await runTransaction(db, async (transaction) => {
+    result = await runTransaction(db, async (transaction: any) => {
       const bundleSnapshot = await transaction.get(bundleRef);
       if (!bundleSnapshot.exists()) {
         throw new Error('Mission bundle not found');
@@ -1420,17 +1421,17 @@ export async function releaseMissionBundleForGiller(bundleId: string, gillerUser
     const pickupStationRecord = (requestData.pickupStation as { stationName?: string } | undefined) ?? {};
     const deliveryStationRecord = (requestData.deliveryStation as { stationName?: string } | undefined) ?? {};
     const feeRecord = (requestData.fee as { totalFee?: number } | undefined) ?? {};
-    const reactivatedBundles = siblingBundles.filter((candidate) => candidate.status === BundleStatus.ACTIVE);
+    const reactivatedBundles = siblingBundles.filter((candidate: any) => candidate.status === BundleStatus.ACTIVE);
     const candidateIds = Array.from(
       new Set(
-        reactivatedBundles.flatMap((candidate) => candidate.candidateGillerUserIds ?? [])
+        reactivatedBundles.flatMap((candidate: any) => candidate.candidateGillerUserIds ?? [])
       )
     ).filter((candidateId) => candidateId !== gillerUserId);
 
     await Promise.all(
       candidateIds.map((candidateId) =>
         sendMissionBundleAvailableNotification(
-          candidateId,
+          candidateId as string,
           bundle.requestId!,
           String(pickupStationRecord.stationName ?? '출발역'),
           String(deliveryStationRecord.stationName ?? '도착역'),

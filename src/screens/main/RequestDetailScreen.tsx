@@ -563,8 +563,10 @@ export default function RequestDetailScreen() {
       RequestStatus.COMPLETED,
     ].includes(request.status);
   
+  const directParticipationMode = (request as any).directParticipationMode;
+
   const canRequesterDropoffAtLocker =
-    request.directParticipationMode === 'locker_assisted' &&
+    directParticipationMode === 'locker_assisted' &&
     request.lockerId &&
     (request.status === RequestStatus.PENDING ||
       request.status === RequestStatus.MATCHED ||

@@ -46,11 +46,11 @@ export default function RequesterDropoffLockerScreen() {
           if (lockerDetail) {
             setSelectedLocker({
               lockerId: lockerDetail.lockerId,
-              stationId: lockerDetail.stationId,
-              stationName: lockerDetail.stationName,
-              status: lockerDetail.status,
+              stationId: lockerDetail.location.stationId,
+              stationName: lockerDetail.location.stationName,
               size: lockerDetail.size,
-              pricePerHour: lockerDetail.pricePerHour,
+              status: lockerDetail.status,
+              available: lockerDetail.availability.available > 0,
             });
             setStep('reserve');
             return;
