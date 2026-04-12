@@ -56,6 +56,7 @@ import DisputeResolutionScreen from '../screens/main/DisputeResolutionScreen';
 import LevelBenefitsScreen from '../screens/main/LevelBenefitsScreen';
 import UnlockLockerScreen from '../screens/main/UnlockLockerScreen';
 import QRCodeScannerScreen from '../screens/main/QRCodeScannerScreen';
+import RequesterDropoffLockerScreen from '../screens/requester/RequesterDropoffLockerScreen';
 import RealtimeTrackingScreen from '../screens/main/RealtimeTrackingScreen';
 import OnetimeModeScreen from '../screens/main/OnetimeModeScreen';
 import CreateAuctionScreen from '../screens/main/CreateAuctionScreen';
@@ -105,6 +106,7 @@ const SCREEN_TITLES: Record<string, string> = {
   DisputeResolution: '분쟁 처리',
   LevelBenefits: '레벨 혜택',
   UnlockLocker: '사물함 열기',
+  RequesterDropoffLocker: '사물함 보관',
   OnetimeMode: '일회성 매칭',
   CreateAuction: '경매 생성',
   AuctionList: '경매 목록',
@@ -420,7 +422,12 @@ export default function MainNavigator() {
       <Stack.Screen
         name="UnlockLocker"
         component={UnlockLockerScreen}
-        options={{ headerShown: true }}
+        options={{ headerShown: false }}
+      />
+      <Stack.Screen
+        name="RequesterDropoffLocker"
+        component={RequesterDropoffLockerScreen}
+        options={{ headerShown: false }}
       />
       <Stack.Screen
         name="QRCodeScanner"
