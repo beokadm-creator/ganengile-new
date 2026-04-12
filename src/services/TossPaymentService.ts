@@ -1,4 +1,4 @@
-import { getPaymentIntegrationConfig } from './integration-config-service';
+import { getPaymentIntegrationConfig } from './config-service';
 
 // Toss Payments API Base URL
 const TOSS_API_URL = 'https://api.tosspayments.com/v1';
@@ -25,7 +25,8 @@ export class TossPaymentService {
       }
 
       // 실제 Toss Payments API 호출
-      const secretKey = config.secretKey;
+      const paymentConfig = await getPaymentIntegrationConfig();
+    const secretKey = paymentConfig.secretKey;
       if (!secretKey) throw new Error('Toss Payments 시크릿 키가 설정되지 않았습니다.');
 
       const encodedKey = Buffer.from(`${secretKey}:`).toString('base64');
@@ -70,7 +71,8 @@ export class TossPaymentService {
         return { paymentKey, status: 'DONE', totalAmount: 0 }; // Mock response
       }
 
-      const secretKey = config.secretKey;
+      const paymentConfig = await getPaymentIntegrationConfig();
+    const secretKey = paymentConfig.secretKey;
       if (!secretKey) throw new Error('Toss Payments 시크릿 키가 설정되지 않았습니다.');
 
       const encodedKey = Buffer.from(`${secretKey}:`).toString('base64');
@@ -100,7 +102,8 @@ export class TossPaymentService {
         return { success: true };
       }
 
-      const secretKey = config.secretKey;
+      const paymentConfig = await getPaymentIntegrationConfig();
+    const secretKey = paymentConfig.secretKey;
       if (!secretKey) throw new Error('Toss Payments 시크릿 키가 설정되지 않았습니다.');
 
       const encodedKey = Buffer.from(`${secretKey}:`).toString('base64');
@@ -149,7 +152,8 @@ export class TossPaymentService {
         return { success: true, transactionId: `test_transfer_${Date.now()}` };
       }
 
-      const secretKey = config.secretKey;
+      const paymentConfig = await getPaymentIntegrationConfig();
+    const secretKey = paymentConfig.secretKey;
       if (!secretKey) throw new Error('Toss Payments 시크릿 키가 설정되지 않았습니다.');
 
       // TODO: 실제 토스 펌뱅킹(지급 대행) API 엔드포인트 및 페이로드 규격에 맞게 연동

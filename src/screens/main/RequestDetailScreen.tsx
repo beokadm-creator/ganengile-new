@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -482,6 +482,7 @@ export default function RequestDetailScreen() {
       const result = await confirmDeliveryByRequester({
         deliveryId: delivery.deliveryId,
         requesterId: requireUserId(),
+        requestId: request.requestId,
       });
 
       if (!result.success) {

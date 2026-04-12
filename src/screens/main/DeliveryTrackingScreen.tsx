@@ -406,6 +406,7 @@ export default function DeliveryTrackingScreen(): JSX.Element {
       const result = await confirmDeliveryByRequester({
         deliveryId: delivery.deliveryId,
         requesterId: requireUserId(),
+        requestId,
       });
 
       if (!result.success) {

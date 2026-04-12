@@ -125,6 +125,7 @@ export default function UnlockLockerScreen() {
       const result = await confirmDeliveryByRequester({
         deliveryId,
         requesterId,
+        requestId: reservation.requestId,
       });
 
       if (!result.success) {

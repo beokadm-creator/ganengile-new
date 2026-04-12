@@ -147,7 +147,7 @@ export default function GillerPickupFromLockerScreen({ route, navigation }: Prop
       const result = await confirmDeliveryByRequester({
         deliveryId: delivery.deliveryId,
         requesterId,
-        notes: 'Locker pickup confirmed by requester.',
+        requestId,
       });
 
       if (!result.success) {

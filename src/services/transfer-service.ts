@@ -131,7 +131,7 @@ export class TransferService {
 
     // 2. 지하철 요금 (거리/시간 기반 추정)
     // 정책에 명시된 기본 대중교통 요금 사용
-    let subwayFee = policy.publicFare ?? 1400;
+    let subwayFee = policy.basePublicFare ?? 1400;
     if (totalTravelTime && totalTravelTime > 30) {
       subwayFee += 200; // 단순 예시: 30분 초과 시 200원 추가
     }

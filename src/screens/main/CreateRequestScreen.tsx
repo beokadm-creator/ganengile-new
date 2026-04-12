@@ -396,6 +396,7 @@ export default function CreateRequestScreen({ navigation, route }: Props) {
   const [recipientPhone, setRecipientPhone] = useState(prefill?.recipientPhone ?? '');
   const [pickupLocationDetail, setPickupLocationDetail] = useState(prefill?.pickupLocationDetail ?? '');
   const [storageLocation, setStorageLocation] = useState(prefill?.storageLocation ?? '');
+  const [lockerId, setLockerId] = useState<string | null>(prefill?.lockerId ?? null);
   const [specialInstructions, setSpecialInstructions] = useState(prefill?.specialInstructions ?? '');
   const [directMode, setDirectMode] = useState<'none' | 'requester_to_station' | 'locker_assisted'>(
     prefill?.directParticipationMode ?? 'none'

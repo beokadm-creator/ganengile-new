@@ -537,7 +537,7 @@ export const deliveryLifecycleService = {
       };
     } catch (error) {
       console.error('Error accepting request:', error);
-      return { success: false, message: '수락에 실패했습니다.', error: String(error) };
+      return { success: false, message: '수락에 실패했습니다.' };
     }
   },
 
@@ -653,7 +653,7 @@ export const deliveryLifecycleService = {
 
         let depositStatus: DeliveryCancellationResult['depositStatus'] = deposit ? 'unchanged' : 'not_found';
         if (deposit?.depositId) {
-          const refundResult = await DepositService.refundDeposit(deposit.depositId, '사용자 요청 취소에 의한 환불');
+          const refundResult = await DepositService.refundDeposit(deposit.depositId);
           depositStatus = refundResult.success ? 'refunded' : 'failed';
         }
 
@@ -727,7 +727,7 @@ export const deliveryLifecycleService = {
 
           let depositStatus: DeliveryCancellationResult['depositStatus'] = deposit ? 'unchanged' : 'not_found';
           if (deposit?.depositId) {
-            const deductionResult = await DepositService.deductCompensation(deposit.depositId, '길러의 픽업 후 무단 취소에 의한 보상금 차감');
+            const deductionResult = await DepositService.deductCompensation(deposit.depositId);
             depositStatus = deductionResult.success ? 'deducted' : 'failed';
           }
 

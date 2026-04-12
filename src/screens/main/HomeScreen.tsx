@@ -187,6 +187,12 @@ export default function HomeScreen({ navigation }: { navigation: MainStackNaviga
             subtitle="포인트 확인"
             onPress={() => navigation.navigate('PointHistory')}
           />
+          <ActionCard
+            icon="inventory-2"
+            title="사물함 보기"
+            subtitle="가까운 사물함 확인"
+            onPress={() => navigation.navigate('LockerMap')}
+          />
         </View>
       </View>
 

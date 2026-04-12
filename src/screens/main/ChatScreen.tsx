@@ -19,7 +19,7 @@ import { createChatService } from '../../services/chat-service';
 import { getBeta1ChatContext, type Beta1ChatContext } from '../../services/beta1-orchestration-service';
 import { useUser } from '../../contexts/UserContext';
 import { BorderRadius, Colors, Spacing, Typography } from '../../theme';
-import { MessageType, type ChatMessage } from '../../types/chat';
+import { MessageType, type ChatMessage, type ChatRoom } from '../../types/chat';
 import type { MainStackParamList } from '../../types/navigation';
 
 type ChatRoute = RouteProp<MainStackParamList, 'Chat'>;
@@ -31,6 +31,7 @@ export default function ChatScreen() {
   const insets = useSafeAreaInsets();
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [context, setContext] = useState<Beta1ChatContext | null>(null);
+  const [chatRoom, setChatRoom] = useState<ChatRoom | null>(null);
   const [loading, setLoading] = useState(true);
   const [sending, setSending] = useState(false);
   const [input, setInput] = useState('');
@@ -64,9 +65,14 @@ export default function ChatScreen() {
 
     const loadContext = async () => {
       try {
-        const nextContext = await getBeta1ChatContext(route.params.chatRoomId);
+        const chatService = createChatService();
+        const [nextContext, room] = await Promise.all([
+          getBeta1ChatContext(route.params.chatRoomId),
+          chatService.getChatRoom(route.params.chatRoomId)
+        ]);
         if (!cancelled) {
           setContext(nextContext);
+          setChatRoom(room);
         }
       } catch (error) {
         console.error('Failed to load chat context', error);

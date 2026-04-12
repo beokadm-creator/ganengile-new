@@ -39,7 +39,7 @@ export const deliverySettlementService = {
 
     const tracking = deliveryData.tracking || { events: [] };
     tracking.events.push({
-      type: 'completed',
+      type: 'delivered',
       description: '수령 확인 완료',
       timestamp: new Date(),
     });
@@ -52,7 +52,7 @@ export const deliverySettlementService = {
       const deposit = await DepositService.getDepositByRequestId(requestId);
       if (deposit && deposit.status === 'paid' && deposit.depositId) {
         try {
-          await DepositService.refundDeposit(deposit.depositId, '배송 완료 환불');
+          await DepositService.refundDeposit(deposit.depositId);
         } catch (e) {
           console.error('보증금 환불 실패:', e);
         }
@@ -61,13 +61,13 @@ export const deliverySettlementService = {
       // 2. 길러 수익 정산 (payment-service 위임)
       if (deliveryData.gillerId) {
         try {
-          const totalFee = deliveryData.fee?.totalFee || deliveryData.totalFee || 0;
+          const totalFee = deliveryData.fee?.totalFee || 0;
           await createGillerEarning(
             deliveryData.gillerId,
             requestId,
-            deliveryData.id,
             totalFee,
-            '배송 수익금 (수수료/세금 공제 전)'
+            true,
+            { description: '배송 수익금 (수수료/세금 공제 전)' }
           );
         } catch (e) {
           console.error('길러 수익 창출 실패:', e);
