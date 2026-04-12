@@ -53,13 +53,24 @@ export async function GET(req: NextRequest) {
     const thresholdMs = (Number.isFinite(thresholdMinutes) ? thresholdMinutes : 15) * 60 * 1000;
     const thresholdDate = new Date(Date.now() - thresholdMs);
 
-    const snap = await db
-      .collection('requests')
-      .where('status', 'in', ['pending', 'matched'])
-      .where('createdAt', '<=', thresholdDate)
-      .orderBy('createdAt', 'asc')
-      .limit(200)
-      .get();
+    let snap;
+
+    try {
+      snap = await db
+        .collection('requests')
+        .where('status', 'in', ['pending', 'matched'])
+        .where('createdAt', '<=', thresholdDate)
+        .orderBy('createdAt', 'asc')
+        .limit(200)
+        .get();
+    } catch (queryError) {
+      console.warn('[admin/delayed-requests] primary query failed, using fallback query', queryError);
+      snap = await db
+        .collection('requests')
+        .orderBy('createdAt', 'asc')
+        .limit(400)
+        .get();
+    }
 
     const items = snap.docs.map((snapshot) => {
       const raw = (snapshot.data() as UnknownRecord) ?? {};
@@ -97,7 +108,24 @@ export async function GET(req: NextRequest) {
         opsMemo: asString(raw.opsMemo),
         opsLastReviewedAt: toDate(raw.opsLastReviewedAt)?.toISOString() ?? null,
       };
-    });
+    })
+      .filter((item) => {
+        if (!['pending', 'matched'].includes(item.status)) {
+          return false;
+        }
+
+        if (!item.createdAt) {
+          return false;
+        }
+
+        return new Date(item.createdAt).getTime() <= thresholdDate.getTime();
+      })
+      .sort((a, b) => {
+        const left = a.createdAt ? new Date(a.createdAt).getTime() : Number.MAX_SAFE_INTEGER;
+        const right = b.createdAt ? new Date(b.createdAt).getTime() : Number.MAX_SAFE_INTEGER;
+        return left - right;
+      })
+      .slice(0, 200);
 
     return NextResponse.json({ items, thresholdMinutes: Math.max(1, Math.floor(thresholdMs / 60000)) });
   } catch (error: unknown) {
