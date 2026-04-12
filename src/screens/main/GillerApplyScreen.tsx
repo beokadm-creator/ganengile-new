@@ -11,6 +11,7 @@ import {
   TextInput,
   TouchableOpacity,
   View,
+  BackHandler,
 } from 'react-native';
 import { addDoc, collection, doc, serverTimestamp, setDoc } from 'firebase/firestore';
 import { useFocusEffect } from '@react-navigation/native';
@@ -149,12 +150,22 @@ export default function GillerApplyScreen({ navigation }: { navigation: MainStac
   };
 
   const handleBack = () => {
-    if (step === 1) {
-      navigation.goBack();
-      return;
+    if (step === 1 || user?.gillerApplicationStatus === 'pending') {
+      if (navigation.canGoBack()) {
+        navigation.goBack();
+      } else {
+        navigation.navigate('Tabs', { screen: 'Profile' });
+      }
+      return true;
     }
     setStep((current) => current - 1);
+    return true;
   };
+
+  useEffect(() => {
+    const subscription = BackHandler.addEventListener('hardwareBackPress', handleBack);
+    return () => subscription.remove();
+  }, [step, user?.gillerApplicationStatus, navigation]);
 
   const handleSubmit = async () => {
     setSubmitHint('');
@@ -343,6 +354,37 @@ export default function GillerApplyScreen({ navigation }: { navigation: MainStac
     }
   };
 
+  if (user?.gillerApplicationStatus === 'pending') {
+    return (
+      <View style={styles.container}>
+        <AppTopBar title="길러 전환 신청" onBack={handleBack} />
+        <View style={styles.centerState}>
+          <Text style={styles.statusHeadline}>심사 중입니다</Text>
+          <Text style={styles.statusBody}>길러 전환 신청이 접수되어 검토 중입니다.</Text>
+          <Text style={styles.statusBody}>승인 완료 후 활동 권역과 동선을 등록할 수 있습니다.</Text>
+          <TouchableOpacity style={styles.primaryAction} onPress={handleBack} activeOpacity={0.9}>
+            <Text style={styles.primaryActionText}>프로필로 돌아가기</Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+    );
+  }
+
+  if (user?.gillerApplicationStatus === 'approved') {
+    return (
+      <View style={styles.container}>
+        <AppTopBar title="길러 전환 신청" onBack={handleBack} />
+        <View style={styles.centerState}>
+          <Text style={styles.statusHeadline}>승인 완료</Text>
+          <Text style={styles.statusBody}>이미 길러로 승인되었습니다.</Text>
+          <TouchableOpacity style={styles.primaryAction} onPress={handleBack} activeOpacity={0.9}>
+            <Text style={styles.primaryActionText}>길러 메뉴로 가기</Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+    );
+  }
+
   return (
     <KeyboardAvoidingView style={styles.container} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
       <AppTopBar title="길러 전환 신청" onBack={handleBack} />
@@ -424,6 +466,14 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: Colors.background,
+  },
+  centerState: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: Colors.background,
+    paddingHorizontal: 20,
+    gap: 12,
   },
   progressTrack: {
     height: 6,
