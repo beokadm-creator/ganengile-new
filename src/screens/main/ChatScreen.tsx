@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
+  Alert,
   FlatList,
   KeyboardAvoidingView,
   Platform,
@@ -11,7 +12,7 @@ import {
   View,
 } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
-import { RouteProp, useRoute } from '@react-navigation/native';
+import { RouteProp, useNavigation, useRoute } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { createChatService } from '../../services/chat-service';
@@ -25,6 +26,7 @@ type ChatRoute = RouteProp<MainStackParamList, 'Chat'>;
 
 export default function ChatScreen() {
   const route = useRoute<ChatRoute>();
+  const navigation = useNavigation<any>();
   const { user, loading: userLoading } = useUser();
   const insets = useSafeAreaInsets();
   const [messages, setMessages] = useState<ChatMessage[]>([]);
@@ -104,8 +106,7 @@ export default function ChatScreen() {
         <ActivityIndicator size="large" color={Colors.primary} />
         <Text style={styles.loaderText}>채팅을 불러오는 중입니다.</Text>
       </View>
-    );
-  }
+  );
 
   return (
     <KeyboardAvoidingView
@@ -114,10 +115,31 @@ export default function ChatScreen() {
       keyboardVerticalOffset={Platform.OS === 'ios' ? 88 : 0}
     >
       <View style={styles.topPanel}>
-        <Text style={styles.chatTitle}>{context?.title ?? route.params.otherUserName}</Text>
-        <Text style={styles.chatSubtitle}>
-          {context?.subtitle ?? '배송 진행 상황과 필요한 이야기만 간단히 주고받습니다.'}
-        </Text>
+        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.chatTitle}>{context?.title ?? route.params.otherUserName}</Text>
+            <Text style={styles.chatSubtitle}>
+              {context?.subtitle ?? '배송 진행 상황과 필요한 이야기만 간단히 주고받습니다.'}
+            </Text>
+          </View>
+          <TouchableOpacity
+            style={{ padding: 4 }}
+            onPress={() => {
+              Alert.alert('문제 신고', '배송과 관련하여 문제가 발생했나요? 관리자에게 신고할 수 있습니다.', [
+                { text: '취소', style: 'cancel' },
+                {
+                  text: '신고하기',
+                  style: 'destructive',
+                  onPress: () => {
+                    navigation.navigate('DisputeReport', { deliveryId: route.params.chatRoomId });
+                  },
+                },
+              ]);
+            }}
+          >
+            <MaterialIcons name="error-outline" size={24} color={Colors.textTertiary} />
+          </TouchableOpacity>
+        </View>
 
         <View style={styles.contextCard}>
           <View style={styles.contextHeader}>

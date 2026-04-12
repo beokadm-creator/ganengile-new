@@ -89,12 +89,9 @@ export class DepositCompensationService {
         return { success: false, error: 'Deposit is not paid' };
       }
 
-      await PointService.spendPoints(
-        deposit.userId,
-        deposit.depositAmount,
-        PointCategory.DEPOSIT_COMPENSATION,
-        `사고/분실에 따른 보증금 배상 차감 (${deposit.depositAmount.toLocaleString()}원)`
-      );
+      // 1. 이미 보증금 결제 시점(payDeposit)에서 Giller의 포인트가 차감되었고,
+      // Toss 결제도 승인되었으므로 여기서 Giller의 포인트를 한 번 더 차감(spendPoints)하면 이중 차감 버그가 발생합니다.
+      // 보증금은 플랫폼이 '보관(hold)' 중인 상태이므로, 단순히 상태만 'deducted'로 변경하여 환불을 불가하게 만듭니다.
 
       await updateDoc(ref, {
         status: 'deducted' as DepositStatus,
@@ -102,6 +99,9 @@ export class DepositCompensationService {
         compensationAmount: deposit.depositAmount,
         updatedAt: Timestamp.now(),
       });
+
+      // TODO: (추가 정책에 따라) 차감된 보증금을 요청자(Requester)에게 포인트로 보상금 지급(earnPoints)하는 로직을 여기에 추가할 수 있습니다.
+      // 예: await PointService.earnPoints(deposit.gllerId, deposit.depositAmount, PointCategory.DISPUTE_COMPENSATION, ...);
 
       return { success: true };
     } catch (error: any) {
