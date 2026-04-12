@@ -196,6 +196,7 @@ export const useCreateRequestStore = create<CreateRequestState>((set) => ({
 
   hydrateFromDraft: (draft) => set((state) => {
     return {
+      activeStep: 1, // ALWAYS start at step 1 to let users review restored data
       requestMode: draft.requestMode as RequestMode ?? 'immediate',
       pickupMode: draft.pickupMode ?? 'station',
       deliveryMode: draft.deliveryMode ?? 'station',
