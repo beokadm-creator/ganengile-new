@@ -21,9 +21,9 @@ interface DisputeDoc {
   };
 }
 
-interface DeliveryRequestDoc {
-  pickupStation?: { stationName?: string; lat?: number; lng?: number };
-  deliveryStation?: { stationName?: string; lat?: number; lng?: number };
+interface RequestDoc {
+  fromLocation?: { stationName?: string; lat?: number; lng?: number };
+  toLocation?: { stationName?: string; lat?: number; lng?: number };
 }
 
 interface ResolvePayload {
@@ -56,12 +56,12 @@ function normalizeDisputeItem(id: string, data: DisputeDoc, requestData?: Delive
         }
       : undefined,
     geo:
-      requestData?.pickupStation && requestData?.deliveryStation
-        ? {
-            pickup: requestData.pickupStation,
-            dropoff: requestData.deliveryStation,
-          }
-        : null,
+          requestData?.fromLocation && requestData?.toLocation
+            ? {
+                pickup: requestData.fromLocation,
+                dropoff: requestData.toLocation,
+              }
+            : null,
   };
 }
 
@@ -95,9 +95,9 @@ export async function GET(req: NextRequest) {
 
   const requestEntries = await Promise.all(
     requestIds.map(async (requestId) => {
-      const requestSnap = await db.collection('delivery_requests').doc(requestId).get();
-      return [requestId, (requestSnap.data() as DeliveryRequestDoc | undefined) ?? undefined] as const;
-    })
+        const requestSnap = await db.collection('requests').doc(requestId).get();
+        return [requestId, (requestSnap.data() as RequestDoc | undefined) ?? undefined] as const;
+      })
   );
 
   const requestMap = new Map(requestEntries);

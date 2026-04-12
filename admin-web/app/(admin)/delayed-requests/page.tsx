@@ -73,10 +73,25 @@ export default function DelayedRequestsPage() {
     setLoading(true);
     try {
       const res = await fetch('/api/admin/delayed-requests');
-      const json = (await res.json()) as {
+      if (!res.ok) {
+        let errorMsg = 'Failed to fetch delayed requests';
+        try {
+          const errorData = await res.json();
+          errorMsg = errorData.error || errorMsg;
+        } catch {
+          // ignore json parse error
+        }
+        throw new Error(errorMsg);
+      }
+      
+      const text = await res.text();
+      if (!text) throw new Error('Empty response received from server');
+      
+      const json = JSON.parse(text) as {
         items?: DelayedRequestItem[];
         thresholdMinutes?: number;
       };
+      
       const nextItems = json.items ?? [];
       setItems(nextItems);
       setThresholdMinutes(json.thresholdMinutes ?? 15);
@@ -86,6 +101,9 @@ export default function DelayedRequestsPage() {
         setOpsMemo(nextSelected?.opsMemo ?? '');
         setOpsPriority(nextSelected?.opsPriority ?? 'normal');
       }
+    } catch (error) {
+      console.error('지연 요청 데이터를 불러오는 중 오류가 발생했습니다:', error);
+      // alert 등 추가적인 에러 처리 가능
     } finally {
       setLoading(false);
     }
@@ -96,7 +114,7 @@ export default function DelayedRequestsPage() {
 
     setSaving(selected.id);
     try {
-      await fetch('/api/admin/delayed-requests', {
+      const res = await fetch('/api/admin/delayed-requests', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -105,7 +123,13 @@ export default function DelayedRequestsPage() {
           opsMemo,
         }),
       });
+      if (!res.ok) {
+        throw new Error('Failed to save ops state');
+      }
       await load();
+    } catch (error) {
+      console.error('상태 저장 중 오류가 발생했습니다:', error);
+      alert('상태 저장에 실패했습니다.');
     } finally {
       setSaving(null);
     }

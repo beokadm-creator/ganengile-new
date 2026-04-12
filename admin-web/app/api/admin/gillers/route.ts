@@ -78,7 +78,6 @@ interface GillerApplicationItem {
   userId?: string;
   userName?: string;
   phone?: string;
-  routeDescription?: string;
   verificationStatus?: string;
   status: string;
   createdAt?: unknown;
@@ -136,12 +135,6 @@ export async function GET(req: NextRequest) {
           userId: doc.id,
           userName: typeof user.name === 'string' ? user.name : '',
           phone: typeof user.phoneNumber === 'string' ? user.phoneNumber : '',
-          routeDescription:
-            typeof user?.gillerInfo === 'object' &&
-            user.gillerInfo !== null &&
-            typeof (user.gillerInfo as Record<string, unknown>).activeRoute === 'string'
-              ? ((user.gillerInfo as Record<string, unknown>).activeRoute as string)
-              : '',
           verificationStatus: user.isVerified ? 'approved' : 'not_submitted',
           identityTestMode: false,
           identityLiveReady: false,

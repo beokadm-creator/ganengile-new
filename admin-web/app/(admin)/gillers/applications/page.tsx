@@ -9,8 +9,6 @@ interface GillerApplication {
   userId: string;
   userName?: string;
   phone?: string;
-  routeDescription?: string;
-  selfIntroduction?: string;
   verificationStatus?: string;
   bankAccount?: {
     bankName?: string;
@@ -73,12 +71,10 @@ function asGillerApplication(value: unknown): GillerApplication | null {
     userId: typeof record.userId === 'string' ? record.userId : '',
     userName: typeof record.userName === 'string' ? record.userName : undefined,
     phone: typeof record.phone === 'string' ? record.phone : undefined,
-    routeDescription:
-      typeof record.routeDescription === 'string' ? record.routeDescription : undefined,
-    selfIntroduction:
-      typeof record.selfIntroduction === 'string' ? record.selfIntroduction : undefined,
     verificationStatus:
       typeof record.verificationStatus === 'string' ? record.verificationStatus : undefined,
+    verificationProvider:
+      typeof record.verificationProvider === 'string' ? record.verificationProvider : undefined,
     bankAccount: asBankAccount(record.bankAccount),
     status: record.status,
     createdAt:
@@ -230,7 +226,6 @@ export default function GillerApplicationsPage() {
             <thead className="bg-slate-50 text-xs text-slate-500">
               <tr>
                 <th className="px-4 py-3 text-left">신청자</th>
-                <th className="px-4 py-3 text-left">주요 이동 구간</th>
                 <th className="px-4 py-3 text-left">본인 확인</th>
                 <th className="px-4 py-3 text-left">계좌 인증</th>
                 <th className="px-4 py-3 text-left">심사 상태</th>
@@ -251,9 +246,6 @@ export default function GillerApplicationsPage() {
                     <td className="px-4 py-3">
                       <div className="font-medium text-slate-900">{item.userName ?? '(이름 없음)'}</div>
                       <div className="mt-1 text-xs text-slate-500">{item.phone ?? '-'}</div>
-                    </td>
-                    <td className="max-w-xs px-4 py-3 text-slate-600">
-                      <div className="truncate">{item.routeDescription ?? '-'}</div>
                     </td>
                     <td className="px-4 py-3">
                       <div className="flex flex-col gap-1">
@@ -335,7 +327,6 @@ export default function GillerApplicationsPage() {
                   <h3 className="mb-3 font-semibold text-slate-900">기본 정보</h3>
                   <ReviewRow label="신청자" value={selected.userName ?? '-'} />
                   <ReviewRow label="연락처" value={selected.phone ?? '-'} />
-                  <ReviewRow label="주요 이동 구간" value={selected.routeDescription ?? '-'} />
                   <ReviewRow label="신청일" value={formatDate(selected.createdAt)} />
                 </section>
 
@@ -387,13 +378,6 @@ export default function GillerApplicationsPage() {
                   />
                 </section>
               </div>
-
-              {selected.selfIntroduction ? (
-                <section className="mt-4 rounded-xl border border-slate-200 p-4">
-                  <h3 className="mb-2 text-sm font-semibold text-slate-900">자기소개</h3>
-                  <p className="text-sm leading-6 text-slate-700">{selected.selfIntroduction}</p>
-                </section>
-              ) : null}
 
               <div className="mt-4 rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
                 본인 확인 또는 계좌 인증이 테스트 우회 상태일 수 있습니다. 지금 단계에서는 승급 심사가

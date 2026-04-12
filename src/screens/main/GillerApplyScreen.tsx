@@ -30,7 +30,7 @@ import AppTopBar from '../../components/common/AppTopBar';
 import BankSelectModal from '../../components/common/BankSelectModal';
 import { createProtectedBankAccount } from '../../../shared/bank-account';
 
-const TOTAL_STEPS = 4;
+const TOTAL_STEPS = 3;
 const ACCENT = Colors.primary;
 
 export default function GillerApplyScreen({ navigation }: { navigation: MainStackNavigationProp }) {
@@ -44,9 +44,6 @@ export default function GillerApplyScreen({ navigation }: { navigation: MainStac
   const [submitHint, setSubmitHint] = useState('');
   const [bankModalVisible, setBankModalVisible] = useState(false);
 
-  const [phone, setPhone] = useState(user?.phoneNumber ?? '');
-  const [routeDescription, setRouteDescription] = useState('');
-  const [selfIntroduction, setSelfIntroduction] = useState('');
   const [bankName, setBankName] = useState('');
   const [accountNumber, setAccountNumber] = useState('');
   const [accountHolder, setAccountHolder] = useState(user?.name ?? '');
@@ -88,32 +85,12 @@ export default function GillerApplyScreen({ navigation }: { navigation: MainStac
   );
 
   useEffect(() => {
-    if (step === 3 && verification?.status === 'approved') {
-      setStep(4);
+    if (step === 2 && verification?.status === 'approved') {
+      setStep(3);
     }
   }, [step, verification?.status]);
 
-  const steps = ['안내', '기본 정보', '본인확인', '정산 계좌'];
-
-  const validateProfileStep = () => {
-    if (!phone.trim()) {
-      Alert.alert('입력 확인', '연락처를 입력해 주세요.');
-      return false;
-    }
-
-    const cleaned = phone.replace(/-/g, '');
-    if (!/^010[0-9]{8}$/.test(cleaned)) {
-      Alert.alert('입력 확인', '휴대폰 번호를 확인해 주세요.');
-      return false;
-    }
-
-    if (!routeDescription.trim()) {
-      Alert.alert('입력 확인', '주요 이동 구간을 입력해 주세요.');
-      return false;
-    }
-
-    return true;
-  };
+  const steps = ['안내', '본인확인', '정산 계좌'];
 
   const validateIdentityStep = () => {
     if (!identityConfig?.requiredForGillerUpgrade) {
@@ -161,13 +138,10 @@ export default function GillerApplyScreen({ navigation }: { navigation: MainStac
   };
 
   const handleNext = async () => {
-    if (step === 2 && !validateProfileStep()) {
+    if (step === 2 && !validateIdentityStep()) {
       return;
     }
-    if (step === 3 && !validateIdentityStep()) {
-      return;
-    }
-    if (step === 4) {
+    if (step === 3) {
       await handleSubmit();
       return;
     }
@@ -208,9 +182,7 @@ export default function GillerApplyScreen({ navigation }: { navigation: MainStac
       await addDoc(collection(db, 'giller_applications'), {
         userId: user.uid,
         userName: user.name,
-        phone: phone.trim(),
-        routeDescription: routeDescription.trim(),
-        selfIntroduction: selfIntroduction.trim(),
+        phone: user.phoneNumber ?? '',
         verificationStatus:
           identityTestMode && identityConfig?.allowTestBypass
             ? 'approved_test_bypass'
@@ -252,7 +224,7 @@ export default function GillerApplyScreen({ navigation }: { navigation: MainStac
       );
 
       await refreshUser();
-      Alert.alert('신청 완료', '길러 전환 신청이 접수되었습니다.', [
+      Alert.alert('신청 완료', '길러 전환 신청이 접수되었습니다.\n승인 완료 후 활동 권역과 동선을 등록해 주세요.', [
         { text: '확인', onPress: () => navigation.navigate('Tabs', { screen: 'Profile' }) },
       ]);
     } catch (error) {
@@ -298,34 +270,6 @@ export default function GillerApplyScreen({ navigation }: { navigation: MainStac
         );
       case 2:
         return (
-          <ScrollView style={styles.stepContent} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
-            <Text style={styles.stepTitle}>기본 정보</Text>
-            <Text style={styles.stepDescription}>길러 역할 심사에 필요한 연락처와 활동 정보를 입력해 주세요.</Text>
-
-            <InputField
-              label="연락처"
-              value={phone}
-              onChangeText={setPhone}
-              placeholder="010-0000-0000"
-              keyboardType="phone-pad"
-            />
-            <InputField
-              label="주요 이동 구간"
-              value={routeDescription}
-              onChangeText={setRouteDescription}
-              placeholder="예: 강남-여의도, 평일 저녁 이동"
-            />
-            <InputField
-              label="소개"
-              value={selfIntroduction}
-              onChangeText={setSelfIntroduction}
-              placeholder="선택 입력"
-              multiline
-            />
-          </ScrollView>
-        );
-      case 3:
-        return (
           <ScrollView style={styles.stepContent} showsVerticalScrollIndicator={false}>
             <Text style={styles.stepTitle}>본인확인</Text>
             <Text style={styles.stepDescription}>길러 전환을 위한 본인확인 상태를 확인합니다.</Text>
@@ -340,7 +284,7 @@ export default function GillerApplyScreen({ navigation }: { navigation: MainStac
             </View>
 
             {verification?.status === 'approved' ? (
-              <TouchableOpacity style={styles.secondaryAction} onPress={() => setStep(4)} activeOpacity={0.9}>
+              <TouchableOpacity style={styles.secondaryAction} onPress={() => setStep(3)} activeOpacity={0.9}>
                 <Text style={styles.secondaryActionText}>다음 단계</Text>
               </TouchableOpacity>
             ) : (

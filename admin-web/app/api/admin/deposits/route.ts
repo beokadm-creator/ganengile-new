@@ -14,9 +14,11 @@ interface DepositDoc {
   createdAt?: unknown;
 }
 
-interface DeliveryRequestDoc {
-  pickupStation?: { stationName?: string; lat?: number; lng?: number };
-  deliveryStation?: { stationName?: string; lat?: number; lng?: number };
+interface RequestDoc {
+  fromLocation?: LocationData;
+  toLocation?: LocationData;
+  requesterId?: string;
+  gllerId?: string;
 }
 
 interface DepositActionPayload {
@@ -59,9 +61,9 @@ export async function GET(req: NextRequest) {
 
   const requestEntries = await Promise.all(
     requestIds.map(async (requestId) => {
-      const requestSnap = await db.collection('delivery_requests').doc(requestId).get();
-      return [requestId, (requestSnap.data() as DeliveryRequestDoc | undefined) ?? undefined] as const;
-    })
+        const requestSnap = await db.collection('requests').doc(requestId).get();
+        return [requestId, (requestSnap.data() as RequestDoc | undefined) ?? undefined] as const;
+      })
   );
 
   const requestMap = new Map(requestEntries);
@@ -79,10 +81,10 @@ export async function GET(req: NextRequest) {
       status: entry.data.status ?? status,
       createdAt: entry.data.createdAt ?? new Date().toISOString(),
       geo:
-        requestData?.pickupStation && requestData?.deliveryStation
+        requestData?.fromLocation && requestData?.toLocation
           ? {
-              pickup: requestData.pickupStation,
-              dropoff: requestData.deliveryStation,
+              pickup: requestData.fromLocation,
+              dropoff: requestData.toLocation,
             }
           : null,
     };

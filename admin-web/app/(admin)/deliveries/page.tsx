@@ -20,6 +20,32 @@ export default function DeliveriesPage() {
   const [tab, setTab] = useState<'active' | 'done'>('active');
   const [items, setItems] = useState<Delivery[]>([]);
   const [loading, setLoading] = useState(true);
+  const [updatingId, setUpdatingId] = useState<string | null>(null);
+
+  async function updateStatus(id: string, newStatus: string) {
+    if (!confirm(`배송 상태를 '${statusLabel(newStatus)}'(으)로 강제 변경하시겠습니까?`)) return;
+    
+    setUpdatingId(id);
+    try {
+      const res = await fetch(`/api/admin/deliveries/${id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: newStatus }),
+      });
+
+      if (res.ok) {
+        setItems((prev) =>
+          prev.map((item) => (item.id === id ? { ...item, status: newStatus } : item))
+        );
+      } else {
+        alert('상태 업데이트에 실패했습니다.');
+      }
+    } catch (error) {
+      alert('오류가 발생했습니다.');
+    } finally {
+      setUpdatingId(null);
+    }
+  }
 
   async function loadData(t: string) {
     setLoading(true);
@@ -99,9 +125,29 @@ export default function DeliveriesPage() {
                   </td>
                   <td className="px-4 py-3 text-gray-500 text-xs">{formatDate(item.createdAt)}</td>
                   <td className="px-4 py-3">
-                    <span className={`px-2 py-1 rounded-full text-xs font-medium ${statusColor(item.status)}`}>
-                      {statusLabel(item.status)}
-                    </span>
+                    <select
+                      value={item.status}
+                      onChange={(e) => updateStatus(item.id, e.target.value)}
+                      disabled={updatingId === item.id}
+                      className={`px-2 py-1 rounded-full text-xs font-medium cursor-pointer border-0 outline-none ring-1 ring-inset ring-gray-200 focus:ring-2 focus:ring-indigo-600 appearance-none text-center ${statusColor(item.status)} ${updatingId === item.id ? 'opacity-50 cursor-not-allowed' : ''}`}
+                    >
+                      <optgroup label="진행중">
+                        <option value="pending" className="bg-white text-gray-900">대기 중</option>
+                        <option value="matched" className="bg-white text-gray-900">매칭 완료</option>
+                        <option value="accepted" className="bg-white text-gray-900">수락됨</option>
+                        <option value="picked_up" className="bg-white text-gray-900">픽업 완료</option>
+                        <option value="in_transit" className="bg-white text-gray-900">이동 중</option>
+                        <option value="arrived" className="bg-white text-gray-900">도착</option>
+                        <option value="at_locker" className="bg-white text-gray-900">보관함 도착</option>
+                        <option value="handover_pending" className="bg-white text-gray-900">인계 대기</option>
+                        <option value="last_mile_in_progress" className="bg-white text-gray-900">라스트마일 진행중</option>
+                      </optgroup>
+                      <optgroup label="완료/취소">
+                        <option value="completed" className="bg-white text-gray-900">완료</option>
+                        <option value="cancelled" className="bg-white text-gray-900">취소</option>
+                        <option value="failed" className="bg-white text-gray-900">실패</option>
+                      </optgroup>
+                    </select>
                   </td>
                 </tr>
               ))}

@@ -231,6 +231,18 @@ export interface User {
   };
 }
 
+export interface GillerInfo {
+  level: number;
+  experience: number;
+  completedDeliveries: number;
+  rating: number;
+  activeRoute?: string;
+  territoryId?: string;
+  vehicleType?: string;
+  bankAccount?: GillerBankAccount;
+  identityVerificationStatus?: 'not_submitted' | 'pending' | 'approved' | 'approved_test_bypass' | 'rejected';
+}
+
 /**
  * 회원가입 폼 데이터
  */

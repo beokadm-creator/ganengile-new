@@ -1,8 +1,8 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextResponse, type NextRequest } from 'next/server';
 import { getAdminDb } from '@/lib/firebase-admin';
 import { isAdmin } from '@/lib/auth';
 
-const ACTIVE_STATUSES = ['matched', 'picked_up', 'in_locker', 'pending'];
+const ACTIVE_STATUSES = ['accepted', 'picked_up', 'in_transit', 'arrived', 'at_locker', 'handover_pending', 'last_mile_in_progress'];
 const DONE_STATUSES = ['completed', 'cancelled', 'failed'];
 
 export async function GET(req: NextRequest) {
@@ -15,7 +15,7 @@ export async function GET(req: NextRequest) {
   const statuses = tab === 'active' ? ACTIVE_STATUSES : DONE_STATUSES;
 
   const snap = await db
-    .collection('delivery_requests')
+    .collection('deliveries')
     .where('status', 'in', statuses)
     .orderBy('createdAt', 'desc')
     .limit(100)

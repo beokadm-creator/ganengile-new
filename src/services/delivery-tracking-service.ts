@@ -14,7 +14,17 @@ import { locationService, type LocationData } from './location-service';
 export interface DeliveryStatus {
   id: string;
   requestId: string;
-  status: 'pending' | 'matched' | 'picked_up' | 'in_transit' | 'delivered' | 'cancelled';
+  status:
+    | 'pending'
+    | 'matched'
+    | 'accepted'
+    | 'picked_up'
+    | 'in_transit'
+    | 'arrived'
+    | 'at_locker'
+    | 'delivered'
+    | 'completed'
+    | 'cancelled';
   gillerId: string;
   gillerLocation?: LocationData;
   currentStation?: string;
@@ -44,27 +54,34 @@ interface DeliveryTrackingDoc extends DocumentData {
 const PROGRESS_MAP: Record<DeliveryStatus['status'], number> = {
   pending: 0,
   matched: 10,
+  accepted: 20,
   picked_up: 30,
   in_transit: 60,
+  arrived: 80,
+  at_locker: 90,
   delivered: 100,
+  completed: 100,
   cancelled: 0,
 };
 
 const AVERAGE_DELIVERY_TIME_MINUTES = 30;
 
 function toValidStatus(value: unknown): DeliveryStatus['status'] {
-  if (
-    value === 'pending' ||
-    value === 'matched' ||
-    value === 'picked_up' ||
-    value === 'in_transit' ||
-    value === 'delivered' ||
-    value === 'cancelled'
-  ) {
-    return value;
-  }
-
-  return 'pending';
+  const validStatuses: Array<DeliveryStatus['status']> = [
+    'pending',
+    'matched',
+    'accepted',
+    'picked_up',
+    'in_transit',
+    'arrived',
+    'at_locker',
+    'delivered',
+    'completed',
+    'cancelled',
+  ];
+  return validStatuses.includes(value as DeliveryStatus['status'])
+    ? (value as DeliveryStatus['status'])
+    : 'pending';
 }
 
 function formatEta(date: Date): string {
@@ -223,7 +240,7 @@ export class DeliveryTrackingService {
   ): { eta: string; isDelayed?: boolean; delayMinutes?: number } {
     const now = Date.now();
 
-    if (status === 'delivered') {
+    if (status === 'delivered' || status === 'completed' || status === 'at_locker') {
       if (deliveryTime) {
         return {
           eta: formatEta(new Date(deliveryTime.toMillis())),
@@ -239,7 +256,7 @@ export class DeliveryTrackingService {
       };
     }
 
-    if (status === 'picked_up' || status === 'in_transit') {
+    if (status === 'picked_up' || status === 'in_transit' || status === 'arrived') {
       if (deliveryTime) {
         const targetTime = deliveryTime.toMillis();
         const isDelayed = targetTime < now;
@@ -260,7 +277,7 @@ export class DeliveryTrackingService {
       };
     }
 
-    if (status === 'matched' && createdAt) {
+    if ((status === 'matched' || status === 'accepted') && createdAt) {
       const estimatedTime = createdAt.toMillis() + AVERAGE_DELIVERY_TIME_MINUTES * 60 * 1000;
       const isDelayed = estimatedTime < now;
       const delayMinutes = isDelayed ? Math.round((now - estimatedTime) / 60000) : 0;
