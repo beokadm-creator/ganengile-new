@@ -28,6 +28,16 @@ type DeliveryPartnerItem = {
     supportedMissionTypes: string[];
     fallbackOnly: boolean;
   };
+  settlementConfig?: {
+    commissionRate: number;
+    taxRate: number;
+    settlementCycle: 'weekly' | 'monthly';
+    bankAccount?: {
+      bank: string;
+      accountNumber: string;
+      accountHolder: string;
+    };
+  };
 };
 
 type PartnerResponse = {
@@ -66,6 +76,11 @@ const DEFAULT_FORM: DeliveryPartnerItem = {
     supportsPartialLegs: true,
     supportedMissionTypes: ['last_mile'],
     fallbackOnly: false,
+  },
+  settlementConfig: {
+    commissionRate: 0.15,
+    taxRate: 0.1,
+    settlementCycle: 'monthly',
   },
 };
 
@@ -558,6 +573,66 @@ export default function DeliveryPartnersPage() {
                   onChange={(event) => setForm((prev) => ({ ...prev, statusMessage: event.target.value }))}
                   className="min-h-[88px] w-full rounded-lg border border-slate-300 px-3 py-2 text-sm"
                 />
+              </Field>
+
+              <Field label="정산 및 수수료 설정">
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <div>
+                    <label className="mb-1 block text-xs font-medium text-slate-500">위임 수수료율 (예: 0.15 = 15%)</label>
+                    <input
+                      type="number"
+                      step="0.01"
+                      value={form.settlementConfig?.commissionRate ?? 0.15}
+                      onChange={(event) =>
+                        setForm((prev) => ({
+                          ...prev,
+                          settlementConfig: {
+                            ...prev.settlementConfig!,
+                            commissionRate: Number(event.target.value || 0),
+                          },
+                        }))
+                      }
+                      className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm"
+                    />
+                  </div>
+                  <div>
+                    <label className="mb-1 block text-xs font-medium text-slate-500">세율 (예: 0.1 = 10%)</label>
+                    <input
+                      type="number"
+                      step="0.01"
+                      value={form.settlementConfig?.taxRate ?? 0.1}
+                      onChange={(event) =>
+                        setForm((prev) => ({
+                          ...prev,
+                          settlementConfig: {
+                            ...prev.settlementConfig!,
+                            taxRate: Number(event.target.value || 0),
+                          },
+                        }))
+                      }
+                      className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm"
+                    />
+                  </div>
+                  <div>
+                    <label className="mb-1 block text-xs font-medium text-slate-500">정산 주기</label>
+                    <select
+                      value={form.settlementConfig?.settlementCycle ?? 'monthly'}
+                      onChange={(event) =>
+                        setForm((prev) => ({
+                          ...prev,
+                          settlementConfig: {
+                            ...prev.settlementConfig!,
+                            settlementCycle: event.target.value as 'weekly' | 'monthly',
+                          },
+                        }))
+                      }
+                      className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm"
+                    >
+                      <option value="weekly">매주 (Weekly)</option>
+                      <option value="monthly">매월 (Monthly)</option>
+                    </select>
+                  </div>
+                </div>
               </Field>
 
               <div className="flex flex-wrap gap-3">

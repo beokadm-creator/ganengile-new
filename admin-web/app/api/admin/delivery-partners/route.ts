@@ -35,6 +35,27 @@ function buildPublicPayload(body: UnknownRecord) {
     status: asString(body.status, 'testing').trim(),
     capabilities: asStringArray(body.capabilities),
     coverage: Array.isArray(body.coverage) ? body.coverage : [],
+    settlementConfig:
+      typeof body.settlementConfig === 'object' && body.settlementConfig !== null
+        ? {
+            commissionRate: asNumber((body.settlementConfig as UnknownRecord).commissionRate, 0.15),
+            taxRate: asNumber((body.settlementConfig as UnknownRecord).taxRate, 0.1),
+            settlementCycle: asString((body.settlementConfig as UnknownRecord).settlementCycle, 'monthly'),
+            bankAccount:
+              typeof (body.settlementConfig as UnknownRecord).bankAccount === 'object' &&
+              (body.settlementConfig as UnknownRecord).bankAccount !== null
+                ? {
+                    bank: asString(((body.settlementConfig as UnknownRecord).bankAccount as UnknownRecord).bank),
+                    accountNumber: asString(((body.settlementConfig as UnknownRecord).bankAccount as UnknownRecord).accountNumber),
+                    accountHolder: asString(((body.settlementConfig as UnknownRecord).bankAccount as UnknownRecord).accountHolder),
+                  }
+                : undefined,
+          }
+        : {
+            commissionRate: 0.15,
+            taxRate: 0.1,
+            settlementCycle: 'monthly',
+          },
     integrationMode: asString(body.integrationMode, 'manual_ops').trim(),
     pricingPolicy:
       typeof body.pricingPolicy === 'object' && body.pricingPolicy !== null
@@ -96,6 +117,14 @@ function mergePartnerItem(
     status: asString(publicDoc?.status, 'testing'),
     capabilities: asStringArray(publicDoc?.capabilities),
     coverage: Array.isArray(publicDoc?.coverage) ? publicDoc?.coverage : [],
+    settlementConfig:
+      typeof publicDoc?.settlementConfig === 'object' && publicDoc.settlementConfig !== null
+        ? publicDoc.settlementConfig
+        : {
+            commissionRate: 0.15,
+            taxRate: 0.1,
+            settlementCycle: 'monthly',
+          },
     integrationMode: asString(publicDoc?.integrationMode, 'manual_ops'),
     orchestration: {
       actorType: 'external_partner',

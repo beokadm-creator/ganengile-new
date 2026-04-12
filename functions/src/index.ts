@@ -51,6 +51,7 @@ import {
 } from './beta1-ai';
 import { taxInvoiceScheduler } from './scheduled/tax-invoice-scheduler';
 import { gillerSettlementScheduler } from './scheduled/settlement-scheduler';
+import { partnerSettlementScheduler } from './scheduled/partner-settlement-scheduler';
 import { fareCacheScheduler } from './scheduled/fare-cache-scheduler';
 import { syncConfigStationsFromSeoulApi } from './station-sync';
 import {
@@ -503,20 +504,37 @@ async function getAvailableGillerRoutesForRequest(request: DeliveryRequest): Pro
 
   const requestDate = request.requestTime?.toDate?.() ?? new Date();
   const dayOfWeek = requestDate.getDay() === 0 ? 7 : requestDate.getDay();
+  
+  // 1차 필터링: 요일 매칭
+  const validRoutes = routesSnapshot.docs
+    .map(doc => doc.data() as RouteData)
+    .filter(routeData => routeData.daysOfWeek?.includes(dayOfWeek) && routeData.userId);
+
+  if (validRoutes.length === 0) {
+    return [];
+  }
+
+  // 2차: 중복 제거된 userId 추출
+  const userIds = [...new Set(validRoutes.map(r => r.userId))];
+  
+  // 3차: 병렬 일괄 조회 (N+1 문제 해결)
+  const userDocs = await Promise.all(
+    userIds.map(id => db.collection('users').doc(id).get())
+  );
+  
+  const userMap = new Map<string, User>();
+  for (const userDoc of userDocs) {
+    if (userDoc.exists) {
+      userMap.set(userDoc.id, userDoc.data() as User);
+    }
+  }
+
   const gillerRoutes: GillerRoute[] = [];
 
-  for (const routeDoc of routesSnapshot.docs) {
-    const routeData = routeDoc.data() as RouteData;
-    if (!routeData.daysOfWeek?.includes(dayOfWeek)) {
-      continue;
-    }
+  for (const routeData of validRoutes) {
+    const userData = userMap.get(routeData.userId);
+    if (!userData) continue;
 
-    const userDoc = await db.collection('users').doc(routeData.userId).get();
-    if (!userDoc.exists) {
-      continue;
-    }
-
-    const userData = userDoc.data() as User;
     gillerRoutes.push({
       gillerId: routeData.userId,
       gillerName: userData?.name ?? '이름 미설정',
@@ -618,6 +636,115 @@ async function createMatchesForRequest(
 
   return createdMatches;
 }
+
+export const confirmDeliveryReceipt = functions.https.onCall(
+  async (data: { deliveryId: string; photoUrl?: string; notes?: string; location?: any }, context) => {
+    if (!context.auth) {
+      throw new functions.https.HttpsError('unauthenticated', 'User must be authenticated');
+    }
+    const requesterId = context.auth.uid;
+    const { deliveryId, photoUrl, notes, location } = data;
+    
+    if (!deliveryId) {
+      throw new functions.https.HttpsError('invalid-argument', 'deliveryId is required');
+    }
+    
+    const deliveryRef = db.collection('deliveries').doc(deliveryId);
+    
+    return db.runTransaction(async (tx) => {
+      const deliveryDoc = await tx.get(deliveryRef);
+      if (!deliveryDoc.exists) {
+        throw new functions.https.HttpsError('not-found', 'Delivery not found');
+      }
+      
+      const delivery = deliveryDoc.data() as any;
+      if (delivery.status === 'cancelled') {
+        throw new functions.https.HttpsError('failed-precondition', 'Cancelled delivery cannot be confirmed');
+      }
+      
+      const requestId = delivery.requestId;
+      if (!requestId) {
+        throw new functions.https.HttpsError('failed-precondition', 'Request info missing');
+      }
+      
+      const requestRef = db.collection('requests').doc(requestId);
+      const requestDoc = await tx.get(requestRef);
+      if (!requestDoc.exists) {
+        throw new functions.https.HttpsError('not-found', 'Request not found');
+      }
+      const request = requestDoc.data() as DeliveryRequest;
+      
+      const ownerId = request.requesterId ?? delivery.gllerId;
+      if (ownerId && ownerId !== requesterId) {
+        throw new functions.https.HttpsError('permission-denied', 'Not authorized');
+      }
+      
+      const confirmableStatuses = new Set(['delivered', 'at_locker', 'completed']);
+      if (!delivery.status || !confirmableStatuses.has(delivery.status)) {
+        throw new functions.https.HttpsError('failed-precondition', 'Not in confirmable status');
+      }
+      
+      if (delivery.requesterConfirmedAt) {
+        return { success: true, message: 'Already confirmed', alreadyCompleted: true };
+      }
+      
+      const settlementRef = db.collection('settlements').doc(requestId);
+      const settlementSnap = await tx.get(settlementRef);
+      if (settlementSnap.exists && settlementSnap.data()?.status === 'completed') {
+        return { success: true, alreadyCompleted: true };
+      }
+      
+      const now = admin.firestore.FieldValue.serverTimestamp();
+      
+      if (!settlementSnap.exists) {
+        tx.set(settlementRef, {
+          requestId,
+          deliveryId,
+          gillerId: delivery.gillerId,
+          requesterId,
+          status: 'processing',
+          createdAt: now,
+          updatedAt: now,
+        });
+      } else {
+        tx.update(settlementRef, {
+          status: 'processing',
+          updatedAt: now,
+        });
+      }
+      
+      const trackingEvents = delivery.tracking?.events ?? [];
+      tx.update(deliveryRef, {
+        status: 'completed',
+        requesterConfirmedAt: now,
+        requesterConfirmedBy: requesterId,
+        confirmationPhotos: photoUrl ? [photoUrl] : [],
+        confirmationNote: notes || null,
+        'tracking.events': [
+          ...trackingEvents,
+          {
+            type: 'confirmed_by_requester',
+            timestamp: new Date().toISOString(),
+            description: '수령자가 배송을 확인했습니다',
+            actorId: requesterId,
+            location: location || null,
+          }
+        ],
+        'tracking.progress': 100,
+        updatedAt: now,
+      });
+      
+      tx.update(requestRef, {
+        status: 'completed',
+        requesterConfirmedAt: now,
+        requesterConfirmedBy: requesterId,
+        updatedAt: now,
+      });
+      
+      return { success: true, alreadyCompleted: false };
+    });
+  }
+);
 
 // ==================== FCM Notification Functions ====================
 
@@ -1877,7 +2004,7 @@ export const acceptMatch = functions.https.onCall(
         updatedAt: admin.firestore.FieldValue.serverTimestamp(),
       });
 
-      // 5. Reject other matches for this request
+      // 5. Reject other matches for this request (with chunking for >500 limit)
       const otherMatchesSnapshot = await db
         .collection('matches')
         .where('requestId', '==', match.requestId)
@@ -1885,17 +2012,23 @@ export const acceptMatch = functions.https.onCall(
         .get();
 
       if (!otherMatchesSnapshot.empty) {
-        const batch = db.batch();
-        otherMatchesSnapshot.forEach((doc) => {
-          if (doc.id !== matchId) {
+        const docsToReject = otherMatchesSnapshot.docs.filter((doc) => doc.id !== matchId);
+        
+        // Firestore batch limit is 500
+        const CHUNK_SIZE = 400;
+        for (let i = 0; i < docsToReject.length; i += CHUNK_SIZE) {
+          const chunk = docsToReject.slice(i, i + CHUNK_SIZE);
+          const batch = db.batch();
+          chunk.forEach((doc) => {
             batch.update(doc.ref, {
               status: 'rejected',
               updatedAt: admin.firestore.FieldValue.serverTimestamp(),
             });
-          }
-        });
-        await batch.commit();
-        console.warn(`Rejected ${otherMatchesSnapshot.size} other matches`);
+          });
+          await batch.commit();
+        }
+        
+        console.warn(`Rejected ${docsToReject.length} other matches`);
       }
 
       console.warn(`Match accepted: ${matchId}, delivery created: ${deliveryId}`);

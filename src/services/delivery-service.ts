@@ -1122,60 +1122,14 @@ export async function confirmDeliveryByRequester(
     const settlementRef = doc(db, 'settlements', requestId);
     const trackingEvents = getTrackingEvents(delivery);
 
-    const txResult = await runTransaction(db, async (tx) => {
-      const settlementSnap = await tx.get(settlementRef);
-      const settlementData = toSettlementStatusDoc(settlementSnap.data());
-      if (settlementSnap.exists() && settlementData?.status === 'completed') {
-        return { alreadyCompleted: true };
-      }
-
-      const now = serverTimestamp();
-
-      if (!settlementSnap.exists()) {
-        tx.set(settlementRef, {
-          requestId,
-          deliveryId: data.deliveryId,
-          gillerId: delivery.gillerId,
-          requesterId: data.requesterId,
-          status: 'processing',
-          createdAt: now,
-          updatedAt: now,
-        });
-      } else {
-        tx.update(settlementRef, {
-          status: 'processing',
-          updatedAt: now,
-        });
-      }
-
-      tx.update(deliveryRef, {
-        status: 'completed' as DeliveryStatus,
-        requesterConfirmedAt: now,
-        requesterConfirmedBy: data.requesterId,
-        confirmationPhotos: photoUrl ? [photoUrl] : [],
-        confirmationNote: data.notes,
-        'tracking.events': [
-          ...trackingEvents,
-          {
-            type: 'confirmed_by_requester',
-            timestamp: new Date(),
-            description: '수령자가 배송을 확인했습니다',
-            actorId: data.requesterId,
-            location: data.location,
-          },
-        ],
-        'tracking.progress': 100,
-        updatedAt: now,
-      });
-
-      tx.update(requestRef, {
-        status: 'completed' as DeliveryStatus,
-        requesterConfirmedAt: now,
-        requesterConfirmedBy: data.requesterId,
-        updatedAt: now,
-      });
-
-      return { alreadyCompleted: false };
+    const txResult = await httpsCallable<{ deliveryId: string; photoUrl?: string; notes?: string; location?: any }, { success: boolean; message?: string; alreadyCompleted: boolean }>(functions, 'confirmDeliveryReceipt')({
+      deliveryId: data.deliveryId,
+      photoUrl,
+      notes: data.notes,
+      location: data.location
+    }).then(res => res.data).catch(error => {
+      console.error('Error calling confirmDeliveryReceipt:', error);
+      throw error;
     });
 
     if (txResult.alreadyCompleted) {

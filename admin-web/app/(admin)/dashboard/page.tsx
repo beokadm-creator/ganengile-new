@@ -25,6 +25,7 @@ interface DashboardPayload {
     partnerDispatchQueuedCount: number;
     partnerDispatchActiveCount: number;
     delayedRequestCount: number;
+    delayedDeliveryCount: number;
     criticalQueue: number;
   };
   integrations: {
@@ -217,11 +218,18 @@ export default function DashboardPage(): ReactElement {
 
     return [
       {
-        title: '매칭 지연 요청',
+        title: '매칭 지연',
         count: dashboard.metrics.delayedRequestCount,
         description: '15분 이상 pending 또는 matched 상태에 머문 요청입니다.',
         href: '/delayed-requests',
         tone: dashboard.metrics.delayedRequestCount > 0 ? 'critical' : 'neutral',
+      },
+      {
+        title: '운행 지연 배송',
+        count: dashboard.metrics.delayedDeliveryCount,
+        description: '픽업(배송 시작) 후 2시간 이상 경과된 배송 건입니다.',
+        href: '/deliveries?tab=active',
+        tone: dashboard.metrics.delayedDeliveryCount > 0 ? 'critical' : 'neutral',
       },
       {
         title: '분쟁 대기',
@@ -306,6 +314,7 @@ export default function DashboardPage(): ReactElement {
           <MetricCard title="오늘 요청" value={dashboard?.metrics.todayRequests ?? 0} hint="오늘 들어온 전체 요청 건수" tone="neutral" />
           <MetricCard title="활성 배송" value={dashboard?.metrics.activeDeliveries ?? 0} hint="현재 진행 중인 배송 건수" tone="positive" />
           <MetricCard title="매칭 지연" value={dashboard?.metrics.delayedRequestCount ?? 0} hint="15분 이상 응답이 지연된 요청" tone="warning" />
+          <MetricCard title="운행 지연" value={dashboard?.metrics.delayedDeliveryCount ?? 0} hint="2시간 초과 배송 건수" tone="warning" />
           <MetricCard title="업체 위임 대기" value={dashboard?.metrics.partnerDispatchQueuedCount ?? 0} hint="외부 배송업체 응답 대기 건수" tone="warning" />
         </section>
 

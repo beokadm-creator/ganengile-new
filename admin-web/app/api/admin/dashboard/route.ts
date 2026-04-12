@@ -32,6 +32,21 @@ async function getDelayedRequestCount(requestDelayThreshold: Date) {
   }).length;
 }
 
+async function getDelayedDeliveryCount(deliveryDelayThreshold: Date) {
+  const db = getAdminDb();
+  const snap = await db.collection('deliveries')
+    .where('status', 'in', ['picked_up', 'in_transit', 'arrived', 'at_locker', 'handover_pending', 'last_mile_in_progress'])
+    .get();
+
+  return snap.docs.filter((doc) => {
+    const createdAt = doc.data().createdAt;
+    if (createdAt && typeof createdAt.toDate === 'function') {
+      return createdAt.toDate() <= deliveryDelayThreshold;
+    }
+    return false;
+  }).length;
+}
+
 function readConfig(
   data: Record<string, unknown> | undefined,
   type: 'identity' | 'bank' | 'payment' | 'ai'
@@ -114,6 +129,7 @@ export async function GET() {
     const now = new Date();
     const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
     const requestDelayThreshold = new Date(now.getTime() - 15 * 60 * 1000);
+    const deliveryDelayThreshold = new Date(now.getTime() - 2 * 60 * 60 * 1000);
 
     const [
       pendingWithdrawals,
@@ -139,6 +155,7 @@ export async function GET() {
       partnerDispatchQueuedCount,
       partnerDispatchActiveCount,
       delayedRequestCount,
+      delayedDeliveryCount,
     ] = await Promise.all([
       db.collection('withdraw_requests').where('status', '==', 'pending').count().get(),
       db.collection('disputes').where('status', '==', 'pending').count().get(),
@@ -166,6 +183,7 @@ export async function GET() {
       getCombinedCount('partner_dispatches', 'status', ['queued', 'requested']),
       getCombinedCount('partner_dispatches', 'status', ['accepted', 'in_progress']),
       getDelayedRequestCount(requestDelayThreshold),
+      getDelayedDeliveryCount(deliveryDelayThreshold),
     ]);
 
     const latestFareDoc = fareLatest.docs[0]?.data() as { updatedAt?: { toDate?: () => Date } } | undefined;
@@ -268,13 +286,15 @@ export async function GET() {
         partnerDispatchQueuedCount,
         partnerDispatchActiveCount,
         delayedRequestCount,
+        delayedDeliveryCount,
         criticalQueue:
           pendingWithdrawals.data().count +
           pendingDisputes.data().count +
           manualReviewCount +
           lowConfidenceCount +
           partnerDispatchQueuedCount +
-          delayedRequestCount,
+          delayedRequestCount +
+          delayedDeliveryCount,
       },
       integrations: {
         identity: identityConfig,

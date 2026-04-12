@@ -10,8 +10,8 @@ export async function GET(request: Request) {
     const { searchParams } = new URL(request.url);
     const status = searchParams.get('status') || 'pending';
 
-    // Fetch from b2bSettlements
-    const settlementsRef = adminDb.collection('b2bSettlements')
+    // Fetch from partner_settlements
+    const settlementsRef = adminDb.collection('partner_settlements')
       .where('status', '==', status)
       .orderBy('createdAt', 'desc')
       .limit(100);

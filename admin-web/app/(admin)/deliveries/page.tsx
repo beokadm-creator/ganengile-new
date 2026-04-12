@@ -72,6 +72,8 @@ export default function DeliveriesPage() {
 
   useEffect(() => { loadData(tab); }, [tab]);
 
+  const nowMs = new Date().getTime();
+
   return (
     <div className="p-6">
       <div className="mb-6">
@@ -120,9 +122,22 @@ export default function DeliveriesPage() {
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
-              {items.map((item) => (
-                <tr key={item.id} className="hover:bg-gray-50">
-                  <td className="px-4 py-3 font-mono text-xs text-gray-500">{item.id.slice(0, 10)}...</td>
+              {items.map((item) => {
+                const createdAtMs = typeof item.createdAt === 'object' && item.createdAt !== null && 'seconds' in item.createdAt
+                  ? item.createdAt.seconds * 1000
+                  : new Date(item.createdAt as any).getTime();
+                const isDelayed = tab === 'active' && item.createdAt && (nowMs - createdAtMs) > 2 * 60 * 60 * 1000;
+                
+                return (
+                  <tr key={item.id} className="hover:bg-gray-50">
+                    <td className="px-4 py-3 font-mono text-xs text-gray-500">
+                      {item.id.slice(0, 10)}...
+                      {isDelayed && (
+                        <span className="ml-2 inline-flex items-center rounded-full bg-red-100 px-1.5 py-0.5 text-xs font-medium text-red-700">
+                          지연 (2H+)
+                        </span>
+                      )}
+                    </td>
                   <td className="px-4 py-3 text-gray-700 max-w-[120px] truncate">{item.itemDescription || '-'}</td>
                   <td className="px-4 py-3 text-xs text-gray-600 max-w-[160px]">
                     <p className="truncate">{item.fromLocation || '-'}</p>
@@ -160,7 +175,8 @@ export default function DeliveriesPage() {
                     </select>
                   </td>
                 </tr>
-              ))}
+              );
+              })}
             </tbody>
           </table>
         </div>

@@ -7,14 +7,13 @@ export async function GET() {
     await requireAdmin();
     const adminDb = getAdminDb();
 
-    // Fetch summaries from b2b_deliveries and b2bSettlements
-    // For now, this is a basic aggregation for the dashboard
+    // Fetch summaries from partner_dispatches and partner_settlements
     
-    // 1. Total B2B Deliveries this month
+    // 1. Total Partner Dispatches this month
     const now = new Date();
     const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
     
-    const deliveriesQuery = await adminDb.collection('b2b_deliveries')
+    const deliveriesQuery = await adminDb.collection('partner_dispatches')
       .where('createdAt', '>=', startOfMonth)
       .get();
       
@@ -33,7 +32,7 @@ export async function GET() {
     const activePartnersCount = partnersQuery.size;
 
     // 3. Current Pending Settlements
-    const settlementsQuery = await adminDb.collection('b2bSettlements')
+    const settlementsQuery = await adminDb.collection('partner_settlements')
       .where('status', 'in', ['pending', 'processing'])
       .get();
       

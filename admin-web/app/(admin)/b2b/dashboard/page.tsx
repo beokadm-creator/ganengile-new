@@ -80,7 +80,7 @@ export default function B2BDashboardPage() {
             </Link>
             <Link href="/partner-dispatches" className="block p-4 rounded-xl border border-slate-100 hover:border-cyan-500 hover:bg-cyan-50 transition-colors">
               <h3 className="font-semibold text-slate-900">업체 위임 현황</h3>
-              <p className="text-sm text-slate-500">외부 파트너로 할당된 배송 요청(b2b_deliveries) 실시간 관제</p>
+              <p className="text-sm text-slate-500">외부 파트너로 할당된 배송 요청(partner_dispatches) 실시간 관제</p>
             </Link>
             <Link href="/b2b/settlements" className="block p-4 rounded-xl border border-slate-100 hover:border-cyan-500 hover:bg-cyan-50 transition-colors">
               <h3 className="font-semibold text-slate-900">B2B 정산 내역</h3>

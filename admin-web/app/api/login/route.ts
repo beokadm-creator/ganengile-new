@@ -16,6 +16,10 @@ export async function POST(req: NextRequest) {
     // 허용된 관리자 UID 확인 (콤마로 구분된 여러 관리자 지원)
     const allowedUids = process.env.ADMIN_UID?.split(',').map(uid => uid.trim()) || [];
     if (allowedUids.length === 0 || !allowedUids.includes(decoded.uid)) {
+      if (decoded.admin) {
+        // 권한 박탈자: 커스텀 클레임 영구 회수
+        await auth.setCustomUserClaims(decoded.uid, { admin: false });
+      }
       return NextResponse.json({ error: '관리자 권한이 없습니다.' }, { status: 403 });
     }
 

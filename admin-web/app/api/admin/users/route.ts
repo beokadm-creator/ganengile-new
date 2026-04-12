@@ -205,12 +205,6 @@ export async function DELETE(req: NextRequest) {
     return NextResponse.json({ error: 'Deactivate the user first' }, { status: 400 });
   }
 
-  try {
-    await getAuth(getAdminApp()).deleteUser(userId);
-  } catch (error) {
-    console.error(`Failed to delete Auth user ${userId}:`, error);
-  }
-
   const profileRef = userRef.collection('profile').doc(userId);
   const [savedAddresses, recentAddresses, verifications] = await Promise.all([
     profileRef.collection('saved_addresses').get(),
@@ -226,7 +220,17 @@ export async function DELETE(req: NextRequest) {
     userRef.delete(),
   ];
 
+  // 1. Delete Firestore data first
   await Promise.all(deletions);
+
+  // 2. Delete Firebase Auth user last to prevent orphaned data
+  try {
+    await getAuth(getAdminApp()).deleteUser(userId);
+  } catch (error) {
+    console.error(`Failed to delete Auth user ${userId}:`, error);
+    // Even if Auth deletion fails, the DB is clean. 
+    // It's better than DB being orphaned.
+  }
 
   return NextResponse.json({ ok: true });
 }
