@@ -72,21 +72,6 @@ export function Step2Item({
         ) : null}
 
         {store.photoUrl ? <Image source={{ uri: store.photoUrl }} style={styles.previewImage} /> : null}
-        
-        {!store.photoUrl && !hasItemValue ? (
-          <TouchableOpacity
-            style={styles.secondaryButton}
-            onPress={() => {
-              if (!store.packageSize || !store.weightKg || !store.packageItemName) {
-                Alert.alert('확인 필요', '아래의 물품 정보를 모두 입력해 주세요.');
-                return;
-              }
-              store.setActiveStep(3); // 사진 없이 바로 다음 스텝으로 이동
-            }}
-          >
-            <Text style={styles.secondaryButtonText}>사진 없이 다음 단계로 넘어가기</Text>
-          </TouchableOpacity>
-        ) : null}
 
         <TouchableOpacity
           style={[styles.secondaryButton, !store.photoUrl && styles.disabled]}
