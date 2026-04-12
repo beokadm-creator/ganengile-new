@@ -13,6 +13,7 @@ import {
   where,
 } from 'firebase/firestore';
 import { db } from './firebase';
+import { generateShortId } from '../utils/id-generator';
 import { createAIAnalysis, createPricingQuote, createRequestDraft, markPricingQuoteSelected, updateRequestDraft } from './request-draft-service';
 import type {
   ActorSelectionActorType,
@@ -679,9 +680,13 @@ export async function createBeta1Request(input: Beta1RequestCreateInput): Promis
     updatedAt: serverTimestamp(),
   };
 
-  const requestRef = await addDoc(collection(db, 'requests'), requestPayload);
+  const requestId = generateShortId('R');
+  const requestRef = doc(collection(db, 'requests'), requestId);
+  await setDoc(requestRef, requestPayload);
 
-  const deliveryRef = await addDoc(collection(db, 'deliveries'), {
+  const deliveryId = generateShortId('D');
+  const deliveryRef = doc(collection(db, 'deliveries'), deliveryId);
+  await setDoc(deliveryRef, {
     requestId: requestRef.id,
     requesterId: input.requesterUserId,
     pickupStation: input.pickupStation,
@@ -1038,7 +1043,7 @@ async function queueExternalPartnerDispatch(params: {
       deliveryId: params.deliveryId,
       deliveryLegId: params.deliveryLegId,
       partnerCapability: requiresAddressHandling(params.leg.legType) ? 'address_dropoff' : 'station_to_station',
-      dispatchMethod: 'manual_dashboard',
+      dispatchMethod: 'api',
       opsMemo: params.fallbackDeliveryId
         ? `fallback_delivery:${params.fallbackDeliveryId}`
         : 'queued_from_beta1_external_partner_selection',

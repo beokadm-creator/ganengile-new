@@ -41,6 +41,67 @@ function asNumber(value: unknown, fallback = 0): number {
   return typeof value === 'number' && Number.isFinite(value) ? value : fallback;
 }
 
+export async function POST(req: Request) {
+  if (!(await isAdmin())) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  }
+
+  try {
+    const body = await req.json();
+    const { decisionId, action, fallbackPartnerId } = body;
+
+    if (!decisionId || !action) {
+      return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
+    }
+
+    const db = getAdminDb();
+    const decisionRef = db.collection('actor_selection_decisions').doc(decisionId);
+
+    await db.runTransaction(async (transaction) => {
+      const decisionDoc = await transaction.get(decisionRef);
+      if (!decisionDoc.exists) {
+        throw new Error('Decision not found');
+      }
+
+      const data = decisionDoc.data();
+      if (data?.status === 'executed' || data?.status === 'rejected') {
+        throw new Error(`Already ${data.status}`);
+      }
+
+      if (action === 'approve') {
+        transaction.update(decisionRef, {
+          status: 'executed',
+          manualReviewRequired: false,
+          'actorSelection.selectedActorType': data?.actorSelection?.selectedActorType || 'external_partner',
+          'actorSelection.selectedPartnerId': fallbackPartnerId || data?.actorSelection?.selectedPartnerId || null,
+          updatedAt: new Date(),
+        });
+        
+        // 실제 미션 라우팅 로직은 여기에 추가될 수 있습니다. (Cloud Function 트리거 또는 상태 변경)
+        // 예: delivery 문서의 dispatch 상태 업데이트
+        if (data?.deliveryId) {
+           const deliveryRef = db.collection('deliveries').doc(data.deliveryId);
+           transaction.update(deliveryRef, {
+             dispatchMethod: 'api',
+             assignedPartnerId: fallbackPartnerId || data?.actorSelection?.selectedPartnerId || null,
+             updatedAt: new Date(),
+           });
+        }
+      } else if (action === 'reject') {
+        transaction.update(decisionRef, {
+          status: 'rejected',
+          updatedAt: new Date(),
+        });
+      }
+    });
+
+    return NextResponse.json({ success: true });
+  } catch (error: any) {
+    console.error('Failed to execute AI review decision:', error);
+    return NextResponse.json({ error: error.message }, { status: 500 });
+  }
+}
+
 export async function GET(req: Request) {
   if (!(await isAdmin())) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });

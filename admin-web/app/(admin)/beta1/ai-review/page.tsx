@@ -351,18 +351,67 @@ export default function AIReviewPage() {
                   <div key={item.id} className="rounded-2xl border border-slate-100 p-4">
                     <div className="flex items-start justify-between gap-3">
                       <div>
-                        <p className="text-sm font-semibold text-slate-900">
-                          {item.selectedActorType || '-'} / {item.interventionLevel || '-'}
-                        </p>
-                        <p className="mt-2 text-sm text-slate-600">{item.selectionReason || '사유 없음'}</p>
+                        <p className="text-sm font-semibold text-slate-900">미션 라우팅 결정: {item.selectedActorType}</p>
+                        <p className="mt-1 text-xs text-slate-500">배송 ID: {(item as any).deliveryId}</p>
                       </div>
-                      <span
-                        className={`rounded-full px-3 py-1 text-xs font-semibold ${
-                          item.manualReviewRequired ? 'bg-rose-100 text-rose-700' : 'bg-emerald-100 text-emerald-700'
-                        }`}
-                      >
-                        {item.manualReviewRequired ? '수동 검토' : '자동 보조'}
-                      </span>
+                      <div className="flex items-center gap-2">
+                        {item.manualReviewRequired && (item as any).status !== 'executed' && (item as any).status !== 'rejected' && (
+                          <div className="flex gap-2">
+                            <button
+                              onClick={async () => {
+                                if (confirm('이 AI 결정을 승인하고 실행하시겠습니까?')) {
+                                  try {
+                                    const res = await fetch('/api/admin/beta1-ai-review', {
+                                      method: 'POST',
+                                      headers: { 'Content-Type': 'application/json' },
+                                      body: JSON.stringify({ decisionId: item.id, action: 'approve' }),
+                                    });
+                                    if (!res.ok) throw new Error('승인 실패');
+                                    alert('승인되었습니다. 새로고침을 권장합니다.');
+                                    window.location.reload();
+                                  } catch (e) {
+                                    alert(e instanceof Error ? e.message : '오류 발생');
+                                  }
+                                }
+                              }}
+                              className="rounded-full bg-cyan-600 px-3 py-1 text-xs font-semibold text-white hover:bg-cyan-700"
+                            >
+                              승인 (Execute)
+                            </button>
+                            <button
+                              onClick={async () => {
+                                if (confirm('이 AI 결정을 반려하시겠습니까?')) {
+                                  try {
+                                    const res = await fetch('/api/admin/beta1-ai-review', {
+                                      method: 'POST',
+                                      headers: { 'Content-Type': 'application/json' },
+                                      body: JSON.stringify({ decisionId: item.id, action: 'reject' }),
+                                    });
+                                    if (!res.ok) throw new Error('반려 실패');
+                                    alert('반려되었습니다.');
+                                    window.location.reload();
+                                  } catch (e) {
+                                    alert(e instanceof Error ? e.message : '오류 발생');
+                                  }
+                                }
+                              }}
+                              className="rounded-full bg-rose-600 px-3 py-1 text-xs font-semibold text-white hover:bg-rose-700"
+                            >
+                              반려
+                            </button>
+                          </div>
+                        )}
+                        <span className={`rounded-full px-3 py-1 text-xs font-semibold ${item.manualReviewRequired ? 'bg-amber-100 text-amber-700' : 'bg-emerald-100 text-emerald-700'}`}>
+                          {item.manualReviewRequired ? '수동 검토 요망' : '자동 승인됨'}
+                        </span>
+                        <span className={`rounded-full px-3 py-1 text-xs font-semibold ${toneClass((item as any).status || 'pending')}`}>
+                          {(item as any).status || 'pending'}
+                        </span>
+                      </div>
+                    </div>
+                    <div className="mt-3 flex flex-wrap gap-3 text-xs text-slate-500">
+                      <span>개입 단계: {item.interventionLevel}</span>
+                      <span>{formatDate(item.createdAt)}</span>
                     </div>
                   </div>
                 ))}

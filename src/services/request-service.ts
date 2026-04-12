@@ -11,6 +11,7 @@ import {
   getDoc,
   getDocs,
   addDoc,
+  setDoc,
   updateDoc,
   deleteDoc,
   deleteField,
@@ -23,6 +24,7 @@ import {
   onSnapshot,
 } from 'firebase/firestore';
 import { db } from './firebase';
+import { generateShortId } from '../utils/id-generator';
 import { bootstrapRequestCreationEngine } from './beta1-engine-service';
 import { getTravelTimeConfig } from './config-service';
 import { processMatchingForRequest } from './matching-service';
@@ -469,7 +471,9 @@ export async function createRequest(
         updatedAt: serverTimestamp() as unknown as Timestamp,
       };
 
-      const docRef = await addDoc(requestsRef, newRequest);
+      const requestId = generateShortId('R');
+      const docRef = doc(requestsRef, requestId);
+      await setDoc(docRef, newRequest);
 
       // Request created
 

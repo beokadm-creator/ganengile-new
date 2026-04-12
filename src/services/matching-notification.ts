@@ -66,15 +66,7 @@ async function saveNotification(
   return docRef.id;
 }
 
-function sendFCM(
-  token: string,
-  title: string,
-  body: string,
-  data?: Record<string, string>
-): Promise<void> {
-  console.warn('FCM notification queued', { token, title, body, data });
-  return Promise.resolve();
-}
+
 
 export async function sendMatchFoundNotification(
   gillerId: string,
@@ -87,20 +79,13 @@ export async function sendMatchFoundNotification(
   const body = `${pickupStation} -> ${deliveryStation} · ${fee.toLocaleString()}원`;
 
   await saveNotification(gillerId, NotificationType.MATCH_FOUND, title, body, {
+    type: NotificationType.MATCH_FOUND,
     requestId,
     pickupStation,
     deliveryStation,
     fee,
+    screen: 'GillerRequests',
   });
-
-  const token = await getUserFCMToken(gillerId);
-  if (token) {
-    await sendFCM(token, title, body, {
-      type: NotificationType.MATCH_FOUND,
-      requestId,
-      screen: 'GillerRequests',
-    });
-  }
 }
 
 export async function sendMissionBundleAvailableNotification(
@@ -115,23 +100,15 @@ export async function sendMissionBundleAvailableNotification(
   const body = `${pickupStation} -> ${deliveryStation} · ${bundleCount}개 구간 카드 · ${fee.toLocaleString()}원`;
 
   await saveNotification(gillerId, NotificationType.MATCH_FOUND, title, body, {
+    type: NotificationType.MATCH_FOUND,
     requestId,
     pickupStation,
     deliveryStation,
     fee,
     bundleCount,
     mode: 'mission_bundle',
+    screen: 'GillerRequests',
   });
-
-  const token = await getUserFCMToken(gillerId);
-  if (token) {
-    await sendFCM(token, title, body, {
-      type: NotificationType.MATCH_FOUND,
-      requestId,
-      screen: 'GillerRequests',
-      mode: 'mission_bundle',
-    });
-  }
 }
 
 export async function sendRequestAcceptedNotification(
@@ -143,18 +120,11 @@ export async function sendRequestAcceptedNotification(
   const body = `${gillerName}님이 배송 요청을 수락했습니다.`;
 
   await saveNotification(gllerId, NotificationType.REQUEST_ACCEPTED, title, body, {
+    type: NotificationType.REQUEST_ACCEPTED,
     requestId,
     gillerName,
+    screen: 'RequestDetail',
   });
-
-  const token = await getUserFCMToken(gllerId);
-  if (token) {
-    await sendFCM(token, title, body, {
-      type: NotificationType.REQUEST_ACCEPTED,
-      requestId,
-      screen: 'RequestDetail',
-    });
-  }
 }
 
 export async function sendRequestProgressNotification(
@@ -170,20 +140,13 @@ export async function sendRequestProgressNotification(
     : `${acceptedMissionCount}/${totalMissionCount} 구간 연결 중`;
 
   await saveNotification(gllerId, NotificationType.REQUEST_ACCEPTED, title, body, {
+    type: NotificationType.REQUEST_ACCEPTED,
     requestId,
     acceptedMissionCount,
     totalMissionCount,
     fullyMatched,
+    screen: 'RequestDetail',
   });
-
-  const token = await getUserFCMToken(gllerId);
-  if (token) {
-    await sendFCM(token, title, body, {
-      type: NotificationType.REQUEST_ACCEPTED,
-      requestId,
-      screen: 'RequestDetail',
-    });
-  }
 }
 
 export async function sendRequestExecutionNotification(
@@ -201,19 +164,11 @@ export async function sendRequestExecutionNotification(
         : NotificationType.DELIVERY_COMPLETED;
 
   await saveNotification(userId, notificationType, title, body, {
+    type: notificationType,
     requestId,
     stage,
+    screen: 'RequestDetail',
   });
-
-  const token = await getUserFCMToken(userId);
-  if (token) {
-    await sendFCM(token, title, body, {
-      type: notificationType,
-      requestId,
-      screen: 'RequestDetail',
-      stage,
-    });
-  }
 }
 
 export async function sendMissionReturnedNotification(
@@ -224,18 +179,11 @@ export async function sendMissionReturnedNotification(
   const body = '남은 구간을 다시 찾고 있습니다.';
 
   await saveNotification(gllerId, NotificationType.REQUEST_ACCEPTED, title, body, {
+    type: NotificationType.REQUEST_ACCEPTED,
     requestId,
     mode: 'mission_returned',
+    screen: 'RequestDetail',
   });
-
-  const token = await getUserFCMToken(gllerId);
-  if (token) {
-    await sendFCM(token, title, body, {
-      type: NotificationType.REQUEST_ACCEPTED,
-      requestId,
-      screen: 'RequestDetail',
-    });
-  }
 }
 
 export async function sendDeliveryCompletedNotification(
@@ -247,18 +195,11 @@ export async function sendDeliveryCompletedNotification(
   const body = `${gillerName}님이 배송을 완료했습니다.`;
 
   await saveNotification(gllerId, NotificationType.DELIVERY_COMPLETED, title, body, {
+    type: NotificationType.DELIVERY_COMPLETED,
     requestId,
     gillerName,
+    screen: 'RequestDetail',
   });
-
-  const token = await getUserFCMToken(gllerId);
-  if (token) {
-    await sendFCM(token, title, body, {
-      type: NotificationType.DELIVERY_COMPLETED,
-      requestId,
-      screen: 'RequestDetail',
-    });
-  }
 }
 
 export async function sendBulkNotifications(

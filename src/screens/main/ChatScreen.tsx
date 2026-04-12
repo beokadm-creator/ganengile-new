@@ -106,7 +106,8 @@ export default function ChatScreen() {
         <ActivityIndicator size="large" color={Colors.primary} />
         <Text style={styles.loaderText}>채팅을 불러오는 중입니다.</Text>
       </View>
-  );
+    );
+  }
 
   return (
     <KeyboardAvoidingView

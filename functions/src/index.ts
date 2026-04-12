@@ -53,7 +53,9 @@ import { taxInvoiceScheduler } from './scheduled/tax-invoice-scheduler';
 import { gillerSettlementScheduler } from './scheduled/settlement-scheduler';
 import { partnerSettlementScheduler } from './scheduled/partner-settlement-scheduler';
 import { fareCacheScheduler } from './scheduled/fare-cache-scheduler';
+export { onNotificationCreated } from './notifications';
 export { tossWebhook } from './webhooks/toss-webhook';
+export { partnerWebhook } from './webhooks/partner-webhook';
 import { syncConfigStationsFromSeoulApi } from './station-sync';
 import {
   calculateSharedDeliveryFee,

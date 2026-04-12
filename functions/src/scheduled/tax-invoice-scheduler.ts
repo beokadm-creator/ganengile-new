@@ -9,6 +9,7 @@
 
 import * as admin from 'firebase-admin';
 import { getFunctionsPricingPolicyConfig } from '../pricing-policy-config';
+import { sendTaxInvoiceEmail } from '../services/email-service';
 
 interface PlatformInfo {
   name: string;
@@ -200,14 +201,7 @@ export const taxInvoiceScheduler = async (): Promise<{
 
         console.warn(`✅ Invoice created: ${invoice.invoiceNumber}`);
 
-        // TODO: 2-4. PDF 생성 (제미나이 디자인 전문가가 생성한 템플릿 사용)
-        // const pdfUrl = await generateTaxInvoicePDF(invoice);
-        // batch.update(invoiceRef, { pdfUrl });
-
-        // TODO: 2-5. 이메일 발송
-        // await sendTaxInvoiceEmail(contract.companyEmail, invoice, pdfUrl);
-        // batch.update(invoiceRef, { sentAt: admin.firestore.Timestamp.now() });
-
+        // 2-4. 이메일 발송 준비를 위해 배열에 담아둡니다 (Phase 2 처리)
       } catch (error) {
         const errMsg = `Error processing contract ${contractDoc.id}: ${error}`;
         console.error(errMsg);
@@ -221,8 +215,37 @@ export const taxInvoiceScheduler = async (): Promise<{
       console.warn(`🎉 Phase 1: Saved ${invoicesGenerated} invoices to DB`);
     }
 
-    // TODO: Phase 2: PDF 생성 및 이메일 발송 비동기 큐 처리
-    // DB 저장 성공 후 안전하게 외부 서비스(AWS SES, SendGrid 등)를 호출하여 발송하도록 분리
+    // 4. Phase 2: 이메일 발송 (PDF 생성은 현재 생략, 추후 연동 가능)
+    if (invoicesGenerated > 0) {
+      const startOfMonth = new Date(year, month - 1, 1);
+      const invoicesQuery = await db.collection('taxInvoices')
+        .where('period.start', '==', startOfMonth)
+        .where('status', '==', 'issued')
+        .get();
+
+      for (const doc of invoicesQuery.docs) {
+        const invoice = doc.data();
+        const contractDoc = await db.collection('businessContracts').doc(invoice.contractId).get();
+        if (contractDoc.exists) {
+          const contract = contractDoc.data();
+          const email = contract?.companyEmail || contract?.managerEmail;
+          if (email) {
+            const emailSent = await sendTaxInvoiceEmail(email, {
+              period: invoice.period,
+              amounts: invoice.totals
+            });
+            
+            if (emailSent) {
+              await doc.ref.update({
+                sentAt: admin.firestore.Timestamp.now(),
+                updatedAt: admin.firestore.Timestamp.now()
+              });
+              console.warn(`📧 Email sent to ${email} for invoice ${invoice.invoiceNumber}`);
+            }
+          }
+        }
+      }
+    }
 
     return {
       processed: contractsSnapshot.size,
