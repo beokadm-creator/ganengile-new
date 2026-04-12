@@ -534,11 +534,11 @@ export default function CreateRequestScreen({ navigation, route }: Props) {
       // 1단계보다 더 진행된 상태라면 화면이 닫히는 것을 막고 이전 단계로 이동
       if (activeStep > 1) {
         e.preventDefault();
-        store.setActiveStep(activeStep - 1);
+        setActiveStep(activeStep - 1);
       }
     });
     return unsubscribe;
-  }, [navigation, activeStep, store]);
+  }, [navigation, activeStep, setActiveStep]);
 
   useEffect(() => {
     // 활성화된 스텝이 변경될 때 스크롤을 맨 위로 이동
@@ -549,7 +549,7 @@ export default function CreateRequestScreen({ navigation, route }: Props) {
 
   function handleBack() {
     if (activeStep > 1) {
-      store.setActiveStep(activeStep - 1);
+      setActiveStep(activeStep - 1);
       return;
     }
     

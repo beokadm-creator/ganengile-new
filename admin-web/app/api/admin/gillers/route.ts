@@ -157,6 +157,7 @@ export async function GET(req: NextRequest) {
     // Enrich with user profile and activity stats
     const userIdsToFetch = Array.from(new Set(items.map((i) => i.userId).filter(Boolean))) as string[];
     const usersDataMap = new Map<string, any>();
+    const verificationDataMap = new Map<string, any>();
     const chunkSize = 30;
     
     for (let i = 0; i < userIdsToFetch.length; i += chunkSize) {
@@ -166,11 +167,20 @@ export async function GET(req: NextRequest) {
         usersSnap.docs.forEach((doc) => {
           usersDataMap.set(doc.id, doc.data());
         });
+
+        const verificationRefs = chunk.map((id) => db.collection('users').doc(id).collection('verification').doc(id));
+        const verificationSnaps = await db.getAll(...verificationRefs);
+        verificationSnaps.forEach((snap) => {
+          if (snap.exists) {
+            verificationDataMap.set(snap.id, snap.data());
+          }
+        });
       }
     }
 
     const enrichedItems = items.map((item) => {
       const userData = item.userId ? usersDataMap.get(item.userId) : null;
+      const verificationData = item.userId ? verificationDataMap.get(item.userId) : null;
       const gllerInfo = (userData?.gllerInfo as Record<string, any>) || {};
       const gillerInfo = (userData?.gillerInfo as Record<string, any>) || {};
       const stats = (userData?.stats as Record<string, any>) || {};
@@ -181,6 +191,11 @@ export async function GET(req: NextRequest) {
         profilePhoto: userData?.profilePhoto ?? null,
         totalRequests: gllerInfo.totalRequests ?? stats.totalRequests ?? 0,
         totalDeliveries: gillerInfo.totalDeliveries ?? stats.totalDeliveries ?? 0,
+        idCardFrontUrl: verificationData?.idCard?.frontImageUrl ?? null,
+        idCardBackUrl: verificationData?.idCard?.backImageUrl ?? null,
+        realName: verificationData?.name ?? null,
+        birthDate: verificationData?.birthDate ?? null,
+        actualVerificationStatus: verificationData?.status ?? item.verificationStatus,
       };
     });
 
@@ -237,7 +252,7 @@ export async function PATCH(req: NextRequest) {
       : undefined;
   }
 
-  const isVerificationApproved =
+  let isVerificationApproved =
     verificationStatus === 'approved' || verificationStatus === 'approved_test_bypass';
 
   const bankAccount =
@@ -250,9 +265,28 @@ export async function PATCH(req: NextRequest) {
     bankAccount?.verificationStatus === 'verified' || bankAccount?.verificationStatus === 'verified_test_bypass';
 
   if (body.action === 'approve') {
+    // If verification is pending, automatically approve it
+    if (!isVerificationApproved && (verificationStatus === 'pending' || verificationStatus === 'under_review' || !verificationStatus)) {
+      if (typeof data.userId === 'string') {
+        const verificationRef = db.collection('users').doc(data.userId).collection('verification').doc(data.userId);
+        await verificationRef.set({
+          status: 'approved',
+          updatedAt: new Date(),
+          reviewedAt: new Date(),
+          reviewedBy: 'admin',
+        }, { merge: true });
+        
+        await db.collection('users').doc(data.userId).update({
+          isVerified: true,
+          updatedAt: new Date(),
+        });
+        isVerificationApproved = true;
+      }
+    }
+
     if (!isVerificationApproved) {
       return NextResponse.json(
-        { error: '본인확인 완료 상태가 아니어서 승인할 수 없습니다.' },
+        { error: '본인확인 정보가 반려되었거나 완료 상태가 아닙니다.' },
         { status: 400 }
       );
     }
@@ -261,6 +295,23 @@ export async function PATCH(req: NextRequest) {
         { error: '정산 계좌가 인증되지 않아 승인할 수 없습니다.' },
         { status: 400 }
       );
+    }
+  } else if (body.action === 'reject') {
+    // Also reject verification if it was pending
+    if (!isVerificationApproved && (verificationStatus === 'pending' || verificationStatus === 'under_review') && typeof data.userId === 'string') {
+      const verificationRef = db.collection('users').doc(data.userId).collection('verification').doc(data.userId);
+      await verificationRef.update({
+        status: 'rejected',
+        rejectionReason: body.note ?? '길러 승급 거절과 함께 반려됨',
+        updatedAt: new Date(),
+        reviewedAt: new Date(),
+        reviewedBy: 'admin',
+      });
+      
+      await db.collection('users').doc(data.userId).update({
+        isVerified: false,
+        updatedAt: new Date(),
+      });
     }
   }
 

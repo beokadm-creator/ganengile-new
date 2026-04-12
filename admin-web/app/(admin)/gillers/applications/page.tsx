@@ -24,6 +24,11 @@ interface GillerApplication {
   profilePhoto?: string | null;
   totalRequests?: number;
   totalDeliveries?: number;
+  idCardFrontUrl?: string | null;
+  idCardBackUrl?: string | null;
+  realName?: string | null;
+  birthDate?: string | null;
+  actualVerificationStatus?: string | null;
   adminNote?: string;
   isSynthetic?: boolean;
   identityTestMode?: boolean;
@@ -90,6 +95,11 @@ function asGillerApplication(value: unknown): GillerApplication | null {
     profilePhoto: typeof record.profilePhoto === 'string' ? record.profilePhoto : null,
     totalRequests: typeof record.totalRequests === 'number' ? record.totalRequests : 0,
     totalDeliveries: typeof record.totalDeliveries === 'number' ? record.totalDeliveries : 0,
+    idCardFrontUrl: typeof record.idCardFrontUrl === 'string' ? record.idCardFrontUrl : null,
+    idCardBackUrl: typeof record.idCardBackUrl === 'string' ? record.idCardBackUrl : null,
+    realName: typeof record.realName === 'string' ? record.realName : null,
+    birthDate: typeof record.birthDate === 'string' ? record.birthDate : null,
+    actualVerificationStatus: typeof record.actualVerificationStatus === 'string' ? record.actualVerificationStatus : null,
     adminNote: typeof record.adminNote === 'string' ? record.adminNote : undefined,
     isSynthetic: Boolean(record.isSynthetic),
     identityTestMode: Boolean(record.identityTestMode),
