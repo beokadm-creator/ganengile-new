@@ -19,6 +19,7 @@ export interface Phase1PricingParams {
   packageSize?: PackageSizeType;
   urgency?: 'normal' | 'fast' | 'urgent';
   publicFare?: number;
+  manualAdjustment?: number;
   context?: SharedPricingContext;
 }
 
@@ -29,6 +30,7 @@ export interface DeliveryFeeBreakdown {
   sizeFee: number;
   urgencySurcharge: number;
   publicFare: number;
+  manualAdjustment: number;
   dynamicAdjustment: number;
   serviceFee: number;
   subtotal: number;
@@ -70,6 +72,7 @@ export function calculatePhase1DeliveryFee(
     packageSize,
     urgency,
     publicFare: params.publicFare,
+    manualAdjustment: params.manualAdjustment,
     context: params.context,
   }, policy);
 
@@ -80,6 +83,7 @@ export function calculatePhase1DeliveryFee(
     sizeFee: result.sizeFee,
     urgencySurcharge: result.urgencySurcharge,
     publicFare: result.publicFare,
+    manualAdjustment: result.manualAdjustment,
     dynamicAdjustment: result.dynamicAdjustment,
     serviceFee: result.serviceFee,
     subtotal: result.subtotal,

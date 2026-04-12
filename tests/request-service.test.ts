@@ -19,6 +19,53 @@ import { db } from '../src/services/firebase';
 import { requireUserId } from '../src/services/firebase';
 import { PackageSize } from '../src/types/delivery';
 
+jest.mock('../src/services/config-service', () => ({
+  getTravelTimeConfig: jest.fn().mockResolvedValue({ normalTime: 1500, peakTime: 1800 })
+}));
+
+jest.mock('../src/services/pricing-policy-config-service', () => ({
+  getPricingPolicyConfig: jest.fn().mockResolvedValue({
+    baseFee: 2000,
+    minFee: 2000,
+    maxFee: 50000,
+    baseStations: 2,
+    baseDistanceFee: 0,
+    feePerStation: 300,
+    baseWeight: 1,
+    minWeightFee: 0,
+    feePerKg: 100,
+    sizeFees: {
+      small: 0,
+      medium: 500,
+      large: 1000,
+      xl: 2000,
+    },
+    urgencyMultipliers: {
+      normal: 1,
+      fast: 1.5,
+      urgent: 2,
+    },
+    platformFeeRate: 0.1,
+    pgFeeRate: 0.03,
+    vatRate: 0.1,
+    withholdingTaxRate: 0.033,
+    timeRules: [],
+    dynamicRules: {
+      rainMultiplier: 1.2,
+      snowMultiplier: 1.5,
+      peakTimeMultiplier: 1.2,
+      professionalPeakMultiplier: 1.3,
+      lowSupplyMultiplier: 1.5,
+      highSupplyDiscountMultiplier: 0.8,
+      lowSupplyThreshold: 5,
+      highSupplyThreshold: 50,
+    },
+    addressPickupFee: 0,
+    addressDropoffFee: 0,
+    lockerFee: 0,
+  })
+}));
+
 const mockCollection = jest.fn();
 const mockDoc = jest.fn();
 const mockGetDoc = jest.fn();

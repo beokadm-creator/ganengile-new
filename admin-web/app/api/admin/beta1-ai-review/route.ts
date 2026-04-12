@@ -3,12 +3,31 @@ import { getAdminDb } from '@/lib/firebase-admin';
 import { isAdmin } from '@/lib/auth';
 
 function toIso(value: unknown): string | null {
-  if (value && typeof value === 'object' && 'toDate' in value && typeof (value as { toDate?: () => Date }).toDate === 'function') {
-    return (value as { toDate: () => Date }).toDate().toISOString();
+  if (!value) return null;
+
+  if (typeof value === 'object') {
+    if ('toDate' in value && typeof (value as { toDate?: () => Date }).toDate === 'function') {
+      return (value as { toDate: () => Date }).toDate().toISOString();
+    }
+    if ('_seconds' in value && typeof (value as { _seconds: number })._seconds === 'number') {
+      return new Date((value as { _seconds: number })._seconds * 1000).toISOString();
+    }
+    if ('seconds' in value && typeof (value as { seconds: number }).seconds === 'number') {
+      return new Date((value as { seconds: number }).seconds * 1000).toISOString();
+    }
   }
 
   if (value instanceof Date) {
     return value.toISOString();
+  }
+
+  if (typeof value === 'string') {
+    const d = new Date(value);
+    if (!Number.isNaN(d.getTime())) return d.toISOString();
+  }
+
+  if (typeof value === 'number') {
+    return new Date(value).toISOString();
   }
 
   return null;
@@ -22,18 +41,39 @@ function asNumber(value: unknown, fallback = 0): number {
   return typeof value === 'number' && Number.isFinite(value) ? value : fallback;
 }
 
-export async function GET() {
+export async function GET(req: Request) {
   if (!(await isAdmin())) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
+  const { searchParams } = new URL(req.url);
+  const limitCount = Number(searchParams.get('limit')) || 50;
+
   const db = getAdminDb();
-  const [analysesSnap, draftsSnap, quotesSnap, decisionsSnap, missionsSnap] = await Promise.all([
-    db.collection('ai_analyses').orderBy('createdAt', 'desc').limit(8).get(),
-    db.collection('request_drafts').orderBy('updatedAt', 'desc').limit(8).get(),
-    db.collection('pricing_quotes').orderBy('updatedAt', 'desc').limit(8).get(),
-    db.collection('actor_selection_decisions').orderBy('createdAt', 'desc').limit(8).get(),
-    db.collection('missions').orderBy('updatedAt', 'desc').limit(8).get(),
+  const [
+    analysesSnap,
+    draftsSnap,
+    quotesSnap,
+    decisionsSnap,
+    missionsSnap,
+    analysisCountSnap,
+    lowConfidenceCountSnap,
+    selectedQuoteCountSnap,
+    manualReviewCountSnap,
+    reservationDraftCountSnap,
+    immediateDraftCountSnap
+  ] = await Promise.all([
+    db.collection('ai_analyses').orderBy('createdAt', 'desc').limit(limitCount).get(),
+    db.collection('request_drafts').orderBy('updatedAt', 'desc').limit(limitCount).get(),
+    db.collection('pricing_quotes').orderBy('updatedAt', 'desc').limit(limitCount).get(),
+    db.collection('actor_selection_decisions').orderBy('createdAt', 'desc').limit(limitCount).get(),
+    db.collection('missions').orderBy('updatedAt', 'desc').limit(limitCount).get(),
+    db.collection('ai_analyses').count().get(),
+    db.collection('ai_analyses').where('status', '==', 'low_confidence').count().get(),
+    db.collection('pricing_quotes').where('status', '==', 'selected').count().get(),
+    db.collection('actor_selection_decisions').where('manualReviewRequired', '==', true).count().get(),
+    db.collection('request_drafts').where('requestMode', '==', 'reservation').count().get(),
+    db.collection('request_drafts').where('requestMode', '==', 'immediate').count().get(),
   ]);
 
   const analyses = analysesSnap.docs.map((snap) => {
@@ -129,15 +169,22 @@ export async function GET() {
     };
   });
 
+  // missions collection status count query
+  // "in" query allows up to 10 values, so this is safe
+  const activeMissionCountSnap = await db.collection('missions')
+    .where('status', 'in', ['queued', 'offered', 'accepted', 'in_progress', 'reassigning'])
+    .count()
+    .get();
+
   return NextResponse.json({
     summary: {
-      analysisCount: analyses.length,
-      lowConfidenceCount: analyses.filter((item) => item.status === 'low_confidence').length,
-      selectedQuoteCount: quotes.filter((item) => item.status === 'selected').length,
-      manualReviewCount: decisions.filter((item) => item.manualReviewRequired).length,
-      activeMissionCount: missions.filter((item) => ['queued', 'offered', 'accepted', 'in_progress', 'reassigning'].includes(item.status)).length,
-      reservationDraftCount: drafts.filter((item) => item.requestMode === 'reservation').length,
-      immediateDraftCount: drafts.filter((item) => item.requestMode !== 'reservation').length,
+      analysisCount: analysisCountSnap.data().count,
+      lowConfidenceCount: lowConfidenceCountSnap.data().count,
+      selectedQuoteCount: selectedQuoteCountSnap.data().count,
+      manualReviewCount: manualReviewCountSnap.data().count,
+      activeMissionCount: activeMissionCountSnap.data().count,
+      reservationDraftCount: reservationDraftCountSnap.data().count,
+      immediateDraftCount: immediateDraftCountSnap.data().count,
     },
     analyses,
     drafts,

@@ -241,9 +241,9 @@ export default function UsersPage() {
                     <tr key={item.id} className="hover:bg-slate-50">
                       <td className="px-4 py-4 align-top">
                         <p className="font-medium text-slate-900">{item.name}</p>
-                        <p className="mt-1 text-xs text-slate-500">{item.email || '??? ??'}</p>
+                        <p className="mt-1 text-xs text-slate-500">{item.email || '이메일 없음'}</p>
                         <p className="mt-1 text-xs text-slate-500">
-                          {item.phoneNumber || '???? ??'}
+                          {item.phoneNumber || '전화번호 없음'}
                         </p>
                         <p className="mt-1 font-mono text-[11px] text-slate-400">{item.id}</p>
                       </td>
@@ -253,7 +253,7 @@ export default function UsersPage() {
                             ROLE_COLOR[item.role] ?? 'bg-slate-100 text-slate-700'
                           }`}
                         >
-                          {ROLE_LABEL[item.role] ?? item.role ?? '???'}
+                          {ROLE_LABEL[item.role] ?? item.role ?? '역할 없음'}
                         </span>
                         {item.gillerApplicationStatus ? (
                           <div className="mt-2">

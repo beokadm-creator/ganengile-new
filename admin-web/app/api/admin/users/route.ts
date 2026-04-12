@@ -5,7 +5,8 @@ import type {
   Query,
   QueryDocumentSnapshot,
 } from 'firebase-admin/firestore';
-import { getAdminDb } from '@/lib/firebase-admin';
+import { getAdminDb, getAdminApp } from '@/lib/firebase-admin';
+import { getAuth } from 'firebase-admin/auth';
 import { isAdmin } from '@/lib/auth';
 
 type UserDoc = DocumentData & {
@@ -191,12 +192,23 @@ export async function DELETE(req: NextRequest) {
   const userSnap = await userRef.get();
 
   if (!userSnap.exists) {
+    try {
+      await getAuth(getAdminApp()).deleteUser(userId);
+    } catch (e) {
+      // Ignore if user not found in Auth
+    }
     return NextResponse.json({ error: 'Not found' }, { status: 404 });
   }
 
   const userData = userSnap.data() as UserDoc;
   if (userData.isActive !== false) {
     return NextResponse.json({ error: 'Deactivate the user first' }, { status: 400 });
+  }
+
+  try {
+    await getAuth(getAdminApp()).deleteUser(userId);
+  } catch (error) {
+    console.error(`Failed to delete Auth user ${userId}:`, error);
   }
 
   const profileRef = userRef.collection('profile').doc(userId);

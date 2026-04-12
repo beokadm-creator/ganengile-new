@@ -49,6 +49,15 @@ function toPositiveNumber(...values: unknown[]): number | null {
   return null;
 }
 
+function toFiniteNumber(...values: unknown[]): number | null {
+  for (const value of values) {
+    if (typeof value === 'number' && Number.isFinite(value)) {
+      return value;
+    }
+  }
+  return null;
+}
+
 type CancellationActor = 'requester' | 'giller' | 'system';
 
 type DeliveryCancellationResult = {
@@ -67,6 +76,8 @@ type LegacyFeeInput = {
   publicFare?: number | null;
   serviceFee?: number | null;
   stationCount?: number | null;
+  manualAdjustment?: number | null;
+  dynamicAdjustment?: number | null;
   breakdown?: DeliveryFeeBreakdown['breakdown'] | null;
 };
 
@@ -92,6 +103,8 @@ type DeliveryRequestLike = {
   urgency?: 'normal' | 'fast' | 'urgent';
   itemValue?: number;
   requestMode?: string;
+  manualAdjustment?: number;
+  dynamicAdjustment?: number;
   preferredTime?: {
     departureTime?: string;
     arrivalTime?: string;
@@ -414,6 +427,16 @@ export async function gillerAcceptRequest(
         request?.fee?.publicFare,
         request?.feeBreakdown?.publicFare
       ) ?? 0;
+      const manualAdjustment = toFiniteNumber(
+        request?.fee?.manualAdjustment,
+        request?.feeBreakdown?.manualAdjustment,
+        request?.manualAdjustment
+      ) ?? 0;
+      const dynamicAdjustment = toFiniteNumber(
+        request?.fee?.dynamicAdjustment,
+        request?.feeBreakdown?.dynamicAdjustment,
+        request?.dynamicAdjustment
+      ) ?? 0;
 
       const pricingPolicy = await getPricingPolicyConfig();
       const fallbackFee = calculatePhase1DeliveryFee({
@@ -422,14 +445,30 @@ export async function gillerAcceptRequest(
         packageSize,
         urgency,
         publicFare,
+        manualAdjustment,
+      }, pricingPolicy);
+
+      // Phase1 doesn't accept dynamicAdjustment as param directly (it calculates it using context),
+      // so if there's any dynamicAdjustment from the request, we need to add it to the final calculation or assume manualAdjustment includes it.
+      // Wait, `Phase1PricingParams` does not accept `dynamicAdjustment`, it accepts `context` to compute it.
+      // But we can just use `fallbackFee` and manually adjust if needed.
+      // Wait, `calculatePhase1DeliveryFee` will use `manualAdjustment` directly. If we pass `dynamicAdjustment` as well via `manualAdjustment`, it will preserve the total.
+      // Let's pass the sum as manualAdjustment to ensure total is preserved.
+      const fallbackFeeAdjusted = calculatePhase1DeliveryFee({
+        stationCount,
+        weight: rawWeight,
+        packageSize,
+        urgency,
+        publicFare,
+        manualAdjustment: manualAdjustment + dynamicAdjustment,
       }, pricingPolicy);
 
       confirmedFee = {
-        totalFee: fallbackFee.totalFee,
-        deliveryFee: fallbackFee.baseFee + fallbackFee.distanceFee + fallbackFee.weightFee + fallbackFee.sizeFee,
-        vat: fallbackFee.vat,
-        breakdown: fallbackFee.breakdown,
-        publicFare: fallbackFee.publicFare,
+        totalFee: fallbackFeeAdjusted.totalFee,
+        deliveryFee: fallbackFeeAdjusted.baseFee + fallbackFeeAdjusted.distanceFee + fallbackFeeAdjusted.weightFee + fallbackFeeAdjusted.sizeFee,
+        vat: fallbackFeeAdjusted.vat,
+        breakdown: fallbackFeeAdjusted.breakdown,
+        publicFare: fallbackFeeAdjusted.publicFare,
       };
     }
 

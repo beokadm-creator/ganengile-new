@@ -19,6 +19,9 @@ import { Colors } from '../../src/theme';
 import type { RequestsScreenProps } from '../../src/types/navigation';
 import { db, auth } from '../../src/services/firebase';
 
+import { getPricingPolicyConfig } from '../../src/services/pricing-policy-config-service';
+import { calculatePhase1DeliveryFee } from '../../src/services/pricing-service';
+
 export default function CreateRequestScreen({
   navigation,
 }: RequestsScreenProps) {
@@ -28,6 +31,15 @@ export default function CreateRequestScreen({
   const [packageWeight, setPackageWeight] = useState('');
   const [description, setDescription] = useState('');
   const [loading, setLoading] = useState(false);
+  const [estimatedFee, setEstimatedFee] = useState(5000);
+
+  React.useEffect(() => {
+    let isMounted = true;
+    calculateFeeAsync().then((fee) => {
+      if (isMounted) setEstimatedFee(fee);
+    });
+    return () => { isMounted = false; };
+  }, [packageSize, packageWeight]);
 
   const packageSizes = [
     { label: '소형 (가로x세로x높이 30cm 이하)', value: 'small' },
@@ -75,17 +87,23 @@ export default function CreateRequestScreen({
     return true;
   };
 
-  const calculateFee = (): number => {
-    // 기본 요금 계산 (나중에 더 복잡한 로직으로 대체)
-    let baseFee = 5000; // 기본 5,000원
-
-    if (packageSize === 'medium') baseFee += 2000;
-    if (packageSize === 'large') baseFee += 5000;
-
-    if (packageWeight === 'medium') baseFee += 1000;
-    if (packageWeight === 'heavy') baseFee += 3000;
-
-    return baseFee;
+  const calculateFeeAsync = async (): Promise<number> => {
+    try {
+      const policy = await getPricingPolicyConfig();
+      const result = calculatePhase1DeliveryFee(
+        {
+          stationCount: 5, // 임시로 5정거장 기준으로 정책 기반 요금 산출 (향후 거리 기반 개선 필요)
+          packageSize: (packageSize as any) || 'small',
+          weight: packageWeight === 'heavy' ? 10 : packageWeight === 'medium' ? 5 : 1,
+          urgency: 'normal',
+        },
+        policy
+      );
+      return result.totalFee;
+    } catch (error) {
+      console.warn('Failed to calculate fee with policy, using fallback', error);
+      return 5000;
+    }
   };
 
   const handleSubmit = async () => {
@@ -98,7 +116,7 @@ export default function CreateRequestScreen({
         throw new Error('사용자 인증 정보가 없습니다.');
       }
 
-      const fee = calculateFee();
+      const fee = await calculateFeeAsync();
 
       await addDoc(collection(db, 'requests'), {
         requesterId: user.uid,
@@ -232,7 +250,7 @@ export default function CreateRequestScreen({
         <View style={styles.feeCard}>
           <Text style={styles.feeLabel}>예상 배송비</Text>
           <Text style={styles.feeValue}>
-            {calculateFee().toLocaleString()}원
+            {estimatedFee.toLocaleString()}원
           </Text>
         </View>
 

@@ -196,20 +196,43 @@ export function calculateSharedDeliveryFee(
   const weightFee = calculateSharedWeightFee(weight, resolved);
   const sizeFee = calculateSharedSizeFee(packageSize, resolved);
   const urgencySurcharge = calculateSharedUrgencySurcharge(urgency, baseFee + distanceFee, resolved);
-  const dynamicAdjustment = calculateSharedDynamicAdjustment(
+  let dynamicAdjustment = calculateSharedDynamicAdjustment(
     baseFee + distanceFee + weightFee + sizeFee + urgencySurcharge,
     params.context,
     resolved
   );
-  const feeBeforeService =
+  
+  let feeBeforeService =
     baseFee + distanceFee + weightFee + sizeFee + urgencySurcharge + publicFare + manualAdjustment + dynamicAdjustment;
-  const serviceFee = calculateSharedServiceFee(feeBeforeService, resolved);
-  const subtotal = feeBeforeService + serviceFee;
-  const vat = Math.round(subtotal * resolved.vatRate);
-
+  let serviceFee = calculateSharedServiceFee(feeBeforeService, resolved);
+  let subtotal = feeBeforeService + serviceFee;
+  let vat = Math.round(subtotal * resolved.vatRate);
   let totalFee = subtotal + vat;
-  totalFee = Math.max(resolved.minFee, totalFee);
-  totalFee = Math.min(resolved.maxFee, totalFee);
+
+  // 최소/최대 요금 보정 시 하위 항목들의 합계가 깨지지 않도록 역산하여 dynamicAdjustment에 차액을 반영
+  if (totalFee < resolved.minFee || totalFee > resolved.maxFee) {
+    const targetTotalFee = Math.max(resolved.minFee, Math.min(resolved.maxFee, totalFee));
+    // totalFee = feeBeforeService * (1 + platformFeeRate) * (1 + vatRate)
+    // 따라서 targetFeeBeforeService를 역산
+    const targetFeeBeforeService = Math.round(targetTotalFee / ((1 + resolved.platformFeeRate) * (1 + resolved.vatRate)));
+    
+    // 차액을 dynamicAdjustment에 추가
+    dynamicAdjustment += (targetFeeBeforeService - feeBeforeService);
+    
+    // 다시 정방향 계산하여 반올림 오차를 최소화
+    feeBeforeService = baseFee + distanceFee + weightFee + sizeFee + urgencySurcharge + publicFare + manualAdjustment + dynamicAdjustment;
+    serviceFee = calculateSharedServiceFee(feeBeforeService, resolved);
+    subtotal = feeBeforeService + serviceFee;
+    vat = Math.round(subtotal * resolved.vatRate);
+    totalFee = subtotal + vat;
+
+    // 만약 정방향 계산 후에도 1~2원 오차가 있다면, 부가세나 서비스수수료에서 직접 가감하여 최종액을 강제 일치시킴
+    const diff = targetTotalFee - totalFee;
+    if (diff !== 0) {
+      vat += diff;
+      totalFee = targetTotalFee;
+    }
+  }
 
   return {
     baseFee,

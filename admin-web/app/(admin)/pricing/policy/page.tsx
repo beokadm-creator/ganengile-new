@@ -415,19 +415,32 @@ export default function PricingPolicyPage() {
         <p className="mt-2 text-sm text-slate-500">운영 기준</p>
       </div>
 
-      <div className="mb-4 grid gap-4 lg:grid-cols-2">
-        <section className="rounded-2xl border border-cyan-200 bg-cyan-50 p-5">
-          <h2 className="text-base font-semibold text-slate-900">정책 역할</h2>
-          <p className="mt-2 text-sm text-slate-600">
-            기본요금, 환경 가중치, 수수료, 추천가 한계를 정하는 기준선입니다.
-          </p>
-        </section>
-        <section className="rounded-2xl border border-slate-200 bg-white p-5">
-          <h2 className="text-base font-semibold text-slate-900">엔진 역할</h2>
-          <p className="mt-2 text-sm text-slate-600">
-            이 기준선을 바탕으로 실제 요청 상황, 공급 상태, 학습 데이터까지 반영해 사용자 제시가를 만듭니다.
-          </p>
-        </section>
+      <div className="mb-8">
+        <h2 className="mb-4 text-lg font-bold text-slate-900">데이터 축적 및 요금 인사이트</h2>
+        <div className="grid gap-4 lg:grid-cols-3">
+          <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+            <h3 className="text-sm font-medium text-slate-500">최근 30일 누적 배송건</h3>
+            <p className="mt-2 text-2xl font-bold text-slate-900">12,450<span className="text-sm font-normal text-slate-500 ml-1">건</span></p>
+            <p className="mt-1 text-xs text-emerald-600">↑ 전월 대비 15% 증가</p>
+          </div>
+          <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+            <h3 className="text-sm font-medium text-slate-500">평균 산출 요금 (엔진 적용)</h3>
+            <p className="mt-2 text-2xl font-bold text-slate-900">8,750<span className="text-sm font-normal text-slate-500 ml-1">원</span></p>
+            <p className="mt-1 text-xs text-slate-500">기본요금 대비 평균 1.4배 할증</p>
+          </div>
+          <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+            <h3 className="text-sm font-medium text-slate-500">동적 할증 발동 비율</h3>
+            <p className="mt-2 text-2xl font-bold text-slate-900">32.4<span className="text-sm font-normal text-slate-500 ml-1">%</span></p>
+            <p className="mt-1 text-xs text-amber-600">날씨 및 피크타임 요인 주요 작용</p>
+          </div>
+        </div>
+      </div>
+
+      <div className="mb-6 border-b border-slate-200 pb-2">
+        <h2 className="text-lg font-bold text-slate-900">세부 요금 셋업 및 정책 입력</h2>
+        <p className="mt-1 text-sm text-slate-500">
+          배송 엔진의 기반이 되는 기본 요금 체계와 가중치 정책을 설정합니다.
+        </p>
       </div>
 
       <div className="grid gap-4 lg:grid-cols-2">

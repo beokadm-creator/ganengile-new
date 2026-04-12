@@ -967,61 +967,46 @@ export async function calculateDeliveryFee(
     const travelTimeData = await getTravelTimeConfig(
       pickupStation.stationId,
       deliveryStation.stationId
-    );
+    ).catch(e => {
+      console.warn('Failed to get travel time config, falling back to distance based estimation:', e);
+      return null;
+    });
 
-    const travelTimeSeconds = travelTimeData?.normalTime ?? 1800;
-    const travelTimeMinutes = Math.round(travelTimeSeconds / 60);
+    let stationCount: number;
+    let travelTimeMinutes: number;
 
-    const stationCount = Math.max(2, Math.round(travelTimeMinutes / 2.5));
+    if (travelTimeData && typeof travelTimeData.normalTime === 'number') {
+      travelTimeMinutes = Math.round(travelTimeData.normalTime / 60);
+      stationCount = Math.max(2, Math.round(travelTimeMinutes / 2.5));
+    } else {
+      // Fallback: estimate from distance using Haversine formula
+      const R = 6371; // Earth's radius in km
+      const dLat = (deliveryStation.lat - pickupStation.lat) * (Math.PI / 180);
+      const dLon = (deliveryStation.lng - pickupStation.lng) * (Math.PI / 180);
+      const a = 
+        Math.sin(dLat/2) * Math.sin(dLat/2) +
+        Math.cos(pickupStation.lat * (Math.PI / 180)) * Math.cos(deliveryStation.lat * (Math.PI / 180)) * 
+        Math.sin(dLon/2) * Math.sin(dLon/2);
+      const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+      const distanceKm = R * c;
+      
+      stationCount = Math.max(2, Math.round(distanceKm * 1.8)); // from estimateStationCountFromDistanceKm
+      travelTimeMinutes = Math.round(stationCount * 2.5);
+    }
+
+    // Determine urgency enum
+    let urgencyValue: 'normal' | 'fast' | 'urgent' = 'normal';
+    if (urgencySurcharge > 0) {
+      // Very basic heuristic if external urgency surcharge was passed
+      urgencyValue = urgencySurcharge > 5000 ? 'urgent' : 'fast';
+    }
 
     const pricingParams: Phase1PricingParams = {
       stationCount,
       weight,
       packageSize: packageSize as PackageSizeType,
-      urgency: 'normal',
-    };
-
-    const feeResult = calculatePhase1DeliveryFee(pricingParams, pricingPolicy);
-
-    const subtotal = feeResult.baseFee + feeResult.distanceFee + feeResult.weightFee +
-                     feeResult.sizeFee + feeResult.dynamicAdjustment + feeResult.serviceFee + urgencySurcharge + manualAdjustment;
-    const vat = Math.round(subtotal * pricingPolicy.vatRate);
-    let totalFee = subtotal + vat;
-
-    if (totalFee < pricingPolicy.minFee) totalFee = pricingPolicy.minFee;
-    if (totalFee > pricingPolicy.maxFee) totalFee = pricingPolicy.maxFee;
-
-    const platformFee = Math.round(totalFee * pricingPolicy.platformFeeRate);
-    const gillerFee = totalFee - platformFee;
-
-    return {
-      baseFee: feeResult.baseFee,
-      distanceFee: feeResult.distanceFee,
-      sizeFee: feeResult.sizeFee,
-      weightFee: feeResult.weightFee,
-      urgencySurcharge,
-      dynamicAdjustment: feeResult.dynamicAdjustment,
+      urgency: urgencyValue,
       manualAdjustment,
-      serviceFee: feeResult.serviceFee,
-      subtotal,
-      vat,
-      totalFee,
-      estimatedTime: travelTimeMinutes,
-      breakdown: {
-        gillerFee,
-        platformFee,
-      },
-    };
-  } catch (error) {
-    console.error('Error calculating delivery fee:', error);
-
-    const stationCount = 5;
-    const pricingPolicy = await getPricingPolicyConfig();
-    const pricingParams: Phase1PricingParams = {
-      stationCount,
-      weight,
-      packageSize: packageSize as PackageSizeType,
-      urgency: 'normal',
     };
 
     const feeResult = calculatePhase1DeliveryFee(pricingParams, pricingPolicy);
@@ -1031,16 +1016,19 @@ export async function calculateDeliveryFee(
       distanceFee: feeResult.distanceFee,
       sizeFee: feeResult.sizeFee,
       weightFee: feeResult.weightFee,
-      urgencySurcharge,
+      urgencySurcharge: feeResult.urgencySurcharge,
       dynamicAdjustment: feeResult.dynamicAdjustment,
-      manualAdjustment,
+      manualAdjustment: feeResult.manualAdjustment,
       serviceFee: feeResult.serviceFee,
       subtotal: feeResult.subtotal,
       vat: feeResult.vat,
       totalFee: feeResult.totalFee,
-      estimatedTime: 30,
+      estimatedTime: travelTimeMinutes,
       breakdown: feeResult.breakdown,
     };
+  } catch (error) {
+    console.error('Error calculating delivery fee:', error);
+    throw new Error('배송 요금을 산출할 수 없습니다. 길찾기 API 장애 또는 정책 로딩에 실패했습니다.');
   }
 }
 
