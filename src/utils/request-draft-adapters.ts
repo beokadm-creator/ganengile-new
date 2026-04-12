@@ -1,4 +1,5 @@
 import { Timestamp } from 'firebase/firestore';
+import type { SharedPackageSize } from '../../shared/pricing-config';
 import type {
   LocationRef,
   PricingQuote,
@@ -42,7 +43,7 @@ export interface LegacyCreateRequestDraftInput {
   description?: string;
   estimatedValue?: number;
   estimatedWeightKg?: number;
-  estimatedSize?: 'small' | 'medium' | 'large' | 'xl';
+  estimatedSize?: SharedPackageSize;
   isFragile?: boolean;
   isPerishable?: boolean;
   recipientName?: string;

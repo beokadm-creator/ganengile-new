@@ -102,6 +102,8 @@ export interface Bid {
 /**
  * 경매 정보
  */
+import type { SharedPackageSize } from '../../shared/pricing-config';
+
 export interface Auction {
   /** 경매 ID */
   auctionId: string;
@@ -132,7 +134,7 @@ export interface Auction {
 
   // ===== 패키지 정보 =====
   /** 패키지 크기 */
-  packageSize: 'small' | 'medium' | 'large' | 'xl';
+  packageSize: SharedPackageSize;
 
   /** 패키지 무게 (kg) */
   packageWeight: number;

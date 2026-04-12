@@ -28,6 +28,8 @@ export type MainTabParamList = {
   Profile: undefined;
 };
 
+import type { SharedPackageSize } from '../../shared/pricing-config';
+
 export type MainStackParamList = {
   Tabs: NavigatorScreenParams<MainTabParamList>;
   CreateRequest:
@@ -44,7 +46,7 @@ export type MainStackParamList = {
           deliveryRoadAddress?: string;
           deliveryDetailAddress?: string;
           packageDescription?: string;
-          packageSize?: 'small' | 'medium' | 'large' | 'xl';
+          packageSize?: SharedPackageSize;
           weightKg?: number;
           itemValue?: number;
           photoRefs?: string[];

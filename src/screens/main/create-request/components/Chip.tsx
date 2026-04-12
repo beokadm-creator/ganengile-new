@@ -1,6 +1,6 @@
 import React from 'react';
 import { TouchableOpacity, Text, StyleSheet } from 'react-native';
-import { BorderRadius, Colors, Spacing } from '../../../../theme';
+import { BorderRadius, Colors, Spacing, Typography } from '../../../../theme';
 
 type Props = {
   label: string;
@@ -33,7 +33,7 @@ const styles = StyleSheet.create({
   },
   chipText: {
     color: Colors.textPrimary,
-    fontWeight: '700',
+    fontWeight: Typography.fontWeight.bold,
   },
   chipTextActive: {
     color: Colors.white,

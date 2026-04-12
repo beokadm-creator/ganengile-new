@@ -47,7 +47,7 @@ const styles = StyleSheet.create({
   },
   editStepButton: {
     position: 'absolute',
-    top: -10,
+    top: -Spacing.sm,
     right: 0,
     padding: Spacing.sm,
     backgroundColor: Colors.white,
@@ -58,7 +58,7 @@ const styles = StyleSheet.create({
   editStepButtonText: {
     color: Colors.primary,
     fontSize: Typography.fontSize.sm,
-    fontWeight: '700',
+    fontWeight: Typography.fontWeight.bold,
   },
   nextStepButton: {
     minHeight: 56,
@@ -71,7 +71,7 @@ const styles = StyleSheet.create({
   },
   nextStepButtonText: {
     color: Colors.white,
-    fontSize: 18,
-    fontWeight: '800',
+    fontSize: Typography.fontSize.xl,
+    fontWeight: Typography.fontWeight.extrabold,
   },
 });

@@ -68,6 +68,8 @@ function formatRemainingTime(seconds: number): string {
   return `${minutes}분`;
 }
 
+import type { SharedPackageSize } from '../../../shared/pricing-config';
+
 function getPackageSizeText(size: string): string {
   switch (size) {
     case 'small':
@@ -78,6 +80,8 @@ function getPackageSizeText(size: string): string {
       return '대형';
     case 'xl':
       return '특대형';
+    case 'extra_large':
+      return '엑스라지';
     default:
       return size;
   }

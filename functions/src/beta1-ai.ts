@@ -1,5 +1,7 @@
 type FirestoreDb = import('firebase-admin/firestore').Firestore;
 
+import type { SharedPackageSize } from '../../shared/pricing-config';
+
 export interface Beta1AIConfig {
   enabled: boolean;
   provider: string;
@@ -34,7 +36,7 @@ export interface Beta1RequestDraftAnalysisInput {
     description?: string;
     estimatedValue?: number;
     estimatedWeightKg?: number;
-    estimatedSize?: 'small' | 'medium' | 'large' | 'xl';
+    estimatedSize?: SharedPackageSize;
     isFragile?: boolean;
     isPerishable?: boolean;
   };
@@ -711,9 +713,9 @@ export async function executeRequestDraftAnalysis(
         description: asString(parsed.description, input.packageDraft?.description ?? ''),
         estimatedValue: asNumber(parsed.estimatedValue, input.packageDraft?.estimatedValue ?? 0) ?? input.packageDraft?.estimatedValue,
         estimatedWeightKg: asNumber(parsed.estimatedWeightKg, input.packageDraft?.estimatedWeightKg ?? 0) ?? input.packageDraft?.estimatedWeightKg,
-        estimatedSize: ['small', 'medium', 'large', 'xl'].includes(asString(parsed.estimatedSize))
-          ? (parsed.estimatedSize as 'small' | 'medium' | 'large' | 'xl')
-          : (input.packageDraft?.estimatedSize ?? 'medium'),
+        estimatedSize: ['small', 'medium', 'large', 'xl', 'extra_large'].includes(asString(parsed.estimatedSize))
+            ? (parsed.estimatedSize as SharedPackageSize)
+            : (input.packageDraft?.estimatedSize ?? 'medium'),
         riskFlags: Array.isArray(parsed.riskFlags) ? parsed.riskFlags.map((flag) => asString(flag)).filter(Boolean) : [],
         handlingNotes: Array.isArray(parsed.handlingNotes) ? parsed.handlingNotes.map((note) => asString(note)).filter(Boolean) : [],
       },

@@ -40,6 +40,7 @@ import { BorderRadius, Colors, Shadows, Spacing } from '../../theme';
 import type { MainStackNavigationProp, MainStackParamList } from '../../types/navigation';
 import { RequestStatus, type Request } from '../../types/request';
 import { Image } from 'expo-image';
+import type { SharedPackageSize } from '../../../shared/pricing-config';
 
 type RequestDetailRoute = RouteProp<MainStackParamList, 'RequestDetail'>;
 
@@ -315,7 +316,7 @@ export default function RequestDetailScreen() {
         pickupStation: request.pickupStation,
         deliveryStation: request.deliveryStation,
         packageDescription: request.packageInfo.description,
-        packageSize: request.packageInfo.size as 'small' | 'medium' | 'large' | 'xl',
+        packageSize: request.packageInfo.size as SharedPackageSize,
         weightKg:
           typeof request.packageInfo.weightKg === 'number'
             ? request.packageInfo.weightKg

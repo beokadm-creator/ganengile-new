@@ -21,6 +21,7 @@ import { cancelRequest, getUserRequests, increaseRequestBid } from '../../servic
 import { BorderRadius, Colors, Shadows, Spacing, Typography } from '../../theme';
 import type { MainStackNavigationProp } from '../../types/navigation';
 import { RequestStatus, type Request } from '../../types/request';
+import type { SharedPackageSize } from '../../../shared/pricing-config';
 
 export default function RequestsScreen({ navigation }: { navigation: MainStackNavigationProp }) {
   const [requests, setRequests] = useState<Request[]>([]);
@@ -159,7 +160,7 @@ export default function RequestsScreen({ navigation }: { navigation: MainStackNa
         pickupStation: request.pickupStation,
         deliveryStation: request.deliveryStation,
         packageDescription: request.packageInfo.description,
-        packageSize: request.packageInfo.size as 'small' | 'medium' | 'large' | 'xl',
+        packageSize: request.packageInfo.size as SharedPackageSize,
         weightKg:
           typeof request.packageInfo.weightKg === 'number'
             ? request.packageInfo.weightKg

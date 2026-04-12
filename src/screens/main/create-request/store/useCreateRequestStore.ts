@@ -1,12 +1,14 @@
 import { create } from 'zustand';
 import type { Station } from '../../../../types/config';
 import type { CreateRequestDraft } from '../../../../utils/draft-storage';
-
 import type { Beta1QuoteCard } from '../../../../services/beta1-orchestration-service';
+import type { StationInfo } from '../../../../types/request';
+
+import type { SharedPackageSize } from '../../../../../shared/pricing-config';
 
 export type RequestMode = 'immediate' | 'reservation';
 export type LocationMode = 'station' | 'address';
-export type PackageSize = 'small' | 'medium' | 'large' | 'xl';
+export type PackageSize = SharedPackageSize;
 export type Urgency = 'normal' | 'fast' | 'urgent';
 export type DirectMode = 'none' | 'requester_to_station' | 'locker_assisted';
 
@@ -22,8 +24,8 @@ export interface CreateRequestState {
   // Origin (Step 1)
   pickupMode: LocationMode;
   setPickupMode: (mode: LocationMode) => void;
-  pickupStation: Station | null;
-  setPickupStation: (station: Station | null) => void;
+  pickupStation: StationInfo | null;
+  setPickupStation: (station: StationInfo | null) => void;
   pickupRoadAddress: string;
   setPickupRoadAddress: (address: string) => void;
   pickupDetailAddress: string;
@@ -32,8 +34,8 @@ export interface CreateRequestState {
   // Destination (Step 1)
   deliveryMode: LocationMode;
   setDeliveryMode: (mode: LocationMode) => void;
-  deliveryStation: Station | null;
-  setDeliveryStation: (station: Station | null) => void;
+  deliveryStation: StationInfo | null;
+  setDeliveryStation: (station: StationInfo | null) => void;
   deliveryRoadAddress: string;
   setDeliveryRoadAddress: (address: string) => void;
   deliveryDetailAddress: string;
@@ -137,7 +139,7 @@ const initialState = {
   specialInstructions: '',
   directMode: 'none' as DirectMode,
   storageLocation: '',
-  lockerId: null,
+  lockerId: null as string | null,
   contactPhoneNumber: '',
   verifiedPhoneOverride: null,
   aiQuotesLoading: false,
@@ -193,12 +195,31 @@ export const useCreateRequestStore = create<CreateRequestState>((set) => ({
   setDraftSaving: (saving) => set({ draftSaving: saving }),
 
   hydrateFromDraft: (draft) => set((state) => {
-    // Note: Station conversion logic should be handled by the caller 
-    // since this store doesn't know about `fromDraftStation` utility yet.
     return {
-      requestMode: draft.requestMode,
-      pickupMode: draft.pickupMode,
-      deliveryMode: draft.deliveryMode,
+      requestMode: draft.requestMode as RequestMode ?? 'immediate',
+      pickupMode: draft.pickupMode ?? 'station',
+      deliveryMode: draft.deliveryMode ?? 'station',
+      
+      pickupStation: draft.pickupStation ? {
+        id: draft.pickupStation.stationId,
+        stationId: draft.pickupStation.stationId,
+        stationName: draft.pickupStation.stationName,
+        line: draft.pickupStation.line ?? '',
+        lineCode: draft.pickupStation.lineCode ?? '',
+        lat: draft.pickupStation.lat,
+        lng: draft.pickupStation.lng,
+      } : null,
+      
+      deliveryStation: draft.deliveryStation ? {
+        id: draft.deliveryStation.stationId,
+        stationId: draft.deliveryStation.stationId,
+        stationName: draft.deliveryStation.stationName,
+        line: draft.deliveryStation.line ?? '',
+        lineCode: draft.deliveryStation.lineCode ?? '',
+        lat: draft.deliveryStation.lat,
+        lng: draft.deliveryStation.lng,
+      } : null,
+      
       pickupRoadAddress: draft.pickupRoadAddress,
       pickupDetailAddress: draft.pickupDetailAddress,
       deliveryRoadAddress: draft.deliveryRoadAddress,
@@ -215,6 +236,7 @@ export const useCreateRequestStore = create<CreateRequestState>((set) => ({
       recipientPhone: draft.recipientPhone,
       pickupLocationDetail: draft.pickupLocationDetail,
       storageLocation: draft.storageLocation,
+      lockerId: (draft as any).lockerId ?? null,
       specialInstructions: draft.specialInstructions,
       directMode: draft.directMode,
       urgency: draft.urgency,

@@ -139,6 +139,8 @@ export enum ActorSelectionActorType {
   REQUESTER = 'requester',
 }
 
+import type { SharedPackageSize } from '../../shared/pricing-config';
+
 export interface LocationRef {
   type: LocationRefType;
   stationId?: string;
@@ -189,7 +191,7 @@ export interface RequestDraft {
     description?: string;
     estimatedValue?: number;
     estimatedWeightKg?: number;
-    estimatedSize?: 'small' | 'medium' | 'large' | 'xl';
+    estimatedSize?: SharedPackageSize;
     isFragile?: boolean;
     isPerishable?: boolean;
   };

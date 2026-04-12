@@ -2,6 +2,8 @@ import { getFunctions, httpsCallable } from 'firebase/functions';
 import type { RequestDraft } from '../types/beta1';
 import type { StationInfo, CreateRequestData } from '../types/request';
 
+import type { SharedPackageSize } from '../../../shared/pricing-config';
+
 export interface Beta1AIAnalysisResponse {
   provider: string;
   model: string;
@@ -14,7 +16,7 @@ export interface Beta1AIAnalysisResponse {
     description?: string;
     estimatedValue?: number;
     estimatedWeightKg?: number;
-    estimatedSize?: 'small' | 'medium' | 'large' | 'xl';
+    estimatedSize?: SharedPackageSize;
     riskFlags: string[];
     handlingNotes: string[];
   };
@@ -214,7 +216,7 @@ export async function generatePricingQuotesForBeta1Input(input: {
   packageDescription?: string;
   itemValue?: number;
   weightKg?: number;
-  packageSize?: 'small' | 'medium' | 'large' | 'xl';
+  packageSize: SharedPackageSize;
   requestMode?: 'immediate' | 'reservation';
   preferredPickupTime?: string;
   preferredArrivalTime?: string;

@@ -1,6 +1,6 @@
 import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
-import { Colors, Typography } from '../../../../theme';
+import { Colors, Typography, Spacing } from '../../../../theme';
 
 type Props = {
   label: string;
@@ -26,7 +26,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    gap: 12,
+    gap: Spacing.md,
   },
   quoteBreakdownLabel: {
     color: Colors.textSecondary,
@@ -34,15 +34,16 @@ const styles = StyleSheet.create({
   },
   quoteBreakdownLabelStrong: {
     color: Colors.textPrimary,
-    fontWeight: '800',
+    fontWeight: Typography.fontWeight.extrabold,
   },
   quoteBreakdownValue: {
     color: Colors.textPrimary,
     fontSize: Typography.fontSize.sm,
-    fontWeight: '700',
+    fontWeight: Typography.fontWeight.bold,
   },
   quoteBreakdownValueStrong: {
     color: Colors.primary,
     fontSize: Typography.fontSize.base,
+    fontWeight: Typography.fontWeight.extrabold,
   },
 });

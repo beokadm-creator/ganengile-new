@@ -3,6 +3,7 @@ import { calculatePhase1DeliveryFee, estimateStationCountFromCoords, type Packag
 import { type LegacyStationInfo as StationInfo } from '../utils/request-draft-adapters';
 import type { SharedPricingPolicyConfig } from '../../shared/pricing-policy';
 import type { RoutePricingOverrideConfig } from '../../shared/route-pricing-override';
+import type { SharedPackageSize } from '../../shared/pricing-config';
 import type { Beta1AIQuoteResponse } from './beta1-ai-service';
 import type { RequestPricingContext } from '../types/request';
 
@@ -22,7 +23,7 @@ export interface Beta1RequestCreateInput {
   packageItemName?: string;
   packageCategory?: string;
   packageDescription: string;
-  packageSize: PackageSizeType;
+  packageSize: SharedPackageSize;
   weightKg: number;
   itemValue?: number;
   recipientName: string;

@@ -2,210 +2,27 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import type { ChangeEvent, ReactNode } from 'react';
-import { calculateSharedDeliveryFee } from '../../../../../shared/pricing-policy';
+import { calculateSharedDeliveryFee, type SharedPricingPolicyConfig, DEFAULT_SHARED_PRICING_POLICY } from '../../../../../shared/pricing-policy';
+import { type SharedPackageSize } from '../../../../../shared/pricing-config';
 import { MAJOR_STATIONS } from '../../../../../data/subway-stations';
 
-type PricingPolicy = {
-  version: string;
-  baseFee: number;
-  minFee: number;
-  maxFee: number;
-  platformFeeRate: number;
-  vatRate: number;
-  pgFeeRate: number;
-  withholdingTaxRate: number;
-  baseStations: number;
-  baseDistanceFee: number;
-  feePerStation: number;
-  baseWeight: number;
-  minWeightFee: number;
-  feePerKg: number;
-  sizeFees: {
-    small: number;
-    medium: number;
-    large: number;
-    xl: number;
-    extra_large: number;
-  };
-  urgencyMultipliers: {
-    normal: number;
-    fast: number;
-    urgent: number;
-  };
-  dynamicRules: {
-    rainMultiplier: number;
-    snowMultiplier: number;
-    peakTimeMultiplier: number;
-    professionalPeakMultiplier: number;
-    lowSupplyThreshold: number;
-    lowSupplyMultiplier: number;
-    highSupplyThreshold: number;
-    highSupplyDiscountMultiplier: number;
-  };
-  incentiveRules: {
-    transferBonusPerHop: number;
-    transferDiscount: number;
-    professionalBonusRate: number;
-    masterBonusRate: number;
-  };
-  quoteAdjustments: {
-    addressPickupFee: number;
-    addressDropoffFee: number;
-    fastestReservationSurcharge: number;
-    fastestImmediateSurcharge: number;
-    balancedLockerAssistedFee: number;
-    lowestPriceDistanceDiscount: number;
-    lowestPriceReservationUrgencyDiscount: number;
-    lowestPriceImmediateUrgencyDiscount: number;
-    lowestPriceLockerFee: number;
-    lowestPriceAddressPickupDiscountRate: number;
-    lowestPriceAddressDropoffDiscountRate: number;
-    lowestPriceServiceFeeDiscount: number;
-    lowestPriceMinPublicPrice: number;
-    lockerIncludedBaseFee: number;
-    lockerIncludedReservationExtraFee: number;
-    lockerIncludedImmediateExtraFee: number;
-    lockerIncludedAddressPickupDiscountRate: number;
-    lockerIncludedAddressDropoffDiscountRate: number;
-    balancedReservationUrgencyOffset: number;
-  };
-  recommendationRules: {
-    peakTimeMultiplier: number;
-    professionalPeakMultiplier: number;
-    rainMultiplier: number;
-    snowMultiplier: number;
-    lowSupplyMultiplier: number;
-    highSupplyDiscountMultiplier: number;
-    reservationDiscountMultiplier: number;
-    maxRecommendationMultiplier: number;
-    minRecommendationMultiplier: number;
-  };
-  timeRules: Array<{
-    label: string;
-    enabled: boolean;
-    startHour: number;
-    endHour: number;
-    fixedAdjustment: number;
-    multiplier: number;
-  }>;
-  bidStep: number;
-  minimumWithdrawalAmount: number;
-  recommendationMultiplier: number;
-  notes: string;
-};
+
 
 type ApiResponse = {
-  item?: Partial<PricingPolicy>;
+  item?: Partial<SharedPricingPolicyConfig>;
   error?: string;
 };
 
-const emptyPolicy: PricingPolicy = {
-  version: 'pricing-policy-v1',
-  baseFee: 2000,
-  minFee: 3000,
-  maxFee: 10000,
-  platformFeeRate: 0.1,
-  vatRate: 0.1,
-  pgFeeRate: 0.03,
-  withholdingTaxRate: 0.033,
-  baseStations: 5,
-  baseDistanceFee: 600,
-  feePerStation: 120,
-  baseWeight: 1,
-  minWeightFee: 100,
-  feePerKg: 100,
-  sizeFees: {
-    small: 0,
-    medium: 400,
-    large: 800,
-    xl: 1500,
-    extra_large: 1500,
-  },
-  urgencyMultipliers: {
-    normal: 0,
-    fast: 0.1,
-    urgent: 0.2,
-  },
-  dynamicRules: {
-    rainMultiplier: 0.08,
-    snowMultiplier: 0.18,
-    peakTimeMultiplier: 0.12,
-    professionalPeakMultiplier: 0.1,
-    lowSupplyThreshold: 3,
-    lowSupplyMultiplier: 0.12,
-    highSupplyThreshold: 8,
-    highSupplyDiscountMultiplier: -0.05,
-  },
-  incentiveRules: {
-    transferBonusPerHop: 500,
-    transferDiscount: 500,
-    professionalBonusRate: 0.25,
-    masterBonusRate: 0.35,
-  },
-  quoteAdjustments: {
-    addressPickupFee: 900,
-    addressDropoffFee: 800,
-    fastestReservationSurcharge: 900,
-    fastestImmediateSurcharge: 2500,
-    balancedLockerAssistedFee: 1000,
-    lowestPriceDistanceDiscount: 300,
-    lowestPriceReservationUrgencyDiscount: 600,
-    lowestPriceImmediateUrgencyDiscount: 200,
-    lowestPriceLockerFee: 700,
-    lowestPriceAddressPickupDiscountRate: 0.6,
-    lowestPriceAddressDropoffDiscountRate: 0.6,
-    lowestPriceServiceFeeDiscount: 150,
-    lowestPriceMinPublicPrice: 3000,
-    lockerIncludedBaseFee: 1200,
-    lockerIncludedReservationExtraFee: 200,
-    lockerIncludedImmediateExtraFee: 500,
-    lockerIncludedAddressPickupDiscountRate: 0.7,
-    lockerIncludedAddressDropoffDiscountRate: 0.7,
-    balancedReservationUrgencyOffset: -200,
-  },
-  recommendationRules: {
-    peakTimeMultiplier: 0.06,
-    professionalPeakMultiplier: 0.04,
-    rainMultiplier: 0.03,
-    snowMultiplier: 0.07,
-    lowSupplyMultiplier: 0.08,
-    highSupplyDiscountMultiplier: -0.04,
-    reservationDiscountMultiplier: -0.02,
-    maxRecommendationMultiplier: 1.35,
-    minRecommendationMultiplier: 0.8,
-  },
-  timeRules: [
-    {
-      label: '출근 피크',
-      enabled: true,
-      startHour: 7,
-      endHour: 9,
-      fixedAdjustment: 500,
-      multiplier: 1,
-    },
-    {
-      label: '퇴근 피크',
-      enabled: true,
-      startHour: 18,
-      endHour: 20,
-      fixedAdjustment: 700,
-      multiplier: 1,
-    },
-  ],
-  bidStep: 1000,
-  minimumWithdrawalAmount: 10000,
-  recommendationMultiplier: 1.05,
-  notes: '운영 기준 가격 정책',
-};
+
 
 export default function PricingPolicyPage() {
-  const [policy, setPolicy] = useState<PricingPolicy>(emptyPolicy);
+  const [policy, setPolicy] = useState<SharedPricingPolicyConfig>(DEFAULT_SHARED_PRICING_POLICY);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [previewPickupStationId, setPreviewPickupStationId] = useState('150');
   const [previewDeliveryStationId, setPreviewDeliveryStationId] = useState('222');
   const [previewWeight, setPreviewWeight] = useState(2);
-  const [previewPackageSize, setPreviewPackageSize] = useState<'small' | 'medium' | 'large' | 'xl'>('medium');
+  const [previewPackageSize, setPreviewPackageSize] = useState<SharedPackageSize>('medium');
   const [previewRequestMode, setPreviewRequestMode] = useState<'immediate' | 'reservation'>('immediate');
   const [previewUrgency, setPreviewUrgency] = useState<'normal' | 'fast' | 'urgent'>('fast');
   const [previewWeather, setPreviewWeather] = useState<'clear' | 'rain' | 'snow'>('clear');
@@ -289,30 +106,30 @@ export default function PricingPolicyPage() {
       const json = (await res.json()) as ApiResponse;
       if (res.ok && json.item) {
         setPolicy({
-          ...emptyPolicy,
+          ...DEFAULT_SHARED_PRICING_POLICY,
           ...json.item,
           sizeFees: {
-            ...emptyPolicy.sizeFees,
+            ...DEFAULT_SHARED_PRICING_POLICY.sizeFees,
             ...(json.item.sizeFees ?? {}),
           },
           urgencyMultipliers: {
-            ...emptyPolicy.urgencyMultipliers,
+            ...DEFAULT_SHARED_PRICING_POLICY.urgencyMultipliers,
             ...(json.item.urgencyMultipliers ?? {}),
           },
           dynamicRules: {
-            ...emptyPolicy.dynamicRules,
+            ...DEFAULT_SHARED_PRICING_POLICY.dynamicRules,
             ...(json.item.dynamicRules ?? {}),
           },
           incentiveRules: {
-            ...emptyPolicy.incentiveRules,
+            ...DEFAULT_SHARED_PRICING_POLICY.incentiveRules,
             ...(json.item.incentiveRules ?? {}),
           },
           quoteAdjustments: {
-            ...emptyPolicy.quoteAdjustments,
+            ...DEFAULT_SHARED_PRICING_POLICY.quoteAdjustments,
             ...(json.item.quoteAdjustments ?? {}),
           },
           recommendationRules: {
-            ...emptyPolicy.recommendationRules,
+            ...DEFAULT_SHARED_PRICING_POLICY.recommendationRules,
             ...(json.item.recommendationRules ?? {}),
           },
           timeRules: Array.isArray(json.item.timeRules) && json.item.timeRules.length > 0
@@ -324,7 +141,7 @@ export default function PricingPolicyPage() {
                 fixedAdjustment: rule?.fixedAdjustment ?? 0,
                 multiplier: rule?.multiplier ?? 1,
               }))
-            : emptyPolicy.timeRules,
+            : DEFAULT_SHARED_PRICING_POLICY.timeRules,
         });
       }
     } finally {
@@ -332,46 +149,46 @@ export default function PricingPolicyPage() {
     }
   }
 
-  function updateField<K extends keyof PricingPolicy>(key: K, value: PricingPolicy[K]) {
+  function updateField<K extends keyof SharedPricingPolicyConfig>(key: K, value: SharedPricingPolicyConfig[K]) {
     setPolicy((prev) => ({ ...prev, [key]: value }));
   }
 
-  function updateNestedField<K extends keyof PricingPolicy['sizeFees']>(key: K, value: number) {
+  function updateNestedField<K extends keyof SharedPricingPolicyConfig['sizeFees']>(key: K, value: number) {
     setPolicy((prev) => ({
       ...prev,
       sizeFees: { ...prev.sizeFees, [key]: value },
     }));
   }
 
-  function updateUrgencyField<K extends keyof PricingPolicy['urgencyMultipliers']>(key: K, value: number) {
+  function updateUrgencyField<K extends keyof SharedPricingPolicyConfig['urgencyMultipliers']>(key: K, value: number) {
     setPolicy((prev) => ({
       ...prev,
       urgencyMultipliers: { ...prev.urgencyMultipliers, [key]: value },
     }));
   }
 
-  function updateDynamicField<K extends keyof PricingPolicy['dynamicRules']>(key: K, value: number) {
+  function updateDynamicField<K extends keyof SharedPricingPolicyConfig['dynamicRules']>(key: K, value: number) {
     setPolicy((prev) => ({
       ...prev,
       dynamicRules: { ...prev.dynamicRules, [key]: value },
     }));
   }
 
-  function updateIncentiveField<K extends keyof PricingPolicy['incentiveRules']>(key: K, value: number) {
+  function updateIncentiveField<K extends keyof SharedPricingPolicyConfig['incentiveRules']>(key: K, value: number) {
     setPolicy((prev) => ({
       ...prev,
       incentiveRules: { ...prev.incentiveRules, [key]: value },
     }));
   }
 
-  function updateQuoteField<K extends keyof PricingPolicy['quoteAdjustments']>(key: K, value: number) {
+  function updateQuoteField<K extends keyof SharedPricingPolicyConfig['quoteAdjustments']>(key: K, value: number) {
     setPolicy((prev) => ({
       ...prev,
       quoteAdjustments: { ...prev.quoteAdjustments, [key]: value },
     }));
   }
 
-  function updateRecommendationField<K extends keyof PricingPolicy['recommendationRules']>(key: K, value: number) {
+  function updateRecommendationField<K extends keyof SharedPricingPolicyConfig['recommendationRules']>(key: K, value: number) {
     setPolicy((prev) => ({
       ...prev,
       recommendationRules: { ...prev.recommendationRules, [key]: value },
@@ -470,6 +287,7 @@ export default function PricingPolicyPage() {
           <NumberField label="중형 가산" value={policy.sizeFees.medium} onChange={(value) => updateNestedField('medium', value)} />
           <NumberField label="대형 가산" value={policy.sizeFees.large} onChange={(value) => updateNestedField('large', value)} />
           <NumberField label="특대형 가산" value={policy.sizeFees.xl} onChange={(value) => updateNestedField('xl', value)} />
+          <NumberField label="엑스라지 가산" value={policy.sizeFees.extra_large} onChange={(value) => updateNestedField('extra_large', value)} />
           <RateField label="빠른 요청 가산율" value={policy.urgencyMultipliers.fast} onChange={(value) => updateUrgencyField('fast', value)} />
           <RateField label="긴급 요청 가산율" value={policy.urgencyMultipliers.urgent} onChange={(value) => updateUrgencyField('urgent', value)} />
         </Section>
@@ -616,12 +434,13 @@ export default function PricingPolicyPage() {
             <select
               className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm"
               value={previewPackageSize}
-              onChange={(event) => setPreviewPackageSize(event.target.value as 'small' | 'medium' | 'large' | 'xl')}
+              onChange={(event) => setPreviewPackageSize(event.target.value as SharedPackageSize)}
             >
               <option value="small">소형</option>
               <option value="medium">중형</option>
               <option value="large">대형</option>
               <option value="xl">특대형</option>
+              <option value="extra_large">엑스라지</option>
             </select>
           </Field>
           <Field label="긴급도">

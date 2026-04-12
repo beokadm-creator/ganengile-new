@@ -25,6 +25,7 @@ import {
 } from '../../services/request-service';
 import { RequestStatus, type Request } from '../../types/request';
 import type { MainStackNavigationProp, MainStackParamList } from '../../types/navigation';
+import type { SharedPackageSize } from '../../../shared/pricing-config';
 
 type GillerSnapshot = Awaited<ReturnType<typeof fetchUserInfo>> & { id: string };
 
@@ -396,7 +397,7 @@ export function MatchingResultScreen() {
                 deliveryRoadAddress: request.deliveryAddress?.roadAddress,
                 deliveryDetailAddress: request.deliveryAddress?.detailAddress,
                 packageDescription: request.packageInfo.description,
-                packageSize: request.packageInfo.size as 'small' | 'medium' | 'large' | 'xl',
+                packageSize: request.packageInfo.size as SharedPackageSize,
                 weightKg:
                   typeof request.packageInfo.weightKg === 'number'
                     ? request.packageInfo.weightKg

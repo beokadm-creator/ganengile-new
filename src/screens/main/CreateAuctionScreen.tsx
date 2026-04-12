@@ -17,6 +17,7 @@ import { requireUserId } from '../../services/firebase';
 import { calculatePhase1DeliveryFee, type PackageSizeType } from '../../services/pricing-service';
 import { createAuction } from '../../services/auction-service';
 import { BorderRadius, Colors, Spacing, Typography } from '../../theme';
+import type { SharedPackageSize } from '../../../shared/pricing-config';
 import type { Station } from '../../types/config';
 import type { MainStackNavigationProp } from '../../types/navigation';
 import type { StationInfo } from '../../types/request';
@@ -33,11 +34,12 @@ function toStationInfo(station: Station): StationInfo {
   };
 }
 
-const PACKAGE_SIZES: Array<{ value: 'small' | 'medium' | 'large' | 'xl'; label: string }> = [
-  { value: 'small', label: '소형' },
-  { value: 'medium', label: '중형' },
-  { value: 'large', label: '대형' },
-  { value: 'xl', label: '특대형' },
+const PACKAGE_SIZES: Array<{ value: SharedPackageSize; label: string }> = [
+  { value: 'small', label: '소형 (쇼핑백)' },
+  { value: 'medium', label: '중형 (일반 상자)' },
+  { value: 'large', label: '대형 (우체국 5호)' },
+  { value: 'xl', label: '특대형 (캐리어)' },
+  { value: 'extra_large', label: '엑스라지' },
 ];
 
 function SelectorRow({
@@ -66,7 +68,7 @@ export default function CreateAuctionScreen() {
   const [deliveryStation, setDeliveryStation] = useState<Station | null>(null);
   const [pickupModalVisible, setPickupModalVisible] = useState(false);
   const [deliveryModalVisible, setDeliveryModalVisible] = useState(false);
-  const [packageSize, setPackageSize] = useState<'small' | 'medium' | 'large' | 'xl'>('small');
+  const [packageSize, setPackageSize] = useState<SharedPackageSize>('medium');
   const [weight, setWeight] = useState('1');
   const [description, setDescription] = useState('');
   const [durationMinutes, setDurationMinutes] = useState('30');

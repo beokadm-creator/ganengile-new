@@ -54,11 +54,21 @@ function sanitizeProvider(provider: Record<string, unknown> | undefined, fallbac
   };
 }
 
-function computeProviderReady(provider: { enabled: boolean; startUrl: string; clientId: string; apiKey: string }) {
+function computeProviderReady(provider: {
+  enabled: boolean;
+  startUrl: string;
+  callbackUrl?: string;
+  clientId: string;
+  apiKey: string;
+}) {
   if (!provider.enabled) {
     return false;
   }
-  return Boolean(provider.startUrl && (provider.clientId ?? provider.apiKey));
+  return Boolean(
+    provider.startUrl &&
+    (provider.callbackUrl !== undefined ? provider.callbackUrl : true) &&
+    (provider.clientId || provider.apiKey)
+  );
 }
 
 export async function GET() {
@@ -118,7 +128,7 @@ export async function PATCH(req: NextRequest) {
     testMode: privatePayload.testMode,
     allowTestBypass: privatePayload.allowTestBypass,
     requiredForGillerUpgrade: privatePayload.requiredForGillerUpgrade,
-    liveReady: passReady ?? kakaoReady,
+    liveReady: privatePayload.enabled && (passReady || kakaoReady),
     providers: {
       pass: {
         enabled: privatePayload.pass.enabled,

@@ -255,6 +255,8 @@ export async function deleteRatingDraft(deliveryId: string): Promise<void> {
 /**
  * 배송 요청 폼 진행 상태 저장
  */
+import type { SharedPackageSize } from '../../shared/pricing-config';
+
 export interface CreateRequestDraft {
   step: number;
   requestMode: 'immediate' | 'reservation';
@@ -286,7 +288,7 @@ export interface CreateRequestDraft {
   packageCategory: string;
   recipientName: string;
   recipientPhone: string;
-  packageSize: 'small' | 'medium' | 'large' | 'xl';
+  packageSize: SharedPackageSize;
   weightKg: string;
   itemValue: string;
   packageDescription: string;
@@ -300,6 +302,46 @@ export interface CreateRequestDraft {
   preferredArrivalTime: string;
   contactPhoneNumber: string;
   recipientConsentChecked: boolean;
+}
+
+export function hasDraftableContent(input: {
+  pickupStation: any;
+  deliveryStation: any;
+  pickupRoadAddress: string;
+  pickupDetailAddress: string;
+  deliveryRoadAddress: string;
+  deliveryDetailAddress: string;
+  photoRefs: string[];
+  packageItemName: string;
+  packageDescription: string;
+  recipientName: string;
+  recipientPhone: string;
+  pickupLocationDetail: string;
+  storageLocation: string;
+  specialInstructions: string;
+  itemValue: string;
+  preferredPickupDate: string;
+  preferredPickupTime: string;
+}) {
+  return Boolean(
+    input.pickupStation ||
+      input.deliveryStation ||
+      input.pickupRoadAddress.trim() ||
+      input.pickupDetailAddress.trim() ||
+      input.deliveryRoadAddress.trim() ||
+      input.deliveryDetailAddress.trim() ||
+      input.photoRefs.length > 0 ||
+      input.packageItemName.trim() ||
+      input.packageDescription.trim() ||
+      input.recipientName.trim() ||
+      input.recipientPhone.trim() ||
+      input.pickupLocationDetail.trim() ||
+      input.storageLocation.trim() ||
+      input.specialInstructions.trim() ||
+      input.itemValue.trim() ||
+      input.preferredPickupDate.trim() ||
+      input.preferredPickupTime.trim()
+  );
 }
 
 export async function saveCreateRequestProgress(

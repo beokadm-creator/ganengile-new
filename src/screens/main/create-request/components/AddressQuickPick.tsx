@@ -28,9 +28,9 @@ export function AddressQuickPick({ title, addresses, onSelect }: Props) {
 }
 
 const styles = StyleSheet.create({
-  quickPickWrap: { gap: 8 },
-  quickPickTitle: { color: Colors.textSecondary, fontSize: Typography.fontSize.sm, fontWeight: '700' },
-  quickPickRow: { gap: 8 },
+  quickPickWrap: { gap: Spacing.sm },
+  quickPickTitle: { color: Colors.textSecondary, fontSize: Typography.fontSize.sm, fontWeight: Typography.fontWeight.bold },
+  quickPickRow: { gap: Spacing.sm },
   quickPickChip: {
     width: 180,
     borderRadius: BorderRadius.lg,
@@ -38,8 +38,8 @@ const styles = StyleSheet.create({
     borderColor: Colors.border,
     backgroundColor: Colors.gray50,
     padding: Spacing.sm,
-    gap: 4,
+    gap: Spacing.xs,
   },
-  quickPickLabel: { color: Colors.textPrimary, fontWeight: '800', fontSize: Typography.fontSize.sm },
+  quickPickLabel: { color: Colors.textPrimary, fontWeight: Typography.fontWeight.extrabold, fontSize: Typography.fontSize.sm },
   quickPickText: { color: Colors.textSecondary, ...Typography.caption },
 });

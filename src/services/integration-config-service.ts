@@ -40,9 +40,9 @@ export interface PaymentIntegrationConfig {
   provider: string;
   liveReady: boolean;
   clientKey: string;
-  secretKey?: string;
   bankVerificationRequired: boolean;
   manualSettlementReview: boolean;
+  escrowEnabled: boolean;
   statusMessage: string;
 }
 
@@ -124,6 +124,7 @@ function _getDefaultPaymentIntegrationConfig(): PaymentIntegrationConfig {
     clientKey: '',
     bankVerificationRequired: true,
     manualSettlementReview: true,
+    escrowEnabled: true,
     statusMessage: 'PG 키가 준비되기 전에는 테스트 모드로 결제를 우회하고 운영이 최종 정산을 검토합니다.',
   };
 }
@@ -246,6 +247,7 @@ export async function getPaymentIntegrationConfig(): Promise<PaymentIntegrationC
       manualSettlementReview: Boolean(
         data?.manualSettlementReview ?? fallback.manualSettlementReview
       ),
+      escrowEnabled: Boolean(data?.escrowEnabled ?? fallback.escrowEnabled),
       statusMessage: String(data?.statusMessage ?? fallback.statusMessage),
     };
     paymentCache = { data: config, expiresAt: Date.now() + CACHE_TTL };
