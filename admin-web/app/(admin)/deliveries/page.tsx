@@ -51,6 +51,16 @@ export default function DeliveriesPage() {
     setLoading(true);
     try {
       const res = await fetch(`/api/admin/deliveries?tab=${t}`);
+      if (!res.ok) {
+        let errorMsg = 'Failed to fetch deliveries';
+        try {
+          const errorData = await res.json();
+          errorMsg = errorData.error || errorMsg;
+        } catch {
+          // ignore json parse error
+        }
+        throw new Error(errorMsg);
+      }
       const json = await res.json();
       setItems(json.items ?? []);
     } catch {
