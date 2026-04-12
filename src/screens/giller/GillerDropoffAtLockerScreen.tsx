@@ -39,23 +39,28 @@ export default function GillerDropoffAtLockerScreen() {
   const [reservationId, setReservationId] = useState<string | null>(null);
   const [dropoffPhotoUrl, setDropoffPhotoUrl] = useState<string | null>(null);
 
+  const [requestId, setRequestId] = useState<string | null>(null);
+
   useEffect(() => {
     async function init() {
       try {
         const delivery = await getDeliveryById(deliveryId);
-        if (delivery && delivery.lockerId) {
-          const lockerDetail = await getLocker(delivery.lockerId);
-          if (lockerDetail) {
-            setSelectedLocker({
-              lockerId: lockerDetail.lockerId,
-              stationId: lockerDetail.stationId,
-              stationName: lockerDetail.stationName,
-              status: lockerDetail.status,
-              size: lockerDetail.size,
-              pricePerHour: lockerDetail.pricePerHour,
-            });
-            setStep('reserve');
-            return;
+        if (delivery) {
+          setRequestId(delivery.requestId || null);
+          if (delivery.lockerId) {
+            const lockerDetail = await getLocker(delivery.lockerId);
+            if (lockerDetail) {
+              setSelectedLocker({
+                lockerId: lockerDetail.lockerId,
+                stationId: lockerDetail.stationId,
+                stationName: lockerDetail.stationName,
+                status: lockerDetail.status,
+                size: lockerDetail.size,
+                pricePerHour: lockerDetail.pricePerHour,
+              });
+              setStep('reserve');
+              return;
+            }
           }
         }
       } catch (error) {
@@ -86,7 +91,8 @@ export default function GillerDropoffAtLockerScreen() {
   };
 
   const handleReserve = async (): Promise<void> => {
-    if (!selectedLocker) {
+    if (!selectedLocker || !requestId) {
+      Alert.alert('정보 부족', '배송 요청 정보를 찾을 수 없거나 보관함을 선택하지 않았습니다.');
       return;
     }
 
@@ -99,6 +105,7 @@ export default function GillerDropoffAtLockerScreen() {
 
       const reservation = await createLockerReservation(
         selectedLocker.lockerId,
+        requestId,
         deliveryId,
         userId,
         'giller_dropoff',

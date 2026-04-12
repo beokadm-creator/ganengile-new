@@ -73,6 +73,7 @@ export default function LockerSelectionScreen() {
       await createLockerReservation(
         selectedLocker.lockerId,
         'manual-locker-selection',
+        'manual-locker-selection',
         userId,
         'manual_selection',
         startTime,

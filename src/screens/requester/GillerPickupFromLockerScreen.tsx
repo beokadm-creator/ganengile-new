@@ -11,7 +11,7 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { confirmDeliveryByRequester, getDeliveryByRequestId } from '../../services/delivery-service';
-import { createLockerService, getLocker, openLocker } from '../../services/locker-service';
+import { createLockerService, getLocker, openLocker, completeLockerReservation } from '../../services/locker-service';
 import { requireUserId } from '../../services/firebase';
 import type { Locker, LockerReservation } from '../../types/locker';
 import type { MainStackNavigationProp, MainStackParamList } from '../../types/navigation';

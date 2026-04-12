@@ -563,6 +563,10 @@ export async function updateReservationStatus(reservationId: string, status: str
   });
 }
 
+export async function completeLockerReservation(reservationId: string): Promise<void> {
+  await lockerService.completeReservation(reservationId);
+}
+
 export async function addReservationPhotos(
   reservationId: string,
   pickupPhotoUrl?: string,
@@ -593,6 +597,7 @@ export async function getLocker(lockerId: string): Promise<Locker | null> {
 
 export async function createLockerReservation(
   lockerId: string,
+  requestId: string,
   deliveryId: string,
   userId: string,
   type: string,
@@ -601,7 +606,7 @@ export async function createLockerReservation(
   qrCode: string
 ): Promise<LockerReservation> {
   const durationMinutes = Math.max(1, Math.round((endTime.getTime() - startTime.getTime()) / 60000));
-  const reservation = await lockerService.createReservation(lockerId, userId, deliveryId, 'medium', durationMinutes);
+  const reservation = await lockerService.createReservation(lockerId, userId, requestId, 'medium', durationMinutes);
 
   const accessQrCode = QRCodeService.generateLockerAccessQRCode({
     lockerId,

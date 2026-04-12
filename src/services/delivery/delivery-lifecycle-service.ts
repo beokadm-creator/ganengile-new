@@ -443,6 +443,8 @@ export const deliveryLifecycleService = {
         pickupStation: request.pickupStation,
         deliveryStation: request.deliveryStation,
         deliveryType: request.deliveryType ?? 'standard',
+        lockerId: (request as any).lockerId || undefined,
+        reservationId: (request as any).reservationId || undefined,
         packageInfo: request.packageInfo,
         fee: confirmedFee,
         pricingPolicyVersion: request.pricingPolicyVersion ?? null,

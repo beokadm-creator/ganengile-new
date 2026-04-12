@@ -900,7 +900,13 @@ export async function bundleMissionsForDelivery(deliveryId: string): Promise<Mis
   let bundleIndex = 0;
 
   for (let start = 0; start < deliveryMissions.length; start += 1) {
-    for (let end = start; end < deliveryMissions.length; end += 1) {
+    // 번들 생성 최적화: 구간 전체(Whole)와 단일 구간(Single)만 번들로 생성 (O(N^2) 방지)
+    const endIndices = [start];
+    if (start === 0 && deliveryMissions.length > 1) {
+      endIndices.push(deliveryMissions.length - 1);
+    }
+    
+    for (const end of endIndices) {
       bundleIndex += 1;
       const missionGroup = deliveryMissions.slice(start, end + 1);
       const firstMission = missionGroup[0];
@@ -1030,6 +1036,9 @@ async function dispatchMissionToB2BFallback(params: {
   }
 
   try {
+    // 실제 외부 파트너 연동이 진행되는 시점에서는 delivery_partners 컬렉션에서
+    // 매칭 가능한 파트너의 ID나 견적 ID를 받아오는 로직이 필요합니다.
+    // 현재는 시스템 식별용 Fallback ID를 발급합니다.
     return `beta1-fallback:${params.requestId}:${params.mission.id}`;
   } catch (error) {
     console.warn('Unable to prepare fallback plan id', error);
