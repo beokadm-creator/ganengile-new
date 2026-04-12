@@ -421,21 +421,8 @@ export default function CreateRequestScreen({ navigation, route }: Props) {
         
         hydrateFromDraft(draft);
 
-        // Auto-advance step if draft is partially filled
-        let restoredStep = draft.step ?? 1;
-        if (restoredStep === 1) {
-          if (draft.pickupStation && draft.deliveryStation) {
-            restoredStep = 2;
-            if (draft.packageSize && draft.weightKg && draft.itemValue) {
-              restoredStep = 3;
-              if (draft.recipientName && draft.recipientPhone && draft.recipientConsentChecked) {
-                restoredStep = 4;
-              }
-            }
-          }
-        }
-        
-        setActiveStep(Math.min(Math.max(1, restoredStep), 4));
+        // ALWAYS stay at step 1 on load so the user can review from the beginning
+        setActiveStep(1);
       }
 
       draftHydratedRef.current = true;
