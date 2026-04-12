@@ -2,7 +2,6 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
-  Image,
   Modal,
   Platform,
   Pressable,
@@ -39,6 +38,7 @@ import {
 import { BorderRadius, Colors, Shadows, Spacing } from '../../theme';
 import type { MainStackNavigationProp, MainStackParamList } from '../../types/navigation';
 import { RequestStatus, type Request } from '../../types/request';
+import { Image } from 'expo-image';
 
 type RequestDetailRoute = RouteProp<MainStackParamList, 'RequestDetail'>;
 

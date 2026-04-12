@@ -3,11 +3,11 @@ import {
   View,
   Text,
   StyleSheet,
-  Image,
   TouchableOpacity,
   Dimensions,
 } from 'react-native';
 import { MaterialIcons as Icon } from '@expo/vector-icons';
+import { Image } from 'expo-image';
 
 const { width: _width } = Dimensions.get('window');
 

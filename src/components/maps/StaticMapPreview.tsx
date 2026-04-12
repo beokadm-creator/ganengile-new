@@ -1,7 +1,8 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { ActivityIndicator, Image, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
 
 import { getStaticMapProxyUrl, isMapEnabled } from '../../config/map-config';
+import { Image } from 'expo-image';
 
 export type StaticMapMarker = {
   latitude: number;

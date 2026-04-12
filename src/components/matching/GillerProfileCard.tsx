@@ -5,10 +5,10 @@ import {
   StyleSheet,
   TouchableOpacity,
   Animated,
-  Image,
 } from 'react-native';
 import RatingStars from '../common/RatingStars';
 import { Colors, Spacing, BorderRadius, Typography } from '../../theme';
+import { Image } from 'expo-image';
 
 export interface GillerMatch {
   rank: number;

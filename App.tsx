@@ -7,8 +7,17 @@ import { ActivityIndicator, View, Platform, StyleSheet, Dimensions, Text } from 
 import { useFonts } from 'expo-font';
 import { Ionicons, MaterialIcons } from '@expo/vector-icons';
 import AppNavigator from './src/navigation/AppNavigator';
+import { ErrorBoundary } from './src/components/common/ErrorBoundary';
+import * as Sentry from '@sentry/react-native';
 
-export default function App() {
+// Sentry 초기화 (DSN은 추후 환경변수 등으로 주입)
+Sentry.init({
+  dsn: process.env.EXPO_PUBLIC_SENTRY_DSN || '',
+  debug: __DEV__, // 개발 모드일 때만 디버그 활성화
+  tracesSampleRate: 1.0,
+});
+
+function AppContent() {
   // 웹 환경에서는 폰트 로딩을 무시하고 바로 렌더링
   const [fontsLoaded] = useFonts({
     ...Ionicons.font,
@@ -124,6 +133,14 @@ export default function App() {
         </View>
       </View>
     </View>
+  );
+}
+
+export default function App() {
+  return (
+    <ErrorBoundary>
+      <AppContent />
+    </ErrorBoundary>
   );
 }
 

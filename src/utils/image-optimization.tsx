@@ -4,7 +4,7 @@
  */
 
 import React from 'react';
-import { Image } from 'react-native';
+import { Image } from 'expo-image';
 
 interface ImageOptimizationOptions {
   width?: number;
@@ -14,28 +14,17 @@ interface ImageOptimizationOptions {
 }
 
 /**
- * 이미지 최적화 옵션 생성
+ * 이미지 최적화 옵션 생성 (expo-image 호환)
  */
 export const createImageOptions = (
   source: any,
   options: ImageOptimizationOptions = {}
 ): any => {
-  const {
-    width = 300,
-    height = 300,
-    quality: _quality = 80,
-    format = 'webp'
-  } = options;
-
-  return {
-    uri: source,
-    width,
-    height,
-    // React Native의 cache 설정
-    cache: 'force-cache',
-    // WebP 형식 지원 시 사용
-    ...(format === 'webp' && { mimeType: 'image/webp' })
-  };
+  // expo-image는 uri를 그대로 받으면 자동으로 최적화 캐싱 처리합니다.
+  if (typeof source === 'string') {
+    return { uri: source };
+  }
+  return source;
 };
 
 /**
@@ -53,49 +42,22 @@ export const getResponsiveImageSource = (
 
   const sizeSuffix = sizeMap[screenSize] || sizeMap.medium;
 
-  // WebP 형식 지원 시 우선 사용
-  if (supportsWebP()) {
-    return baseUri.replace(/\.(jpg|png)$/i, `${sizeSuffix}.webp`);
-  }
-
-  return baseUri.replace(/\.\w+$/i, `${sizeSuffix}.jpg`);
-};
-
-/**
- * WebP 지원 여부 확인
- */
-const supportsWebP = (): boolean => {
-  // React Native Web 환경에서만 작동
-  if (typeof document === 'undefined') return false;
-
-  const canvas = document.createElement('canvas');
-  if (canvas?.getContext?.('2d')) {
-    return canvas.toDataURL('image/webp').indexOf('data:image/webp') === 0;
-  }
-  return false;
+  // expo-image는 대부분 webp를 기본 지원하므로 안심하고 사용
+  return baseUri.replace(/\.(jpg|png|jpeg)$/i, `${sizeSuffix}.webp`);
 };
 
 /**
  * 블러 이미지 생성 (로딩 중 플레이스홀더)
  */
 export const createBlurImage = (uri: string): any => {
-  return {
-    uri,
-    // React Native에서는 블러 효과 적용 필요
-    // iOS: CIFilter
-    // Android: RenderScript blur
-  };
+  return { uri };
 };
 
 /**
  * 이미지 프리로딩
  */
 export const preloadImages = (imageUris: string[]): void => {
-  if (typeof Image === 'undefined') return;
-
-  imageUris.forEach(uri => {
-    Image.prefetch(uri);
-  });
+  Image.prefetch(imageUris);
 };
 
 /**
@@ -144,30 +106,22 @@ export const ICON_SIZES = {
 } as const;
 
 /**
- * Lazy loading 이미지 컴포넌트
+ * Lazy loading 이미지 컴포넌트 (expo-image로 교체)
  */
 export const LazyImage: React.FC<{
-  source: { uri: string };
+  source: { uri: string } | string;
   style?: any;
   onLoad?: () => void;
-}> = ({ source, style, onLoad }) => {
-  const [isLoaded, setIsLoaded] = React.useState(false);
-
-  React.useEffect(() => {
-    // 이미지 미리 로딩
-    if (source?.uri) {
-      Image.prefetch?.(source.uri);
-    }
-  }, [source]);
-
+  contentFit?: 'cover' | 'contain' | 'fill';
+}> = ({ source, style, onLoad, contentFit = 'cover' }) => {
   return (
     <Image
       source={createImageOptions(source)}
-      style={[style, !isLoaded && { opacity: 0 }]}
-      onLoad={() => {
-        setIsLoaded(true);
-        onLoad?.();
-      }}
+      style={style}
+      contentFit={contentFit}
+      transition={200}
+      onLoad={() => onLoad?.()}
+      cachePolicy="disk"
     />
   );
 };

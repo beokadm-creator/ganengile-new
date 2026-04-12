@@ -2,7 +2,6 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
-  Image,
   KeyboardAvoidingView,
   Modal,
   Platform,
@@ -62,6 +61,7 @@ import {
 } from '../../utils/draft-storage';
 import type { SharedPricingPolicyConfig } from '../../../shared/pricing-policy';
 import type { RequestPricingContext } from '../../types/request';
+import { Image } from 'expo-image';
 
 type LocationMode = 'station' | 'address';
 type PackageSize = 'small' | 'medium' | 'large' | 'xl';
@@ -1908,7 +1908,7 @@ export default function CreateRequestScreen({ navigation, route }: Props) {
                 <Text style={styles.quoteHeadline}>{card.headline}</Text>
                 {aiQuotesLoading ? <Text style={styles.quoteEngineHint}>추천 엔진 반영 중</Text> : null}
                 <Text style={styles.muted}>{card.recommendationReason}</Text>
-                {card.pricing.dynamicAdjustment && card.pricing.dynamicAdjustment > 0 ? (
+                {(card.pricing as any).dynamicAdjustment && (card.pricing as any).dynamicAdjustment > 0 ? (
                   <View style={styles.surchargeBadge}>
                     <Text style={styles.surchargeBadgeText}>⚡️ 수요/공급 할증 적용</Text>
                   </View>
@@ -1928,7 +1928,9 @@ export default function CreateRequestScreen({ navigation, route }: Props) {
               <QuoteBreakdownRow label="주소픽업" value={card.pricing.addressPickupFee} />
               <QuoteBreakdownRow label="주소도착" value={card.pricing.addressDropoffFee} />
               <QuoteBreakdownRow label="사물함" value={card.pricing.lockerFee} />
-              <QuoteBreakdownRow label="수동/동적 조정" value={(card.pricing.dynamicAdjustment ?? 0) + (card.pricing.manualAdjustment ?? 0)} />
+              {((card.pricing as any).dynamicAdjustment || (card.pricing as any).manualAdjustment) ? (
+                <QuoteBreakdownRow label="수동/동적 조정" value={((card.pricing as any).dynamicAdjustment ?? 0) + ((card.pricing as any).manualAdjustment ?? 0)} />
+              ) : null}
               <QuoteBreakdownRow label="서비스수수료" value={card.pricing.serviceFee} />
               <QuoteBreakdownRow label="부가세" value={card.pricing.vat} />
               <View style={styles.quoteDivider} />

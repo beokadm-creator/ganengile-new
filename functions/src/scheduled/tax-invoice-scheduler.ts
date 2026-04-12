@@ -114,14 +114,55 @@ export const taxInvoiceScheduler = async (): Promise<{
 
         // 2-2. 금액 집계
         const totalDeliveries = deliveries.length;
-        const subtotal = deliveries.reduce((sum, d) => sum + (d.fee?.total ?? 0), 0);
-        const tax = Math.round(subtotal * pricingPolicy.vatRate);
-        const totalAmount = subtotal + tax;
+        
+        let sumTotalFee = 0;
+        let sumDynamicAdjustment = 0;
+
+        for (const d of deliveries) {
+          // 새 요금 정책의 totalFee 사용. 없으면 기존 fee.total 폴백
+          const totalFee = d.fee?.totalFee ?? d.fee?.total ?? 0;
+          sumTotalFee += totalFee;
+          
+          // 동적 요금(할증/할인) 별도 합산
+          sumDynamicAdjustment += d.fee?.dynamicAdjustment ?? 0;
+        }
+
+        // totalFee는 부가세가 이미 포함된 최종 금액이므로 역산하여 공급가액(subtotal)과 세액(tax)을 구함
+        // totalFee = subtotal * (1 + vatRate)
+        const subtotal = Math.round(sumTotalFee / (1 + pricingPolicy.vatRate));
+        const tax = sumTotalFee - subtotal;
+        const totalAmount = sumTotalFee;
 
         console.warn(`💰 Contract ${contractId}: ${totalDeliveries} deliveries, ${subtotal}원 (tax: ${tax}원)`);
 
         // 2-3. 세금계산서 생성
         const invoiceRef = db.collection('taxInvoices').doc();
+
+        // 명세서 상세 항목 구성 (기본 배송비와 동적 할증 분리)
+        const items = [];
+        
+        // 동적 요금을 제외한 기본 배송비 공급가액
+        const baseSubtotal = subtotal - sumDynamicAdjustment;
+        items.push({
+          description: '크라우드 배송 대행 기본 수수료',
+          quantity: totalDeliveries,
+          unitPrice: Math.round(baseSubtotal / totalDeliveries),
+          amount: baseSubtotal,
+          tax: Math.round(baseSubtotal * pricingPolicy.vatRate),
+          supply: baseSubtotal,
+        });
+
+        // 동적 할증/할인이 존재할 경우 별도 표기
+        if (sumDynamicAdjustment !== 0) {
+          items.push({
+            description: '배송 환경 및 피크타임 동적 할증/할인',
+            quantity: 1, // 전체 합산액이므로 1건으로 표기
+            unitPrice: sumDynamicAdjustment,
+            amount: sumDynamicAdjustment,
+            tax: Math.round(sumDynamicAdjustment * pricingPolicy.vatRate),
+            supply: sumDynamicAdjustment,
+          });
+        }
 
         const invoice: TaxInvoice = {
           invoiceNumber: `TAX-${year}${String(month).padStart(2, '0')}-${String(invoicesGenerated + 1).padStart(4, '0')}`,
@@ -141,16 +182,7 @@ export const taxInvoiceScheduler = async (): Promise<{
             start: startOfMonth,
             end: endOfMonth,
           },
-          items: [
-            {
-              description: '크라우드 배송 대행 수수료',
-              quantity: totalDeliveries,
-              unitPrice: Math.round(subtotal / totalDeliveries),
-              amount: subtotal,
-              tax,
-              supply: subtotal,
-            },
-          ],
+          items,
           totals: {
             subtotal,
             tax,

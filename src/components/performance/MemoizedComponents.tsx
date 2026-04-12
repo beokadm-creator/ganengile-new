@@ -1,6 +1,7 @@
 import React, { memo } from 'react';
-import { FlatList, Image, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { FlatList, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { MaterialIcons as Icon } from '@expo/vector-icons';
+import { Image } from 'expo-image';
 
 interface GillerProfileCardProps {
   giller: {

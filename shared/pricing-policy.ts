@@ -209,9 +209,18 @@ export function calculateSharedDeliveryFee(
   let vat = Math.round(subtotal * resolved.vatRate);
   let totalFee = subtotal + vat;
 
+  // 비정상 동적 할증 감지 (Alerting purpose)
+  const baseDeliveryFee = baseFee + distanceFee;
+  if (baseDeliveryFee > 0 && Math.abs(dynamicAdjustment) / baseDeliveryFee > 0.5) {
+    console.warn(`[Anomaly Detection] dynamicAdjustment is excessively high compared to baseDeliveryFee: ${dynamicAdjustment} / ${baseDeliveryFee}`);
+  }
+
   // 최소/최대 요금 보정 시 하위 항목들의 합계가 깨지지 않도록 역산하여 dynamicAdjustment에 차액을 반영
   if (totalFee < resolved.minFee || totalFee > resolved.maxFee) {
     const targetTotalFee = Math.max(resolved.minFee, Math.min(resolved.maxFee, totalFee));
+    
+    console.warn(`[Min/Max Fee Clipping Alert] Calculated totalFee ${totalFee} is being clamped to ${targetTotalFee} (min: ${resolved.minFee}, max: ${resolved.maxFee}). Adjusting dynamicAdjustment.`);
+    
     // totalFee = feeBeforeService * (1 + platformFeeRate) * (1 + vatRate)
     // 따라서 targetFeeBeforeService를 역산
     const targetFeeBeforeService = Math.round(targetTotalFee / ((1 + resolved.platformFeeRate) * (1 + resolved.vatRate)));

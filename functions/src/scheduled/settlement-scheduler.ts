@@ -88,7 +88,20 @@ export const gillerSettlementScheduler = async (): Promise<{
 
           // 2-2. 기본 수익 계산
           const totalDeliveries = deliveries.length;
-          const baseEarnings = deliveries.reduce((sum, d) => sum + (d.fee?.gillerNet ?? 0), 0);
+          
+          let baseEarnings = 0;
+          for (const d of deliveries) {
+            // 기존 gillerNet이 있으면 사용, 없으면 totalFee 기반으로 calculateSharedBreakdown을 통해 gillerFee 산출
+            if (typeof d.fee?.gillerNet === 'number') {
+              baseEarnings += d.fee.gillerNet;
+            } else {
+              const totalFee = d.fee?.totalFee ?? d.fee?.total ?? 0;
+              // gillerFee는 totalFee에서 플랫폼 수수료를 제외한 금액
+              const platformFee = Math.round(totalFee * pricingPolicy.platformFeeRate);
+              const gillerFee = totalFee - platformFee;
+              baseEarnings += gillerFee;
+            }
+          }
 
           // 2-3. 등급별 보너스 계산
           let tierBonusRate = 0;
@@ -106,8 +119,14 @@ export const gillerSettlementScheduler = async (): Promise<{
           const totalEarnings = baseEarnings + bonusTotal;
 
           // 2-5. 세금 계산 (3.3% 원천징수)
+          // `calculateSharedSettlementBreakdown`의 로직과 일치시킴
           const withholdingTax = Math.round(totalEarnings * pricingPolicy.withholdingTaxRate);
           const netAmount = totalEarnings - withholdingTax;
+
+          // 비정상적인 마이너스 정산 방어 (Alerting purpose)
+          if (netAmount <= 0 && totalDeliveries > 0) {
+            console.error(`[Anomaly Detection] Negative or zero net settlement for giller ${gillerId}. netAmount: ${netAmount}, baseEarnings: ${baseEarnings}`);
+          }
 
           console.warn(
             `💰 Giller ${gillerId} (${tier}): ${totalDeliveries} deliveries, ${baseEarnings}원 base, ${bonusTotal}원 bonus, ${netAmount}원 net`

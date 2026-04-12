@@ -3,7 +3,6 @@ import React, { useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
-  Image,
   ScrollView,
   StyleSheet,
   Text,
@@ -20,6 +19,7 @@ import { getRequestById } from '../../services/request-service';
 import { takePhoto, uploadPhotoWithThumbnail } from '../../services/photo-service';
 import { getCurrentLocation } from '../../utils/permission-handler';
 import * as Location from 'expo-location';
+import { Image } from 'expo-image';
 
 type PickupRoute = RouteProp<MainStackParamList, 'PickupVerification'>;
 type VerificationMethod = 'qr' | 'code';

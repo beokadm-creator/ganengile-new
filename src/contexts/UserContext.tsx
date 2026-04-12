@@ -1,5 +1,5 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import React, { createContext, useContext, useEffect, useRef, useState, type ReactNode } from 'react';
+import React, { createContext, useContext, useEffect, useRef, useState, useCallback, type ReactNode } from 'react';
 import { signOut } from 'firebase/auth';
 import { doc, serverTimestamp, updateDoc } from 'firebase/firestore';
 
@@ -184,7 +184,7 @@ export function UserProvider({ children }: UserProviderProps) {
     void syncUser();
   }, [firebaseUser, authLoading]);
 
-  const refreshUser = async () => {
+  const refreshUser = useCallback(async () => {
     const activeUser = auth.currentUser;
     if (!activeUser) {
       return;
@@ -218,9 +218,9 @@ export function UserProvider({ children }: UserProviderProps) {
     })();
 
     return refreshInFlightRef.current;
-  };
+  }, []);
 
-  const completeOnboarding = async (): Promise<string | null> => {
+  const completeOnboarding = useCallback(async (): Promise<string | null> => {
     const activeUser = auth.currentUser;
     if (!activeUser) {
       return null;
@@ -248,12 +248,12 @@ export function UserProvider({ children }: UserProviderProps) {
     setCurrentRole(resolveActiveRole(refreshedUser ?? user));
 
     // 온보딩 전에 사용자가 가려던 URL 반환
-// eslint-disable-next-line @typescript-eslint/no-require-imports
-const { consumePendingDeepLink } = require('../navigation/navigationRef');
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const { consumePendingDeepLink } = require('../navigation/navigationRef');
     return consumePendingDeepLink();
-  };
+  }, [user]);
 
-  const switchRole = (role: UserRole) => {
+  const switchRole = useCallback((role: UserRole) => {
     if (!user) {
       return;
     }
@@ -271,9 +271,9 @@ const { consumePendingDeepLink } = require('../navigation/navigationRef');
     if (user.role === UserRole.BOTH) {
       setCurrentRole(role);
     }
-  };
+  }, [user]);
 
-  const logout = async () => {
+  const logout = useCallback(async () => {
     try {
       await signOut(auth);
       await clearStoredSession();
@@ -290,9 +290,9 @@ const { consumePendingDeepLink } = require('../navigation/navigationRef');
       console.error('Logout error:', error);
       throw error;
     }
-  };
+  }, []);
 
-  const deactivateAccount = async (reason?: string) => {
+  const deactivateAccount = useCallback(async (reason?: string) => {
     const activeUser = auth.currentUser;
     if (!activeUser) {
       throw new Error('로그인이 필요합니다.');
@@ -315,21 +315,24 @@ const { consumePendingDeepLink } = require('../navigation/navigationRef');
     }
 
     await logout();
-  };
+  }, [logout]);
+
+  const value = React.useMemo(
+    () => ({
+      user,
+      loading,
+      currentRole,
+      switchRole,
+      refreshUser,
+      completeOnboarding,
+      logout,
+      deactivateAccount,
+    }),
+    [user, loading, currentRole, switchRole, refreshUser, completeOnboarding, logout, deactivateAccount]
+  );
 
   return (
-    <UserContext.Provider
-      value={{
-        user,
-        loading,
-        currentRole,
-        switchRole,
-        refreshUser,
-        completeOnboarding,
-        logout,
-        deactivateAccount,
-      }}
-    >
+    <UserContext.Provider value={value}>
       {children}
     </UserContext.Provider>
   );
