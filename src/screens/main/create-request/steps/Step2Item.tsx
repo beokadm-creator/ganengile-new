@@ -42,13 +42,18 @@ export function Step2Item({
       step={2} 
       currentStep={store.activeStep} 
       onNext={() => {
-        if (!store.packageSize || !store.weightKg || !store.itemValue) {
+        if (!store.packageSize || !store.weightKg || !store.packageItemName) {
           Alert.alert('확인 필요', '물품 정보를 모두 입력해 주세요.');
+          return;
+        }
+        if (hasItemValue && !store.photoUrl) {
+          Alert.alert('사진 필수', '물품 가치(보증금)가 입력된 경우, 사진을 반드시 올려주셔야 합니다.');
           return;
         }
         store.setActiveStep(3);
       }}
       onPrev={() => store.setActiveStep(2)}
+      nextDisabled={hasItemValue && !store.photoUrl}
     >
       <Block title={store.photoUrl ? '물건 사진 ✓' : hasItemValue ? '물건 사진 (필수)' : '물건 사진 (선택)'}>
         <View style={styles.row}>
@@ -59,12 +64,30 @@ export function Step2Item({
             <Text style={styles.secondaryButtonText}>앨범에서 선택</Text>
           </TouchableOpacity>
         </View>
+        
         {hasItemValue && !store.photoUrl ? (
-          <Text style={styles.muted}>⚠️ 물품 가치를 입력하셨습니다. 보증금 적용을 위해 사진이 필요합니다.</Text>
+          <Text style={styles.errorText}>⚠️ 물품 가치(보증금)를 입력하셨습니다. 보증금 적용을 위해 사진이 반드시 필요합니다.</Text>
         ) : !store.photoUrl ? (
           <Text style={styles.muted}>사진을 올리면 AI가 물품 설명을 작성해 드립니다. 없이도 진행할 수 있습니다.</Text>
         ) : null}
+
         {store.photoUrl ? <Image source={{ uri: store.photoUrl }} style={styles.previewImage} /> : null}
+        
+        {!store.photoUrl && !hasItemValue ? (
+          <TouchableOpacity
+            style={styles.secondaryButton}
+            onPress={() => {
+              if (!store.packageSize || !store.weightKg || !store.packageItemName) {
+                Alert.alert('확인 필요', '아래의 물품 정보를 모두 입력해 주세요.');
+                return;
+              }
+              store.setActiveStep(3); // 사진 없이 바로 다음 스텝으로 이동
+            }}
+          >
+            <Text style={styles.secondaryButtonText}>사진 없이 다음 단계로 넘어가기</Text>
+          </TouchableOpacity>
+        ) : null}
+
         <TouchableOpacity
           style={[styles.secondaryButton, !store.photoUrl && styles.disabled]}
           onPress={() => void handleAI()}
@@ -190,6 +213,7 @@ const styles = StyleSheet.create({
   flexButton: { flex: 1 },
   disabled: { opacity: 0.5 },
   muted: { color: Colors.textSecondary, fontSize: 13, marginTop: Spacing.xs },
+  errorText: { color: Colors.error, fontSize: 13, marginTop: Spacing.xs, fontWeight: Typography.fontWeight.bold },
   previewImage: { width: '100%', height: 200, borderRadius: BorderRadius.md, marginTop: Spacing.sm },
   aiBox: { padding: Spacing.md, backgroundColor: Colors.gray50, borderRadius: BorderRadius.sm, borderWidth: 1, borderColor: Colors.border },
   aiTitle: { color: Colors.primary, fontWeight: Typography.fontWeight.bold, marginBottom: Spacing.xs },

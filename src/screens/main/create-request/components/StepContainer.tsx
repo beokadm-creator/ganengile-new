@@ -8,6 +8,7 @@ type Props = {
   onNext?: () => void;
   onPrev?: () => void;
   nextLabel?: string;
+  nextDisabled?: boolean;
   children: React.ReactNode;
 };
 
@@ -17,6 +18,7 @@ export function StepContainer({
   onNext,
   onPrev,
   nextLabel = '다음 단계로',
+  nextDisabled = false,
   children,
 }: Props) {
   if (currentStep < step) return null;
@@ -32,7 +34,11 @@ export function StepContainer({
         )}
       </View>
       {currentStep === step && onNext && (
-        <TouchableOpacity style={styles.nextStepButton} onPress={onNext}>
+        <TouchableOpacity
+          style={[styles.nextStepButton, nextDisabled && styles.nextStepButtonDisabled]}
+          onPress={onNext}
+          disabled={nextDisabled}
+        >
           <Text style={styles.nextStepButtonText}>{nextLabel}</Text>
         </TouchableOpacity>
       )}
@@ -68,6 +74,9 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     marginTop: Spacing.md,
     ...Shadows.md,
+  },
+  nextStepButtonDisabled: {
+    opacity: 0.5,
   },
   nextStepButtonText: {
     color: Colors.white,
