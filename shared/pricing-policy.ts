@@ -212,7 +212,7 @@ export function calculateSharedDeliveryFee(
   // 비정상 동적 할증 감지 (Alerting purpose)
   const baseDeliveryFee = baseFee + distanceFee;
   if (baseDeliveryFee > 0 && Math.abs(dynamicAdjustment) / baseDeliveryFee > 0.5) {
-    console.warn(`[Anomaly Detection] dynamicAdjustment is excessively high compared to baseDeliveryFee: ${dynamicAdjustment} / ${baseDeliveryFee}`);
+    // console.warn(`[Anomaly Detection] dynamicAdjustment is excessively high compared to baseDeliveryFee: ${dynamicAdjustment} / ${baseDeliveryFee}`);
   }
 
   // 최소/최대 요금 보정 시 하위 항목들의 합계가 깨지지 않도록 역산하여 dynamicAdjustment에 차액을 반영
