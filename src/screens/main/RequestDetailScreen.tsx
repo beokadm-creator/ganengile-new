@@ -463,6 +463,11 @@ export default function RequestDetailScreen() {
   async function handleConfirmDelivery() {
     if (!request) return;
 
+    if (request.status === RequestStatus.AT_LOCKER) {
+      navigation.navigate('GillerPickupFromLocker', { requestId: request.requestId });
+      return;
+    }
+
     try {
       setWorking('confirm');
       const delivery = (await getDeliveryByRequestId(request.requestId)) as

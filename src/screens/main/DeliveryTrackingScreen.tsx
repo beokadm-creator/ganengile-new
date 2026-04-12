@@ -390,6 +390,11 @@ export default function DeliveryTrackingScreen(): JSX.Element {
   }
 
   async function handleConfirmDelivery() {
+    if (trackingData?.status === 'at_locker') {
+      navigation.navigate('GillerPickupFromLocker', { requestId });
+      return;
+    }
+
     try {
       setConfirming(true);
       const delivery = (await getDeliveryByRequestId(requestId)) as DeliveryLookup | null;

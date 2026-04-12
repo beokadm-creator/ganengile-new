@@ -117,6 +117,8 @@ export interface Request {
   selectedPhotoIds?: string[];
   pickupLocationDetail?: string;
   storageLocation?: string;
+  lockerId?: string;
+  reservationId?: string;
   specialInstructions?: string;
 
   // 패키지 정보
