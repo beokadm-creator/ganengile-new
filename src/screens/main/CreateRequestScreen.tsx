@@ -1961,9 +1961,7 @@ export default function CreateRequestScreen({ navigation, route }: Props) {
           ) : submitDisabled ? (
             <Text style={styles.primaryButtonText}>부족한 항목 확인하기</Text>
           ) : (
-            <Text style={styles.primaryButtonText}>
-              {requestMode === 'reservation' ? '예약 요청하기' : '배송 요청하기'}
-            </Text>
+            <Text style={styles.primaryButtonText}>배송 요청하기</Text>
           )}
         </TouchableOpacity>
         <TouchableOpacity style={styles.secondaryButton} onPress={() => void handleSaveDraftNow()} disabled={saving || draftSaving}>
