@@ -236,8 +236,17 @@ function calculateInsightRecommendation(input: {
     multiplier: number;
     minCompletedCount: number;
   } | null;
+  fallbackFee?: number;
 }): number {
   const { pricingPolicy } = input;
+  
+  // 표본이 너무 적을 경우 (예: 5건 미만), 과거 아웃라이어 데이터가 전체 추천가를 심각하게 왜곡할 수 있으므로
+  // 시스템에서 산출된 기본 정책 요금(fallbackFee)을 신뢰할 수 있는 최소 기준으로 사용합니다.
+  const MIN_RELIABLE_SAMPLES = 5;
+  const baseAverage = (input.sampleCount < MIN_RELIABLE_SAMPLES && input.fallbackFee) 
+    ? input.fallbackFee 
+    : input.averageFee;
+
   let multiplier = pricingPolicy.recommendationMultiplier;
 
   if (input.sampleCount > 0 && input.peakSamples / input.sampleCount >= 0.4) {
@@ -266,10 +275,13 @@ function calculateInsightRecommendation(input: {
     multiplier += pricingPolicy.recommendationRules.reservationDiscountMultiplier;
   }
 
-  multiplier = Math.max(1, Math.min(pricingPolicy.recommendationRules.maxRecommendationMultiplier, multiplier));
+  multiplier = Math.max(
+    pricingPolicy.recommendationRules.minRecommendationMultiplier ?? 0.5,
+    Math.min(pricingPolicy.recommendationRules.maxRecommendationMultiplier, multiplier)
+  );
   let recommendedFee = Math.max(
-    input.averageFee,
-    Math.ceil((input.averageFee * multiplier) / pricingPolicy.bidStep) * pricingPolicy.bidStep
+    pricingPolicy.minFee ?? 0,
+    Math.ceil((baseAverage * multiplier) / pricingPolicy.bidStep) * pricingPolicy.bidStep
   );
 
   if (

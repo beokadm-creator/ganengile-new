@@ -105,6 +105,7 @@ type DeliveryRequestLike = {
   requestMode?: string;
   manualAdjustment?: number;
   dynamicAdjustment?: number;
+  pricingPolicyVersion?: string | null;
   preferredTime?: {
     departureTime?: string;
     arrivalTime?: string;
@@ -488,20 +489,21 @@ export async function gillerAcceptRequest(
         request.recipientVerificationCode ?? request.verificationCode ?? request.recipientCode ?? '000000';
 
     // Create delivery document
-    const deliveryData = {
-      requestId,
-      gllerId: request.requesterId ?? request.gllerId,
-      gillerId,
-      pickupStation: request.pickupStation,
-      deliveryStation: request.deliveryStation,
-      deliveryType: request.deliveryType ?? 'standard',
-      packageInfo: request.packageInfo,
-      fee: confirmedFee,
-      recipientInfo: {
-        name: recipientName,
-        phone: recipientPhone,
-        verificationCode: recipientVerificationCode,
-      },
+  const deliveryData = {
+    requestId,
+    gllerId: request.requesterId ?? request.gllerId,
+    gillerId,
+    pickupStation: request.pickupStation,
+    deliveryStation: request.deliveryStation,
+    deliveryType: request.deliveryType ?? 'standard',
+    packageInfo: request.packageInfo,
+    fee: confirmedFee,
+    pricingPolicyVersion: request.pricingPolicyVersion ?? null,
+    recipientInfo: {
+      name: recipientName,
+      phone: recipientPhone,
+      verificationCode: recipientVerificationCode,
+    },
       status: 'accepted' as DeliveryStatus,
       tracking: {
         events: [

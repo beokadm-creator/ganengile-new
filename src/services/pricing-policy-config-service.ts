@@ -1,4 +1,4 @@
-import { doc, getDoc } from 'firebase/firestore';
+import { doc, getDoc, onSnapshot } from 'firebase/firestore';
 import { db } from './firebase';
 import {
   DEFAULT_SHARED_PRICING_POLICY,
@@ -6,26 +6,52 @@ import {
   type SharedPricingPolicyConfig,
 } from '../../shared/pricing-config';
 
-const CACHE_TTL = 60 * 1000;
-
-let pricingPolicyCache: { data: SharedPricingPolicyConfig; expiresAt: number } | null = null;
+let pricingPolicyCache: SharedPricingPolicyConfig | null = null;
+let isListening = false;
 
 export async function getPricingPolicyConfig(): Promise<SharedPricingPolicyConfig> {
-  if (pricingPolicyCache && Date.now() < pricingPolicyCache.expiresAt) {
-    return pricingPolicyCache.data;
+  // If cache is loaded and we are listening for real-time updates, return the cache immediately.
+  if (pricingPolicyCache && isListening) {
+    return pricingPolicyCache;
   }
 
   try {
-    const snap = await getDoc(doc(db, 'config_pricing', 'default'));
-    const config = normalizeSharedPricingPolicy(snap.exists() ? (snap.data() as Partial<SharedPricingPolicyConfig>) : DEFAULT_SHARED_PRICING_POLICY);
-    pricingPolicyCache = { data: config, expiresAt: Date.now() + CACHE_TTL };
-    return config;
+    const docRef = doc(db, 'config_pricing', 'default');
+    
+    // Set up real-time listener if not already listening
+    if (!isListening) {
+      onSnapshot(
+        docRef,
+        (snap) => {
+          pricingPolicyCache = normalizeSharedPricingPolicy(
+            snap.exists() ? (snap.data() as Partial<SharedPricingPolicyConfig>) : DEFAULT_SHARED_PRICING_POLICY
+          );
+        },
+        (error) => {
+          console.error('[pricing-policy-config] realtime listener failed:', error);
+          isListening = false;
+        }
+      );
+      isListening = true;
+    }
+
+    // Await the first load if cache is still null
+    if (!pricingPolicyCache) {
+      const snap = await getDoc(docRef);
+      pricingPolicyCache = normalizeSharedPricingPolicy(
+        snap.exists() ? (snap.data() as Partial<SharedPricingPolicyConfig>) : DEFAULT_SHARED_PRICING_POLICY
+      );
+    }
+    
+    return pricingPolicyCache;
   } catch (error) {
     console.error('[pricing-policy-config] load failed:', error);
-    return DEFAULT_SHARED_PRICING_POLICY;
+    return pricingPolicyCache ?? DEFAULT_SHARED_PRICING_POLICY;
   }
 }
 
 export function clearPricingPolicyConfigCache() {
   pricingPolicyCache = null;
+  // Note: For full cleanup, we would need to unsubscribe the onSnapshot listener,
+  // but since this is an app-level singleton configuration, keeping the listener alive is generally fine.
 }

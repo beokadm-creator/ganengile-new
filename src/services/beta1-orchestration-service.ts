@@ -654,7 +654,7 @@ export async function createBeta1Request(input: Beta1RequestCreateInput): Promis
         input.pricingContextOverride?.urgencyBucket ??
         (input.urgency === 'urgent' ? 'urgent' : input.urgency === 'fast' ? 'fast' : 'normal'),
     },
-    pricingPolicyVersion: pricingPolicy.version,
+    pricingPolicyVersion: input.pricingPolicyVersion ?? pricingPolicy.version,
     requestMode: input.requestMode ?? 'immediate',
     sourceRequestId: input.sourceRequestId ?? null,
     missionProgress: {
@@ -691,6 +691,7 @@ export async function createBeta1Request(input: Beta1RequestCreateInput): Promis
     specialInstructions: input.specialInstructions?.trim() || null,
     recipientName: input.recipientName,
     recipientPhone: input.recipientPhone,
+    pricingPolicyVersion: input.pricingPolicyVersion ?? pricingPolicy.version,
     status: 'pending',
     beta1DeliveryStatus: 'created',
     fee: {

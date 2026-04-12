@@ -78,6 +78,7 @@ type PricingPolicy = {
     highSupplyDiscountMultiplier: number;
     reservationDiscountMultiplier: number;
     maxRecommendationMultiplier: number;
+    minRecommendationMultiplier: number;
   };
   timeRules: Array<{
     label: string;
@@ -171,6 +172,7 @@ const emptyPolicy: PricingPolicy = {
     highSupplyDiscountMultiplier: -0.04,
     reservationDiscountMultiplier: -0.02,
     maxRecommendationMultiplier: 1.35,
+    minRecommendationMultiplier: 0.8,
   },
   timeRules: [
     {
@@ -520,6 +522,7 @@ export default function PricingPolicyPage() {
           <RateField label="공급 부족 추천 가산" value={policy.recommendationRules.lowSupplyMultiplier} onChange={(value) => updateRecommendationField('lowSupplyMultiplier', value)} />
           <RateField label="공급 충분 추천 할인" value={policy.recommendationRules.highSupplyDiscountMultiplier} onChange={(value) => updateRecommendationField('highSupplyDiscountMultiplier', value)} />
           <RateField label="예약 추천 할인" value={policy.recommendationRules.reservationDiscountMultiplier} onChange={(value) => updateRecommendationField('reservationDiscountMultiplier', value)} />
+          <RateField label="추천가 최소 배수" value={policy.recommendationRules.minRecommendationMultiplier} onChange={(value) => updateRecommendationField('minRecommendationMultiplier', value)} />
           <RateField label="추천가 최대 배수" value={policy.recommendationRules.maxRecommendationMultiplier} onChange={(value) => updateRecommendationField('maxRecommendationMultiplier', value)} />
         </Section>
 

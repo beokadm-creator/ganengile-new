@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import type { JSX } from 'react';
+import Image from 'next/image';
 import { formatDate, formatKRW, statusColor, statusLabel } from '@/lib/format';
 
 interface SettlementItem {
@@ -404,11 +405,15 @@ export default function SettlementsPage(): JSX.Element {
             </div>
             {selectedMapUrl ? (
               <div className="space-y-4">
-                <img
-                  src={selectedMapUrl}
-                  alt="정산 대상 요청 구간 지도"
-                  className="h-64 w-full rounded-2xl object-cover"
-                />
+                <div className="relative h-64 w-full overflow-hidden rounded-2xl">
+                  <Image
+                    src={selectedMapUrl}
+                    alt="정산 대상 요청 구간 지도"
+                    fill
+                    className="object-cover"
+                    unoptimized
+                  />
+                </div>
                 <p className="text-sm leading-6 text-slate-500">
                   픽업지는 P, 도착지는 D로 표시됩니다. 취소/분쟁/정산 판단을 함께 볼 때 참고용으로 사용합니다.
                 </p>

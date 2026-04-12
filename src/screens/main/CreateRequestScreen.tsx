@@ -1412,6 +1412,7 @@ export default function CreateRequestScreen({ navigation, route }: Props) {
             }
           : undefined,
         aiQuoteOverride: aiQuoteResponse ?? undefined,
+        pricingPolicyVersion: pricingPolicy?.version ?? undefined,
         pricingContextOverride: pricingContext ?? undefined,
       });
 
@@ -1907,6 +1908,11 @@ export default function CreateRequestScreen({ navigation, route }: Props) {
                 <Text style={styles.quoteHeadline}>{card.headline}</Text>
                 {aiQuotesLoading ? <Text style={styles.quoteEngineHint}>추천 엔진 반영 중</Text> : null}
                 <Text style={styles.muted}>{card.recommendationReason}</Text>
+                {card.pricing.dynamicAdjustment && card.pricing.dynamicAdjustment > 0 ? (
+                  <View style={styles.surchargeBadge}>
+                    <Text style={styles.surchargeBadgeText}>⚡️ 수요/공급 할증 적용</Text>
+                  </View>
+                ) : null}
               </View>
               <View style={styles.quotePriceWrap}>
                 <Text style={styles.quotePrice}>{card.priceLabel}</Text>
@@ -1922,6 +1928,7 @@ export default function CreateRequestScreen({ navigation, route }: Props) {
               <QuoteBreakdownRow label="주소픽업" value={card.pricing.addressPickupFee} />
               <QuoteBreakdownRow label="주소도착" value={card.pricing.addressDropoffFee} />
               <QuoteBreakdownRow label="사물함" value={card.pricing.lockerFee} />
+              <QuoteBreakdownRow label="수동/동적 조정" value={(card.pricing.dynamicAdjustment ?? 0) + (card.pricing.manualAdjustment ?? 0)} />
               <QuoteBreakdownRow label="서비스수수료" value={card.pricing.serviceFee} />
               <QuoteBreakdownRow label="부가세" value={card.pricing.vat} />
               <View style={styles.quoteDivider} />
@@ -2078,6 +2085,8 @@ function QuoteBreakdownRow({
   value: number;
   strong?: boolean;
 }) {
+  if (value === 0 && !strong) return null;
+
   return (
     <View style={styles.quoteBreakdownRow}>
       <Text style={[styles.quoteBreakdownLabel, strong && styles.quoteBreakdownLabelStrong]}>{label}</Text>
@@ -2323,6 +2332,21 @@ const styles = StyleSheet.create({
   quoteEngineHint: {
     color: Colors.primary,
     fontSize: Typography.fontSize.xs,
+    fontWeight: '700',
+  },
+  surchargeBadge: {
+    backgroundColor: '#fff7ed',
+    borderColor: '#fed7aa',
+    borderWidth: 1,
+    borderRadius: 6,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    alignSelf: 'flex-start',
+    marginTop: 2,
+  },
+  surchargeBadgeText: {
+    color: '#ea580c',
+    fontSize: 10,
     fontWeight: '700',
   },
   quotePriceWrap: {

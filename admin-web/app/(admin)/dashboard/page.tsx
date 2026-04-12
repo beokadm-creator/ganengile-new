@@ -2,6 +2,7 @@
 /* eslint-disable @typescript-eslint/no-unsafe-return */
 
 import Link from 'next/link';
+import Image from 'next/image';
 import { useEffect, useMemo, useState } from 'react';
 import type { ReactElement } from 'react';
 
@@ -331,11 +332,15 @@ export default function DashboardPage(): ReactElement {
             <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-400">ops map</p>
             <h2 className="mt-2 text-xl font-bold text-slate-900">최근 요청 지도</h2>
             {operationsMapUrl ? (
-              <img
-                src={operationsMapUrl}
-                alt="최근 요청 구간 지도"
-                className="mt-5 h-64 w-full rounded-2xl object-cover"
-              />
+              <div className="mt-5 relative h-64 w-full overflow-hidden rounded-2xl">
+                <Image
+                  src={operationsMapUrl}
+                  alt="최근 요청 구간 지도"
+                  fill
+                  className="object-cover"
+                  unoptimized
+                />
+              </div>
             ) : (
               <div className="mt-5 rounded-2xl bg-slate-50 p-6 text-sm leading-6 text-slate-500">
                 최근 요청 좌표가 아직 충분하지 않아 운영 지도를 표시하지 못하고 있습니다.

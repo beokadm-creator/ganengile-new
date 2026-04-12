@@ -50,6 +50,7 @@ export interface SharedPricingRecommendationRules {
   lowSupplyMultiplier: number;
   highSupplyDiscountMultiplier: number;
   reservationDiscountMultiplier: number;
+  minRecommendationMultiplier: number;
   maxRecommendationMultiplier: number;
 }
 
@@ -162,6 +163,7 @@ export const DEFAULT_SHARED_PRICING_POLICY: SharedPricingPolicyConfig = {
     lowSupplyMultiplier: 0.08,
     highSupplyDiscountMultiplier: -0.04,
     reservationDiscountMultiplier: -0.02,
+    minRecommendationMultiplier: 0.5,
     maxRecommendationMultiplier: 1.35,
   },
   timeRules: [
@@ -193,8 +195,8 @@ function toNumber(value: unknown, fallback: number): number {
 }
 
 function clampRate(value: unknown, fallback: number): number {
-  const next = toNumber(value, fallback);
-  return Math.max(-1, Math.min(5, next));
+  const num = toNumber(value, fallback);
+  return Math.max(-1, Math.min(1, num));
 }
 
 export function normalizeSharedPricingPolicy(
@@ -275,6 +277,7 @@ export function normalizeSharedPricingPolicy(
       lowSupplyMultiplier: clampRate(source.recommendationRules?.lowSupplyMultiplier, DEFAULT_SHARED_PRICING_POLICY.recommendationRules.lowSupplyMultiplier),
       highSupplyDiscountMultiplier: clampRate(source.recommendationRules?.highSupplyDiscountMultiplier, DEFAULT_SHARED_PRICING_POLICY.recommendationRules.highSupplyDiscountMultiplier),
       reservationDiscountMultiplier: clampRate(source.recommendationRules?.reservationDiscountMultiplier, DEFAULT_SHARED_PRICING_POLICY.recommendationRules.reservationDiscountMultiplier),
+      minRecommendationMultiplier: Math.max(0.1, toNumber(source.recommendationRules?.minRecommendationMultiplier, DEFAULT_SHARED_PRICING_POLICY.recommendationRules.minRecommendationMultiplier)),
       maxRecommendationMultiplier: Math.max(1, toNumber(source.recommendationRules?.maxRecommendationMultiplier, DEFAULT_SHARED_PRICING_POLICY.recommendationRules.maxRecommendationMultiplier)),
     },
     timeRules: Array.isArray(source.timeRules) && source.timeRules.length > 0

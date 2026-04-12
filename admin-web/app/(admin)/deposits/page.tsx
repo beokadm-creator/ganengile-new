@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import type { JSX } from 'react';
+import Image from 'next/image';
 import { formatDate, formatKRW, statusColor, statusLabel } from '@/lib/format';
 
 type DepositTab = 'paid' | 'refunded' | 'deducted';
@@ -286,11 +287,15 @@ export default function DepositsPage(): JSX.Element {
               <div className="mt-4 rounded-2xl border border-slate-200 bg-white p-4">
                 <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-400">route context</p>
                 <h3 className="mt-2 text-base font-semibold text-slate-900">보증금 대상 요청 구간 지도</h3>
-                <img
-                  src={selectedMapUrl}
-                  alt="보증금 대상 요청 구간 지도"
-                  className="mt-4 h-56 w-full rounded-2xl object-cover"
-                />
+                <div className="mt-4 relative h-56 w-full overflow-hidden rounded-2xl">
+                  <Image
+                    src={selectedMapUrl}
+                    alt="보증금 대상 요청 구간 지도"
+                    fill
+                    className="object-cover"
+                    unoptimized
+                  />
+                </div>
                 <p className="mt-3 text-sm leading-6 text-slate-500">
                   픽업지는 P, 도착지는 D로 표시됩니다. 환급과 차감을 결정할 때 취소 시점과 경로 맥락을 함께 확인합니다.
                 </p>

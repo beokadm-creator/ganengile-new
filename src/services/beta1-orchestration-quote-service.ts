@@ -52,6 +52,7 @@ export interface Beta1RequestCreateInput {
     };
   };
   aiQuoteOverride?: Beta1AIQuoteResponse;
+  pricingPolicyVersion?: string;
   pricingContextOverride?: Partial<RequestPricingContext>;
 }
 
