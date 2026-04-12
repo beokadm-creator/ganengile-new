@@ -16,24 +16,17 @@ export function StepContainer({
   step,
   currentStep,
   onNext,
-  onPrev,
+  onPrev, // Keep for compatibility if used elsewhere, but not needed in UI
   nextLabel = '다음 단계로',
   nextDisabled = false,
   children,
 }: Props) {
-  if (currentStep < step) return null;
+  if (currentStep !== step) return null;
 
   return (
-    <View style={[styles.stepContainer, currentStep < step && { display: 'none' }]}>
-      <View style={currentStep > step ? { opacity: 0.6 } : undefined} pointerEvents={currentStep > step ? 'none' : 'auto'}>
-        {children}
-      </View>
-      {currentStep > step && onPrev && (
-        <TouchableOpacity style={styles.editStepButton} onPress={onPrev}>
-          <Text style={styles.editStepButtonText}>수정하기</Text>
-        </TouchableOpacity>
-      )}
-      {currentStep === step && onNext && (
+    <View style={styles.stepContainer}>
+      {children}
+      {onNext && (
         <TouchableOpacity
           style={[styles.nextStepButton, nextDisabled && styles.nextStepButtonDisabled]}
           onPress={onNext}
@@ -50,21 +43,6 @@ const styles = StyleSheet.create({
   stepContainer: {
     gap: Spacing.xl,
     paddingBottom: Spacing.xl,
-  },
-  editStepButton: {
-    position: 'absolute',
-    top: -Spacing.sm,
-    right: 0,
-    padding: Spacing.sm,
-    backgroundColor: Colors.white,
-    borderRadius: BorderRadius.full,
-    ...Shadows.sm,
-    zIndex: 10,
-  },
-  editStepButtonText: {
-    color: Colors.primary,
-    fontSize: Typography.fontSize.sm,
-    fontWeight: Typography.fontWeight.bold,
   },
   nextStepButton: {
     minHeight: 56,

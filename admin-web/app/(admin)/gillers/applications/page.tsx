@@ -20,6 +20,10 @@ interface GillerApplication {
   };
   status: string;
   createdAt: { seconds: number } | string;
+  userCreatedAt?: { seconds: number } | string;
+  profilePhoto?: string | null;
+  totalRequests?: number;
+  totalDeliveries?: number;
   adminNote?: string;
   isSynthetic?: boolean;
   identityTestMode?: boolean;
@@ -79,6 +83,13 @@ function asGillerApplication(value: unknown): GillerApplication | null {
       typeof record.createdAt === 'string' || asRecord(record.createdAt)
         ? (record.createdAt as GillerApplication['createdAt'])
         : '',
+    userCreatedAt:
+      typeof record.userCreatedAt === 'string' || asRecord(record.userCreatedAt)
+        ? (record.userCreatedAt as GillerApplication['userCreatedAt'])
+        : undefined,
+    profilePhoto: typeof record.profilePhoto === 'string' ? record.profilePhoto : null,
+    totalRequests: typeof record.totalRequests === 'number' ? record.totalRequests : 0,
+    totalDeliveries: typeof record.totalDeliveries === 'number' ? record.totalDeliveries : 0,
     adminNote: typeof record.adminNote === 'string' ? record.adminNote : undefined,
     isSynthetic: Boolean(record.isSynthetic),
     identityTestMode: Boolean(record.identityTestMode),
@@ -224,6 +235,7 @@ export default function GillerApplicationsPage() {
             <thead className="bg-slate-50 text-xs text-slate-500">
               <tr>
                 <th className="px-4 py-3 text-left">신청자</th>
+                <th className="px-4 py-3 text-left">활동 이력</th>
                 <th className="px-4 py-3 text-left">본인 확인</th>
                 <th className="px-4 py-3 text-left">계좌 인증</th>
                 <th className="px-4 py-3 text-left">심사 상태</th>
@@ -242,8 +254,28 @@ export default function GillerApplicationsPage() {
                 return (
                   <tr key={item.id} className="hover:bg-slate-50">
                     <td className="px-4 py-3">
-                      <div className="font-medium text-slate-900">{item.userName ?? '(이름 없음)'}</div>
-                      <div className="mt-1 text-xs text-slate-500">{item.phone ?? '-'}</div>
+                      <div className="flex items-center gap-3">
+                        {item.profilePhoto ? (
+                          <img src={item.profilePhoto} alt="" className="h-10 w-10 rounded-full object-cover" />
+                        ) : (
+                          <div className="flex h-10 w-10 items-center justify-center rounded-full bg-slate-200 text-slate-500 font-bold">
+                            {item.userName?.[0] || '?'}
+                          </div>
+                        )}
+                        <div>
+                          <div className="font-medium text-slate-900">{item.userName ?? '(이름 없음)'}</div>
+                          <div className="text-xs text-slate-500">{item.phone ?? '-'}</div>
+                          {item.userCreatedAt ? (
+                            <div className="text-[10px] text-slate-400 mt-0.5">가입: {formatDate(item.userCreatedAt)}</div>
+                          ) : null}
+                        </div>
+                      </div>
+                    </td>
+                    <td className="px-4 py-3">
+                      <div className="flex flex-col gap-1">
+                        <span className="text-xs text-slate-700">배송: <span className="font-semibold">{item.totalDeliveries || 0}</span>건</span>
+                        <span className="text-xs text-slate-500">요청: {item.totalRequests || 0}건</span>
+                      </div>
                     </td>
                     <td className="px-4 py-3">
                       <div className="flex flex-col gap-1">
@@ -325,7 +357,8 @@ export default function GillerApplicationsPage() {
                   <h3 className="mb-3 font-semibold text-slate-900">기본 정보</h3>
                   <ReviewRow label="신청자" value={selected.userName ?? '-'} />
                   <ReviewRow label="연락처" value={selected.phone ?? '-'} />
-                  <ReviewRow label="신청일" value={formatDate(selected.createdAt)} />
+                  <ReviewRow label="가입일" value={selected.userCreatedAt ? formatDate(selected.userCreatedAt) : '-'} />
+                  <ReviewRow label="활동 이력" value={`배달 ${selected.totalDeliveries || 0}건 / 요청 ${selected.totalRequests || 0}건`} />
                 </section>
 
                 <section className="rounded-xl bg-slate-50 p-4 text-sm">
@@ -381,6 +414,13 @@ export default function GillerApplicationsPage() {
                 본인 확인 또는 계좌 인증이 테스트 우회 상태일 수 있습니다. 지금 단계에서는 승급 심사가
                 가능하지만, 운영자는 실제 서비스 전환 전 최종 확인 책임을 함께 집니다.
               </div>
+
+              {selected.adminNote ? (
+                <div className="mt-4 rounded-xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-800">
+                  <h3 className="mb-2 font-semibold text-slate-900">이전 심사 메모</h3>
+                  <p className="whitespace-pre-wrap">{selected.adminNote}</p>
+                </div>
+              ) : null}
 
               <div className="mt-4">
                 <label className="mb-1 block text-sm font-medium text-slate-700">심사 메모</label>

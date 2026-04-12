@@ -53,7 +53,7 @@ export function Step1Location({
     >
       <Block title="보내기 방식">
         <View style={styles.row}>
-          <Chip label="지금 보내기" active={store.requestMode === 'immediate'} onPress={() => { store.setRequestMode('immediate'); setTimeout(() => store.setActiveStep(2), 300); }} />
+          <Chip label="지금 보내기" active={store.requestMode === 'immediate'} onPress={() => { store.setRequestMode('immediate'); }} />
           <Chip label="예약 보내기" active={store.requestMode === 'reservation'} onPress={() => { store.setRequestMode('reservation'); }} />
         </View>
       </Block>

@@ -543,13 +543,18 @@ export default function CreateRequestScreen({ navigation, route }: Props) {
     }
   };
   useEffect(() => {
-    // 활성화된 스텝이 변경될 때 약간의 딜레이를 두고 스크롤 이동
+    // 활성화된 스텝이 변경될 때 스크롤을 맨 위로 이동
     setTimeout(() => {
-      scrollViewRef.current?.scrollToEnd({ animated: true });
+      scrollViewRef.current?.scrollTo({ y: 0, animated: true });
     }, 100);
   }, [activeStep]);
 
   function handleBack() {
+    if (activeStep > 1) {
+      store.setActiveStep(activeStep - 1);
+      return;
+    }
+    
     if (navigation.canGoBack()) {
       navigation.goBack();
       return;
@@ -776,7 +781,7 @@ export default function CreateRequestScreen({ navigation, route }: Props) {
 
   return (
     <KeyboardAvoidingView style={styles.container} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-      <AppTopBar title="배송 요청 만들기" onBack={handleBack} />
+      <AppTopBar title={`배송 요청 (${activeStep}/4)`} onBack={handleBack} />
 
       <ScrollView ref={scrollViewRef} contentContainerStyle={[styles.content, { paddingBottom: 100 }]} showsVerticalScrollIndicator={false}>
         <Step1Location

@@ -154,7 +154,37 @@ export async function GET(req: NextRequest) {
       .filter((item) => aliases.includes(String(item.status ?? 'pending')))
       .sort((a, b) => toMillis(b.createdAt) - toMillis(a.createdAt));
 
-    return NextResponse.json({ items });
+    // Enrich with user profile and activity stats
+    const userIdsToFetch = Array.from(new Set(items.map((i) => i.userId).filter(Boolean))) as string[];
+    const usersDataMap = new Map<string, any>();
+    const chunkSize = 30;
+    
+    for (let i = 0; i < userIdsToFetch.length; i += chunkSize) {
+      const chunk = userIdsToFetch.slice(i, i + chunkSize);
+      if (chunk.length > 0) {
+        const usersSnap = await db.collection('users').where('__name__', 'in', chunk).get();
+        usersSnap.docs.forEach((doc) => {
+          usersDataMap.set(doc.id, doc.data());
+        });
+      }
+    }
+
+    const enrichedItems = items.map((item) => {
+      const userData = item.userId ? usersDataMap.get(item.userId) : null;
+      const gllerInfo = (userData?.gllerInfo as Record<string, any>) || {};
+      const gillerInfo = (userData?.gillerInfo as Record<string, any>) || {};
+      const stats = (userData?.stats as Record<string, any>) || {};
+
+      return {
+        ...item,
+        userCreatedAt: userData?.createdAt ?? null,
+        profilePhoto: userData?.profilePhoto ?? null,
+        totalRequests: gllerInfo.totalRequests ?? stats.totalRequests ?? 0,
+        totalDeliveries: gillerInfo.totalDeliveries ?? stats.totalDeliveries ?? 0,
+      };
+    });
+
+    return NextResponse.json({ items: enrichedItems });
   } catch (error: unknown) {
     console.error('[admin/gillers][GET] failed:', error);
     return NextResponse.json(
