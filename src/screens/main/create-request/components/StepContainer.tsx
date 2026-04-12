@@ -25,14 +25,14 @@ export function StepContainer({
 
   return (
     <View style={[styles.stepContainer, currentStep < step && { display: 'none' }]}>
-      <View style={currentStep > step ? { opacity: 0.6, pointerEvents: 'none' } : undefined}>
+      <View style={currentStep > step ? { opacity: 0.6 } : undefined} pointerEvents={currentStep > step ? 'none' : 'auto'}>
         {children}
-        {currentStep > step && onPrev && (
-          <TouchableOpacity style={styles.editStepButton} onPress={onPrev}>
-            <Text style={styles.editStepButtonText}>수정하기</Text>
-          </TouchableOpacity>
-        )}
       </View>
+      {currentStep > step && onPrev && (
+        <TouchableOpacity style={styles.editStepButton} onPress={onPrev}>
+          <Text style={styles.editStepButtonText}>수정하기</Text>
+        </TouchableOpacity>
+      )}
       {currentStep === step && onNext && (
         <TouchableOpacity
           style={[styles.nextStepButton, nextDisabled && styles.nextStepButtonDisabled]}
