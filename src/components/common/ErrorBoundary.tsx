@@ -1,6 +1,7 @@
 import React, { Component, ErrorInfo, ReactNode } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import * as Sentry from '@sentry/react-native';
+import * as Updates from 'expo-updates';
 
 interface Props {
   children: ReactNode;
@@ -26,8 +27,13 @@ export class ErrorBoundary extends Component<Props, State> {
     Sentry.captureException(error);
   }
 
-  private handleReset = () => {
-    this.setState({ hasError: false, error: null });
+  private handleReset = async () => {
+    try {
+      await Updates.reloadAsync();
+    } catch (e) {
+      // Fallback if reloadAsync fails (e.g. in Expo Go or Web)
+      this.setState({ hasError: false, error: null });
+    }
   };
 
   public render() {

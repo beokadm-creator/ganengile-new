@@ -23,9 +23,9 @@ export async function isAdmin(): Promise<boolean> {
     getAdminApp();
     const decodedClaims = await getAuth().verifySessionCookie(sessionCookie, true);
     
-    // Check if the custom claim is true or if UID matches
-    const allowedUid = process.env.ADMIN_UID;
-    if (decodedClaims.admin === true || (allowedUid && decodedClaims.uid === allowedUid)) {
+    // Check if the custom claim is true or if UID matches any in the allowed list
+    const allowedUids = process.env.ADMIN_UID?.split(',').map(uid => uid.trim()) || [];
+    if (decodedClaims.admin === true || allowedUids.includes(decodedClaims.uid)) {
       return true;
     }
     return false;

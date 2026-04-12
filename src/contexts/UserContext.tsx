@@ -173,7 +173,18 @@ export function UserProvider({ children }: UserProviderProps) {
         }
 
         setUser(userData);
-        setCurrentRole(resolveActiveRole(userData));
+        
+        // Load saved role preference if available
+        try {
+          const savedRole = await AsyncStorage.getItem('user_current_role');
+          if (savedRole && userData && userData.role === UserRole.BOTH) {
+            setCurrentRole(savedRole as UserRole);
+          } else {
+            setCurrentRole(resolveActiveRole(userData));
+          }
+        } catch (e) {
+          setCurrentRole(resolveActiveRole(userData));
+        }
       } catch (error) {
         console.error('Error loading user:', error);
       } finally {
@@ -198,7 +209,17 @@ export function UserProvider({ children }: UserProviderProps) {
       try {
         const userData = await getUserById(activeUser.uid);
         setUser(userData);
-        setCurrentRole(resolveActiveRole(userData));
+        
+        try {
+          const savedRole = await AsyncStorage.getItem('user_current_role');
+          if (savedRole && userData && userData.role === UserRole.BOTH) {
+            setCurrentRole(savedRole as UserRole);
+          } else {
+            setCurrentRole(resolveActiveRole(userData));
+          }
+        } catch (e) {
+          setCurrentRole(resolveActiveRole(userData));
+        }
       } catch (error) {
         const errorCode = typeof error === 'object' && error != null && 'code' in error
           ? (error as { code?: unknown }).code
@@ -245,7 +266,19 @@ export function UserProvider({ children }: UserProviderProps) {
             }
           : currentUser
     );
-    setCurrentRole(resolveActiveRole(refreshedUser ?? user));
+    
+    // Maintain saved role if user is BOTH, otherwise resolve naturally
+    try {
+      const savedRole = await AsyncStorage.getItem('user_current_role');
+      const latestUser = refreshedUser ?? user;
+      if (savedRole && latestUser && latestUser.role === UserRole.BOTH) {
+        setCurrentRole(savedRole as UserRole);
+      } else {
+        setCurrentRole(resolveActiveRole(latestUser));
+      }
+    } catch (e) {
+      setCurrentRole(resolveActiveRole(refreshedUser ?? user));
+    }
 
     // 온보딩 전에 사용자가 가려던 URL 반환
     // eslint-disable-next-line @typescript-eslint/no-require-imports
@@ -258,18 +291,23 @@ export function UserProvider({ children }: UserProviderProps) {
       return;
     }
 
+    const saveRole = (newRole: UserRole) => {
+      setCurrentRole(newRole);
+      AsyncStorage.setItem('user_current_role', newRole).catch(console.error);
+    };
+
     if (role === UserRole.GILLER && canUseGillerRole(user)) {
-      setCurrentRole(UserRole.GILLER);
+      saveRole(UserRole.GILLER);
       return;
     }
 
     if (role === UserRole.GLER) {
-      setCurrentRole(UserRole.GLER);
+      saveRole(UserRole.GLER);
       return;
     }
 
     if (user.role === UserRole.BOTH) {
-      setCurrentRole(role);
+      saveRole(role);
     }
   }, [user]);
 

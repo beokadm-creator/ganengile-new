@@ -136,13 +136,15 @@ function AppContent() {
   );
 }
 
-export default function App() {
+function RootApp() {
   return (
     <ErrorBoundary>
       <AppContent />
     </ErrorBoundary>
   );
 }
+
+export default Sentry.wrap(RootApp);
 
 const styles = StyleSheet.create({
   center: {

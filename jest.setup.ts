@@ -340,6 +340,17 @@ const mockFirestoreModule = {
     name: name ?? String(_db),
   })),
   doc: jest.fn((_db, ...segments: string[]) => {
+    // If first argument is a collection reference, auto-generate an ID
+    if (_db && typeof _db === 'object' && _db.type === 'collection') {
+      const collectionName = _db.name;
+      const docId = segments[0] ?? `mock-doc-${mockFirestoreIdCounter += 1}`;
+      return {
+        type: 'doc',
+        collectionName,
+        id: docId,
+        path: `${collectionName}/${docId}`,
+      };
+    }
     const parts = segments.length > 0 ? segments : [String(_db)];
     const { collectionName, docId } = getRefParts(parts);
     return {
@@ -445,6 +456,15 @@ const mockFirestoreModule = {
     }
 
     return jest.fn();
+  }),
+  runTransaction: jest.fn(async (db, updateFunction) => {
+    const transactionMock = {
+      get: jest.fn(async (docRef) => mockFirestoreModule.getDoc(docRef)),
+      set: jest.fn((docRef, data, options) => mockFirestoreModule.setDoc(docRef, data, options)),
+      update: jest.fn((docRef, data) => mockFirestoreModule.updateDoc(docRef, data)),
+      delete: jest.fn((docRef) => mockFirestoreModule.deleteDoc(docRef)),
+    };
+    return await updateFunction(transactionMock);
   }),
   serverTimestamp: jest.fn(() => new Date()),
   increment: jest.fn((amount) => ({ __op: 'increment', amount })),

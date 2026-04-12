@@ -61,6 +61,7 @@ describe('Delivery Service', () => {
       },
       recipientName: 'Test Recipient',
       recipientPhone: '010-1234-5678',
+      verificationCode: '1234',
       recipientVerificationCode: '123456',
       createdAt: new Date(),
       updatedAt: new Date(),
@@ -86,7 +87,8 @@ describe('Delivery Service', () => {
 
   test('accepts a matched request and creates a delivery', async () => {
     const result = await gillerAcceptRequest(testRequestId, testGillerId);
-
+    if (!result.success) throw new Error(JSON.stringify(result));
+    
     expect(result.success).toBe(true);
     expect(result.deliveryId).toBeDefined();
 

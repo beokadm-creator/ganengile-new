@@ -31,6 +31,11 @@ export async function PATCH(
       updatedAt: new Date().toISOString(),
     };
 
+    // 완료 처리 시 도메인 정합성을 위해 completedAt 추가 (실제 정산 로직은 향후 Functions 트리거 또는 별도 API 연동 필요)
+    if (status === 'completed') {
+      updates.completedAt = new Date().toISOString();
+    }
+
     await deliveryRef.update(updates);
 
     return NextResponse.json({ success: true, status });

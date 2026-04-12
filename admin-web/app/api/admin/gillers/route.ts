@@ -210,11 +210,28 @@ export async function PATCH(req: NextRequest) {
   const isVerificationApproved =
     verificationStatus === 'approved' || verificationStatus === 'approved_test_bypass';
 
-  if (body.action === 'approve' && !isVerificationApproved) {
-    return NextResponse.json(
-      { error: '본인확인 완료 상태가 아니어서 승인할 수 없습니다.' },
-      { status: 400 }
-    );
+  const bankAccount =
+    (data.bankAccount as Record<string, unknown> | undefined) ??
+    ((typeof data.gillerInfo === 'object' && data.gillerInfo !== null
+      ? (data.gillerInfo as Record<string, unknown>).bankAccount
+      : undefined) as Record<string, unknown> | undefined);
+
+  const isBankAccountVerified =
+    bankAccount?.verificationStatus === 'verified' || bankAccount?.verificationStatus === 'verified_test_bypass';
+
+  if (body.action === 'approve') {
+    if (!isVerificationApproved) {
+      return NextResponse.json(
+        { error: '본인확인 완료 상태가 아니어서 승인할 수 없습니다.' },
+        { status: 400 }
+      );
+    }
+    if (!isBankAccountVerified) {
+      return NextResponse.json(
+        { error: '정산 계좌가 인증되지 않아 승인할 수 없습니다.' },
+        { status: 400 }
+      );
+    }
   }
 
   await ref.update({
@@ -228,13 +245,6 @@ export async function PATCH(req: NextRequest) {
     const userSnap = await userRef.get();
     const currentRole = userSnap.exists ? (userSnap.data()?.role as string | undefined) : undefined;
     const nextRole = currentRole === 'giller' ? 'giller' : 'both';
-    const bankAccount =
-      (data.bankAccount as Record<string, unknown> | undefined) ??
-      ((typeof data.gillerInfo === 'object' && data.gillerInfo !== null
-        ? (data.gillerInfo as Record<string, unknown>).bankAccount
-        : null) as Record<string, unknown> | null) ??
-      (data.bank_account as Record<string, unknown> | undefined) ??
-      null;
 
     await userRef.update({
       role: nextRole,

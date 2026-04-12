@@ -489,21 +489,23 @@ export async function gillerAcceptRequest(
         request.recipientVerificationCode ?? request.verificationCode ?? request.recipientCode ?? '000000';
 
     // Create delivery document
-  const deliveryData = {
-    requestId,
-    gllerId: request.requesterId ?? request.gllerId,
-    gillerId,
-    pickupStation: request.pickupStation,
-    deliveryStation: request.deliveryStation,
-    deliveryType: request.deliveryType ?? 'standard',
-    packageInfo: request.packageInfo,
-    fee: confirmedFee,
-    pricingPolicyVersion: request.pricingPolicyVersion ?? null,
-    recipientInfo: {
-      name: recipientName,
-      phone: recipientPhone,
-      verificationCode: recipientVerificationCode,
-    },
+    const deliveryRef = doc(collection(db, 'deliveries'));
+    const deliveryData = {
+      requestId,
+      gllerId: request.requesterId ?? request.gllerId,
+      gillerId,
+      pickupStation: request.pickupStation,
+      deliveryStation: request.deliveryStation,
+      deliveryType: request.deliveryType ?? 'standard',
+      packageInfo: request.packageInfo,
+      fee: confirmedFee,
+      pricingPolicyVersion: request.pricingPolicyVersion ?? null,
+      pickupVerificationCode: request.verificationCode ?? '0000',
+      recipientInfo: {
+        name: recipientName,
+        phone: recipientPhone,
+        verificationCode: recipientVerificationCode,
+      },
       status: 'accepted' as DeliveryStatus,
       tracking: {
         events: [
@@ -520,7 +522,35 @@ export async function gillerAcceptRequest(
       updatedAt: serverTimestamp(),
     };
 
-    const deliveryRef = await addDoc(collection(db, 'deliveries'), deliveryData);
+    // Use transaction to ensure both delivery creation and request update happen atomically
+    await runTransaction(db, async (transaction) => {
+      const requestSnap = await transaction.get(requestRef);
+      if (!requestSnap.exists()) {
+        throw new Error('요청을 찾을 수 없습니다.');
+      }
+      
+      const currentRequest = requestSnap.data() as DeliveryRequestLike;
+      if (currentRequest.status !== 'matched' && currentRequest.status !== 'pending' && currentRequest.status !== 'accepted') {
+        throw new Error('수락할 수 없는 상태입니다.');
+      }
+
+      transaction.set(deliveryRef, deliveryData);
+      transaction.update(requestRef, {
+        status: 'accepted',
+        matchedGillerId: gillerId,
+        primaryDeliveryId: deliveryRef.id,
+        fee: {
+          totalFee: confirmedFee.totalFee,
+          deliveryFee: confirmedFee.deliveryFee ?? 0,
+          vat: confirmedFee.vat ?? 0,
+          publicFare: confirmedFee.publicFare ?? 0,
+          breakdown: confirmedFee.breakdown ?? null,
+        },
+        acceptedAt: serverTimestamp(),
+        updatedAt: serverTimestamp(),
+      });
+    });
+
     await syncDeliveryToBeta1Execution(deliveryRef.id);
     const missionPlan = await planMissionExecutionWithAI({
       requestId,
@@ -552,21 +582,6 @@ export async function gillerAcceptRequest(
       manualReviewRequired: missionPlan?.actorSelection.manualReviewRequired ?? false,
       riskFlags: missionPlan?.actorSelection.riskFlags ?? [],
     });
-    // Update request status + fee snapshot (delivery 생성 성공 후 반영)
-    await updateDoc(requestRef, {
-      status: 'accepted',
-      matchedGillerId: gillerId,
-      primaryDeliveryId: deliveryRef.id,
-      fee: {
-        totalFee: confirmedFee.totalFee,
-        deliveryFee: confirmedFee.deliveryFee ?? 0,
-        vat: confirmedFee.vat ?? 0,
-        publicFare: confirmedFee.publicFare ?? 0,
-        breakdown: confirmedFee.breakdown ?? null,
-      },
-      acceptedAt: serverTimestamp(),
-      updatedAt: serverTimestamp(),
-    });
 
     return {
       success: true,
@@ -575,7 +590,7 @@ export async function gillerAcceptRequest(
     };
   } catch (error) {
     console.error('Error accepting request:', error);
-    return { success: false, message: '수락에 실패했습니다.' };
+    return { success: false, message: '수락에 실패했습니다.', error: String(error) };
   }
 }
 
@@ -858,10 +873,8 @@ export async function verifyPickup(data: PickupVerificationData): Promise<{ succ
       return { success: false, message: '픽업 인증을 할 수 없는 상태입니다.' };
     }
 
-    // Verify 4-digit code (would be generated when request is created)
-    // For now, accept any 4-digit code
-    if (data.verificationCode?.length !== 4) {
-      return { success: false, message: '인증 코드가 올바르지 않습니다.' };
+    if (data.verificationCode !== delivery.pickupVerificationCode) {
+      return { success: false, message: '픽업 인증 코드가 올바르지 않습니다.' };
     }
 
     // Upload photo

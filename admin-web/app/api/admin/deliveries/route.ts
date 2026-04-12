@@ -2,7 +2,7 @@ import { NextResponse, type NextRequest } from 'next/server';
 import { getAdminDb } from '@/lib/firebase-admin';
 import { isAdmin } from '@/lib/auth';
 
-const ACTIVE_STATUSES = ['accepted', 'picked_up', 'in_transit', 'arrived', 'at_locker', 'handover_pending', 'last_mile_in_progress'];
+const ACTIVE_STATUSES = ['pending', 'matched', 'accepted', 'picked_up', 'in_transit', 'arrived', 'at_locker', 'delivered', 'handover_pending', 'last_mile_in_progress'];
 const DONE_STATUSES = ['completed', 'cancelled', 'failed'];
 
 export async function GET(req: NextRequest) {
