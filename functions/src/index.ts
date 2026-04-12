@@ -243,6 +243,15 @@ function buildNaverGeocodeUrl(query: { address: string }): string {
   return `https://maps.apigw.ntruss.com/map-geocode/v2/geocode?${params.toString()}`;
 }
 
+function buildNaverReverseGeocodeUrl(query: { coords: string }): string {
+  const params = new URLSearchParams({
+    coords: query.coords,
+    output: 'json',
+  });
+
+  return `https://maps.apigw.ntruss.com/map-reversegeocode/v2/gc?${params.toString()}`;
+}
+
 function buildNaverDirectionsUrl(query: {
   start: string;
   goal: string;
@@ -3016,6 +3025,129 @@ export const naverGeocodeProxy = functions.https.onRequest(async (req, res) => {
   } catch (error) {
     console.error('naverGeocodeProxy error:', error);
     res.status(500).json({ ok: false, message: 'failed to geocode address' });
+  }
+});
+
+/**
+ * HTTP: Naver reverse geocode proxy
+ * Converts coordinates into a road address on the server side.
+ */
+export const naverReverseGeocodeProxy = functions.https.onRequest(async (req, res) => {
+  const ip = getClientIp(req);
+  if (checkRateLimit(ip, 'naverReverseGeocodeProxy', 10, 60)) {
+    console.warn(`[rate-limit] naverReverseGeocodeProxy blocked for ip=${ip}`);
+    res.status(429).send('Too many requests');
+    return;
+  }
+
+  try {
+    res.set('Access-Control-Allow-Origin', '*');
+    res.set('Access-Control-Allow-Methods', 'GET,OPTIONS');
+    res.set('Access-Control-Allow-Headers', 'Content-Type');
+
+    if (req.method === 'OPTIONS') {
+      res.status(204).send('');
+      return;
+    }
+
+    const clientId = getFirstNonEmptyString(
+      NAVER_MAP_CLIENT_ID_PARAM.value(),
+      process.env.NAVER_MAP_CLIENT_ID
+    );
+    const clientSecret = getFirstNonEmptyString(
+      NAVER_MAP_CLIENT_SECRET_PARAM.value(),
+      process.env.NAVER_MAP_CLIENT_SECRET
+    );
+
+    if (!clientId || !clientSecret) {
+      res.status(503).json({ ok: false, message: 'naver map credentials are not configured' });
+      return;
+    }
+
+    const coords = readFirstQueryValue(req.query.coords).trim(); // e.g. "126.9783881,37.5666102"
+    if (!coords) {
+      res.status(400).json({ ok: false, message: 'coords is required' });
+      return;
+    }
+
+    const naverUrl = buildNaverReverseGeocodeUrl({ coords });
+    const payload = (await fetchJson(naverUrl, {
+      headers: {
+        Accept: 'application/json',
+        'X-NCP-APIGW-API-KEY-ID': clientId,
+        'X-NCP-APIGW-API-KEY': clientSecret,
+      },
+    })) as {
+      status?: { code: number; name: string; message: string };
+      results?: Array<{
+        name: string;
+        region: {
+          area1?: { name: string };
+          area2?: { name: string };
+          area3?: { name: string };
+          area4?: { name: string };
+        };
+        land?: {
+          name?: string;
+          number1?: string;
+          number2?: string;
+          addition0?: { value?: string };
+        };
+      }>;
+    };
+
+    if (payload.status?.code !== 0) {
+      res.status(502).json({ ok: false, message: payload.status?.message ?? 'failed to reverse geocode' });
+      return;
+    }
+
+    const result = payload.results?.[0];
+    if (!result) {
+      res.status(404).json({ ok: false, message: 'address not found for coordinates' });
+      return;
+    }
+
+    // Build human readable address
+    const region = result.region;
+    const land = result.land;
+    const parts = [
+      region?.area1?.name,
+      region?.area2?.name,
+      region?.area3?.name,
+      region?.area4?.name,
+    ].filter(Boolean);
+
+    if (result.name === 'roadaddr' && land) {
+      // Road address format
+      const roadName = land.name;
+      const buildNum = land.number1;
+      const subNum = land.number2 ? `-${land.number2}` : '';
+      const bldgName = land.addition0?.value;
+      if (roadName && buildNum) {
+        parts.push(`${roadName} ${buildNum}${subNum}`);
+        if (bldgName) {
+          parts.push(`(${bldgName})`);
+        }
+      }
+    } else if (land) {
+      // Jibun address format
+      const number1 = land.number1;
+      const number2 = land.number2 ? `-${land.number2}` : '';
+      if (number1) {
+        parts.push(`${number1}${number2}`);
+      }
+    }
+
+    const address = parts.join(' ').trim();
+
+    res.set('Cache-Control', 'public, max-age=300, s-maxage=300');
+    res.status(200).json({
+      ok: true,
+      address,
+    });
+  } catch (error) {
+    console.error('naverReverseGeocodeProxy error:', error);
+    res.status(500).json({ ok: false, message: 'failed to reverse geocode coordinates' });
   }
 });
 

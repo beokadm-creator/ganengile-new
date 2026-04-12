@@ -11,6 +11,7 @@ export const mapConfig = {
   publicClientId: readEnv(process.env.EXPO_PUBLIC_NAVER_MAP_CLIENT_ID),
   staticMapProxyBaseUrl: readEnv(process.env.EXPO_PUBLIC_NAVER_STATIC_MAP_PROXY_URL),
   geocodeProxyBaseUrl: readEnv(process.env.EXPO_PUBLIC_NAVER_GEOCODE_PROXY_URL),
+  reverseGeocodeProxyBaseUrl: readEnv(process.env.EXPO_PUBLIC_NAVER_REVERSE_GEOCODE_PROXY_URL),
   directionsProxyBaseUrl: readEnv(process.env.EXPO_PUBLIC_NAVER_DIRECTIONS_PROXY_URL),
   webClientId: readEnv(process.env.EXPO_PUBLIC_NAVER_MAP_WEB_CLIENT_ID),
   dynamicWebEnabled: readEnv(process.env.EXPO_PUBLIC_NAVER_WEB_MAP_ENABLED) === 'true',
@@ -67,6 +68,16 @@ export function getNaverGeocodeProxyUrl(): string {
 
   const fallback = getDefaultFunctionsBaseUrl();
   return fallback ? `${fallback}/naverGeocodeProxy` : '';
+}
+
+export function getNaverReverseGeocodeProxyUrl(): string {
+  const configured = mapConfig.reverseGeocodeProxyBaseUrl;
+  if (configured) {
+    return configured.replace(/\/$/, '');
+  }
+
+  const fallback = getDefaultFunctionsBaseUrl();
+  return fallback ? `${fallback}/naverReverseGeocodeProxy` : '';
 }
 
 export function getNaverDirectionsProxyUrl(): string {

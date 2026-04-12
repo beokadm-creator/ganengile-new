@@ -508,6 +508,16 @@ describe('LocationService', () => {
   });
 
   describe('reverseGeocode', () => {
+    beforeEach(() => {
+      jest.mock('../../config/map-config', () => ({
+        getNaverReverseGeocodeProxyUrl: () => '',
+      }));
+    });
+
+    afterEach(() => {
+      jest.restoreAllMocks();
+    });
+
     it('위도/경도를 주소로 변환해야 한다', async () => {
       // Given
       const mockGeocoded = [

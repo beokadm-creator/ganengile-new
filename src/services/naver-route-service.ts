@@ -57,6 +57,21 @@ export async function getDrivingRoute(args: {
     return null;
   }
 
+  // Simplify coordinates if they are too long to prevent URL length limits on Static Map API
+  if (payload.route.coordinates.length > 50) {
+    const coords = payload.route.coordinates;
+    const step = Math.ceil(coords.length / 50);
+    const simplified = [];
+    for (let i = 0; i < coords.length; i += step) {
+      simplified.push(coords[i]);
+    }
+    // Ensure the last coordinate is always included
+    if (simplified[simplified.length - 1] !== coords[coords.length - 1]) {
+      simplified.push(coords[coords.length - 1]);
+    }
+    payload.route.coordinates = simplified;
+  }
+
   return payload.route;
 }
 

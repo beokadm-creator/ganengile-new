@@ -99,32 +99,30 @@ export class LocationTrackingService {
   /**
    * 위치 추적 시작
    * @param deliveryId 배송 ID
-   * @param updateIntervalMs 업데이트 간격 (ms)
+   * @param updateIntervalMs 업데이트 간격 (ms) - 기본 15초로 최적화
    */
-  async startTracking(deliveryId: string, updateIntervalMs: number = 10000): Promise<void> {
+  async startTracking(deliveryId: string, updateIntervalMs: number = 15000): Promise<void> {
     if (this.isTracking) {
-      // Already tracking location
       return;
     }
 
     try {
-      // 권한 요청
       await requestLocationPermission();
 
       this.deliveryId = deliveryId;
       this.isTracking = true;
 
-      // 위치 추적 시작
+      // 위치 추적 시작 - 배터리 최적화를 위해 Balanced/15초 사용
       this.subscription = await Location.watchPositionAsync(
         {
           accuracy: Location.Accuracy.Balanced,
-          distanceInterval: 10, // 10m 이동 시 업데이트
+          distanceInterval: 20, // 20m 이상 이동 시 업데이트
           timeInterval: updateIntervalMs,
         },
         (location) => {
           this.handleLocationUpdate(location);
-         }
-       );
+        }
+      );
 
        // Location tracking started for delivery
      } catch (error: any) {

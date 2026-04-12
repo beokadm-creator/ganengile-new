@@ -73,8 +73,8 @@ export class LocationService {
       this.locationSubscription = await Location.watchPositionAsync(
         {
           accuracy: Location.Accuracy.Balanced,
-          distanceInterval: 10,
-          timeInterval: 5000,
+          distanceInterval: 20, // 10 -> 20 최적화
+          timeInterval: 15000, // 5000 -> 15000 최적화
         },
         (location) => {
           callback({
@@ -191,6 +191,32 @@ export class LocationService {
 
   async reverseGeocode(latitude: number, longitude: number): Promise<string> {
     try {
+      let proxyUrl = '';
+      try {
+        const mapConfig = await import('../config/map-config');
+        proxyUrl = mapConfig.getNaverReverseGeocodeProxyUrl();
+      } catch (e) {
+        // ignore dynamic import errors in tests
+      }
+      
+      if (proxyUrl) {
+        const requestUrl = new URL(proxyUrl);
+        requestUrl.searchParams.set('coords', `${longitude},${latitude}`);
+        
+        try {
+          const response = await fetch(requestUrl.toString());
+          if (response.ok) {
+            const payload = await response.json();
+            if (payload.ok && payload.address) {
+              return payload.address;
+            }
+          }
+        } catch (e) {
+          console.warn('Naver reverse geocoding failed, falling back to native', e);
+        }
+      }
+
+      // Fallback to native reverse geocoding
       const geocoded = await Location.reverseGeocodeAsync({
         latitude,
         longitude,
