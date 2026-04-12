@@ -214,6 +214,7 @@ function buildNaverStaticMapUrl(query: {
   height: string;
   scale: string;
   markers?: string;
+  path?: string;
 }): string {
   const params = new URLSearchParams({
     center: query.center,
@@ -225,6 +226,10 @@ function buildNaverStaticMapUrl(query: {
 
   if (query.markers) {
     params.set('markers', query.markers);
+  }
+
+  if (query.path) {
+    params.set('path', query.path);
   }
 
   return `https://maps.apigw.ntruss.com/map-static/v2/raster?${params.toString()}`;
@@ -2893,6 +2898,7 @@ export const naverStaticMapProxy = functions.https.onRequest(async (req, res) =>
     const height = String(readPositiveInteger(readFirstQueryValue(req.query.h), 320, 64, 1280));
     const scale = String(readPositiveInteger(readFirstQueryValue(req.query.scale), 2, 1, 2));
     const markers = readFirstQueryValue(req.query.markers);
+    const path = readFirstQueryValue(req.query.path);
 
     const naverUrl = buildNaverStaticMapUrl({
       center,
@@ -2901,6 +2907,7 @@ export const naverStaticMapProxy = functions.https.onRequest(async (req, res) =>
       height,
       scale,
       markers: markers ?? undefined,
+      path: path ?? undefined,
     });
 
     const imageResponse = await fetchBinary(naverUrl, {

@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState, useRef } from 'react';
 import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
 
 import { getStaticMapProxyUrl, isMapEnabled } from '../../config/map-config';
@@ -34,9 +34,16 @@ function buildMarkerParam(markers: StaticMapMarker[]): string {
     .join('|');
 }
 
+function buildPathString(path: StaticMapMarker[]): string {
+  if (!path || path.length < 2) return '';
+  const coords = path.map((p) => `${p.longitude} ${p.latitude}`).join(',');
+  return `color:0x0F766E|weight:5|opacity:0.85|path:${coords}`;
+}
+
 export default function StaticMapPreview({
   center,
   markers = [],
+  path = [],
   width = 640,
   height = 320,
   zoom = 14,
@@ -45,6 +52,7 @@ export default function StaticMapPreview({
 }: StaticMapPreviewProps) {
   const [loading, setLoading] = useState(true);
   const [loadFailed, setLoadFailed] = useState(false);
+  const timeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   const uri = useMemo(() => {
     if (!isMapEnabled()) {
@@ -68,8 +76,13 @@ export default function StaticMapPreview({
       query.set('markers', buildMarkerParam(markers));
     }
 
+    if (path.length > 1) {
+      const pathParam = path.map((p) => `${p.longitude} ${p.latitude}`).join('|');
+      query.set('path', `color:0x0F766Eff|weight:5|path:${pathParam}`);
+    }
+
     return `${baseUrl}?${query.toString()}`;
-  }, [center.latitude, center.longitude, height, markers, width, zoom]);
+  }, [center.latitude, center.longitude, height, markers, path, width, zoom]);
 
   useEffect(() => {
     if (!uri) {
@@ -80,12 +93,20 @@ export default function StaticMapPreview({
     setLoading(true);
     setLoadFailed(false);
 
-    const timeoutId = setTimeout(() => {
+    if (timeoutRef.current) {
+      clearTimeout(timeoutRef.current);
+    }
+
+    timeoutRef.current = setTimeout(() => {
       setLoading(false);
       setLoadFailed(true);
     }, 12000);
 
-    return () => clearTimeout(timeoutId);
+    return () => {
+      if (timeoutRef.current) {
+        clearTimeout(timeoutRef.current);
+      }
+    };
   }, [uri]);
 
   if (!uri || loadFailed) {
@@ -110,17 +131,25 @@ export default function StaticMapPreview({
       <Image
         key={uri}
         source={{ uri }}
-        style={styles.image}
+        style={[styles.image, height ? { height } : undefined]}
         resizeMode="cover"
         accessibilityLabel={title}
         onLoadStart={() => {
           setLoading(true);
           setLoadFailed(false);
         }}
-        onLoadEnd={() => setLoading(false)}
+        onLoadEnd={() => {
+          setLoading(false);
+          if (timeoutRef.current) {
+            clearTimeout(timeoutRef.current);
+          }
+        }}
         onError={() => {
           setLoading(false);
           setLoadFailed(true);
+          if (timeoutRef.current) {
+            clearTimeout(timeoutRef.current);
+          }
         }}
       />
       <View style={styles.badge}>
