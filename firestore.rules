@@ -97,12 +97,12 @@ service cloud.firestore {
     }
 
     match /config_pricing/{docId} {
-      allow read: if isAuthenticated();
+      allow read: if true;
       allow write: if false;
     }
 
     match /config_route_pricing_overrides/{docId} {
-      allow read: if isAuthenticated();
+      allow read: if true;
       allow write: if false;
     }
 
