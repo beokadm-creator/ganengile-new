@@ -98,11 +98,18 @@ export default function GillerApplyScreen({ navigation }: { navigation: MainStac
       return true;
     }
 
-    if (identityTestMode && identityConfig.allowTestBypass) {
-      return true;
-    }
-
     if (verification?.status !== 'approved') {
+      if (identityTestMode && identityConfig?.allowTestBypass) {
+        Alert.alert(
+          '테스트 모드 우회',
+          '현재 테스트 모드입니다. 본인확인 절차를 건너뛰고 다음 단계로 진행하시겠습니까?',
+          [
+            { text: '취소', style: 'cancel' },
+            { text: '건너뛰기', onPress: () => setStep(3) },
+          ]
+        );
+        return false;
+      }
       Alert.alert('본인확인 필요', '본인확인을 완료해 주세요.');
       return false;
     }
@@ -309,6 +316,16 @@ export default function GillerApplyScreen({ navigation }: { navigation: MainStac
                   <Text style={styles.primaryActionText}>길러 전환용 본인확인 하러 가기</Text>
                 </TouchableOpacity>
                 <Text style={styles.helperText}>완료 후 돌아오면 길러 신청 절차를 계속 진행할 수 있습니다.</Text>
+
+                {identityTestMode && identityConfig?.allowTestBypass ? (
+                  <TouchableOpacity
+                    style={[styles.secondaryAction, { marginTop: 16 }]}
+                    onPress={() => setStep(3)}
+                    activeOpacity={0.9}
+                  >
+                    <Text style={styles.secondaryActionText}>[테스트용] 본인확인 건너뛰기</Text>
+                  </TouchableOpacity>
+                ) : null}
               </>
             )}
           </ScrollView>
