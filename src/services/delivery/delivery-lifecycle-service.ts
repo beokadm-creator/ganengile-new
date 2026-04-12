@@ -151,6 +151,8 @@ type DeliveryDocLike = {
   gillerId?: string;
   gllerId?: string;
   status?: string;
+  lockerId?: string;
+  reservationId?: string;
   fee?: LegacyFeeInput;
   recipientInfo?: {
     verificationCode?: string;

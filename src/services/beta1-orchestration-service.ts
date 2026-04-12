@@ -597,7 +597,18 @@ export async function createBeta1Request(input: Beta1RequestCreateInput): Promis
       selectedPricingQuoteId: selectedQuote.pricingQuoteId,
     });
   } catch (error) {
-    console.error('[orchestration-service] draft pipeline failed, continuing with direct request creation', error);
+    console.error('[orchestration-service] draft pipeline failed:', error);
+    throw new Error(`AI 분석 및 견적 파이프라인 생성에 실패했습니다: ${error instanceof Error ? error.message : String(error)}`);
+  }
+
+  // 기본 마감기한 정책: 예약 모드면 예약시간 기준 + 2시간, 즉시 모드면 현재 + 2시간
+  const deadlineHours = pricingPolicy.baseDeadlineHours ?? 2;
+  let deadlineTimestamp = Timestamp.fromDate(new Date(Date.now() + 1000 * 60 * 60 * deadlineHours));
+  if (input.requestMode === 'reservation' && input.preferredPickupTime) {
+    const pickupDate = new Date(input.preferredPickupTime);
+    if (!Number.isNaN(pickupDate.getTime())) {
+      deadlineTimestamp = Timestamp.fromDate(new Date(pickupDate.getTime() + 1000 * 60 * 60 * deadlineHours));
+    }
   }
 
   const requestPayload = {
@@ -638,8 +649,9 @@ export async function createBeta1Request(input: Beta1RequestCreateInput): Promis
     recipientPhone: input.recipientPhone,
     pickupLocationDetail: input.pickupLocationDetail?.trim() || null,
     storageLocation: input.storageLocation?.trim() || null,
+    lockerId: input.lockerId?.trim() || null,
     specialInstructions: input.specialInstructions?.trim() || null,
-    deadline: Timestamp.fromDate(new Date(Date.now() + 1000 * 60 * 120)),
+    deadline: deadlineTimestamp,
     preferredTime: {
       departureTime: input.preferredPickupTime ?? '지금 바로',
       arrivalTime: input.preferredArrivalTime ?? '협의 가능',
@@ -693,6 +705,7 @@ export async function createBeta1Request(input: Beta1RequestCreateInput): Promis
     deliveryStation: input.deliveryStation,
     pickupLocationDetail: input.pickupLocationDetail?.trim() || null,
     storageLocation: input.storageLocation?.trim() || null,
+    lockerId: input.lockerId?.trim() || null,
     specialInstructions: input.specialInstructions?.trim() || null,
     recipientName: input.recipientName,
     recipientPhone: input.recipientPhone,
@@ -703,7 +716,7 @@ export async function createBeta1Request(input: Beta1RequestCreateInput): Promis
       ...selectedCard.pricing,
       totalFee: selectedCard.pricing.publicPrice,
       breakdown: {
-        gillerFee: Math.round(selectedCard.pricing.publicPrice * 0.7),
+        gillerFee: Math.round(selectedCard.pricing.publicPrice * (1 - (pricingPolicy.platformFeeRate ?? 0.3))),
       },
     },
     createdAt: serverTimestamp(),
@@ -742,7 +755,7 @@ export async function createBeta1Request(input: Beta1RequestCreateInput): Promis
       updatedAt: serverTimestamp(),
     });
     const legRewards = splitRewardAcrossLegs(
-      Math.max(0, Math.round(selectedCard.pricing.publicPrice * 0.7)),
+      Math.max(0, Math.round(selectedCard.pricing.publicPrice * (1 - (pricingPolicy.platformFeeRate ?? 0.3)))),
       legDefinitions.length
     );
 
@@ -778,7 +791,7 @@ export async function createBeta1Request(input: Beta1RequestCreateInput): Promis
         fallbackActorTypes: requiresAddressHandling(definition.legType)
           ? [ActorType.GILLER]
           : [ActorType.EXTERNAL_PARTNER],
-        fallbackPartnerIds: PARTNER_QUOTES.map((quote) => quote.partnerId),
+        fallbackPartnerIds: [], // 하드코딩 제거: 동적 설정 또는 빈 배열
         manualReviewRequired: false,
         riskFlags: requiresAddressHandling(definition.legType) ? ['address_leg'] : [],
       });
@@ -793,18 +806,19 @@ export async function createBeta1Request(input: Beta1RequestCreateInput): Promis
 
     await Promise.all(
       candidateGillerIds.map((gillerId) =>
-        sendMissionBundleAvailableNotification(
-          gillerId,
-          requestRef.id,
-          input.pickupStation.stationName,
-          input.deliveryStation.stationName,
-          selectedCard.pricing.publicPrice,
-          bundles.length
-        )
+      sendMissionBundleAvailableNotification(
+        gillerId,
+        requestRef.id,
+        input.pickupStation.stationName,
+        input.deliveryStation.stationName,
+        selectedCard.pricing.publicPrice,
+        bundles.length
       )
-    );
+    )
+  );
+
   } catch (error) {
-    console.error('[orchestration-service] request created but follow-up orchestration failed', {
+    console.error('[orchestration-service] orchestration failed, but request was created', {
       requestId: requestRef.id,
       deliveryId: deliveryRef.id,
       error,
@@ -820,6 +834,7 @@ export async function createBeta1Request(input: Beta1RequestCreateInput): Promis
 }
 
 export function selectActorForMission(params: {
+  requestId: string;
   missionType: Mission['missionType'];
   preferLocker: boolean;
   requiresAddressHandling: boolean;
@@ -841,13 +856,13 @@ export function selectActorForMission(params: {
   }
 
   return {
-    requestId: '',
+    requestId: params.requestId,
     interventionLevel,
     selectedActorType,
     selectedPartnerId,
     selectionReason,
     fallbackActorTypes,
-    fallbackPartnerIds: PARTNER_QUOTES.map((quote) => quote.partnerId),
+    fallbackPartnerIds: [],
     manualReviewRequired: params.urgency === 'urgent' && params.requiresAddressHandling,
     riskFlags: params.urgency === 'urgent' ? ['tight_sla'] : [],
   };
@@ -1062,215 +1077,172 @@ async function queueExternalPartnerDispatch(params: {
 
 export async function acceptMissionBundleForGiller(bundleId: string, gillerUserId: string): Promise<void> {
   const bundleRef = doc(db, 'mission_bundles', bundleId);
-  const bundleSnapshot = await getDoc(bundleRef);
-  if (!bundleSnapshot.exists()) {
-    throw new Error('Mission bundle not found');
-  }
+  
+  let result;
+  try {
+    result = await runTransaction(db, async (transaction) => {
+      const bundleSnapshot = await transaction.get(bundleRef);
+      if (!bundleSnapshot.exists()) {
+        throw new Error('Mission bundle not found');
+      }
 
-  const bundle = {
-    missionBundleId: bundleSnapshot.id,
-    ...(bundleSnapshot.data() as Record<string, unknown>),
-  } as Beta1MissionBundleDoc;
+      const bundle = {
+        missionBundleId: bundleSnapshot.id,
+        ...(bundleSnapshot.data() as Record<string, unknown>),
+      } as Beta1MissionBundleDoc;
 
-  if (bundle.selectedGillerUserId && bundle.selectedGillerUserId !== gillerUserId) {
-    throw new Error('Mission bundle already accepted by another giller');
-  }
+      if (bundle.selectedGillerUserId && bundle.selectedGillerUserId !== gillerUserId) {
+        throw new Error('Mission bundle already accepted by another giller');
+      }
 
-  const missionDocs = await Promise.all(
-    (bundle.missionIds ?? []).map(async (missionId) => {
-      const snapshot = await getDoc(doc(db, 'missions', missionId));
-      return snapshot.exists()
-        ? ({ id: snapshot.id, ...(snapshot.data() as Record<string, unknown>) } as Beta1MissionDoc)
-        : null;
-    })
-  );
-  const selectedMissions = missionDocs.filter(Boolean) as Beta1MissionDoc[];
-  const requestSnapshot = bundle.requestId ? await getDoc(doc(db, 'requests', bundle.requestId)) : null;
-  const requestData = (requestSnapshot?.data() as Record<string, unknown> | undefined) ?? {};
-  const siblingBundleSnapshots = await getDocs(query(collection(db, 'mission_bundles'), where('deliveryId', '==', bundle.deliveryId)));
-  const siblingBundles = siblingBundleSnapshots.docs.map((snapshot) => ({
-    missionBundleId: snapshot.id,
-    ...(snapshot.data() as Record<string, unknown>),
-  })) as Beta1MissionBundleDoc[];
-  const baseSelectedRewardTotal = selectedMissions.reduce((sum, mission) => sum + Number(mission.currentReward ?? 0), 0);
-  const exposurePricing = getMissionExposurePricing(baseSelectedRewardTotal, bundle.createdAt);
-  const bonusAmount = exposurePricing.bonusAmount;
-  const perMissionBonus =
-    selectedMissions.length > 0 && bonusAmount > 0
-      ? Math.floor(bonusAmount / selectedMissions.length / 100) * 100
-      : 0;
-  const bonusRemainder = selectedMissions.length > 0 ? bonusAmount - perMissionBonus * selectedMissions.length : 0;
+      const missionDocs = await Promise.all(
+        (bundle.missionIds ?? []).map(async (missionId) => {
+          const snapshot = await transaction.get(doc(db, 'missions', missionId));
+          return snapshot.exists()
+            ? ({ id: snapshot.id, ...(snapshot.data() as Record<string, unknown>) } as Beta1MissionDoc)
+            : null;
+        })
+      );
+      const selectedMissions = missionDocs.filter(Boolean) as Beta1MissionDoc[];
+      
+      const requestRef = bundle.requestId ? doc(db, 'requests', bundle.requestId) : null;
+      const requestSnapshot = requestRef ? await transaction.get(requestRef) : null;
+      const requestData = (requestSnapshot?.data() as Record<string, unknown> | undefined) ?? {};
+      
+      const siblingBundleSnapshots = await getDocs(query(collection(db, 'mission_bundles'), where('deliveryId', '==', bundle.deliveryId)));
+      const siblingBundles = siblingBundleSnapshots.docs.map((snapshot) => ({
+        missionBundleId: snapshot.id,
+        ...(snapshot.data() as Record<string, unknown>),
+      })) as Beta1MissionBundleDoc[];
+      
+      const baseSelectedRewardTotal = selectedMissions.reduce((sum, mission) => sum + Number(mission.currentReward ?? 0), 0);
+      const exposurePricing = getMissionExposurePricing(baseSelectedRewardTotal, bundle.createdAt);
+      const bonusAmount = exposurePricing.bonusAmount;
+      const perMissionBonus =
+        selectedMissions.length > 0 && bonusAmount > 0
+          ? Math.floor(bonusAmount / selectedMissions.length / 100) * 100
+          : 0;
+      const bonusRemainder = selectedMissions.length > 0 ? bonusAmount - perMissionBonus * selectedMissions.length : 0;
 
-  await Promise.all(
-    selectedMissions.map((mission, index) => {
-      const rewardBonus = perMissionBonus + (index === 0 ? bonusRemainder : 0);
-      const nextReward = Number(mission.currentReward ?? 0) + rewardBonus;
+      selectedMissions.forEach((mission, index) => {
+        const rewardBonus = perMissionBonus + (index === 0 ? bonusRemainder : 0);
+        const nextReward = Number(mission.currentReward ?? 0) + rewardBonus;
 
-      return updateDoc(doc(db, 'missions', mission.id), {
-        assignedGillerUserId: gillerUserId,
-        status: MissionState.ACCEPTED,
-        currentReward: nextReward,
-        recommendedReward: nextReward,
-        minimumReward: Number(mission.currentReward ?? 0),
+        transaction.update(doc(db, 'missions', mission.id), {
+          assignedGillerUserId: gillerUserId,
+          status: MissionState.ACCEPTED,
+          currentReward: nextReward,
+          recommendedReward: nextReward,
+          minimumReward: Number(mission.currentReward ?? 0),
+          updatedAt: serverTimestamp(),
+        });
+      });
+
+      const selectedLegIds = selectedMissions.map((mission) => String(mission.deliveryLegId ?? ''));
+      selectedLegIds.forEach((deliveryLegId) => {
+        if (deliveryLegId) {
+          transaction.update(doc(db, 'delivery_legs', deliveryLegId), {
+            actorType: 'giller',
+            status: DeliveryLegStatus.READY,
+            updatedAt: serverTimestamp(),
+          });
+        }
+      });
+
+      transaction.update(bundleRef, {
+        selectedGillerUserId: gillerUserId,
+        status: BundleStatus.ACTIVE,
+        rewardTotal: exposurePricing.adjustedReward,
         updatedAt: serverTimestamp(),
       });
-    })
-  );
 
-  const selectedLegIds = selectedMissions.map((mission) => String(mission.deliveryLegId ?? ''));
-  await Promise.all(
-    selectedLegIds.map((deliveryLegId) =>
-      updateDoc(doc(db, 'delivery_legs', deliveryLegId), {
-        actorType: 'giller',
-        status: DeliveryLegStatus.READY,
+      // To avoid nested async calls inside transaction that might break locks,
+      // we prepare the data and return it to be processed outside or simply read needed states.
+      // Fetching all missions to calculate coversEntireDelivery
+      const allMissionSnapshots = await getDocs(query(collection(db, 'missions'), where('deliveryId', '==', bundle.deliveryId)));
+      const allMissions = allMissionSnapshots.docs.map((snapshot) => ({
+        id: snapshot.id,
+        ...(snapshot.data() as Record<string, unknown>),
+      })) as Beta1MissionDoc[];
+
+      const coversEntireDelivery = selectedMissions.length === allMissions.length;
+      const acceptedMissionCount = allMissions.filter(
+        (mission) => Boolean(mission.assignedGillerUserId) || selectedLegIds.includes(String(mission.deliveryLegId ?? ''))
+      ).length;
+      const totalMissionCount = allMissions.length;
+      const partiallyMatched = acceptedMissionCount > 0 && acceptedMissionCount < totalMissionCount;
+      
+      const deliveryUpdate: Record<string, unknown> = {
+        beta1DeliveryStatus: coversEntireDelivery ? 'assigned' : 'created',
         updatedAt: serverTimestamp(),
-      })
-    )
-  );
+      };
+      if (coversEntireDelivery) {
+        deliveryUpdate.gillerId = gillerUserId;
+      }
+      transaction.update(doc(db, 'deliveries', bundle.deliveryId), deliveryUpdate);
 
-  await setDoc(
-    bundleRef,
-    {
-      ...bundle,
-      selectedGillerUserId: gillerUserId,
-      status: BundleStatus.ACTIVE,
-      rewardTotal: exposurePricing.adjustedReward,
-      updatedAt: serverTimestamp(),
-    },
-    { merge: true }
-  );
+      if (requestRef) {
+        transaction.update(requestRef, {
+          matchedGillerId: coversEntireDelivery ? gillerUserId : null,
+          status: coversEntireDelivery ? 'accepted' : 'pending',
+          beta1RequestStatus: coversEntireDelivery ? 'accepted' : 'match_pending',
+          missionProgress: {
+            acceptedMissionCount,
+            totalMissionCount,
+            partiallyMatched,
+            lastBundleId: bundle.missionBundleId,
+            lastMatchedAt: serverTimestamp(),
+            rewardBoostAmount: bonusAmount,
+          },
+          updatedAt: serverTimestamp(),
+        });
+      }
 
-  const [allMissionSnapshots, allLegSnapshots] = await Promise.all([
-    getDocs(query(collection(db, 'missions'), where('deliveryId', '==', bundle.deliveryId))),
-    getDocs(query(collection(db, 'delivery_legs'), where('deliveryId', '==', bundle.deliveryId))),
-  ]);
-  const allMissions = allMissionSnapshots.docs.map((snapshot) => ({
-    id: snapshot.id,
-    ...(snapshot.data() as Record<string, unknown>),
-  })) as Beta1MissionDoc[];
-  const allLegsById = new Map(
-    allLegSnapshots.docs.map((snapshot) => {
-      const leg = { id: snapshot.id, ...(snapshot.data() as Record<string, unknown>) } as Beta1LegDoc;
-      return [snapshot.id, leg] as const;
-    })
-  );
+      const blockedMissionIds = new Set([...selectedMissions.map((mission) => mission.id)]);
+      siblingBundles
+        .filter((candidate) => candidate.missionBundleId !== bundle.missionBundleId)
+        .filter((candidate) => (candidate.missionIds ?? []).some((missionId) => blockedMissionIds.has(missionId)))
+        .forEach((candidate) => {
+          transaction.update(doc(db, 'mission_bundles', candidate.missionBundleId), {
+            status: BundleStatus.CANCELLED,
+            updatedAt: serverTimestamp(),
+          });
+        });
 
-  const fallbackDeliveryIds: string[] = [];
-  const fallbackMissionIds: string[] = [];
-  for (const mission of allMissions) {
-    if (selectedLegIds.includes(String(mission.deliveryLegId ?? '')) || !!mission.assignedGillerUserId) {
-      continue;
-    }
-
-    const leg = allLegsById.get(String(mission.deliveryLegId ?? ''));
-    if (!leg || !requiresAddressHandling(leg.legType)) {
-      continue;
-    }
-
-    const fallbackDeliveryId = await dispatchMissionToB2BFallback({
-      requestId: bundle.requestId,
-      mission,
-      leg,
-      requestDoc: requestData,
-    });
-
-    if (!fallbackDeliveryId) {
-      continue;
-    }
-
-    fallbackDeliveryIds.push(fallbackDeliveryId);
-    fallbackMissionIds.push(mission.id);
-    const externalPartnerDispatchId = await queueExternalPartnerDispatch({
-      partnerId: PARTNER_QUOTES[0]?.partnerId,
-      requestId: bundle.requestId,
-      deliveryId: bundle.deliveryId,
-      missionId: mission.id,
-      deliveryLegId: leg.deliveryLegId,
-      leg,
-      fallbackDeliveryId,
-    });
-    await Promise.all([
-      updateDoc(doc(db, 'missions', mission.id), {
-        status: MissionState.OFFERED,
-        fallbackPlanId: fallbackDeliveryId,
-        updatedAt: serverTimestamp(),
-      }),
-      updateDoc(doc(db, 'delivery_legs', leg.deliveryLegId), {
-        actorType: 'external_partner',
-        status: DeliveryLegStatus.READY,
-        updatedAt: serverTimestamp(),
-      }),
-      persistActorSelectionDecision({
-        requestId: bundle.requestId,
-        deliveryId: bundle.deliveryId,
-        deliveryLegId: leg.deliveryLegId,
-        missionId: mission.id,
-        interventionLevel: 'guarded_execute',
-        selectedActorType: ActorType.EXTERNAL_PARTNER,
-        selectedPartnerId: PARTNER_QUOTES[0]?.partnerId,
-        selectionReason: '길러가 선택하지 않은 주소 구간을 external partner fallback으로 전환했습니다.',
-        fallbackActorTypes: [ActorType.GILLER],
-        fallbackPartnerIds: PARTNER_QUOTES.map((quote) => quote.partnerId),
-        manualReviewRequired: false,
-        riskFlags: [
-          'address_leg_fallback',
-          ...(externalPartnerDispatchId ? [`partner_dispatch:${externalPartnerDispatchId}`] : []),
-        ],
-      }),
-    ]);
-  }
-
-  const coversEntireDelivery = selectedMissions.length === allMissions.length;
-  const acceptedMissionCount = allMissions.filter(
-    (mission) => Boolean(mission.assignedGillerUserId) || selectedLegIds.includes(String(mission.deliveryLegId ?? ''))
-  ).length;
-  const totalMissionCount = allMissions.length;
-  const partiallyMatched = acceptedMissionCount > 0 && acceptedMissionCount < totalMissionCount;
-  const deliveryUpdate: Record<string, unknown> = {
-    beta1DeliveryStatus: coversEntireDelivery ? 'assigned' : 'created',
-    updatedAt: serverTimestamp(),
-  };
-  if (coversEntireDelivery) {
-    deliveryUpdate.gillerId = gillerUserId;
-  }
-  await updateDoc(doc(db, 'deliveries', bundle.deliveryId), deliveryUpdate);
-
-  if (bundle.requestId) {
-    await updateDoc(doc(db, 'requests', bundle.requestId), {
-      matchedGillerId: coversEntireDelivery ? gillerUserId : null,
-      status: coversEntireDelivery ? 'accepted' : 'pending',
-      beta1RequestStatus: coversEntireDelivery ? 'accepted' : 'match_pending',
-      missionProgress: {
+      return {
+        bundle,
+        requestData,
+        partiallyMatched,
+        siblingBundles,
+        blockedMissionIds,
         acceptedMissionCount,
         totalMissionCount,
-        partiallyMatched,
-        lastBundleId: bundle.missionBundleId,
-        lastMatchedAt: serverTimestamp(),
-        rewardBoostAmount: bonusAmount,
-      },
-      updatedAt: serverTimestamp(),
+        coversEntireDelivery,
+      };
     });
+  } catch (error) {
+    console.error('Transaction failed during acceptMissionBundleForGiller', error);
+    throw error;
   }
 
-  const blockedMissionIds = new Set([...selectedMissions.map((mission) => mission.id), ...fallbackMissionIds]);
-  await Promise.all(
-    siblingBundles
-      .filter((candidate) => candidate.missionBundleId !== bundle.missionBundleId)
-      .filter((candidate) => (candidate.missionIds ?? []).some((missionId) => blockedMissionIds.has(missionId)))
-      .map((candidate) =>
-        updateDoc(doc(db, 'mission_bundles', candidate.missionBundleId), {
-          status: BundleStatus.CANCELLED,
-          updatedAt: serverTimestamp(),
-        })
-      )
-  );
+  const {
+    bundle,
+    requestData,
+    partiallyMatched,
+    siblingBundles,
+    blockedMissionIds,
+    acceptedMissionCount,
+    totalMissionCount,
+    coversEntireDelivery,
+  } = result;
 
-  const remainingBundles = siblingBundles
-    .filter((candidate) => candidate.missionBundleId !== bundle.missionBundleId)
-    .filter((candidate) => candidate.status === BundleStatus.ACTIVE)
-    .filter((candidate) => (candidate.missionIds ?? []).every((missionId) => !blockedMissionIds.has(missionId)));
-
+  // 알림 등 트랜잭션 외부 작업 수행
   if (partiallyMatched && bundle.requestId) {
+    const remainingBundles = siblingBundles
+      .filter((candidate) => candidate.missionBundleId !== bundle.missionBundleId)
+      .filter((candidate) => candidate.status === BundleStatus.ACTIVE)
+      .filter((candidate) => (candidate.missionIds ?? []).every((missionId) => !blockedMissionIds.has(missionId)));
+
     const pickupStationRecord = (requestData.pickupStation as { stationName?: string } | undefined) ?? {};
     const deliveryStationRecord = (requestData.deliveryStation as { stationName?: string } | undefined) ?? {};
     const feeRecord = (requestData.fee as { totalFee?: number } | undefined) ?? {};
@@ -1294,17 +1266,6 @@ export async function acceptMissionBundleForGiller(bundleId: string, gillerUserI
     );
   }
 
-  if (fallbackDeliveryIds.length > 0) {
-    await setDoc(
-      bundleRef,
-      {
-        fallbackDeliveryIds,
-        updatedAt: serverTimestamp(),
-      },
-      { merge: true }
-    );
-  }
-
   if (bundle.requestId && requestData.requesterId) {
     await sendRequestProgressNotification(
       String(requestData.requesterId),
@@ -1318,125 +1279,133 @@ export async function acceptMissionBundleForGiller(bundleId: string, gillerUserI
 
 export async function releaseMissionBundleForGiller(bundleId: string, gillerUserId: string): Promise<void> {
   const bundleRef = doc(db, 'mission_bundles', bundleId);
-  const bundleSnapshot = await getDoc(bundleRef);
-  if (!bundleSnapshot.exists()) {
-    throw new Error('Mission bundle not found');
-  }
+  
+  let result;
+  try {
+    result = await runTransaction(db, async (transaction) => {
+      const bundleSnapshot = await transaction.get(bundleRef);
+      if (!bundleSnapshot.exists()) {
+        throw new Error('Mission bundle not found');
+      }
 
-  const bundle = {
-    missionBundleId: bundleSnapshot.id,
-    ...(bundleSnapshot.data() as Record<string, unknown>),
-  } as Beta1MissionBundleDoc;
+      const bundle = {
+        missionBundleId: bundleSnapshot.id,
+        ...(bundleSnapshot.data() as Record<string, unknown>),
+      } as Beta1MissionBundleDoc;
 
-  if (bundle.selectedGillerUserId !== gillerUserId) {
-    throw new Error('내가 맡은 미션만 반납할 수 있습니다.');
-  }
+      if (bundle.selectedGillerUserId !== gillerUserId) {
+        throw new Error('내가 맡은 미션만 반납할 수 있습니다.');
+      }
 
-  const missionDocs = await Promise.all(
-    (bundle.missionIds ?? []).map(async (missionId) => {
-      const snapshot = await getDoc(doc(db, 'missions', missionId));
-      return snapshot.exists()
-        ? ({ id: snapshot.id, ...(snapshot.data() as Record<string, unknown>) } as Beta1MissionDoc)
-        : null;
-    })
-  );
-  const selectedMissions = missionDocs.filter(Boolean) as Beta1MissionDoc[];
-
-  if (
-    selectedMissions.some((mission) =>
-      ['in_progress', 'arrival_pending', 'handover_pending', 'completed'].includes(String(mission.status ?? ''))
-    )
-  ) {
-    throw new Error('이미 진행된 구간은 반납할 수 없습니다.');
-  }
-
-  const legSnapshots = await Promise.all(
-    selectedMissions.map((mission) => getDoc(doc(db, 'delivery_legs', String(mission.deliveryLegId ?? ''))))
-  );
-  const selectedLegs = legSnapshots
-    .filter((snapshot) => snapshot.exists())
-    .map((snapshot) => ({ id: snapshot.id, ...(snapshot.data() as Record<string, unknown>) }) as Beta1LegDoc);
-
-  await Promise.all(
-    selectedMissions.map((mission) =>
-      updateDoc(doc(db, 'missions', mission.id), {
-        assignedGillerUserId: deleteField(),
-        status: MissionState.QUEUED,
-        updatedAt: serverTimestamp(),
-      })
-    )
-  );
-
-  await Promise.all(
-    selectedLegs.map((leg) =>
-      updateDoc(doc(db, 'delivery_legs', leg.deliveryLegId), {
-        actorType: requiresAddressHandling(leg.legType) ? 'external_partner' : 'giller',
-        status: DeliveryLegStatus.READY,
-        updatedAt: serverTimestamp(),
-      })
-    )
-  );
-
-  await setDoc(
-    bundleRef,
-    {
-      selectedGillerUserId: deleteField(),
-      updatedAt: serverTimestamp(),
-    },
-    { merge: true }
-  );
-
-  const siblingBundleSnapshots = await getDocs(query(collection(db, 'mission_bundles'), where('deliveryId', '==', bundle.deliveryId)));
-  const siblingBundles = siblingBundleSnapshots.docs.map((snapshot) => ({
-    missionBundleId: snapshot.id,
-    ...(snapshot.data() as Record<string, unknown>),
-  })) as Beta1MissionBundleDoc[];
-
-  await Promise.all(
-    siblingBundles
-      .filter((candidate) => (candidate.missionIds ?? []).some((missionId) => (bundle.missionIds ?? []).includes(missionId)))
-      .map((candidate) =>
-        updateDoc(doc(db, 'mission_bundles', candidate.missionBundleId), {
-          status: BundleStatus.ACTIVE,
-          updatedAt: serverTimestamp(),
+      const missionDocs = await Promise.all(
+        (bundle.missionIds ?? []).map(async (missionId) => {
+          const snapshot = await transaction.get(doc(db, 'missions', missionId));
+          return snapshot.exists()
+            ? ({ id: snapshot.id, ...(snapshot.data() as Record<string, unknown>) } as Beta1MissionDoc)
+            : null;
         })
-      )
-  );
+      );
+      const selectedMissions = missionDocs.filter(Boolean) as Beta1MissionDoc[];
 
-  const allMissionSnapshots = await getDocs(query(collection(db, 'missions'), where('deliveryId', '==', bundle.deliveryId)));
-  const allMissions = allMissionSnapshots.docs.map((snapshot) => ({
-    id: snapshot.id,
-    ...(snapshot.data() as Record<string, unknown>),
-  })) as Beta1MissionDoc[];
-  const acceptedMissionCount = allMissions.filter((mission) => Boolean(mission.assignedGillerUserId)).length;
-  const totalMissionCount = allMissions.length;
-  const coversEntireDelivery = acceptedMissionCount === totalMissionCount && totalMissionCount > 0;
-  const partiallyMatched = acceptedMissionCount > 0 && acceptedMissionCount < totalMissionCount;
-  const requestSnapshot = bundle.requestId ? await getDoc(doc(db, 'requests', bundle.requestId)) : null;
-  const requestData = (requestSnapshot?.data() as Record<string, unknown> | undefined) ?? {};
+      if (
+        selectedMissions.some((mission) =>
+          ['in_progress', 'arrival_pending', 'handover_pending', 'completed'].includes(String(mission.status ?? ''))
+        )
+      ) {
+        throw new Error('이미 진행된 구간은 반납할 수 없습니다.');
+      }
 
-  await updateDoc(doc(db, 'deliveries', bundle.deliveryId), {
-    gillerId: coversEntireDelivery ? gillerUserId : deleteField(),
-    beta1DeliveryStatus: coversEntireDelivery ? 'assigned' : 'created',
-    updatedAt: serverTimestamp(),
-  });
+      const legSnapshots = await Promise.all(
+        selectedMissions.map((mission) => transaction.get(doc(db, 'delivery_legs', String(mission.deliveryLegId ?? ''))))
+      );
+      const selectedLegs = legSnapshots
+        .filter((snapshot) => snapshot.exists())
+        .map((snapshot) => ({ id: snapshot.id, ...(snapshot.data() as Record<string, unknown>) }) as Beta1LegDoc);
 
-  if (bundle.requestId) {
-    await updateDoc(doc(db, 'requests', bundle.requestId), {
-      matchedGillerId: coversEntireDelivery ? gillerUserId : deleteField(),
-      status: coversEntireDelivery ? 'accepted' : 'pending',
-      beta1RequestStatus: coversEntireDelivery ? 'accepted' : 'match_pending',
-      missionProgress: {
-        acceptedMissionCount,
-        totalMissionCount,
-        partiallyMatched,
-        lastBundleId: bundle.missionBundleId,
-        lastMatchedAt: serverTimestamp(),
-        rewardBoostAmount: 0,
-      },
-      updatedAt: serverTimestamp(),
+      selectedMissions.forEach((mission) => {
+        transaction.update(doc(db, 'missions', mission.id), {
+          assignedGillerUserId: deleteField(),
+          status: MissionState.QUEUED,
+          updatedAt: serverTimestamp(),
+        });
+      });
+
+      selectedLegs.forEach((leg) => {
+        transaction.update(doc(db, 'delivery_legs', leg.deliveryLegId), {
+          actorType: requiresAddressHandling(leg.legType) ? 'external_partner' : 'giller',
+          status: DeliveryLegStatus.READY,
+          updatedAt: serverTimestamp(),
+        });
+      });
+
+      transaction.update(bundleRef, {
+        selectedGillerUserId: deleteField(),
+        status: BundleStatus.ACTIVE,
+        updatedAt: serverTimestamp(),
+      });
+
+      const siblingBundleSnapshots = await getDocs(query(collection(db, 'mission_bundles'), where('deliveryId', '==', bundle.deliveryId)));
+      const siblingBundles = siblingBundleSnapshots.docs.map((snapshot) => ({
+        missionBundleId: snapshot.id,
+        ...(snapshot.data() as Record<string, unknown>),
+      })) as Beta1MissionBundleDoc[];
+
+      siblingBundles
+        .filter((candidate) => (candidate.missionIds ?? []).some((missionId) => (bundle.missionIds ?? []).includes(missionId)))
+        .forEach((candidate) => {
+          transaction.update(doc(db, 'mission_bundles', candidate.missionBundleId), {
+            status: BundleStatus.ACTIVE,
+            updatedAt: serverTimestamp(),
+          });
+        });
+
+      const requestRef = bundle.requestId ? doc(db, 'requests', bundle.requestId) : null;
+      if (requestRef) {
+        const allMissionSnapshots = await getDocs(query(collection(db, 'missions'), where('deliveryId', '==', bundle.deliveryId)));
+        const allMissions = allMissionSnapshots.docs.map((snapshot) => ({
+          id: snapshot.id,
+          ...(snapshot.data() as Record<string, unknown>),
+        })) as Beta1MissionDoc[];
+
+        // selectedMissions 은 이제 막 취소되었으므로, 남은 수락 건수 계산
+        const acceptedMissionCount = allMissions.filter(
+          (mission) => Boolean(mission.assignedGillerUserId) && !selectedMissions.some((sm) => sm.id === mission.id)
+        ).length;
+        const totalMissionCount = allMissions.length;
+
+        transaction.update(requestRef, {
+          matchedGillerId: null,
+          status: 'pending',
+          beta1RequestStatus: 'match_pending',
+          missionProgress: {
+            acceptedMissionCount,
+            totalMissionCount,
+            partiallyMatched: acceptedMissionCount > 0,
+            lastBundleId: null,
+            lastMatchedAt: null,
+            rewardBoostAmount: 0,
+          },
+          updatedAt: serverTimestamp(),
+        });
+      }
+      
+      const deliveryRef = bundle.deliveryId ? doc(db, 'deliveries', bundle.deliveryId) : null;
+      if (deliveryRef) {
+        transaction.update(deliveryRef, {
+          gillerId: null,
+          beta1DeliveryStatus: 'created',
+          updatedAt: serverTimestamp(),
+        });
+      }
+
+      return { bundle, requestData: requestData || {}, siblingBundles };
     });
+  } catch (error) {
+    console.error('Transaction failed during releaseMissionBundleForGiller', error);
+    throw error;
   }
+
+  const { bundle, requestData, siblingBundles } = result;
 
   if (bundle.requestId) {
     const pickupStationRecord = (requestData.pickupStation as { stationName?: string } | undefined) ?? {};

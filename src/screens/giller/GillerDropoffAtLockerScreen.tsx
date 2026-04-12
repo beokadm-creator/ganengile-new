@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -10,6 +10,7 @@ import {
 } from 'react-native';
 import { RouteProp, useNavigation, useRoute } from '@react-navigation/native';
 import { requireUserId } from '../../services/firebase';
+import { getDeliveryById } from '../../services/delivery-service';
 import {
   addReservationPhotos,
   createLockerReservation,
@@ -25,18 +26,45 @@ import { BorderRadius, Colors, Shadows, Spacing, Typography } from '../../theme'
 import LockerLocator from '../../components/delivery/LockerLocator';
 
 type DropoffRoute = RouteProp<MainStackParamList, 'GillerDropoffAtLocker'>;
-type Step = 'select' | 'reserve' | 'photo' | 'complete';
+type Step = 'loading' | 'select' | 'reserve' | 'photo' | 'complete';
 
 export default function GillerDropoffAtLockerScreen() {
   const navigation = useNavigation<MainStackNavigationProp>();
   const route = useRoute<DropoffRoute>();
   const { deliveryId } = route.params;
 
-  const [step, setStep] = useState<Step>('select');
+  const [step, setStep] = useState<Step>('loading');
   const [working, setWorking] = useState(false);
   const [selectedLocker, setSelectedLocker] = useState<LockerSummary | null>(null);
   const [reservationId, setReservationId] = useState<string | null>(null);
   const [dropoffPhotoUrl, setDropoffPhotoUrl] = useState<string | null>(null);
+
+  useEffect(() => {
+    async function init() {
+      try {
+        const delivery = await getDeliveryById(deliveryId);
+        if (delivery && delivery.lockerId) {
+          const lockerDetail = await getLocker(delivery.lockerId);
+          if (lockerDetail) {
+            setSelectedLocker({
+              lockerId: lockerDetail.lockerId,
+              stationId: lockerDetail.stationId,
+              stationName: lockerDetail.stationName,
+              status: lockerDetail.status,
+              size: lockerDetail.size,
+              pricePerHour: lockerDetail.pricePerHour,
+            });
+            setStep('reserve');
+            return;
+          }
+        }
+      } catch (error) {
+        console.error('Failed to init GillerDropoffAtLockerScreen:', error);
+      }
+      setStep('select');
+    }
+    init();
+  }, [deliveryId]);
 
   const handleLockerSelect = async (locker: LockerSummary): Promise<void> => {
     try {
@@ -140,6 +168,15 @@ export default function GillerDropoffAtLockerScreen() {
       setWorking(false);
     }
   };
+
+  if (step === 'loading') {
+    return (
+      <View style={[styles.container, { justifyContent: 'center', alignItems: 'center' }]}>
+        <ActivityIndicator size="large" color={Colors.primary} />
+        <Text style={{ marginTop: 16, color: Colors.textSecondary }}>사물함 정보를 불러오는 중...</Text>
+      </View>
+    );
+  }
 
   if (step === 'select') {
     return (

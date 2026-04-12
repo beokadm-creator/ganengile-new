@@ -135,6 +135,40 @@ export default function DelayedRequestsPage() {
     }
   }
 
+  async function handleCancelRequest() {
+    if (!selected) return;
+
+    if (!confirm(`요청 ${selected.id}을(를) 취소하시겠습니까?\n매칭 대기 중인 길러가 있다면 함께 반려됩니다.`)) {
+      return;
+    }
+
+    setSaving(selected.id);
+    try {
+      const res = await fetch('/api/admin/delayed-requests', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'cancel',
+          requestId: selected.id,
+          reason: '운영자 직권 취소 (지연)',
+        }),
+      });
+
+      if (!res.ok) {
+        throw new Error('Failed to cancel request');
+      }
+
+      alert('성공적으로 취소되었습니다.');
+      setSelected(null);
+      await load();
+    } catch (error) {
+      console.error('취소 처리 중 오류가 발생했습니다:', error);
+      alert('취소 처리에 실패했습니다.');
+    } finally {
+      setSaving(null);
+    }
+  }
+
   return (
     <div className="min-h-screen bg-stone-50 p-6">
       <div className="mx-auto max-w-7xl space-y-6">
@@ -234,6 +268,16 @@ export default function DelayedRequestsPage() {
                           >
                             배송 운영
                           </Link>
+                          <button
+                            onClick={() => {
+                              setSelected(item);
+                              void handleCancelRequest();
+                            }}
+                            disabled={saving === item.id}
+                            className="rounded-lg border border-red-200 bg-red-50 px-3 py-1.5 text-xs font-medium text-red-700 hover:bg-red-100 disabled:opacity-60"
+                          >
+                            직권 취소
+                          </button>
                         </div>
                       </td>
                     </tr>
@@ -299,6 +343,13 @@ export default function DelayedRequestsPage() {
                     className="rounded-lg bg-slate-900 px-4 py-2 text-sm font-semibold text-white hover:bg-slate-800 disabled:opacity-60"
                   >
                     저장
+                  </button>
+                  <button
+                    onClick={() => void handleCancelRequest()}
+                    disabled={saving === selected.id}
+                    className="rounded-lg bg-red-600 px-4 py-2 text-sm font-semibold text-white hover:bg-red-700 disabled:opacity-60"
+                  >
+                    요청 취소
                   </button>
                   <Link
                     href="/beta1/ai-review"

@@ -698,7 +698,8 @@ export async function createMatchDocument(
   requestId: string,
   gillerId: string,
   matchScore: MatchingResult,
-  requesterId: string = ''
+  requesterId: string = '',
+  requestData?: any
 ): Promise<string> {
   try {
     const matchData = {
@@ -706,6 +707,11 @@ export async function createMatchDocument(
       requesterId,
       gllerId: requesterId,
       gillerId, // 매칭 대상 길러 ID
+      pickupStation: requestData?.pickupStation || null,
+      deliveryStation: requestData?.deliveryStation || null,
+      lockerId: requestData?.lockerId || null,
+      reservationId: requestData?.reservationId || null,
+      fee: requestData?.fee || null,
       matchScore: matchScore.totalScore,
       matchingDetails: {
         routeScore: matchScore.scores.pickupMatchScore + matchScore.scores.deliveryMatchScore,
@@ -753,7 +759,7 @@ export async function processMatchingForRequest(
 
     // 3. Create match documents for each
     const matchPromises = matches.map((match) =>
-      createMatchDocument(requestId, match.gillerId, match, requesterId)
+      createMatchDocument(requestId, match.gillerId, match, requesterId, request)
     );
 
     await Promise.all(matchPromises);

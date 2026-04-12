@@ -84,6 +84,22 @@ export async function GET(req: NextRequest) {
         typeof raw.deliveryStation === 'object' && raw.deliveryStation !== null
           ? (raw.deliveryStation as UnknownRecord)
           : {};
+      const pickupAddress =
+        typeof raw.pickupAddress === 'object' && raw.pickupAddress !== null
+          ? (raw.pickupAddress as UnknownRecord)
+          : {};
+      const deliveryAddress =
+        typeof raw.deliveryAddress === 'object' && raw.deliveryAddress !== null
+          ? (raw.deliveryAddress as UnknownRecord)
+          : {};
+
+      const pStation = asString(pickupStation.stationName);
+      const pAddr = asString(pickupAddress.roadAddress) || asString(pickupAddress.address);
+      const pickupStationName = pStation || pAddr || '출발지 미상';
+
+      const dStation = asString(deliveryStation.stationName);
+      const dAddr = asString(deliveryAddress.roadAddress) || asString(deliveryAddress.address);
+      const deliveryStationName = dStation || dAddr || '도착지 미상';
       const fee =
         typeof raw.fee === 'object' && raw.fee !== null
           ? (raw.fee as UnknownRecord)
@@ -98,8 +114,8 @@ export async function GET(req: NextRequest) {
         status: asString(raw.status, 'pending'),
         beta1RequestStatus: asString(raw.beta1RequestStatus),
         requestMode: asString(raw.requestMode, 'immediate'),
-        pickupStationName: asString(pickupStation.stationName, '출발역'),
-        deliveryStationName: asString(deliveryStation.stationName, '도착역'),
+        pickupStationName,
+        deliveryStationName,
         createdAt: createdAt?.toISOString() ?? null,
         updatedAt: updatedAt?.toISOString() ?? null,
         ageMinutes: createdAt ? Math.max(0, Math.floor((Date.now() - createdAt.getTime()) / 60000)) : 0,
@@ -145,15 +161,57 @@ export async function PATCH(req: NextRequest) {
 
   try {
     const body = (await req.json()) as UnknownRecord;
+    const action = asString(body.action);
     const requestId = asString(body.requestId).trim();
-    const opsPriority = asString(body.opsPriority, 'normal').trim() || 'normal';
-    const opsMemo = asString(body.opsMemo).trim();
 
     if (!requestId) {
       return NextResponse.json({ error: 'requestId is required' }, { status: 400 });
     }
 
     const db = getDb();
+
+    if (action === 'cancel') {
+      const reason = asString(body.reason) || '운영자 직권 취소 (지연)';
+      
+      await db.runTransaction(async (tx) => {
+        const reqRef = db.collection('requests').doc(requestId);
+        const doc = await tx.get(reqRef);
+        if (!doc.exists) {
+          throw new Error('요청을 찾을 수 없습니다.');
+        }
+
+        const data = doc.data() as UnknownRecord;
+        if (data.status === 'completed' || data.status === 'cancelled') {
+          throw new Error('이미 완료되거나 취소된 요청입니다.');
+        }
+
+        tx.update(reqRef, {
+          status: 'cancelled',
+          cancellationReason: reason,
+          cancelledBy: 'admin',
+          updatedAt: new Date(),
+        });
+
+        // 진행중인 매칭이 있다면 모두 반려(rejected) 처리
+        const matchesSnap = await tx.get(
+          db.collection('matches').where('requestId', '==', requestId).where('status', '==', 'pending')
+        );
+        matchesSnap.forEach((matchDoc) => {
+          tx.update(matchDoc.ref, {
+            status: 'rejected',
+            rejectionReason: '운영자 직권 취소',
+            updatedAt: new Date(),
+          });
+        });
+      });
+
+      return NextResponse.json({ ok: true, message: '요청이 성공적으로 취소되었습니다.' });
+    }
+
+    // 기본 액션: 상태 업데이트 (opsPriority, opsMemo)
+    const opsPriority = asString(body.opsPriority, 'normal').trim() || 'normal';
+    const opsMemo = asString(body.opsMemo).trim();
+
     await db.collection('requests').doc(requestId).set(
       {
         opsPriority,

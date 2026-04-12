@@ -99,6 +99,7 @@ type RequestDocShape = Partial<Request> & {
   recipientPhone?: unknown;
   pickupLocationDetail?: unknown;
   storageLocation?: unknown;
+  lockerId?: unknown;
   specialInstructions?: unknown;
   missionProgress?: Request['missionProgress'];
   createdAt?: TimestampLike;
@@ -381,6 +382,7 @@ function normalizeRequestDoc(requestId: string, raw: RequestDocShape): Request {
     recipientPhone: readString(raw.recipientPhone),
     pickupLocationDetail: readString(raw.pickupLocationDetail),
     storageLocation: readString(raw.storageLocation),
+    lockerId: readString(raw.lockerId),
     specialInstructions: readString(raw.specialInstructions),
     selectedPhotoIds,
     packageInfo: {

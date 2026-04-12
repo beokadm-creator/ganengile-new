@@ -66,8 +66,7 @@ export const deliverySettlementService = {
             deliveryData.gillerId,
             requestId,
             totalFee,
-            true,
-            { description: '배송 수익금 (수수료/세금 공제 전)' }
+            true
           );
         } catch (e) {
           console.error('길러 수익 창출 실패:', e);

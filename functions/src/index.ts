@@ -1984,6 +1984,8 @@ export const acceptMatch = functions.https.onCall(
         gllerId: match.gllerId,
         pickupStation: match.pickupStation,
         deliveryStation: match.deliveryStation,
+        lockerId: match.lockerId || null,
+        reservationId: match.reservationId || null,
         fee: match.fee,
         status: 'accepted',
         createdAt: admin.firestore.FieldValue.serverTimestamp(),

@@ -40,6 +40,7 @@ export interface PaymentIntegrationConfig {
   provider: string;
   liveReady: boolean;
   clientKey: string;
+  secretKey?: string;
   bankVerificationRequired: boolean;
   manualSettlementReview: boolean;
   statusMessage: string;

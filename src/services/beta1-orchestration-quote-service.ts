@@ -29,6 +29,7 @@ export interface Beta1RequestCreateInput {
   recipientPhone: string;
   pickupLocationDetail?: string;
   storageLocation?: string;
+  lockerId?: string;
   specialInstructions?: string;
   urgency?: 'normal' | 'fast' | 'urgent';
   selectedQuoteType: QuoteType;

@@ -608,6 +608,7 @@ export default function CreateRequestScreen({ navigation, route }: Props) {
       recipientPhone: recipientPhone || '010-0000-0000',
       pickupLocationDetail: pickupLocationDetail || undefined,
       storageLocation: storageLocation || undefined,
+      lockerId: lockerId || undefined,
       specialInstructions: specialInstructions || undefined,
       urgency: requestMode === 'reservation' ? 'normal' : urgency,
       selectedQuoteType: 'balanced',
@@ -721,6 +722,7 @@ export default function CreateRequestScreen({ navigation, route }: Props) {
                 recipientPhone: recipientPhone || '010-0000-0000',
                 pickupLocationDetail: pickupLocationDetail || undefined,
                 storageLocation: storageLocation || undefined,
+                lockerId: lockerId || undefined,
                 specialInstructions: specialInstructions || undefined,
                 urgency: requestMode === 'reservation' ? 'normal' : urgency,
                 selectedQuoteType: 'balanced',
@@ -1399,6 +1401,7 @@ export default function CreateRequestScreen({ navigation, route }: Props) {
         recipientPhone,
         pickupLocationDetail: pickupLocationDetail || undefined,
         storageLocation: storageLocation || undefined,
+        lockerId: lockerId || undefined,
         specialInstructions: specialInstructions || undefined,
         urgency: requestMode === 'reservation' ? 'normal' : urgency,
         selectedQuoteType,
@@ -2058,6 +2061,7 @@ export default function CreateRequestScreen({ navigation, route }: Props) {
             <LockerLocator
               selectedStationId={pickupStation?.stationId}
               onLockerSelect={(locker) => {
+                setLockerId(locker.lockerId);
                 setStorageLocation(`${locker.stationName} ${locker.lockerId} (상태: ${locker.status})`);
                 setShowLockerLocator(false);
               }}

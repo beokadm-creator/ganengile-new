@@ -379,6 +379,12 @@ export interface Delivery {
   /** Delivery tracking */
   tracking: DeliveryTracking;
 
+  /** Used locker ID */
+  lockerId?: string;
+
+  /** Used reservation ID */
+  reservationId?: string;
+
   /** Match ID */
   matchId: string;
 
