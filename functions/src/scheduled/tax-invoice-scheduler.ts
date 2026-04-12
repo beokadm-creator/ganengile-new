@@ -215,11 +215,14 @@ export const taxInvoiceScheduler = async (): Promise<{
       }
     }
 
-    // 3. Batch commit
+    // 3. Batch commit (1st Phase: Save invoices to DB)
     if (invoicesGenerated > 0) {
       await batch.commit();
-      console.warn(`🎉 Tax invoice scheduler completed: ${invoicesGenerated} invoices generated`);
+      console.warn(`🎉 Phase 1: Saved ${invoicesGenerated} invoices to DB`);
     }
+
+    // TODO: Phase 2: PDF 생성 및 이메일 발송 비동기 큐 처리
+    // DB 저장 성공 후 안전하게 외부 서비스(AWS SES, SendGrid 등)를 호출하여 발송하도록 분리
 
     return {
       processed: contractsSnapshot.size,

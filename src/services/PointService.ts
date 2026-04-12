@@ -297,6 +297,7 @@ export class PointService {
       accountHolder: data.accountHolder,
       bankCode: data.bankCode,
     });
+    
     const withdrawData: WithdrawRequest = {
       requestId: withdrawRef.id,
       userId: data.userId,
@@ -320,16 +321,50 @@ export class PointService {
       },
     };
 
-    await setDoc(withdrawRef, withdrawData);
-    await this.spendPoints(
-      data.userId,
-      data.amount,
-      'withdraw' as PointCategory,
-      'Point withdrawal request',
-      {
-        relatedRequestId: withdrawRef.id,
+    // 트랜잭션으로 출금 문서 생성과 포인트 차감을 원자적으로 처리
+    await runTransaction(db, async (transaction) => {
+      const userRef = doc(db, USERS_COLLECTION, data.userId);
+      const userDoc = await transaction.get(userRef);
+
+      if (!userDoc.exists()) {
+        throw new Error('User not found');
       }
-    );
+
+      const userData = (userDoc.data() ?? {}) as Record<string, unknown>;
+      const balanceBefore = asNumber(userData.pointBalance);
+      
+      if (balanceBefore < data.amount) {
+        throw new Error('Insufficient points');
+      }
+
+      const balanceAfter = balanceBefore - data.amount;
+
+      // 1. 포인트 차감 내역 생성
+      const transactionRef = doc(collection(db, TRANSACTIONS_COLLECTION));
+      const transactionData = createTransactionRecord({
+        transactionId: transactionRef.id,
+        userId: data.userId,
+        amount: data.amount,
+        type: 'spend' as PointType,
+        category: 'withdraw' as PointCategory,
+        balanceBefore,
+        balanceAfter,
+        description: 'Point withdrawal request',
+        metadata: { relatedRequestId: withdrawRef.id },
+      });
+
+      transaction.set(transactionRef, transactionData);
+      
+      // 2. 유저 잔액 업데이트
+      transaction.update(userRef, {
+        pointBalance: balanceAfter,
+        totalSpentPoints: asNumber(userData.totalSpentPoints) + data.amount,
+        updatedAt: Timestamp.now(),
+      });
+
+      // 3. 출금 요청 문서 생성
+      transaction.set(withdrawRef, withdrawData);
+    });
 
     return withdrawData;
   }

@@ -160,57 +160,85 @@ export async function PATCH(req: NextRequest) {
 
   const db = getAdminDb();
   const ref = db.collection('withdraw_requests').doc(requestId);
-  const snap = await ref.get();
-  if (!snap.exists) {
-    return NextResponse.json({ error: 'Not found' }, { status: 404 });
-  }
-
-  const current = (snap.data() as UnknownRecord) ?? {};
-  const newStatus = action === 'approve' ? 'completed' : 'rejected';
-
-  await ref.update({
-    status: newStatus,
-    adminNote: note ?? '',
-    processedAt: new Date(),
-    processedContext: {
-      bankVerificationStatus:
-        typeof current.bankVerificationStatus === 'string'
-          ? current.bankVerificationStatus
-          : 'manual_review',
-      integrationSnapshot: current.integrationSnapshot ?? null,
-      reviewChecklist: reviewChecklist ?? null,
-    },
-  });
-
-  if (action === 'reject') {
-    const userId = typeof current.userId === 'string' ? current.userId : '';
-    const amount = typeof current.amount === 'number' ? current.amount : 0;
-    if (userId && amount > 0) {
-      const userRef = db.collection('users').doc(userId);
-      const userSnap = await userRef.get();
-      if (userSnap.exists) {
-        const currentBalance = Number(userSnap.data()?.pointBalance ?? 0);
-        const currentSpent = Number(userSnap.data()?.totalSpentPoints ?? 0);
-        await userRef.update({
-          pointBalance: currentBalance + amount,
-          totalSpentPoints: Math.max(0, currentSpent - amount),
-        });
-        await db.collection('point_transactions').add({
-          userId,
-          amount,
-          type: 'earn',
-          category: 'withdraw_rejected',
-          description: `출금 반려 환급 (${note ?? '사유 없음'})`,
-          balanceBefore: currentBalance,
-          balanceAfter: currentBalance + amount,
-          status: 'completed',
-          relatedRequestId: requestId,
-          createdAt: new Date(),
-          completedAt: new Date(),
-        });
+  
+  try {
+    await db.runTransaction(async (transaction) => {
+      const snap = await transaction.get(ref);
+      if (!snap.exists) {
+        throw new Error('Not found');
       }
-    }
-  }
 
-  return NextResponse.json({ ok: true, status: newStatus });
+      const current = (snap.data() as UnknownRecord) ?? {};
+      if (current.status !== 'pending') {
+        throw new Error('Request is not in pending status');
+      }
+
+      const newStatus = action === 'approve' ? 'completed' : 'rejected';
+      const userId = typeof current.userId === 'string' ? current.userId : '';
+      const amount = typeof current.amount === 'number' ? current.amount : 0;
+      
+      // 승인인 경우 (자동 송금 연동은 별도의 Payout API 호출 필요, 여기서는 DB 상태만 안전하게 트랜잭션 처리)
+      if (action === 'approve') {
+        // TODO: executeTossPayout 연동 (현재는 Firebase Functions의 서비스이므로 직접 호출은 생략하고 상태만 업데이트)
+        // 만약 여기서 fetch로 펌뱅킹 API를 호출한다면, 그 전에 반드시 상태를 processing으로 변경해야 함
+      }
+
+      // 반려인 경우 포인트 환불을 동일 트랜잭션 내에서 처리
+      if (action === 'reject' && userId && amount > 0) {
+        const userRef = db.collection('users').doc(userId);
+        const userSnap = await transaction.get(userRef);
+        
+        if (userSnap.exists) {
+          const currentBalance = Number(userSnap.data()?.pointBalance ?? 0);
+          const currentSpent = Number(userSnap.data()?.totalSpentPoints ?? 0);
+          
+          transaction.update(userRef, {
+            pointBalance: currentBalance + amount,
+            totalSpentPoints: Math.max(0, currentSpent - amount),
+          });
+
+          const txRef = db.collection('point_transactions').doc();
+          transaction.set(txRef, {
+            userId,
+            amount,
+            type: 'earn',
+            category: 'withdraw_rejected',
+            description: `출금 반려 환급 (${note ?? '사유 없음'})`,
+            balanceBefore: currentBalance,
+            balanceAfter: currentBalance + amount,
+            status: 'completed',
+            relatedRequestId: requestId,
+            createdAt: new Date(),
+            completedAt: new Date(),
+          });
+        }
+      }
+
+      transaction.update(ref, {
+        status: newStatus,
+        adminNote: note ?? '',
+        processedAt: new Date(),
+        processedContext: {
+          bankVerificationStatus:
+            typeof current.bankVerificationStatus === 'string'
+              ? current.bankVerificationStatus
+              : 'manual_review',
+          integrationSnapshot: current.integrationSnapshot ?? null,
+          reviewChecklist: reviewChecklist ?? null,
+        },
+      });
+    });
+
+    const newStatus = action === 'approve' ? 'completed' : 'rejected';
+    return NextResponse.json({ ok: true, status: newStatus });
+  } catch (error: any) {
+    if (error.message === 'Not found') {
+      return NextResponse.json({ error: 'Not found' }, { status: 404 });
+    }
+    if (error.message === 'Request is not in pending status') {
+      return NextResponse.json({ error: 'Request is not in pending status' }, { status: 400 });
+    }
+    console.error('Withdrawal patch transaction failed:', error);
+    return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });
+  }
 }

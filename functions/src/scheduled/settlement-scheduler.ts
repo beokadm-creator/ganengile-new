@@ -178,31 +178,6 @@ export const gillerSettlementScheduler = async (): Promise<{
           totalAmount += netAmount;
 
           console.warn(`✅ Settlement created: ${settlement.settlementId}`);
-
-          // 2-7. 이체 실행
-          if (netAmount > 0 && giller.bankAccount?.bank && giller.bankAccount?.accountNumber) {
-            const payoutResult = await executeTossPayout(
-              giller.bankAccount.bank,
-              giller.bankAccount.accountNumber,
-              netAmount,
-              `${month}월 크라우드 배송 정산금`
-            );
-
-            if (payoutResult.success) {
-              settlement.status = 'completed';
-              settlement.transferredAt = admin.firestore.Timestamp.now();
-              batch.set(settlementRef, settlement);
-            } else {
-              settlement.status = 'failed';
-              settlement.transferError = payoutResult.error;
-              batch.set(settlementRef, settlement);
-              console.error(`❌ Payout failed for giller ${gillerId}: ${payoutResult.error}`);
-            }
-          }
-
-          // TODO: 2-8. 길러에게 푸시 알림
-          // await sendSettlementNotification(gillerId, settlement);
-
         } catch (error) {
           const errMsg = `Error processing giller ${gillerId}: ${error}`;
           console.error(errMsg);
@@ -211,10 +186,68 @@ export const gillerSettlementScheduler = async (): Promise<{
       }
     }
 
-    // 3. Batch commit
+    // 3. Batch commit (1st Phase: Save settlements as pending)
     if (settlementsGenerated > 0) {
       await batch.commit();
-      console.warn(`🎉 Giller settlement scheduler completed: ${settlementsGenerated} settlements, ${totalAmount}원 total`);
+      console.warn(`💾 Phase 1: Saved ${settlementsGenerated} pending settlements to DB.`);
+    }
+
+    // 4. Phase 2: Execute Payouts sequentially for the generated settlements
+    if (settlementsGenerated > 0) {
+      const pendingSettlements = await db
+        .collection('b2bSettlements')
+        .where('period.year', '==', year)
+        .where('period.month', '==', month)
+        .where('status', '==', 'pending')
+        .get();
+
+      for (const doc of pendingSettlements.docs) {
+        const settlement = doc.data();
+        const { settlementId, gillerId, earnings, bankAccount } = settlement;
+        const netAmount = earnings?.netAmount ?? 0;
+
+        if (netAmount > 0 && bankAccount?.bank && bankAccount?.accountNumber) {
+          try {
+            const payoutResult = await executeTossPayout(
+              bankAccount.bank,
+              bankAccount.accountNumber,
+              netAmount,
+              `${month}월 크라우드 배송 정산금`
+            );
+
+            if (payoutResult.success) {
+              await doc.ref.update({
+                status: 'completed',
+                transferredAt: admin.firestore.Timestamp.now(),
+                transactionId: payoutResult.transactionId ?? null,
+                updatedAt: admin.firestore.Timestamp.now(),
+              });
+              console.warn(`✅ Payout success for giller ${gillerId}`);
+            } else {
+              await doc.ref.update({
+                status: 'failed',
+                transferError: payoutResult.error,
+                updatedAt: admin.firestore.Timestamp.now(),
+              });
+              console.error(`❌ Payout failed for giller ${gillerId}: ${payoutResult.error}`);
+            }
+          } catch (payoutError) {
+            await doc.ref.update({
+              status: 'failed',
+              transferError: String(payoutError),
+              updatedAt: admin.firestore.Timestamp.now(),
+            });
+            console.error(`❌ Critical payout error for giller ${gillerId}:`, payoutError);
+          }
+        } else {
+          // If amount is 0 or bank info is missing, mark as failed automatically
+          await doc.ref.update({
+            status: 'failed',
+            transferError: 'Invalid bank account or zero amount',
+            updatedAt: admin.firestore.Timestamp.now(),
+          });
+        }
+      }
     }
 
     return {

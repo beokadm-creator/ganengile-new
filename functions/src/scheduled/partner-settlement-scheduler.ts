@@ -128,30 +128,6 @@ export const partnerSettlementScheduler = async (): Promise<{
         batch.set(settlementRef, settlement);
         settlementsGenerated++;
         totalAmount += netAmount;
-
-        // 실제 이체 실행
-        if (netAmount > 0 && settlementConfig.bankAccount?.bank && settlementConfig.bankAccount?.accountNumber) {
-          const payoutResult = await executeTossPayout(
-            settlementConfig.bankAccount.bank,
-            settlementConfig.bankAccount.accountNumber,
-            netAmount,
-            `${month}월 크라우드 파트너 정산금`
-          );
-
-          if (payoutResult.success) {
-            settlement.status = 'completed';
-            settlement.settledAt = admin.firestore.Timestamp.now();
-            settlement.transactionId = payoutResult.transactionId;
-            batch.set(settlementRef, settlement);
-            console.warn(`✅ Partner payout success for ${partnerId}`);
-          } else {
-            settlement.status = 'failed';
-            settlement.transferError = payoutResult.error;
-            batch.set(settlementRef, settlement);
-            console.error(`❌ Partner payout failed for ${partnerId}: ${payoutResult.error}`);
-          }
-        }
-
       } catch (error) {
         const errMsg = `Error processing partner ${partnerId}: ${error}`;
         console.error(errMsg);
@@ -159,10 +135,66 @@ export const partnerSettlementScheduler = async (): Promise<{
       }
     }
 
-    // 5. 일괄 저장
+    // 5. 일괄 저장 (1st Phase: Save settlements as pending)
     if (settlementsGenerated > 0) {
       await batch.commit();
-      console.warn(`💾 Batch committed ${settlementsGenerated} partner settlements.`);
+      console.warn(`💾 Phase 1: Saved ${settlementsGenerated} pending partner settlements to DB.`);
+    }
+
+    // 6. Phase 2: Execute Payouts sequentially for the generated settlements
+    if (settlementsGenerated > 0) {
+      const pendingSettlements = await db
+        .collection('partner_settlements')
+        .where('periodStart', '==', new Date(year, month - 1, 1).toISOString().split('T')[0])
+        .where('status', '==', 'pending')
+        .get();
+
+      for (const doc of pendingSettlements.docs) {
+        const settlement = doc.data();
+        const { partnerId, netAmount, bankAccount } = settlement;
+
+        if (netAmount > 0 && bankAccount?.bank && bankAccount?.accountNumber) {
+          try {
+            const payoutResult = await executeTossPayout(
+              bankAccount.bank,
+              bankAccount.accountNumber,
+              netAmount,
+              `${month}월 크라우드 파트너 정산금`
+            );
+
+            if (payoutResult.success) {
+              await doc.ref.update({
+                status: 'completed',
+                settledAt: admin.firestore.Timestamp.now(),
+                transactionId: payoutResult.transactionId ?? null,
+                updatedAt: admin.firestore.Timestamp.now(),
+              });
+              console.warn(`✅ Partner payout success for ${partnerId}`);
+            } else {
+              await doc.ref.update({
+                status: 'failed',
+                transferError: payoutResult.error,
+                updatedAt: admin.firestore.Timestamp.now(),
+              });
+              console.error(`❌ Partner payout failed for ${partnerId}: ${payoutResult.error}`);
+            }
+          } catch (payoutError) {
+            await doc.ref.update({
+              status: 'failed',
+              transferError: String(payoutError),
+              updatedAt: admin.firestore.Timestamp.now(),
+            });
+            console.error(`❌ Critical payout error for partner ${partnerId}:`, payoutError);
+          }
+        } else {
+          // If amount is 0 or bank info is missing, mark as failed automatically
+          await doc.ref.update({
+            status: 'failed',
+            transferError: 'Invalid bank account or zero amount',
+            updatedAt: admin.firestore.Timestamp.now(),
+          });
+        }
+      }
     }
 
     return { processedPartners, settlementsGenerated, totalAmount, errors };

@@ -132,46 +132,64 @@ export async function PATCH(req: NextRequest) {
 
   const compensationAmount = payload.compensation ?? 0;
 
-  // 보상금이 설정된 경우, 요청자(또는 신고자)에게 포인트 지급 처리
-  if (compensationAmount > 0 && disputeData.reporterId) {
-    const userRef = db.collection('users').doc(disputeData.reporterId);
-    const userSnap = await userRef.get();
-    
-    if (userSnap.exists) {
-      const userData = userSnap.data() as { pointBalance?: number; totalEarnedPoints?: number };
-      const current = userData?.pointBalance ?? 0;
-      const currentEarned = userData?.totalEarnedPoints ?? 0;
-      
-      await userRef.update({
-        pointBalance: current + compensationAmount,
-        totalEarnedPoints: currentEarned + compensationAmount,
-      });
+  try {
+    await db.runTransaction(async (transaction) => {
+      const disputeDoc = await transaction.get(ref);
+      if (!disputeDoc.exists) {
+        throw new Error('Dispute not found in transaction');
+      }
 
-      await db.collection('point_transactions').add({
-        userId: disputeData.reporterId,
-        amount: compensationAmount,
-        type: 'earn',
-        category: 'dispute_compensation',
-        description: `분쟁 조정에 따른 보상금 지급 (${compensationAmount.toLocaleString()}원)`,
-        balanceBefore: current,
-        balanceAfter: current + compensationAmount,
-        status: 'completed',
-        createdAt: new Date(),
-        completedAt: new Date(),
+      if (disputeDoc.data()?.status === 'resolved') {
+        throw new Error('Already resolved in transaction');
+      }
+
+      // 보상금이 설정된 경우, 요청자(또는 신고자)에게 포인트 지급 처리
+      if (compensationAmount > 0 && disputeData.reporterId) {
+        const userRef = db.collection('users').doc(disputeData.reporterId);
+        const userSnap = await transaction.get(userRef);
+        
+        if (userSnap.exists) {
+          const userData = userSnap.data() as { pointBalance?: number; totalEarnedPoints?: number };
+          const current = userData?.pointBalance ?? 0;
+          const currentEarned = userData?.totalEarnedPoints ?? 0;
+          
+          transaction.update(userRef, {
+            pointBalance: current + compensationAmount,
+            totalEarnedPoints: currentEarned + compensationAmount,
+            updatedAt: new Date(),
+          });
+
+          const txRef = db.collection('point_transactions').doc();
+          transaction.set(txRef, {
+            userId: disputeData.reporterId,
+            amount: compensationAmount,
+            type: 'earn',
+            category: 'dispute_compensation',
+            description: `분쟁 조정에 따른 보상금 지급 (${compensationAmount.toLocaleString()}원)`,
+            balanceBefore: current,
+            balanceAfter: current + compensationAmount,
+            status: 'completed',
+            createdAt: new Date(),
+            completedAt: new Date(),
+          });
+        }
+      }
+
+      transaction.update(ref, {
+        status: 'resolved',
+        resolution: {
+          responsibility: payload.responsibility,
+          compensation: compensationAmount,
+          note: payload.note ?? '',
+        },
+        resolvedAt: new Date(),
+        updatedAt: new Date(),
       });
-    }
+    });
+
+    return NextResponse.json({ ok: true });
+  } catch (error: any) {
+    console.error('Transaction failed in dispute resolution:', error);
+    return NextResponse.json({ error: error.message }, { status: 500 });
   }
-
-  await ref.update({
-    status: 'resolved',
-    resolution: {
-      responsibility: payload.responsibility,
-      compensation: payload.compensation ?? 0,
-      note: payload.note ?? '',
-    },
-    resolvedAt: new Date(),
-    updatedAt: new Date(),
-  });
-
-  return NextResponse.json({ ok: true });
 }

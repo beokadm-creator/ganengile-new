@@ -39,15 +39,6 @@ export class DepositCompensationService {
         return { success: false, error: 'Deposit is not paid' };
       }
 
-      if (deposit.pointAmount && deposit.pointAmount > 0) {
-        await PointService.earnPoints(
-          deposit.userId,
-          deposit.pointAmount,
-          PointCategory.DEPOSIT_REFUND,
-          `보증금 환급 (${deposit.pointAmount.toLocaleString()}원)`
-        );
-      }
-
       if (deposit.tossAmount && deposit.tossAmount > 0 && deposit.paymentId) {
         const refundResult = await TossPaymentService.refundPayment(
           deposit.paymentId,
@@ -57,6 +48,15 @@ export class DepositCompensationService {
         if (!refundResult.success) {
           throw new Error(`보증금 환급(결제 취소) 실패: ${refundResult.error}`);
         }
+      }
+
+      if (deposit.pointAmount && deposit.pointAmount > 0) {
+        await PointService.earnPoints(
+          deposit.userId,
+          deposit.pointAmount,
+          PointCategory.DEPOSIT_REFUND,
+          `보증금 환급 (${deposit.pointAmount.toLocaleString()}원)`
+        );
       }
 
       await updateDoc(ref, {

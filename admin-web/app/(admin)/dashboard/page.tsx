@@ -119,11 +119,6 @@ function getEnvString(value: string | undefined, fallback = ''): string {
   return value ?? fallback;
 }
 
-function getPublicEnv(name: string, fallback = ''): string {
-  const env = process.env as Record<string, string | undefined>;
-  return getEnvString(env[name], fallback);
-}
-
 function formatDateLabel(date: string | null | undefined): string {
   if (!date) return '-';
   const resolved = new Date(date);
@@ -159,8 +154,8 @@ function buildAdminStaticMapUrl(markers: Array<{ label: string; latitude: number
     return '';
   }
 
-  const projectId = getPublicEnv('NEXT_PUBLIC_FIREBASE_PROJECT_ID', 'ganengile');
-  const region = getPublicEnv('NEXT_PUBLIC_FIREBASE_FUNCTIONS_REGION', 'us-central1');
+  const projectId = process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID || 'ganengile';
+  const region = process.env.NEXT_PUBLIC_FIREBASE_FUNCTIONS_REGION || 'us-central1';
   if (!projectId) {
     return '';
   }

@@ -6,17 +6,15 @@ function readEnv(value: string | undefined): string {
   return typeof value === 'string' ? value.trim() : '';
 }
 
-const env = process.env as Record<string, string | undefined>;
-
 export const mapConfig = {
-  provider: (readEnv(env.EXPO_PUBLIC_MAP_PROVIDER) ?? 'naver-static') as SupportedMapProvider,
-  publicClientId: readEnv(env.EXPO_PUBLIC_NAVER_MAP_CLIENT_ID),
-  staticMapProxyBaseUrl: readEnv(env.EXPO_PUBLIC_NAVER_STATIC_MAP_PROXY_URL),
-  geocodeProxyBaseUrl: readEnv(env.EXPO_PUBLIC_NAVER_GEOCODE_PROXY_URL),
-  directionsProxyBaseUrl: readEnv(env.EXPO_PUBLIC_NAVER_DIRECTIONS_PROXY_URL),
-  webClientId: readEnv(env.EXPO_PUBLIC_NAVER_MAP_WEB_CLIENT_ID),
-  dynamicWebEnabled: readEnv(env.EXPO_PUBLIC_NAVER_WEB_MAP_ENABLED) === 'true',
-  enabled: readEnv(env.EXPO_PUBLIC_NAVER_MAP_ENABLED) !== 'false',
+  provider: (readEnv(process.env.EXPO_PUBLIC_MAP_PROVIDER) || 'naver-static') as SupportedMapProvider,
+  publicClientId: readEnv(process.env.EXPO_PUBLIC_NAVER_MAP_CLIENT_ID),
+  staticMapProxyBaseUrl: readEnv(process.env.EXPO_PUBLIC_NAVER_STATIC_MAP_PROXY_URL),
+  geocodeProxyBaseUrl: readEnv(process.env.EXPO_PUBLIC_NAVER_GEOCODE_PROXY_URL),
+  directionsProxyBaseUrl: readEnv(process.env.EXPO_PUBLIC_NAVER_DIRECTIONS_PROXY_URL),
+  webClientId: readEnv(process.env.EXPO_PUBLIC_NAVER_MAP_WEB_CLIENT_ID),
+  dynamicWebEnabled: readEnv(process.env.EXPO_PUBLIC_NAVER_WEB_MAP_ENABLED) === 'true',
+  enabled: readEnv(process.env.EXPO_PUBLIC_NAVER_MAP_ENABLED) !== 'false',
 };
 
 export function isMapEnabled(): boolean {
