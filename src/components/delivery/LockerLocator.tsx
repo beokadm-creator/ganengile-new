@@ -34,12 +34,17 @@ interface LockerLocatorProps {
   selectedStationId?: string;
   onLockerSelect: (locker: LockerSummary) => void;
   onClose: () => void;
+  mode?: 'grouped' | 'specific';
 }
 
 type LockerMapRow = ReturnType<typeof createLockerLocation> & {
   distanceMeters: number | null;
   latitude?: number;
   longitude?: number;
+  isAreaGroup?: boolean;
+  availableCount?: number;
+  basePrice?: number;
+  stationId?: string;
 };
 
 function formatDistance(distanceMeters: number | null): string {
@@ -72,7 +77,7 @@ function buildRow(locker: Locker, station: Station | null, currentLocation: Loca
   };
 }
 
-export default function LockerLocator({ selectedStationId, onLockerSelect, onClose }: LockerLocatorProps) {
+export default function LockerLocator({ selectedStationId, onLockerSelect, onClose, mode = 'grouped' }: LockerLocatorProps) {
   const [lockers, setLockers] = useState<LockerMapRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [viewMode, setViewMode] = useState<'list' | 'map'>('list');
@@ -96,13 +101,48 @@ export default function LockerLocator({ selectedStationId, onLockerSelect, onClo
       }
 
       const stationMap = new Map(stations.map((station) => [station.stationId, station]));
-      const rows = lockerList
-        .filter((locker) => locker.status === LockerStatus.AVAILABLE && (locker.availability?.available ?? 1) > 0)
-        .map((locker) => buildRow(locker, stationMap.get(locker.location.stationId) ?? null, currentLocation))
-        .sort(
-          (left, right) =>
-            (left.distanceMeters ?? Number.MAX_SAFE_INTEGER) - (right.distanceMeters ?? Number.MAX_SAFE_INTEGER)
-        );
+      
+      let rows: LockerMapRow[] = [];
+
+      if (mode === 'grouped') {
+        const areaGroups = new Map<string, LockerMapRow>();
+        
+        lockerList
+          .filter((locker) => locker.status === LockerStatus.AVAILABLE && (locker.availability?.available ?? 1) > 0)
+          .forEach((locker) => {
+            const areaKey = `AREA::${locker.location.stationId}::${locker.location.section || 'default'}`;
+            const station = stationMap.get(locker.location.stationId) ?? null;
+            const row = buildRow(locker, station, currentLocation);
+            
+            if (!areaGroups.has(areaKey)) {
+              areaGroups.set(areaKey, {
+                ...row,
+                lockerId: areaKey,
+                isAreaGroup: true,
+                availableCount: locker.availability?.available ?? 1,
+                basePrice: locker.pricing.base,
+                stationId: locker.location.stationId,
+              });
+            } else {
+              const existing = areaGroups.get(areaKey)!;
+              existing.availableCount = (existing.availableCount || 0) + (locker.availability?.available ?? 1);
+              if (locker.pricing.base < (existing.basePrice || Infinity)) {
+                existing.basePrice = locker.pricing.base;
+              }
+            }
+          });
+
+        rows = Array.from(areaGroups.values());
+      } else {
+        rows = lockerList
+          .filter((locker) => locker.status === LockerStatus.AVAILABLE && (locker.availability?.available ?? 1) > 0)
+          .map((locker) => buildRow(locker, stationMap.get(locker.location.stationId) ?? null, currentLocation));
+      }
+
+      rows.sort(
+        (left, right) =>
+          (left.distanceMeters ?? Number.MAX_SAFE_INTEGER) - (right.distanceMeters ?? Number.MAX_SAFE_INTEGER)
+      );
 
       setLockers(rows);
     } catch (error) {
@@ -139,10 +179,12 @@ export default function LockerLocator({ selectedStationId, onLockerSelect, onClo
   const handleLockerSelect = (locker: LockerMapRow): void => {
     const summary: LockerSummary = {
       lockerId: locker.lockerId,
+      stationId: locker.stationId,
       stationName: locker.stationName ?? locker.name ?? '',
       size: 'medium' as never,
       status: locker.isAvailable ? LockerStatus.AVAILABLE : LockerStatus.OCCUPIED,
       available: locker.isAvailable ?? true,
+      pricePerHour: locker.isAreaGroup ? locker.basePrice : locker.pricePer4Hours,
     };
     onLockerSelect(summary);
   };
@@ -158,14 +200,23 @@ export default function LockerLocator({ selectedStationId, onLockerSelect, onClo
       </View>
       <View style={styles.lockerInfo}>
         <View style={styles.titleRow}>
-          <Text style={styles.lockerName}>{item.stationName || item.name}</Text>
+          <Text style={styles.lockerName}>
+            {item.stationName || item.name} {item.isAreaGroup ? '보관함 구역' : ''}
+          </Text>
           <Text style={styles.distanceBadge}>{formatDistance(item.distanceMeters)}</Text>
         </View>
         <Text style={styles.detailText}>
           {item.line ?? '노선 정보 없음'} · {item.floor ?? 1}층 · {item.section ?? item.name}
         </Text>
-        <Text style={styles.detailText}>기본 {(item.pricePer4Hours ?? 0).toLocaleString()}원 / 4시간</Text>
-        {!!item.telNo && <Text style={styles.detailText}>문의: {item.telNo}</Text>}
+        <Text style={styles.detailText}>
+          기본 {(item.isAreaGroup ? item.basePrice ?? 0 : item.pricePer4Hours ?? 0).toLocaleString()}원 / 4시간
+        </Text>
+        {item.isAreaGroup && (
+          <Text style={[styles.detailText, { color: Colors.primary, fontWeight: 'bold' }]}>
+            현재 {item.availableCount}개 이용 가능
+          </Text>
+        )}
+        {!item.isAreaGroup && !!item.telNo && <Text style={styles.detailText}>문의: {item.telNo}</Text>}
       </View>
     </TouchableOpacity>
   );

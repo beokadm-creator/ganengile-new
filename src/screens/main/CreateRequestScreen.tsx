@@ -336,6 +336,7 @@ export default function CreateRequestScreen({ navigation, route }: Props) {
     directMode, setDirectMode,
     storageLocation, setStorageLocation,
     lockerId, setLockerId,
+    actualLockerFee, setActualLockerFee,
     contactPhoneNumber, setContactPhoneNumber,
     verifiedPhoneOverride, setVerifiedPhoneOverride,
     aiQuotesLoading, setAiQuotesLoading,
@@ -968,10 +969,13 @@ export default function CreateRequestScreen({ navigation, route }: Props) {
             <LockerLocator
               selectedStationId={pickupStation?.stationId}
               onLockerSelect={(locker) => {
-                setLockerId(locker.lockerId);
-                setStorageLocation(`${locker.stationName} ${locker.lockerId} (상태: ${locker.status})`);
-                setShowLockerLocator(false);
-              }}
+              setLockerId(locker.lockerId);
+              setActualLockerFee(locker.pricePerHour ?? null);
+              setStorageLocation(
+                `${locker.stationName} ${locker.lockerId.startsWith('AREA::') ? '사물함 구역' : locker.lockerId} (상태: ${locker.status})`
+              );
+              setShowLockerLocator(false);
+            }}
               onClose={() => setShowLockerLocator(false)}
             />
           </View>

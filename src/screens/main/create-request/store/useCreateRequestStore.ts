@@ -94,6 +94,8 @@ export interface CreateRequestState {
   setStorageLocation: (location: string) => void;
   lockerId: string | null;
   setLockerId: (id: string | null) => void;
+  actualLockerFee: number | null;
+  setActualLockerFee: (fee: number | null) => void;
 
   // Phone Verification (Step 3)
   contactPhoneNumber: string;
@@ -150,6 +152,7 @@ const initialState = {
   directMode: 'none' as DirectMode,
   storageLocation: '',
   lockerId: null as string | null,
+  actualLockerFee: null as number | null,
   contactPhoneNumber: '',
   verifiedPhoneOverride: null,
   aiQuotesLoading: false,
@@ -196,8 +199,9 @@ export const useCreateRequestStore = create<CreateRequestState>((set) => ({
   setPickupLocationDetail: (detail) => set({ pickupLocationDetail: detail }),
   setSpecialInstructions: (instructions) => set({ specialInstructions: instructions }),
   setDirectMode: (mode) => set({ directMode: mode }),
-  setStorageLocation: (location) => set({ storageLocation: location }),
+  setStorageLocation: (loc) => set({ storageLocation: loc }),
   setLockerId: (id) => set({ lockerId: id }),
+  setActualLockerFee: (fee) => set({ actualLockerFee: fee }),
   
   setContactPhoneNumber: (phone) => set({ contactPhoneNumber: phone }),
   setVerifiedPhoneOverride: (phone) => set({ verifiedPhoneOverride: phone }),
@@ -253,6 +257,7 @@ export const useCreateRequestStore = create<CreateRequestState>((set) => ({
       pickupLocationDetail: draft.pickupLocationDetail,
       storageLocation: draft.storageLocation,
       lockerId: (draft as any).lockerId ?? null,
+      actualLockerFee: (draft as any).actualLockerFee ?? null,
       specialInstructions: draft.specialInstructions,
       directMode: draft.directMode,
       urgency: draft.urgency,
@@ -285,6 +290,7 @@ export const useCreateRequestStore = create<CreateRequestState>((set) => ({
       pickupLocationDetail: prefill?.pickupLocationDetail ?? '',
       storageLocation: prefill?.storageLocation ?? '',
       lockerId: prefill?.lockerId ?? null,
+      actualLockerFee: prefill?.actualLockerFee ?? null,
       specialInstructions: prefill?.specialInstructions ?? '',
       directMode: prefill?.directParticipationMode ?? 'none',
       urgency: prefill?.urgency ?? 'fast',

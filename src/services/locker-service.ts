@@ -463,18 +463,30 @@ export class LockerService {
     size: string,
     durationMinutes: number
   ): Promise<LockerReservation> {
-    const locker = await this.getLocker(lockerId);
-    if (!locker) {
-      throw new Error('Locker not found');
+    let lockerStatusCheckRequired = true;
+    let actualLockerId: string | null = lockerId;
+    let isLazyAllocation = false;
+
+    if (lockerId.startsWith('AREA::')) {
+      isLazyAllocation = true;
+      actualLockerId = null;
+      lockerStatusCheckRequired = false;
     }
-    if (locker.status !== LockerStatus.AVAILABLE) {
-      throw new Error('Locker is not available');
+
+    if (lockerStatusCheckRequired && actualLockerId) {
+      const locker = await this.getLocker(actualLockerId);
+      if (!locker) {
+        throw new Error('Locker not found');
+      }
+      if (locker.status !== LockerStatus.AVAILABLE) {
+        throw new Error('Locker is not available');
+      }
     }
 
     const startTime = new Date();
     const endTime = new Date(startTime.getTime() + durationMinutes * 60 * 1000);
     const reservationData = {
-      lockerId,
+      lockerId: actualLockerId || lockerId, // Store the AREA ID if lazy allocation
       userId,
       requestId,
       size: normalizeLockerSize(size),
@@ -482,20 +494,46 @@ export class LockerService {
       endTime,
       accessCode: this.generateAccessCode(),
       qrCode: '',
-      status: 'pending' as ReservationStatus,
+      status: (isLazyAllocation ? 'pending_allocation' : 'pending') as ReservationStatus,
       createdAt: serverTimestamp(),
       updatedAt: serverTimestamp(),
     };
 
     const snapshot = await addDoc(collection(db, RESERVATIONS_COLLECTION), reservationData);
-    await this.updateLockerStatus(lockerId, LockerStatus.OCCUPIED);
+    
+    if (!isLazyAllocation && actualLockerId) {
+      await this.updateLockerStatus(actualLockerId, LockerStatus.OCCUPIED);
+    }
 
     return {
       reservationId: snapshot.id,
       ...reservationData,
       createdAt: startTime,
       updatedAt: startTime,
-    };
+    } as LockerReservation;
+  }
+
+  async assignLockerToReservation(reservationId: string, actualLockerId: string): Promise<void> {
+    const reservation = await this.getReservation(reservationId);
+    if (!reservation) {
+      throw new Error('Reservation not found');
+    }
+
+    const locker = await this.getLocker(actualLockerId);
+    if (!locker) {
+      throw new Error('Locker not found');
+    }
+    if (locker.status !== LockerStatus.AVAILABLE) {
+      throw new Error('Locker is not available');
+    }
+
+    await updateDoc(doc(db, RESERVATIONS_COLLECTION, reservationId), {
+      lockerId: actualLockerId,
+      status: 'active',
+      updatedAt: serverTimestamp(),
+    });
+
+    await this.updateLockerStatus(actualLockerId, LockerStatus.OCCUPIED);
   }
 
   async getReservation(reservationId: string): Promise<LockerReservation | null> {
@@ -561,6 +599,10 @@ export async function updateReservationStatus(reservationId: string, status: str
     status,
     updatedAt: serverTimestamp(),
   });
+}
+
+export async function assignLockerToReservation(reservationId: string, actualLockerId: string): Promise<void> {
+  return lockerService.assignLockerToReservation(reservationId, actualLockerId);
 }
 
 export async function completeLockerReservation(reservationId: string): Promise<void> {

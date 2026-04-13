@@ -48,9 +48,22 @@ export default function GillerDropoffAtLockerScreen() {
         if (delivery) {
           setRequestId(delivery.requestId || null);
           if (delivery.lockerId) {
+            // If it's a lazy allocated area, don't try to fetch a specific locker, just go to select mode
+            if (delivery.lockerId.startsWith('AREA::')) {
+              setStep('select');
+              return;
+            }
+
             const lockerDetail = await getLocker(delivery.lockerId);
             if (lockerDetail) {
-              setSelectedLocker(lockerDetail as any);
+              setSelectedLocker({
+                lockerId: lockerDetail.lockerId,
+                stationId: lockerDetail.location.stationId,
+                stationName: lockerDetail.location.stationName,
+                status: lockerDetail.status,
+                size: lockerDetail.size,
+                pricePerHour: lockerDetail.pricing.base,
+              });
               setStep('reserve');
               return;
             }
@@ -181,6 +194,7 @@ export default function GillerDropoffAtLockerScreen() {
   if (step === 'select') {
     return (
       <LockerLocator
+        mode="specific"
         onLockerSelect={(locker) => {
           void handleLockerSelect(locker);
         }}

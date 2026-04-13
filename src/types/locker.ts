@@ -128,8 +128,10 @@ export interface LockerReservation {
  */
 export interface LockerSummary {
   lockerId: string;
+  stationId?: string;
   stationName: string;
   size: LockerSize;
   status: LockerStatus;
-  available: boolean;
+  available?: boolean;
+  pricePerHour?: number;
 }

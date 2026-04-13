@@ -137,6 +137,7 @@ export function usePricingQuotes() {
       pickupLocationDetail: store.pickupLocationDetail || undefined,
       storageLocation: store.storageLocation || undefined,
       lockerId: store.lockerId || undefined,
+      actualLockerFee: store.actualLockerFee ?? undefined,
       specialInstructions: store.specialInstructions || undefined,
       urgency: store.requestMode === 'reservation' ? 'normal' : store.urgency,
       selectedQuoteType: 'balanced' as const,
@@ -178,6 +179,7 @@ export function usePricingQuotes() {
     store.deliveryRoadAddress,
     store.deliveryDetailAddress,
     store.lockerId,
+    store.actualLockerFee,
   ]);
 
   // Apply AI Quote Response to deterministic quotes

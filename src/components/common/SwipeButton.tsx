@@ -2,7 +2,7 @@ import React, { useRef, useState } from 'react';
 import { View, Text, StyleSheet, Animated, PanResponder, Dimensions, LayoutChangeEvent } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
-import { Colors, Spacing, BorderRadius, Typography, Shadows } from '../../../theme';
+import { Colors, Spacing, BorderRadius, Typography, Shadows } from '../../theme';
 
 interface SwipeButtonProps {
   onComplete: () => void | Promise<void>;

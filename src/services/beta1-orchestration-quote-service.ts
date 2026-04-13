@@ -31,6 +31,7 @@ export interface Beta1RequestCreateInput {
   pickupLocationDetail?: string;
   storageLocation?: string;
   lockerId?: string;
+  actualLockerFee?: number;
   specialInstructions?: string;
   urgency?: 'normal' | 'fast' | 'urgent';
   selectedQuoteType: QuoteType;
@@ -318,7 +319,7 @@ export function buildBeta1QuoteCards(
       : base.urgencySurcharge,
     lockerFee:
       input.directParticipationMode === 'locker_assisted'
-        ? (resolvedPolicy?.quoteAdjustments?.balancedLockerAssistedFee ?? 1000)
+        ? (input.actualLockerFee ?? resolvedPolicy?.quoteAdjustments?.balancedLockerAssistedFee ?? 1000)
         : 0,
     addressPickupFee,
     addressDropoffFee,
@@ -333,7 +334,7 @@ export function buildBeta1QuoteCards(
           ? (resolvedPolicy?.quoteAdjustments?.lowestPriceReservationUrgencyDiscount ?? 600)
           : (resolvedPolicy?.quoteAdjustments?.lowestPriceImmediateUrgencyDiscount ?? 200))
     ),
-    lockerFee: resolvedPolicy?.quoteAdjustments?.lowestPriceLockerFee ?? 700,
+    lockerFee: input.actualLockerFee ?? resolvedPolicy?.quoteAdjustments?.lowestPriceLockerFee ?? 700,
     addressPickupFee: Math.round(addressPickupFee * (resolvedPolicy?.quoteAdjustments?.lowestPriceAddressPickupDiscountRate ?? 0.6)),
     addressDropoffFee: Math.round(addressDropoffFee * (resolvedPolicy?.quoteAdjustments?.lowestPriceAddressDropoffDiscountRate ?? 0.6)),
     serviceFee: Math.max(0, base.serviceFee - (resolvedPolicy?.quoteAdjustments?.lowestPriceServiceFeeDiscount ?? 150)),
@@ -345,7 +346,7 @@ export function buildBeta1QuoteCards(
 
   const lockerIncludedPricing = buildQuotePricing(base, input, {
     lockerFee:
-      (resolvedPolicy?.quoteAdjustments?.lockerIncludedBaseFee ?? 1200) +
+      (input.actualLockerFee ?? resolvedPolicy?.quoteAdjustments?.lockerIncludedBaseFee ?? 1200) +
       (reservationMode
         ? (resolvedPolicy?.quoteAdjustments?.lockerIncludedReservationExtraFee ?? 200)
         : (resolvedPolicy?.quoteAdjustments?.lockerIncludedImmediateExtraFee ?? 500)),

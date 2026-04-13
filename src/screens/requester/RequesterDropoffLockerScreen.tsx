@@ -10,7 +10,7 @@ import {
 } from 'react-native';
 import { RouteProp, useNavigation, useRoute } from '@react-navigation/native';
 import { requireUserId } from '../../services/firebase';
-import { getRequestById } from '../../services/request-service';
+import { getRequestById, updateRequestLockerId } from '../../services/request-service';
 import {
   addReservationPhotos,
   createLockerReservation,
@@ -19,12 +19,13 @@ import {
 } from '../../services/locker-service';
 import { takePhoto, uploadPhotoWithThumbnail } from '../../services/photo-service';
 import QRCodeService from '../../services/qrcode-service';
+import LockerLocator from '../../components/delivery/LockerLocator';
 import type { LockerSummary } from '../../types/locker';
 import type { MainStackNavigationProp, MainStackParamList } from '../../types/navigation';
 import { BorderRadius, Colors, Shadows, Spacing, Typography } from '../../theme';
 
 type DropoffRoute = RouteProp<MainStackParamList, 'RequesterDropoffLocker'>;
-type Step = 'loading' | 'reserve' | 'photo' | 'complete';
+type Step = 'loading' | 'select' | 'reserve' | 'photo' | 'complete';
 
 export default function RequesterDropoffLockerScreen() {
   const navigation = useNavigation<MainStackNavigationProp>();
@@ -42,6 +43,11 @@ export default function RequesterDropoffLockerScreen() {
       try {
         const request = await getRequestById(requestId);
         if (request && request.lockerId) {
+          if (request.lockerId.startsWith('AREA::')) {
+            setStep('select');
+            return;
+          }
+
           const lockerDetail = await getLocker(request.lockerId);
           if (lockerDetail) {
             setSelectedLocker(lockerDetail as any);
@@ -61,6 +67,32 @@ export default function RequesterDropoffLockerScreen() {
     }
     init();
   }, [requestId, navigation]);
+
+  const handleLockerSelect = async (locker: LockerSummary): Promise<void> => {
+    try {
+      setWorking(true);
+      const lockerDetail = await getLocker(locker.lockerId);
+      if (!lockerDetail || lockerDetail.availability.available <= 0) {
+        Alert.alert('사물함 선택 불가', '지금은 이 사물함을 사용할 수 없어요.');
+        return;
+      }
+
+      setSelectedLocker({
+        lockerId: lockerDetail.lockerId,
+        stationId: lockerDetail.location.stationId,
+        stationName: lockerDetail.location.stationName,
+        status: lockerDetail.status,
+        size: lockerDetail.size,
+        pricePerHour: lockerDetail.pricing.base,
+      });
+      setStep('reserve');
+    } catch (error) {
+      console.error('Failed to select locker:', error);
+      Alert.alert('사물함 확인 실패', '잠시 후 다시 시도해 주세요.');
+    } finally {
+      setWorking(false);
+    }
+  };
 
   const handleReserve = async (): Promise<void> => {
     if (!selectedLocker || !requestId) {
@@ -137,6 +169,9 @@ export default function RequesterDropoffLockerScreen() {
       // We only update the reservation status.
       await updateReservationStatus(reservationId, 'completed');
 
+      // Update the request with the specific lockerId (overwriting the AREA:: id if present)
+      await updateRequestLockerId(requestId, selectedLocker.lockerId);
+
       Alert.alert('보관 완료', '물품이 사물함에 안전하게 보관되었습니다. 길러가 수거할 예정입니다.', [
         { text: '확인', onPress: () => navigation.goBack() },
       ]);
@@ -154,6 +189,18 @@ export default function RequesterDropoffLockerScreen() {
         <ActivityIndicator size="large" color={Colors.primary} />
         <Text style={{ marginTop: 16, color: Colors.textSecondary }}>사물함 정보를 불러오는 중...</Text>
       </View>
+    );
+  }
+
+  if (step === 'select') {
+    return (
+      <LockerLocator
+        mode="specific"
+        onLockerSelect={(locker) => {
+          void handleLockerSelect(locker);
+        }}
+        onClose={() => navigation.goBack()}
+      />
     );
   }
 
