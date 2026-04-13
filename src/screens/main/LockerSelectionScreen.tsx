@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
+  Platform,
   ScrollView,
   StyleSheet,
   Text,
@@ -81,17 +82,22 @@ export default function LockerSelectionScreen() {
         qrCode
       );
 
-      Alert.alert('사물함 예약 완료', '사물함 임시 예약이 생성됐어요. QR 해제 화면에서 바로 테스트할 수 있습니다.', [
-        {
-          text: 'QR 확인',
-          onPress: () => navigation.navigate('QRCodeScanner'),
-        },
-        {
-          text: '닫기',
-          style: 'cancel',
-          onPress: () => navigation.goBack(),
-        },
-      ]);
+      if (Platform.OS === 'web') {
+        window.alert('사물함 임시 예약이 생성됐어요. QR 해제 화면에서 바로 테스트할 수 있습니다.');
+        navigation.navigate('QRCodeScanner');
+      } else {
+        Alert.alert('사물함 예약 완료', '사물함 임시 예약이 생성됐어요. QR 해제 화면에서 바로 테스트할 수 있습니다.', [
+          {
+            text: 'QR 확인',
+            onPress: () => navigation.navigate('QRCodeScanner'),
+          },
+          {
+            text: '닫기',
+            style: 'cancel',
+            onPress: () => navigation.goBack(),
+          },
+        ]);
+      }
     } catch (error) {
       console.error('Failed to create locker reservation:', error);
       Alert.alert('사물함 예약 실패', '잠시 후 다시 시도해 주세요.');

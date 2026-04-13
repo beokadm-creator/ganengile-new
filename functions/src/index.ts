@@ -7,7 +7,7 @@ import * as functions from 'firebase-functions';
 import * as admin from 'firebase-admin';
 import * as https from 'https';
 import { createHash, createHmac, randomUUID, timingSafeEqual } from 'crypto';
-import { defineString } from 'firebase-functions/params';
+import { defineString, defineSecret } from 'firebase-functions/params';
 import {
   User,
   GillerRoute,
@@ -80,8 +80,8 @@ const db = admin.firestore();
 const fcm = admin.messaging();
 const CI_PASS_URL_PARAM = defineString('CI_PASS_URL', { default: '' });
 const CI_KAKAO_URL_PARAM = defineString('CI_KAKAO_URL', { default: '' });
-const NAVER_MAP_CLIENT_ID_PARAM = defineString('NAVER_MAP_CLIENT_ID', { default: '' });
-const NAVER_MAP_CLIENT_SECRET_PARAM = defineString('NAVER_MAP_CLIENT_SECRET', { default: '' });
+const NAVER_MAP_CLIENT_ID_SECRET = defineSecret('NAVER_MAP_CLIENT_ID');
+const NAVER_MAP_CLIENT_SECRET_SECRET = defineSecret('NAVER_MAP_CLIENT_SECRET');
 const JUSO_API_KEY_PARAM = defineString('JUSO_API_KEY', { default: '' });
 const OTP_TEST_CODE_PARAM = defineString('OTP_TEST_CODE', { default: '123456' });
 const OTP_TEST_MODE_PARAM = defineString('OTP_TEST_MODE', { default: 'true' });
@@ -2983,7 +2983,9 @@ export const issueKakaoCustomToken = functions.https.onCall(
  * HTTP: Naver static map proxy
  * Keeps the secret key on the server side while the app/web can request a rendered image.
  */
-export const naverStaticMapProxy = functions.https.onRequest(async (req, res) => {
+export const naverStaticMapProxy = functions
+  .runWith({ secrets: [NAVER_MAP_CLIENT_ID_SECRET, NAVER_MAP_CLIENT_SECRET_SECRET] })
+  .https.onRequest(async (req, res) => {
   const ip = getClientIp(req);
   if (checkRateLimit(ip, 'naverStaticMapProxy', 10, 60)) {
     console.warn(`[rate-limit] naverStaticMapProxy blocked for ip=${ip}`);
@@ -2992,14 +2994,25 @@ export const naverStaticMapProxy = functions.https.onRequest(async (req, res) =>
   }
 
   try {
-    const clientId = getFirstNonEmptyString(
-      NAVER_MAP_CLIENT_ID_PARAM.value(),
-      process.env.NAVER_MAP_CLIENT_ID
-    );
-    const clientSecret = getFirstNonEmptyString(
-      NAVER_MAP_CLIENT_SECRET_PARAM.value(),
-      process.env.NAVER_MAP_CLIENT_SECRET
-    );
+    res.set('Access-Control-Allow-Origin', '*');
+    res.set('Access-Control-Allow-Methods', 'GET,OPTIONS');
+    res.set('Access-Control-Allow-Headers', 'Content-Type');
+
+    if (req.method === 'OPTIONS') {
+      res.status(204).send('');
+      return;
+    }
+
+    let clientId = '';
+    let clientSecret = '';
+    try {
+      clientId = NAVER_MAP_CLIENT_ID_SECRET.value() || process.env.NAVER_MAP_CLIENT_ID || '';
+      clientSecret = NAVER_MAP_CLIENT_SECRET_SECRET.value() || process.env.NAVER_MAP_CLIENT_SECRET || '';
+    } catch (e) {
+      console.warn('Failed to read Naver Map secrets, falling back to process.env', e);
+      clientId = process.env.NAVER_MAP_CLIENT_ID || '';
+      clientSecret = process.env.NAVER_MAP_CLIENT_SECRET || '';
+    }
 
     if (!clientId || !clientSecret) {
       res.status(503).json({ ok: false, message: 'naver map credentials are not configured' });
@@ -3052,7 +3065,9 @@ export const naverStaticMapProxy = functions.https.onRequest(async (req, res) =>
  * HTTP: Naver geocode proxy
  * Converts a selected road address into latitude/longitude on the server side.
  */
-export const naverGeocodeProxy = functions.https.onRequest(async (req, res) => {
+export const naverGeocodeProxy = functions
+  .runWith({ secrets: [NAVER_MAP_CLIENT_ID_SECRET, NAVER_MAP_CLIENT_SECRET_SECRET] })
+  .https.onRequest(async (req, res) => {
   const ip = getClientIp(req);
   if (checkRateLimit(ip, 'naverGeocodeProxy', 10, 60)) {
     console.warn(`[rate-limit] naverGeocodeProxy blocked for ip=${ip}`);
@@ -3070,14 +3085,16 @@ export const naverGeocodeProxy = functions.https.onRequest(async (req, res) => {
       return;
     }
 
-    const clientId = getFirstNonEmptyString(
-      NAVER_MAP_CLIENT_ID_PARAM.value(),
-      process.env.NAVER_MAP_CLIENT_ID
-    );
-    const clientSecret = getFirstNonEmptyString(
-      NAVER_MAP_CLIENT_SECRET_PARAM.value(),
-      process.env.NAVER_MAP_CLIENT_SECRET
-    );
+    let clientId = '';
+    let clientSecret = '';
+    try {
+      clientId = NAVER_MAP_CLIENT_ID_SECRET.value() || process.env.NAVER_MAP_CLIENT_ID || '';
+      clientSecret = NAVER_MAP_CLIENT_SECRET_SECRET.value() || process.env.NAVER_MAP_CLIENT_SECRET || '';
+    } catch (e) {
+      console.warn('Failed to read Naver Map secrets, falling back to process.env', e);
+      clientId = process.env.NAVER_MAP_CLIENT_ID || '';
+      clientSecret = process.env.NAVER_MAP_CLIENT_SECRET || '';
+    }
 
     if (!clientId || !clientSecret) {
       res.status(503).json({ ok: false, message: 'naver map credentials are not configured' });
@@ -3142,7 +3159,9 @@ export const naverGeocodeProxy = functions.https.onRequest(async (req, res) => {
  * HTTP: Naver reverse geocode proxy
  * Converts coordinates into a road address on the server side.
  */
-export const naverReverseGeocodeProxy = functions.https.onRequest(async (req, res) => {
+export const naverReverseGeocodeProxy = functions
+  .runWith({ secrets: [NAVER_MAP_CLIENT_ID_SECRET, NAVER_MAP_CLIENT_SECRET_SECRET] })
+  .https.onRequest(async (req, res) => {
   const ip = getClientIp(req);
   if (checkRateLimit(ip, 'naverReverseGeocodeProxy', 10, 60)) {
     console.warn(`[rate-limit] naverReverseGeocodeProxy blocked for ip=${ip}`);
@@ -3160,14 +3179,16 @@ export const naverReverseGeocodeProxy = functions.https.onRequest(async (req, re
       return;
     }
 
-    const clientId = getFirstNonEmptyString(
-      NAVER_MAP_CLIENT_ID_PARAM.value(),
-      process.env.NAVER_MAP_CLIENT_ID
-    );
-    const clientSecret = getFirstNonEmptyString(
-      NAVER_MAP_CLIENT_SECRET_PARAM.value(),
-      process.env.NAVER_MAP_CLIENT_SECRET
-    );
+    let clientId = '';
+    let clientSecret = '';
+    try {
+      clientId = NAVER_MAP_CLIENT_ID_SECRET.value() || process.env.NAVER_MAP_CLIENT_ID || '';
+      clientSecret = NAVER_MAP_CLIENT_SECRET_SECRET.value() || process.env.NAVER_MAP_CLIENT_SECRET || '';
+    } catch (e) {
+      console.warn('Failed to read Naver Map secrets, falling back to process.env', e);
+      clientId = process.env.NAVER_MAP_CLIENT_ID || '';
+      clientSecret = process.env.NAVER_MAP_CLIENT_SECRET || '';
+    }
 
     if (!clientId || !clientSecret) {
       res.status(503).json({ ok: false, message: 'naver map credentials are not configured' });
@@ -3265,7 +3286,9 @@ export const naverReverseGeocodeProxy = functions.https.onRequest(async (req, re
  * HTTP: Naver directions proxy
  * Returns route coordinates between two points so the client can render an actual route line.
  */
-export const naverDirectionsProxy = functions.https.onRequest(async (req, res) => {
+export const naverDirectionsProxy = functions
+  .runWith({ secrets: [NAVER_MAP_CLIENT_ID_SECRET, NAVER_MAP_CLIENT_SECRET_SECRET] })
+  .https.onRequest(async (req, res) => {
   const ip = getClientIp(req);
   if (checkRateLimit(ip, 'naverDirectionsProxy', 10, 60)) {
     console.warn(`[rate-limit] naverDirectionsProxy blocked for ip=${ip}`);
@@ -3283,14 +3306,16 @@ export const naverDirectionsProxy = functions.https.onRequest(async (req, res) =
       return;
     }
 
-    const clientId = getFirstNonEmptyString(
-      NAVER_MAP_CLIENT_ID_PARAM.value(),
-      process.env.NAVER_MAP_CLIENT_ID
-    );
-    const clientSecret = getFirstNonEmptyString(
-      NAVER_MAP_CLIENT_SECRET_PARAM.value(),
-      process.env.NAVER_MAP_CLIENT_SECRET
-    );
+    let clientId = '';
+    let clientSecret = '';
+    try {
+      clientId = NAVER_MAP_CLIENT_ID_SECRET.value() || process.env.NAVER_MAP_CLIENT_ID || '';
+      clientSecret = NAVER_MAP_CLIENT_SECRET_SECRET.value() || process.env.NAVER_MAP_CLIENT_SECRET || '';
+    } catch (e) {
+      console.warn('Failed to read Naver Map secrets, falling back to process.env', e);
+      clientId = process.env.NAVER_MAP_CLIENT_ID || '';
+      clientSecret = process.env.NAVER_MAP_CLIENT_SECRET || '';
+    }
 
     if (!clientId || !clientSecret) {
       res.status(503).json({ ok: false, message: 'naver map credentials are not configured' });

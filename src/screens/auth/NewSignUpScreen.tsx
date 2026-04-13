@@ -652,16 +652,12 @@ function ConsentItemRow({
           thumbColor={agreed ? Colors.primary : Colors.surface}
         />
       </View>
-      {item.content ? (
-        <TouchableOpacity onPress={onToggleExpand} activeOpacity={0.6}>
-          <Text style={styles.expandButton}>
-            {expanded ? '내용 닫기' : '내용 보기'}
-          </Text>
-        </TouchableOpacity>
-      ) : null}
-      {expanded && item.content ? (
+      <TouchableOpacity onPress={onToggleExpand} activeOpacity={0.6}>
+        <Text style={styles.expandButton}>{expanded ? '내용 닫기' : '내용 보기'}</Text>
+      </TouchableOpacity>
+      {expanded ? (
         <View style={styles.expandedContent}>
-          <Text style={styles.expandedText}>{item.content}</Text>
+          <Text style={styles.expandedText}>{item.content || '등록된 약관 내용이 없습니다.'}</Text>
         </View>
       ) : null}
     </View>

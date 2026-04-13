@@ -356,6 +356,16 @@ export default function CreateRequestScreen({ navigation, route }: Props) {
 
   const { draftHydratedRef, handleClearDraft, handleSaveDraftNow } = useRequestDraft();
   const depositPhotoNoticeShownRef = useRef(false);
+  const stepBackLockUntilRef = useRef(0);
+  const prevStepRef = useRef(activeStep);
+
+  useEffect(() => {
+    // 다음 단계로 넘어간(Forward) 직후 발생하는 beforeRemove의 뒤로가기 동작을 무시하도록 lock 설정
+    if (activeStep > prevStepRef.current) {
+      stepBackLockUntilRef.current = Date.now() + 450;
+    }
+    prevStepRef.current = activeStep;
+  }, [activeStep]);
 
   const isStepInteractionLocked = activeStep === 4 && Date.now() < transitionLockUntil;
 
@@ -537,8 +547,16 @@ export default function CreateRequestScreen({ navigation, route }: Props) {
   useEffect(() => {
     const unsubscribe = navigation.addListener('beforeRemove', (e) => {
       // 1단계보다 더 진행된 상태라면 화면이 닫히는 것을 막고 이전 단계로 이동
-      if (activeStep > 1) {
+      const actionType = (e as any)?.data?.action?.type as string | undefined;
+      const isBackAction = actionType === 'GO_BACK' || actionType === 'POP' || actionType === 'POP_TO_TOP';
+
+      if (activeStep > 1 && isBackAction) {
         e.preventDefault();
+        const now = Date.now();
+        if (stepBackLockUntilRef.current > now) {
+          return;
+        }
+        stepBackLockUntilRef.current = now + 450;
         setActiveStep(activeStep - 1);
       }
     });
@@ -559,7 +577,13 @@ export default function CreateRequestScreen({ navigation, route }: Props) {
   }, [activeStep]);
 
   function handleBack() {
+    const now = Date.now();
+    if (stepBackLockUntilRef.current > now) {
+      return;
+    }
+
     if (activeStep > 1) {
+      stepBackLockUntilRef.current = now + 450;
       setActiveStep(activeStep - 1);
       return;
     }
@@ -755,7 +779,7 @@ export default function CreateRequestScreen({ navigation, route }: Props) {
       setSaving(false);
       
       setTimeout(() => {
-        navigation.replace('RequestConfirmation', {
+        navigation.replace('MatchingResult', {
           requestId: result.requestId,
           pickupStationName:
             pickupMode === 'address'
@@ -765,12 +789,6 @@ export default function CreateRequestScreen({ navigation, route }: Props) {
             deliveryMode === 'address'
               ? `${formatDetailedAddress(deliveryRoadAddress, deliveryDetailAddress)} · ${deliveryStation.stationName}`
               : deliveryStation.stationName,
-          deliveryFee: selected
-            ? {
-                totalFee: Number(selected.pricing.publicPrice),
-                estimatedTime: parseEtaMinutes(selected.etaLabel),
-              }
-            : undefined,
         });
       }, 50);
     } catch (error) {

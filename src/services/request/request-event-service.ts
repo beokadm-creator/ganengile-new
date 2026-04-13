@@ -1,6 +1,6 @@
 import { doc, onSnapshot } from 'firebase/firestore';
+import { getFunctions, httpsCallable } from 'firebase/functions';
 import { db } from '../firebase';
-import { processMatchingForRequest } from '../matching-service';
 import { getRequestById, normalizeRequestDoc, type RequestDocShape } from './request-repository';
 import type { Request } from '../../types/request';
 
@@ -47,8 +47,15 @@ export async function notifyGillers(requestId: string): Promise<{ success: boole
       return { success: false, error: '요청을 찾을 수 없습니다.' };
     }
 
-    const matchCount = await processMatchingForRequest(requestId);
-    if (matchCount === 0) {
+    const functionsInstance = getFunctions();
+    const triggerMatching = httpsCallable<{ requestId: string }, { success: boolean; matchesFound?: number }>(
+      functionsInstance,
+      'triggerMatching'
+    );
+    const response = await triggerMatching({ requestId });
+    const matchCount = response.data?.matchesFound ?? 0;
+
+    if (!response.data?.success || matchCount === 0) {
       return { success: false, error: '매칭 가능한 길러가 없습니다.' };
     }
 

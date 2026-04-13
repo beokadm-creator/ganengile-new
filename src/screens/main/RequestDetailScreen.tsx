@@ -298,8 +298,27 @@ export default function RequestDetailScreen() {
         return;
       }
 
-      Alert.alert('금액을 올렸습니다', `${(result.newFee ?? 0).toLocaleString()}원으로 다시 요청합니다.`);
+      if (Platform.OS === 'web') {
+        window.alert(`길러를 다시 찾고 있습니다.\n${(result.newFee ?? 0).toLocaleString()}원으로 매칭을 다시 시작했습니다.`);
+      } else {
+        Alert.alert(
+          '길러를 다시 찾고 있습니다',
+          `${(result.newFee ?? 0).toLocaleString()}원으로 매칭을 다시 시작했습니다. 길러가 수락하면 알림을 보내드릴게요!`,
+          [
+            { 
+              text: '확인', 
+              onPress: () => {
+                navigation.navigate('Tabs', { screen: 'Home' });
+              }
+            }
+          ]
+        );
+      }
+      
       await loadRequest();
+      if (Platform.OS === 'web') {
+        navigation.navigate('Tabs', { screen: 'Home' });
+      }
     } catch (error) {
       console.error('Failed to increase bid', error);
       Alert.alert('재매칭 금액 조정 실패', '잠시 후 다시 시도해 주세요.');

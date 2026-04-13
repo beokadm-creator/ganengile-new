@@ -215,6 +215,7 @@ export async function getBeta1HomeSnapshot(userId: string, role: 'requester' | '
     try {
       return await getDocs(source as never);
     } catch (error) {
+      console.error('safeGetDocs failed:', error);
       return null;
     }
   };
@@ -235,8 +236,8 @@ export async function getBeta1HomeSnapshot(userId: string, role: 'requester' | '
 
   const requestQuery =
     role === 'requester'
-      ? query(collection(db, 'requests'), where('requesterId', '==', userId), orderBy('createdAt', 'desc'), limit(50))
-      : query(collection(db, 'requests'), where('status', '==', 'pending'), orderBy('createdAt', 'desc'), limit(50));
+      ? query(collection(db, 'requests'), where('requesterId', '==', userId))
+      : query(collection(db, 'requests'), where('status', '==', 'pending'));
 
   const missionQuery = query(collection(db, 'missions'), where('assignedGillerUserId', '==', userId), limit(50));
 

@@ -219,7 +219,22 @@ export async function getRequestsByRequester(requesterId: string, options?: Requ
     const snapshot = await getDocs(q);
     const requests: Request[] = [];
     snapshot.forEach((docSnapshot) => requests.push(normalizeRequestDoc(docSnapshot.id, docSnapshot.data() as RequestDocShape)));
-    requests.sort((a, b) => (b.createdAt?.toMillis() ?? 0) - (a.createdAt?.toMillis() ?? 0));
+    
+    // 안전한 Timestamp 변환 및 정렬
+    requests.sort((a, b) => {
+      const getMillis = (createdAt: any) => {
+        if (!createdAt) return 0;
+        if (typeof createdAt.toMillis === 'function') return createdAt.toMillis();
+        if (typeof createdAt.getTime === 'function') return createdAt.getTime();
+        if (createdAt.seconds) return createdAt.seconds * 1000 + (createdAt.nanoseconds || 0) / 1000000;
+        if (typeof createdAt === 'number') return createdAt;
+        if (typeof createdAt === 'string') return new Date(createdAt).getTime();
+        return 0;
+      };
+      
+      return getMillis(b.createdAt) - getMillis(a.createdAt);
+    });
+    
     return requests;
   } catch (error) {
     console.error('Error fetching requests by requester:', error);
@@ -237,6 +252,21 @@ export async function getRequestsByGiller(gillerId: string, options?: RequestFil
     const snapshot = await getDocs(q);
     const requests: Request[] = [];
     snapshot.forEach((docSnapshot) => requests.push(normalizeRequestDoc(docSnapshot.id, docSnapshot.data() as RequestDocShape)));
+    
+    // 안전한 Timestamp 변환 및 정렬 (백업)
+    requests.sort((a, b) => {
+      const getMillis = (createdAt: any) => {
+        if (!createdAt) return 0;
+        if (typeof createdAt.toMillis === 'function') return createdAt.toMillis();
+        if (typeof createdAt.getTime === 'function') return createdAt.getTime();
+        if (createdAt.seconds) return createdAt.seconds * 1000 + (createdAt.nanoseconds || 0) / 1000000;
+        if (typeof createdAt === 'number') return createdAt;
+        if (typeof createdAt === 'string') return new Date(createdAt).getTime();
+        return 0;
+      };
+      return getMillis(b.createdAt) - getMillis(a.createdAt);
+    });
+    
     return requests;
   } catch (error) {
     console.error('Error fetching requests by giller:', error);

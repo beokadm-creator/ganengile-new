@@ -731,6 +731,26 @@ export async function processMatchingForRequest(
   requestId: string
 ): Promise<number> {
   try {
+    const requestRef = doc(db, 'requests', requestId);
+    const existingMatchesSnapshot = await getDocs(
+      query(collection(db, 'matches'), where('requestId', '==', requestId))
+    );
+
+    if (!existingMatchesSnapshot.empty) {
+      const requestDoc = await getDoc(requestRef);
+      const request = requestDoc.data() as FirestoreMatchingRequestDoc | undefined;
+
+      if (request?.status === 'pending') {
+        await updateDoc(requestRef, {
+          status: 'matched',
+          matchedAt: serverTimestamp(),
+          updatedAt: serverTimestamp(),
+        });
+      }
+
+      return existingMatchesSnapshot.size;
+    }
+
     // 1. 상위 3명의 매칭 후보를 찾습니다.
     const matches = await findMatchesForRequest(requestId, 3);
 
@@ -740,7 +760,6 @@ export async function processMatchingForRequest(
     }
 
     // 2. 요청 문서에서 requesterId를 읽어옵니다.
-    const requestRef = doc(db, 'requests', requestId);
     const requestDoc = await getDoc(requestRef);
     const request = requestDoc.data() as FirestoreMatchingRequestDoc | undefined;
     const requesterId = request?.requesterId ?? '';

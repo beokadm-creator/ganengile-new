@@ -97,7 +97,7 @@ export function Step3Recipient({
         console.log('[Step3] Validations passed, calling setActiveStep(4)');
         store.setActiveStep(4);
       }} 
-      onPrev={() => store.setActiveStep(3)}
+      onPrev={() => store.setActiveStep(2)}
       nextLabel="견적 확인하기"
     >
       <Block title="인계와 수령 정보">

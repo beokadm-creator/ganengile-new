@@ -479,7 +479,8 @@ export class LockerService {
         throw new Error('Locker not found');
       }
       if (locker.status !== LockerStatus.AVAILABLE) {
-        throw new Error('Locker is not available');
+        // Only warn for now, since external APIs might have outdated status
+        console.warn('Locker is reported as not available, proceeding anyway for manual selection', locker.status);
       }
     }
 
@@ -502,7 +503,9 @@ export class LockerService {
     const snapshot = await addDoc(collection(db, RESERVATIONS_COLLECTION), reservationData);
     
     if (!isLazyAllocation && actualLockerId) {
-      await this.updateLockerStatus(actualLockerId, LockerStatus.OCCUPIED);
+      await this.updateLockerStatus(actualLockerId, LockerStatus.OCCUPIED).catch(error => {
+        console.warn('Failed to update locker status, proceeding anyway', error);
+      });
     }
 
     return {

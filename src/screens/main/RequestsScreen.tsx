@@ -235,13 +235,21 @@ export default function RequestsScreen({ navigation }: { navigation: MainStackNa
         return;
       }
 
-      Alert.alert('제안 금액을 올렸습니다', `현재 제안 금액은 ${(result.newFee ?? 0).toLocaleString()}원입니다.`);
+      if (Platform.OS === 'web') {
+        window.alert(`길러를 다시 찾고 있습니다.\n${(result.newFee ?? 0).toLocaleString()}원으로 매칭을 다시 시작했습니다.`);
+      } else {
+        Alert.alert(
+          '길러를 다시 찾고 있습니다', 
+          `${(result.newFee ?? 0).toLocaleString()}원으로 매칭을 다시 시작했습니다. 길러가 수락하면 알림을 보내드릴게요!`
+        );
+      }
+      
       await loadRequests();
     } catch (error) {
       console.error('Failed to increase bid', error);
-      Alert.alert('금액 조정 실패', '잠시 후 다시 시도해 주세요.');
+      if (isMounted.current) Alert.alert('금액 조정 실패', '잠시 후 다시 시도해 주세요.');
     } finally {
-      setWorkingRequestId(null);
+      if (isMounted.current) setWorkingRequestId(null);
     }
   }
 

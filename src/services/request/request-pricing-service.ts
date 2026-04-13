@@ -310,7 +310,9 @@ export async function increaseRequestBid(
       updatedAt: serverTimestamp(),
     });
 
-    void notifyGillers(requestId);
+    void notifyGillers(requestId).catch((error) => {
+      console.warn('Failed to notify gillers (ignored):', error);
+    });
 
     return { success: true, newFee: nextFee };
   } catch (error) {

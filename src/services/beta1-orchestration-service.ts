@@ -79,7 +79,21 @@ import type { StationInfo as RequestStationInfo } from '../types/request';
 import type { GillerTerritory } from '../types/user';
 
 function cleanForFirestore<T>(value: T): T {
-  return JSON.parse(JSON.stringify(value));
+  if (value === null || value === undefined) return value;
+  if (typeof value !== 'object') return value;
+  if (Array.isArray(value)) {
+    return value.map(cleanForFirestore) as unknown as T;
+  }
+  if (value.constructor.name === 'Timestamp' || value.constructor.name === 'FieldValue' || (value as any)._methodName) {
+    return value;
+  }
+  const cleanObj: any = {};
+  for (const [k, v] of Object.entries(value)) {
+    if (v !== undefined) {
+      cleanObj[k] = cleanForFirestore(v);
+    }
+  }
+  return cleanObj as T;
 }
 
 export {
@@ -724,7 +738,7 @@ export async function createBeta1Request(input: Beta1RequestCreateInput): Promis
 
   const requestId = generateShortId('R');
   const requestRef = doc(collection(db, 'requests'), requestId);
-  const cleanRequestPayload = JSON.parse(JSON.stringify(requestPayload));
+  const cleanRequestPayload = cleanForFirestore(requestPayload);
   await setDoc(requestRef, cleanRequestPayload);
 
   const deliveryId = generateShortId('D');
@@ -754,7 +768,7 @@ export async function createBeta1Request(input: Beta1RequestCreateInput): Promis
     createdAt: serverTimestamp(),
     updatedAt: serverTimestamp(),
   };
-  const cleanDeliveryPayload = JSON.parse(JSON.stringify(deliveryPayload));
+  const cleanDeliveryPayload = cleanForFirestore(deliveryPayload);
   await setDoc(deliveryRef, cleanDeliveryPayload);
 
   await updateDoc(doc(db, 'requests', requestRef.id), {
@@ -1009,11 +1023,11 @@ export async function bundleMissionsForDelivery(deliveryId: string): Promise<Mis
 
   await Promise.all(
     bundles.map((bundle) => {
-      const cleanBundle = JSON.parse(JSON.stringify({
+      const cleanBundle = cleanForFirestore({
         ...bundle,
         createdAt: serverTimestamp(),
         updatedAt: serverTimestamp(),
-      }));
+      });
       return setDoc(doc(db, 'mission_bundles', bundle.missionBundleId), cleanBundle);
     })
   );
