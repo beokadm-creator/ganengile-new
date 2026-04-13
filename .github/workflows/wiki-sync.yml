@@ -12,51 +12,36 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
         with:
-          fetch-depth: 0
+          fetch-depth: 2
 
       - name: Build daily digest
         id: digest
         run: |
-          # Get today's commits (push에 포함된 것들만)
-          TODAY=$(date +'%Y-%m-%d')
-          COMMIT_COUNT=$(git log --since="2026-01-01" --oneline | wc -l)
+          # Get commits between HEAD and HEAD~1 (the pushed commits)
+          BEFORE="${{ github.event.before }}"
+          AFTER="${{ github.event.after }}"
           
-          # Get all commits for today from the push
-          COMMITS=$(git log -1 --pretty=format:"%H|%s|%an" ${{ github.event.after }})
-          # Also get parent commits from same day
-          PREV_HASH=$(git log -1 --pretty=format:"%H" ${{ github.event.before }})
-          
-          # Collect all commits pushed in this event that are from today
-          > /tmp/commits.txt
-          while IFS= read -r line; do
-            HASH=$(echo "$line" | cut -d'|' -f1)
-            MSG=$(echo "$line" | cut -d'|' -f2)
-            AUTHOR=$(echo "$line" | cut -d'|' -f3)
-            SHORT_HASH=$(git rev-parse --short "$HASH")
-            echo "${SHORT_HASH}|${MSG}|${AUTHOR}" >> /tmp/commits.txt
-          done <<< "$COMMITS"
-          
-          # If there are multiple commits, collect parents from today too
-          if [ "${{ github.event.before }}" != "0000000000000000000000000000000000000000" ]; then
-            git log ${{ github.event.before }}..${{ github.event.after }} --pretty=format:"%h|%s|%an" --reverse > /tmp/commits.txt
+          if [ "$BEFORE" = "0000000000000000000000000000000000000000" ]; then
+            # First push or new repo — use last commit only
+            COMMITS=$(git log -1 --pretty=format:"%h|%s|%an")
+          else
+            COMMITS=$(git log "${BEFORE}..${AFTER}" --pretty=format:"%h|%s|%an" --reverse)
           fi
           
-          TOTAL=$(wc -l < /tmp/commits.txt | tr -d ' ')
+          TOTAL=$(echo "$COMMITS" | grep -c '|' || true)
           echo "Total commits to sync: $TOTAL"
           
           if [ "$TOTAL" -eq 0 ]; then
-            echo "No commits to sync"
             echo "skip=true" >> $GITHUB_OUTPUT
             exit 0
           fi
           
-          DATE_YYYY_MM_DD=$(date +'%Y-%m-%d')
-          DATE_YYYY_MM=$(date +'%Y-%m')
-          DATE_MONTH=$(date +'%-m')
-          DATE_DAY=$(date +'%-d')
+          DATE_YYYY_MM_DD=$(TZ=Asia/Seoul date +'%Y-%m-%d')
+          DATE_YYYY_MM=$(TZ=Asia/Seoul date +'%Y-%m')
+          DATE_MONTH=$(TZ=Asia/Seoul date +'%-m')
+          DATE_DAY=$(TZ=Asia/Seoul date +'%-d')
           
-          # Build TipTap JSON content: heading per commit + details
-          # Start with document-level heading
+          # Build TipTap JSON content
           TIPTAP_JSON='{"type":"doc","content":['
           TIPTAP_JSON+='{"type":"heading","attrs":{"level":2},"content":[{"type":"text","text":"'${DATE_MONTH}'월 '${DATE_DAY}'일 — 커밋 '"${TOTAL}"'개"}]},'
           
@@ -67,21 +52,17 @@ jobs:
             [ -z "$HASH" ] && continue
             
             if [[ "$MSG" =~ ^([a-zA-Z]+)(\([^)]*\))?:\ (.+) ]]; then
-              PREFIX="${BASH_REMATCH[1]}"
               SUBJECT="${BASH_REMATCH[3]}"
             else
-              PREFIX="chore"
               SUBJECT="$MSG"
             fi
             
             [ -z "$FIRST_SUBJECT" ] && FIRST_SUBJECT="$SUBJECT"
             HASHES="${HASHES}${HASH},"
             
-            # Escape JSON special chars in MSG and AUTHOR
             SAFE_MSG=$(echo "$MSG" | sed 's/\\/\\\\/g; s/"/\\"/g')
             SAFE_AUTHOR=$(echo "$AUTHOR" | sed 's/\\/\\\\/g; s/"/\\"/g')
             
-            # Commit heading (level 3)
             if [ $COMMIT_INDEX -gt 0 ]; then
               TIPTAP_JSON+=','
             fi
@@ -89,16 +70,12 @@ jobs:
             TIPTAP_JSON+='{"type":"paragraph","content":[{"type":"text","text":"작성자: '"${SAFE_AUTHOR}"'"}]}'
             
             COMMIT_INDEX=$((COMMIT_INDEX + 1))
-          done < /tmp/commits.txt
+          done <<< "$COMMITS"
           
-          # Remove trailing comma from hashes
           HASHES=$(echo "$HASHES" | sed 's/,$//')
-          
           TIPTAP_JSON+=']}'
           
           TITLE="${DATE_MONTH}월 ${DATE_DAY}일 — ${FIRST_SUBJECT}"
-          
-          # Truncate subject for title if too long
           if [ ${#TITLE} -gt 80 ]; then
             TITLE="${DATE_MONTH}월 ${DATE_DAY}일 — 커밋 ${TOTAL}개"
           fi
