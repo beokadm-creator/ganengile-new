@@ -53,7 +53,12 @@ export default function BasicInfoOnboarding() {
     async function load() {
       setLoadingTemplates(true);
       try {
-        const templates = await fetchConsentTemplates();
+        const templates = await Promise.race([
+          fetchConsentTemplates(),
+          new Promise<ConsentDisplayItem[]>((_, reject) => {
+            setTimeout(() => reject(new Error('timeout')), 6000);
+          }),
+        ]);
         if (cancelled) return;
         if (templates.length > 0) {
           setConsentTemplates(templates);

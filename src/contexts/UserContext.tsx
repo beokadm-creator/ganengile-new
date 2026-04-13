@@ -14,7 +14,7 @@ interface UserContextType {
   currentRole: UserRole | null;
   switchRole: (role: UserRole) => void;
   refreshUser: () => Promise<void>;
-  completeOnboarding: () => Promise<string | null>;
+  completeOnboarding: () => Promise<void>;
   logout: () => Promise<void>;
   deactivateAccount: (reason?: string) => Promise<void>;
 }
@@ -241,10 +241,10 @@ export function UserProvider({ children }: UserProviderProps) {
     return refreshInFlightRef.current;
   }, []);
 
-  const completeOnboarding = useCallback(async (): Promise<string | null> => {
+  const completeOnboarding = useCallback(async (): Promise<void> => {
     const activeUser = auth.currentUser;
     if (!activeUser) {
-      return null;
+      return;
     }
 
     await updateDoc(doc(db, 'users', activeUser.uid), {
@@ -279,11 +279,6 @@ export function UserProvider({ children }: UserProviderProps) {
     } catch (e) {
       setCurrentRole(resolveActiveRole(refreshedUser ?? user));
     }
-
-    // 온보딩 전에 사용자가 가려던 URL 반환
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
-    const { consumePendingDeepLink } = require('../navigation/navigationRef');
-    return consumePendingDeepLink();
   }, [user]);
 
   const switchRole = useCallback((role: UserRole) => {

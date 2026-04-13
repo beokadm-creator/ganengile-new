@@ -1,5 +1,5 @@
-﻿import React, { useEffect, useRef } from 'react';
-import { NavigationContainer } from '@react-navigation/native';
+import React, { useEffect, useRef } from 'react';
+import { NavigationContainer, getStateFromPath } from '@react-navigation/native';
 import { createStackNavigator } from '@react-navigation/stack';
 import { ActivityIndicator, Platform, StyleSheet, View } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
@@ -91,7 +91,7 @@ function AppNavigatorContent() {
   useEffect(() => {
     if (!user || user.hasCompletedOnboarding) return;
     if (Platform.OS !== 'web') return;
-    const currentPath = window.location.pathname;
+    const currentPath = window.location.pathname + window.location.search + window.location.hash;
     if (currentPath && currentPath !== '/' && currentPath !== '/onboarding') {
       void savePendingDeepLink(currentPath);
     }
@@ -106,14 +106,20 @@ function AppNavigatorContent() {
       prevOnboardingRef.current = true;
       void (async () => {
         const pendingUrl = await consumePendingDeepLink();
-        if (pendingUrl && navigationRef.current?.isReady()) {
-          if (pendingUrl.includes('request/new')) {
-            navigationRef.current.navigate('Main', {
-              screen: 'CreateRequest',
-              params: undefined,
-            });
+        if (!navigationRef.current?.isReady()) return;
+
+        if (pendingUrl) {
+          const state = getStateFromPath(pendingUrl, linking.config);
+          if (state) {
+            navigationRef.current.resetRoot(state as never);
+            return;
           }
         }
+
+        navigationRef.current.navigate('Main', {
+          screen: 'Tabs',
+          params: { screen: 'Home' },
+        });
       })();
     }
 
