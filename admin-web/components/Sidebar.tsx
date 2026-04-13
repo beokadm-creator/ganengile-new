@@ -10,6 +10,7 @@ const NAV = [
   { href: '/pricing/policy', label: '가격 정책', indent: true, badge: 'new' },
   { href: '/pricing/insights', label: '가격 인사이트', indent: true, badge: 'new' },
   { href: '/pricing/overrides', label: '구간 오버라이드', indent: true, badge: 'new' },
+  { href: '/coupons', label: '쿠폰 관리', badge: 'new' },
   { href: '/users', label: '사용자 관리' },
   { href: '/gillers/applications', label: '길러 심사 (통합)', indent: true },
   { href: '/integrations/identity', label: 'CI 설정', indent: true },
