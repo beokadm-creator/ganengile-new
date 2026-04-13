@@ -543,9 +543,15 @@ export default function CreateRequestScreen({ navigation, route }: Props) {
   }, [navigation, activeStep, setActiveStep]);
 
   useEffect(() => {
-    // 활성화된 스텝이 변경될 때 스크롤을 맨 위로 이동
+    // 활성화된 스텝이 변경될 때 스크롤 제어
     setTimeout(() => {
-      scrollViewRef.current?.scrollTo({ y: 0, animated: true });
+      if (activeStep === 4) {
+        // 4단계(견적 확인)일 때는 화면 맨 아래로 스크롤하여 결제 요약이 보이게 함
+        scrollViewRef.current?.scrollToEnd({ animated: true });
+      } else {
+        // 1~3단계일 때는 맨 위로 스크롤
+        scrollViewRef.current?.scrollTo({ y: 0, animated: true });
+      }
     }, 100);
   }, [activeStep]);
 
