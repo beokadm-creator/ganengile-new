@@ -2854,6 +2854,24 @@ export const issueKakaoCustomToken = functions.https.onCall(
           badgeBenefits: existingTx.exists
             ? existingDataTx.badgeBenefits ?? { profileFrame: 'none', totalBadges: 0, currentTier: 'none' }
             : { profileFrame: 'none', totalBadges: 0, currentTier: 'none' },
+          pointBalance: existingDataTx.pointBalance ?? 0,
+          walletBalances: existingTx.exists ? existingDataTx.walletBalances ?? {
+            chargeBalance: 0,
+            earnedBalance: 0,
+            promoBalance: 0,
+            lockedChargeBalance: 0,
+            lockedEarnedBalance: 0,
+            lockedPromoBalance: 0,
+            pendingWithdrawalBalance: 0,
+          } : {
+            chargeBalance: 0,
+            earnedBalance: 0,
+            promoBalance: 0,
+            lockedChargeBalance: 0,
+            lockedEarnedBalance: 0,
+            lockedPromoBalance: 0,
+            pendingWithdrawalBalance: 0,
+          },
           ...(existingTx.exists ? {} : { createdAt: now }),
         },
         { merge: true }

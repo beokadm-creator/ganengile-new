@@ -97,16 +97,21 @@ export async function PATCH(req: NextRequest) {
   };
 
   const oldSummary = getWalletSummary(currentBalances as any);
-  const delta = type === 'earn' ? Number(amount) : -Number(amount);
+  const requestedDelta = type === 'earn' ? Number(amount) : -Number(amount);
 
   // 3. Apply changes to the specific funding source
   const newBalances = { ...currentBalances };
+  let actualDelta = 0;
+
   if (fundingSource === 'charge') {
-    newBalances.chargeBalance = Math.max(0, currentBalances.chargeBalance + delta);
+    newBalances.chargeBalance = Math.max(0, currentBalances.chargeBalance + requestedDelta);
+    actualDelta = newBalances.chargeBalance - currentBalances.chargeBalance;
   } else if (fundingSource === 'earned') {
-    newBalances.earnedBalance = Math.max(0, currentBalances.earnedBalance + delta);
+    newBalances.earnedBalance = Math.max(0, currentBalances.earnedBalance + requestedDelta);
+    actualDelta = newBalances.earnedBalance - currentBalances.earnedBalance;
   } else {
-    newBalances.promoBalance = Math.max(0, currentBalances.promoBalance + delta);
+    newBalances.promoBalance = Math.max(0, currentBalances.promoBalance + requestedDelta);
+    actualDelta = newBalances.promoBalance - currentBalances.promoBalance;
   }
 
   const newSummary = getWalletSummary(newBalances as any);
@@ -122,9 +127,9 @@ export async function PATCH(req: NextRequest) {
   };
   
   if (type === 'earn') {
-    totalUpdate.totalEarnedPoints = (userData.totalEarnedPoints ?? 0) + Number(amount);
+    totalUpdate.totalEarnedPoints = (userData.totalEarnedPoints ?? 0) + actualDelta;
   } else {
-    totalUpdate.totalSpentPoints = (userData.totalSpentPoints ?? 0) + Number(amount);
+    totalUpdate.totalSpentPoints = (userData.totalSpentPoints ?? 0) + Math.abs(actualDelta);
   }
   
   batch.update(userRef, totalUpdate);
@@ -140,7 +145,7 @@ export async function PATCH(req: NextRequest) {
   // 5. Add Legacy Transaction Log
   batch.set(db.collection('point_transactions').doc(), {
     userId,
-    amount: delta,
+    amount: actualDelta,
     type: type === 'earn' ? 'earn' : 'spend',
     category: 'admin_adjustment',
     description: `관리자 수동 조정 (${fundingSource}): ${reason}`,
@@ -157,7 +162,7 @@ export async function PATCH(req: NextRequest) {
     userId,
     type: 'adjustment',
     fundingSource: fundingSource,
-    amount: delta,
+    amount: actualDelta,
     balanceBefore: oldSummary,
     balanceAfter: newSummary,
     description: `관리자 수동 조정: ${reason}`,
