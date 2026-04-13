@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
+  Alert,
   RefreshControl,
   ScrollView,
   StyleSheet,
@@ -11,6 +12,7 @@ import {
 import { ParamListBase } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
 import { useUser } from '../../contexts/UserContext';
+import { useGillerAccess } from '../../hooks/useGillerAccess';
 import {
   getUserMonthlyEarnings,
   getUserPayments,
@@ -33,6 +35,8 @@ interface Props {
 
 export default function EarningsScreen({ navigation }: Props) {
   const { user } = useUser();
+  const { canAccessGiller } = useGillerAccess();
+  const isPreviewMode = !canAccessGiller;
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [payments, setPayments] = useState<Payment[]>([]);
@@ -166,7 +170,23 @@ export default function EarningsScreen({ navigation }: Props) {
           <SettlementRow label="누적 실수령액" value={totals.totalNet} strong />
         </View>
 
-        <TouchableOpacity style={styles.withdrawButton} onPress={() => navigation.navigate('PointWithdraw')}>
+        <TouchableOpacity 
+          style={styles.withdrawButton} 
+          onPress={() => {
+            if (isPreviewMode) {
+              Alert.alert(
+                '미리보기 모드',
+                '수익금을 출금하려면 길러 신청을 완료해주세요.',
+                [
+                  { text: '닫기', style: 'cancel' },
+                  { text: '신청하기', onPress: () => navigation.navigate('Profile') }
+                ]
+              );
+              return;
+            }
+            navigation.navigate('PointWithdraw');
+          }}
+        >
           <Text style={styles.withdrawButtonText}>정산금 출금하기</Text>
           <Text style={styles.withdrawButtonSubtext}>
             출금 전에는 계좌 상태, 본인 확인, 운영 검토 여부를 먼저 확인합니다.

@@ -11,7 +11,6 @@ import { View, StyleSheet } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { MainStackParamList, MainTabParamList } from '../types/navigation';
 import { useUser } from '../contexts/UserContext';
-import { useGillerAccess } from '../hooks/useGillerAccess';
 import { UserRole } from '../types/user';
 
 import HomeScreen from '../screens/main/HomeScreen';
@@ -138,12 +137,10 @@ function TabBarIcon({ name, focused }: { name: string; focused: boolean }) {
 
 function TabNavigator() {
   const { currentRole } = useUser();
-  const { canAccessGiller } = useGillerAccess();
   const insets = useSafeAreaInsets();
 
   const showRequesterTab = currentRole === UserRole.GLER || currentRole === UserRole.BOTH;
-  const showGillerTabs =
-    (currentRole === UserRole.GILLER || currentRole === UserRole.BOTH) && canAccessGiller;
+  const showGillerTabs = currentRole === UserRole.GILLER || currentRole === UserRole.BOTH;
 
   return (
     <Tab.Navigator

@@ -307,7 +307,7 @@ export default function ProfileScreen({ navigation }: { navigation: MainStackNav
         />
       </View>
 
-      {activeRole === UserRole.GILLER && canAccessGiller ? (
+      {activeRole === UserRole.GILLER ? (
         <MenuSection title="길러 메뉴" items={gillerLinks} />
       ) : (
         <MenuSection title="이용자 메뉴" items={requesterLinks} />
