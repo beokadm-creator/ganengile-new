@@ -149,10 +149,20 @@ export interface MonthlyEarningsWithTax {
 export async function createRequestPayment(
   userId: string,
   requestId: string,
-  amount: number
+  amount: number,
+  couponDiscountAmount: number = 0,
+  pointUsedAmount: number = 0
 ): Promise<string> {
   try {
     const settlementPolicy = await getRuntimeSettlementPolicy();
+    
+    // 세무/재무적 분류:
+    // - amount: 원래 배송 요금 (매출 기준액)
+    // - couponDiscountAmount: 쿠폰 사용액 (매출 에누리/할인 성격, 플랫폼/길러가 부담하는 할인액)
+    // - pointUsedAmount: 포인트 사용액 (부채 상계 성격, 이미 선수금/비용으로 잡힌 포인트를 차감하여 결제 대금으로 인정)
+    // - finalAmountToPay: 실제 PG사를 통해 결제해야 하는 남은 현금 결제액
+    const finalAmountToPay = Math.max(0, amount - couponDiscountAmount - pointUsedAmount);
+
     const paymentData = {
       userId,
       type: PaymentType.REQUEST_FEE,
@@ -167,6 +177,13 @@ export async function createRequestPayment(
         platformFeeRate: settlementPolicy.platformFeeRate,
         taxRate: 0,
         isTaxable: false,
+        // 재무 회계용 추가 메타데이터
+        accounting: {
+          originalGrossAmount: amount,
+          revenueDiscountAmount: couponDiscountAmount, // 쿠폰(바우처)는 매출할인으로 인식
+          liabilityOffsetAmount: pointUsedAmount,      // 포인트는 기충전 부채(선수금) 상계로 인식
+          actualCashPaymentRequired: finalAmountToPay
+        }
       },
       createdAt: serverTimestamp(),
     };
@@ -201,7 +218,10 @@ export async function createGillerEarning(
   requestId: string,
   amount: number,
   isTaxable: boolean = true,
-  options?: CreateGillerEarningOptions
+  options?: CreateGillerEarningOptions & {
+    couponDiscountApplied?: number;
+    pointOffsetApplied?: number;
+  }
 ): Promise<string> {
   try {
     const settlementPolicy = await getRuntimeSettlementPolicy();
@@ -260,6 +280,12 @@ export async function createGillerEarning(
         baseAmount, // 기본 요금
         bonusAmount, // 배지 보너스
         badgeBonusRate: badgeBonus, // 배지 보너스율
+        // 재무 회계용 메타데이터 기록 (길러 정산 시 참고용)
+        accounting: {
+          originalGrossAmount: baseAmount,
+          revenueDiscountAmount: options?.couponDiscountApplied ?? 0, // 결제 시 사용된 쿠폰 할인(매출할인)
+          liabilityOffsetAmount: options?.pointOffsetApplied ?? 0,    // 결제 시 사용된 포인트(부채 상계)
+        }
       } as PaymentMetadata,
       createdAt: serverTimestamp(),
       completedAt: serverTimestamp(),
