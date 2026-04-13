@@ -38,6 +38,7 @@ import {
   releaseMissionBundleForGiller,
   type Beta1HomeSnapshot,
 } from '../../services/beta1-orchestration-service';
+import { locationService, type LocationData } from '../../services/location-service';
 import {
   buildProfessionalMissionBridgeReason,
   resolveGillerMissionExecutionMode,
@@ -52,6 +53,7 @@ export default function GillerRequestsScreen() {
   const { canAccessGiller } = useGillerAccess();
   const isPreviewMode = !canAccessGiller;
   const [snapshot, setSnapshot] = useState<Beta1HomeSnapshot | null>(null);
+  const [currentLocation, setCurrentLocation] = useState<LocationData | null>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [submittingBundleId, setSubmittingBundleId] = useState<string | null>(null);
@@ -90,6 +92,20 @@ export default function GillerRequestsScreen() {
     void loadSnapshot('initial');
   }, [loadSnapshot]);
 
+  useEffect(() => {
+    if (isPreviewMode) {
+      locationService.getCurrentLocation()
+        .then((loc) => {
+          if (loc) {
+            setCurrentLocation(loc);
+          }
+        })
+        .catch((error) => {
+          console.error('Failed to get location for preview mode', error);
+        });
+    }
+  }, [isPreviewMode]);
+
   const activeTerritory = useMemo(() => {
     const territories = user?.gillerProfile?.territories ?? [];
     const activeTerritoryId = user?.gillerProfile?.activeTerritoryId;
@@ -109,11 +125,22 @@ export default function GillerRequestsScreen() {
 
   const filterByTerritory = useCallback(
     (groups: MissionGroup[]) => {
-      if (!activeTerritory) {
+      let centerLat: number;
+      let centerLng: number;
+      let radiusMeters: number;
+
+      if (activeTerritory) {
+        centerLat = activeTerritory.latitude;
+        centerLng = activeTerritory.longitude;
+        radiusMeters = activeTerritory.radiusKm * 1000;
+      } else if (isPreviewMode && currentLocation) {
+        centerLat = currentLocation.latitude;
+        centerLng = currentLocation.longitude;
+        radiusMeters = 6000; // 미리보기 모드 시 내 주변 6km 기본 적용
+      } else {
         return groups;
       }
 
-      const radiusMeters = activeTerritory.radiusKm * 1000;
       return groups.filter((group) => {
         const points = [group.originPoint, group.destinationPoint].filter(
           (point): point is NonNullable<MissionGroup['originPoint']> => point != null
@@ -125,14 +152,14 @@ export default function GillerRequestsScreen() {
 
         return points.some((point) => {
           const distance = Math.min(
-            locationDistance(activeTerritory.latitude, activeTerritory.longitude, point.latitude, point.longitude),
+            locationDistance(centerLat, centerLng, point.latitude, point.longitude),
             Number.POSITIVE_INFINITY
           );
           return distance <= radiusMeters;
         });
       });
     },
-    [activeTerritory]
+    [activeTerritory, isPreviewMode, currentLocation]
   );
 
   const immediateMissionGroups = useMemo(
@@ -314,11 +341,19 @@ export default function GillerRequestsScreen() {
       </View>
 
       <MissionBoardHeader
-        scopeTitle={activeTerritory ? `${activeTerritory.label} 기준` : '전체 권역 기준'}
+        scopeTitle={
+          activeTerritory 
+            ? `${activeTerritory.label} 기준` 
+            : isPreviewMode && currentLocation
+              ? '내 주변 기준 (미리보기)'
+              : '전체 권역 기준'
+        }
         scopeSubtitle={
           user?.gillerProfile?.type === GillerType.PROFESSIONAL || user?.gillerProfile?.type === GillerType.MASTER
             ? '권역 노출 후 동선 우선권을 보고, 일부 미션은 외부 연동으로 이어집니다.'
-            : '권역 노출 후 동선이 맞는 길러에게 먼저 기회가 갑니다.'
+            : isPreviewMode && currentLocation
+              ? '내 주변 6km 이내의 미션을 미리 확인해보세요.'
+              : '권역 노출 후 동선이 맞는 길러에게 먼저 기회가 갑니다.'
         }
         onPressScopeSettings={() => navigation.navigate('Tabs', { screen: 'RouteManagement' })}
         featuredMission={
@@ -376,7 +411,13 @@ export default function GillerRequestsScreen() {
         subtitle="지금 바로 맡을 수 있는 배송을 지도와 구간 옵션으로 확인하세요."
         items={immediateMissionGroups}
         emptyTitle="지금 바로 맡을 수 있는 배송이 없습니다"
-        emptySubtitle={activeTerritory ? '선택한 권역에 들어오는 새 배송은 여기에서 전체 구간과 부분 구간으로 보입니다.' : '새 배송이 들어오면 여기에서 전체 구간과 부분 구간을 함께 보여드립니다.'}
+        emptySubtitle={
+          activeTerritory
+            ? '선택한 권역에 들어오는 새 배송은 여기에서 전체 구간과 부분 구간으로 보입니다.'
+            : isPreviewMode && currentLocation
+              ? '현재 내 주변 6km 이내에 올라온 배송이 없습니다.'
+              : '새 배송이 들어오면 여기에서 전체 구간과 부분 구간을 함께 보여드립니다.'
+        }
         getKey={(group) => group.id}
         renderItem={(group) => (
           <MissionGroupCard
