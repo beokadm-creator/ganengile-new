@@ -18,6 +18,8 @@ import { db } from '../services/firebase';
 import { gillerAcceptRequest } from './delivery-service';
 import {
   matchGillersToRequest,
+  type DeliveryRequest,
+  type GillerRoute,
   type MatchingResult,
 } from '../../data/matching-engine';
 import { getStationByName } from '../data/subway-stations';
@@ -105,34 +107,6 @@ type FilterRequestBase = {
   };
   [key: string]: unknown;
 };
-
-type EngineGillerRoute = {
-  gillerId: string;
-  gillerName?: string;
-  departureStation: string;
-  arrivalStation: string;
-  departureTime: string;
-  daysOfWeek: number[];
-  rating?: number;
-  totalDeliveries?: number;
-  completedDeliveries?: number;
-  badgeBonus?: number;
-  priorityBoost?: number;
-};
-
-type EngineDeliveryRequest = {
-  pickupStation: string;
-  deliveryStation: string;
-  dayOfWeek: string;
-  time: string;
-};
-
-const runMatchingEngine = matchGillersToRequest as unknown as (
-  request: EngineDeliveryRequest,
-  gillerRoutes: EngineGillerRoute[]
-) => MatchingResult[];
-
-type RouteMatchableRequest = FilterRequestBase & RouteScoreRequest;
 
 type BadgeCollections = {
   activity?: string[];
@@ -502,7 +476,7 @@ async function fetchUserStats(userId: string): Promise<{
  * Fetch all active giller routes from Firestore
  * @returns Array of giller routes
  */
-export async function fetchActiveGillerRoutes(): Promise<EngineGillerRoute[]> {
+export async function fetchActiveGillerRoutes(): Promise<GillerRoute[]> {
   try {
     const q = query(
       collection(db, 'routes'),
@@ -510,7 +484,7 @@ export async function fetchActiveGillerRoutes(): Promise<EngineGillerRoute[]> {
     );
 
     const snapshot = await getDocs(q);
-    const routes: EngineGillerRoute[] = [];
+    const routes: GillerRoute[] = [];
 
     snapshot.forEach((docSnapshot) => {
       const data = docSnapshot.data() as FirestoreRouteDoc;
@@ -522,7 +496,6 @@ export async function fetchActiveGillerRoutes(): Promise<EngineGillerRoute[]> {
         return;
       }
 
-      // Convert Firestore data to GillerRoute format
       const startStation = getStationByName(startStationName);
       const endStation = getStationByName(endStationName);
 
@@ -531,31 +504,22 @@ export async function fetchActiveGillerRoutes(): Promise<EngineGillerRoute[]> {
         return;
       }
 
-      // Fetch user stats from users collection (using defaults for now)
       const userStats = {
         rating: data.rating ?? 4.5,
         totalDeliveries: data.totalDeliveries ?? 0,
         completedDeliveries: data.completedDeliveries ?? 0,
       };
 
-      // Calculate badge bonus (using default for now)
-      const badgeBonus = {
-        feeBonus: 0,
-        priorityBoost: 0,
-      };
-
       routes.push({
         gillerId: data.userId,
         gillerName: data.gillerName ?? 'giller',
-        departureStation: startStation.stationName,
-        arrivalStation: endStation.stationName,
+        startStation,
+        endStation,
         departureTime: data.departureTime ?? '08:00',
         daysOfWeek: data.daysOfWeek ?? [1, 2, 3, 4, 5],
         rating: userStats.rating,
         totalDeliveries: userStats.totalDeliveries,
         completedDeliveries: userStats.completedDeliveries,
-        badgeBonus: badgeBonus.feeBonus,
-        priorityBoost: badgeBonus.priorityBoost,
       });
     });
 
@@ -617,16 +581,41 @@ export async function fetchUserInfo(userId: string): Promise<{
  * @param requestDoc Firestore request document
  * @returns DeliveryRequest object
  */
-export function convertToDeliveryRequest(requestDoc: FirestoreMatchingRequestDoc): EngineDeliveryRequest {
+export function convertToDeliveryRequest(requestDoc: FirestoreMatchingRequestDoc): DeliveryRequest {
   const departureTime = requestDoc.preferredTime?.departureTime ?? '08:00';
-  const today = new Date().getDay();
-  const dayOfWeek = today === 0 ? 'sun' : today === 1 ? 'mon' : today === 2 ? 'tue' : today === 3 ? 'wed' : today === 4 ? 'thu' : today === 5 ? 'fri' : 'sat';
+  const today = new Date().getDay(); // 0=Sun..6=Sat
+  const dayOfWeekNumber = today === 0 ? 7 : today;
+
+  const pickupStationName = requestDoc.pickupStation?.stationName ?? '';
+  const deliveryStationName = requestDoc.deliveryStation?.stationName ?? '';
+
+  const pickupStartTime = departureTime;
+  const pickupEndTime = departureTime;
+
+  const deadlineDate =
+    typeof (requestDoc.deadline as any)?.toDate === 'function'
+      ? (requestDoc.deadline as any).toDate()
+      : requestDoc.deadline instanceof Date
+        ? requestDoc.deadline
+        : new Date(Date.now() + 1000 * 60 * 60 * 2);
+
+  const packageSizeRaw = String(requestDoc.packageInfo?.size ?? 'medium').toLowerCase();
+  const packageSize: DeliveryRequest['packageSize'] =
+    packageSizeRaw === 'small' ? 'small' : packageSizeRaw === 'large' ? 'large' : 'medium';
+
+  const weightValue = requestDoc.packageInfo?.weight;
+  const packageWeight = typeof weightValue === 'number' ? weightValue : Number(weightValue ?? 1);
 
   return {
-    pickupStation: requestDoc.pickupStation?.stationName ?? '',
-    deliveryStation: requestDoc.deliveryStation?.stationName ?? '',
-    dayOfWeek,
-    time: departureTime,
+    requestId: requestDoc.id ?? '',
+    pickupStationName,
+    deliveryStationName,
+    pickupStartTime,
+    pickupEndTime,
+    deliveryDeadline: deadlineDate.toISOString(),
+    preferredDays: [dayOfWeekNumber],
+    packageSize,
+    packageWeight: Number.isFinite(packageWeight) && packageWeight > 0 ? packageWeight : 1,
   };
 }
 
@@ -658,12 +647,10 @@ export async function findMatchesForRequest(
     const today = new Date().getDay(); // 0 = Sunday, 1 = Monday, ...
     const dayOfWeek = today === 0 ? 7 : today; // Convert to 1-7 (Mon-Sun)
 
-    const availableGillers = gillerRoutes.filter((giller) =>
-      giller.daysOfWeek.includes(dayOfWeek)
-    );
+    const availableGillers = gillerRoutes.filter((giller) => giller.daysOfWeek.includes(dayOfWeek));
 
     // 4. Find matches (major station engine first)
-    const matches = runMatchingEngine(request, availableGillers).slice(0, topN);
+    const matches = matchGillersToRequest(availableGillers, request).slice(0, topN);
     if (matches.length > 0) {
       return matches;
     }
@@ -704,6 +691,7 @@ export async function createMatchDocument(
   try {
     const matchData = {
       requestId,
+      userId: requesterId,
       requesterId,
       gllerId: requesterId,
       gillerId, // 매칭 대상 길러 ID
