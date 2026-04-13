@@ -1,4 +1,4 @@
-import React, { useCallback, useState } from 'react';
+import React, { useCallback, useState, useRef } from 'react';
 import {
   View,
   Text,
@@ -28,6 +28,7 @@ import AppTopBar from '../../components/common/AppTopBar';
 
 const MAX_ROUTES = 5;
 const MAX_TERRITORIES = 2;
+const STALE_TIME = 5 * 60 * 1000; // 5 minutes
 
 export default function RouteManagementScreen() {
   const navigation = useNavigation<MainStackNavigationProp>();
@@ -42,9 +43,19 @@ export default function RouteManagementScreen() {
     user?.gillerProfile?.activeTerritoryId ?? ''
   );
 
-  const loadRoutes = useCallback(async () => {
+  const lastFetchedRef = useRef<number>(0);
+
+  const loadRoutes = useCallback(async (force: boolean = false) => {
     try {
-      setLoading(true);
+      const now = Date.now();
+      if (!force && now - lastFetchedRef.current < STALE_TIME) {
+        return;
+      }
+
+      if (!lastFetchedRef.current || force) {
+        setLoading(true);
+      }
+      
       const userId = requireUserId();
       const userRoutes = await getUserRoutes(userId);
       const activeRoutes = userRoutes
@@ -52,6 +63,7 @@ export default function RouteManagementScreen() {
         .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
 
       setRoutes(activeRoutes);
+      lastFetchedRef.current = Date.now();
     } catch (error) {
       console.error('Failed to load routes', error);
       Alert.alert('동선을 불러오지 못했습니다', '잠시 후 다시 시도해 주세요.');
@@ -134,7 +146,7 @@ export default function RouteManagementScreen() {
         }
 
         Alert.alert('동선을 삭제했습니다');
-        await loadRoutes();
+        await loadRoutes(true);
       } catch (error) {
         console.error('Failed to delete route', error);
         Alert.alert('동선 삭제 실패', '잠시 후 다시 시도해 주세요.');
@@ -207,14 +219,21 @@ export default function RouteManagementScreen() {
               <Text style={styles.sectionSubtitle}>현재 위치 인증으로만 추가되고 최대 2개까지 관리합니다.</Text>
             </View>
             <TouchableOpacity
-              style={[styles.inlinePrimaryButton, territoryLoading && styles.inlineButtonDisabled]}
+              style={[
+                styles.inlinePrimaryButton, 
+                (territoryLoading || isPreviewMode) && styles.inlineButtonDisabled,
+                isPreviewMode && styles.previewButton
+              ]}
               activeOpacity={0.9}
               disabled={territoryLoading || territories.length >= MAX_TERRITORIES}
               onPress={handleRegisterTerritory}
             >
-              <Text style={styles.inlinePrimaryButtonText}>
-                {territoryLoading ? '확인 중...' : '현재 위치로 추가'}
-              </Text>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                {isPreviewMode && <MaterialIcons name="lock" size={14} color={Colors.primary} />}
+                <Text style={styles.inlinePrimaryButtonText}>
+                  {territoryLoading ? '확인 중...' : '현재 위치로 추가'}
+                </Text>
+              </View>
             </TouchableOpacity>
           </View>
 
@@ -281,7 +300,7 @@ export default function RouteManagementScreen() {
                 자주 가는 길을 등록해 두면 맞는 미션이 더 빨리 올라옵니다.
               </Text>
               <TouchableOpacity
-                style={styles.addButton}
+                style={[styles.addButton, isPreviewMode && styles.previewButtonAlt]}
                 onPress={() => {
                   if (isPreviewMode) {
                     Alert.alert(
@@ -298,7 +317,10 @@ export default function RouteManagementScreen() {
                 }}
                 activeOpacity={0.9}
               >
-                <Text style={styles.addButtonText}>첫 동선 추가</Text>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                  {isPreviewMode && <MaterialIcons name="lock" size={18} color={Colors.white} />}
+                  <Text style={styles.addButtonText}>첫 동선 추가</Text>
+                </View>
               </TouchableOpacity>
             </View>
           ) : (
@@ -348,7 +370,7 @@ export default function RouteManagementScreen() {
 
       {routes.length < MAX_ROUTES && routes.length > 0 ? (
         <TouchableOpacity
-          style={styles.fab}
+          style={[styles.fab, isPreviewMode && styles.previewButtonAlt]}
           onPress={() => {
             if (isPreviewMode) {
               Alert.alert(
@@ -365,7 +387,11 @@ export default function RouteManagementScreen() {
           }}
           activeOpacity={0.9}
         >
-          <Text style={styles.fabLabel}>+</Text>
+          {isPreviewMode ? (
+            <MaterialIcons name="lock" size={24} color={Colors.white} />
+          ) : (
+            <Text style={styles.fabLabel}>+</Text>
+          )}
         </TouchableOpacity>
       ) : null}
     </View>
@@ -648,4 +674,12 @@ const styles = StyleSheet.create({
     ...Shadows.md,
   },
   fabLabel: { color: Colors.white, fontSize: 32, fontWeight: '300', marginTop: -4 },
+  previewButton: {
+    backgroundColor: Colors.gray100,
+    borderWidth: 1,
+    borderColor: Colors.border,
+  },
+  previewButtonAlt: {
+    backgroundColor: Colors.textTertiary,
+  },
 });

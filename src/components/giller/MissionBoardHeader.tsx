@@ -1,5 +1,6 @@
 import React from 'react';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { MaterialIcons } from '@expo/vector-icons';
 
 import { BorderRadius, Colors, Shadows, Spacing, Typography } from '../../theme';
 
@@ -9,6 +10,7 @@ type FeaturedMissionSummary = {
   quickFacts: string;
   rewardLabel?: string;
   disabled?: boolean;
+  isPreviewMode?: boolean;
   onPress: () => void;
 };
 
@@ -53,12 +55,21 @@ export function MissionBoardHeader({
           <Text style={styles.featuredReason}>{featuredMission.featuredReason}</Text>
           <Text style={styles.featuredBody}>{featuredMission.quickFacts}</Text>
           <TouchableOpacity
-            style={[styles.featuredButton, featuredMission.disabled ? styles.featuredButtonDisabled : undefined]}
+            style={[
+              styles.featuredButton, 
+              featuredMission.disabled ? styles.featuredButtonDisabled : undefined,
+              featuredMission.isPreviewMode && styles.previewButton
+            ]}
             activeOpacity={0.9}
             disabled={featuredMission.disabled}
             onPress={featuredMission.onPress}
           >
-            <Text style={styles.featuredButtonText}>바로 잡기</Text>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+              {featuredMission.isPreviewMode && (
+                <MaterialIcons name="lock" size={14} color={featuredMission.disabled ? Colors.textSecondary : Colors.primaryDark} />
+              )}
+              <Text style={[styles.featuredButtonText, featuredMission.isPreviewMode && styles.previewButtonText]}>바로 잡기</Text>
+            </View>
           </TouchableOpacity>
         </View>
       ) : null}
@@ -153,5 +164,11 @@ const styles = StyleSheet.create({
     color: Colors.primaryDark,
     fontSize: Typography.fontSize.sm,
     fontWeight: Typography.fontWeight.bold,
+  },
+  previewButton: {
+    backgroundColor: '#F2F4F6',
+  },
+  previewButtonText: {
+    color: '#4E5968',
   },
 });

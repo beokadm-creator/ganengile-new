@@ -393,6 +393,7 @@ export default function GillerRequestsScreen() {
           <MissionGroupCard
             group={group}
             submittingBundleId={submittingBundleId}
+            isPreviewMode={isPreviewMode}
             onPress={handleAccept}
             onRelease={handleRelease}
             onNextAction={handleNextAction}
@@ -423,6 +424,7 @@ export default function GillerRequestsScreen() {
           <MissionGroupCard
             group={group}
             submittingBundleId={submittingBundleId}
+            isPreviewMode={isPreviewMode}
             onPress={handleAccept}
             onRelease={handleRelease}
             onNextAction={handleNextAction}
@@ -447,6 +449,7 @@ export default function GillerRequestsScreen() {
           <MissionGroupCard
             group={group}
             submittingBundleId={submittingBundleId}
+            isPreviewMode={isPreviewMode}
             onPress={handleAccept}
             onRelease={handleRelease}
             onNextAction={handleNextAction}
@@ -463,6 +466,7 @@ export default function GillerRequestsScreen() {
       <MissionDetailSheet
         group={selectedGroup}
         submittingBundleId={submittingBundleId}
+        isPreviewMode={isPreviewMode}
         onClose={() => setSelectedGroup(null)}
         onAccept={handleAccept}
         onRelease={handleRelease}

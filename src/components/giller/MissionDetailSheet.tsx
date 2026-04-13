@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { Modal, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 
@@ -16,6 +16,7 @@ type MissionDetailSheetProps = {
   onNextAction: (group: MissionGroup) => void;
   buildOptionLabel: (card: MissionCard) => string;
   getNextActionLabel: (group: MissionGroup) => string | null;
+  isPreviewMode?: boolean;
 };
 
 function buildCenterPoint(group: MissionGroup) {
@@ -75,7 +76,7 @@ function SignalPill({
   );
 }
 
-export function MissionDetailSheet({
+export const MissionDetailSheet = React.memo(function MissionDetailSheet({
   group,
   submittingBundleId,
   onClose,
@@ -84,15 +85,16 @@ export function MissionDetailSheet({
   onNextAction,
   buildOptionLabel,
   getNextActionLabel,
+  isPreviewMode,
 }: MissionDetailSheetProps) {
   if (!group) {
     return null;
   }
 
-  const centerPoint = buildCenterPoint(group);
-  const mapPoints = [group.originPoint, group.destinationPoint].filter(
+  const centerPoint = useMemo(() => buildCenterPoint(group), [group.originPoint, group.destinationPoint, group.routeLabel]);
+  const mapPoints = useMemo(() => [group.originPoint, group.destinationPoint].filter(
     (point): point is NonNullable<MissionGroup['originPoint']> => point != null
-  );
+  ), [group.originPoint, group.destinationPoint]);
   const nextActionLabel = getNextActionLabel(group);
   const guide = buildMissionExecutionGuideFromCard(
     group.options.find((option) => option.selectionState === 'accepted') ?? group.options[0] ?? null
@@ -179,14 +181,25 @@ export function MissionDetailSheet({
                     {card.rewardBoostLabel ? <Text style={styles.rewardBoostLabel}>{card.rewardBoostLabel}</Text> : null}
                     <Text style={styles.optionSummary}>{card.legSummary ?? card.strategyBody}</Text>
                     <TouchableOpacity
-                      style={[styles.actionButton, disabled && styles.actionButtonDisabled]}
+                      style={[
+                        styles.actionButton, 
+                        disabled && styles.actionButtonDisabled,
+                        isPreviewMode && !disabled && styles.previewButton
+                      ]}
                       activeOpacity={0.88}
                       disabled={disabled}
                       onPress={() => onAccept(card)}
                     >
-                      <Text style={[styles.actionButtonText, disabled && styles.actionButtonTextDisabled]}>
-                        {actionLabel}
-                      </Text>
+                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                        {isPreviewMode && <MaterialIcons name="lock" size={14} color={disabled ? Colors.textSecondary : '#4E5968'} />}
+                        <Text style={[
+                          styles.actionButtonText, 
+                          disabled && styles.actionButtonTextDisabled,
+                          isPreviewMode && !disabled && styles.previewButtonText
+                        ]}>
+                          {actionLabel}
+                        </Text>
+                      </View>
                     </TouchableOpacity>
                     {card.selectionState === 'accepted' ? (
                       <TouchableOpacity
@@ -207,7 +220,7 @@ export function MissionDetailSheet({
       </View>
     </Modal>
   );
-}
+});
 
 const styles = StyleSheet.create({
   modalBackdrop: {
@@ -420,5 +433,13 @@ const styles = StyleSheet.create({
     color: Colors.textPrimary,
     fontSize: Typography.fontSize.sm,
     fontWeight: Typography.fontWeight.bold,
+  },
+  previewButton: {
+    backgroundColor: '#F2F4F6',
+    borderWidth: 1,
+    borderColor: Colors.border,
+  },
+  previewButtonText: {
+    color: '#4E5968',
   },
 });

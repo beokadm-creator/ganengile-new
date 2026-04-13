@@ -24,7 +24,12 @@ export function ActionCard({
   onPress: () => void;
 }) {
   return (
-    <TouchableOpacity style={sharedStyles.actionCard} onPress={onPress} activeOpacity={0.88}>
+    <TouchableOpacity 
+      style={sharedStyles.actionCard} 
+      onPress={onPress} 
+      activeOpacity={0.88}
+      hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+    >
       <View style={sharedStyles.actionIconWrap}>
         <MaterialIcons name={icon} size={22} color={Colors.primaryDark} />
       </View>
@@ -343,7 +348,10 @@ export const sharedStyles = StyleSheet.create({
   },
   moreLink: {
     alignSelf: 'flex-start',
-    paddingVertical: 4,
+    paddingVertical: 12,
+    paddingHorizontal: 8,
+    minHeight: 44,
+    justifyContent: 'center',
   },
   moreLinkText: {
     color: Colors.primary,

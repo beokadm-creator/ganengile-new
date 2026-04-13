@@ -9,6 +9,7 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
+import { MaterialIcons } from '@expo/vector-icons';
 import { ParamListBase } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
 import { useUser } from '../../contexts/UserContext';
@@ -171,7 +172,7 @@ export default function EarningsScreen({ navigation }: Props) {
         </View>
 
         <TouchableOpacity 
-          style={styles.withdrawButton} 
+          style={[styles.withdrawButton, isPreviewMode && styles.previewButtonAlt]} 
           onPress={() => {
             if (isPreviewMode) {
               Alert.alert(
@@ -186,9 +187,13 @@ export default function EarningsScreen({ navigation }: Props) {
             }
             navigation.navigate('PointWithdraw');
           }}
+          activeOpacity={0.9}
         >
-          <Text style={styles.withdrawButtonText}>정산금 출금하기</Text>
-          <Text style={styles.withdrawButtonSubtext}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+            {isPreviewMode && <MaterialIcons name="lock" size={18} color={Colors.white} />}
+            <Text style={styles.withdrawButtonText}>정산금 출금하기</Text>
+          </View>
+          <Text style={[styles.withdrawButtonSubtext, isPreviewMode && styles.previewButtonSubtextAlt]}>
             출금 전에는 계좌 상태, 본인 확인, 운영 검토 여부를 먼저 확인합니다.
           </Text>
         </TouchableOpacity>
@@ -507,5 +512,11 @@ const styles = StyleSheet.create({
     fontSize: Typography.fontSize.xs,
     fontWeight: '700',
     color: Colors.successDark,
+  },
+  previewButtonAlt: {
+    backgroundColor: Colors.textTertiary,
+  },
+  previewButtonSubtextAlt: {
+    color: Colors.gray200,
   },
 });

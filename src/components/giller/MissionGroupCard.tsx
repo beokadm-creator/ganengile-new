@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
@@ -20,6 +20,7 @@ type MissionGroupCardProps = {
   getNextActionLabel: (group: MissionGroup) => string | null;
   isFullSpanOption: (card: MissionCard, group: MissionGroup) => boolean;
   buildComparisonHint: (card: MissionCard, group: MissionGroup) => string | null;
+  isPreviewMode?: boolean;
 };
 
 function buildCenterPoint(group: MissionGroup) {
@@ -38,7 +39,7 @@ function buildCenterPoint(group: MissionGroup) {
   };
 }
 
-export function MissionGroupCard({
+export const MissionGroupCard = React.memo(function MissionGroupCard({
   group,
   submittingBundleId,
   onPress,
@@ -50,11 +51,12 @@ export function MissionGroupCard({
   getNextActionLabel,
   isFullSpanOption,
   buildComparisonHint,
+  isPreviewMode,
 }: MissionGroupCardProps) {
-  const centerPoint = buildCenterPoint(group);
-  const mapPoints = [group.originPoint, group.destinationPoint].filter(
+  const centerPoint = useMemo(() => buildCenterPoint(group), [group.originPoint, group.destinationPoint, group.routeLabel]);
+  const mapPoints = useMemo(() => [group.originPoint, group.destinationPoint].filter(
     (point): point is NonNullable<MissionGroup['originPoint']> => point != null
-  );
+  ), [group.originPoint, group.destinationPoint]);
   const isAcceptedGroup = group.selectionState === 'accepted';
   const nextActionLabel = getNextActionLabel(group);
   const primaryOption = group.options[0];
@@ -165,14 +167,25 @@ export function MissionGroupCard({
                 <Text style={styles.optionSummary}>{card.legSummary ?? card.strategyBody}</Text>
                 
                 <TouchableOpacity
-                  style={[styles.actionButton, disabled && styles.actionButtonDisabled]}
+                  style={[
+                    styles.actionButton, 
+                    disabled && styles.actionButtonDisabled,
+                    isPreviewMode && !disabled && styles.previewButton
+                  ]}
                   activeOpacity={0.85}
                   disabled={disabled}
                   onPress={() => onPress(card)}
                 >
-                  <Text style={[styles.actionButtonText, disabled && styles.actionButtonTextDisabled]}>
-                    {actionLabel}
-                  </Text>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                    {isPreviewMode && <MaterialIcons name="lock" size={14} color={disabled ? '#B0B8C1' : '#4E5968'} />}
+                    <Text style={[
+                      styles.actionButtonText, 
+                      disabled && styles.actionButtonTextDisabled,
+                      isPreviewMode && !disabled && styles.previewButtonText
+                    ]}>
+                      {actionLabel}
+                    </Text>
+                  </View>
                 </TouchableOpacity>
                 {card.selectionState === 'accepted' && (
                   <TouchableOpacity
@@ -193,14 +206,17 @@ export function MissionGroupCard({
       {/* Primary Action Button for Available Missions */}
       {group.selectionState === 'available' && primaryOption && (
         <TouchableOpacity
-          style={styles.primaryAcceptButton}
+          style={[styles.primaryAcceptButton, isPreviewMode && styles.previewButton]}
           activeOpacity={0.85}
           disabled={submittingBundleId === primaryOption.bundleId}
           onPress={handlePrimaryPress}
         >
-          <Text style={styles.primaryAcceptButtonText}>
-            {submittingBundleId === primaryOption.bundleId ? '처리 중...' : '바로 수행하기'}
-          </Text>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+            {isPreviewMode && <MaterialIcons name="lock" size={16} color={submittingBundleId === primaryOption.bundleId ? '#B0B8C1' : '#4E5968'} />}
+            <Text style={[styles.primaryAcceptButtonText, isPreviewMode && styles.previewButtonText]}>
+              {submittingBundleId === primaryOption.bundleId ? '처리 중...' : '바로 수행하기'}
+            </Text>
+          </View>
         </TouchableOpacity>
       )}
 
@@ -212,7 +228,7 @@ export function MissionGroupCard({
       )}
     </View>
   );
-}
+});
 
 const styles = StyleSheet.create({
   card: {
@@ -424,5 +440,11 @@ const styles = StyleSheet.create({
     color: Colors.white,
     fontSize: 16,
     fontWeight: '700',
+  },
+  previewButton: {
+    backgroundColor: '#F2F4F6',
+  },
+  previewButtonText: {
+    color: '#4E5968',
   },
 });

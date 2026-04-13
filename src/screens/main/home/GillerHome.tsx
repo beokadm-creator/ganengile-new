@@ -238,6 +238,7 @@ export function GillerHome({
             style={styles.moreLink}
             onPress={() => navigation.navigate('Tabs', { screen: 'GillerRequests' })}
             activeOpacity={0.88}
+            hitSlop={{ top: 16, bottom: 16, left: 16, right: 16 }}
           >
             <Text style={styles.moreLinkText}>미션 보드 전체 보기</Text>
           </TouchableOpacity>
