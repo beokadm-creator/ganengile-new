@@ -34,7 +34,11 @@ export async function GET(request: Request) {
       });
     } catch (dbError: any) {
       // Handle missing index error by falling back to client-side sort
-      if (dbError.message?.includes('FAILED_PRECONDITION') && dbError.message?.includes('requires an index')) {
+      const isIndexError = dbError.code === 9 || 
+                          dbError.message?.includes('requires an index') || 
+                          (dbError.message?.includes('FAILED_PRECONDITION') && dbError.message?.includes('index'));
+                          
+      if (isIndexError) {
         console.warn('B2B Settlements: Missing index for status + createdAt, falling back to client-side sort');
         
         const fallbackRef = adminDb.collection('partner_settlements')

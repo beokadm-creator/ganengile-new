@@ -8,6 +8,12 @@ interface UserPoint {
   displayName: string;
   email: string;
   pointBalance: number;
+  withdrawableBalance: number;
+  balances: {
+    charge: number;
+    earned: number;
+    promo: number;
+  };
   totalEarnedPoints: number;
   totalSpentPoints: number;
 }
@@ -17,7 +23,7 @@ export default function PointBalancesPage() {
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [selected, setSelected] = useState<UserPoint | null>(null);
-  const [form, setForm] = useState({ type: 'earn', amount: '', reason: '' });
+  const [form, setForm] = useState({ type: 'earn', amount: '', reason: '', fundingSource: 'promo' });
   const [processing, setProcessing] = useState(false);
 
   async function loadData() {
@@ -45,7 +51,7 @@ export default function PointBalancesPage() {
         body: JSON.stringify({ userId: selected.id, ...form }),
       });
       setSelected(null);
-      setForm({ type: 'earn', amount: '', reason: '' });
+      setForm({ type: 'earn', amount: '', reason: '', fundingSource: 'promo' });
       await loadData();
     } finally {
       setProcessing(false);
@@ -81,9 +87,9 @@ export default function PointBalancesPage() {
             <thead className="bg-gray-50 text-gray-500 text-xs">
               <tr>
                 <th className="px-4 py-3 text-left">사용자</th>
-                <th className="px-4 py-3 text-right">현재 잔액</th>
-                <th className="px-4 py-3 text-right">총 적립</th>
-                <th className="px-4 py-3 text-right">총 사용</th>
+                <th className="px-4 py-3 text-right">총 사용 가능</th>
+                <th className="px-4 py-3 text-right">세부 잔액</th>
+                <th className="px-4 py-3 text-right">출금 가능</th>
                 <th className="px-4 py-3 text-left">액션</th>
               </tr>
             </thead>
@@ -95,8 +101,12 @@ export default function PointBalancesPage() {
                     <p className="text-xs text-gray-400">{item.email}</p>
                   </td>
                   <td className="px-4 py-3 text-right font-bold text-indigo-600">{formatKRW(item.pointBalance)}</td>
-                  <td className="px-4 py-3 text-right text-green-600">{formatKRW(item.totalEarnedPoints)}</td>
-                  <td className="px-4 py-3 text-right text-red-500">{formatKRW(item.totalSpentPoints)}</td>
+                  <td className="px-4 py-3 text-right text-xs text-gray-500">
+                    <div>충전: {formatKRW(item.balances.charge)}</div>
+                    <div>정산: {formatKRW(item.balances.earned)}</div>
+                    <div>이벤트: {formatKRW(item.balances.promo)}</div>
+                  </td>
+                  <td className="px-4 py-3 text-right font-medium text-green-600">{formatKRW(item.withdrawableBalance)}</td>
                   <td className="px-4 py-3">
                     <button
                       onClick={() => setSelected(item)}
@@ -129,9 +139,22 @@ export default function PointBalancesPage() {
                   onChange={(e) => setForm({ ...form, type: e.target.value })}
                   className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm"
                 >
-                  <option value="earn">적립 (잔액 증가)</option>
+                  <option value="earn">지급 (잔액 증가)</option>
                   <option value="spend">차감 (잔액 감소)</option>
                 </select>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">재원 (Funding Source)</label>
+                <select
+                  value={form.fundingSource}
+                  onChange={(e) => setForm({ ...form, fundingSource: e.target.value })}
+                  className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm"
+                >
+                  <option value="promo">이벤트/CS 보상 (프로모션)</option>
+                  <option value="earned">배송 완료 보상 (정산금)</option>
+                  <option value="charge">시스템 충전 (충전금)</option>
+                </select>
+                <p className="text-xs text-gray-500 mt-1">※ 프로모션 금액은 출금이 불가능합니다.</p>
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">금액 (원)</label>
