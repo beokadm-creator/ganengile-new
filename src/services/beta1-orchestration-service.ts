@@ -77,6 +77,11 @@ import { getUserActiveRoutes } from './route-service';
 import { getUserById } from './user-service';
 import type { StationInfo as RequestStationInfo } from '../types/request';
 import type { GillerTerritory } from '../types/user';
+
+function cleanForFirestore<T>(value: T): T {
+  return JSON.parse(JSON.stringify(value));
+}
+
 export {
   getBeta1AdminSnapshot,
   getBeta1ChatContext,
@@ -1008,7 +1013,7 @@ export async function createMissionForDeliveryLeg(params: {
     updatedAt: serverTimestamp(),
   };
 
-  const missionRef = await addDoc(collection(db, 'missions'), missionPayload);
+  const missionRef = await addDoc(collection(db, 'missions'), cleanForFirestore(missionPayload));
   return {
     missionId: missionRef.id,
     requestId: params.requestId,
@@ -1452,11 +1457,12 @@ export async function releaseMissionBundleForGiller(bundleId: string, gillerUser
 export async function persistActorSelectionDecision(
   decision: Omit<ActorSelectionDecision, 'decisionId' | 'createdAt' | 'updatedAt'>
 ): Promise<ActorSelectionDecision> {
-  const ref = await addDoc(collection(db, 'actor_selection_decisions'), {
+  const payload = {
     ...decision,
     createdAt: serverTimestamp(),
     updatedAt: serverTimestamp(),
-  });
+  };
+  const ref = await addDoc(collection(db, 'actor_selection_decisions'), cleanForFirestore(payload));
 
   return {
     decisionId: ref.id,
