@@ -49,6 +49,20 @@ service cloud.firestore {
       );
     }
 
+    // ==================== Coupons Collections ====================
+
+    match /coupons/{couponId} {
+      allow read: if isAuthenticated();
+      allow write: if isAdmin();
+    }
+
+    match /user_coupons/{userCouponId} {
+      allow read: if isAuthenticated() && isOwner(resource.data.userId);
+      allow create: if isAuthenticated() && isOwner(request.resource.data.userId);
+      allow update: if isAuthenticated() && isOwner(resource.data.userId);
+      allow delete: if isAdmin();
+    }
+
     // ==================== Config Collections (Read-Only, Public) ====================
 
     match /config_stations/{stationId} {
