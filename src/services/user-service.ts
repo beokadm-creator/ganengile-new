@@ -18,6 +18,7 @@ import {
 
 import { auth, db } from './firebase';
 import { getRequestsByRequester as getRequestsByRequesterFromRequestService } from './request-service';
+import { autoIssueCouponsByTrigger } from './coupon-service';
 import type { Request } from '../types/request';
 import { AuthProviderType, UserRole, type Badge, type User } from '../types/user';
 
@@ -530,6 +531,12 @@ export async function createUser(
 
     await setDoc(userRef, userDoc);
     console.warn('User created in Firestore:', userId);
+    
+    // 신규 가입 쿠폰 자동 발급
+    await autoIssueCouponsByTrigger(userId, 'signup').catch((err) => 
+      console.error('Failed to issue signup coupons:', err)
+    );
+
     return userDoc;
   } catch (error) {
     console.error('Error creating user:', error);

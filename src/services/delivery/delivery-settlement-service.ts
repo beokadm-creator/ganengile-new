@@ -4,6 +4,8 @@ import { db } from '../../config/firebase';
 import { doc, getDoc, updateDoc } from 'firebase/firestore';
 import { DepositService } from '../DepositService';
 import { createGillerEarning } from '../payment-service';
+import { getUserStats } from '../user-service';
+import { autoIssueCouponsByTrigger } from '../coupon-service';
 
 export interface RequesterConfirmationData {
   deliveryId: string;
@@ -71,6 +73,19 @@ export const deliverySettlementService = {
         } catch (e) {
           console.error('길러 수익 창출 실패:', e);
         }
+      }
+
+      // 3. 첫 주문 완료 확인 및 쿠폰 발급
+      try {
+        const stats = await getUserStats(requesterId);
+        // 이번에 막 완료 처리되었으므로, completedRequests(totalRequests)가 1이면 첫 주문입니다.
+        if (stats.totalRequests === 1) {
+          await autoIssueCouponsByTrigger(requesterId, 'first_order').catch((err) => {
+            console.error('Failed to issue first_order coupons:', err);
+          });
+        }
+      } catch (e) {
+        console.error('Failed to check and issue first order coupon:', e);
       }
 
       return { success: true, message: '물품 수령이 확인되었습니다.' };

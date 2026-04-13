@@ -25,6 +25,7 @@ import {
   fetchConsentTemplates,
   getFallbackConsentItems,
 } from '../../services/consent-service';
+import { autoIssueCouponsByTrigger } from '../../services/coupon-service';
 import { handleGoogleSignIn } from '../../services/google-auth';
 import { getKakaoLoginErrorMessage, signUpWithKakao } from '../../services/kakao-auth';
 import type { AuthNavigationProp } from '../../types/navigation';
@@ -330,6 +331,8 @@ export default function NewSignUpScreen({ navigation }: Props) {
         },
         { merge: true },
       );
+
+      await autoIssueCouponsByTrigger(userCredential.user.uid, 'signup').catch(console.error);
 
       Alert.alert(
         '계정이 만들어졌습니다',
