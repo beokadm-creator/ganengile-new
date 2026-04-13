@@ -9,17 +9,19 @@ interface StepSummaryCardProps {
   title: string;
   summary: string[];
   onEdit: () => void;
+  disabled?: boolean;
 }
 
-export function StepSummaryCard({ step, title, summary, onEdit }: StepSummaryCardProps) {
+export function StepSummaryCard({ step, title, summary, onEdit, disabled = false }: StepSummaryCardProps) {
   const handleEdit = () => {
+    if (disabled) return;
     Keyboard.dismiss();
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
     onEdit();
   };
 
   return (
-    <TouchableOpacity style={styles.container} onPress={handleEdit} activeOpacity={0.7}>
+    <TouchableOpacity style={[styles.container, disabled && styles.disabled]} onPress={handleEdit} activeOpacity={0.7} disabled={disabled}>
       <View style={styles.headerRow}>
         <View style={styles.titleWrapper}>
           <View style={styles.badge}>
@@ -80,12 +82,15 @@ const styles = StyleSheet.create({
     color: Colors.textPrimary,
   },
   content: {
-    paddingLeft: 32, // Indent to align with title text
+    paddingLeft: 32,
     gap: 4,
   },
   summaryText: {
     fontSize: Typography.fontSize.base,
     color: Colors.textPrimary,
     lineHeight: 22,
+  },
+  disabled: {
+    opacity: 0.5,
   },
 });

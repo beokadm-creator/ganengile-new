@@ -17,7 +17,7 @@ export function StepContainer({
   step,
   currentStep,
   onNext,
-  onPrev, // Keep for compatibility if used elsewhere, but not needed in UI
+  onPrev: _onPrev,
   nextLabel = '다음 단계로',
   nextDisabled = false,
   children,
@@ -35,7 +35,6 @@ export function StepContainer({
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
       onNext();
       
-      // 더블 클릭(고스트 클릭)을 막기 위해 1000ms 딜레이
       setTimeout(() => {
         isPressingRef.current = false;
       }, 1000);

@@ -265,6 +265,7 @@ export default function CreateRequestScreen({ navigation, route }: Props) {
   const [addressTarget, setAddressTarget] = useState<AddressTarget>(null);
   const [saving, setSaving] = useState(false);
   const [aiLoading, setAiLoading] = useState(false);
+  const [stepTransitionLocked, setStepTransitionLocked] = useState(false);
   const [savedAddresses, setSavedAddresses] = useState<SavedAddress[]>([]);
   const [recentAddresses, setRecentAddresses] = useState<SavedAddress[]>([]);
   const [aiResult, setAiResult] = useState<Beta1AIAnalysisResponse | null>(null);
@@ -355,6 +356,17 @@ export default function CreateRequestScreen({ navigation, route }: Props) {
 
   const { draftHydratedRef, handleClearDraft, handleSaveDraftNow } = useRequestDraft();
   const depositPhotoNoticeShownRef = useRef(false);
+
+  useEffect(() => {
+    if (activeStep !== 4) {
+      setStepTransitionLocked(false);
+      return;
+    }
+
+    setStepTransitionLocked(true);
+    const timer = setTimeout(() => setStepTransitionLocked(false), 600);
+    return () => clearTimeout(timer);
+  }, [activeStep]);
 
 
 
@@ -801,7 +813,8 @@ export default function CreateRequestScreen({ navigation, route }: Props) {
         step={1}
         title="출발/도착지 정보"
         summary={[`출발: ${pickup || '-'}`, `도착: ${delivery || '-'}`]}
-        onEdit={() => !saving && setActiveStep(1)}
+        onEdit={() => !saving && !stepTransitionLocked && setActiveStep(1)}
+        disabled={saving || stepTransitionLocked}
       />
     );
   };
@@ -817,7 +830,8 @@ export default function CreateRequestScreen({ navigation, route }: Props) {
           `상세: ${packageItemName || '-'}`,
           `크기/무게: ${packageSize || '-'} / ${weightKg ? `${weightKg}kg` : '-'}`,
         ]}
-        onEdit={() => !saving && setActiveStep(2)}
+        onEdit={() => !saving && !stepTransitionLocked && setActiveStep(2)}
+        disabled={saving || stepTransitionLocked}
       />
     );
   };
@@ -832,7 +846,8 @@ export default function CreateRequestScreen({ navigation, route }: Props) {
           `수령인: ${recipientName || '-'}`,
           `요청사항: ${specialInstructions || '없음'}`,
         ]}
-        onEdit={() => !saving && setActiveStep(3)}
+        onEdit={() => !saving && !stepTransitionLocked && setActiveStep(3)}
+        disabled={saving || stepTransitionLocked}
       />
     );
   };

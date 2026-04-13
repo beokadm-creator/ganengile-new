@@ -41,10 +41,11 @@ export function Step4Quote({
   const [isMounting, setIsMounting] = useState(true);
 
   useEffect(() => {
-    // 렌더링 직후 발생할 수 있는 Ghost click 방지를 위해 잠시 대기
+    if (store.activeStep !== 4) return;
+    setIsMounting(true);
     const timer = setTimeout(() => setIsMounting(false), 500);
     return () => clearTimeout(timer);
-  }, []);
+  }, [store.activeStep]);
 
   useEffect(() => {
     if (!user?.uid) return;
@@ -63,7 +64,6 @@ export function Step4Quote({
         );
         setAvailableCoupons(validCoupons);
         
-        // 적용 가능한 쿠폰이 있고 현재 선택된 쿠폰이 없으면 첫 번째 쿠폰 자동 적용
         if (validCoupons.length > 0 && !store.selectedCoupon) {
           store.setSelectedCoupon(validCoupons[0]);
         }
@@ -206,7 +206,6 @@ export function Step4Quote({
       <TouchableOpacity style={styles.secondaryButton} onPress={() => void handleSaveDraftNow()} disabled={saving || store.draftSaving}>
         <Text style={styles.secondaryButtonText}>{store.draftSaving ? '저장 중...' : '임시 저장하기'}</Text>
       </TouchableOpacity>
-      {/* 쿠폰 선택 모달 */}
       <Modal
         visible={isCouponModalVisible}
         onClose={() => setIsCouponModalVisible(false)}
