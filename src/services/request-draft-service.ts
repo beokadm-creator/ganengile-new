@@ -71,8 +71,9 @@ export async function updateRequestDraft(
   requestDraftId: string,
   patch: Partial<Omit<RequestDraft, 'requestDraftId' | 'createdAt'>>
 ): Promise<void> {
+  const cleanPatch = JSON.parse(JSON.stringify(patch));
   await updateDoc(doc(db, 'request_drafts', requestDraftId), {
-    ...patch,
+    ...cleanPatch,
     updatedAt: serverTimestamp(),
   });
 }
