@@ -681,6 +681,8 @@ export default function CreateRequestScreen({ navigation, route }: Props) {
       return;
     }
 
+    if (saving) return; // 중복 요청 방지
+
     setSaving(true);
     try {
       if (pickupMode === 'address' && user?.uid) {
@@ -746,6 +748,7 @@ export default function CreateRequestScreen({ navigation, route }: Props) {
       const selected = result.quoteCards.find((card) => card.quoteType === selectedQuoteType) ?? result.quoteCards[0];
       await deleteCreateRequestProgress();
       setDraftRestored(false);
+      setSaving(false); // 네비게이션 전에 saving 상태 해제
 
       navigation.replace('RequestConfirmation', {
         requestId: result.requestId,
@@ -770,7 +773,6 @@ export default function CreateRequestScreen({ navigation, route }: Props) {
         '요청 생성 실패',
         error instanceof Error ? error.message : '요청을 만드는 중 문제가 발생했습니다. 잠시 후 다시 시도해 주세요.'
       );
-    } finally {
       setSaving(false);
     }
   }
@@ -788,8 +790,8 @@ export default function CreateRequestScreen({ navigation, route }: Props) {
 
   const renderStep1Summary = () => {
     if (activeStep <= 1) return null;
-    const pickup = pickupRoadAddress ? `${pickupRoadAddress} (${pickupStation?.stationName})` : pickupStation?.stationName;
-    const delivery = deliveryRoadAddress ? `${deliveryRoadAddress} (${deliveryStation?.stationName})` : deliveryStation?.stationName;
+    const pickup = pickupMode === 'address' && pickupRoadAddress ? `${pickupRoadAddress} (${pickupStation?.stationName})` : pickupStation?.stationName;
+    const delivery = deliveryMode === 'address' && deliveryRoadAddress ? `${deliveryRoadAddress} (${deliveryStation?.stationName})` : deliveryStation?.stationName;
     return (
       <StepSummaryCard
         step={1}

@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useRef } from 'react';
 import { View, TouchableOpacity, Text, StyleSheet, Keyboard } from 'react-native';
 import * as Haptics from 'expo-haptics';
 import { BorderRadius, Colors, Shadows, Spacing, Typography } from '../../../../theme';
@@ -22,13 +22,23 @@ export function StepContainer({
   nextDisabled = false,
   children,
 }: Props) {
+  const isPressingRef = useRef(false);
+
   if (currentStep !== step) return null;
 
   const handleNext = () => {
+    if (isPressingRef.current) return;
+    
     if (!nextDisabled && onNext) {
+      isPressingRef.current = true;
       Keyboard.dismiss();
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
       onNext();
+      
+      // 더블 클릭(고스트 클릭)을 막기 위해 1000ms 딜레이
+      setTimeout(() => {
+        isPressingRef.current = false;
+      }, 1000);
     }
   };
 

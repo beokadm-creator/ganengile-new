@@ -191,9 +191,9 @@ export function Step4Quote({
       )}
 
       <TouchableOpacity
-        style={[styles.primaryButton, (submitDisabled || isMounting) && styles.disabled]}
+        style={[styles.primaryButton, (submitDisabled || isMounting || saving) && styles.disabled]}
         onPress={() => void handleSubmit()}
-        disabled={saving || isMounting}
+        disabled={saving || isMounting || submitDisabled}
       >
         {saving ? (
           <ActivityIndicator color={Colors.white} />
