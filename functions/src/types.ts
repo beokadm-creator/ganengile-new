@@ -31,6 +31,7 @@ export interface User {
   gillerInfo?: GillerInfo;
   fcmToken?: string;
   fcmTokenUpdatedAt?: FirestoreFieldValue;
+  phoneNumber?: string;
 }
 
 // ==================== Route Types ====================

@@ -890,29 +890,51 @@ export const sendMatchFoundNotification = functions.firestore
       const giller = gillerDoc.data() as User;
       const fcmToken = giller?.fcmToken;
 
-      if (!fcmToken) {
-        console.warn('?좑툘 No FCM token for giller:', match.gillerId);
-        return null;
-      }
-
-      // Send notification
-      const title = '?렞 ?덈줈??諛곗넚 ?붿껌';
+      const title = '새로운 배송 요청';
       const body = `${request.pickupStation.stationName} -> ${request.deliveryStation.stationName} (${request.fee.totalFee.toLocaleString()}원)`;
 
-      await sendFCM(fcmToken, title, body, {
-        type: 'match_found',
-        requestId,
-        matchId: context.params.matchId,
-        screen: 'GillerRequests',
-      });
+      let notificationSent = false;
+
+      if (fcmToken) {
+        // Send App Push notification
+        try {
+          await sendFCM(fcmToken, title, body, {
+            type: 'match_found',
+            requestId,
+            matchId: context.params.matchId,
+            screen: 'GillerRequests',
+          });
+          notificationSent = true;
+          console.warn('App Push sent to Giller:', match.gillerId);
+        } catch (fcmError) {
+          console.error('App Push failed, falling back to Alimtalk:', fcmError);
+        }
+      } else {
+        console.warn('No FCM token for giller:', match.gillerId);
+      }
+
+      // Fallback to NHN Alimtalk if FCM is not available or failed
+      if (!notificationSent && giller?.phoneNumber) {
+        const alimtalkSuccess = await NHNAlimtalkService.sendNewMissionAlimtalk(giller.phoneNumber, {
+          pickup: request.pickupStation.stationName,
+          dropoff: request.deliveryStation.stationName,
+          reward: `${request.fee.totalFee.toLocaleString()}원`,
+        });
+        
+        if (alimtalkSuccess) {
+          notificationSent = true;
+          console.warn('NHN Alimtalk sent as fallback to Giller:', match.gillerId);
+        }
+      }
 
       // Update match document
       await snapshot.ref.update({
         notifiedAt: admin.firestore.FieldValue.serverTimestamp(),
-        notificationSent: true,
+        notificationSent,
+        notificationMethod: fcmToken ? 'fcm' : (giller?.phoneNumber ? 'alimtalk' : 'none'),
       });
 
-      console.warn('??Match notification sent:', context.params.matchId);
+      console.warn('Match notification process completed:', context.params.matchId);
       return null;
     } catch (error) {
       console.error('??Error sending match notification:', error);
@@ -955,28 +977,48 @@ export const onRequestStatusChanged = functions.firestore
         const gller = gllerDoc.data() as User;
         const fcmToken = gller?.fcmToken;
 
-        if (!fcmToken) {
-          console.warn('?좑툘 No FCM token for gller:', gllerId);
-          return null;
-        }
-
         // Get delivery details to find giller name
         const deliveryDoc = await db.collection('deliveries').doc(matchedDeliveryId).get();
         const deliveryData = deliveryDoc.data() as RequestAcceptedDeliveryDoc | undefined;
         const gillerName = deliveryDoc.exists ? (deliveryData?.gillerName ?? '길러') : '길러';
 
-        // Send notification
         const title = '배송 요청이 수락되었습니다.';
-        const body = `${gillerName}?섏씠 諛곗넚???섎씫?덉뒿?덈떎.`;
+        const body = `${gillerName}님이 배송을 수락했습니다.`;
 
-        await sendFCM(fcmToken, title, body, {
-          type: 'request_accepted',
-          requestId: context.params.requestId,
-          deliveryId: matchedDeliveryId,
-          screen: 'RequestDetail',
-        });
+        let notificationSent = false;
 
-        console.warn('??Request accepted notification sent:', context.params.requestId);
+        if (fcmToken) {
+          try {
+            await sendFCM(fcmToken, title, body, {
+              type: 'request_accepted',
+              requestId: context.params.requestId,
+              deliveryId: matchedDeliveryId,
+              screen: 'RequestDetail',
+            });
+            notificationSent = true;
+            console.warn('App Push sent to Gller:', gllerId);
+          } catch (error) {
+            console.error('App Push failed for Gller:', error);
+          }
+        } else {
+          console.warn('No FCM token for Gller:', gllerId);
+        }
+
+        // Fallback to NHN Alimtalk if FCM is not available or failed
+        if (!notificationSent && gller?.phoneNumber) {
+          const alimtalkSuccess = await NHNAlimtalkService.sendAlimtalk({
+            recipientNo: gller.phoneNumber,
+            templateCode: 'REQUEST_ACCEPTED_V1',
+            templateParams: {
+              gillerName,
+            }
+          });
+          if (alimtalkSuccess) {
+            console.warn('NHN Alimtalk sent as fallback to Gller:', gllerId);
+          }
+        }
+
+        console.warn('Request accepted notification process completed:', context.params.requestId);
         return null;
       } catch (error) {
         console.error('??Error sending request accepted notification:', error);
@@ -1054,8 +1096,20 @@ export const onRequestStatusChanged = functions.firestore
       if (gillerId) {
         try {
           const totalFee: number = after.fee?.totalFee ?? 0;
+          const requesterId: string = typeof after.requesterId === 'string' ? after.requesterId : '';
 
           if (totalFee > 0) {
+            // FDS 자전거래 사후 체크
+            const fdsResult = await FdsService.checkSelfMatching(requesterId, gillerId);
+            let paymentStatus = 'completed';
+            let description = '배송 완료 수익';
+            
+            if (fdsResult.isFraud) {
+              console.error(`[FDS Flag] Request ${requestId} payment flagged for fraud: ${fdsResult.reason}`);
+              paymentStatus = 'held'; // 관리자 승인 필요 상태로 보류
+              description = `배송 완료 수익 (어뷰징 의심 보류: ${fdsResult.reason})`;
+            }
+
             const pricingPolicy = await getFunctionsPricingPolicyConfig();
             const PLATFORM_FEE_RATE = pricingPolicy.platformFeeRate;
             const TAX_RATE = pricingPolicy.withholdingTaxRate;
@@ -1065,7 +1119,7 @@ export const onRequestStatusChanged = functions.firestore
             const tax = Math.round(afterFee * TAX_RATE);
             const netAmount = afterFee - tax;
 
-            // payments 而щ젆?섏뿉 ?섏씡 ?덉퐫???앹꽦
+            // payments 컬렉션에 수익 레코드 생성
             const paymentRef = db.collection('payments').doc();
             await paymentRef.set({
               paymentId: paymentRef.id,
@@ -1075,27 +1129,31 @@ export const onRequestStatusChanged = functions.firestore
               fee: platformFee,
               tax,
               netAmount,
-              status: 'completed',
+              status: paymentStatus,
               requestId,
-              description: '諛곗넚 ?꾨즺 ?섏씡',
+              description,
               metadata: {
                 platformFeeRate: PLATFORM_FEE_RATE,
                 taxRate: TAX_RATE,
                 taxWithheld: tax,
                 isTaxable: true,
+                fdsResult: fdsResult.isFraud ? fdsResult : null,
               },
               createdAt: admin.firestore.FieldValue.serverTimestamp(),
-              completedAt: admin.firestore.FieldValue.serverTimestamp(),
+              completedAt: paymentStatus === 'completed' ? admin.firestore.FieldValue.serverTimestamp() : null,
             });
 
-            // 湲몃윭 ?ъ슜??臾몄꽌 totalEarnings, totalTaxWithheld ?낅뜲?댄듃
-            await db.collection('users').doc(gillerId).update({
-              totalEarnings: admin.firestore.FieldValue.increment(netAmount),
-              totalTaxWithheld: admin.firestore.FieldValue.increment(tax),
-              earningsUpdatedAt: admin.firestore.FieldValue.serverTimestamp(),
-            });
-
-            console.warn(`??Giller earning created for ${gillerId}: ${netAmount}??net (fee: ${platformFee}?? tax: ${tax}??`);
+            if (paymentStatus === 'completed') {
+              // 길러 사용자 문서 업데이트
+              await db.collection('users').doc(gillerId).update({
+                totalEarnings: admin.firestore.FieldValue.increment(netAmount),
+                totalTaxWithheld: admin.firestore.FieldValue.increment(tax),
+                earningsUpdatedAt: admin.firestore.FieldValue.serverTimestamp(),
+              });
+              console.warn(`??Giller earning created for ${gillerId}: ${netAmount}??net (fee: ${platformFee}?? tax: ${tax}??`);
+            } else {
+              console.warn(`??Giller earning held for ${gillerId} due to FDS.`);
+            }
           } else {
             console.warn(`?좑툘 No fee info for request ${requestId}, skipping earning creation`);
           }
@@ -1122,22 +1180,43 @@ export const onRequestStatusChanged = functions.firestore
         const gller = gllerDoc.data() as User;
         const fcmToken = gller?.fcmToken;
 
-        if (!fcmToken) {
-          console.warn('?좑툘 No FCM token for gller:', gllerId);
-          return null;
+        const gillerName = after.gillerName ?? '길러';
+        const title = '배송이 완료되었습니다.';
+        const body = `${gillerName}님이 배송을 완료했습니다.`;
+
+        let notificationSent = false;
+
+        if (fcmToken) {
+          try {
+            await sendFCM(fcmToken, title, body, {
+              type: 'delivery_completed',
+              requestId,
+              screen: 'RequestDetail',
+            });
+            notificationSent = true;
+            console.warn('App Push sent to Gller:', gllerId);
+          } catch (error) {
+            console.error('App Push failed for Gller:', error);
+          }
+        } else {
+          console.warn('No FCM token for Gller:', gllerId);
         }
 
-        const gillerName = after.gillerName ?? '湲몃윭';
-        const title = '배송이 완료되었습니다.';
-        const body = `${gillerName}?섏씠 諛곗넚???꾨즺?덉뒿?덈떎.`;
+        // Fallback to NHN Alimtalk if FCM is not available or failed
+        if (!notificationSent && gller?.phoneNumber) {
+          const alimtalkSuccess = await NHNAlimtalkService.sendAlimtalk({
+            recipientNo: gller.phoneNumber,
+            templateCode: 'DELIVERY_COMPLETED_V1',
+            templateParams: {
+              gillerName,
+            }
+          });
+          if (alimtalkSuccess) {
+            console.warn('NHN Alimtalk sent as fallback to Gller:', gllerId);
+          }
+        }
 
-        await sendFCM(fcmToken, title, body, {
-          type: 'delivery_completed',
-          requestId,
-          screen: 'RequestDetail',
-        });
-
-        console.warn('??Delivery completed notification sent:', requestId);
+        console.warn('Delivery completed notification process completed:', requestId);
         return null;
       } catch (error) {
         console.error('??Error sending delivery completed notification:', error);
@@ -1980,6 +2059,13 @@ export const acceptMatch = functions.https.onCall(
       // Verify giller is the match owner
       if (match.gillerId !== gillerId) {
         throw new functions.https.HttpsError('permission-denied', 'Not authorized to accept this match');
+      }
+
+      // Check FDS for self-matching abuse
+      const fdsResult = await FdsService.checkSelfMatching(match.gllerId, match.gillerId);
+      if (fdsResult.isFraud && fdsResult.action === 'block') {
+        console.error(`[FDS Block] Match ${matchId} blocked: ${fdsResult.reason}`);
+        throw new functions.https.HttpsError('permission-denied', `부정 사용(어뷰징)이 감지되어 매칭이 차단되었습니다: ${fdsResult.reason}`);
       }
 
       // Check if match is still pending
@@ -3696,7 +3782,10 @@ export const confirmPhoneOtp = functions.https.onCall(
   }
 );
 
-import { encrypt } from '../../src/utils/crypto';
+import { encrypt } from './utils/crypto';
+import { FdsService } from './services/fds-service';
+import { NHNAlimtalkService } from './services/nhn-alimtalk-service';
+export * from './triggers/accounting-stats-trigger';
 
 export { syncConfigStationsFromSeoulApi };
 
