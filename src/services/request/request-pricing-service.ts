@@ -17,7 +17,7 @@ import { getRequestById } from './request-repository';
 import { notifyGillers } from './request-event-service';
 import { RequestStatus } from '../../types/request';
 import type { CreateRequestData, RequestPricingContext, StationInfo } from '../../types/request';
-import type { SharedPackageSize } from '../../../../shared/pricing-config';
+import type { SharedPackageSize } from '../../../shared/pricing-config';
 
 export type FeeSnapshot = {
   totalFee?: number;

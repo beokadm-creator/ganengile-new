@@ -12,6 +12,7 @@ import {
 } from 'react-native';
 import { useNavigation, useRoute, type RouteProp } from '@react-navigation/native';
 import { NaverMapCard } from '../../components/maps/NaverMapCard';
+import { CompoundPaymentPreview } from '../../components/payment/CompoundPaymentPreview';
 import { BorderRadius, Colors, Spacing } from '../../theme';
 import { fetchUserInfo } from '../../services/matching-service';
 import { requireUserId } from '../../services/firebase';
@@ -300,8 +301,15 @@ export function MatchingResultScreen() {
       <View style={styles.card}>
         <Text style={styles.cardTitle}>요청 경로</Text>
         <InfoRow label="구간" value={routeLabel} />
-        <InfoRow label="현재 제안 금액" value={`${currentFee.toLocaleString()}원`} />
         <InfoRow label="현재 상태" value={getProgressLabel(request)} />
+      </View>
+
+      <View style={styles.card}>
+        <CompoundPaymentPreview
+          requestId={request.requestId}
+          baseAmount={currentFee}
+          initialSelectedCouponId={request.selectedCouponId}
+        />
       </View>
 
       {typeof request.pickupStation.lat === 'number' &&

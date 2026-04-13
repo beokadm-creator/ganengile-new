@@ -48,7 +48,7 @@ export interface Beta1RequestCreateInput {
       description?: string;
       estimatedValue?: number;
       estimatedWeightKg?: number;
-      estimatedSize?: 'small' | 'medium' | 'large' | 'xl';
+      estimatedSize?: SharedPackageSize;
       riskFlags: string[];
       handlingNotes: string[];
     };
@@ -56,6 +56,7 @@ export interface Beta1RequestCreateInput {
   aiQuoteOverride?: Beta1AIQuoteResponse;
   pricingPolicyVersion?: string;
   pricingContextOverride?: Partial<RequestPricingContext>;
+  selectedCouponId?: string;
 }
 
 export interface Beta1QuoteCard {

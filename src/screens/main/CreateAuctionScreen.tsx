@@ -139,7 +139,7 @@ export default function CreateAuctionScreen() {
         gllerName: '경매 등록자',
         pickupStation: toStationInfo(pickupStation),
         deliveryStation: toStationInfo(deliveryStation),
-        packageSize,
+        packageSize: packageSize === 'extra_large' ? 'xl' : packageSize,
         packageWeight: Number.parseFloat(weight),
         packageDescription: description.trim(),
         baseFee: estimatedFee.baseFee,

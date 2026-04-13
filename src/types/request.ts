@@ -127,6 +127,7 @@ export interface Request {
   // 물건 가치 및 보증금
   itemValue?: number;
   depositAmount?: number;
+  selectedCouponId?: string | null;
 
   initialNegotiationFee: number;
 
@@ -248,6 +249,7 @@ export interface CreateRequestData {
     };
   };
   itemValue?: number;
+  selectedCouponId?: string | null;
   pricingPolicyVersion?: string;
   pricingContext?: RequestPricingContext;
   preferredTime?: {

@@ -1,10 +1,16 @@
-import React from 'react';
-import { View, Text, TouchableOpacity, ActivityIndicator, StyleSheet } from 'react-native';
+import React, { useEffect, useState } from 'react';
+import { View, Text, TouchableOpacity, ActivityIndicator, StyleSheet, FlatList } from 'react-native';
 import { StepContainer } from '../components/StepContainer';
 import { QuoteBreakdownRow } from '../components/QuoteBreakdownRow';
 import { Colors, Spacing, BorderRadius, Typography } from '../../../../theme';
 import { useCreateRequestStore } from '../store/useCreateRequestStore';
 import type { Beta1QuoteCard } from '../../../../services/beta1-orchestration-service';
+
+import { useUser } from '../../../../contexts/UserContext';
+import { getUserCoupons } from '../../../../services/coupon-service';
+import { PointService } from '../../../../services/PointService';
+import type { UserCoupon } from '../../../../types/coupon';
+import Modal from '../../../../components/common/Modal';
 
 type Props = {
   quotes: Beta1QuoteCard[];
@@ -28,12 +34,79 @@ export function Step4Quote({
   handleSaveDraftNow,
 }: Props) {
   const store = useCreateRequestStore();
+  const { user } = useUser();
+  const [isCouponModalVisible, setIsCouponModalVisible] = useState(false);
+  const [availableCoupons, setAvailableCoupons] = useState<UserCoupon[]>([]);
+  const [pointBalance, setPointBalance] = useState(0);
+
+  useEffect(() => {
+    if (!user?.uid) return;
+    async function loadData() {
+      if (!user?.uid) return;
+      try {
+        const [coupons, balance] = await Promise.all([
+          getUserCoupons(user.uid),
+          PointService.getBalance(user.uid)
+        ]);
+        setPointBalance(balance);
+        
+        const validCoupons = coupons.filter(c => 
+          c.status === 'active' && 
+          (c.purpose === 'delivery_fee' || c.purpose === 'all')
+        );
+        setAvailableCoupons(validCoupons);
+        
+        // 적용 가능한 쿠폰이 있고 현재 선택된 쿠폰이 없으면 첫 번째 쿠폰 자동 적용
+        if (validCoupons.length > 0 && !store.selectedCoupon) {
+          store.setSelectedCoupon(validCoupons[0]);
+        }
+      } catch (e) {
+        console.error('Failed to load coupons/points in Step4:', e);
+      }
+    }
+    void loadData();
+  }, [user?.uid]);
+
+  const getCouponDiscount = (price: number) => {
+    if (!store.selectedCoupon) return 0;
+    if (store.selectedCoupon.minOrderAmount && price < store.selectedCoupon.minOrderAmount) return 0;
+
+    if (store.selectedCoupon.discountType === 'fixed') {
+      return Math.min(store.selectedCoupon.discountValue, price);
+    }
+    const discount = Math.floor(price * (store.selectedCoupon.discountValue / 100));
+    return store.selectedCoupon.maxDiscountAmount 
+      ? Math.min(discount, store.selectedCoupon.maxDiscountAmount) 
+      : discount;
+  };
 
   return (
     <StepContainer step={4} currentStep={store.activeStep}>
+      <Text style={styles.sectionHeader}>쿠폰 적용</Text>
+      <TouchableOpacity
+        style={styles.couponSelectorCard}
+        onPress={() => setIsCouponModalVisible(true)}
+        disabled={availableCoupons.length === 0}
+      >
+        <Text style={store.selectedCoupon ? styles.couponSelectedText : styles.couponPlaceholderText}>
+          {store.selectedCoupon 
+            ? `${store.selectedCoupon.name} 적용됨` 
+            : availableCoupons.length > 0 
+              ? '사용 가능한 쿠폰 선택하기' 
+              : '사용 가능한 쿠폰이 없습니다'}
+        </Text>
+      </TouchableOpacity>
+
       <Text style={styles.sectionHeader}>예상 금액</Text>
-      {quotes.map((card) => (
-        <TouchableOpacity
+      {quotes.map((card) => {
+        const price = card.pricing.publicPrice;
+        const discount = getCouponDiscount(price);
+        const afterCouponAmount = Math.max(0, price - discount);
+        const pointCoverage = Math.min(pointBalance, afterCouponAmount);
+        const finalPrice = Math.max(0, afterCouponAmount - pointCoverage);
+
+        return (
+          <TouchableOpacity
           key={card.quoteType}
           style={[styles.quoteCard, store.selectedQuoteType === card.quoteType && styles.quoteCardSelected]}
           onPress={() => {
@@ -59,24 +132,35 @@ export function Step4Quote({
             </View>
           </View>
           <View style={styles.quoteBreakdown}>
-            <QuoteBreakdownRow label="기본요금" value={card.pricing.baseFee} />
-            <QuoteBreakdownRow label="거리요금" value={card.pricing.distanceFee} />
-            <QuoteBreakdownRow label="무게요금" value={card.pricing.weightFee} />
-            <QuoteBreakdownRow label="크기요금" value={card.pricing.sizeFee} />
-            <QuoteBreakdownRow label="긴급가산" value={card.pricing.urgencySurcharge} />
-            <QuoteBreakdownRow label="주소픽업" value={card.pricing.addressPickupFee} />
-            <QuoteBreakdownRow label="주소도착" value={card.pricing.addressDropoffFee} />
-            <QuoteBreakdownRow label="사물함" value={card.pricing.lockerFee} />
-            {((card.pricing as any).dynamicAdjustment || (card.pricing as any).manualAdjustment) ? (
-              <QuoteBreakdownRow label="수동/동적 조정" value={((card.pricing as any).dynamicAdjustment ?? 0) + ((card.pricing as any).manualAdjustment ?? 0)} />
-            ) : null}
-            <QuoteBreakdownRow label="서비스수수료" value={card.pricing.serviceFee} />
-            <QuoteBreakdownRow label="부가세" value={card.pricing.vat} />
-            <View style={styles.quoteDivider} />
-            <QuoteBreakdownRow label="예상금액 합계" value={card.pricing.publicPrice} strong />
-          </View>
-        </TouchableOpacity>
-      ))}
+              <QuoteBreakdownRow label="기본요금" value={card.pricing.baseFee} />
+              <QuoteBreakdownRow label="거리요금" value={card.pricing.distanceFee} />
+              <QuoteBreakdownRow label="무게요금" value={card.pricing.weightFee} />
+              <QuoteBreakdownRow label="크기요금" value={card.pricing.sizeFee} />
+              <QuoteBreakdownRow label="긴급가산" value={card.pricing.urgencySurcharge} />
+              <QuoteBreakdownRow label="주소픽업" value={card.pricing.addressPickupFee} />
+              <QuoteBreakdownRow label="주소도착" value={card.pricing.addressDropoffFee} />
+              <QuoteBreakdownRow label="사물함" value={card.pricing.lockerFee} />
+              {((card.pricing as any).dynamicAdjustment || (card.pricing as any).manualAdjustment) ? (
+                <QuoteBreakdownRow label="수동/동적 조정" value={((card.pricing as any).dynamicAdjustment ?? 0) + ((card.pricing as any).manualAdjustment ?? 0)} />
+              ) : null}
+              <QuoteBreakdownRow label="서비스수수료" value={card.pricing.serviceFee} />
+              <QuoteBreakdownRow label="부가세" value={card.pricing.vat} />
+              <View style={styles.quoteDivider} />
+              
+              <QuoteBreakdownRow label="예상금액" value={price} />
+              {discount > 0 && (
+                <QuoteBreakdownRow label={`쿠폰 할인 (${store.selectedCoupon?.name})`} value={-discount} strong />
+              )}
+              {pointCoverage > 0 && (
+                <QuoteBreakdownRow label="보유 포인트 결제 예정" value={-pointCoverage} />
+              )}
+              
+              <View style={styles.quoteDivider} />
+              <QuoteBreakdownRow label="최종 결제 예정 금액" value={finalPrice} strong />
+            </View>
+          </TouchableOpacity>
+        );
+      })}
 
       {missingItems.length > 0 && (
         <View style={styles.missingCard}>
@@ -115,12 +199,82 @@ export function Step4Quote({
       <TouchableOpacity style={styles.secondaryButton} onPress={() => void handleSaveDraftNow()} disabled={saving || store.draftSaving}>
         <Text style={styles.secondaryButtonText}>{store.draftSaving ? '저장 중...' : '임시 저장하기'}</Text>
       </TouchableOpacity>
+      {/* 쿠폰 선택 모달 */}
+      <Modal
+        visible={isCouponModalVisible}
+        onClose={() => setIsCouponModalVisible(false)}
+        variant="bottomSheet"
+        animationType="slide"
+        showCloseButton={true}
+      >
+        <View style={styles.sheetContainer}>
+          <Text style={styles.sheetTitle}>사용 가능한 쿠폰</Text>
+          <FlatList
+            data={availableCoupons}
+            keyExtractor={(item) => item.id}
+            contentContainerStyle={styles.couponList}
+            renderItem={({ item }) => {
+              const isSelected = store.selectedCoupon?.id === item.id;
+              const discountValue = item.discountType === 'fixed' 
+                ? `${item.discountValue.toLocaleString()}원`
+                : `${item.discountValue}%`;
+              return (
+                <TouchableOpacity
+                  style={[styles.couponItem, isSelected && styles.couponItemSelected]}
+                  onPress={() => {
+                    store.setSelectedCoupon(item);
+                    setIsCouponModalVisible(false);
+                  }}
+                >
+                  <View>
+                    <Text style={[styles.couponName, isSelected && styles.couponNameSelected]}>{item.name}</Text>
+                    <Text style={styles.couponDesc}>{item.description}</Text>
+                  </View>
+                  <View style={styles.couponRight}>
+                    <Text style={[styles.couponDiscount, isSelected && styles.couponDiscountSelected]}>{discountValue} 할인</Text>
+                    <Text style={styles.couponExpiry}>~ {(item.expiresAt as any)?.toDate ? (item.expiresAt as any).toDate().toLocaleDateString() : new Date(item.expiresAt as any).toLocaleDateString()}</Text>
+                  </View>
+                </TouchableOpacity>
+              );
+            }}
+            ListFooterComponent={
+              <TouchableOpacity
+                style={[styles.couponItem, !store.selectedCoupon && styles.couponItemSelected]}
+                onPress={() => {
+                  store.setSelectedCoupon(null);
+                  setIsCouponModalVisible(false);
+                }}
+              >
+                <Text style={[styles.couponName, !store.selectedCoupon && styles.couponNameSelected]}>적용 안 함</Text>
+              </TouchableOpacity>
+            }
+          />
+        </View>
+      </Modal>
     </StepContainer>
   );
 }
 
 const styles = StyleSheet.create({
   sectionHeader: { color: Colors.textPrimary, fontSize: Typography.fontSize.xl, fontWeight: Typography.fontWeight.extrabold, marginTop: Spacing.md, marginBottom: Spacing.sm },
+  
+  // Coupon Styles
+  couponSelectorCard: { backgroundColor: Colors.surface, borderRadius: BorderRadius.md, padding: Spacing.md, borderWidth: 1, borderColor: Colors.border, marginBottom: Spacing.md, alignItems: 'center' },
+  couponSelectedText: { color: Colors.primary, fontWeight: '700', fontSize: Typography.fontSize.base },
+  couponPlaceholderText: { color: Colors.textSecondary, fontWeight: '700', fontSize: Typography.fontSize.base },
+  
+  sheetContainer: { padding: Spacing.xl, minHeight: 300, maxHeight: 500 },
+  sheetTitle: { fontSize: Typography.fontSize.lg, fontWeight: '700', color: Colors.textPrimary, marginBottom: Spacing.md },
+  couponList: { paddingBottom: Spacing.xl },
+  couponItem: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: Spacing.md, borderRadius: BorderRadius.md, backgroundColor: Colors.white, borderWidth: 1, borderColor: Colors.gray200, marginBottom: Spacing.sm },
+  couponItemSelected: { borderColor: Colors.primary, backgroundColor: `${Colors.primary}08` },
+  couponName: { fontSize: Typography.fontSize.base, fontWeight: '600', color: Colors.textPrimary, marginBottom: 2 },
+  couponNameSelected: { color: Colors.primary },
+  couponDesc: { fontSize: Typography.fontSize.xs, color: Colors.gray500 },
+  couponRight: { alignItems: 'flex-end' },
+  couponDiscount: { fontSize: Typography.fontSize.base, fontWeight: '700', color: Colors.textPrimary },
+  couponDiscountSelected: { color: Colors.primary },
+  couponExpiry: { fontSize: Typography.fontSize.xs, color: Colors.gray400, marginTop: 2 },
   quoteCard: { backgroundColor: Colors.surface, borderRadius: BorderRadius.lg, padding: Spacing.lg, borderWidth: 2, borderColor: Colors.border, marginBottom: Spacing.md },
   quoteCardSelected: { borderColor: Colors.primary, backgroundColor: Colors.successLight },
   quoteHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: Spacing.lg },

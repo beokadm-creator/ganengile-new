@@ -132,6 +132,10 @@ export interface Deposit {
   tossAmount?: number;        // 토스페이먼츠 결제 금액
   totalAmount: number;        // 총 결제 금액
 
+  // 쿠폰 할인 정보
+  couponId?: string;
+  discountAmount?: number;
+
   // 결제 ID
   paymentId?: string;         // 토스페이먼츠 결제 ID
 

@@ -223,7 +223,7 @@ export interface AIAnalysis {
     description?: string;
     estimatedValue?: number;
     estimatedWeightKg?: number;
-    estimatedSize?: 'small' | 'medium' | 'large' | 'xl';
+    estimatedSize?: 'small' | 'medium' | 'large' | 'extra_large' | 'xl';
     riskFlags?: string[];
     handlingNotes?: string[];
   };

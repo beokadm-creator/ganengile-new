@@ -17,6 +17,8 @@ import { RouteProp, useNavigation, useRoute } from '@react-navigation/native';
 import { Timestamp } from 'firebase/firestore';
 
 import AppTopBar from '../../components/common/AppTopBar';
+import { CompoundPaymentPreview } from '../../components/payment/CompoundPaymentPreview';
+import { useUser } from '../../contexts/UserContext';
 import { ensureChatRoomForRequest, getChatRoomByRequestId } from '../../services/chat-service';
 import { deliveryPartnerService } from '../../services/delivery-partner-service';
 import {
@@ -613,9 +615,15 @@ export default function RequestDetailScreen() {
             />
           ) : null}
           <InfoRow label="보내기 방식" value={request.requestMode === 'reservation' ? '예약 보내기' : '지금 보내기'} />
-          <InfoRow label="예상 금액" value={`${amount.toLocaleString()}원`} />
           <InfoRow label="마감 시간" value={formatDateTime(request.deadline)} />
         </Panel>
+
+        <CompoundPaymentPreview
+          requestId={request.requestId}
+          baseAmount={amount}
+          initialSelectedCouponId={request.selectedCouponId}
+          readOnly={request.status !== RequestStatus.PENDING && request.status !== RequestStatus.MATCHED}
+        />
 
         <Panel title="배송 정보">
           <InfoRow label="출발역" value={`${request.pickupStation.stationName} / ${request.pickupStation.line}`} />

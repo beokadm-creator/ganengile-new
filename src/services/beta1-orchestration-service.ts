@@ -541,12 +541,12 @@ export async function createBeta1Request(input: Beta1RequestCreateInput): Promis
     });
 
     const aiResult = input.aiAnalysisOverride?.result ?? {
-      itemName: input.packageItemName ?? null,
-      category: input.packageCategory ?? null,
-      description: input.packageDescription ?? null,
-      estimatedValue: input.itemValue ?? null,
-      estimatedWeightKg: input.weightKg ?? null,
-      estimatedSize: normalizePackageSize(input.packageSize) ?? null,
+      itemName: input.packageItemName ?? undefined,
+      category: input.packageCategory ?? undefined,
+      description: input.packageDescription ?? undefined,
+      estimatedValue: input.itemValue ?? undefined,
+      estimatedWeightKg: input.weightKg ?? undefined,
+      estimatedSize: normalizePackageSize(input.packageSize) ?? undefined,
       handlingNotes:
         input.requestMode === 'reservation'
           ? [
@@ -689,6 +689,7 @@ export async function createBeta1Request(input: Beta1RequestCreateInput): Promis
     initialNegotiationFee: selectedCard.pricing.publicPrice,
     itemValue: input.itemValue ?? 0,
     selectedPhotoIds: input.selectedPhotoIds ?? [],
+    selectedCouponId: input.selectedCouponId ?? null,
     createdAt: serverTimestamp(),
     updatedAt: serverTimestamp(),
   };
@@ -713,6 +714,7 @@ export async function createBeta1Request(input: Beta1RequestCreateInput): Promis
     pricingPolicyVersion: input.pricingPolicyVersion ?? pricingPolicy.version,
     status: 'pending',
     beta1DeliveryStatus: 'created',
+    selectedCouponId: input.selectedCouponId ?? null,
     fee: {
       ...selectedCard.pricing,
       totalFee: selectedCard.pricing.publicPrice,

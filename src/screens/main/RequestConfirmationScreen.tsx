@@ -5,6 +5,7 @@ import { useNavigation, useRoute, type RouteProp } from '@react-navigation/nativ
 import { deliveryPartnerService } from '../../services/delivery-partner-service';
 import { getRequestById, subscribeToRequest } from '../../services/request-service';
 import { getRequesterStatusBody, getRequesterStatusLabel } from '../../services/request-status-presentation-service';
+import { CompoundPaymentPreview } from '../../components/payment/CompoundPaymentPreview';
 import { BorderRadius, Colors, Shadows, Spacing, Typography } from '../../theme';
 import type { MainStackNavigationProp, MainStackParamList } from '../../types/navigation';
 import { RequestStatus, type Request } from '../../types/request';
@@ -163,12 +164,17 @@ export default function RequestConfirmationScreen() {
           {arrivedAtLabel ? <InfoRow label="도착" value={arrivedAtLabel} /> : null}
           {deliveredAtLabel ? <InfoRow label="전달" value={deliveredAtLabel} /> : null}
           {deliveryFee ? (
-            <>
-              <InfoRow label="제안 금액" value={`${deliveryFee.totalFee.toLocaleString()}원`} />
-              <InfoRow label="예상 시간" value={`${deliveryFee.estimatedTime}분`} />
-            </>
+            <InfoRow label="예상 시간" value={`${deliveryFee.estimatedTime}분`} />
           ) : null}
         </View>
+
+        {deliveryFee ? (
+          <CompoundPaymentPreview
+            requestId={requestId}
+            baseAmount={deliveryFee.totalFee}
+            initialSelectedCouponId={request?.selectedCouponId}
+          />
+        ) : null}
 
         {partnerDispatches.length > 0 ? (
           <View style={styles.card}>

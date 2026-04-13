@@ -5,6 +5,7 @@ import type { Beta1QuoteCard } from '../../../../services/beta1-orchestration-se
 import type { StationInfo } from '../../../../types/request';
 
 import type { SharedPackageSize } from '../../../../../shared/pricing-config';
+import type { UserCoupon } from '../../../../types/coupon';
 
 export type RequestMode = 'immediate' | 'reservation';
 export type LocationMode = 'station' | 'address';
@@ -98,6 +99,8 @@ export interface CreateRequestState {
   setAiQuotesLoading: (loading: boolean) => void;
   selectedQuoteType: Beta1QuoteCard['quoteType'];
   setSelectedQuoteType: (type: Beta1QuoteCard['quoteType']) => void;
+  selectedCoupon: UserCoupon | null;
+  setSelectedCoupon: (coupon: UserCoupon | null) => void;
 
   // Draft Management
   draftRestored: boolean;
@@ -144,6 +147,8 @@ const initialState = {
   verifiedPhoneOverride: null,
   aiQuotesLoading: false,
   selectedQuoteType: 'balanced' as Beta1QuoteCard['quoteType'],
+  selectedCoupon: null,
+
   draftRestored: false,
   draftSaving: false,
 };
@@ -190,7 +195,8 @@ export const useCreateRequestStore = create<CreateRequestState>((set) => ({
   
   setAiQuotesLoading: (loading) => set({ aiQuotesLoading: loading }),
   setSelectedQuoteType: (type) => set({ selectedQuoteType: type }),
-  
+  setSelectedCoupon: (coupon) => set({ selectedCoupon: coupon }),
+
   setDraftRestored: (restored) => set({ draftRestored: restored }),
   setDraftSaving: (saving) => set({ draftSaving: saving }),
 

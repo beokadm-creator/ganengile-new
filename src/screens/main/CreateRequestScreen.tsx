@@ -142,7 +142,7 @@ function hasUsableCoordinates(latitude: number | null, longitude: number | null)
   );
 }
 
-function getStationCandidates(stations: Station[]): StationCandidate[] {
+function getStationCandidates(stations: Station[]): any[] {
   return stations
     .filter((station) => {
       const { latitude, longitude } = getStationCoordinates(station);
@@ -732,6 +732,7 @@ export default function CreateRequestScreen({ navigation, route }: Props) {
         aiQuoteOverride: aiQuoteResponse ?? undefined,
         pricingPolicyVersion: pricingPolicy?.version ?? undefined,
         pricingContextOverride: pricingContext ?? undefined,
+        selectedCouponId: useCreateRequestStore.getState().selectedCoupon?.id,
       });
 
       const selected = result.quoteCards.find((card) => card.quoteType === selectedQuoteType) ?? result.quoteCards[0];

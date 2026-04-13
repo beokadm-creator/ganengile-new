@@ -5,11 +5,11 @@ import { StepContainer } from '../components/StepContainer';
 import { Block } from '../components/Block';
 import { Colors, Spacing, BorderRadius, Typography } from '../../../../theme';
 import { useCreateRequestStore } from '../store/useCreateRequestStore';
-import type { RecipientContactPrivacyConfig } from '../../../../types/request';
+import { SafeNumberIntegrationConfig } from '../../../../services/integration-config-service';
 
 type Props = {
   setShowLockerLocator: (visible: boolean) => void;
-  recipientPrivacyConfig: RecipientContactPrivacyConfig;
+  recipientPrivacyConfig: any;
   handleContactPhoneChange: (value: string) => void;
   hasLockedVerifiedPhone: boolean;
   isPhoneVerified: boolean;

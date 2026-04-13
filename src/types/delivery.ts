@@ -233,6 +233,8 @@ export interface DeliveryRequest {
   /** Request status */
   status: DeliveryStatus;
 
+  selectedCouponId?: string | null;
+
   /** Created timestamp */
   createdAt: Date;
 

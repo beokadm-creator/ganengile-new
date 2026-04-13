@@ -2,7 +2,7 @@ import { getFunctions, httpsCallable } from 'firebase/functions';
 import type { RequestDraft } from '../types/beta1';
 import type { StationInfo, CreateRequestData } from '../types/request';
 
-import type { SharedPackageSize } from '../../../shared/pricing-config';
+import type { SharedPackageSize } from '../../shared/pricing-config';
 
 export interface Beta1AIAnalysisResponse {
   provider: string;
@@ -137,7 +137,7 @@ export async function generatePricingQuotesWithAI(requestData: CreateRequestData
         description?: string;
         estimatedValue?: number;
         estimatedWeightKg?: number;
-        estimatedSize?: 'small' | 'medium' | 'large' | 'xl';
+        estimatedSize?: SharedPackageSize;
       };
       requestMode?: 'immediate' | 'reservation';
       preferredPickupTime?: string;
@@ -245,7 +245,7 @@ export async function generatePricingQuotesForBeta1Input(input: {
         description?: string;
         estimatedValue?: number;
         estimatedWeightKg?: number;
-        estimatedSize?: 'small' | 'medium' | 'large' | 'xl';
+        estimatedSize?: SharedPackageSize;
       };
       requestMode?: 'immediate' | 'reservation';
       preferredPickupTime?: string;
