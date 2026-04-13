@@ -46,6 +46,14 @@ export function Step3Recipient({
 }: Props) {
   const store = useCreateRequestStore();
 
+  const formatPhoneNumber = (text: string) => {
+    const cleaned = text.replace(/[^0-9]/g, '');
+    if (cleaned.length <= 3) return cleaned;
+    if (cleaned.length <= 7) return `${cleaned.slice(0, 3)}-${cleaned.slice(3)}`;
+    if (cleaned.length <= 10) return `${cleaned.slice(0, 3)}-${cleaned.slice(3, 6)}-${cleaned.slice(6)}`;
+    return `${cleaned.slice(0, 3)}-${cleaned.slice(3, 7)}-${cleaned.slice(7, 11)}`;
+  };
+
   return (
     <StepContainer 
       step={3} 
@@ -53,6 +61,10 @@ export function Step3Recipient({
       onNext={() => {
         if (!store.recipientName || !store.recipientPhone || !store.recipientConsentChecked) {
           Alert.alert('확인 필요', '수령인 정보와 개인정보 제공 동의를 완료해 주세요.');
+          return;
+        }
+        if (!/^01\d-\d{3,4}-\d{4}$/.test(store.recipientPhone)) {
+          Alert.alert('확인 필요', '올바른 휴대폰 번호 형식을 입력해 주세요. (예: 010-1234-5678)');
           return;
         }
         if (!isPhoneVerified) {
@@ -104,10 +116,11 @@ export function Step3Recipient({
         <TextInput
           style={styles.input}
           value={store.recipientPhone}
-          onChangeText={store.setRecipientPhone}
+          onChangeText={(text) => store.setRecipientPhone(formatPhoneNumber(text))}
           keyboardType="phone-pad"
-          placeholder="수령인 연락처"
+          placeholder="수령인 연락처 (예: 010-1234-5678)"
           placeholderTextColor={Colors.gray400}
+          maxLength={13}
         />
         <View style={styles.noticeBox}>
           <Text style={styles.noticeTitle}>개인정보 및 안심번호 안내</Text>

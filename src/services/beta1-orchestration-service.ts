@@ -541,12 +541,12 @@ export async function createBeta1Request(input: Beta1RequestCreateInput): Promis
     });
 
     const aiResult = input.aiAnalysisOverride?.result ?? {
-      itemName: input.packageItemName,
-      category: input.packageCategory,
-      description: input.packageDescription,
-      estimatedValue: input.itemValue,
-      estimatedWeightKg: input.weightKg,
-      estimatedSize: normalizePackageSize(input.packageSize),
+      itemName: input.packageItemName ?? null,
+      category: input.packageCategory ?? null,
+      description: input.packageDescription ?? null,
+      estimatedValue: input.itemValue ?? null,
+      estimatedWeightKg: input.weightKg ?? null,
+      estimatedSize: normalizePackageSize(input.packageSize) ?? null,
       handlingNotes:
         input.requestMode === 'reservation'
           ? [
@@ -638,16 +638,16 @@ export async function createBeta1Request(input: Beta1RequestCreateInput): Promis
     pickupStation: input.pickupStation,
     deliveryStation: input.deliveryStation,
     packageInfo: {
-      size: input.packageSize,
-      weight: input.weightKg,
-      weightKg: input.weightKg,
-      description: input.packageDescription,
-      imageUrl: input.selectedPhotoIds?.[0] ?? undefined,
+      size: input.packageSize ?? null,
+      weight: input.weightKg ?? null,
+      weightKg: input.weightKg ?? null,
+      description: input.packageDescription ?? null,
+      imageUrl: input.selectedPhotoIds?.[0] ?? null,
       isFragile: false,
       isPerishable: false,
     },
-    recipientName: input.recipientName,
-    recipientPhone: input.recipientPhone,
+    recipientName: input.recipientName ?? null,
+    recipientPhone: input.recipientPhone ?? null,
     pickupLocationDetail: input.pickupLocationDetail?.trim() || null,
     storageLocation: input.storageLocation?.trim() || null,
     lockerId: input.lockerId?.trim() || null,
@@ -708,8 +708,8 @@ export async function createBeta1Request(input: Beta1RequestCreateInput): Promis
     storageLocation: input.storageLocation?.trim() || null,
     lockerId: input.lockerId?.trim() || null,
     specialInstructions: input.specialInstructions?.trim() || null,
-    recipientName: input.recipientName,
-    recipientPhone: input.recipientPhone,
+    recipientName: input.recipientName ?? null,
+    recipientPhone: input.recipientPhone ?? null,
     pricingPolicyVersion: input.pricingPolicyVersion ?? pricingPolicy.version,
     status: 'pending',
     beta1DeliveryStatus: 'created',

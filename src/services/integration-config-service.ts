@@ -71,12 +71,22 @@ export interface AIIntegrationConfig {
   autoFillFields: AIAutoFillFieldsConfig;
 }
 
+export interface SafeNumberIntegrationConfig {
+  enabled: boolean;
+  testMode: boolean;
+  allowTestBypass: boolean;
+  provider: string;
+  liveReady: boolean;
+  statusMessage: string;
+}
+
 const CACHE_TTL = 60 * 1000;
 
 let identityCache: { data: IdentityIntegrationConfig; expiresAt: number } | null = null;
 let bankCache: { data: BankIntegrationConfig; expiresAt: number } | null = null;
 let paymentCache: { data: PaymentIntegrationConfig; expiresAt: number } | null = null;
 let aiCache: { data: AIIntegrationConfig; expiresAt: number } | null = null;
+let safeNumberCache: { data: SafeNumberIntegrationConfig; expiresAt: number } | null = null;
 
 function getDefaultIdentityIntegrationConfig(): IdentityIntegrationConfig {
   return {
@@ -187,6 +197,40 @@ export async function getIdentityIntegrationConfig(): Promise<IdentityIntegratio
     return config;
   } catch (error) {
     console.error('[integration-config] 은행 설정 로드 실패:', error);
+    return fallback;
+  }
+}
+
+export async function getSafeNumberIntegrationConfig(): Promise<SafeNumberIntegrationConfig> {
+  if (safeNumberCache && Date.now() < safeNumberCache.expiresAt) {
+    return safeNumberCache.data;
+  }
+
+  const fallback: SafeNumberIntegrationConfig = {
+    enabled: true,
+    testMode: true,
+    allowTestBypass: true,
+    provider: '050-sejong',
+    liveReady: false,
+    statusMessage: '안심번호 서비스 점검 중입니다.',
+  };
+
+  try {
+    const snap = await getDoc(doc(db, 'config_integrations', 'safe_number'));
+    const data = snap.exists() ? snap.data() : {};
+    
+    const config: SafeNumberIntegrationConfig = {
+      enabled: Boolean(data?.enabled ?? fallback.enabled),
+      testMode: Boolean(data?.testMode ?? fallback.testMode),
+      allowTestBypass: Boolean(data?.allowTestBypass ?? fallback.allowTestBypass),
+      provider: String(data?.provider ?? fallback.provider),
+      liveReady: Boolean(data?.liveReady ?? fallback.liveReady),
+      statusMessage: String(data?.statusMessage ?? fallback.statusMessage),
+    };
+    safeNumberCache = { data: config, expiresAt: Date.now() + CACHE_TTL };
+    return config;
+  } catch (error) {
+    console.error('[integration-config] 안심번호 설정 로드 실패:', error);
     return fallback;
   }
 }
