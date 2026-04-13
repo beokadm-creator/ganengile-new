@@ -7,7 +7,7 @@ import { BorderRadius, Colors, Spacing, Typography } from '../../theme';
 export function MissionStatusBadge({ label }: { label: string }) {
   return (
     <View style={styles.statusBadge}>
-      <MaterialIcons name="bolt" size={14} color={Colors.primaryDark} />
+      <MaterialIcons name="bolt" size={14} color="#3182F6" />
       <Text style={styles.statusBadgeText}>{label}</Text>
     </View>
   );
@@ -36,19 +36,16 @@ export function MissionSignalPill({
         ? styles.signalPillTextWarning
         : styles.signalPillTextNeutral;
 
+  const iconColor =
+    tone === 'positive'
+      ? '#00B26F'
+      : tone === 'warning'
+        ? '#F04452'
+        : '#8B95A1';
+
   return (
     <View style={[styles.signalPill, toneStyle]}>
-      <MaterialIcons
-        name={icon}
-        size={14}
-        color={
-          tone === 'positive'
-            ? Colors.successDark
-            : tone === 'warning'
-              ? Colors.warningDark
-              : Colors.textSecondary
-        }
-      />
+      <MaterialIcons name={icon} size={14} color={iconColor} />
       <Text style={[styles.signalPillText, toneTextStyle]}>{label}</Text>
     </View>
   );
@@ -59,44 +56,44 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 4,
-    borderRadius: BorderRadius.full,
-    backgroundColor: Colors.primaryLight,
-    paddingHorizontal: Spacing.sm,
-    paddingVertical: 6,
+    borderRadius: 8,
+    backgroundColor: '#E8F3FF', // 연한 블루
+    paddingHorizontal: 8,
+    paddingVertical: 4,
   },
   statusBadgeText: {
-    color: Colors.primaryDark,
-    fontSize: Typography.fontSize.xs,
-    fontWeight: Typography.fontWeight.bold,
+    color: '#3182F6', // 쨍한 블루
+    fontSize: 13,
+    fontWeight: '700',
   },
   signalPill: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 4,
-    paddingHorizontal: Spacing.sm,
-    paddingVertical: 6,
-    borderRadius: BorderRadius.full,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 6,
   },
   signalPillPositive: {
-    backgroundColor: Colors.successLight,
+    backgroundColor: '#E5F7ED',
   },
   signalPillWarning: {
-    backgroundColor: Colors.warningLight,
+    backgroundColor: '#FDECEE',
   },
   signalPillNeutral: {
-    backgroundColor: Colors.gray100,
+    backgroundColor: '#F2F4F6',
   },
   signalPillText: {
-    fontSize: Typography.fontSize.xs,
-    fontWeight: Typography.fontWeight.medium,
+    fontSize: 12,
+    fontWeight: '600',
   },
   signalPillTextPositive: {
-    color: Colors.successDark,
+    color: '#00B26F',
   },
   signalPillTextWarning: {
-    color: Colors.warningDark,
+    color: '#F04452',
   },
   signalPillTextNeutral: {
-    color: Colors.textSecondary,
+    color: '#4E5968',
   },
 });

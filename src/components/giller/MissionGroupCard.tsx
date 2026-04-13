@@ -1,6 +1,7 @@
 import React from 'react';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
+import * as Haptics from 'expo-haptics';
 
 import { MissionSignalPill, MissionStatusBadge } from './MissionBoardBadges';
 import type { MissionCard, MissionGroup } from './mission-board-types';
@@ -56,73 +57,74 @@ export function MissionGroupCard({
   );
   const isAcceptedGroup = group.selectionState === 'accepted';
   const nextActionLabel = getNextActionLabel(group);
+  const primaryOption = group.options[0];
+
+  const handlePrimaryPress = () => {
+    if (primaryOption) {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+      onPress(primaryOption);
+    }
+  };
 
   return (
-    <View
-      style={[
-        styles.card,
-        isAcceptedGroup ? styles.cardAcceptedShell : styles.cardAvailableShell,
-      ]}
-    >
-      {group.selectionState === 'available' && group.options[0] ? (
-        <TouchableOpacity
-          style={styles.quickActionBanner}
-          activeOpacity={0.9}
-          disabled={submittingBundleId === group.options[0].bundleId}
-          onPress={() => onPress(group.options[0])}
-        >
-          <View style={styles.quickActionCopy}>
-            <Text style={styles.quickActionTitle}>바로 잡기</Text>
-            <Text style={styles.quickActionBody}>
-              {buildOptionLabel(group.options[0])} · {group.options[0].rewardLabel}
-            </Text>
-          </View>
-          <MaterialIcons name="bolt" size={18} color={Colors.white} />
-        </TouchableOpacity>
-      ) : null}
-
-      <View style={styles.cardTop}>
-        <Text style={styles.cardTitle}>{group.routeLabel}</Text>
-        <View style={styles.cardTopActions}>
+    <View style={[styles.card, isAcceptedGroup ? styles.cardAcceptedShell : styles.cardAvailableShell]}>
+      {/* Header: Badges & Details */}
+      <View style={styles.cardHeader}>
+        <View style={styles.badgeContainer}>
           <MissionStatusBadge label={group.status} />
-          <TouchableOpacity style={styles.detailLink} activeOpacity={0.88} onPress={() => onOpenDetails(group)}>
-            <Text style={styles.detailLinkText}>상세</Text>
-          </TouchableOpacity>
+          {primaryOption?.exposureLabel && (
+            <Text style={styles.exposureText}>{primaryOption.exposureLabel}</Text>
+          )}
         </View>
-      </View>
-      <Text style={styles.quickFacts}>{buildQuickFacts(group)}</Text>
-      <Text style={styles.windowLabel}>{group.windowLabel}</Text>
-      {group.options[0]?.exposureLabel ? <Text style={styles.exposureLabel}>{group.options[0].exposureLabel}</Text> : null}
-      {nextActionLabel ? <Text style={styles.nextActionLabel}>다음 행동 · {nextActionLabel}</Text> : null}
-      <Text style={styles.cardBody}>{group.strategyTitle}</Text>
-      <Text style={styles.cardSummary}>{group.strategyBody}</Text>
-
-      {isAcceptedGroup && nextActionLabel ? (
-        <TouchableOpacity style={styles.nextActionButton} activeOpacity={0.88} onPress={() => onNextAction(group)}>
-          <Text style={styles.nextActionButtonText}>{nextActionLabel}</Text>
+        <TouchableOpacity style={styles.detailButton} onPress={() => onOpenDetails(group)} activeOpacity={0.7}>
+          <Text style={styles.detailButtonText}>상세보기</Text>
         </TouchableOpacity>
-      ) : null}
+      </View>
 
-      <View style={styles.signalRow}>
-        {group.candidateCount > 0 ? (
-          <MissionSignalPill
-            icon="group"
-            label={`추천 대상 ${group.candidateCount}명`}
-            tone="neutral"
-          />
+      {/* Main Content: Toss-style emphasis on amount and route */}
+      <View style={styles.mainContent}>
+        <Text style={styles.routeLabel}>{group.routeLabel}</Text>
+        <Text style={styles.windowLabel}>{group.windowLabel}</Text>
+        
+        {group.selectionState === 'available' && primaryOption ? (
+          <View style={styles.rewardContainer}>
+            <Text style={styles.rewardAmount}>{primaryOption.rewardLabel}</Text>
+            {primaryOption.rewardBoostLabel && (
+              <View style={styles.rewardBoostBadge}>
+                <Text style={styles.rewardBoostText}>{primaryOption.rewardBoostLabel}</Text>
+              </View>
+            )}
+          </View>
         ) : null}
+      </View>
+
+      {/* Strategy & Facts */}
+      <View style={styles.strategyContainer}>
+        <Text style={styles.strategyTitle}>{group.strategyTitle}</Text>
+        <Text style={styles.strategyBody}>{group.strategyBody}</Text>
+      </View>
+
+      {/* Signal Pills */}
+      <View style={styles.signalRow}>
+        {group.candidateCount > 0 && (
+          <MissionSignalPill icon="group" label={`추천 대상 ${group.candidateCount}명`} tone="neutral" />
+        )}
         {group.requiresExternalPartner ? (
-          <MissionSignalPill
-            icon="local-shipping"
-            label="일부 파트너 연계"
-            tone="warning"
-          />
+          <MissionSignalPill icon="local-shipping" label="일부 파트너 연계" tone="warning" />
         ) : (
           <MissionSignalPill icon="directions-subway" label="길러 수행 중심" tone="positive" />
         )}
       </View>
 
-      {isAcceptedGroup && centerPoint && mapPoints.length >= 2 ? (
+      {/* Next Action Label (Accepted) */}
+      {isAcceptedGroup && nextActionLabel && (
+        <View style={styles.nextActionBox}>
+          <Text style={styles.nextActionText}>다음 할 일 · {nextActionLabel}</Text>
+        </View>
+      )}
+
+      {/* Map (Accepted) */}
+      {isAcceptedGroup && centerPoint && mapPoints.length >= 2 && (
         <View style={styles.mapWrap}>
           <NaverMapCard
             title={group.routeLabel}
@@ -130,91 +132,83 @@ export function MissionGroupCard({
             center={centerPoint}
             markers={mapPoints}
             path={mapPoints}
-            height={180}
+            height={160}
           />
         </View>
-      ) : null}
+      )}
 
-      {isAcceptedGroup ? (
-        <>
-          <View style={styles.optionHeader}>
-            <Text style={styles.optionHeaderTitle}>진행 중 구간</Text>
-            <Text style={styles.optionHeaderHint}>진행 전이라면 수락을 취소할 수 있습니다.</Text>
-          </View>
+      {/* Accepted Options List */}
+      {isAcceptedGroup && (
+        <View style={styles.optionList}>
+          {group.options.map((card, index) => {
+            const disabled = card.selectionState === 'accepted' || !card.bundleId || submittingBundleId === card.bundleId;
+            const actionLabel = submittingBundleId === card.bundleId
+                ? '처리 중...'
+                : card.actionLabel ?? (card.selectionState === 'accepted' ? '수락 완료' : '이 구간 수행하기');
+            const isFullSpan = isFullSpanOption(card, group);
+            const comparisonHint = buildComparisonHint(card, group);
 
-          <View style={styles.optionList}>
-            {group.options.map((card, index) => {
-              const disabled =
-                card.selectionState === 'accepted' ||
-                !card.bundleId ||
-                submittingBundleId === card.bundleId;
-              const actionLabel =
-                submittingBundleId === card.bundleId
-                  ? '처리 중...'
-                  : card.actionLabel ??
-                    (card.selectionState === 'accepted' ? '수락 완료' : '이 구간 수행하기');
-              const isPrimaryOption = index === 0;
-              const isFullSpan = isFullSpanOption(card, group);
-              const comparisonHint = buildComparisonHint(card, group);
-
-              return (
-                <View
-                  key={card.id}
-                  style={[
-                    styles.optionCard,
-                    isPrimaryOption && styles.optionCardPrimary,
-                    card.selectionState === 'accepted' && styles.optionCardAccepted,
-                  ]}
-                >
-                  <View style={styles.optionTop}>
-                    <Text style={styles.optionTitle}>{buildOptionLabel(card)}</Text>
-                    <Text style={styles.optionReward}>{card.rewardLabel}</Text>
-                  </View>
-                  {card.rewardBoostLabel ? <Text style={styles.rewardBoostLabel}>{card.rewardBoostLabel}</Text> : null}
-                  <View style={styles.optionSignalRow}>
-                    {isFullSpan ? (
-                      <MissionSignalPill icon="star" label="전체 수행" tone="positive" />
-                    ) : (
-                      <MissionSignalPill icon="call-split" label="부분 수행" tone="neutral" />
-                    )}
-                    {comparisonHint ? (
-                      <MissionSignalPill icon="payments" label={comparisonHint} tone="neutral" />
-                    ) : null}
-                  </View>
-                  <Text style={styles.optionSummary}>{card.legSummary ?? card.strategyBody}</Text>
-                  {card.fallbackLabel ? <Text style={styles.fallbackLabel}>{card.fallbackLabel}</Text> : null}
-                  <TouchableOpacity
-                    style={[styles.actionButton, disabled && styles.actionButtonDisabled]}
-                    activeOpacity={0.88}
-                    disabled={disabled}
-                    onPress={() => onPress(card)}
-                  >
-                    <Text style={[styles.actionButtonText, disabled && styles.actionButtonTextDisabled]}>
-                      {actionLabel}
-                    </Text>
-                  </TouchableOpacity>
-                  {card.selectionState === 'accepted' ? (
-                    <TouchableOpacity
-                      style={styles.inlineSecondaryButton}
-                      activeOpacity={0.88}
-                      disabled={submittingBundleId === card.bundleId}
-                      onPress={() => onRelease(card)}
-                    >
-                      <Text style={styles.inlineSecondaryButtonText}>수락 취소</Text>
-                    </TouchableOpacity>
-                  ) : null}
+            return (
+              <View key={card.id} style={[styles.optionCard, card.selectionState === 'accepted' && styles.optionCardAccepted]}>
+                <View style={styles.optionTop}>
+                  <Text style={styles.optionTitle}>{buildOptionLabel(card)}</Text>
+                  <Text style={styles.optionReward}>{card.rewardLabel}</Text>
                 </View>
-              );
-            })}
-          </View>
-        </>
-      ) : (
-        <View style={styles.availableFooter}>
-          <Text style={styles.availableFooterText}>먼저 잡고, 자세한 구간은 상세에서 확인할 수 있습니다.</Text>
-          <TouchableOpacity style={styles.availableDetailButton} activeOpacity={0.88} onPress={() => onOpenDetails(group)}>
-            <Text style={styles.availableDetailButtonText}>상세 보기</Text>
-          </TouchableOpacity>
+                <View style={styles.optionSignalRow}>
+                  {isFullSpan ? (
+                    <MissionSignalPill icon="star" label="전체 수행" tone="positive" />
+                  ) : (
+                    <MissionSignalPill icon="call-split" label="부분 수행" tone="neutral" />
+                  )}
+                  {comparisonHint && <MissionSignalPill icon="payments" label={comparisonHint} tone="neutral" />}
+                </View>
+                <Text style={styles.optionSummary}>{card.legSummary ?? card.strategyBody}</Text>
+                
+                <TouchableOpacity
+                  style={[styles.actionButton, disabled && styles.actionButtonDisabled]}
+                  activeOpacity={0.85}
+                  disabled={disabled}
+                  onPress={() => onPress(card)}
+                >
+                  <Text style={[styles.actionButtonText, disabled && styles.actionButtonTextDisabled]}>
+                    {actionLabel}
+                  </Text>
+                </TouchableOpacity>
+                {card.selectionState === 'accepted' && (
+                  <TouchableOpacity
+                    style={styles.inlineSecondaryButton}
+                    activeOpacity={0.85}
+                    disabled={submittingBundleId === card.bundleId}
+                    onPress={() => onRelease(card)}
+                  >
+                    <Text style={styles.inlineSecondaryButtonText}>수락 취소</Text>
+                  </TouchableOpacity>
+                )}
+              </View>
+            );
+          })}
         </View>
+      )}
+
+      {/* Primary Action Button for Available Missions */}
+      {group.selectionState === 'available' && primaryOption && (
+        <TouchableOpacity
+          style={styles.primaryAcceptButton}
+          activeOpacity={0.85}
+          disabled={submittingBundleId === primaryOption.bundleId}
+          onPress={handlePrimaryPress}
+        >
+          <Text style={styles.primaryAcceptButtonText}>
+            {submittingBundleId === primaryOption.bundleId ? '처리 중...' : '바로 수행하기'}
+          </Text>
+        </TouchableOpacity>
+      )}
+
+      {/* Next Action Button for Accepted Missions */}
+      {isAcceptedGroup && nextActionLabel && (
+        <TouchableOpacity style={styles.primaryAcceptButton} activeOpacity={0.85} onPress={() => onNextAction(group)}>
+          <Text style={styles.primaryAcceptButtonText}>{nextActionLabel}</Text>
+        </TouchableOpacity>
       )}
     </View>
   );
@@ -222,245 +216,213 @@ export function MissionGroupCard({
 
 const styles = StyleSheet.create({
   card: {
-    backgroundColor: Colors.surface,
-    borderRadius: BorderRadius.xl,
-    padding: Spacing.lg,
-    gap: Spacing.sm,
-    ...Shadows.sm,
+    backgroundColor: Colors.white,
+    borderRadius: 24, // 모던한 큰 라운딩
+    padding: 24,
+    marginBottom: Spacing.md,
+    // 토스 스타일 부드러운 그림자
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.04,
+    shadowRadius: 16,
+    elevation: 2,
   },
   cardAvailableShell: {
     borderWidth: 1,
-    borderColor: Colors.gray200,
+    borderColor: '#F2F4F6', // 아주 연한 보더
   },
   cardAcceptedShell: {
     borderWidth: 1,
-    borderColor: Colors.success,
-    backgroundColor: '#F5FCF7',
+    borderColor: Colors.primaryLight,
+    backgroundColor: '#F9FCFF', // 수락된 미션은 연한 블루/민트 배경
   },
-  quickActionBanner: {
+  cardHeader: {
     flexDirection: 'row',
-    alignItems: 'center',
     justifyContent: 'space-between',
-    gap: Spacing.md,
-    paddingHorizontal: Spacing.md,
-    paddingVertical: Spacing.md,
-    borderRadius: BorderRadius.lg,
-    backgroundColor: Colors.primary,
-  },
-  quickActionCopy: {
-    flex: 1,
-    gap: 2,
-  },
-  quickActionTitle: {
-    color: Colors.white,
-    fontSize: Typography.fontSize.sm,
-    fontWeight: Typography.fontWeight.bold,
-  },
-  quickActionBody: {
-    color: Colors.white,
-    fontSize: Typography.fontSize.xs,
-  },
-  cardTop: {
-    flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
-    gap: Spacing.md,
+    marginBottom: Spacing.lg,
   },
-  cardTopActions: {
+  badgeContainer: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: Spacing.xs,
   },
-  detailLink: {
+  exposureText: {
+    color: Colors.error,
+    fontSize: Typography.fontSize.xs,
+    fontWeight: '700',
+  },
+  detailButton: {
     paddingHorizontal: Spacing.sm,
     paddingVertical: 6,
     borderRadius: BorderRadius.full,
-    backgroundColor: Colors.gray100,
+    backgroundColor: '#F2F4F6',
   },
-  detailLinkText: {
-    color: Colors.textPrimary,
+  detailButtonText: {
+    color: '#4E5968', // Secondary
     fontSize: Typography.fontSize.xs,
-    fontWeight: Typography.fontWeight.bold,
+    fontWeight: '600',
   },
-  cardTitle: {
-    flex: 1,
-    color: Colors.textPrimary,
-    fontSize: Typography.fontSize.lg,
-    fontWeight: Typography.fontWeight.bold,
+  mainContent: {
+    marginBottom: Spacing.md,
   },
-  quickFacts: {
-    color: Colors.textPrimary,
-    fontSize: Typography.fontSize.sm,
-    fontWeight: Typography.fontWeight.bold,
+  routeLabel: {
+    fontSize: 20,
+    fontWeight: '700',
+    color: '#191F28', // Primary
+    marginBottom: 4,
+    letterSpacing: -0.3,
   },
   windowLabel: {
-    color: Colors.primary,
-    fontSize: Typography.fontSize.sm,
-    fontWeight: Typography.fontWeight.medium,
+    fontSize: 14,
+    fontWeight: '500',
+    color: '#8B95A1', // Tertiary
+    marginBottom: Spacing.lg,
   },
-  exposureLabel: {
-    color: Colors.warningDark,
-    fontSize: Typography.fontSize.xs,
-    fontWeight: Typography.fontWeight.bold,
-  },
-  nextActionLabel: {
-    color: Colors.primaryDark,
-    fontSize: Typography.fontSize.sm,
-    fontWeight: Typography.fontWeight.bold,
-  },
-  cardBody: {
-    color: Colors.textPrimary,
-    fontSize: Typography.fontSize.base,
-    fontWeight: Typography.fontWeight.bold,
-  },
-  cardSummary: {
-    color: Colors.textSecondary,
-    fontSize: Typography.fontSize.sm,
-    lineHeight: 20,
-  },
-  nextActionButton: {
-    marginTop: Spacing.xs,
+  rewardContainer: {
+    flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: Spacing.md,
-    borderRadius: BorderRadius.lg,
-    backgroundColor: Colors.primaryDark,
+    gap: Spacing.sm,
   },
-  nextActionButtonText: {
-    color: Colors.white,
-    fontSize: Typography.fontSize.sm,
-    fontWeight: Typography.fontWeight.bold,
+  rewardAmount: {
+    fontSize: 28,
+    fontWeight: '800',
+    color: '#191F28', // 강렬한 텍스트
+    letterSpacing: -0.5,
+  },
+  rewardBoostBadge: {
+    backgroundColor: '#FFE5E5',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 8,
+  },
+  rewardBoostText: {
+    color: '#E53E3E',
+    fontSize: 12,
+    fontWeight: '800',
+  },
+  strategyContainer: {
+    backgroundColor: '#F9FAFB',
+    padding: Spacing.md,
+    borderRadius: 16,
+    marginBottom: Spacing.md,
+  },
+  strategyTitle: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#4E5968',
+    marginBottom: 2,
+  },
+  strategyBody: {
+    fontSize: 13,
+    color: '#8B95A1',
+    lineHeight: 20,
   },
   signalRow: {
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: Spacing.xs,
+    marginBottom: Spacing.md,
+  },
+  nextActionBox: {
+    backgroundColor: Colors.primaryLight,
+    padding: Spacing.sm,
+    borderRadius: 8,
+    marginBottom: Spacing.md,
+  },
+  nextActionText: {
+    color: Colors.primaryDark,
+    fontSize: 14,
+    fontWeight: '700',
+    textAlign: 'center',
   },
   mapWrap: {
-    marginTop: Spacing.xs,
-  },
-  optionHeader: {
-    marginTop: Spacing.sm,
-    gap: 2,
-  },
-  optionHeaderTitle: {
-    color: Colors.textPrimary,
-    fontSize: Typography.fontSize.base,
-    fontWeight: Typography.fontWeight.bold,
-  },
-  optionHeaderHint: {
-    color: Colors.textSecondary,
-    fontSize: Typography.fontSize.xs,
+    borderRadius: 16,
+    overflow: 'hidden',
+    marginBottom: Spacing.md,
   },
   optionList: {
-    gap: Spacing.sm,
+    gap: Spacing.md,
+    marginBottom: Spacing.md,
   },
   optionCard: {
-    borderRadius: BorderRadius.lg,
+    backgroundColor: Colors.white,
     borderWidth: 1,
-    borderColor: Colors.border,
-    backgroundColor: Colors.gray50,
+    borderColor: '#E5E8EB',
+    borderRadius: 16,
     padding: Spacing.md,
-    gap: Spacing.xs,
-  },
-  optionCardPrimary: {
-    borderColor: Colors.primary,
-    backgroundColor: Colors.primaryLight,
   },
   optionCardAccepted: {
-    borderColor: Colors.success,
-    backgroundColor: '#ECFDF3',
+    borderColor: Colors.primary,
+    backgroundColor: '#F9FCFF',
   },
   optionTop: {
     flexDirection: 'row',
-    alignItems: 'center',
     justifyContent: 'space-between',
-    gap: Spacing.md,
+    alignItems: 'center',
+    marginBottom: Spacing.xs,
+  },
+  optionTitle: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: '#191F28',
+  },
+  optionReward: {
+    fontSize: 16,
+    fontWeight: '800',
+    color: Colors.primary,
   },
   optionSignalRow: {
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: Spacing.xs,
-  },
-  optionTitle: {
-    color: Colors.textPrimary,
-    fontSize: Typography.fontSize.base,
-    fontWeight: Typography.fontWeight.bold,
-  },
-  optionReward: {
-    color: Colors.textPrimary,
-    fontSize: Typography.fontSize.base,
-    fontWeight: Typography.fontWeight.bold,
+    marginBottom: Spacing.sm,
   },
   optionSummary: {
-    color: Colors.textSecondary,
-    fontSize: Typography.fontSize.sm,
+    fontSize: 13,
+    color: '#4E5968',
+    marginBottom: Spacing.md,
     lineHeight: 20,
   },
-  rewardBoostLabel: {
-    color: Colors.warningDark,
-    fontSize: Typography.fontSize.xs,
-    fontWeight: Typography.fontWeight.bold,
-  },
-  fallbackLabel: {
-    color: Colors.warning,
-    fontSize: Typography.fontSize.sm,
-  },
   actionButton: {
-    marginTop: Spacing.xs,
     backgroundColor: Colors.primary,
-    borderRadius: BorderRadius.lg,
+    borderRadius: 12,
+    paddingVertical: 12,
     alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: Spacing.md,
   },
   actionButtonDisabled: {
-    backgroundColor: Colors.border,
+    backgroundColor: '#F2F4F6',
   },
   actionButtonText: {
     color: Colors.white,
-    fontSize: Typography.fontSize.sm,
-    fontWeight: Typography.fontWeight.bold,
+    fontSize: 14,
+    fontWeight: '700',
   },
   actionButtonTextDisabled: {
-    color: Colors.textSecondary,
+    color: '#B0B8C1',
   },
   inlineSecondaryButton: {
-    marginTop: Spacing.xs,
+    marginTop: Spacing.sm,
     alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: Spacing.sm,
-    borderRadius: BorderRadius.lg,
-    borderWidth: 1,
-    borderColor: Colors.border,
-    backgroundColor: Colors.surface,
+    paddingVertical: 8,
   },
   inlineSecondaryButtonText: {
-    color: Colors.textPrimary,
-    fontSize: Typography.fontSize.sm,
-    fontWeight: Typography.fontWeight.bold,
+    color: '#8B95A1',
+    fontSize: 13,
+    fontWeight: '600',
+    textDecorationLine: 'underline',
   },
-  availableFooter: {
-    marginTop: Spacing.xs,
-    flexDirection: 'row',
+  primaryAcceptButton: {
+    backgroundColor: Colors.primary,
+    borderRadius: 16,
+    paddingVertical: 16,
     alignItems: 'center',
-    justifyContent: 'space-between',
-    gap: Spacing.md,
+    justifyContent: 'center',
+    marginTop: Spacing.sm,
   },
-  availableFooterText: {
-    flex: 1,
-    color: Colors.textSecondary,
-    fontSize: Typography.fontSize.xs,
-  },
-  availableDetailButton: {
-    paddingHorizontal: Spacing.md,
-    paddingVertical: Spacing.sm,
-    borderRadius: BorderRadius.lg,
-    backgroundColor: Colors.gray100,
-  },
-  availableDetailButtonText: {
-    color: Colors.textPrimary,
-    fontSize: Typography.fontSize.xs,
-    fontWeight: Typography.fontWeight.bold,
+  primaryAcceptButtonText: {
+    color: Colors.white,
+    fontSize: 16,
+    fontWeight: '700',
   },
 });
