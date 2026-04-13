@@ -29,6 +29,7 @@ import {
   isImmediateMission,
   locationDistance,
 } from '../../components/giller/mission-board-utils';
+import * as Haptics from 'expo-haptics';
 import { useUser } from '../../contexts/UserContext';
 import {
   acceptMissionBundleForGiller,
@@ -162,6 +163,7 @@ export default function GillerRequestsScreen() {
         return;
       }
 
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
       Alert.alert(
         '이 구간을 맡을까요?',
         `${buildOptionLabel(card)} · ${card.rewardLabel}\n${card.legSummary ?? card.strategyBody}\n\n선택하지 않은 나머지 구간은 다른 길러나 배송 파트너에게 이어질 수 있습니다.`,
@@ -201,6 +203,7 @@ export default function GillerRequestsScreen() {
         return;
       }
 
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
       Alert.alert(
         '수락을 취소할까요?',
         '아직 진행 전이라면 다시 미션 보드로 돌릴 수 있습니다.',

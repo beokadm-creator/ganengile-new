@@ -25,6 +25,7 @@ import { takePhoto, uploadPhotoWithThumbnail } from '../../services/photo-servic
 import { getCurrentLocation } from '../../utils/permission-handler';
 import * as Location from 'expo-location';
 import { Image } from 'expo-image';
+import { SwipeButton } from '../../components/common/SwipeButton';
 
 type CompletionRoute = RouteProp<MainStackParamList, 'DeliveryCompletion'>;
 
@@ -278,13 +279,11 @@ export default function DeliveryCompletionScreen() {
         </View>
       </View>
 
-      <TouchableOpacity style={styles.primaryButton} onPress={() => void handleComplete()} disabled={loading}>
-        {loading ? (
-          <ActivityIndicator size="small" color={Colors.white} />
-        ) : (
-          <Text style={styles.primaryButtonText}>배송 완료 기록</Text>
-        )}
-      </TouchableOpacity>
+      <SwipeButton 
+        onComplete={handleComplete} 
+        title="밀어서 배송 완료" 
+        disabled={loading || verificationCode.trim().length !== 6 || photoLoading}
+      />
     </ScrollView>
   );
 }

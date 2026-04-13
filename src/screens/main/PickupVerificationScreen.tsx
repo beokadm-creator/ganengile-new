@@ -20,6 +20,7 @@ import { takePhoto, uploadPhotoWithThumbnail } from '../../services/photo-servic
 import { getCurrentLocation } from '../../utils/permission-handler';
 import * as Location from 'expo-location';
 import { Image } from 'expo-image';
+import { SwipeButton } from '../../components/common/SwipeButton';
 
 type PickupRoute = RouteProp<MainStackParamList, 'PickupVerification'>;
 type VerificationMethod = 'qr' | 'code';
@@ -205,9 +206,11 @@ export default function PickupVerificationScreen() {
         </TouchableOpacity>
       </View>
 
-      <TouchableOpacity style={styles.primaryButton} onPress={() => void handleVerifyPickup()} disabled={loading}>
-        {loading ? <ActivityIndicator size="small" color={Colors.white} /> : <Text style={styles.primaryButtonText}>인수 확인하기</Text>}
-      </TouchableOpacity>
+      <SwipeButton 
+        onComplete={handleVerifyPickup} 
+        title="밀어서 인수 확인" 
+        disabled={loading || photoLoading || (method === 'code' && verificationCode.trim().length !== 4) || !photoUri}
+      />
     </ScrollView>
   );
 }
