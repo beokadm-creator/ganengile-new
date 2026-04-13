@@ -6,7 +6,7 @@ import { RouteProp, useNavigation, useRoute } from '@react-navigation/native';
 import { doc, onSnapshot } from 'firebase/firestore';
 
 import AppTopBar from '../../components/common/AppTopBar';
-import { NaverMapCard } from '../../components/maps/NaverMapCard';
+import { InteractiveNaverMap } from '../../components/maps/InteractiveNaverMap';
 import { updateGillerLocation } from '../../services/delivery-service';
 import { db, requireUserId } from '../../services/firebase';
 import { locationService } from '../../services/location-service';
@@ -202,13 +202,15 @@ export default function RealtimeTrackingScreen(): JSX.Element {
           </Text>
         </View>
 
-        <NaverMapCard
-          center={center}
-          markers={markers}
-          path={routePath}
-          title="실시간 배송 지도"
-          subtitle="웹 지도에서는 현재 위치부터 도착지까지의 경로 좌표를 선으로 표시합니다."
-        />
+        <View style={styles.mapContainer}>
+          <InteractiveNaverMap
+            center={center}
+            markers={markers}
+            path={routePath}
+            height={360}
+            zoom={15}
+          />
+        </View>
 
         <View style={styles.routeCard}>
           <View style={styles.routeHeader}>
@@ -335,6 +337,12 @@ const styles = StyleSheet.create({
   content: {
     padding: Spacing.lg,
     gap: Spacing.md,
+  },
+  mapContainer: {
+    borderRadius: BorderRadius.xl,
+    overflow: 'hidden',
+    ...Shadows.sm,
+    backgroundColor: Colors.white,
   },
   heroCard: {
     backgroundColor: Colors.surface,
