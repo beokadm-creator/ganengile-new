@@ -43,7 +43,10 @@ export async function createRequestDraft(
     updatedAt: serverTimestamp(),
   };
 
-  const ref = await addDoc(collection(db, 'request_drafts'), payload);
+  // Firestore에 객체를 넘기기 전에 명시적인 undefined 속성들을 재귀적으로 제거
+  const cleanPayload = JSON.parse(JSON.stringify(payload));
+
+  const ref = await addDoc(collection(db, 'request_drafts'), cleanPayload);
   return {
     requestDraftId: ref.id,
     ...input,
@@ -83,7 +86,9 @@ export async function createAIAnalysis(
     createdAt: serverTimestamp(),
     updatedAt: serverTimestamp(),
   };
-  const ref = await addDoc(collection(db, 'ai_analyses'), payload);
+  
+  const cleanPayload = JSON.parse(JSON.stringify(payload));
+  const ref = await addDoc(collection(db, 'ai_analyses'), cleanPayload);
   return {
     aiAnalysisId: ref.id,
     ...input,
@@ -102,7 +107,8 @@ export async function createPricingQuote(
     createdAt: serverTimestamp(),
     updatedAt: serverTimestamp(),
   };
-  const ref = await addDoc(collection(db, 'pricing_quotes'), payload);
+  const cleanPayload = JSON.parse(JSON.stringify(payload));
+  const ref = await addDoc(collection(db, 'pricing_quotes'), cleanPayload);
   return {
     pricingQuoteId: ref.id,
     ...input,
@@ -128,8 +134,9 @@ export async function markPricingQuoteSelected(
 }
 
 export async function upsertHandoverEvent(event: HandoverEvent): Promise<void> {
+  const cleanEvent = JSON.parse(JSON.stringify(event));
   await setDoc(doc(db, 'handover_events', event.handoverEventId), {
-    ...event,
+    ...cleanEvent,
     updatedAt: serverTimestamp(),
   });
 }
