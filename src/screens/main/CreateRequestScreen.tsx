@@ -748,25 +748,29 @@ export default function CreateRequestScreen({ navigation, route }: Props) {
       const selected = result.quoteCards.find((card) => card.quoteType === selectedQuoteType) ?? result.quoteCards[0];
       await deleteCreateRequestProgress();
       setDraftRestored(false);
-      setSaving(false); // 네비게이션 전에 saving 상태 해제
 
-      navigation.replace('RequestConfirmation', {
-        requestId: result.requestId,
-        pickupStationName:
-          pickupMode === 'address'
-            ? `${formatDetailedAddress(pickupRoadAddress, pickupDetailAddress)} · ${pickupStation.stationName}`
-            : pickupStation.stationName,
-        deliveryStationName:
-          deliveryMode === 'address'
-            ? `${formatDetailedAddress(deliveryRoadAddress, deliveryDetailAddress)} · ${deliveryStation.stationName}`
-            : deliveryStation.stationName,
-        deliveryFee: selected
-          ? {
-              totalFee: Number(selected.pricing.publicPrice),
-              estimatedTime: parseEtaMinutes(selected.etaLabel),
-            }
-          : undefined,
-      });
+      // 모달을 먼저 해제하고 약간의 딜레이를 주어 React가 렌더링할 시간을 확보한 뒤 네비게이션
+      setSaving(false);
+      
+      setTimeout(() => {
+        navigation.replace('RequestConfirmation', {
+          requestId: result.requestId,
+          pickupStationName:
+            pickupMode === 'address'
+              ? `${formatDetailedAddress(pickupRoadAddress, pickupDetailAddress)} · ${pickupStation.stationName}`
+              : pickupStation.stationName,
+          deliveryStationName:
+            deliveryMode === 'address'
+              ? `${formatDetailedAddress(deliveryRoadAddress, deliveryDetailAddress)} · ${deliveryStation.stationName}`
+              : deliveryStation.stationName,
+          deliveryFee: selected
+            ? {
+                totalFee: Number(selected.pricing.publicPrice),
+                estimatedTime: parseEtaMinutes(selected.etaLabel),
+              }
+            : undefined,
+        });
+      }, 50);
     } catch (error) {
       console.error(error);
       Alert.alert(
