@@ -30,6 +30,7 @@ const NAV = [
   { href: '/integrations/tax', label: '세금계산서/원천세 API', indent: true, badge: 'new' },
   { href: '/disputes', label: '분쟁 처리', badge: 'hot' },
   { href: '/integrations/payment', label: '결제 설정' },
+  { href: '/integrations/alimtalk', label: '알림톡 설정', indent: true },
   { href: '/integrations/fare-cache', label: '운임 캐시' },
   { href: '/consents', label: '약관 관리', badge: 'new' },
 ];
