@@ -23,10 +23,9 @@ export default function HomeScreen({ navigation }: { navigation: MainStackNaviga
   const [refreshing, setRefreshing] = useState(false);
   const [hasRequestDraft, setHasRequestDraft] = useState(false);
 
-  const role = canAccessGiller && currentRole === UserRole.GILLER ? 'giller' : 'requester';
+  const role = currentRole === UserRole.GILLER ? 'giller' : 'requester';
   const isRequesterView = role === 'requester';
-  const showRoleSwitch =
-    canAccessGiller && (user?.role === UserRole.BOTH || user?.role === UserRole.GLER);
+  const showRoleSwitch = user?.role === UserRole.BOTH || user?.role === UserRole.GLER;
 
   useEffect(() => {
     let mounted = true;

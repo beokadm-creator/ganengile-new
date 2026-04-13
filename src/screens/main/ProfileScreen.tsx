@@ -49,10 +49,8 @@ export default function ProfileScreen({ navigation }: { navigation: MainStackNav
     withdrawableBalance: 0,
   });
 
-  const activeRole =
-    canAccessGiller && currentRole === UserRole.GILLER ? UserRole.GILLER : UserRole.GLER;
-  const showRoleSwitch =
-    canAccessGiller && (user?.role === UserRole.BOTH || user?.role === UserRole.GLER);
+  const activeRole = currentRole === UserRole.GILLER ? UserRole.GILLER : UserRole.GLER;
+  const showRoleSwitch = user?.role === UserRole.BOTH || user?.role === UserRole.GLER;
 
   useEffect(() => {
     let mounted = true;

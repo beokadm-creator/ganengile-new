@@ -1,5 +1,5 @@
 import React, { useEffect, useRef } from 'react';
-import { ScrollView, RefreshControl, View, Text, TouchableOpacity, Animated } from 'react-native';
+import { ScrollView, RefreshControl, View, Text, TouchableOpacity, Animated, StyleSheet } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { Colors } from '../../../theme';
 import { UserRole } from '../../../types/user';
@@ -97,6 +97,8 @@ export function GillerHome({
   onSwitchRole,
   canAccessGiller,
 }: GillerHomeProps) {
+  const isPreviewMode = !canAccessGiller;
+
   return (
     <ScrollView
       style={styles.container}
@@ -104,6 +106,18 @@ export function GillerHome({
       showsVerticalScrollIndicator={false}
       refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
     >
+      {isPreviewMode && (
+        <TouchableOpacity 
+          style={localStyles.previewBanner}
+          onPress={() => navigation.navigate('Profile')}
+          activeOpacity={0.9}
+        >
+          <MaterialIcons name="visibility" size={16} color="#FFFFFF" style={{ marginRight: 6 }} />
+          <Text style={localStyles.previewText}>길러 미리보기 모드입니다. 실제 배송을 하려면 신청을 완료해주세요.</Text>
+          <MaterialIcons name="chevron-right" size={18} color="#FFFFFF" style={{ marginLeft: 'auto' }} />
+        </TouchableOpacity>
+      )}
+
       <View style={styles.hero}>
         <View style={styles.heroTop}>
           <View style={styles.heroCopy}>
@@ -242,3 +256,21 @@ export function GillerHome({
     </ScrollView>
   );
 }
+
+const localStyles = StyleSheet.create({
+  previewBanner: {
+    backgroundColor: Colors.primary,
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderRadius: 8,
+    marginBottom: 16,
+  },
+  previewText: {
+    color: '#FFFFFF',
+    fontSize: 13,
+    fontWeight: '700',
+    flex: 1,
+  },
+});

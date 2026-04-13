@@ -31,6 +31,7 @@ import {
 } from '../../components/giller/mission-board-utils';
 import * as Haptics from 'expo-haptics';
 import { useUser } from '../../contexts/UserContext';
+import { useGillerAccess } from '../../hooks/useGillerAccess';
 import {
   acceptMissionBundleForGiller,
   getBeta1HomeSnapshot,
@@ -48,6 +49,8 @@ import { GillerType } from '../../types/user';
 export default function GillerRequestsScreen() {
   const navigation = useNavigation<MainStackNavigationProp>();
   const { user } = useUser();
+  const { canAccessGiller } = useGillerAccess();
+  const isPreviewMode = !canAccessGiller;
   const [snapshot, setSnapshot] = useState<Beta1HomeSnapshot | null>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -162,6 +165,18 @@ export default function GillerRequestsScreen() {
 
   const handleAccept = useCallback(
     (card: MissionCard) => {
+      if (isPreviewMode) {
+        Alert.alert(
+          '미리보기 모드', 
+          '실제 배송을 수행하려면 길러 신청을 완료해주세요.',
+          [
+            { text: '닫기', style: 'cancel' },
+            { text: '신청하기', onPress: () => navigation.navigate('Profile') }
+          ]
+        );
+        return;
+      }
+
       if (!user?.uid || !card.bundleId || card.selectionState === 'accepted') {
         return;
       }
@@ -197,7 +212,7 @@ export default function GillerRequestsScreen() {
         ]
       );
     },
-    [loadSnapshot, user?.uid]
+    [loadSnapshot, user?.uid, isPreviewMode, navigation]
   );
 
   const handleRelease = useCallback(

@@ -291,7 +291,7 @@ export function UserProvider({ children }: UserProviderProps) {
       AsyncStorage.setItem('user_current_role', newRole).catch(console.error);
     };
 
-    if (role === UserRole.GILLER && canUseGillerRole(user)) {
+    if (role === UserRole.GILLER) {
       saveRole(UserRole.GILLER);
       return;
     }

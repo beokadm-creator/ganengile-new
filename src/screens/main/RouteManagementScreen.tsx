@@ -13,6 +13,7 @@ import { StackActions, useFocusEffect, useNavigation } from '@react-navigation/n
 import { MaterialIcons } from '@expo/vector-icons';
 
 import { useUser } from '../../contexts/UserContext';
+import { useGillerAccess } from '../../hooks/useGillerAccess';
 import { requireUserId } from '../../services/firebase';
 import {
   saveCurrentLocationAsGillerTerritory,
@@ -31,6 +32,8 @@ const MAX_TERRITORIES = 2;
 export default function RouteManagementScreen() {
   const navigation = useNavigation<MainStackNavigationProp>();
   const { user } = useUser();
+  const { canAccessGiller } = useGillerAccess();
+  const isPreviewMode = !canAccessGiller;
   const [routes, setRoutes] = useState<Route[]>([]);
   const [loading, setLoading] = useState(true);
   const [territoryLoading, setTerritoryLoading] = useState(false);
@@ -61,6 +64,18 @@ export default function RouteManagementScreen() {
   const activeTerritoryId = localActiveTerritoryId;
 
   const handleRegisterTerritory = () => {
+    if (isPreviewMode) {
+      Alert.alert(
+        '미리보기 모드',
+        '권역을 추가하려면 길러 신청을 완료해주세요.',
+        [
+          { text: '닫기', style: 'cancel' },
+          { text: '신청하기', onPress: () => navigation.navigate('Profile') }
+        ]
+      );
+      return;
+    }
+
     if (!user?.uid) {
       return;
     }
@@ -267,7 +282,20 @@ export default function RouteManagementScreen() {
               </Text>
               <TouchableOpacity
                 style={styles.addButton}
-                onPress={() => navigation.dispatch(StackActions.push('AddRoute'))}
+                onPress={() => {
+                  if (isPreviewMode) {
+                    Alert.alert(
+                      '미리보기 모드',
+                      '동선을 추가하려면 길러 신청을 완료해주세요.',
+                      [
+                        { text: '닫기', style: 'cancel' },
+                        { text: '신청하기', onPress: () => navigation.navigate('Profile') }
+                      ]
+                    );
+                    return;
+                  }
+                  navigation.dispatch(StackActions.push('AddRoute'));
+                }}
                 activeOpacity={0.9}
               >
                 <Text style={styles.addButtonText}>첫 동선 추가</Text>
@@ -321,7 +349,20 @@ export default function RouteManagementScreen() {
       {routes.length < MAX_ROUTES && routes.length > 0 ? (
         <TouchableOpacity
           style={styles.fab}
-          onPress={() => navigation.dispatch(StackActions.push('AddRoute'))}
+          onPress={() => {
+            if (isPreviewMode) {
+              Alert.alert(
+                '미리보기 모드',
+                '동선을 추가하려면 길러 신청을 완료해주세요.',
+                [
+                  { text: '닫기', style: 'cancel' },
+                  { text: '신청하기', onPress: () => navigation.navigate('Profile') }
+                ]
+              );
+              return;
+            }
+            navigation.dispatch(StackActions.push('AddRoute'));
+          }}
           activeOpacity={0.9}
         >
           <Text style={styles.fabLabel}>+</Text>
