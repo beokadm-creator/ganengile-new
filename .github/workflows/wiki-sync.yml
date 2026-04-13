@@ -11,22 +11,43 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
-      - name: Extract commit info
-        id: commit_info
+      - name: Build daily digest
+        id: digest
         run: |
-          COMMIT_MSG=$(git log -1 --pretty=format:"%s")
-          COMMIT_HASH=$(git rev-parse --short HEAD)
-          COMMIT_AUTHOR=$(git log -1 --pretty=format:"%an")
+          # Get today's commits (push에 포함된 것들만)
+          TODAY=$(date +'%Y-%m-%d')
+          COMMIT_COUNT=$(git log --since="2026-01-01" --oneline | wc -l)
           
-          echo "Raw message: $COMMIT_MSG"
+          # Get all commits for today from the push
+          COMMITS=$(git log -1 --pretty=format:"%H|%s|%an" ${{ github.event.after }})
+          # Also get parent commits from same day
+          PREV_HASH=$(git log -1 --pretty=format:"%H" ${{ github.event.before }})
           
-          if [[ "$COMMIT_MSG" =~ ^([a-zA-Z]+)(\(.*\))?:\ (.+) ]]; then
-            PREFIX="${BASH_REMATCH[1]}"
-            SUBJECT="${BASH_REMATCH[3]}"
-          else
-            PREFIX="chore"
-            SUBJECT="$COMMIT_MSG"
+          # Collect all commits pushed in this event that are from today
+          > /tmp/commits.txt
+          while IFS= read -r line; do
+            HASH=$(echo "$line" | cut -d'|' -f1)
+            MSG=$(echo "$line" | cut -d'|' -f2)
+            AUTHOR=$(echo "$line" | cut -d'|' -f3)
+            SHORT_HASH=$(git rev-parse --short "$HASH")
+            echo "${SHORT_HASH}|${MSG}|${AUTHOR}" >> /tmp/commits.txt
+          done <<< "$COMMITS"
+          
+          # If there are multiple commits, collect parents from today too
+          if [ "${{ github.event.before }}" != "0000000000000000000000000000000000000000" ]; then
+            git log ${{ github.event.before }}..${{ github.event.after }} --pretty=format:"%h|%s|%an" --reverse > /tmp/commits.txt
+          fi
+          
+          TOTAL=$(wc -l < /tmp/commits.txt | tr -d ' ')
+          echo "Total commits to sync: $TOTAL"
+          
+          if [ "$TOTAL" -eq 0 ]; then
+            echo "No commits to sync"
+            echo "skip=true" >> $GITHUB_OUTPUT
+            exit 0
           fi
           
           DATE_YYYY_MM_DD=$(date +'%Y-%m-%d')
@@ -34,53 +55,102 @@ jobs:
           DATE_MONTH=$(date +'%-m')
           DATE_DAY=$(date +'%-d')
           
-          TITLE="${DATE_MONTH}월 ${DATE_DAY}일 — ${SUBJECT}"
-          CONTENT="커밋: ${COMMIT_HASH}\n작성자: ${COMMIT_AUTHOR}\n메시지: ${COMMIT_MSG}"
+          # Build TipTap JSON content: heading per commit + details
+          # Start with document-level heading
+          TIPTAP_JSON='{"type":"doc","content":['
+          TIPTAP_JSON+='{"type":"heading","attrs":{"level":2},"content":[{"type":"text","text":"'${DATE_MONTH}'월 '${DATE_DAY}'일 — 커밋 '"${TOTAL}"'개"}]},'
           
-          echo "prefix=$PREFIX" >> $GITHUB_OUTPUT
-          echo "subject=$SUBJECT" >> $GITHUB_OUTPUT
+          COMMIT_INDEX=0
+          HASHES=""
+          FIRST_SUBJECT=""
+          while IFS='|' read -r HASH MSG AUTHOR; do
+            [ -z "$HASH" ] && continue
+            
+            if [[ "$MSG" =~ ^([a-zA-Z]+)(\([^)]*\))?:\ (.+) ]]; then
+              PREFIX="${BASH_REMATCH[1]}"
+              SUBJECT="${BASH_REMATCH[3]}"
+            else
+              PREFIX="chore"
+              SUBJECT="$MSG"
+            fi
+            
+            [ -z "$FIRST_SUBJECT" ] && FIRST_SUBJECT="$SUBJECT"
+            HASHES="${HASHES}${HASH},"
+            
+            # Escape JSON special chars in MSG and AUTHOR
+            SAFE_MSG=$(echo "$MSG" | sed 's/\\/\\\\/g; s/"/\\"/g')
+            SAFE_AUTHOR=$(echo "$AUTHOR" | sed 's/\\/\\\\/g; s/"/\\"/g')
+            
+            # Commit heading (level 3)
+            if [ $COMMIT_INDEX -gt 0 ]; then
+              TIPTAP_JSON+=','
+            fi
+            TIPTAP_JSON+='{"type":"heading","attrs":{"level":3},"content":[{"type":"text","text":"'"${HASH}"' — '"${SAFE_MSG}"'"}]},'
+            TIPTAP_JSON+='{"type":"paragraph","content":[{"type":"text","text":"작성자: '"${SAFE_AUTHOR}"'"}]}'
+            
+            COMMIT_INDEX=$((COMMIT_INDEX + 1))
+          done < /tmp/commits.txt
+          
+          # Remove trailing comma from hashes
+          HASHES=$(echo "$HASHES" | sed 's/,$//')
+          
+          TIPTAP_JSON+=']}'
+          
+          TITLE="${DATE_MONTH}월 ${DATE_DAY}일 — ${FIRST_SUBJECT}"
+          
+          # Truncate subject for title if too long
+          if [ ${#TITLE} -gt 80 ]; then
+            TITLE="${DATE_MONTH}월 ${DATE_DAY}일 — 커밋 ${TOTAL}개"
+          fi
+          
           echo "title=$TITLE" >> $GITHUB_OUTPUT
           echo "date_group=$DATE_YYYY_MM_DD" >> $GITHUB_OUTPUT
           echo "month_group=$DATE_YYYY_MM" >> $GITHUB_OUTPUT
+          echo "hashes=$HASHES" >> $GITHUB_OUTPUT
           
-          # Handle multiline string safely
           EOF_DELIM=$(dd if=/dev/urandom bs=15 count=1 status=none | base64)
           echo "content<<$EOF_DELIM" >> $GITHUB_OUTPUT
-          echo -e "$CONTENT" >> $GITHUB_OUTPUT
+          echo "$TIPTAP_JSON" >> $GITHUB_OUTPUT
           echo "$EOF_DELIM" >> $GITHUB_OUTPUT
 
       - name: Send to Wiki
+        if: steps.digest.outputs.skip != 'true'
         uses: actions/github-script@v7
         env:
           WIKI_API_URL: ${{ secrets.WIKI_API_URL }}
           WIKI_API_KEY: ${{ secrets.WIKI_API_KEY }}
-          PAYLOAD_TITLE: ${{ steps.commit_info.outputs.title }}
-          PAYLOAD_CONTENT: ${{ steps.commit_info.outputs.content }}
-          PAYLOAD_PREFIX: ${{ steps.commit_info.outputs.prefix }}
-          PAYLOAD_DATE_GROUP: ${{ steps.commit_info.outputs.date_group }}
-          PAYLOAD_MONTH_GROUP: ${{ steps.commit_info.outputs.month_group }}
+          PAYLOAD_TITLE: ${{ steps.digest.outputs.title }}
+          PAYLOAD_CONTENT: ${{ steps.digest.outputs.content }}
+          PAYLOAD_DATE_GROUP: ${{ steps.digest.outputs.date_group }}
+          PAYLOAD_MONTH_GROUP: ${{ steps.digest.outputs.month_group }}
+          PAYLOAD_HASHES: ${{ steps.digest.outputs.hashes }}
         with:
           script: |
             const WIKI_API_URL = process.env.WIKI_API_URL;
             const WIKI_API_KEY = process.env.WIKI_API_KEY;
-            
+
             if (!WIKI_API_URL || !WIKI_API_KEY) {
               console.error("Missing WIKI_API_URL or WIKI_API_KEY secrets");
               process.exit(1);
             }
-            
+
+            const content = process.env.PAYLOAD_CONTENT;
+            const hashes = process.env.PAYLOAD_HASHES || "";
+            const keywords = hashes.split(",").filter(h => h.trim());
+
             const payload = {
               title: process.env.PAYLOAD_TITLE,
-              content: process.env.PAYLOAD_CONTENT,
+              content: content,
               category: "log",
               icon: "📝",
-              tags: ["ganengile", process.env.PAYLOAD_PREFIX],
+              tags: ["ganengile"],
+              keywords: keywords,
               date_group: process.env.PAYLOAD_DATE_GROUP,
               month_group: process.env.PAYLOAD_MONTH_GROUP
             };
-            
-            console.log("Sending payload:", JSON.stringify(payload, null, 2));
-            
+
+            console.log("Sending daily digest, commits:", keywords.length);
+
             try {
               const response = await fetch(WIKI_API_URL, {
                 method: 'POST',
@@ -90,12 +160,12 @@ jobs:
                 },
                 body: JSON.stringify(payload)
               });
-              
+
               if (!response.ok) {
                 const text = await response.text();
                 throw new Error(`HTTP error! status: ${response.status}, message: ${text}`);
               }
-              
+
               const data = await response.json();
               console.log("Success:", data);
             } catch (error) {
