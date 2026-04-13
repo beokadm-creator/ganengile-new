@@ -4,6 +4,8 @@ import {
   where,
   getDocs,
   addDoc,
+  updateDoc,
+  doc,
   serverTimestamp,
   Timestamp,
 } from 'firebase/firestore';
@@ -80,5 +82,42 @@ export async function getUserCoupons(userId: string): Promise<UserCoupon[]> {
   } catch (error) {
     console.error('[coupon-service] Error fetching user coupons:', error);
     return [];
+  }
+}
+
+/**
+ * 쿠폰을 '사용 완료' 상태로 변경합니다.
+ */
+export async function markCouponAsUsed(
+  userCouponId: string,
+  usedOrderId: string
+): Promise<void> {
+  try {
+    const couponRef = doc(db, 'user_coupons', userCouponId);
+    await updateDoc(couponRef, {
+      status: 'used',
+      usedAt: serverTimestamp(),
+      usedOrderId,
+    });
+  } catch (error) {
+    console.error('[coupon-service] Error marking coupon as used:', error);
+    throw error;
+  }
+}
+
+/**
+ * 결제/요청 취소 시 사용되었던 쿠폰을 다시 '활성' 상태로 복구(환불)합니다.
+ */
+export async function restoreCoupon(userCouponId: string): Promise<void> {
+  try {
+    const couponRef = doc(db, 'user_coupons', userCouponId);
+    await updateDoc(couponRef, {
+      status: 'active',
+      usedAt: null,
+      usedOrderId: null,
+    });
+  } catch (error) {
+    console.error('[coupon-service] Error restoring coupon:', error);
+    throw error;
   }
 }

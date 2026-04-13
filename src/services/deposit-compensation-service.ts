@@ -1,6 +1,7 @@
 import { doc, getDoc, Timestamp, updateDoc } from 'firebase/firestore';
 import { db } from './firebase';
 import { PointService } from './PointService';
+import { restoreCoupon } from './coupon-service';
 import { TossPaymentService } from './TossPaymentService';
 import type { Deposit, DepositStatus } from '../types/point';
 import { PointCategory } from '../types/point';
@@ -62,6 +63,15 @@ export class DepositCompensationService {
           // 포인트 환급 실패 시, 토스 결제 취소도 롤백할 수 없으므로(이미 완료됨) 
           // 치명적 에러로 로깅하고 DB 상태 업데이트를 중단하여 관리자 개입을 유도합니다.
           throw new Error(`포인트 환급 실패 (PG 환불은 완료됨): ${pointError}`);
+        }
+      }
+
+      // 만약 보증금에 쿠폰이 사용된 내역이 있다면 쿠폰 복구 (현재 보증금에 쿠폰이 적용되지 않으나 방어 로직)
+      if ((deposit as any).usedCouponId) {
+        try {
+          await restoreCoupon((deposit as any).usedCouponId);
+        } catch (couponError) {
+          console.error('Failed to restore coupon on deposit refund:', couponError);
         }
       }
 

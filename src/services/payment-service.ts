@@ -30,6 +30,7 @@ import {
 import { db } from './firebase';
 import { calculateBadgeBonus } from './matching-service';
 import { getRuntimeSettlementPolicy } from './settlement-policy-service';
+import { markCouponAsUsed } from './coupon-service';
 
 // ==================== Constants ====================
 
@@ -150,11 +151,17 @@ export async function createRequestPayment(
   userId: string,
   requestId: string,
   amount: number,
-  couponDiscountAmount: number = 0,
-  pointUsedAmount: number = 0
+  options?: {
+    couponDiscountApplied?: number;
+    pointOffsetApplied?: number;
+    userCouponId?: string;
+  }
 ): Promise<string> {
   try {
     const settlementPolicy = await getRuntimeSettlementPolicy();
+    
+    const couponDiscountAmount = options?.couponDiscountApplied ?? 0;
+    const pointUsedAmount = options?.pointOffsetApplied ?? 0;
     
     // 세무/재무적 분류:
     // - amount: 원래 배송 요금 (매출 기준액)
@@ -190,7 +197,9 @@ export async function createRequestPayment(
 
     const docRef = await addDoc(collection(db, 'payments'), paymentData);
 
-    // Request payment created
+    if (options?.couponDiscountApplied && options.couponDiscountApplied > 0 && options.userCouponId) {
+      await markCouponAsUsed(options.userCouponId, docRef.id);
+    }
 
     return docRef.id;
   } catch (error) {
@@ -221,6 +230,7 @@ export async function createGillerEarning(
   options?: CreateGillerEarningOptions & {
     couponDiscountApplied?: number;
     pointOffsetApplied?: number;
+    userCouponId?: string;
   }
 ): Promise<string> {
   try {
