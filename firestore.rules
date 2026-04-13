@@ -735,5 +735,14 @@ service cloud.firestore {
         allow update, delete: if false;
       }
     }
+
+    match /notificationSettings/{userId} {
+      allow read: if isOwner(userId);
+      allow create: if isOwner(userId) &&
+                    request.resource.data.userId == userId;
+      allow update: if isOwner(userId) &&
+                    request.resource.data.userId == userId;
+      allow delete: if false;
+    }
   }
 }
