@@ -795,7 +795,7 @@ export default function CreateRequestScreen({ navigation, route }: Props) {
         step={1}
         title="출발/도착지 정보"
         summary={[`출발: ${pickup || '-'}`, `도착: ${delivery || '-'}`]}
-        onEdit={() => setActiveStep(1)}
+        onEdit={() => !saving && setActiveStep(1)}
       />
     );
   };
@@ -811,7 +811,7 @@ export default function CreateRequestScreen({ navigation, route }: Props) {
           `상세: ${packageItemName || '-'}`,
           `크기/무게: ${packageSize || '-'} / ${weightKg ? `${weightKg}kg` : '-'}`,
         ]}
-        onEdit={() => setActiveStep(2)}
+        onEdit={() => !saving && setActiveStep(2)}
       />
     );
   };
@@ -826,7 +826,7 @@ export default function CreateRequestScreen({ navigation, route }: Props) {
           `수령인: ${recipientName || '-'}`,
           `요청사항: ${specialInstructions || '없음'}`,
         ]}
-        onEdit={() => setActiveStep(3)}
+        onEdit={() => !saving && setActiveStep(3)}
       />
     );
   };
@@ -965,6 +965,18 @@ export default function CreateRequestScreen({ navigation, route }: Props) {
             <Text style={styles.modalTitle}>AI가 작성 중입니다</Text>
             <Text style={styles.modalBody}>
               사진과 주소, 지하철 조건을 바탕으로 물품 설명과 예상 정보를 정리하고 있습니다. 잠시만 기다려 주세요.
+            </Text>
+          </View>
+        </View>
+      </Modal>
+
+      <Modal visible={saving} transparent animationType="fade" statusBarTranslucent>
+        <View style={styles.modalBackdrop}>
+          <View style={styles.modalCard}>
+            <ActivityIndicator size="large" color={Colors.primary} />
+            <Text style={styles.modalTitle}>요청을 접수하고 있습니다</Text>
+            <Text style={styles.modalBody}>
+              안전한 배송을 위해 정보를 저장하고 있습니다. 완료 후 배송 현황 화면으로 이동합니다.
             </Text>
           </View>
         </View>

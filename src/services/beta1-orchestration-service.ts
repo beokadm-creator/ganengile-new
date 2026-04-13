@@ -815,25 +815,31 @@ export async function createBeta1Request(input: Beta1RequestCreateInput): Promis
       });
     }
 
-    const bundles = await bundleMissionsForDelivery(deliveryRef.id);
-    const candidateGillerIds = Array.from(
-      new Set(
-        bundles.flatMap((bundle) => bundle.candidateGillerUserIds ?? [])
-      )
-    );
+    // UI 블로킹 방지를 위해 번들링 및 매칭(길러 탐색) 로직은 백그라운드에서 비동기로 실행합니다.
+    bundleMissionsForDelivery(deliveryRef.id)
+      .then(async (bundles) => {
+        const candidateGillerIds = Array.from(
+          new Set(
+            bundles.flatMap((bundle) => bundle.candidateGillerUserIds ?? [])
+          )
+        );
 
-    await Promise.all(
-      candidateGillerIds.map((gillerId) =>
-      sendMissionBundleAvailableNotification(
-        gillerId,
-        requestRef.id,
-        input.pickupStation.stationName,
-        input.deliveryStation.stationName,
-        selectedCard.pricing.publicPrice,
-        bundles.length
-      )
-    )
-  );
+        await Promise.all(
+          candidateGillerIds.map((gillerId) =>
+            sendMissionBundleAvailableNotification(
+              gillerId,
+              requestRef.id,
+              input.pickupStation.stationName,
+              input.deliveryStation.stationName,
+              selectedCard.pricing.publicPrice,
+              bundles.length
+            )
+          )
+        );
+      })
+      .catch((err) => {
+        console.error('[orchestration-service] background bundling failed', err);
+      });
 
   } catch (error) {
     console.error('[orchestration-service] orchestration failed, but request was created', {
