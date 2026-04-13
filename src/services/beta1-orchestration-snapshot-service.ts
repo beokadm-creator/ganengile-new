@@ -1,9 +1,8 @@
-import { collection, getDocs } from 'firebase/firestore';
+import { collection, getDocs, limit, orderBy, query, where } from 'firebase/firestore';
 import { db } from './firebase';
 import { getWalletLedger } from './beta1-wallet-service';
 import { getMissionExposurePricing } from './mission-exposure-pricing-service';
 import type { ActorSelectionActorType, LocationRef, MissionType, MissionBundle } from '../types/beta1';
-import { MissionBundleStatus as BundleStatus } from '../types/beta1';
 
 export interface Beta1HomeSnapshot {
   role: 'requester' | 'giller';
@@ -148,6 +147,7 @@ type Beta1DeliveryDoc = {
   id: string;
   requestId?: string;
   gillerId?: string;
+  requesterId?: string;
   status?: string;
   beta1DeliveryStatus?: string;
   pickupStation?: { stationName?: string };
@@ -211,48 +211,76 @@ async function getUserWalletSummary(userId: string): Promise<Beta1HomeSnapshot['
 }
 
 export async function getBeta1HomeSnapshot(userId: string, role: 'requester' | 'giller'): Promise<Beta1HomeSnapshot> {
-  const [requestSnapshot, missionSnapshot, deliverySnapshot, missionBundleSnapshot, wallet] = await Promise.all([
-    getDocs(collection(db, 'requests')),
-    getDocs(collection(db, 'missions')),
-    getDocs(collection(db, 'deliveries')),
-    getDocs(collection(db, 'mission_bundles')),
-    getUserWalletSummary(userId),
+  const safeGetDocs = async (source: unknown) => {
+    try {
+      return await getDocs(source as never);
+    } catch (error) {
+      return null;
+    }
+  };
+
+  const safeGetWallet = async () => {
+    try {
+      return await getUserWalletSummary(userId);
+    } catch (error) {
+      return {
+        chargeBalance: 0,
+        earnedBalance: 0,
+        promoBalance: 0,
+        pendingWithdrawalBalance: 0,
+        withdrawableBalance: 0,
+      };
+    }
+  };
+
+  const requestQuery =
+    role === 'requester'
+      ? query(collection(db, 'requests'), where('requesterId', '==', userId), orderBy('createdAt', 'desc'), limit(50))
+      : query(collection(db, 'requests'), where('status', '==', 'pending'), orderBy('createdAt', 'desc'), limit(50));
+
+  const missionQuery = query(collection(db, 'missions'), where('assignedGillerUserId', '==', userId), limit(50));
+
+  const deliveryQuery =
+    role === 'requester'
+      ? query(collection(db, 'deliveries'), where('requesterId', '==', userId), limit(50))
+      : query(collection(db, 'deliveries'), where('gillerId', '==', userId), limit(50));
+
+  const [requestSnapshot, missionSnapshot, deliverySnapshot, wallet] = await Promise.all([
+    safeGetDocs(requestQuery),
+    safeGetDocs(missionQuery),
+    safeGetDocs(deliveryQuery),
+    safeGetWallet(),
   ]);
 
-  const allMissionDocs = missionSnapshot.docs.map(
+  const allMissionDocs = (missionSnapshot?.docs ?? []).map(
     (docItem) => ({ id: docItem.id, ...asRecord(docItem.data()) }) as Beta1MissionDoc
   );
   const missionsById = new Map(allMissionDocs.map((mission) => [String(mission.id), mission] as const));
 
-  const allRequests = requestSnapshot.docs
+  const allRequests = (requestSnapshot?.docs ?? [])
     .map((docItem) => ({ id: docItem.id, ...asRecord(docItem.data()) }) as Beta1RequestDoc);
   const requestsById = new Map(allRequests.map((request) => [String(request.id), request] as const));
 
   const requests = allRequests
-    .filter((request) => request.requesterId === userId || request.requesterUserId === userId);
+    .filter((request) => {
+      if (role === 'requester') {
+        return request.requesterId === userId || request.requesterUserId === userId;
+      }
+      return String(request.status ?? '') === 'pending';
+    });
 
   const missions = allMissionDocs.filter((mission) => mission.assignedGillerUserId === userId);
 
-  const missionBundles = missionBundleSnapshot.docs
-    .map((docItem) => ({
-      missionBundleId: docItem.id,
-      ...asRecord(docItem.data()),
-    }) as Beta1MissionBundleDoc)
-    .filter((bundle) => {
-      if (role !== 'giller') {
-        return false;
-      }
+  const missionBundles: Beta1MissionBundleDoc[] = [];
 
-      const candidateList = bundle.candidateGillerUserIds ?? [];
-      const selectedBySameUser = bundle.selectedGillerUserId === userId;
-      const availableToUser = candidateList.length === 0 || candidateList.includes(userId);
-      const notTaken = !bundle.selectedGillerUserId || selectedBySameUser;
-      return bundle.status === BundleStatus.ACTIVE && availableToUser && notTaken;
-    });
-
-  const deliveries = deliverySnapshot.docs
+  const deliveries = (deliverySnapshot?.docs ?? [])
     .map((docItem) => ({ id: docItem.id, ...asRecord(docItem.data()) }) as Beta1DeliveryDoc)
-    .filter((delivery) => delivery.gillerId === userId);
+    .filter((delivery) => {
+      if (role === 'requester') {
+        return delivery.requesterId === userId;
+      }
+      return delivery.gillerId === userId;
+    });
 
   const activeRequests = requests
     .filter((request) =>

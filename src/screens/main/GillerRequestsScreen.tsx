@@ -72,6 +72,9 @@ export default function GillerRequestsScreen() {
       try {
         const nextSnapshot = await getBeta1HomeSnapshot(user.uid, 'giller');
         setSnapshot(nextSnapshot);
+      } catch (error) {
+        console.error('Failed to load giller snapshot', error);
+        Alert.alert('요청을 불러오지 못했습니다', '잠시 후 다시 시도해 주세요.');
       } finally {
         setLoading(false);
         setRefreshing(false);

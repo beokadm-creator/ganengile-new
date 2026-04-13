@@ -35,9 +35,13 @@ export default function HomeScreen({ navigation }: { navigation: MainStackNaviga
         return;
       }
 
-      const nextSnapshot = await getBeta1HomeSnapshot(user.uid, role);
-      if (mounted) {
-        setSnapshot(nextSnapshot);
+      try {
+        const nextSnapshot = await getBeta1HomeSnapshot(user.uid, role);
+        if (mounted) {
+          setSnapshot(nextSnapshot);
+        }
+      } catch (error) {
+        console.error('Failed to load home snapshot', error);
       }
     })();
 
@@ -69,8 +73,12 @@ export default function HomeScreen({ navigation }: { navigation: MainStackNaviga
     }
 
     setRefreshing(true);
-    const nextSnapshot = await getBeta1HomeSnapshot(user.uid, role);
-    setSnapshot(nextSnapshot);
+    try {
+      const nextSnapshot = await getBeta1HomeSnapshot(user.uid, role);
+      setSnapshot(nextSnapshot);
+    } catch (error) {
+      console.error('Failed to refresh home snapshot', error);
+    }
     setRefreshing(false);
   };
 
