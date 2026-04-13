@@ -38,6 +38,13 @@ export function Step4Quote({
   const [isCouponModalVisible, setIsCouponModalVisible] = useState(false);
   const [availableCoupons, setAvailableCoupons] = useState<UserCoupon[]>([]);
   const [pointBalance, setPointBalance] = useState(0);
+  const [isMounting, setIsMounting] = useState(true);
+
+  useEffect(() => {
+    // 렌더링 직후 발생할 수 있는 Ghost click 방지를 위해 잠시 대기
+    const timer = setTimeout(() => setIsMounting(false), 500);
+    return () => clearTimeout(timer);
+  }, []);
 
   useEffect(() => {
     if (!user?.uid) return;
@@ -184,9 +191,9 @@ export function Step4Quote({
       )}
 
       <TouchableOpacity
-        style={[styles.primaryButton, submitDisabled && styles.disabled]}
+        style={[styles.primaryButton, (submitDisabled || isMounting) && styles.disabled]}
         onPress={() => void handleSubmit()}
-        disabled={saving}
+        disabled={saving || isMounting}
       >
         {saving ? (
           <ActivityIndicator color={Colors.white} />

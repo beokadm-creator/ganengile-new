@@ -95,7 +95,11 @@ export function Step3Recipient({
           return;
         }
         console.log('[Step3] Validations passed, calling setActiveStep(4)');
-        store.setActiveStep(4);
+        if (Platform.OS === 'web') {
+          setTimeout(() => store.setActiveStep(4), 50);
+        } else {
+          setTimeout(() => store.setActiveStep(4), 50);
+        }
       }} 
       onPrev={() => store.setActiveStep(3)}
       nextLabel="견적 확인하기"
