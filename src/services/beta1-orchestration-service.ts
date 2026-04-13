@@ -505,7 +505,16 @@ export async function createBeta1Request(input: Beta1RequestCreateInput): Promis
   let requestDraftId = '';
   let selectedQuoteId = '';
 
-  try {
+  const withTimeout = async <T,>(promise: Promise<T>, ms: number): Promise<T> => {
+    return Promise.race([
+      promise,
+      new Promise<T>((_, reject) => {
+        setTimeout(() => reject(new Error('timeout')), ms);
+      }),
+    ]);
+  };
+
+  const runDraftPipeline = async (): Promise<{ requestDraftId: string; selectedQuoteId: string }> => {
     const aiConfig = await getAIIntegrationConfig();
     const requestDraft = await createRequestDraft(
       buildRequestDraftFromLegacyInput({
@@ -523,7 +532,6 @@ export async function createBeta1Request(input: Beta1RequestCreateInput): Promis
         recipientPhone: input.recipientPhone,
       })
     );
-    requestDraftId = requestDraft.requestDraftId;
 
     await updateRequestDraft(requestDraft.requestDraftId, {
       requestMode: input.requestMode ?? 'immediate',
@@ -603,15 +611,23 @@ export async function createBeta1Request(input: Beta1RequestCreateInput): Promis
     );
 
     const selectedQuote = quoteDocs.find((quote) => quote.quoteType === selectedCard.quoteType) ?? quoteDocs[0];
-    selectedQuoteId = selectedQuote.pricingQuoteId;
     await markPricingQuoteSelected(selectedQuote.pricingQuoteId, requestDraft.requestDraftId);
     await updateRequestDraft(requestDraft.requestDraftId, {
       status: RequestDraftStatus.SUBMITTED,
       selectedPricingQuoteId: selectedQuote.pricingQuoteId,
     });
+
+    return { requestDraftId: requestDraft.requestDraftId, selectedQuoteId: selectedQuote.pricingQuoteId };
+  };
+
+  try {
+    const result = await withTimeout(runDraftPipeline(), 8000);
+    requestDraftId = result.requestDraftId;
+    selectedQuoteId = result.selectedQuoteId;
   } catch (error) {
-    console.error('[orchestration-service] draft pipeline failed:', error);
-    throw new Error(`AI 분석 및 견적 파이프라인 생성에 실패했습니다: ${error instanceof Error ? error.message : String(error)}`);
+    console.error('[orchestration-service] draft pipeline skipped:', error);
+    requestDraftId = '';
+    selectedQuoteId = '';
   }
 
   // 기본 마감기한 정책: 예약 모드면 예약시간 기준 + 2시간, 즉시 모드면 현재 + 2시간
