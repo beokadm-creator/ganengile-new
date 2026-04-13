@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import type { Firestore } from 'firebase-admin/firestore';
 import { getAdminDb } from '@/lib/firebase-admin';
 import { isAdmin } from '@/lib/auth';
+import { getWalletSummary } from '../../../../../src/utils/wallet-balance';
 
 type Responsibility = 'giller' | 'requester' | 'system';
 
@@ -169,18 +170,49 @@ export async function PATCH(req: NextRequest) {
       // 보상금이 설정된 경우, 요청자(또는 신고자)에게 포인트 지급 처리
       if (compensationAmount > 0 && disputeData.reporterId) {
         const userRef = db.collection('users').doc(disputeData.reporterId);
-        const userSnap = await transaction.get(userRef);
+        const ledgerRef = db.collection('wallet_ledgers').doc(disputeData.reporterId);
+
+        const [userSnap, ledgerSnap] = await Promise.all([
+          transaction.get(userRef),
+          transaction.get(ledgerRef)
+        ]);
         
         if (userSnap.exists) {
-          const userData = userSnap.data() as { pointBalance?: number; totalEarnedPoints?: number };
-          const current = userData?.pointBalance ?? 0;
-          const currentEarned = userData?.totalEarnedPoints ?? 0;
+          const userData = userSnap.data() as Record<string, any>;
+          const ledgerData = ledgerSnap.exists ? ledgerSnap.data() as Record<string, any> : null;
+          
+          const rawBalances = ledgerData?.balances ?? userData.walletBalances ?? {};
+          const currentBalances = {
+            chargeBalance: Number(rawBalances.chargeBalance ?? 0),
+            earnedBalance: Number(rawBalances.earnedBalance ?? userData.pointBalance ?? 0),
+            promoBalance: Number(rawBalances.promoBalance ?? 0),
+            lockedChargeBalance: Number(rawBalances.lockedChargeBalance ?? 0),
+            lockedEarnedBalance: Number(rawBalances.lockedEarnedBalance ?? 0),
+            lockedPromoBalance: Number(rawBalances.lockedPromoBalance ?? 0),
+            pendingWithdrawalBalance: Number(rawBalances.pendingWithdrawalBalance ?? 0),
+          };
+
+          const oldSummary = getWalletSummary(currentBalances as any);
+          const newBalances = {
+            ...currentBalances,
+            promoBalance: currentBalances.promoBalance + compensationAmount, // 보상금은 프로모션 포인트로 지급
+          };
+          const newSummary = getWalletSummary(newBalances as any);
+          const now = new Date();
           
           transaction.update(userRef, {
-            pointBalance: current + compensationAmount,
-            totalEarnedPoints: currentEarned + compensationAmount,
-            updatedAt: new Date(),
+            pointBalance: newSummary.totalUsableBalance,
+            walletBalances: newBalances,
+            totalEarnedPoints: (userData.totalEarnedPoints ?? 0) + compensationAmount,
+            updatedAt: now,
           });
+
+          transaction.set(ledgerRef, {
+            userId: disputeData.reporterId,
+            balances: newBalances,
+            summary: newSummary,
+            updatedAt: now,
+          }, { merge: true });
 
           const txRef = db.collection('point_transactions').doc();
           transaction.set(txRef, {
@@ -189,11 +221,24 @@ export async function PATCH(req: NextRequest) {
             type: 'earn',
             category: 'dispute_compensation',
             description: `분쟁 조정에 따른 보상금 지급 (${compensationAmount.toLocaleString()}원)`,
-            balanceBefore: current,
-            balanceAfter: current + compensationAmount,
+            balanceBefore: oldSummary.totalUsableBalance,
+            balanceAfter: newSummary.totalUsableBalance,
             status: 'completed',
-            createdAt: new Date(),
-            completedAt: new Date(),
+            createdAt: now,
+            completedAt: now,
+          });
+
+          const entryRef = db.collection('wallet_entries').doc();
+          transaction.set(entryRef, {
+            walletLedgerId: disputeData.reporterId,
+            userId: disputeData.reporterId,
+            type: 'earn',
+            fundingSource: 'promo',
+            amount: compensationAmount,
+            balanceBefore: oldSummary,
+            balanceAfter: newSummary,
+            description: `분쟁 조정에 따른 보상금 지급 (${compensationAmount.toLocaleString()}원)`,
+            createdAt: now,
           });
         }
       }

@@ -24,8 +24,11 @@ import { PointCategory, WITHDRAW_MIN_AMOUNT } from '../types/point';
 import { getWithdrawalEligibility, getWalletLedger } from './beta1-wallet-service';
 import { getBankIntegrationConfig } from './integration-config-service';
 import { createProtectedBankAccount } from '../../shared/bank-account';
+import { allocateWalletSpend, getWalletSummary } from '../utils/wallet-balance';
 
 const TRANSACTIONS_COLLECTION = 'point_transactions';
+const WALLET_ENTRIES_COLLECTION = 'wallet_entries';
+const WALLET_LEDGERS_COLLECTION = 'wallet_ledgers';
 const WITHDRAW_COLLECTION = 'withdraw_requests';
 const USERS_COLLECTION = 'users';
 
@@ -95,15 +98,48 @@ export class PointService {
 
     return runTransaction(db, async (transaction) => {
       const userRef = doc(db, USERS_COLLECTION, userId);
-      const userDoc = await transaction.get(userRef);
+      const ledgerRef = doc(db, WALLET_LEDGERS_COLLECTION, userId);
+
+      const [userDoc, ledgerDoc] = await Promise.all([
+        transaction.get(userRef),
+        transaction.get(ledgerRef),
+      ]);
 
       if (!userDoc.exists()) {
         throw new Error('User not found');
       }
 
       const userData = (userDoc.data() ?? {}) as Record<string, unknown>;
-      const balanceBefore = asNumber(userData.pointBalance);
-      const balanceAfter = balanceBefore + amount;
+      const ledgerData = ledgerDoc.exists() ? ledgerDoc.data() : null;
+
+      const rawBalances = ledgerData?.balances ?? userData.walletBalances ?? {};
+      const currentBalances = {
+        chargeBalance: Number(rawBalances.chargeBalance ?? 0),
+        earnedBalance: Number(rawBalances.earnedBalance ?? userData.pointBalance ?? 0),
+        promoBalance: Number(rawBalances.promoBalance ?? 0),
+        lockedChargeBalance: Number(rawBalances.lockedChargeBalance ?? 0),
+        lockedEarnedBalance: Number(rawBalances.lockedEarnedBalance ?? 0),
+        lockedPromoBalance: Number(rawBalances.lockedPromoBalance ?? 0),
+        pendingWithdrawalBalance: Number(rawBalances.pendingWithdrawalBalance ?? 0),
+      };
+
+      const oldSummary = getWalletSummary(currentBalances as any);
+
+      // Decide funding source based on category
+      let fundingSource: 'charge' | 'earned' | 'promo' = 'earned';
+      if (category === PointCategory.CHARGE) {
+        fundingSource = 'charge';
+      }
+
+      const newBalances = { ...currentBalances };
+      if (fundingSource === 'charge') {
+        newBalances.chargeBalance += amount;
+      } else {
+        newBalances.earnedBalance += amount;
+      }
+
+      const newSummary = getWalletSummary(newBalances as any);
+
       const transactionRef = doc(collection(db, TRANSACTIONS_COLLECTION));
       const transactionData = createTransactionRecord({
         transactionId: transactionRef.id,
@@ -111,18 +147,47 @@ export class PointService {
         amount,
         type: 'earn' as PointType,
         category,
-        balanceBefore,
-        balanceAfter,
+        balanceBefore: oldSummary.totalUsableBalance,
+        balanceAfter: newSummary.totalUsableBalance,
         description,
         metadata,
       });
 
+      const now = Timestamp.now();
+
+      // Legacy transaction
       transaction.set(transactionRef, transactionData);
-      transaction.update(userRef, {
-        pointBalance: balanceAfter,
-        totalEarnedPoints: asNumber(userData.totalEarnedPoints) + amount,
-        updatedAt: Timestamp.now(),
+
+      // Wallet Entry
+      const entryRef = doc(collection(db, WALLET_ENTRIES_COLLECTION));
+      transaction.set(entryRef, {
+        walletLedgerId: userId,
+        userId,
+        type: 'earn',
+        fundingSource,
+        amount,
+        balanceBefore: oldSummary,
+        balanceAfter: newSummary,
+        description,
+        metadata: metadata ?? null,
+        createdAt: now,
       });
+
+      // Update User (Legacy)
+      transaction.update(userRef, {
+        pointBalance: newSummary.totalUsableBalance,
+        walletBalances: newBalances,
+        totalEarnedPoints: asNumber(userData.totalEarnedPoints) + amount,
+        updatedAt: now,
+      });
+
+      // Update Ledger
+      transaction.set(ledgerRef, {
+        userId,
+        balances: newBalances,
+        summary: newSummary,
+        updatedAt: now,
+      }, { merge: true });
 
       return transactionData;
     });
@@ -141,19 +206,49 @@ export class PointService {
 
     return runTransaction(db, async (transaction) => {
       const userRef = doc(db, USERS_COLLECTION, userId);
-      const userDoc = await transaction.get(userRef);
+      const ledgerRef = doc(db, WALLET_LEDGERS_COLLECTION, userId);
+
+      const [userDoc, ledgerDoc] = await Promise.all([
+        transaction.get(userRef),
+        transaction.get(ledgerRef),
+      ]);
 
       if (!userDoc.exists()) {
         throw new Error('User not found');
       }
 
       const userData = (userDoc.data() ?? {}) as Record<string, unknown>;
-      const balanceBefore = asNumber(userData.pointBalance);
-      if (balanceBefore < amount) {
-        throw new Error(`Insufficient points. Balance: ${balanceBefore}, Required: ${amount}`);
+      const ledgerData = ledgerDoc.exists() ? ledgerDoc.data() : null;
+
+      const rawBalances = ledgerData?.balances ?? userData.walletBalances ?? {};
+      const currentBalances = {
+        chargeBalance: Number(rawBalances.chargeBalance ?? 0),
+        earnedBalance: Number(rawBalances.earnedBalance ?? userData.pointBalance ?? 0),
+        promoBalance: Number(rawBalances.promoBalance ?? 0),
+        lockedChargeBalance: Number(rawBalances.lockedChargeBalance ?? 0),
+        lockedEarnedBalance: Number(rawBalances.lockedEarnedBalance ?? 0),
+        lockedPromoBalance: Number(rawBalances.lockedPromoBalance ?? 0),
+        pendingWithdrawalBalance: Number(rawBalances.pendingWithdrawalBalance ?? 0),
+      };
+
+      const oldSummary = getWalletSummary(currentBalances as any);
+
+      if (oldSummary.totalUsableBalance < amount) {
+        throw new Error(`Insufficient points. Usable: ${oldSummary.totalUsableBalance}, Required: ${amount}`);
       }
 
-      const balanceAfter = balanceBefore - amount;
+      // Advanced: Allocate spend across charge -> earned -> promo
+      const breakdown = allocateWalletSpend(currentBalances as any, amount);
+
+      const newBalances = {
+        ...currentBalances,
+        chargeBalance: breakdown.remainingChargeBalance,
+        earnedBalance: breakdown.remainingEarnedBalance,
+        promoBalance: breakdown.remainingPromoBalance,
+      };
+
+      const newSummary = getWalletSummary(newBalances as any);
+
       const transactionRef = doc(collection(db, TRANSACTIONS_COLLECTION));
       const transactionData = createTransactionRecord({
         transactionId: transactionRef.id,
@@ -161,18 +256,76 @@ export class PointService {
         amount: -amount,
         type: (category === PointCategory.WITHDRAW ? 'withdraw' : 'spend') as PointType,
         category,
-        balanceBefore,
-        balanceAfter,
+        balanceBefore: oldSummary.totalUsableBalance,
+        balanceAfter: newSummary.totalUsableBalance,
         description,
         metadata,
       });
 
+      const now = Timestamp.now();
+
+      // Legacy transaction
       transaction.set(transactionRef, transactionData);
+
+      // Wallet Entries for each funding source deducted
+      if (breakdown.fromChargeBalance > 0) {
+        transaction.set(doc(collection(db, WALLET_ENTRIES_COLLECTION)), {
+          walletLedgerId: userId,
+          userId,
+          type: 'spend',
+          fundingSource: 'charge',
+          amount: -breakdown.fromChargeBalance,
+          balanceBefore: oldSummary,
+          balanceAfter: newSummary, // Simplified
+          description: `${description} (충전금 차감)`,
+          metadata: metadata ?? null,
+          createdAt: now,
+        });
+      }
+      if (breakdown.fromEarnedBalance > 0) {
+        transaction.set(doc(collection(db, WALLET_ENTRIES_COLLECTION)), {
+          walletLedgerId: userId,
+          userId,
+          type: 'spend',
+          fundingSource: 'earned',
+          amount: -breakdown.fromEarnedBalance,
+          balanceBefore: oldSummary,
+          balanceAfter: newSummary,
+          description: `${description} (정산금 차감)`,
+          metadata: metadata ?? null,
+          createdAt: now,
+        });
+      }
+      if (breakdown.fromPromoBalance > 0) {
+        transaction.set(doc(collection(db, WALLET_ENTRIES_COLLECTION)), {
+          walletLedgerId: userId,
+          userId,
+          type: 'spend',
+          fundingSource: 'promo',
+          amount: -breakdown.fromPromoBalance,
+          balanceBefore: oldSummary,
+          balanceAfter: newSummary,
+          description: `${description} (프로모션 차감)`,
+          metadata: metadata ?? null,
+          createdAt: now,
+        });
+      }
+
+      // Update User (Legacy)
       transaction.update(userRef, {
-        pointBalance: balanceAfter,
+        pointBalance: newSummary.totalUsableBalance,
+        walletBalances: newBalances,
         totalSpentPoints: asNumber(userData.totalSpentPoints) + amount,
-        updatedAt: Timestamp.now(),
+        updatedAt: now,
       });
+
+      // Update Ledger
+      transaction.set(ledgerRef, {
+        userId,
+        balances: newBalances,
+        summary: newSummary,
+        updatedAt: now,
+      }, { merge: true });
 
       return transactionData;
     });
@@ -324,43 +477,93 @@ export class PointService {
     // 트랜잭션으로 출금 문서 생성과 포인트 차감을 원자적으로 처리
     await runTransaction(db, async (transaction) => {
       const userRef = doc(db, USERS_COLLECTION, data.userId);
-      const userDoc = await transaction.get(userRef);
+      const ledgerRef = doc(db, WALLET_LEDGERS_COLLECTION, data.userId);
+
+      const [userDoc, ledgerDoc] = await Promise.all([
+        transaction.get(userRef),
+        transaction.get(ledgerRef),
+      ]);
 
       if (!userDoc.exists()) {
         throw new Error('User not found');
       }
 
       const userData = (userDoc.data() ?? {}) as Record<string, unknown>;
-      const balanceBefore = asNumber(userData.pointBalance);
-      
-      if (balanceBefore < data.amount) {
-        throw new Error('Insufficient points');
+      const ledgerData = ledgerDoc.exists() ? ledgerDoc.data() : null;
+
+      const rawBalances = ledgerData?.balances ?? userData.walletBalances ?? {};
+      const currentBalances = {
+        chargeBalance: Number(rawBalances.chargeBalance ?? 0),
+        earnedBalance: Number(rawBalances.earnedBalance ?? userData.pointBalance ?? 0),
+        promoBalance: Number(rawBalances.promoBalance ?? 0),
+        lockedChargeBalance: Number(rawBalances.lockedChargeBalance ?? 0),
+        lockedEarnedBalance: Number(rawBalances.lockedEarnedBalance ?? 0),
+        lockedPromoBalance: Number(rawBalances.lockedPromoBalance ?? 0),
+        pendingWithdrawalBalance: Number(rawBalances.pendingWithdrawalBalance ?? 0),
+      };
+
+      const oldSummary = getWalletSummary(currentBalances as any);
+
+      // Security Fix: Withdrawals MUST ONLY come from withdrawableBalance (which is purely earnedBalance minus locks)
+      if (oldSummary.withdrawableBalance < data.amount) {
+        throw new Error(`출금 가능 잔액이 부족합니다. (가능액: ${oldSummary.withdrawableBalance}원, 요청액: ${data.amount}원)`);
       }
 
-      const balanceAfter = balanceBefore - data.amount;
+      // Deduct from earnedBalance and add to pendingWithdrawalBalance
+      const newBalances = {
+        ...currentBalances,
+        earnedBalance: currentBalances.earnedBalance - data.amount,
+        pendingWithdrawalBalance: currentBalances.pendingWithdrawalBalance + data.amount,
+      };
 
-      // 1. 포인트 차감 내역 생성
+      const newSummary = getWalletSummary(newBalances as any);
+      const now = Timestamp.now();
+
+      // 1. 포인트 차감 내역 생성 (Legacy)
       const transactionRef = doc(collection(db, TRANSACTIONS_COLLECTION));
       const transactionData = createTransactionRecord({
         transactionId: transactionRef.id,
         userId: data.userId,
-        amount: data.amount,
-        type: 'spend' as PointType,
+        amount: -data.amount,
+        type: 'withdraw' as PointType,
         category: 'withdraw' as PointCategory,
-        balanceBefore,
-        balanceAfter,
-        description: 'Point withdrawal request',
+        balanceBefore: oldSummary.totalUsableBalance,
+        balanceAfter: newSummary.totalUsableBalance, // totalUsableBalance decreases because it moved to pending
+        description: '출금 신청',
         metadata: { relatedRequestId: withdrawRef.id },
       });
 
       transaction.set(transactionRef, transactionData);
-      
-      // 2. 유저 잔액 업데이트
-      transaction.update(userRef, {
-        pointBalance: balanceAfter,
-        totalSpentPoints: asNumber(userData.totalSpentPoints) + data.amount,
-        updatedAt: Timestamp.now(),
+
+      // Wallet Entry
+      transaction.set(doc(collection(db, WALLET_ENTRIES_COLLECTION)), {
+        walletLedgerId: data.userId,
+        userId: data.userId,
+        type: 'withdraw_request',
+        fundingSource: 'earned',
+        amount: -data.amount,
+        balanceBefore: oldSummary,
+        balanceAfter: newSummary,
+        description: '출금 신청 (정산금 차감 -> 출금 대기 전환)',
+        metadata: { relatedRequestId: withdrawRef.id },
+        createdAt: now,
       });
+      
+      // 2. 유저 잔액 업데이트 (Legacy)
+      transaction.update(userRef, {
+        pointBalance: newSummary.totalUsableBalance,
+        walletBalances: newBalances,
+        totalSpentPoints: asNumber(userData.totalSpentPoints) + data.amount,
+        updatedAt: now,
+      });
+
+      // Update Ledger
+      transaction.set(ledgerRef, {
+        userId: data.userId,
+        balances: newBalances,
+        summary: newSummary,
+        updatedAt: now,
+      }, { merge: true });
 
       // 3. 출금 요청 문서 생성
       transaction.set(withdrawRef, withdrawData);

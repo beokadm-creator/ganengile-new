@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import type { Firestore } from 'firebase-admin/firestore';
 import { getAdminDb } from '@/lib/firebase-admin';
 import { isAdmin } from '@/lib/auth';
+import { getWalletSummary } from '../../../../../src/utils/wallet-balance';
 
 interface DepositDoc {
   userId?: string;
@@ -195,18 +196,52 @@ export async function PATCH(req: NextRequest) {
 
         if ((data.pointAmount ?? 0) > 0 && data.userId) {
           const userRef = db.collection('users').doc(data.userId);
-          const userSnap = await transaction.get(userRef);
+          const ledgerRef = db.collection('wallet_ledgers').doc(data.userId);
+
+          const [userSnap, ledgerSnap] = await Promise.all([
+            transaction.get(userRef),
+            transaction.get(ledgerRef)
+          ]);
           
           if (userSnap.exists) {
-            const userData = userSnap.data() as { pointBalance?: number; totalEarnedPoints?: number } | undefined;
-            const current = userData?.pointBalance ?? 0;
-            const currentEarned = userData?.totalEarnedPoints ?? 0;
+            const userData = userSnap.data() as Record<string, any>;
+            const ledgerData = ledgerSnap.exists ? ledgerSnap.data() as Record<string, any> : null;
+            
+            const rawBalances = ledgerData?.balances ?? userData.walletBalances ?? {};
+            const currentBalances = {
+              chargeBalance: Number(rawBalances.chargeBalance ?? 0),
+              earnedBalance: Number(rawBalances.earnedBalance ?? userData.pointBalance ?? 0),
+              promoBalance: Number(rawBalances.promoBalance ?? 0),
+              lockedChargeBalance: Number(rawBalances.lockedChargeBalance ?? 0),
+              lockedEarnedBalance: Number(rawBalances.lockedEarnedBalance ?? 0),
+              lockedPromoBalance: Number(rawBalances.lockedPromoBalance ?? 0),
+              pendingWithdrawalBalance: Number(rawBalances.pendingWithdrawalBalance ?? 0),
+            };
+
+            const oldSummary = getWalletSummary(currentBalances as any);
             const pointAmount = data.pointAmount ?? 0;
             
+            // Refund goes back to earnedBalance by default for deposits
+            const newBalances = {
+              ...currentBalances,
+              earnedBalance: currentBalances.earnedBalance + pointAmount,
+            };
+            const newSummary = getWalletSummary(newBalances as any);
+            const now = new Date();
+
             transaction.update(userRef, {
-              pointBalance: current + pointAmount,
-              totalEarnedPoints: currentEarned + pointAmount,
+              pointBalance: newSummary.totalUsableBalance,
+              walletBalances: newBalances,
+              totalEarnedPoints: (userData.totalEarnedPoints ?? 0) + pointAmount,
+              updatedAt: now,
             });
+
+            transaction.set(ledgerRef, {
+              userId: data.userId,
+              balances: newBalances,
+              summary: newSummary,
+              updatedAt: now,
+            }, { merge: true });
 
             const txRef = db.collection('point_transactions').doc();
             transaction.set(txRef, {
@@ -215,11 +250,24 @@ export async function PATCH(req: NextRequest) {
               type: 'earn',
               category: 'deposit_refund',
               description: `보증금 환급 (${(data.depositAmount ?? 0).toLocaleString()}원)`,
-              balanceBefore: current,
-              balanceAfter: current + pointAmount,
+              balanceBefore: oldSummary.totalUsableBalance,
+              balanceAfter: newSummary.totalUsableBalance,
               status: 'completed',
-              createdAt: new Date(),
-              completedAt: new Date(),
+              createdAt: now,
+              completedAt: now,
+            });
+
+            const entryRef = db.collection('wallet_entries').doc();
+            transaction.set(entryRef, {
+              walletLedgerId: data.userId,
+              userId: data.userId,
+              type: 'earn',
+              fundingSource: 'earned',
+              amount: pointAmount,
+              balanceBefore: oldSummary,
+              balanceAfter: newSummary,
+              description: `보증금 환급 (${(data.depositAmount ?? 0).toLocaleString()}원)`,
+              createdAt: now,
             });
           }
         }

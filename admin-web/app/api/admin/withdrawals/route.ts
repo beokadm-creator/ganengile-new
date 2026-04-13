@@ -3,6 +3,8 @@ import { getAdminDb } from '@/lib/firebase-admin';
 import { isAdmin } from '@/lib/auth';
 import { readAccountLast4, readMaskedAccountNumber } from '../../../../../shared/bank-account';
 
+import { getWalletSummary } from '../../../../../src/utils/wallet-balance';
+
 type UnknownRecord = Record<string, unknown>;
 
 function readBankSnapshot(data: UnknownRecord) {
@@ -212,39 +214,96 @@ export async function PATCH(req: NextRequest) {
       const userId = typeof current.userId === 'string' ? current.userId : '';
       const amount = typeof current.amount === 'number' ? current.amount : 0;
       
-      // 승인인 경우 (자동 송금 연동은 별도의 Payout API 호출 필요, 여기서는 DB 상태만 안전하게 트랜잭션 처리)
-      if (action === 'approve') {
-        // TODO: executeTossPayout 연동 (현재는 Firebase Functions의 서비스이므로 직접 호출은 생략하고 상태만 업데이트)
-        // 만약 여기서 fetch로 펌뱅킹 API를 호출한다면, 그 전에 반드시 상태를 processing으로 변경해야 함
-      }
-
-      // 반려인 경우 포인트 환불을 동일 트랜잭션 내에서 처리
-      if (action === 'reject' && userId && amount > 0) {
+      // 승인/반려 시 Wallet Ledger 처리
+      if (userId && amount > 0) {
         const userRef = db.collection('users').doc(userId);
-        const userSnap = await transaction.get(userRef);
-        
+        const ledgerRef = db.collection('wallet_ledgers').doc(userId);
+
+        const [userSnap, ledgerSnap] = await Promise.all([
+          transaction.get(userRef),
+          transaction.get(ledgerRef)
+        ]);
+
         if (userSnap.exists) {
-          const currentBalance = Number(userSnap.data()?.pointBalance ?? 0);
-          const currentSpent = Number(userSnap.data()?.totalSpentPoints ?? 0);
-          
+          const userData = (userSnap.data() as UnknownRecord) ?? {};
+          const ledgerData = ledgerSnap.exists ? (ledgerSnap.data() as UnknownRecord) : null;
+
+          const rawBalances = (ledgerData?.balances as Record<string, any>) ?? (userData.walletBalances as Record<string, any>) ?? {};
+          const currentBalances = {
+            chargeBalance: Number(rawBalances.chargeBalance ?? 0),
+            earnedBalance: Number(rawBalances.earnedBalance ?? userData.pointBalance ?? 0),
+            promoBalance: Number(rawBalances.promoBalance ?? 0),
+            lockedChargeBalance: Number(rawBalances.lockedChargeBalance ?? 0),
+            lockedEarnedBalance: Number(rawBalances.lockedEarnedBalance ?? 0),
+            lockedPromoBalance: Number(rawBalances.lockedPromoBalance ?? 0),
+            pendingWithdrawalBalance: Number(rawBalances.pendingWithdrawalBalance ?? 0),
+          };
+
+          const oldSummary = getWalletSummary(currentBalances as any);
+          const newBalances = { ...currentBalances };
+
+          if (action === 'approve') {
+            // 승인: 대기 중인 출금액을 완전히 차감
+            newBalances.pendingWithdrawalBalance = Math.max(0, currentBalances.pendingWithdrawalBalance - amount);
+          } else if (action === 'reject') {
+            // 반려: 대기 중인 출금액을 다시 정산금으로 원복
+            newBalances.pendingWithdrawalBalance = Math.max(0, currentBalances.pendingWithdrawalBalance - amount);
+            newBalances.earnedBalance += amount;
+          }
+
+          const newSummary = getWalletSummary(newBalances as any);
+          const now = new Date();
+
+          // 1. 유저 업데이트 (Legacy fallback)
           transaction.update(userRef, {
-            pointBalance: currentBalance + amount,
-            totalSpentPoints: Math.max(0, currentSpent - amount),
+            pointBalance: newSummary.totalUsableBalance,
+            walletBalances: newBalances,
+            totalSpentPoints: action === 'reject' ? Math.max(0, Number(userData.totalSpentPoints ?? 0) - amount) : userData.totalSpentPoints,
+            updatedAt: now,
           });
 
-          const txRef = db.collection('point_transactions').doc();
-          transaction.set(txRef, {
+          // 2. 렛저 업데이트
+          transaction.set(ledgerRef, {
             userId,
-            amount,
-            type: 'earn',
-            category: 'withdraw_rejected',
-            description: `출금 반려 환급 (${note ?? '사유 없음'})`,
-            balanceBefore: currentBalance,
-            balanceAfter: currentBalance + amount,
-            status: 'completed',
-            relatedRequestId: requestId,
-            createdAt: new Date(),
-            completedAt: new Date(),
+            balances: newBalances,
+            summary: newSummary,
+            updatedAt: now,
+          }, { merge: true });
+
+          // 3. 로그 남기기
+          const description = action === 'approve' ? '출금 완료 (대기 금액 차감)' : `출금 반려 환급 (${note ?? '사유 없음'})`;
+          
+          // Legacy Transaction
+          if (action === 'reject') {
+            const txRef = db.collection('point_transactions').doc();
+            transaction.set(txRef, {
+              userId,
+              amount,
+              type: 'earn',
+              category: 'withdraw_rejected',
+              description,
+              balanceBefore: oldSummary.totalUsableBalance,
+              balanceAfter: newSummary.totalUsableBalance,
+              status: 'completed',
+              relatedRequestId: requestId,
+              createdAt: now,
+              completedAt: now,
+            });
+          }
+
+          // Wallet Entry
+          const entryRef = db.collection('wallet_entries').doc();
+          transaction.set(entryRef, {
+            walletLedgerId: userId,
+            userId,
+            type: action === 'approve' ? 'withdraw_completed' : 'withdraw_rejected',
+            fundingSource: 'earned',
+            amount: action === 'approve' ? 0 : amount, // For approve, the usable balance doesn't change here, only pending shrinks.
+            balanceBefore: oldSummary,
+            balanceAfter: newSummary,
+            description,
+            metadata: { relatedRequestId: requestId },
+            createdAt: now,
           });
         }
       }
