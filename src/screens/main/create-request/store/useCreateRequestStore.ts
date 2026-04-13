@@ -24,6 +24,7 @@ export interface CreateRequestState {
   // Step Management
   activeStep: number;
   setActiveStep: (step: number) => void;
+  transitionLockUntil: number;
 
   // Request Mode (Step 1)
   requestMode: RequestMode;
@@ -123,6 +124,7 @@ export interface CreateRequestState {
 
 const initialState = {
   activeStep: 1,
+  transitionLockUntil: 0,
   requestMode: 'immediate' as RequestMode,
   pickupMode: 'station' as LocationMode,
   pickupStation: null,
@@ -170,7 +172,22 @@ export const useCreateRequestStore = create<CreateRequestState>((set) => ({
     if (Platform.OS !== 'web') {
       LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
     }
-    set({ activeStep: step });
+    const now = Date.now();
+    set((state) => {
+      if (state.transitionLockUntil > now && step < state.activeStep) {
+        return state;
+      }
+
+      const nextLockUntil = step === 4 ? now + 800 : 0;
+      return { ...state, activeStep: step, transitionLockUntil: nextLockUntil };
+    });
+
+    if (step === 4) {
+      const lockUntil = now + 800;
+      setTimeout(() => {
+        set((state) => (state.transitionLockUntil === lockUntil ? { ...state, transitionLockUntil: 0 } : state));
+      }, 800);
+    }
   },
   setRequestMode: (mode) => set({ requestMode: mode }),
   setPickupMode: (mode) => set({ pickupMode: mode }),

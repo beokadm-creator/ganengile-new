@@ -265,7 +265,6 @@ export default function CreateRequestScreen({ navigation, route }: Props) {
   const [addressTarget, setAddressTarget] = useState<AddressTarget>(null);
   const [saving, setSaving] = useState(false);
   const [aiLoading, setAiLoading] = useState(false);
-  const [stepTransitionLocked, setStepTransitionLocked] = useState(false);
   const [savedAddresses, setSavedAddresses] = useState<SavedAddress[]>([]);
   const [recentAddresses, setRecentAddresses] = useState<SavedAddress[]>([]);
   const [aiResult, setAiResult] = useState<Beta1AIAnalysisResponse | null>(null);
@@ -308,6 +307,7 @@ export default function CreateRequestScreen({ navigation, route }: Props) {
 
   const {
     activeStep, setActiveStep,
+    transitionLockUntil,
     requestMode, setRequestMode,
     pickupMode, setPickupMode,
     pickupStation, setPickupStation,
@@ -357,16 +357,7 @@ export default function CreateRequestScreen({ navigation, route }: Props) {
   const { draftHydratedRef, handleClearDraft, handleSaveDraftNow } = useRequestDraft();
   const depositPhotoNoticeShownRef = useRef(false);
 
-  useEffect(() => {
-    if (activeStep !== 4) {
-      setStepTransitionLocked(false);
-      return;
-    }
-
-    setStepTransitionLocked(true);
-    const timer = setTimeout(() => setStepTransitionLocked(false), 600);
-    return () => clearTimeout(timer);
-  }, [activeStep]);
+  const isStepInteractionLocked = activeStep === 4 && Date.now() < transitionLockUntil;
 
 
 
@@ -761,7 +752,6 @@ export default function CreateRequestScreen({ navigation, route }: Props) {
       await deleteCreateRequestProgress();
       setDraftRestored(false);
 
-      // 모달을 먼저 해제하고 약간의 딜레이를 주어 React가 렌더링할 시간을 확보한 뒤 네비게이션
       setSaving(false);
       
       setTimeout(() => {
@@ -813,8 +803,8 @@ export default function CreateRequestScreen({ navigation, route }: Props) {
         step={1}
         title="출발/도착지 정보"
         summary={[`출발: ${pickup || '-'}`, `도착: ${delivery || '-'}`]}
-        onEdit={() => !saving && !stepTransitionLocked && setActiveStep(1)}
-        disabled={saving || stepTransitionLocked}
+        onEdit={() => !saving && !isStepInteractionLocked && setActiveStep(1)}
+        disabled={saving || isStepInteractionLocked}
       />
     );
   };
@@ -830,8 +820,8 @@ export default function CreateRequestScreen({ navigation, route }: Props) {
           `상세: ${packageItemName || '-'}`,
           `크기/무게: ${packageSize || '-'} / ${weightKg ? `${weightKg}kg` : '-'}`,
         ]}
-        onEdit={() => !saving && !stepTransitionLocked && setActiveStep(2)}
-        disabled={saving || stepTransitionLocked}
+        onEdit={() => !saving && !isStepInteractionLocked && setActiveStep(2)}
+        disabled={saving || isStepInteractionLocked}
       />
     );
   };
@@ -846,8 +836,8 @@ export default function CreateRequestScreen({ navigation, route }: Props) {
           `수령인: ${recipientName || '-'}`,
           `요청사항: ${specialInstructions || '없음'}`,
         ]}
-        onEdit={() => !saving && !stepTransitionLocked && setActiveStep(3)}
-        disabled={saving || stepTransitionLocked}
+        onEdit={() => !saving && !isStepInteractionLocked && setActiveStep(3)}
+        disabled={saving || isStepInteractionLocked}
       />
     );
   };

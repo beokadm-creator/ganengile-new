@@ -47,6 +47,8 @@ export function Step4Quote({
     return () => clearTimeout(timer);
   }, [store.activeStep]);
 
+  const isStepInteractionLocked = store.activeStep === 4 && store.transitionLockUntil > Date.now();
+
   useEffect(() => {
     if (!user?.uid) return;
     async function loadData() {
@@ -191,9 +193,9 @@ export function Step4Quote({
       )}
 
       <TouchableOpacity
-        style={[styles.primaryButton, (submitDisabled || isMounting || saving) && styles.disabled]}
+        style={[styles.primaryButton, (submitDisabled || isMounting || saving || isStepInteractionLocked) && styles.disabled]}
         onPress={() => void handleSubmit()}
-        disabled={saving || isMounting || submitDisabled}
+        disabled={saving || isMounting || submitDisabled || isStepInteractionLocked}
       >
         {saving ? (
           <ActivityIndicator color={Colors.white} />
