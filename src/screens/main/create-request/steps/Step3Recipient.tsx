@@ -1,5 +1,5 @@
 import React, { useEffect, useRef } from 'react';
-import { View, Text, TouchableOpacity, TextInput, ActivityIndicator, Alert, StyleSheet } from 'react-native';
+import { View, Text, TouchableOpacity, TextInput, ActivityIndicator, Alert, StyleSheet, Platform } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { StepContainer } from '../components/StepContainer';
 import { Block } from '../components/Block';
@@ -69,18 +69,32 @@ export function Step3Recipient({
       step={3} 
       currentStep={store.activeStep} 
       onNext={() => {
+        console.log('[Step3] onNext clicked');
+        console.log('Values:', {
+          name: store.recipientName,
+          phone: store.recipientPhone,
+          consent: store.recipientConsentChecked,
+          isPhoneVerified
+        });
         if (!store.recipientName || !store.recipientPhone || !store.recipientConsentChecked) {
-          Alert.alert('확인 필요', '수령인 정보와 개인정보 제공 동의를 완료해 주세요.');
+          if (Platform.OS === 'web') window.alert('수령인 정보와 개인정보 제공 동의를 완료해 주세요.');
+          else Alert.alert('확인 필요', '수령인 정보와 개인정보 제공 동의를 완료해 주세요.');
           return;
         }
-        if (!/^01\d-\d{3,4}-\d{4}$/.test(store.recipientPhone)) {
-          Alert.alert('확인 필요', '올바른 휴대폰 번호 형식을 입력해 주세요. (예: 010-1234-5678)');
+        
+        const cleanedPhone = store.recipientPhone.replace(/[^0-9]/g, '');
+        if (!/^01\d{8,9}$/.test(cleanedPhone)) {
+          if (Platform.OS === 'web') window.alert('올바른 휴대폰 번호 형식을 입력해 주세요. (예: 010-1234-5678)');
+          else Alert.alert('확인 필요', '올바른 휴대폰 번호 형식을 입력해 주세요. (예: 010-1234-5678)');
           return;
         }
+        
         if (!isPhoneVerified) {
-          Alert.alert('인증 필요', '휴대폰 본인 인증을 완료해 주세요.');
+          if (Platform.OS === 'web') window.alert('휴대폰 본인 인증을 완료해 주세요.');
+          else Alert.alert('인증 필요', '휴대폰 본인 인증을 완료해 주세요.');
           return;
         }
+        console.log('[Step3] Validations passed, calling setActiveStep(4)');
         store.setActiveStep(4);
       }} 
       onPrev={() => store.setActiveStep(3)}

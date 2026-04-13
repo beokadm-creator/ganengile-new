@@ -166,6 +166,7 @@ const initialState = {
 export const useCreateRequestStore = create<CreateRequestState>((set) => ({
   ...initialState,activeStep: 1,
   setActiveStep: (step) => {
+    console.log('[useCreateRequestStore] setActiveStep called with:', step);
     if (Platform.OS !== 'web') {
       LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
     }
