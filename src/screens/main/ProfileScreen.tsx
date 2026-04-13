@@ -135,14 +135,14 @@ export default function ProfileScreen({ navigation }: { navigation: MainStackNav
       {
         key: 'requests',
         title: '배송 요청',
-        subtitle: '요청과 진행 상태를 확인합니다.',
+        subtitle: '진행 상태 확인',
         icon: 'inventory-2',
         onPress: () => navigation.navigate('Tabs', { screen: 'Requests' }),
       },
       {
         key: 'points',
         title: '포인트 내역',
-        subtitle: '결제와 적립 내역을 확인합니다.',
+        subtitle: '결제 및 적립',
         icon: 'account-balance-wallet',
         onPress: () => navigation.navigate('PointHistory'),
       },
@@ -155,21 +155,21 @@ export default function ProfileScreen({ navigation }: { navigation: MainStackNav
       {
         key: 'missions',
         title: '미션 보드',
-        subtitle: '수행 가능한 미션을 확인합니다.',
+        subtitle: '수행 가능한 미션',
         icon: 'two-wheeler',
         onPress: () => navigation.navigate('Tabs', { screen: 'GillerRequests' }),
       },
       {
         key: 'routes',
         title: '경로 관리',
-        subtitle: '권역과 등록한 동선을 관리합니다.',
+        subtitle: '권역 및 동선',
         icon: 'alt-route',
         onPress: () => navigation.navigate('Tabs', { screen: 'RouteManagement' }),
       },
       {
         key: 'earnings',
         title: '수익 확인',
-        subtitle: '정산 현황을 확인합니다.',
+        subtitle: '정산 현황',
         icon: 'payments',
         onPress: () => {
           if (isPreviewMode) {
@@ -189,7 +189,7 @@ export default function ProfileScreen({ navigation }: { navigation: MainStackNav
       {
         key: 'withdraw',
         title: '출금 요청',
-        subtitle: '출금 가능한 금액을 정산합니다.',
+        subtitle: '수익금 정산',
         icon: 'account-balance',
         onPress: () => {
           if (isPreviewMode) {
@@ -215,28 +215,28 @@ export default function ProfileScreen({ navigation }: { navigation: MainStackNav
       {
         key: 'chat',
         title: '채팅',
-        subtitle: '대화와 진행 상황을 확인합니다.',
+        subtitle: '대화 기록',
         icon: 'chat',
         onPress: () => navigation.navigate('ChatList'),
       },
       {
         key: 'terms',
         title: '약관',
-        subtitle: '서비스 정책을 확인합니다.',
+        subtitle: '서비스 정책',
         icon: 'description',
         onPress: () => navigation.navigate('Terms'),
       },
       {
         key: 'address-book',
         title: '주소록',
-        subtitle: '자주 쓰는 주소를 관리합니다.',
+        subtitle: '자주 쓰는 주소',
         icon: 'place',
         onPress: () => navigation.navigate('AddressBook'),
       },
       {
         key: 'profile-edit',
         title: '사용자 정보 변경',
-        subtitle: '이름과 인증 휴대폰 번호를 수정합니다.',
+        subtitle: '이름 및 휴대폰 번호',
         icon: 'edit',
         onPress: () => navigation.navigate('ProfileEdit'),
       },
@@ -360,13 +360,13 @@ export default function ProfileScreen({ navigation }: { navigation: MainStackNav
               <MaterialIcons name="two-wheeler" size={20} color={Colors.primaryDark} />
             </View>
             <View style={styles.linkCopy}>
-              <Text style={styles.linkTitle}>길러 역할로 전환해 보세요</Text>
+              <Text style={styles.linkTitle}>길러 역할로 전환하기</Text>
               <Text style={styles.linkSubtitle}>
                 {applicationStatus === 'pending'
-                  ? '현재 심사 상태를 확인할 수 있습니다.'
+                  ? '현재 심사 상태를 확인합니다.'
                   : user.isVerified
-                    ? '간단한 절차 후 길러 활동을 시작하세요.'
-                    : '본인확인 후 활동을 시작할 수 있습니다.'}
+                    ? '간단한 절차 후 시작하세요.'
+                    : '본인확인 후 시작할 수 있습니다.'}
               </Text>
             </View>
             <MaterialIcons name="chevron-right" size={22} color={Colors.gray400} />

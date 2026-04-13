@@ -108,6 +108,18 @@ export default function RouteManagementScreen() {
   };
 
   const handleActivateTerritory = (territoryId: string) => {
+    if (isPreviewMode) {
+      Alert.alert(
+        '길러 전용',
+        '길러 신청 후 권역을 변경할 수 있습니다.',
+        [
+          { text: '닫기', style: 'cancel' },
+          { text: '신청하기', onPress: () => navigation.navigate('Profile') }
+        ]
+      );
+      return;
+    }
+
     if (!user?.uid) {
       return;
     }
@@ -135,6 +147,18 @@ export default function RouteManagementScreen() {
   );
 
   const handleDelete = (routeId: string, routeName: string) => {
+    if (isPreviewMode) {
+      Alert.alert(
+        '길러 전용',
+        '길러 신청 후 동선을 삭제할 수 있습니다.',
+        [
+          { text: '닫기', style: 'cancel' },
+          { text: '신청하기', onPress: () => navigation.navigate('Profile') }
+        ]
+      );
+      return;
+    }
+
     const executeDelete = async () => {
       try {
         const userId = requireUserId();
@@ -207,7 +231,7 @@ export default function RouteManagementScreen() {
         >
           <View style={styles.boardShortcutCopy}>
             <Text style={styles.boardShortcutTitle}>미션 보드 보기</Text>
-            <Text style={styles.boardShortcutBody}>지금 기준으로 어떤 미션이 보이는지 바로 확인합니다.</Text>
+            <Text style={styles.boardShortcutBody}>현재 조건으로 표시되는 미션을 확인합니다.</Text>
           </View>
           <MaterialIcons name="arrow-forward-ios" size={18} color={Colors.primary} />
         </TouchableOpacity>
@@ -216,7 +240,7 @@ export default function RouteManagementScreen() {
           <View style={styles.sectionHeader}>
             <View style={styles.sectionHeaderCopy}>
               <Text style={styles.sectionTitle}>권역</Text>
-              <Text style={styles.sectionSubtitle}>현재 위치 기준으로 권역을 등록하여 미션을 추천받으세요. 최대 2개까지 관리할 수 있습니다.</Text>
+              <Text style={styles.sectionSubtitle}>현재 위치 기준으로 권역을 등록하여 미션을 추천받으세요.</Text>
             </View>
             <TouchableOpacity
               style={[
@@ -288,7 +312,7 @@ export default function RouteManagementScreen() {
           <View style={styles.sectionHeader}>
             <View style={styles.sectionHeaderCopy}>
               <Text style={styles.sectionTitle}>동선</Text>
-              <Text style={styles.sectionSubtitle}>등록한 길이 권역 안의 미션 추천과 우선 노출에 반영됩니다.</Text>
+              <Text style={styles.sectionSubtitle}>등록한 동선은 미션 추천과 우선 노출에 반영됩니다.</Text>
             </View>
           </View>
 
@@ -341,9 +365,20 @@ export default function RouteManagementScreen() {
                     <View style={styles.actionButtons}>
                       <TouchableOpacity
                         style={[styles.actionButton, styles.editActionButton]}
-                        onPress={() =>
-                          navigation.dispatch(StackActions.push('EditRoute', { routeId: item.routeId }))
-                        }
+                        onPress={() => {
+                          if (isPreviewMode) {
+                            Alert.alert(
+                              '길러 전용',
+                              '길러 신청 후 동선을 수정할 수 있습니다.',
+                              [
+                                { text: '닫기', style: 'cancel' },
+                                { text: '신청하기', onPress: () => navigation.navigate('Profile') }
+                              ]
+                            );
+                            return;
+                          }
+                          navigation.dispatch(StackActions.push('EditRoute', { routeId: item.routeId }));
+                        }}
                       >
                         <Text style={styles.editActionButtonText}>동선 수정</Text>
                       </TouchableOpacity>

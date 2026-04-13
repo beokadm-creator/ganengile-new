@@ -244,6 +244,18 @@ export default function GillerRequestsScreen() {
 
   const handleRelease = useCallback(
     (card: MissionCard) => {
+      if (isPreviewMode) {
+        Alert.alert(
+          '길러 전용', 
+          '수락 취소는 길러 신청 후 이용할 수 있습니다.',
+          [
+            { text: '닫기', style: 'cancel' },
+            { text: '신청하기', onPress: () => navigation.navigate('Profile') }
+          ]
+        );
+        return;
+      }
+
       if (!user?.uid || !card.bundleId || card.selectionState !== 'accepted') {
         return;
       }
@@ -275,11 +287,23 @@ export default function GillerRequestsScreen() {
         ]
       );
     },
-    [loadSnapshot, user?.uid]
+    [loadSnapshot, user?.uid, isPreviewMode, navigation]
   );
 
   const handleNextAction = useCallback(
     (group: MissionGroup) => {
+      if (isPreviewMode) {
+        Alert.alert(
+          '길러 전용', 
+          '다음 작업은 길러 신청 후 진행할 수 있습니다.',
+          [
+            { text: '닫기', style: 'cancel' },
+            { text: '신청하기', onPress: () => navigation.navigate('Profile') }
+          ]
+        );
+        return;
+      }
+
       const primaryCard = getPrimaryOption(group);
       if (!primaryCard) {
         return;
@@ -315,7 +339,7 @@ export default function GillerRequestsScreen() {
         navigation.navigate('DeliveryTracking', { requestId });
       }
     },
-    [navigation, user?.gillerProfile?.type]
+    [navigation, user?.gillerProfile?.type, isPreviewMode]
   );
 
   if (loading) {
@@ -387,7 +411,7 @@ export default function GillerRequestsScreen() {
         subtitle="이미 맡은 배송과 현재 수행 중인 구간입니다."
         items={ongoingMissionGroups}
         emptyTitle="현재 진행 중인 배송이 없습니다"
-        emptySubtitle={activeTerritory ? '선택한 권역 안에서 수락한 배송이 가장 먼저 여기에서 보입니다.' : '수락한 구간과 연결된 배송은 가장 먼저 여기에서 보여드립니다.'}
+        emptySubtitle={activeTerritory ? '선택한 권역의 배송이 표시됩니다.' : '수락한 배송이 표시됩니다.'}
         getKey={(group) => group.id}
         renderItem={(group) => (
           <MissionGroupCard

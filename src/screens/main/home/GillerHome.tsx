@@ -167,7 +167,13 @@ export function GillerHome({
             icon="chat"
             title="채팅 보기"
             subtitle="대화 확인"
-            onPress={() => navigation.navigate('ChatList')}
+            onPress={() => {
+              if (isPreviewMode) {
+                Alert.alert('길러 전용', '채팅은 길러 신청 후 확인할 수 있습니다.');
+                return;
+              }
+              navigation.navigate('ChatList');
+            }}
           />
           <ActionCard
             icon="account-balance-wallet"
@@ -184,8 +190,14 @@ export function GillerHome({
           <ActionCard
             icon="inventory-2"
             title="사물함 보기"
-            subtitle="가까운 사물함 확인"
-            onPress={() => navigation.navigate('LockerMap')}
+            subtitle="가까운 사물함"
+            onPress={() => {
+              if (isPreviewMode) {
+                Alert.alert('길러 전용', '사물함은 길러 신청 후 확인할 수 있습니다.');
+                return;
+              }
+              navigation.navigate('LockerMap');
+            }}
           />
         </View>
       </View>
