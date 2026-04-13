@@ -7,6 +7,7 @@ import { useAuth } from './AuthContext';
 import { auth, db } from '../services/firebase';
 import { createUser, getUserById } from '../services/user-service';
 import { AuthProviderType, UserRole, type User } from '../types/user';
+import { PASS_TEST_MODE } from '../config/feature-flags';
 
 interface UserContextType {
   user: User | null;
@@ -42,11 +43,11 @@ function canUseGillerRole(user: User | null): boolean {
     return false;
   }
 
-  return (
-    user.role === UserRole.GILLER ||
-    user.role === UserRole.BOTH ||
-    (user.gillerApplicationStatus === 'approved' && user.isVerified === true)
-  );
+  const isGillerRole = user.role === UserRole.GILLER || user.role === UserRole.BOTH;
+  const isApproved = user.gillerApplicationStatus === 'approved' && user.isVerified === true;
+  const isProfileActive = user.gillerProfile ? user.gillerProfile.status === 'active' : true;
+
+  return (PASS_TEST_MODE || isGillerRole || isApproved) && isProfileActive;
 }
 
 function resolveActiveRole(user: User | null): UserRole | null {
@@ -87,7 +88,6 @@ async function clearStoredSession(): Promise<void> {
       window.localStorage.removeItem(key);
       window.sessionStorage.removeItem(key);
     });
-    return;
   }
 
   await AsyncStorage.multiRemove(STORAGE_KEYS_TO_CLEAR);
@@ -177,7 +177,8 @@ export function UserProvider({ children }: UserProviderProps) {
         // Load saved role preference if available
         try {
           const savedRole = await AsyncStorage.getItem('user_current_role');
-          if (savedRole && userData && userData.role === UserRole.BOTH) {
+          const isValidRole = savedRole === UserRole.GLER || savedRole === UserRole.GILLER || savedRole === UserRole.BOTH;
+          if (savedRole && userData && isValidRole) {
             setCurrentRole(savedRole as UserRole);
           } else {
             setCurrentRole(resolveActiveRole(userData));
@@ -212,7 +213,8 @@ export function UserProvider({ children }: UserProviderProps) {
         
         try {
           const savedRole = await AsyncStorage.getItem('user_current_role');
-          if (savedRole && userData && userData.role === UserRole.BOTH) {
+          const isValidRole = savedRole === UserRole.GLER || savedRole === UserRole.GILLER || savedRole === UserRole.BOTH;
+          if (savedRole && userData && isValidRole) {
             setCurrentRole(savedRole as UserRole);
           } else {
             setCurrentRole(resolveActiveRole(userData));
@@ -271,7 +273,8 @@ export function UserProvider({ children }: UserProviderProps) {
     try {
       const savedRole = await AsyncStorage.getItem('user_current_role');
       const latestUser = refreshedUser ?? user;
-      if (savedRole && latestUser && latestUser.role === UserRole.BOTH) {
+      const isValidRole = savedRole === UserRole.GLER || savedRole === UserRole.GILLER || savedRole === UserRole.BOTH;
+      if (savedRole && latestUser && isValidRole) {
         setCurrentRole(savedRole as UserRole);
       } else {
         setCurrentRole(resolveActiveRole(latestUser));

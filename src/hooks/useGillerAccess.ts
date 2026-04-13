@@ -29,11 +29,15 @@ export function useGillerAccess(): GillerAccessInfo {
   const isVerified = user?.isVerified === true;
   const isGillerRole = role === UserRole.GILLER || role === UserRole.BOTH;
 
+  const isProfileActive = user?.gillerProfile ? user.gillerProfile.status === 'active' : true;
+
   const canAccessGiller =
-    PASS_TEST_MODE || isGillerRole || (applicationStatus === 'approved' && isVerified);
+    (PASS_TEST_MODE || isGillerRole || (applicationStatus === 'approved' && isVerified)) &&
+    isProfileActive;
 
   const canGillerActionInChat =
-    PASS_TEST_MODE || isGillerRole || (applicationStatus === 'approved' && isVerified);
+    (PASS_TEST_MODE || isGillerRole || (applicationStatus === 'approved' && isVerified)) &&
+    isProfileActive;
 
   return {
     canAccessGiller,
