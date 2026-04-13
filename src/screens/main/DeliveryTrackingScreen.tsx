@@ -15,6 +15,7 @@ import { RouteProp, useNavigation, useRoute } from '@react-navigation/native';
 
 import AppTopBar from '../../components/common/AppTopBar';
 import { NaverMapCard } from '../../components/maps/NaverMapCard';
+import { TrackingTimeline } from './tracking/components/TrackingTimeline';
 import { ensureChatRoomForRequest, getChatRoomByRequestId } from '../../services/chat-service';
 import { deliveryPartnerService } from '../../services/delivery-partner-service';
 import {
@@ -247,18 +248,6 @@ function StepRow({ step }: { step: TrackingStep }) {
   );
 }
 
-function TimelineRow({ event }: { event: TrackingEvent }) {
-  return (
-    <View style={styles.timelineRow}>
-      <View style={styles.timelineDot} />
-      <View style={styles.timelineCopy}>
-        <Text style={styles.timelineTitle}>{event.title}</Text>
-        <Text style={styles.timelineDescription}>{event.description}</Text>
-        <Text style={styles.timelineMeta}>{formatDateLabel(event.timestamp)}</Text>
-      </View>
-    </View>
-  );
-}
 
 export default function DeliveryTrackingScreen(): JSX.Element {
   const navigation = useNavigation<MainStackNavigationProp>();
@@ -549,10 +538,7 @@ export default function DeliveryTrackingScreen(): JSX.Element {
         <View style={styles.hero}>
           <Text style={styles.heroKicker}>실시간 배송 상태</Text>
           <Text style={styles.heroTitle}>{getStatusLabel(trackingData.status)}</Text>
-          <View style={styles.progressRail}>
-            <View style={[styles.progressFill, { width: `${progress}%` }]} />
-          </View>
-          <Text style={styles.progressText}>{progress}% 진행</Text>
+          <TrackingTimeline steps={steps} />
         </View>
 
         {hasMapCoordinates ? (
@@ -609,7 +595,7 @@ export default function DeliveryTrackingScreen(): JSX.Element {
         </View>
 
         <View style={styles.panel}>
-          <Text style={styles.panelTitle}>진행 단계</Text>
+          <Text style={styles.panelTitle}>변경 이력 및 상세 설명</Text>
           {steps.map((step) => (
             <StepRow key={step.key} step={step} />
           ))}
@@ -635,14 +621,7 @@ export default function DeliveryTrackingScreen(): JSX.Element {
           <InfoRow label="수령인" value={trackingData.recipientName ?? '수령 단계에서 확인'} />
         </View>
 
-        {(trackingData.trackingEvents ?? []).length ? (
-          <View style={styles.panel}>
-            <Text style={styles.panelTitle}>변경 이력</Text>
-            {(trackingData.trackingEvents ?? []).map((event, index) => (
-              <TimelineRow key={`${event.type}-${index}`} event={event} />
-            ))}
-          </View>
-        ) : null}
+
 
         {partnerDispatches.length > 0 ? (
           <View style={styles.panel}>
@@ -737,42 +716,29 @@ const styles = StyleSheet.create({
     fontSize: 16,
   },
   hero: {
-    backgroundColor: Colors.primaryMint,
+    backgroundColor: Colors.white,
     borderRadius: BorderRadius.xl,
     padding: Spacing.xl,
     gap: Spacing.sm,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    ...Shadows.sm,
   },
   heroKicker: {
     fontSize: 12,
     fontWeight: '800',
     color: Colors.primary,
-    textTransform: 'uppercase',
-    letterSpacing: 1,
+    letterSpacing: 0.5,
   },
   heroTitle: {
-    fontSize: 24,
+    fontSize: 22,
     fontWeight: '800',
     color: Colors.textPrimary,
-    lineHeight: 32,
+    lineHeight: 30,
+    letterSpacing: -0.5,
+    marginBottom: Spacing.sm,
   },
-  progressRail: {
-    height: 8,
-    borderRadius: BorderRadius.full,
-    backgroundColor: Colors.gray200,
-    overflow: 'hidden',
-    marginTop: 12,
-  },
-  progressFill: {
-    height: '100%',
-    backgroundColor: Colors.primary,
-  },
-  progressText: {
-    color: Colors.primary,
-    fontWeight: '800',
-    marginTop: 4,
-    textAlign: 'right',
-    fontSize: 12,
-  },
+
   panel: {
     backgroundColor: Colors.surface,
     borderRadius: BorderRadius.xl,
@@ -877,35 +843,7 @@ const styles = StyleSheet.create({
     color: Colors.textTertiary,
     fontSize: 12,
   },
-  timelineRow: {
-    flexDirection: 'row',
-    gap: 12,
-  },
-  timelineDot: {
-    width: 10,
-    height: 10,
-    marginTop: 6,
-    borderRadius: BorderRadius.full,
-    backgroundColor: Colors.primary,
-  },
-  timelineCopy: {
-    flex: 1,
-    gap: 4,
-  },
-  timelineTitle: {
-    color: Colors.textPrimary,
-    fontSize: 15,
-    fontWeight: '700',
-  },
-  timelineDescription: {
-    color: Colors.textSecondary,
-    fontSize: 14,
-    lineHeight: 20,
-  },
-  timelineMeta: {
-    color: Colors.textTertiary,
-    fontSize: 12,
-  },
+
   actionSection: {
     gap: 10,
     paddingBottom: Spacing.xl,
