@@ -26,6 +26,7 @@ const NAV = [
   { href: '/coupons', label: '쿠폰 관리', badge: 'new' },
   { href: '/points/balances', label: '사용자 지갑', indent: true },
   { href: '/settlements', label: '정산' },
+  { href: '/accounting', label: '재무/세무 리포트', badge: 'new' },
   { href: '/disputes', label: '분쟁 처리', badge: 'hot' },
   { href: '/integrations/payment', label: '결제 설정' },
   { href: '/integrations/fare-cache', label: '운임 캐시' },
