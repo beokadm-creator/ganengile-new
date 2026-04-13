@@ -28,6 +28,8 @@ export enum ConsentKey {
   ADVERTISING = 'advertising',
   /** 야간 광고성 정보 수신 동의 (정보통신망법 §50의2) - 선택 */
   NIGHTTIME_ADS = 'nighttime_ads',
+  /** 고유식별정보 수집 및 이용 동의 (세금 신고용) */
+  TAX_COLLECTION = 'tax_collection',
 }
 
 // ─── 동의 카테고리 ─────────────────────────────────────────
@@ -47,6 +49,7 @@ export const CONSENT_LEGAL_BASIS: Record<ConsentKey, { law: string; article: str
   [ConsentKey.MARKETING]: { law: '정보통신망법', article: '§50' },
   [ConsentKey.ADVERTISING]: { law: '정보통신망법', article: '§50' },
   [ConsentKey.NIGHTTIME_ADS]: { law: '정보통신망법', article: '§50의2' },
+  [ConsentKey.TAX_COLLECTION]: { law: '소득세법', article: '§164' },
 };
 
 // ─── Firestore: consentTemplates 문서 ──────────────────────

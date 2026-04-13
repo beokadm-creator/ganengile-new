@@ -110,6 +110,8 @@ type KakaoLinkedUserDoc = {
   stats?: Record<string, unknown>;
   badges?: Record<string, unknown>;
   badgeBenefits?: Record<string, unknown>;
+  pointBalance?: number;
+  walletBalances?: { charge: number; earned: number; promo: number };
 };
 
 function requireCallableAuth(context: functions.https.CallableContext, functionName: string): string {
@@ -3694,4 +3696,67 @@ export const confirmPhoneOtp = functions.https.onCall(
   }
 );
 
+import { encrypt } from '../../src/utils/crypto';
+
 export { syncConfigStationsFromSeoulApi };
+
+// ==================== Tax & Settlement APIs ====================
+
+interface RegisterTaxInfoData {
+  residentNumber: string;
+  bankName: string;
+  bankAccountNumber: string;
+  accountHolderName: string;
+  consentAgreed: boolean;
+}
+
+export const registerTaxInfo = functions.https.onCall(
+  async (data: RegisterTaxInfoData, context): Promise<{ success: boolean; message?: string }> => {
+    const uid = requireCallableAuth(context, 'registerTaxInfo');
+
+    if (!data.residentNumber || !data.bankName || !data.bankAccountNumber || !data.accountHolderName) {
+      throw new functions.https.HttpsError('invalid-argument', 'Missing required fields');
+    }
+
+    if (!data.consentAgreed) {
+      throw new functions.https.HttpsError('permission-denied', 'Must agree to tax information collection');
+    }
+
+    // 주민등록번호 암호화 (AES-256-GCM)
+    const encryptedResidentNumber = encrypt(data.residentNumber);
+
+    try {
+      const db = admin.firestore();
+      const userRef = db.collection('users').doc(uid);
+
+      await userRef.set(
+        {
+          taxInfo: {
+            residentNumberEncrypted: encryptedResidentNumber,
+            bankName: data.bankName,
+            bankAccountNumber: data.bankAccountNumber, // 계좌번호는 관리자 조회 편의를 위해 평문 저장 (필요시 부분 마스킹/암호화 가능)
+            accountHolderName: data.accountHolderName,
+            registeredAt: admin.firestore.FieldValue.serverTimestamp(),
+          },
+          updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+        },
+        { merge: true }
+      );
+
+      // 동의 이력 저장 (세금 신고용 고유식별정보 수집 동의)
+      const consentRef = db.collection('users').doc(uid).collection('consentHistory').doc('tax_collection');
+      await consentRef.set({
+        templateId: 'tax_collection',
+        key: 'tax_collection',
+        version: '1.0.0', // 하드코딩 또는 템플릿 조회
+        agreedAt: admin.firestore.FieldValue.serverTimestamp(),
+        title: '고유식별정보 수집 및 이용 동의 (세금 신고용)',
+      });
+
+      return { success: true };
+    } catch (error) {
+      console.error('Error registering tax info:', error);
+      throw new functions.https.HttpsError('internal', 'Failed to save tax information');
+    }
+  }
+);

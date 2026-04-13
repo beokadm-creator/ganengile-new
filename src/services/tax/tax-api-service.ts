@@ -4,6 +4,8 @@
  * 이 파일을 수정하여 B2B 정산 스케줄러와 연결합니다.
  */
 
+import { decrypt } from '../../utils/crypto';
+
 export interface TaxApiConfig {
   provider: 'volta' | 'popbill' | 'custom';
   apiKey: string;
@@ -79,7 +81,23 @@ export class TaxApiService {
     console.log(`[TaxApiService] 원천징수 신고 API 호출 준비 (Provider: ${this.config.provider})`, request);
     
     try {
-      // TODO: 원천세 자동 신고 API 연동 로직 구현
+      // 1. DB에 저장된 암호화된 주민등록번호를 메모리에서 복호화 (전송 직전에만 사용)
+      // request.gillerResidentNumber가 'iv:authTag:encryptedText' 형식이라고 가정
+      let decryptedResidentNumber = '';
+      try {
+        decryptedResidentNumber = decrypt(request.gillerResidentNumber);
+      } catch (err) {
+        throw new Error('주민등록번호 복호화 실패: 유효하지 않은 암호화 데이터');
+      }
+
+      // 2. 실제 국세청 신고용 API 페이로드 구성 (복호화된 주민번호 포함)
+      const taxPayload = {
+        ...request,
+        gillerResidentNumber: decryptedResidentNumber,
+      };
+
+      // TODO: 원천세 자동 신고 API 연동 로직 구현 (taxPayload 전송)
+      // const response = await fetch('...', { body: JSON.stringify(taxPayload) });
       
       // 임시 스터브 반환
       return {

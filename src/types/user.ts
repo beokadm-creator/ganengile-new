@@ -103,6 +103,14 @@ export interface User {
   fcmToken?: string;
   fcmTokenUpdatedAt?: Timestamp;
 
+  taxInfo?: {
+    residentNumberEncrypted?: string;
+    bankName?: string;
+    bankAccountNumber?: string;
+    accountHolderName?: string;
+    registeredAt?: Timestamp | string;
+  };
+
   // 생성/업데이트 시간
   createdAt: Timestamp;
   updatedAt: Timestamp;

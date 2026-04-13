@@ -17,13 +17,14 @@ import { getWithdrawalEligibility } from '../../services/beta1-wallet-service';
 import { WithdrawalEligibilityStatus } from '../../types/beta1-wallet';
 import type { MainStackNavigationProp } from '../../types/navigation';
 import { BorderRadius, Colors, Spacing, Typography } from '../../theme';
+import { TaxInfoRegistrationModal } from '../../components/tax/TaxInfoRegistrationModal';
 
 type Props = {
   navigation: MainStackNavigationProp;
 };
 
 export default function PointWithdrawScreen({ navigation }: Props) {
-  const { user } = useUser();
+  const { user, refreshUser } = useUser();
   const [amount, setAmount] = useState('');
   const [bankName, setBankName] = useState('');
   const [accountNumber, setAccountNumber] = useState('');
@@ -33,6 +34,7 @@ export default function PointWithdrawScreen({ navigation }: Props) {
   const [withdrawable, setWithdrawable] = useState(0);
   const [bankStatusMessage, setBankStatusMessage] = useState('계좌 인증 상태를 확인하고 있습니다.');
   const [eligibilityReasons, setEligibilityReasons] = useState<WithdrawalEligibilityStatus[]>([]);
+  const [showTaxModal, setShowTaxModal] = useState(false);
 
   const loadWithdrawContext = useCallback(async () => {
     if (!user?.uid) {
@@ -68,6 +70,11 @@ export default function PointWithdrawScreen({ navigation }: Props) {
 
     if (!user?.uid || !numericAmount || !bankName || !accountNumber || !accountHolder) {
       Alert.alert('입력 확인', '출금 금액과 계좌 정보를 다시 확인해 주세요.');
+      return;
+    }
+
+    if (!user.taxInfo?.residentNumberEncrypted) {
+      setShowTaxModal(true);
       return;
     }
 
@@ -177,8 +184,20 @@ export default function PointWithdrawScreen({ navigation }: Props) {
         }}
         disabled={loading}
       >
-        {loading ? <ActivityIndicator color={Colors.white} /> : <Text style={styles.submitButtonText}>출금 요청 등록</Text>}
+        {loading ? <ActivityIndicator color={Colors.white} /> : <Text style={styles.submitButtonText}>출금 요청하기</Text>}
       </TouchableOpacity>
+
+      <TaxInfoRegistrationModal
+        visible={showTaxModal}
+        onClose={() => setShowTaxModal(false)}
+        onSuccess={async () => {
+          setShowTaxModal(false);
+          if (refreshUser) {
+            await refreshUser();
+          }
+          Alert.alert('알림', '정보가 등록되었습니다. 다시 출금 요청을 눌러주세요.');
+        }}
+      />
     </ScrollView>
   );
 }
