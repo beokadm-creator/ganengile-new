@@ -10,7 +10,7 @@
 
 ## Essential (Post-Compact)
 - 이 저장소는 가넹길 앱, 관리자 웹, Firebase 백엔드를 함께 관리한다.
-- beta1 문서군은 `docs/`에 있고, 제품 계약의 핵심은 상태 계약과 서비스 계획이다.
+- 최신 문서 인덱스는 `docs/README.md`이며, 문서/운영 기준은 `docs/` 아래에서 관리한다.
 - 실행 진입점은 모바일/웹 앱, `admin-web`, `functions` 세 영역이다.
 
 ## [STATIC] Repository Map
@@ -24,8 +24,7 @@
 ## [STATIC] Read Order
 1. `CLAUDE.md`
 2. `docs/README.md`
-3. `docs/beta1-state-contract.md` 또는 작업별 문서
-4. 운영 작업이면 `docs/deployment-preflight.md`
+3. 작업별 문서(운영이면 `docs/deployment-preflight.md`부터)
 
 ## [DYNAMIC] Local Start
 ```bash

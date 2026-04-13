@@ -1,0 +1,104 @@
+name: Wiki Sync
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  sync-to-wiki:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Extract commit info
+        id: commit_info
+        run: |
+          COMMIT_MSG=$(git log -1 --pretty=format:"%s")
+          COMMIT_HASH=$(git rev-parse --short HEAD)
+          COMMIT_AUTHOR=$(git log -1 --pretty=format:"%an")
+          
+          echo "Raw message: $COMMIT_MSG"
+          
+          if [[ "$COMMIT_MSG" =~ ^([a-zA-Z]+)(\(.*\))?:\ (.+) ]]; then
+            PREFIX="${BASH_REMATCH[1]}"
+            SUBJECT="${BASH_REMATCH[3]}"
+          else
+            PREFIX="chore"
+            SUBJECT="$COMMIT_MSG"
+          fi
+          
+          DATE_YYYY_MM_DD=$(date +'%Y-%m-%d')
+          DATE_YYYY_MM=$(date +'%Y-%m')
+          DATE_MONTH=$(date +'%-m')
+          DATE_DAY=$(date +'%-d')
+          
+          TITLE="${DATE_MONTH}월 ${DATE_DAY}일 — ${SUBJECT}"
+          CONTENT="커밋: ${COMMIT_HASH}\n작성자: ${COMMIT_AUTHOR}\n메시지: ${COMMIT_MSG}"
+          
+          echo "prefix=$PREFIX" >> $GITHUB_OUTPUT
+          echo "subject=$SUBJECT" >> $GITHUB_OUTPUT
+          echo "title=$TITLE" >> $GITHUB_OUTPUT
+          echo "date_group=$DATE_YYYY_MM_DD" >> $GITHUB_OUTPUT
+          echo "month_group=$DATE_YYYY_MM" >> $GITHUB_OUTPUT
+          
+          # Handle multiline string safely
+          EOF_DELIM=$(dd if=/dev/urandom bs=15 count=1 status=none | base64)
+          echo "content<<$EOF_DELIM" >> $GITHUB_OUTPUT
+          echo -e "$CONTENT" >> $GITHUB_OUTPUT
+          echo "$EOF_DELIM" >> $GITHUB_OUTPUT
+
+      - name: Send to Wiki
+        uses: actions/github-script@v7
+        env:
+          WIKI_API_URL: ${{ secrets.WIKI_API_URL }}
+          WIKI_API_KEY: ${{ secrets.WIKI_API_KEY }}
+          PAYLOAD_TITLE: ${{ steps.commit_info.outputs.title }}
+          PAYLOAD_CONTENT: ${{ steps.commit_info.outputs.content }}
+          PAYLOAD_PREFIX: ${{ steps.commit_info.outputs.prefix }}
+          PAYLOAD_DATE_GROUP: ${{ steps.commit_info.outputs.date_group }}
+          PAYLOAD_MONTH_GROUP: ${{ steps.commit_info.outputs.month_group }}
+        with:
+          script: |
+            const WIKI_API_URL = process.env.WIKI_API_URL;
+            const WIKI_API_KEY = process.env.WIKI_API_KEY;
+            
+            if (!WIKI_API_URL || !WIKI_API_KEY) {
+              console.error("Missing WIKI_API_URL or WIKI_API_KEY secrets");
+              process.exit(1);
+            }
+            
+            const payload = {
+              title: process.env.PAYLOAD_TITLE,
+              content: process.env.PAYLOAD_CONTENT,
+              category: "log",
+              icon: "📝",
+              tags: ["ganengile", process.env.PAYLOAD_PREFIX],
+              date_group: process.env.PAYLOAD_DATE_GROUP,
+              month_group: process.env.PAYLOAD_MONTH_GROUP
+            };
+            
+            console.log("Sending payload:", JSON.stringify(payload, null, 2));
+            
+            try {
+              const response = await fetch(WIKI_API_URL, {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json',
+                  'x-api-key': WIKI_API_KEY
+                },
+                body: JSON.stringify(payload)
+              });
+              
+              if (!response.ok) {
+                const text = await response.text();
+                throw new Error(`HTTP error! status: ${response.status}, message: ${text}`);
+              }
+              
+              const data = await response.json();
+              console.log("Success:", data);
+            } catch (error) {
+              console.error("Failed to sync to wiki:", error);
+              process.exit(1);
+            }

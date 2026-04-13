@@ -2,8 +2,8 @@
 
 ## Stack
 - **Mobile**: React Native + Expo (Expo Router) ~76K lines
-- **Admin Web**: React + TypeScript + Vite ~25K lines
-- **Backend**: Firebase Cloud Functions (Node.js 20) ~5K lines
+- **Admin Web**: Next.js (App Router) + TypeScript
+- **Backend**: Firebase Cloud Functions (Node.js 22)
 - **DB**: Firestore, **인증**: Firebase Auth, **지도**: 네이버맵, **결제**: 카카오페이
 
 ## Key Files
@@ -28,4 +28,4 @@
 - SEOUL_FARE_API_URL, SEOUL_FARE_SERVICE_KEY
 
 ## Analysis
-- 전체 분석: `~/.openclaw/workspace/ganengile-analysis.md` (106K lines)
+- 문서 인덱스: `docs/README.md`

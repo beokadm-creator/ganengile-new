@@ -1,13 +1,53 @@
 import axios from 'axios';
+import * as admin from 'firebase-admin';
 import * as functions from 'firebase-functions';
 
-// 환경 변수에서 NHN Cloud 설정 로드 (실제 프로젝트 환경에 맞게 설정 필요)
-// firebase functions:config:set nhn.appkey="YOUR_APP_KEY" nhn.secretkey="YOUR_SECRET_KEY" nhn.senderkey="YOUR_SENDER_KEY"
-const getNHNConfig = () => {
+export interface NHNConfig {
+  appKey: string;
+  secretKey: string;
+  senderKey: string;
+  templates: {
+    newMission: string;
+    requestAccepted: string;
+    deliveryCompleted: string;
+  };
+}
+
+// 환경 변수 및 Firestore에서 NHN Cloud 설정 로드
+const getNHNConfig = async (): Promise<NHNConfig> => {
+  const defaultTemplates = {
+    newMission: 'NEW_MISSION_V1',
+    requestAccepted: 'REQUEST_ACCEPTED_V1',
+    deliveryCompleted: 'DELIVERY_COMPLETED_V1',
+  };
+
+  try {
+    const db = admin.firestore();
+    const doc = await db.collection('system_settings').doc('nhn_alimtalk').get();
+    
+    if (doc.exists) {
+      const data = doc.data();
+      return {
+        appKey: data?.appKey || process.env.NHN_APP_KEY || functions.config().nhn?.appkey || 'DEMO_APP_KEY',
+        secretKey: data?.secretKey || process.env.NHN_SECRET_KEY || functions.config().nhn?.secretkey || 'DEMO_SECRET_KEY',
+        senderKey: data?.senderKey || process.env.NHN_SENDER_KEY || functions.config().nhn?.senderkey || 'DEMO_SENDER_KEY',
+        templates: {
+          newMission: data?.templates?.newMission || defaultTemplates.newMission,
+          requestAccepted: data?.templates?.requestAccepted || defaultTemplates.requestAccepted,
+          deliveryCompleted: data?.templates?.deliveryCompleted || defaultTemplates.deliveryCompleted,
+        },
+      };
+    }
+  } catch (error) {
+    console.error('[NHN Alimtalk] Failed to load config from Firestore, falling back to env variables:', error);
+  }
+
+  // Fallback to env variables
   return {
     appKey: process.env.NHN_APP_KEY || functions.config().nhn?.appkey || 'DEMO_APP_KEY',
     secretKey: process.env.NHN_SECRET_KEY || functions.config().nhn?.secretkey || 'DEMO_SECRET_KEY',
     senderKey: process.env.NHN_SENDER_KEY || functions.config().nhn?.senderkey || 'DEMO_SENDER_KEY',
+    templates: defaultTemplates,
   };
 };
 
@@ -25,7 +65,7 @@ export class NHNAlimtalkService {
    * 카카오 알림톡 전송
    */
   static async sendAlimtalk(params: AlimtalkParams): Promise<boolean> {
-    const config = getNHNConfig();
+    const config = await getNHNConfig();
 
     if (config.appKey === 'DEMO_APP_KEY') {
       console.warn(`[NHN Alimtalk] DEMO 모드: 실제 발송 생략. To: ${params.recipientNo}, Template: ${params.templateCode}`);
@@ -76,9 +116,10 @@ export class NHNAlimtalkService {
     dropoff: string;
     reward: string;
   }): Promise<boolean> {
+    const config = await getNHNConfig();
     return this.sendAlimtalk({
       recipientNo,
-      templateCode: 'NEW_MISSION_V1', // NHN 콘솔에 등록된 템플릿 코드
+      templateCode: config.templates.newMission,
       templateParams: {
         pickup: missionData.pickup,
         dropoff: missionData.dropoff,

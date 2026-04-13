@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import { LayoutAnimation, Platform, UIManager } from 'react-native';
 import type { Station } from '../../../../types/config';
 import type { CreateRequestDraft } from '../../../../utils/draft-storage';
 import type { Beta1QuoteCard } from '../../../../services/beta1-orchestration-service';
@@ -6,6 +7,12 @@ import type { StationInfo } from '../../../../types/request';
 
 import type { SharedPackageSize } from '../../../../../shared/pricing-config';
 import type { UserCoupon } from '../../../../types/coupon';
+
+if (Platform.OS === 'android') {
+  if (UIManager.setLayoutAnimationEnabledExperimental) {
+    UIManager.setLayoutAnimationEnabledExperimental(true);
+  }
+}
 
 export type RequestMode = 'immediate' | 'reservation';
 export type LocationMode = 'station' | 'address';
@@ -154,9 +161,11 @@ const initialState = {
 };
 
 export const useCreateRequestStore = create<CreateRequestState>((set) => ({
-  ...initialState,
-
-  setActiveStep: (step) => set({ activeStep: step }),
+  ...initialState,activeStep: 1,
+  setActiveStep: (step) => {
+    LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+    set({ activeStep: step });
+  },
   setRequestMode: (mode) => set({ requestMode: mode }),
   setPickupMode: (mode) => set({ pickupMode: mode }),
   setPickupStation: (station) => set({ pickupStation: station }),

@@ -16,11 +16,11 @@
 ## [STATIC] Rules
 
 ### 1. Precedence
-- 100: `CLAUDE.md`
+- 99: `CLAUDE.md`
 - 95: 제품/운영 공통 강제 규칙
 - 90: 이 문서와 같은 shared governance 문서
-- 80: 도메인 계약 문서 (`docs/beta1-state-contract.md`)
-- 75: 상위 계획 문서 (`docs/beta1-service-plan.md`, `docs/beta1-master-brief.md`)
+- 80: 도메인/행동 계약·표준 문서 (예: `docs/USER-ENTRY-FLOW-STANDARD.md`, `docs/CLOUD-DELIVERY-ACTOR-STANDARD.md`)
+- 75: 상위 계획 문서 (제품 계획/정책 요약; 필요 시 추가)
 - 70: 개별 전략/정책 문서
 - 65: 런북/운영/데이터 안내 문서
 - 60: `.sisyphus` 계획 및 검증 문서

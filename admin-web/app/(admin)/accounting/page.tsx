@@ -86,6 +86,32 @@ export default function AccountingReportPage() {
           >
             조회
           </button>
+          <button
+            onClick={async () => {
+              if (!confirm(`${year}년 ${month}월의 통계 데이터를 재집계하시겠습니까?\n이 작업은 많은 데이터를 읽어오므로 과금이 발생할 수 있습니다.`)) return;
+              try {
+                setLoading(true);
+                const res = await fetch(`/api/admin/accounting/sync`, {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({ year, month })
+                });
+                if (res.ok) {
+                  alert('재집계가 완료되었습니다.');
+                  fetchReport();
+                } else {
+                  alert('재집계 실패');
+                  setLoading(false);
+                }
+              } catch (e: any) {
+                alert(`재집계 중 오류가 발생했습니다: ${e.message}`);
+                setLoading(false);
+              }
+            }}
+            className="rounded-lg bg-gray-100 px-4 py-2 text-sm font-medium text-gray-700 border border-gray-200 hover:bg-gray-200"
+          >
+            전체 재집계 (수동)
+          </button>
         </div>
       </div>
 

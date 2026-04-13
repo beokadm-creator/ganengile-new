@@ -15,6 +15,7 @@ export async function GET(req: NextRequest) {
 
   const year = parseInt(yearStr, 10);
   const month = parseInt(monthStr, 10);
+  const docId = `${year}-${String(month).padStart(2, '0')}`;
 
   const startOfMonth = new Date(year, month - 1, 1);
   const endOfMonth = new Date(year, month, 0, 23, 59, 59, 999);
@@ -22,7 +23,33 @@ export async function GET(req: NextRequest) {
   const db = getAdminDb();
 
   try {
-    // 1. 일반 결제 (매출 / 쿠폰할인 / 포인트상계)
+    // 최적화: 미리 집계된 통계 문서 확인
+    const statsDoc = await db.collection('accounting_stats_monthly').doc(docId).get();
+    if (statsDoc.exists) {
+      const stats = statsDoc.data()!;
+      return NextResponse.json({
+        period: { year, month },
+        revenue: {
+          grossRevenue: stats.totalGrossRevenue || 0,
+          revenueDiscount: stats.totalRevenueDiscount || 0,
+          liabilityOffset: stats.totalLiabilityOffset || 0,
+          cashCollected: stats.totalCashCollected || 0,
+        },
+        gillerSettlement: {
+          grossPayout: stats.totalGillerGrossPayout || 0,
+          withholdingTax: stats.totalGillerWithholdingTax || 0,
+          netPayout: stats.totalGillerNetPayout || 0,
+        },
+        partnerSettlement: {
+          grossPayout: stats.totalPartnerGrossPayout || 0,
+          commission: stats.totalPartnerCommission || 0,
+          vat: stats.totalPartnerVat || 0,
+          netPayout: stats.totalPartnerNetPayout || 0,
+        }
+      });
+    }
+
+    // 만약 집계 문서가 없다면 (레거시 데이터 등) 기존 방식대로 수기 합산
     const paymentsSnap = await db.collection('payments')
       .where('createdAt', '>=', startOfMonth)
       .where('createdAt', '<=', endOfMonth)

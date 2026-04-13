@@ -22,8 +22,9 @@
 - 시스템 목표: AI는 입력 보조, 분류, 추천, 경고를 맡고 최종 확정 책임은 넘지 않는다.
 
 ## [DYNAMIC] Current Reading Hint
-- 상태/필드 정의는 `docs/beta1-state-contract.md`를 우선 확인한다.
-- 화면/정책 우선순위는 `docs/beta1-service-plan.md`를 우선 확인한다.
+- 최신 문서 인덱스는 `docs/README.md`를 우선 확인한다.
+- 회원/온보딩 관련 원칙은 `docs/USER-ENTRY-FLOW-STANDARD.md`를 우선 확인한다.
+- 배송 파트너/B2B actor 관련 원칙은 `docs/CLOUD-DELIVERY-ACTOR-STANDARD.md`를 우선 확인한다.
 - 배포 전 체크는 `docs/deployment-preflight.md`를 본다.
 
 ## Changelog

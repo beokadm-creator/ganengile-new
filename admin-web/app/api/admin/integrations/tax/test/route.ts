@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { isAdmin } from '@/lib/auth';
-import { taxApiService } from '../../../../../../src/services/tax/tax-api-service';
+import { taxApiService } from '../../../../../../../src/services/tax/tax-api-service';
 
 export async function POST() {
   if (!(await isAdmin())) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });

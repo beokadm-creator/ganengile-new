@@ -1,71 +1,61 @@
-# 문서 목차
+# 문서 인덱스
 
-이 문서는 가는길에 프로젝트의 최신 문서 인덱스입니다. 다른 에이전트나 개발자는 이 파일을 기준으로 필요한 기능 문서와 코드 경로를 찾으면 됩니다.
+`precedence`: 85  
+`required-for`: onboarding, repo-navigation, docs-navigation  
+`optional-for`: code-change, deploy  
+`memory-type`: index  
+`token-estimate`: 330
 
-## 1. 시작점
+@include docs/_shared/ai-doc-governance.md
 
-| 영역 | 문서 | 주요 코드 경로 |
-|---|---|---|
-| 프로젝트 개요 | [README.md](../README.md) | `src/`, `admin-web/`, `functions/` |
-| 문서 운영 규칙 | [docs/ops/documentation-rules.md](docs/ops/documentation-rules.md) | `docs/`, `docs/archive/` |
-| 에이전트 인수인계 | [docs/ops/agent-handoff.md](docs/ops/agent-handoff.md) | `docs/`, `src/`, `admin-web/` |
+## Essential (Post-Compact)
+- 문서 진입점은 이 파일이다. 전체 맥락은 `../README.md`, 작업 규칙은 `../CLAUDE.md`로 이어진다.
+- 운영/배포 작업은 `deployment-preflight.md`와 `ops/` 문서가 기준이다.
+- 사용자(앱 사용) 문서는 `user/` 아래에 둔다.
 
-## 2. 핵심 구조
+## 1) 시작점
 
-| 기능 | 문서 | 주요 코드 경로 |
-|---|---|---|
-| 전체 아키텍처 | [docs/core/architecture.md](docs/core/architecture.md) | `src/navigation/`, `src/contexts/`, `functions/src/` |
-| 역할/인증/승급 | [docs/core/identity-and-roles.md](docs/core/identity-and-roles.md) | `src/screens/main/IdentityVerificationScreen.tsx`, `src/screens/main/GillerApplyScreen.tsx`, `src/contexts/UserContext.tsx` |
-| 매칭/동선 | [docs/core/matching-and-routing.md](docs/core/matching-and-routing.md) | `src/services/matching-service.ts`, `src/services/route-service.ts`, `src/screens/main/AddRouteScreen.tsx` |
-| 요금/운임/정산 | [docs/core/pricing-and-fares.md](docs/core/pricing-and-fares.md) | `src/services/pricing-service.ts`, `src/services/fare-service.ts`, `src/services/payment-service.ts` |
-| 사물함/전달 방식 | [docs/core/lockers-and-handover.md](docs/core/lockers-and-handover.md) | `src/services/locker-service.ts`, `src/screens/main/LockerMapScreen.tsx`, `src/screens/giller/` |
-| 배송 파트너/B2B 오케스트레이션 | [docs/CLOUD-DELIVERY-ACTOR-STANDARD.md](docs/CLOUD-DELIVERY-ACTOR-STANDARD.md) | `src/services/beta1-orchestration-service.ts`, `src/services/request-service.ts`, `admin-web/app/(admin)/delivery-partners/` |
-| 보증금/패널티 | [docs/features/deposit-and-penalty.md](docs/features/deposit-and-penalty.md) | `src/services/DepositService.ts`, `src/services/penalty-service.ts` |
+| 목적 | 문서 |
+|---|---|
+| 프로젝트 개요/실행 | [`../README.md`](../README.md) |
+| 작업/문서 거버넌스(에이전트/코드 변경 포함) | [`../CLAUDE.md`](../CLAUDE.md) |
+| 문서 작성/배치 규칙 | [`ops/documentation-rules.md`](ops/documentation-rules.md) |
+| 새 작업자 인수인계(빠른 진입) | [`ops/agent-handoff.md`](ops/agent-handoff.md) |
 
-## 3. 앱 동선
+## 2) 운영/배포 (Runbook)
 
-| 사용자 동선 | 문서 | 주요 화면 경로 |
-|---|---|---|
-| 요청자 앱 흐름 | [docs/flows/requester-app.md](docs/flows/requester-app.md) | `src/screens/main/CreateRequestScreen.tsx`, `src/screens/main/RequestDetailScreen.tsx`, `src/screens/main/DeliveryTrackingScreen.tsx` |
-| 길러 앱 흐름 | [docs/flows/giller-app.md](docs/flows/giller-app.md) | `src/screens/main/GillerRequestsScreen.tsx`, `src/screens/main/ChatScreen.tsx`, `src/screens/main/RouteManagementScreen.tsx` |
+| 주제 | 문서 |
+|---|---|
+| 배포 전 점검(필수) | [`deployment-preflight.md`](deployment-preflight.md) |
+| 환경변수/Secrets 정리 | [`ops/deployment-and-env.md`](ops/deployment-and-env.md) |
+| CI/CD 파이프라인 | [`ops/cicd-pipeline-guide.md`](ops/cicd-pipeline-guide.md) |
+| 인코딩(Windows PowerShell 포함) | [`ENCODING_GUIDE.md`](ENCODING_GUIDE.md) |
 
-## 4. 기능
+## 3) 제품/UX 표준 (현재 유지되는 표준)
 
-| 사용자 동선 | 문서 | 주요 화면 경로 |
-|---|---|---|
-| 게이미피케이션 | [docs/features/gamification.md](docs/features/gamification.md) | `src/screens/main/BadgeCollectionScreen.tsx`, `src/screens/main/PointHistoryScreen.tsx` |
-| 사물함 시스템 | [docs/features/locker-system.md](docs/features/locker-system.md) | `src/screens/main/LockerMapScreen.tsx`, `src/screens/main/LockerSelectionScreen.tsx` |
-| 실시간 추적 | [docs/features/realtime-tracking.md](docs/features/realtime-tracking.md) | `src/screens/main/RealtimeTrackingScreen.tsx` |
-| 원타임 매칭 | [docs/features/onetime-matching.md](docs/features/onetime-matching.md) | `src/screens/main/OnetimeModeScreen.tsx` |
-| 경매 시스템 | [docs/features/auction-system.md](docs/features/auction-system.md) | `src/screens/main/CreateAuctionScreen.tsx` |
+| 주제 | 문서 |
+|---|---|
+| 회원 진입/온보딩 표준 | [`USER-ENTRY-FLOW-STANDARD.md`](USER-ENTRY-FLOW-STANDARD.md) |
+| B2B/배송 파트너 actor 표준 | [`CLOUD-DELIVERY-ACTOR-STANDARD.md`](CLOUD-DELIVERY-ACTOR-STANDARD.md) |
 
-## 5. 관리자
+## 4) 데이터/참고
 
-| 관리자 기능 | 문서 | 주요 코드 경로 |
-|---|---|---|
-| 관리자 웹 구조와 운영 포인트 | [docs/admin/admin-web.md](docs/admin/admin-web.md) | `admin-web/app/(admin)/`, `admin-web/app/api/` |
-| 관리자 웹 실행 | [admin-web/README.md](../admin-web/README.md) | `admin-web/` |
+| 주제 | 문서 |
+|---|---|
+| 데이터 폴더 설명 | [`../data/README.md`](../data/README.md) |
+| 정적 역 데이터 참고 | [`../data/stations-seoul.md`](../data/stations-seoul.md) |
+| 하드코딩/임시값 점검 리포트(참고) | [`MOCK_HARDCODED_AUDIT.md`](MOCK_HARDCODED_AUDIT.md) |
 
-## 6. 운영
+## 5) 사용자 문서 (App Help)
 
-| 운영 문서 | 문서 | 주요 경로 |
-|---|---|---|
-| 배포/환경변수 | [docs/ops/deployment-and-env.md](docs/ops/deployment-and-env.md) | `firebase.json`, `app.json`, `scripts/` |
-| 스모크 테스트 | [docs/ops/smoke-test.md](docs/ops/smoke-test.md) | `src/screens/main/`, `admin-web/app/(admin)/` |
-| 성능 최적화 메모 | [src/services/performance/image-optimization.md](../src/services/performance/image-optimization.md) | `src/services/performance/` |
-| 번들 최적화 메모 | [src/services/performance/bundle-optimization.md](../src/services/performance/bundle-optimization.md) | `src/services/performance/` |
+| 주제 | 문서 |
+|---|---|
+| 시작하기 | [`user/getting-started.md`](user/getting-started.md) |
+| FAQ | [`user/faq.md`](user/faq.md) |
 
-## 7. 데이터와 외부 연동
+## 6) 메모/기록/정리 대상
+- `memory/`는 시점 기록(log)이며, 현재 계약/운영 문서를 덮어쓰지 않는다.
+- 루트의 `DATA-INCONSISTENCY-ANALYSIS.md`, `LEGACY-CLEANUP-*.md`는 “보고서/정리 메모” 성격이라 `/docs/archive/`로 이동 후보(필요 시).
 
-| 데이터/연동 | 문서 | 주요 코드 경로 |
-|---|---|---|
-| 역/운임/사물함 데이터 관리 | [docs/data/station-and-fare-data.md](docs/data/station-and-fare-data.md) | `scripts/update-station-mapping-from-seoul-json.ts`, `scripts/seed-fares-from-api.ts`, `data/` |
-| 데이터 폴더 설명 | [data/README.md](../data/README.md) | `data/` |
-| 정적 역 데이터 참고 | [data/stations-seoul.md](../data/stations-seoul.md) | `data/stations-seoul.md` |
-
-## 8. 문서 갱신 규칙
-
-- `src/screens` 동선이 바뀌면 `docs/flows` 문서를 먼저 갱신합니다.
-- `src/services` 로직이 바뀌면 대응되는 `docs/core` 문서를 갱신합니다.
-- Firebase 설정, 배포, 환경변수가 바뀌면 `docs/ops/deployment-and-env.md`를 갱신합니다.
-- 임시 보고서는 루트에 만들지 않습니다. 정말 필요한 경우에도 별도 협의 후 추가합니다.
+## Changelog
+- 2026-04-13: 현재 저장소에 존재하는 문서 기준으로 인덱스/링크를 재정리하고, 사용자 문서(user/)를 추가하는 구조로 업데이트.

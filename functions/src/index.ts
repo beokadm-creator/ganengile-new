@@ -1008,7 +1008,7 @@ export const onRequestStatusChanged = functions.firestore
         if (!notificationSent && gller?.phoneNumber) {
           const alimtalkSuccess = await NHNAlimtalkService.sendAlimtalk({
             recipientNo: gller.phoneNumber,
-            templateCode: 'REQUEST_ACCEPTED_V1',
+            templateCode: (await db.collection('system_settings').doc('nhn_alimtalk').get()).data()?.templates?.requestAccepted || 'REQUEST_ACCEPTED_V1',
             templateParams: {
               gillerName,
             }
@@ -1206,7 +1206,7 @@ export const onRequestStatusChanged = functions.firestore
         if (!notificationSent && gller?.phoneNumber) {
           const alimtalkSuccess = await NHNAlimtalkService.sendAlimtalk({
             recipientNo: gller.phoneNumber,
-            templateCode: 'DELIVERY_COMPLETED_V1',
+            templateCode: (await db.collection('system_settings').doc('nhn_alimtalk').get()).data()?.templates?.deliveryCompleted || 'DELIVERY_COMPLETED_V1',
             templateParams: {
               gillerName,
             }
