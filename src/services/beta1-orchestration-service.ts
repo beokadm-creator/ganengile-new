@@ -289,7 +289,14 @@ async function rankCandidateGillersForBundle(params: {
   hasAddressLeg: boolean;
   topN?: number;
 }): Promise<string[]> {
-  const baseMatches = await findMatchesForRequest(params.requestId, Math.max(5, (params.topN ?? 5) * 2));
+  let baseMatches: any[] = [];
+  try {
+    const rawMatches = await findMatchesForRequest(params.requestId, Math.max(5, (params.topN ?? 5) * 2));
+    baseMatches = Array.isArray(rawMatches) ? rawMatches : [];
+  } catch (error) {
+    console.error('[orchestration-service] Failed to fetch base matches:', error);
+    baseMatches = [];
+  }
 
   const rescored = await Promise.all(
     baseMatches.map(async (match) => {
@@ -701,11 +708,12 @@ export async function createBeta1Request(input: Beta1RequestCreateInput): Promis
 
   const requestId = generateShortId('R');
   const requestRef = doc(collection(db, 'requests'), requestId);
-  await setDoc(requestRef, requestPayload);
+  const cleanRequestPayload = JSON.parse(JSON.stringify(requestPayload));
+  await setDoc(requestRef, cleanRequestPayload);
 
   const deliveryId = generateShortId('D');
   const deliveryRef = doc(collection(db, 'deliveries'), deliveryId);
-  await setDoc(deliveryRef, {
+  const deliveryPayload = {
     requestId: requestRef.id,
     requesterId: input.requesterUserId,
     pickupStation: input.pickupStation,
@@ -729,7 +737,9 @@ export async function createBeta1Request(input: Beta1RequestCreateInput): Promis
     },
     createdAt: serverTimestamp(),
     updatedAt: serverTimestamp(),
-  });
+  };
+  const cleanDeliveryPayload = JSON.parse(JSON.stringify(deliveryPayload));
+  await setDoc(deliveryRef, cleanDeliveryPayload);
 
   await updateDoc(doc(db, 'requests', requestRef.id), {
     primaryDeliveryId: deliveryRef.id,
@@ -976,13 +986,14 @@ export async function bundleMissionsForDelivery(deliveryId: string): Promise<Mis
   }
 
   await Promise.all(
-    bundles.map((bundle) =>
-      setDoc(doc(db, 'mission_bundles', bundle.missionBundleId), {
+    bundles.map((bundle) => {
+      const cleanBundle = JSON.parse(JSON.stringify({
         ...bundle,
         createdAt: serverTimestamp(),
         updatedAt: serverTimestamp(),
-      })
-    )
+      }));
+      return setDoc(doc(db, 'mission_bundles', bundle.missionBundleId), cleanBundle);
+    })
   );
 
   return bundles;
