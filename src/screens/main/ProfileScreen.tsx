@@ -51,6 +51,7 @@ export default function ProfileScreen({ navigation }: { navigation: MainStackNav
 
   const activeRole = currentRole === UserRole.GILLER ? UserRole.GILLER : UserRole.GLER;
   const showRoleSwitch = user?.role === UserRole.BOTH || user?.role === UserRole.GLER;
+  const isPreviewMode = !canAccessGiller;
 
   useEffect(() => {
     let mounted = true;
@@ -146,7 +147,7 @@ export default function ProfileScreen({ navigation }: { navigation: MainStackNav
         onPress: () => navigation.navigate('PointHistory'),
       },
     ],
-    [navigation]
+    [navigation, isPreviewMode, user?.isVerified]
   );
 
   const gillerLinks = useMemo<LinkItem[]>(
@@ -170,14 +171,40 @@ export default function ProfileScreen({ navigation }: { navigation: MainStackNav
         title: '수익 확인',
         subtitle: '정산 현황을 확인합니다.',
         icon: 'payments',
-        onPress: () => navigation.navigate('Earnings'),
+        onPress: () => {
+          if (isPreviewMode) {
+            Alert.alert(
+              '길러 전용',
+              '수익 확인은 길러 신청 후 이용할 수 있습니다.',
+              [
+                { text: '취소', style: 'cancel' },
+                { text: '신청하기', onPress: () => navigation.navigate(user?.isVerified ? 'GillerApply' : 'IdentityVerification') }
+              ]
+            );
+            return;
+          }
+          navigation.navigate('Earnings');
+        },
       },
       {
         key: 'withdraw',
         title: '출금 요청',
         subtitle: '출금 가능한 금액을 정산합니다.',
         icon: 'account-balance',
-        onPress: () => navigation.navigate('PointWithdraw'),
+        onPress: () => {
+          if (isPreviewMode) {
+            Alert.alert(
+              '길러 전용',
+              '출금 요청은 길러 신청 후 이용할 수 있습니다.',
+              [
+                { text: '취소', style: 'cancel' },
+                { text: '신청하기', onPress: () => navigation.navigate(user?.isVerified ? 'GillerApply' : 'IdentityVerification') }
+              ]
+            );
+            return;
+          }
+          navigation.navigate('PointWithdraw');
+        },
       },
     ],
     [navigation]
@@ -275,7 +302,7 @@ export default function ProfileScreen({ navigation }: { navigation: MainStackNav
         <Text style={styles.subtitle}>{user.phoneNumber ?? user.email}</Text>
 
         <View style={styles.badgeRow}>
-          <Badge label={activeRole === UserRole.GILLER ? '길러 모드' : '이용자 모드'} />
+          <Badge label={activeRole === UserRole.GILLER ? (isPreviewMode ? '길러 모드 (미리보기)' : '길러 모드') : '이용자 모드'} />
           <Badge label={profileState.verificationLabel} />
           <Badge
             label={
@@ -338,8 +365,8 @@ export default function ProfileScreen({ navigation }: { navigation: MainStackNav
                 {applicationStatus === 'pending'
                   ? '현재 심사 상태를 확인할 수 있습니다.'
                   : user.isVerified
-                    ? '길러 신청 절차로 바로 이동합니다.'
-                    : '본인확인 후 길러 신청 절차를 진행할 수 있습니다.'}
+                    ? '간단한 절차 후 길러 활동을 시작하세요.'
+                    : '본인확인 후 활동을 시작할 수 있습니다.'}
               </Text>
             </View>
             <MaterialIcons name="chevron-right" size={22} color={Colors.gray400} />
@@ -356,7 +383,7 @@ export default function ProfileScreen({ navigation }: { navigation: MainStackNav
           activeOpacity={0.9}
         >
           <Text style={styles.actionButtonText}>
-            {user.isVerified ? '길러 신청 절차로 이동' : '길러 전환을 위한 본인확인'}
+            {user.isVerified ? '길러 신청 절차로 이동' : '본인확인 후 시작하기'}
           </Text>
         </TouchableOpacity>
       ) : null}

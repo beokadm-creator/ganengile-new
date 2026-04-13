@@ -194,8 +194,8 @@ export default function GillerRequestsScreen() {
     (card: MissionCard) => {
       if (isPreviewMode) {
         Alert.alert(
-          '미리보기 모드', 
-          '실제 배송을 수행하려면 길러 신청을 완료해주세요.',
+          '길러 전용', 
+          '수락은 길러 신청 후 이용할 수 있습니다.',
           [
             { text: '닫기', style: 'cancel' },
             { text: '신청하기', onPress: () => navigation.navigate('Profile') }
@@ -350,10 +350,10 @@ export default function GillerRequestsScreen() {
         }
         scopeSubtitle={
           user?.gillerProfile?.type === GillerType.PROFESSIONAL || user?.gillerProfile?.type === GillerType.MASTER
-            ? '권역 노출 후 동선 우선권을 보고, 일부 미션은 외부 연동으로 이어집니다.'
+            ? '권역과 동선이 일치하는 미션을 먼저 제안합니다.'
             : isPreviewMode && currentLocation
-              ? '내 주변 6km 이내의 미션을 미리 확인해보세요.'
-              : '권역 노출 후 동선이 맞는 길러에게 먼저 기회가 갑니다.'
+              ? '내 주변 미션을 미리 확인해보세요.'
+              : '동선이 맞는 길러에게 우선 배정됩니다.'
         }
         onPressScopeSettings={() => navigation.navigate('Tabs', { screen: 'RouteManagement' })}
         featuredMission={
@@ -409,15 +409,15 @@ export default function GillerRequestsScreen() {
 
       <MissionBoardSection
         title="지금 선택 가능"
-        subtitle="지금 바로 맡을 수 있는 배송을 지도와 구간 옵션으로 확인하세요."
+        subtitle="바로 맡을 수 있는 배송입니다."
         items={immediateMissionGroups}
-        emptyTitle="지금 바로 맡을 수 있는 배송이 없습니다"
+        emptyTitle="선택 가능한 배송이 없습니다"
         emptySubtitle={
           activeTerritory
-            ? '선택한 권역에 들어오는 새 배송은 여기에서 전체 구간과 부분 구간으로 보입니다.'
+            ? '권역 내 새 배송이 이곳에 표시됩니다.'
             : isPreviewMode && currentLocation
-              ? '현재 내 주변 6km 이내에 올라온 배송이 없습니다.'
-              : '새 배송이 들어오면 여기에서 전체 구간과 부분 구간을 함께 보여드립니다.'
+              ? '내 주변에 등록된 배송이 없습니다.'
+              : '새 배송이 이곳에 표시됩니다.'
         }
         getKey={(group) => group.id}
         renderItem={(group) => (
@@ -440,10 +440,10 @@ export default function GillerRequestsScreen() {
 
       <MissionBoardSection
         title="검토해볼 제안"
-        subtitle="시간 조율이나 fallback이 걸린 배송을 따로 모아 보여드립니다."
+        subtitle="조율이 필요한 배송을 제안합니다."
         items={suggestedMissionGroups}
-        emptyTitle="검토할 제안이 없습니다"
-        emptySubtitle="현재는 바로 수락 가능한 배송이 우선 열려 있습니다."
+        emptyTitle="현재 제안된 배송이 없습니다"
+        emptySubtitle="바로 수락 가능한 배송이 우선 노출됩니다."
         getKey={(group) => group.id}
         renderItem={(group) => (
           <MissionGroupCard

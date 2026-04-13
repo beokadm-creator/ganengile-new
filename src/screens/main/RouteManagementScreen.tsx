@@ -78,8 +78,8 @@ export default function RouteManagementScreen() {
   const handleRegisterTerritory = () => {
     if (isPreviewMode) {
       Alert.alert(
-        '미리보기 모드',
-        '권역을 추가하려면 길러 신청을 완료해주세요.',
+        '길러 전용',
+            '길러 신청 후 권역을 추가할 수 있습니다.',
         [
           { text: '닫기', style: 'cancel' },
           { text: '신청하기', onPress: () => navigation.navigate('Profile') }
@@ -185,7 +185,7 @@ export default function RouteManagementScreen() {
           <Text style={styles.heroKicker}>가는길에</Text>
           <Text style={styles.heroTitle}>미션을 받는 기준</Text>
           <Text style={styles.heroSubtitle}>
-            자주 가는 길을 등록하면 권역 안의 미션과 더 잘 이어집니다.
+            자주 가는 길을 등록하면 맞춤 미션을 제안합니다.
           </Text>
         </View>
 
@@ -216,7 +216,7 @@ export default function RouteManagementScreen() {
           <View style={styles.sectionHeader}>
             <View style={styles.sectionHeaderCopy}>
               <Text style={styles.sectionTitle}>권역</Text>
-              <Text style={styles.sectionSubtitle}>현재 위치 인증으로만 추가되고 최대 2개까지 관리합니다.</Text>
+              <Text style={styles.sectionSubtitle}>현재 위치 기준으로 권역을 등록하여 미션을 추천받으세요. 최대 2개까지 관리할 수 있습니다.</Text>
             </View>
             <TouchableOpacity
               style={[
@@ -280,7 +280,7 @@ export default function RouteManagementScreen() {
               })}
             </View>
           ) : (
-            <Text style={styles.emptyInlineText}>먼저 현재 위치로 권역을 추가하면 미션 리스트가 더 정확해집니다.</Text>
+            <Text style={styles.emptyInlineText}>권역을 추가하여 정확한 미션을 추천받으세요.</Text>
           )}
         </View>
 
@@ -304,8 +304,8 @@ export default function RouteManagementScreen() {
                 onPress={() => {
                   if (isPreviewMode) {
                     Alert.alert(
-                      '미리보기 모드',
-                      '동선을 추가하려면 길러 신청을 완료해주세요.',
+                      '길러 전용',
+                  '길러 신청 후 동선을 추가할 수 있습니다.',
                       [
                         { text: '닫기', style: 'cancel' },
                         { text: '신청하기', onPress: () => navigation.navigate('Profile') }
@@ -374,8 +374,8 @@ export default function RouteManagementScreen() {
           onPress={() => {
             if (isPreviewMode) {
               Alert.alert(
-                '미리보기 모드',
-                '동선을 추가하려면 길러 신청을 완료해주세요.',
+                '길러 전용',
+              '길러 신청 후 동선을 추가할 수 있습니다.',
                 [
                   { text: '닫기', style: 'cancel' },
                   { text: '신청하기', onPress: () => navigation.navigate('Profile') }

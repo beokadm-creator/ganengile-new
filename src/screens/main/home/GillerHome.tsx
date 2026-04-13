@@ -1,5 +1,5 @@
 import React, { useEffect, useRef } from 'react';
-import { ScrollView, RefreshControl, View, Text, TouchableOpacity, Animated, StyleSheet } from 'react-native';
+import { ScrollView, RefreshControl, View, Text, TouchableOpacity, Animated, StyleSheet, Alert } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { Colors } from '../../../theme';
 import { UserRole } from '../../../types/user';
@@ -113,7 +113,7 @@ export function GillerHome({
           activeOpacity={0.9}
         >
           <MaterialIcons name="visibility" size={16} color="#FFFFFF" style={{ marginRight: 6 }} />
-          <Text style={localStyles.previewText}>길러 미리보기 모드입니다. 실제 배송을 하려면 신청을 완료해주세요.</Text>
+          <Text style={localStyles.previewText}>길러 미리보기 모드입니다. 배송을 시작하려면 신청해 주세요.</Text>
           <MaterialIcons name="chevron-right" size={18} color="#FFFFFF" style={{ marginLeft: 'auto' }} />
         </TouchableOpacity>
       )}
@@ -173,7 +173,13 @@ export function GillerHome({
             icon="account-balance-wallet"
             title="지갑 보기"
             subtitle="포인트 확인"
-            onPress={() => navigation.navigate('PointHistory')}
+            onPress={() => {
+              if (isPreviewMode) {
+                Alert.alert('미리보기 모드', '포인트 내역은 길러 신청 후 확인할 수 있습니다.');
+                return;
+              }
+              navigation.navigate('PointHistory');
+            }}
           />
           <ActionCard
             icon="inventory-2"
@@ -197,7 +203,7 @@ export function GillerHome({
             <View style={styles.recommendationRow}>
               <MaterialIcons name="two-wheeler" size={18} color={Colors.primary} />
               <Text style={styles.recommendationText}>
-                길러 역할 전환을 원하시면 프로필에서 본인확인과 신청 상태를 먼저 확인해 주세요.
+                길러 신청 후 활동을 시작해 보세요.
               </Text>
             </View>
           ) : null}
@@ -229,8 +235,8 @@ export function GillerHome({
           ))
         ) : (
           <EmptyCard
-            title="지금 바로 받을 수 있는 미션이 없습니다"
-            subtitle="조건에 맞는 미션이 올라오면 여기에서 바로 보고 선점할 수 있습니다."
+            title="조건에 맞는 미션이 없습니다."
+            subtitle="새로운 미션이 등록되면 여기에 표시됩니다."
           />
         )}
         {(snapshot?.missionCards ?? []).length > 3 ? (

@@ -135,9 +135,9 @@ export default function EarningsScreen({ navigation }: Props) {
       <View style={styles.header}>
         <Text style={styles.headerKicker}>giller settlement</Text>
         <Text style={styles.headerTitle}>수익과 정산 기준</Text>
-        <Text style={styles.headerSubtitle}>
-          매출, 플랫폼 수수료, 원천징수 3.3%, 실수령액을 분리해서 보여줍니다.
-        </Text>
+        <Text style={styles.heroSubtitle}>
+            플랫폼 수수료와 원천징수를 제외한 실수령액입니다.
+          </Text>
       </View>
 
       <ScrollView
@@ -176,8 +176,8 @@ export default function EarningsScreen({ navigation }: Props) {
           onPress={() => {
             if (isPreviewMode) {
               Alert.alert(
-                '미리보기 모드',
-                '수익금을 출금하려면 길러 신청을 완료해주세요.',
+                '길러 전용',
+              '출금은 길러 신청 후 이용할 수 있습니다.',
                 [
                   { text: '닫기', style: 'cancel' },
                   { text: '신청하기', onPress: () => navigation.navigate('Profile') }
@@ -194,7 +194,7 @@ export default function EarningsScreen({ navigation }: Props) {
             <Text style={styles.withdrawButtonText}>정산금 출금하기</Text>
           </View>
           <Text style={[styles.withdrawButtonSubtext, isPreviewMode && styles.previewButtonSubtextAlt]}>
-            출금 전에는 계좌 상태, 본인 확인, 운영 검토 여부를 먼저 확인합니다.
+            계좌 및 본인 확인 후 출금됩니다.
           </Text>
         </TouchableOpacity>
 
@@ -320,7 +320,7 @@ const styles = StyleSheet.create({
     fontSize: Typography.fontSize['3xl'],
     fontWeight: '800',
   },
-  headerSubtitle: {
+  heroSubtitle: {
     marginTop: Spacing.sm,
     color: Colors.textSecondary,
     fontSize: Typography.fontSize.base,
