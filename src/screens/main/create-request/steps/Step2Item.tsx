@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useRef } from 'react';
 import { View, Text, TouchableOpacity, TextInput, Alert, StyleSheet } from 'react-native';
 import { Image } from 'expo-image';
 import { StepContainer } from '../components/StepContainer';
@@ -36,6 +36,16 @@ export function Step2Item({
   hasItemValue,
 }: Props) {
   const store = useCreateRequestStore();
+  const inputRef = useRef<TextInput>(null);
+
+  useEffect(() => {
+    if (store.activeStep === 2) {
+      const timer = setTimeout(() => {
+        inputRef.current?.focus();
+      }, 400); // Wait for LayoutAnimation to complete
+      return () => clearTimeout(timer);
+    }
+  }, [store.activeStep]);
 
   return (
     <StepContainer 
@@ -85,6 +95,7 @@ export function Step2Item({
 
       <Block title="물품 정보">
         <TextInput
+          ref={inputRef}
           style={styles.input}
           value={store.packageItemName}
           onChangeText={store.setPackageItemName}

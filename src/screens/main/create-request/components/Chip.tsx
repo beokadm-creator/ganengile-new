@@ -1,5 +1,6 @@
 import React from 'react';
 import { TouchableOpacity, Text, StyleSheet } from 'react-native';
+import * as Haptics from 'expo-haptics';
 import { BorderRadius, Colors, Spacing, Typography } from '../../../../theme';
 
 type Props = {
@@ -9,8 +10,19 @@ type Props = {
 };
 
 export function Chip({ label, active, onPress }: Props) {
+  const handlePress = () => {
+    if (!active) {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+    }
+    onPress();
+  };
+
   return (
-    <TouchableOpacity style={[styles.chip, active && styles.chipActive]} onPress={onPress}>
+    <TouchableOpacity 
+      style={[styles.chip, active && styles.chipActive]} 
+      onPress={handlePress}
+      activeOpacity={0.7}
+    >
       <Text style={[styles.chipText, active && styles.chipTextActive]}>{label}</Text>
     </TouchableOpacity>
   );

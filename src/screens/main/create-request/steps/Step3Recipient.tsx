@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useRef } from 'react';
 import { View, Text, TouchableOpacity, TextInput, ActivityIndicator, Alert, StyleSheet } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { StepContainer } from '../components/StepContainer';
@@ -45,6 +45,16 @@ export function Step3Recipient({
   onNavigateToProfile,
 }: Props) {
   const store = useCreateRequestStore();
+  const inputRef = useRef<TextInput>(null);
+
+  useEffect(() => {
+    if (store.activeStep === 3) {
+      const timer = setTimeout(() => {
+        inputRef.current?.focus();
+      }, 400); // Wait for LayoutAnimation to complete
+      return () => clearTimeout(timer);
+    }
+  }, [store.activeStep]);
 
   const formatPhoneNumber = (text: string) => {
     const cleaned = text.replace(/[^0-9]/g, '');
@@ -107,6 +117,7 @@ export function Step3Recipient({
           multiline
         />
         <TextInput
+          ref={inputRef}
           style={styles.input}
           value={store.recipientName}
           onChangeText={store.setRecipientName}

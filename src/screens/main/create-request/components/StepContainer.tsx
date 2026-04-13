@@ -1,5 +1,6 @@
 import React from 'react';
-import { View, TouchableOpacity, Text, StyleSheet } from 'react-native';
+import { View, TouchableOpacity, Text, StyleSheet, Keyboard } from 'react-native';
+import * as Haptics from 'expo-haptics';
 import { BorderRadius, Colors, Shadows, Spacing, Typography } from '../../../../theme';
 
 type Props = {
@@ -23,14 +24,23 @@ export function StepContainer({
 }: Props) {
   if (currentStep !== step) return null;
 
+  const handleNext = () => {
+    if (!nextDisabled && onNext) {
+      Keyboard.dismiss();
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
+      onNext();
+    }
+  };
+
   return (
     <View style={styles.stepContainer}>
       {children}
       {onNext && (
         <TouchableOpacity
           style={[styles.nextStepButton, nextDisabled && styles.nextStepButtonDisabled]}
-          onPress={onNext}
+          onPress={handleNext}
           disabled={nextDisabled}
+          activeOpacity={0.8}
         >
           <Text style={styles.nextStepButtonText}>{nextLabel}</Text>
         </TouchableOpacity>
