@@ -71,6 +71,7 @@ import { Step1Location } from './create-request/steps/Step1Location';
 import { Step2Item } from './create-request/steps/Step2Item';
 import { Step3Recipient } from './create-request/steps/Step3Recipient';
 import { Step4Quote } from './create-request/steps/Step4Quote';
+import { StepSummaryCard } from './create-request/components/StepSummaryCard';
 import type { LocationMode, PackageSize, PickerType, AddressTarget, NearbyPickerState } from './create-request/types';
 
 type Props = {
@@ -778,11 +779,57 @@ export default function CreateRequestScreen({ navigation, route }: Props) {
 
   const minQuotePrice = quotes.length > 0 ? Math.min(...quotes.map((q) => q.pricing.publicPrice)) : 0;
 
+  const renderStep1Summary = () => {
+    if (activeStep <= 1) return null;
+    const pickup = pickupRoadAddress ? `${pickupRoadAddress} (${pickupStation?.stationName})` : pickupStation?.stationName;
+    const delivery = deliveryRoadAddress ? `${deliveryRoadAddress} (${deliveryStation?.stationName})` : deliveryStation?.stationName;
+    return (
+      <StepSummaryCard
+        step={1}
+        title="출발/도착지 정보"
+        summary={[`출발: ${pickup || '-'}`, `도착: ${delivery || '-'}`]}
+        onEdit={() => setActiveStep(1)}
+      />
+    );
+  };
+
+  const renderStep2Summary = () => {
+    if (activeStep <= 2) return null;
+    return (
+      <StepSummaryCard
+        step={2}
+        title="물품 정보"
+        summary={[
+          `분류: ${packageCategory || '-'}`,
+          `상세: ${packageItemName || '-'}`,
+          `크기/무게: ${packageSize || '-'} / ${weightKg ? `${weightKg}kg` : '-'}`,
+        ]}
+        onEdit={() => setActiveStep(2)}
+      />
+    );
+  };
+
+  const renderStep3Summary = () => {
+    if (activeStep <= 3) return null;
+    return (
+      <StepSummaryCard
+        step={3}
+        title="수령인 및 요청사항"
+        summary={[
+          `수령인: ${recipientName || '-'}`,
+          `요청사항: ${specialInstructions || '없음'}`,
+        ]}
+        onEdit={() => setActiveStep(3)}
+      />
+    );
+  };
+
   return (
     <KeyboardAvoidingView style={styles.container} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-      <AppTopBar title={`배송 요청 (${activeStep}/4)`} onBack={handleBack} />
+      <AppTopBar title="배송 요청" onBack={handleBack} />
 
       <ScrollView ref={scrollViewRef} contentContainerStyle={[styles.content, { paddingBottom: 100 }]} showsVerticalScrollIndicator={false}>
+        {renderStep1Summary()}
         <Step1Location
           savedAddresses={savedAddresses}
           recentAddresses={recentAddresses}
@@ -795,6 +842,7 @@ export default function CreateRequestScreen({ navigation, route }: Props) {
           handleUseCurrentLocation={handleUseCurrentLocation}
         />
 
+        {renderStep2Summary()}
         <Step2Item
           handleUploadPhotoFromCamera={handleUploadPhotoFromCamera}
           handleUploadPhotoFromLibrary={handleUploadPhotoFromLibrary}
@@ -804,6 +852,7 @@ export default function CreateRequestScreen({ navigation, route }: Props) {
           hasItemValue={hasItemValue}
         />
 
+        {renderStep3Summary()}
         <Step3Recipient
           setShowLockerLocator={setShowLockerLocator}
           recipientPrivacyConfig={recipientPrivacyConfig}
