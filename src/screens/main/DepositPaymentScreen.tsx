@@ -58,7 +58,14 @@ export default function DepositPaymentScreen({ navigation, route }: { navigation
   async function handlePayment() {
     try {
       setLoading(true);
-      const result = await DepositService.payDeposit(gillerId, resolvedRequesterId, requestId, itemValue);
+      
+      // TODO: 추후 토스 페이먼츠 위젯을 연동하여 실제 결제를 진행하고 paymentKey를 받아와야 합니다.
+      // 현재는 pgAmount(외부 결제 금액)가 0보다 크더라도 paymentKey 없이 서비스 함수를 호출하여
+      // 백엔드에서 강제 테스트 모드(config.allowTestBypass 등)로 우회하도록 의존하고 있습니다.
+      // 실 서비스 배포 시 이 부분이 구현되지 않으면 "외부 결제 금액이 필요하나 paymentKey가 제공되지 않았습니다." 에러가 발생합니다.
+      const paymentKey = pgAmount > 0 ? 'test_dummy_key_from_frontend' : undefined;
+
+      const result = await DepositService.payDeposit(gillerId, resolvedRequesterId, requestId, itemValue, paymentKey);
       if (!result.success) {
         Alert.alert('결제 실패', result.error ?? '보증금 결제 중 문제가 발생했습니다.');
         return;

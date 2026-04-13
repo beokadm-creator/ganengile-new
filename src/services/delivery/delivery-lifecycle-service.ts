@@ -224,7 +224,7 @@ function isPrePickupStatus(status: unknown): boolean {
 }
 
 function isPostPickupStatus(status: unknown): boolean {
-  return status === 'in_transit' || status === 'arrived' || status === 'at_locker';
+  return status === 'in_transit' || status === 'arrived' || status === 'at_locker' || status === 'delivered';
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -566,7 +566,7 @@ export const deliveryLifecycleService = {
   async gillerCancelAcceptance(
     requestId: string,
     gillerId: string
-  ): Promise<{ success: boolean; message: string }> {
+  ): Promise<DeliveryCancellationResult> {
     try {
       const requestRef = doc(db, 'requests', requestId);
       const requestSnap = await getDoc(requestRef);
@@ -589,6 +589,26 @@ export const deliveryLifecycleService = {
       } catch (error) {
         console.error('Failed to apply pre-pickup cancellation penalty:', error);
         return { success: false, message: '패널티 적용에 실패하여 취소할 수 없습니다. 다시 시도해주세요.' };
+      }
+
+      let depositStatus: DeliveryCancellationResult['depositStatus'] = 'not_found';
+      const depositsSnap = await getDocs(
+        query(
+          collection(db, 'deposits'),
+          where('requestId', '==', requestId),
+          where('status', '==', 'paid')
+        )
+      );
+
+      if (!depositsSnap.empty) {
+        const depositDoc = depositsSnap.docs[0];
+        const refundResult = await DepositService.refundDeposit(depositDoc.id);
+        if (!refundResult.success) {
+          console.error(`Failed to refund deposit ${depositDoc.id} during giller cancellation:`, (refundResult as any).error || refundResult.message);
+          depositStatus = 'failed';
+        } else {
+          depositStatus = 'refunded';
+        }
       }
 
       const deliveriesQ = query(collection(db, 'deliveries'), where('requestId', '==', requestId));
@@ -616,7 +636,13 @@ export const deliveryLifecycleService = {
         updatedAt: serverTimestamp(),
       });
 
-      return { success: true, message: '수락이 취소되었고 패널티가 반영된 뒤 다시 매칭 대기 상태로 전환되었습니다.' };
+      return {
+        success: true,
+        message: '배송 수락이 취소되었습니다. 패널티가 부과되었으며 보증금이 환불되었습니다.',
+        requestStatus: 'pending',
+        depositStatus,
+        penaltyApplied: true,
+      };
     } catch (error) {
       console.error('Error cancelling acceptance:', error);
       return { success: false, message: '수락 취소 처리에 실패했습니다.' };
@@ -721,6 +747,12 @@ export const deliveryLifecycleService = {
             return { success: false, message: '패널티 적용에 실패하여 취소할 수 없습니다. 다시 시도해주세요.', requestStatus: 'unchanged', depositStatus: 'unchanged' };
           }
 
+          let depositStatus: DeliveryCancellationResult['depositStatus'] = deposit ? 'unchanged' : 'not_found';
+          if (deposit?.depositId) {
+            const refundResult = await DepositService.refundDeposit(deposit.depositId);
+            depositStatus = refundResult.success ? 'refunded' : 'failed';
+          }
+
           await updateDoc(deliveryRef, {
             status: 'cancelled',
             cancellationReason: args.reason,
@@ -743,7 +775,7 @@ export const deliveryLifecycleService = {
             success: true,
             message: '길러 수락이 취소되어 요청이 다시 매칭 대기로 돌아갔습니다.',
             requestStatus: 'pending',
-            depositStatus: deposit ? 'unchanged' : 'not_found',
+            depositStatus,
             penaltyApplied: true,
           };
         }
@@ -790,6 +822,19 @@ export const deliveryLifecycleService = {
             penaltyApplied: true,
           };
         }
+
+        return {
+          success: false,
+          message: '이미 완료되거나 취소된 배송은 취소할 수 없습니다.',
+          requestStatus: 'unchanged',
+          depositStatus: deposit ? 'unchanged' : 'not_found',
+        };
+      }
+
+      let depositStatus: DeliveryCancellationResult['depositStatus'] = deposit ? 'unchanged' : 'not_found';
+      if (deposit?.depositId && (args.actorType === 'system' || (args.actorType as string) === 'admin')) {
+        const refundResult = await DepositService.refundDeposit(deposit.depositId);
+        depositStatus = refundResult.success ? 'refunded' : 'failed';
       }
 
       await updateDoc(deliveryRef, {
@@ -816,7 +861,7 @@ export const deliveryLifecycleService = {
         success: true,
         message: '취소가 반영되었습니다.',
         requestStatus: 'cancelled',
-        depositStatus: deposit ? 'unchanged' : 'not_found',
+        depositStatus,
       };
     } catch (error) {
       console.error('Error cancelling delivery flow:', error);
