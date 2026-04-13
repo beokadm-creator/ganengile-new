@@ -67,13 +67,39 @@ export async function GET(req: NextRequest) {
   const status = searchParams.get('status') ?? 'pending';
 
   try {
-    const [withdrawalsSnap, bankConfigSnap] = await Promise.all([
-      db.collection('withdraw_requests').where('status', '==', status).orderBy('createdAt', 'desc').get(),
-      db.collection('config_integrations').doc('bank').get(),
-    ]);
+    let withdrawalsDocs: any[] = [];
+    
+    try {
+      const snap = await db.collection('withdraw_requests')
+        .where('status', '==', status)
+        .orderBy('createdAt', 'desc')
+        .get();
+      withdrawalsDocs = snap.docs;
+    } catch (dbError: any) {
+      const isIndexError = dbError.code === 9 || 
+                          dbError.message?.includes('requires an index') || 
+                          (dbError.message?.includes('FAILED_PRECONDITION') && dbError.message?.includes('index'));
+                          
+      if (isIndexError) {
+        console.warn('Withdrawals API: Missing index for status + createdAt, falling back to client-side sort');
+        const fallbackSnap = await db.collection('withdraw_requests')
+          .where('status', '==', status)
+          .get();
+          
+        withdrawalsDocs = fallbackSnap.docs.sort((a, b) => {
+          const timeA = a.data().createdAt ? new Date(a.data().createdAt.toDate?.() || a.data().createdAt).getTime() : 0;
+          const timeB = b.data().createdAt ? new Date(b.data().createdAt.toDate?.() || b.data().createdAt).getTime() : 0;
+          return timeB - timeA;
+        });
+      } else {
+        throw dbError;
+      }
+    }
+
+    const bankConfigSnap = await db.collection('config_integrations').doc('bank').get();
 
     const userIds = new Set<string>();
-    withdrawalsSnap.docs.forEach((doc) => {
+    withdrawalsDocs.forEach((doc) => {
       const data = doc.data() as UnknownRecord;
       if (typeof data.userId === 'string' && data.userId) userIds.add(data.userId);
     });
@@ -87,7 +113,7 @@ export async function GET(req: NextRequest) {
     const userMap = new Map(userEntries);
 
     const bankConfig = bankConfigSnap.exists ? ((bankConfigSnap.data() as UnknownRecord) ?? {}) : {};
-    const items = withdrawalsSnap.docs.map((doc) => {
+    const items = withdrawalsDocs.map((doc) => {
       const data = doc.data() as UnknownRecord;
       const user = typeof data.userId === 'string' ? userMap.get(data.userId) ?? null : null;
       const bankSnapshot = readBankSnapshot(data);
@@ -138,20 +164,6 @@ export async function GET(req: NextRequest) {
     });
   } catch (error: any) {
     console.error('Failed to fetch withdrawals:', error);
-    
-    if (error.message?.includes('FAILED_PRECONDITION') && error.message?.includes('requires an index')) {
-      const linkMatch = error.message.match(/https:\/\/console\.firebase\.google\.com[^\s]*/);
-      const indexLink = linkMatch ? linkMatch[0] : null;
-      
-      return NextResponse.json(
-        { 
-          error: '데이터베이스 색인(Index) 생성이 필요합니다.', 
-          details: 'Firestore 복합 색인이 아직 생성되지 않았거나 빌드 중입니다. 백엔드 로그에 출력된 링크를 클릭하여 색인을 생성해주세요.',
-          indexLink
-        }, 
-        { status: 500 }
-      );
-    }
     
     return NextResponse.json(
       { error: '데이터를 불러오는데 실패했습니다.', details: error.message }, 
