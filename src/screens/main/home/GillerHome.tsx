@@ -35,6 +35,24 @@ interface GillerHomeProps {
   canAccessGiller: boolean;
 }
 
+const localStyles = StyleSheet.create({
+  previewBanner: {
+    backgroundColor: Colors.primary,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.sm,
+    paddingVertical: Spacing.md,
+    paddingHorizontal: Spacing.lg,
+    borderRadius: BorderRadius.md,
+  },
+  previewText: {
+    color: Colors.textWhite,
+    fontSize: Typography.fontSize.sm,
+    fontWeight: Typography.fontWeight.bold,
+    flex: 1,
+  },
+});
+
 export function GillerHome({
   snapshot,
   navigation,
@@ -216,21 +234,3 @@ export function GillerHome({
     </ScrollView>
   );
 }
-
-const localStyles = StyleSheet.create({
-  previewBanner: {
-    backgroundColor: Colors.primary,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: Spacing.sm,
-    paddingVertical: Spacing.md,
-    paddingHorizontal: Spacing.lg,
-    borderRadius: BorderRadius.md,
-  },
-  previewText: {
-    color: Colors.textWhite,
-    fontSize: Typography.fontSize.sm,
-    fontWeight: Typography.fontWeight.bold,
-    flex: 1,
-  },
-});
