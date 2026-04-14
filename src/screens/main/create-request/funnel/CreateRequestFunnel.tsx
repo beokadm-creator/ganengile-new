@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { View, Text, TouchableOpacity, TextInput, StyleSheet, ScrollView, Image } from 'react-native';
+import { View, Text, TouchableOpacity, TextInput, StyleSheet, ScrollView, Image, ActivityIndicator } from 'react-native';
 import Animated, { FadeInDown, Layout } from 'react-native-reanimated';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useCreateRequestStore } from '../store/useCreateRequestStore';
@@ -23,6 +23,7 @@ type Props = {
   savedAddresses: SavedAddress[];
   recentAddresses: SavedAddress[];
   setAddressTarget: (target: 'pickup' | 'delivery' | null) => void;
+  resolvingAddressStation: 'pickup' | 'delivery' | null;
   handleRecommendStationFromAddress: (target: 'pickup' | 'delivery', address: string) => void;
   setPickerType: (type: 'pickup' | 'delivery') => void;
   setPickerVisible: (visible: boolean) => void;
@@ -86,6 +87,10 @@ export default function CreateRequestFunnel(props: Props) {
     }
   };
 
+  const goToStep = (step: number) => {
+    setCurrentStep(step);
+  };
+
   // Render Helpers
   const renderQuestionBox = (
     index: number,
@@ -94,14 +99,23 @@ export default function CreateRequestFunnel(props: Props) {
     isActive: boolean
   ) => {
     if (currentStep < index) return null;
+    const isPast = currentStep > index;
+
     return (
       <Animated.View
         key={index}
         entering={FadeInDown.duration(400).delay(100)}
         layout={Layout.springify()}
-        style={[styles.questionBox, !isActive && styles.pastQuestionBox]}
+        style={[styles.questionBox, isPast && styles.pastQuestionBox]}
       >
-        <Text style={styles.questionText}>{question}</Text>
+        <View style={styles.questionHeader}>
+          <Text style={styles.questionText}>{question}</Text>
+          {isPast && (
+            <TouchableOpacity onPress={() => goToStep(index)} style={styles.editButton}>
+              <Text style={styles.editButtonText}>수정</Text>
+            </TouchableOpacity>
+          )}
+        </View>
         <View pointerEvents={isActive ? 'auto' : 'none'}>{content}</View>
       </Animated.View>
     );
@@ -166,7 +180,9 @@ export default function CreateRequestFunnel(props: Props) {
 
   const renderPickupLocation = () => {
     const isAddress = store.pickupMode === 'address';
-    const hasValue = isAddress ? !!store.pickupRoadAddress : !!store.pickupStation;
+    const hasRoadAddress = !!store.pickupRoadAddress;
+    const hasStation = !!store.pickupStation;
+    const hasValue = isAddress ? (hasRoadAddress && hasStation) : hasStation;
     const valueText = isAddress
       ? store.pickupRoadAddress ? formatDetailedAddress(store.pickupRoadAddress, store.pickupDetailAddress) : ''
       : store.pickupStation?.stationName || '';
@@ -174,7 +190,7 @@ export default function CreateRequestFunnel(props: Props) {
     return renderQuestionBox(
       2,
       isAddress ? '출발지 주소를 알려주세요.' : '어느 역에서 출발하나요?',
-      <View>
+      <View style={{ gap: Spacing.sm }}>
         <TouchableOpacity
           style={styles.inputBox}
           onPress={() => {
@@ -182,10 +198,33 @@ export default function CreateRequestFunnel(props: Props) {
             else { props.setPickerType('pickup'); props.setPickerVisible(true); }
           }}
         >
-          <Text style={{ color: hasValue ? Colors.textPrimary : Colors.textSecondary }}>
-            {hasValue ? valueText : (isAddress ? '주소 검색하기' : '지하철역 검색하기')}
+          <Text style={{ color: hasRoadAddress || (!isAddress && hasStation) ? Colors.textPrimary : Colors.textSecondary }}>
+            {isAddress 
+              ? (store.pickupRoadAddress || '주소 검색하기') 
+              : (store.pickupStation?.stationName || '지하철역 검색하기')}
           </Text>
         </TouchableOpacity>
+
+        {isAddress && hasRoadAddress && (
+          <TextInput
+            style={styles.inputBox}
+            placeholder="상세 주소 (동, 호수)"
+            value={store.pickupDetailAddress}
+            onChangeText={store.setPickupDetailAddress}
+          />
+        )}
+
+        {props.resolvingAddressStation === 'pickup' && (
+          <View style={styles.loadingRow}>
+            <ActivityIndicator size="small" color={Colors.primary} />
+            <Text style={styles.loadingText}>가까운 지하철역을 찾는 중입니다...</Text>
+          </View>
+        )}
+
+        {isAddress && hasRoadAddress && !hasStation && props.resolvingAddressStation !== 'pickup' && (
+          <Text style={styles.errorText}>인근에 서비스 가능한 지하철역이 없습니다. 다른 주소를 선택해주세요.</Text>
+        )}
+
         {hasValue && currentStep === 2 && (
           <TouchableOpacity style={styles.nextButton} onPress={() => advanceTo(isAddress ? 4 : 3)}>
             <Text style={styles.nextButtonText}>다음</Text>
@@ -267,7 +306,9 @@ export default function CreateRequestFunnel(props: Props) {
 
   const renderDeliveryLocation = () => {
     const isAddress = store.deliveryMode === 'address';
-    const hasValue = isAddress ? !!store.deliveryRoadAddress : !!store.deliveryStation;
+    const hasRoadAddress = !!store.deliveryRoadAddress;
+    const hasStation = !!store.deliveryStation;
+    const hasValue = isAddress ? (hasRoadAddress && hasStation) : hasStation;
     const valueText = isAddress
       ? store.deliveryRoadAddress ? formatDetailedAddress(store.deliveryRoadAddress, store.deliveryDetailAddress) : ''
       : store.deliveryStation?.stationName || '';
@@ -275,7 +316,7 @@ export default function CreateRequestFunnel(props: Props) {
     return renderQuestionBox(
       5,
       isAddress ? '도착지 주소를 알려주세요.' : '어느 역으로 도착하나요?',
-      <View>
+      <View style={{ gap: Spacing.sm }}>
         <TouchableOpacity
           style={styles.inputBox}
           onPress={() => {
@@ -283,10 +324,33 @@ export default function CreateRequestFunnel(props: Props) {
             else { props.setPickerType('delivery'); props.setPickerVisible(true); }
           }}
         >
-          <Text style={{ color: hasValue ? Colors.textPrimary : Colors.textSecondary }}>
-            {hasValue ? valueText : (isAddress ? '주소 검색하기' : '지하철역 검색하기')}
+          <Text style={{ color: hasRoadAddress || (!isAddress && hasStation) ? Colors.textPrimary : Colors.textSecondary }}>
+            {isAddress 
+              ? (store.deliveryRoadAddress || '주소 검색하기') 
+              : (store.deliveryStation?.stationName || '지하철역 검색하기')}
           </Text>
         </TouchableOpacity>
+
+        {isAddress && hasRoadAddress && (
+          <TextInput
+            style={styles.inputBox}
+            placeholder="상세 주소 (동, 호수)"
+            value={store.deliveryDetailAddress}
+            onChangeText={store.setDeliveryDetailAddress}
+          />
+        )}
+
+        {props.resolvingAddressStation === 'delivery' && (
+          <View style={styles.loadingRow}>
+            <ActivityIndicator size="small" color={Colors.primary} />
+            <Text style={styles.loadingText}>가까운 지하철역을 찾는 중입니다...</Text>
+          </View>
+        )}
+
+        {isAddress && hasRoadAddress && !hasStation && props.resolvingAddressStation !== 'delivery' && (
+          <Text style={styles.errorText}>인근에 서비스 가능한 지하철역이 없습니다. 다른 주소를 선택해주세요.</Text>
+        )}
+
         {hasValue && currentStep === 5 && (
           <TouchableOpacity style={styles.nextButton} onPress={() => advanceTo(isAddress ? 7 : 6)}>
             <Text style={styles.nextButtonText}>다음</Text>
@@ -466,7 +530,9 @@ export default function CreateRequestFunnel(props: Props) {
         layout={Layout.springify()}
         style={styles.quoteCard}
       >
-        <Text style={styles.questionText}>최종 결제 내역을 확인해주세요.</Text>
+        <View style={styles.questionHeader}>
+          <Text style={styles.questionText}>최종 결제 내역을 확인해주세요.</Text>
+        </View>
         
         <View style={styles.quoteBreakdown}>
           <QuoteBreakdownRow label="기본요금" value={card.pricing.baseFee} />
@@ -515,8 +581,11 @@ const styles = StyleSheet.create({
   container: { flex: 1 },
   content: { padding: Spacing.xl, paddingBottom: 200, gap: Spacing.xl },
   questionBox: { marginBottom: Spacing.md },
-  pastQuestionBox: { opacity: 0.5 },
-  questionText: { fontSize: Typography.fontSize.xl, fontWeight: Typography.fontWeight.extrabold, color: Colors.textPrimary, marginBottom: Spacing.md },
+  pastQuestionBox: { opacity: 0.4 },
+  questionHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: Spacing.md },
+  questionText: { fontSize: Typography.fontSize.xl, fontWeight: Typography.fontWeight.extrabold, color: Colors.textPrimary, flex: 1 },
+  editButton: { paddingHorizontal: Spacing.sm, paddingVertical: Spacing.xs, backgroundColor: Colors.gray100, borderRadius: BorderRadius.sm },
+  editButtonText: { color: Colors.primary, fontSize: Typography.fontSize.sm, fontWeight: Typography.fontWeight.bold },
   row: { flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.sm },
   inputBox: { backgroundColor: Colors.surface, padding: Spacing.lg, borderRadius: BorderRadius.md, borderWidth: 1, borderColor: Colors.border, fontSize: Typography.fontSize.base, color: Colors.textPrimary },
   nextButton: { marginTop: Spacing.md, backgroundColor: Colors.primary, padding: Spacing.md, borderRadius: BorderRadius.md, alignItems: 'center' },
@@ -535,4 +604,7 @@ const styles = StyleSheet.create({
   disabledButton: { opacity: 0.5 },
   consentBox: { flexDirection: 'row', alignItems: 'center', gap: Spacing.xs, marginTop: Spacing.sm },
   consentText: { fontSize: Typography.fontSize.sm, color: Colors.textSecondary },
+  loadingRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing.sm, marginTop: Spacing.xs },
+  loadingText: { color: Colors.primary, fontSize: Typography.fontSize.sm, fontWeight: Typography.fontWeight.bold },
+  errorText: { color: Colors.error, fontSize: Typography.fontSize.sm, fontWeight: Typography.fontWeight.bold, marginTop: Spacing.xs },
 });

@@ -838,6 +838,7 @@ export default function CreateRequestScreen({ navigation, route }: Props) {
         savedAddresses={savedAddresses}
         recentAddresses={recentAddresses}
         setAddressTarget={setAddressTarget}
+        resolvingAddressStation={resolvingAddressStation}
         handleRecommendStationFromAddress={handleRecommendStationFromAddress}
         setPickerType={setPickerType}
         setPickerVisible={setPickerVisible}
