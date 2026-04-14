@@ -39,7 +39,8 @@ export interface Beta1RequestCreateInput {
   dropoffLockerId?: string;
   pickupStorageLocation?: string;
   dropoffStorageLocation?: string;
-  actualLockerFee?: number;
+  pickupLockerFee?: number;
+  dropoffLockerFee?: number;
   specialInstructions?: string;
   urgency?: 'normal' | 'fast' | 'urgent';
   selectedQuoteType: QuoteType;
@@ -351,14 +352,17 @@ export function buildBeta1QuoteCards(
     addressDropoffFee,
   });
 
+  // 1. 출발지 사물함 (Requester가 넣음) -> 요금 청구 X
+  // 2. 도착지 사물함 (Giller가 넣음) -> 길러가 본인 돈으로 결제하므로 배송비에 청구 O
+  const dropoffLockerFeeToCharge = input.dropoffLockerId 
+    ? (resolvedPolicy?.quoteAdjustments?.balancedLockerAssistedFee ?? input.dropoffLockerFee ?? 1000) 
+    : 0;
+
   const balancedPricing = buildQuotePricing(base, input, {
     urgencySurcharge: reservationMode
       ? Math.max(0, base.urgencySurcharge + (resolvedPolicy?.quoteAdjustments?.balancedReservationUrgencyOffset ?? -200))
       : base.urgencySurcharge,
-    lockerFee:
-      input.directParticipationMode === 'locker_assisted'
-        ? (resolvedPolicy?.quoteAdjustments?.balancedLockerAssistedFee ?? input.actualLockerFee ?? 1000)
-        : 0,
+    lockerFee: dropoffLockerFeeToCharge,
     addressPickupFee,
     addressDropoffFee,
   });
@@ -372,7 +376,7 @@ export function buildBeta1QuoteCards(
           ? (resolvedPolicy?.quoteAdjustments?.lowestPriceReservationUrgencyDiscount ?? 600)
           : (resolvedPolicy?.quoteAdjustments?.lowestPriceImmediateUrgencyDiscount ?? 200))
     ),
-    lockerFee: resolvedPolicy?.quoteAdjustments?.lowestPriceLockerFee ?? input.actualLockerFee ?? 700,
+    lockerFee: dropoffLockerFeeToCharge,
     addressPickupFee: Math.round(addressPickupFee * (resolvedPolicy?.quoteAdjustments?.lowestPriceAddressPickupDiscountRate ?? 0.6)),
     addressDropoffFee: Math.round(addressDropoffFee * (resolvedPolicy?.quoteAdjustments?.lowestPriceAddressDropoffDiscountRate ?? 0.6)),
     serviceFee: Math.max(0, base.serviceFee - (resolvedPolicy?.quoteAdjustments?.lowestPriceServiceFeeDiscount ?? 150)),
@@ -383,11 +387,7 @@ export function buildBeta1QuoteCards(
   );
 
   const lockerIncludedPricing = buildQuotePricing(base, input, {
-    lockerFee:
-      (resolvedPolicy?.quoteAdjustments?.lockerIncludedBaseFee ?? input.actualLockerFee ?? 1200) +
-      (reservationMode
-        ? (resolvedPolicy?.quoteAdjustments?.lockerIncludedReservationExtraFee ?? 200)
-        : (resolvedPolicy?.quoteAdjustments?.lockerIncludedImmediateExtraFee ?? 500)),
+    lockerFee: dropoffLockerFeeToCharge,
     addressPickupFee: Math.round(addressPickupFee * (resolvedPolicy?.quoteAdjustments?.lockerIncludedAddressPickupDiscountRate ?? 0.7)),
     addressDropoffFee: Math.round(addressDropoffFee * (resolvedPolicy?.quoteAdjustments?.lockerIncludedAddressDropoffDiscountRate ?? 0.7)),
   });

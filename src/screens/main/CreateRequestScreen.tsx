@@ -308,7 +308,8 @@ export default function CreateRequestScreen({ navigation, route }: Props) {
     dropoffLockerId, setDropoffLockerId,
     pickupStorageLocation, setPickupStorageLocation,
     dropoffStorageLocation, setDropoffStorageLocation,
-    actualLockerFee, setActualLockerFee,
+    pickupLockerFee, setPickupLockerFee,
+    dropoffLockerFee, setDropoffLockerFee,
     contactPhoneNumber, setContactPhoneNumber,
     verifiedPhoneOverride, setVerifiedPhoneOverride,
     aiQuotesLoading, setAiQuotesLoading,
@@ -767,7 +768,8 @@ export default function CreateRequestScreen({ navigation, route }: Props) {
         dropoffLockerId: useCreateRequestStore.getState().dropoffLockerId || undefined,
         pickupStorageLocation: useCreateRequestStore.getState().pickupStorageLocation || undefined,
         dropoffStorageLocation: useCreateRequestStore.getState().dropoffStorageLocation || undefined,
-        actualLockerFee: actualLockerFee || undefined,
+        pickupLockerFee: useCreateRequestStore.getState().pickupLockerFee || undefined,
+        dropoffLockerFee: useCreateRequestStore.getState().dropoffLockerFee || undefined,
         specialInstructions: specialInstructions || undefined,
         urgency: requestMode === 'reservation' ? 'normal' : urgency,
         selectedQuoteType: selectedQuoteTypeForSubmit,
@@ -1032,13 +1034,14 @@ export default function CreateRequestScreen({ navigation, route }: Props) {
                   // 기존 하위 호환을 위해 lockerId와 storageLocation도 업데이트 (첫 번째 선택 기준)
                   setLockerId(locker.lockerId);
                   setStorageLocation(`${locker.stationName} ${locker.lockerId}`);
+                  setPickupLockerFee(locker.pricePerHour ?? null);
                 } else {
                   setDropoffLockerId(locker.lockerId);
                   setDropoffStorageLocation(
                     `${locker.stationName} ${locker.lockerId.startsWith('AREA::') ? '사물함 구역' : locker.lockerId} (상태: ${locker.status})`
                   );
+                  setDropoffLockerFee(locker.pricePerHour ?? null);
                 }
-                setActualLockerFee(locker.pricePerHour ?? null);
                 setLockerLocatorTarget(null);
               }}
               onClose={() => setLockerLocatorTarget(null)}

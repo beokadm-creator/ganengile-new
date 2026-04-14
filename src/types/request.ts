@@ -122,6 +122,8 @@ export interface Request {
   dropoffLockerId?: string;
   pickupStorageLocation?: string;
   dropoffStorageLocation?: string;
+  pickupLockerFee?: number;
+  dropoffLockerFee?: number;
   reservationId?: string;
   specialInstructions?: string;
 

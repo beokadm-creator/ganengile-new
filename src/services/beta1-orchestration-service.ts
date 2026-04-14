@@ -675,6 +675,8 @@ export async function createBeta1Request(input: Beta1RequestCreateInput): Promis
     dropoffLockerId: input.dropoffLockerId?.trim() || null,
     pickupStorageLocation: input.pickupStorageLocation?.trim() || null,
     dropoffStorageLocation: input.dropoffStorageLocation?.trim() || null,
+    pickupLockerFee: input.pickupLockerFee ?? null,
+    dropoffLockerFee: input.dropoffLockerFee ?? null,
     specialInstructions: input.specialInstructions?.trim() || null,
     deadline: deadlineTimestamp,
     preferredTime: {
@@ -737,6 +739,8 @@ export async function createBeta1Request(input: Beta1RequestCreateInput): Promis
     dropoffLockerId: input.dropoffLockerId?.trim() || null,
     pickupStorageLocation: input.pickupStorageLocation?.trim() || null,
     dropoffStorageLocation: input.dropoffStorageLocation?.trim() || null,
+    pickupLockerFee: input.pickupLockerFee ?? null,
+    dropoffLockerFee: input.dropoffLockerFee ?? null,
     specialInstructions: input.specialInstructions?.trim() || null,
     recipientName: input.recipientName ?? null,
     recipientPhone: input.recipientPhone ?? null,

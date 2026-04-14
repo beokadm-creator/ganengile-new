@@ -106,8 +106,10 @@ export interface CreateRequestState {
   dropoffStorageLocation: string;
   setDropoffStorageLocation: (location: string) => void;
 
-  actualLockerFee: number | null;
-  setActualLockerFee: (fee: number | null) => void;
+  pickupLockerFee: number | null;
+  setPickupLockerFee: (fee: number | null) => void;
+  dropoffLockerFee: number | null;
+  setDropoffLockerFee: (fee: number | null) => void;
 
   // Phone Verification (Step 3)
   contactPhoneNumber: string;
@@ -169,7 +171,8 @@ const initialState = {
   pickupStorageLocation: '',
   dropoffLockerId: null as string | null,
   dropoffStorageLocation: '',
-  actualLockerFee: null as number | null,
+  pickupLockerFee: null as number | null,
+  dropoffLockerFee: null as number | null,
   contactPhoneNumber: '',
   verifiedPhoneOverride: null,
   aiQuotesLoading: false,
@@ -240,7 +243,8 @@ export const useCreateRequestStore = create<CreateRequestState>((set) => ({
   setPickupStorageLocation: (location) => set({ pickupStorageLocation: location }),
   setDropoffLockerId: (id) => set({ dropoffLockerId: id }),
   setDropoffStorageLocation: (location) => set({ dropoffStorageLocation: location }),
-  setActualLockerFee: (fee) => set({ actualLockerFee: fee }),
+  setPickupLockerFee: (fee) => set({ pickupLockerFee: fee }),
+  setDropoffLockerFee: (fee) => set({ dropoffLockerFee: fee }),
   
   setContactPhoneNumber: (phone) => set({ contactPhoneNumber: phone }),
   setVerifiedPhoneOverride: (phone) => set({ verifiedPhoneOverride: phone }),
