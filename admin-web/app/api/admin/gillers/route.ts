@@ -255,15 +255,6 @@ export async function PATCH(req: NextRequest) {
   let isVerificationApproved =
     verificationStatus === 'approved' || verificationStatus === 'approved_test_bypass';
 
-  const bankAccount =
-    (data.bankAccount as Record<string, unknown> | undefined) ??
-    ((typeof data.gillerInfo === 'object' && data.gillerInfo !== null
-      ? (data.gillerInfo as Record<string, unknown>).bankAccount
-      : undefined) as Record<string, unknown> | undefined);
-
-  const isBankAccountVerified =
-    bankAccount?.verificationStatus === 'verified' || bankAccount?.verificationStatus === 'verified_test_bypass';
-
   if (body.action === 'approve') {
     // If verification is pending, automatically approve it
     if (!isVerificationApproved && (verificationStatus === 'pending' || verificationStatus === 'under_review' || !verificationStatus)) {
@@ -287,12 +278,6 @@ export async function PATCH(req: NextRequest) {
     if (!isVerificationApproved) {
       return NextResponse.json(
         { error: '본인확인 정보가 반려되었거나 완료 상태가 아닙니다.' },
-        { status: 400 }
-      );
-    }
-    if (!isBankAccountVerified) {
-      return NextResponse.json(
-        { error: '정산 계좌가 인증되지 않아 승인할 수 없습니다.' },
         { status: 400 }
       );
     }
@@ -332,24 +317,8 @@ export async function PATCH(req: NextRequest) {
       isGiller: true,
       gillerApplicationStatus: 'approved',
       gillerApprovedAt: new Date(),
-      ...(bankAccount ? { 'gillerInfo.bankAccount': bankAccount } : {}),
       updatedAt: new Date(),
     });
-
-    if (bankAccount) {
-      await db
-        .collection('users')
-        .doc(data.userId)
-        .collection('profile')
-        .doc(data.userId)
-        .set(
-          {
-            bankAccount,
-            updatedAt: new Date(),
-          },
-          { merge: true }
-        );
-    }
   } else if (body.action === 'reject' && typeof data.userId === 'string') {
     await db.collection('users').doc(data.userId).update({
       gillerApplicationStatus: 'rejected',

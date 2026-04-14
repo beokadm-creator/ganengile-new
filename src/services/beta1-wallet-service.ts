@@ -168,8 +168,6 @@ export async function getWithdrawalEligibility(userId: string, amount?: number):
     balances: walletLedger.balances,
     minimumAmount: WITHDRAW_MIN_AMOUNT,
     isIdentityVerified: identityStatus === 'approved' || identityStatus === 'approved_test_bypass',
-    isPayoutAccountVerified: true, // Not required anymore before withdrawal
-    payoutAccountOwnerMatchesUser: true, // Not required anymore before withdrawal
     hasOpenDispute: !disputesSnap.empty,
     requiresManualReview: Boolean(userData.manualWithdrawalHold ?? false),
     hasRiskHold: Boolean(userData.riskHold ?? false),

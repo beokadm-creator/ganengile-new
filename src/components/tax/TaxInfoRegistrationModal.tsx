@@ -1,9 +1,10 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { View, Text, TextInput, TouchableOpacity, StyleSheet, ActivityIndicator, Alert } from 'react-native';
 import { getFunctions, httpsCallable } from 'firebase/functions';
 import { Colors, Spacing, BorderRadius } from '../../theme';
 import { Typography } from '../../theme/typography';
 import Modal from '../common/Modal';
+import { useUser } from '../../contexts/UserContext';
 
 interface TaxInfoRegistrationModalProps {
   visible: boolean;
@@ -12,12 +13,19 @@ interface TaxInfoRegistrationModalProps {
 }
 
 export function TaxInfoRegistrationModal({ visible, onClose, onSuccess }: TaxInfoRegistrationModalProps) {
+  const { user } = useUser();
   const [residentNumber, setResidentNumber] = useState('');
   const [bankName, setBankName] = useState('');
   const [bankAccountNumber, setBankAccountNumber] = useState('');
-  const [accountHolderName, setAccountHolderName] = useState('');
+  const [accountHolderName, setAccountHolderName] = useState(user?.name ?? '');
   const [consentAgreed, setConsentAgreed] = useState(false);
   const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    if (user?.name) {
+      setAccountHolderName(user.name);
+    }
+  }, [user?.name]);
 
   const handleSubmit = async () => {
     if (!residentNumber || !bankName || !bankAccountNumber || !accountHolderName) {
@@ -27,6 +35,11 @@ export function TaxInfoRegistrationModal({ visible, onClose, onSuccess }: TaxInf
     
     if (residentNumber.replace(/[^0-9]/g, '').length !== 13) {
       Alert.alert('알림', '올바른 주민등록번호 13자리를 입력해주세요.');
+      return;
+    }
+
+    if (accountHolderName !== user?.name) {
+      Alert.alert('알림', '가입 시 인증한 본인 이름과 동일한 예금주만 등록할 수 있습니다.');
       return;
     }
 
@@ -68,9 +81,9 @@ export function TaxInfoRegistrationModal({ visible, onClose, onSuccess }: TaxInf
         <View style={styles.inputGroup}>
           <Text style={styles.label}>예금주명</Text>
           <TextInput
-            style={styles.input}
+            style={[styles.input, { backgroundColor: Colors.gray100, color: Colors.gray500 }]}
             value={accountHolderName}
-            onChangeText={setAccountHolderName}
+            editable={false}
             placeholder="본인 명의의 예금주명"
           />
         </View>

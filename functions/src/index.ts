@@ -3796,6 +3796,18 @@ export const registerTaxInfo = functions.https.onCall(
     try {
       const db = admin.firestore();
       const userRef = db.collection('users').doc(uid);
+      const userSnap = await userRef.get();
+      const userData = userSnap.data();
+      
+      if (!userData?.name) {
+        throw new functions.https.HttpsError('failed-precondition', 'User name is not verified or missing');
+      }
+
+      const actualName = userData.name;
+
+      if (data.accountHolderName && data.accountHolderName !== actualName) {
+        throw new functions.https.HttpsError('invalid-argument', 'Account holder name must match verified user name');
+      }
 
       await userRef.set(
         {
@@ -3803,7 +3815,7 @@ export const registerTaxInfo = functions.https.onCall(
             residentNumberEncrypted: encryptedResidentNumber,
             bankName: data.bankName,
             bankAccountNumber: data.bankAccountNumber, // 계좌번호는 관리자 조회 편의를 위해 평문 저장 (필요시 부분 마스킹/암호화 가능)
-            accountHolderName: data.accountHolderName,
+            accountHolderName: actualName,
             registeredAt: admin.firestore.FieldValue.serverTimestamp(),
           },
           updatedAt: admin.firestore.FieldValue.serverTimestamp(),

@@ -19,6 +19,7 @@ import type { MainStackNavigationProp } from '../../types/navigation';
 import { BorderRadius, Colors, Spacing } from '../../theme';
 import { Typography } from '../../theme/typography';
 import { TaxInfoRegistrationModal } from '../../components/tax/TaxInfoRegistrationModal';
+import { maskAccountNumber } from '../../../shared/bank-account';
 
 type Props = {
   navigation: MainStackNavigationProp;
@@ -27,15 +28,18 @@ type Props = {
 export default function PointWithdrawScreen({ navigation }: Props) {
   const { user, refreshUser } = useUser();
   const [amount, setAmount] = useState('');
-  const [bankName, setBankName] = useState('');
-  const [accountNumber, setAccountNumber] = useState('');
-  const [accountHolder, setAccountHolder] = useState('');
   const [loading, setLoading] = useState(false);
   const [initializing, setInitializing] = useState(true);
   const [withdrawable, setWithdrawable] = useState(0);
   const [bankStatusMessage, setBankStatusMessage] = useState('계좌 인증 상태를 확인하고 있습니다.');
   const [eligibilityReasons, setEligibilityReasons] = useState<WithdrawalEligibilityStatus[]>([]);
   const [showTaxModal, setShowTaxModal] = useState(false);
+
+  const taxInfo = user?.taxInfo;
+  const bankName = taxInfo?.bankName ?? '';
+  const accountNumber = taxInfo?.bankAccountNumber ?? '';
+  const accountNumberMasked = accountNumber ? maskAccountNumber(accountNumber) : '';
+  const accountHolder = taxInfo?.accountHolderName ?? '';
 
   const loadWithdrawContext = useCallback(async () => {
     if (!user?.uid) {
@@ -51,7 +55,6 @@ export default function PointWithdrawScreen({ navigation }: Props) {
       ]);
 
       setWithdrawable(snapshot.wallet.withdrawableBalance);
-      setAccountHolder(user.name ?? '');
       setBankStatusMessage(bankConfig.statusMessage);
       setEligibilityReasons(eligibility.reasons);
     } catch (error) {
@@ -69,13 +72,13 @@ export default function PointWithdrawScreen({ navigation }: Props) {
   const submit = async () => {
     const numericAmount = Number(amount || 0);
 
-    if (!user?.uid || !numericAmount || !bankName || !accountNumber || !accountHolder) {
-      Alert.alert('입력 확인', '출금 금액과 계좌 정보를 다시 확인해 주세요.');
+    if (!taxInfo?.residentNumberEncrypted) {
+      setShowTaxModal(true);
       return;
     }
 
-    if (!user.taxInfo?.residentNumberEncrypted) {
-      setShowTaxModal(true);
+    if (!user?.uid || !numericAmount || !bankName || !accountNumber || !accountHolder) {
+      Alert.alert('입력 확인', '출금 금액을 다시 확인해 주세요. 등록된 계좌 정보가 없다면 다시 등록해 주세요.');
       return;
     }
 
@@ -169,9 +172,21 @@ export default function PointWithdrawScreen({ navigation }: Props) {
 
       <View style={styles.formCard}>
         <Field label="출금 금액" value={amount} onChangeText={setAmount} keyboardType="number-pad" />
-        <Field label="은행명" value={bankName} onChangeText={setBankName} />
-        <Field label="계좌번호" value={accountNumber} onChangeText={setAccountNumber} keyboardType="number-pad" />
-        <Field label="예금주" value={accountHolder} onChangeText={setAccountHolder} />
+        
+        <View style={styles.registeredAccountContainer}>
+          <Text style={styles.registeredAccountLabel}>출금 계좌 정보 (본인 명의)</Text>
+          {taxInfo?.residentNumberEncrypted ? (
+            <View style={styles.registeredAccountBox}>
+              <Text style={styles.registeredAccountText}>{bankName}</Text>
+              <Text style={styles.registeredAccountText}>{accountNumberMasked}</Text>
+              <Text style={styles.registeredAccountText}>{accountHolder}</Text>
+            </View>
+          ) : (
+            <TouchableOpacity style={styles.registerAccountButton} onPress={() => setShowTaxModal(true)}>
+              <Text style={styles.registerAccountButtonText}>출금 계좌 등록하기</Text>
+            </TouchableOpacity>
+          )}
+        </View>
       </View>
 
       <TouchableOpacity
@@ -407,5 +422,42 @@ const styles = StyleSheet.create({
     color: Colors.white,
     fontSize: Typography.fontSize.base,
     fontWeight: Typography.fontWeight.extrabold,
+  },
+  registeredAccountContainer: {
+    marginTop: Spacing.sm,
+    gap: 8,
+  },
+  registeredAccountLabel: {
+    fontSize: Typography.fontSize.sm,
+    fontWeight: Typography.fontWeight.bold,
+    color: Colors.gray700,
+  },
+  registeredAccountBox: {
+    borderWidth: 1,
+    borderColor: Colors.gray300,
+    borderRadius: BorderRadius.lg,
+    paddingHorizontal: 14,
+    paddingVertical: 14,
+    backgroundColor: Colors.gray50,
+    gap: 4,
+  },
+  registeredAccountText: {
+    color: Colors.textPrimary,
+    fontSize: Typography.fontSize.base,
+    fontWeight: Typography.fontWeight.medium,
+  },
+  registerAccountButton: {
+    borderWidth: 1,
+    borderColor: Colors.primary,
+    borderRadius: BorderRadius.lg,
+    paddingHorizontal: 14,
+    paddingVertical: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  registerAccountButtonText: {
+    color: Colors.primary,
+    fontSize: Typography.fontSize.base,
+    fontWeight: Typography.fontWeight.bold,
   },
 });

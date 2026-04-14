@@ -99,8 +99,6 @@ export interface WithdrawalEligibilityInput {
   balances: WalletBalances;
   minimumAmount: number;
   isIdentityVerified: boolean;
-  isPayoutAccountVerified: boolean;
-  payoutAccountOwnerMatchesUser: boolean;
   hasOpenDispute?: boolean;
   requiresManualReview?: boolean;
   hasRiskHold?: boolean;

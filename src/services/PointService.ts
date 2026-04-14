@@ -468,7 +468,7 @@ export class PointService {
           liveReady: bankConfig.liveReady,
           provider: bankConfig.provider,
           verificationMode: bankConfig.verificationMode,
-          requiresAccountHolderMatch: bankConfig.requiresAccountHolderMatch,
+          requiresAccountHolderMatch: true, // Always required since we use taxInfo
           manualReviewFallback: bankConfig.manualReviewFallback,
         },
       },

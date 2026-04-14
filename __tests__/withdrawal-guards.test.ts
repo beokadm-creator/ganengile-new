@@ -12,8 +12,6 @@ describe('withdrawal-guards', () => {
         pendingWithdrawalBalance: 5000,
       },
       isIdentityVerified: true,
-      isPayoutAccountVerified: true,
-      payoutAccountOwnerMatchesUser: true,
     });
 
     expect(decision.allowed).toBe(true);
@@ -30,8 +28,6 @@ describe('withdrawal-guards', () => {
         earnedBalance: 25000,
       },
       isIdentityVerified: false,
-      isPayoutAccountVerified: true,
-      payoutAccountOwnerMatchesUser: true,
       hasRiskHold: true,
     });
 
