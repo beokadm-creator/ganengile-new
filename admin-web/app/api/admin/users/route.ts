@@ -29,6 +29,8 @@ type UserDoc = DocumentData & {
       verificationStatus?: string;
     };
   };
+  authProvider?: string;
+  signupMethod?: string;
 };
 
 function getIdentityStatus(data: UserDoc): string {
@@ -91,6 +93,8 @@ function toUserItem(doc: QueryDocumentSnapshot<UserDoc>) {
           : '',
     onboardingStage: getOnboardingStage(data),
     createdAt: data.createdAt ?? null,
+    authProvider: typeof data.authProvider === 'string' ? data.authProvider : null,
+    signupMethod: typeof data.signupMethod === 'string' ? data.signupMethod : null,
   };
 }
 

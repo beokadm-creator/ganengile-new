@@ -20,6 +20,8 @@ interface UserItem {
   accountNumberMasked: string;
   onboardingStage: string;
   createdAt: { seconds?: number; _seconds?: number; toDate?: () => Date } | string | null;
+  authProvider?: string | null;
+  signupMethod?: string | null;
 }
 
 type UsersResponse = { items: UserItem[] };
@@ -74,6 +76,8 @@ function asUserItem(value: unknown): UserItem | null {
       typeof record.onboardingStage === 'string' ? record.onboardingStage : '미설정',
     createdAt:
       typeof record.createdAt === 'string' || asRecord(record.createdAt) ? (record.createdAt as UserItem['createdAt']) : null,
+    authProvider: typeof record.authProvider === 'string' ? record.authProvider : null,
+    signupMethod: typeof record.signupMethod === 'string' ? record.signupMethod : null,
   };
 }
 
@@ -245,6 +249,15 @@ export default function UsersPage() {
                         <p className="mt-1 text-xs text-slate-500">
                           {item.phoneNumber || '전화번호 없음'}
                         </p>
+                        {(item.authProvider || item.signupMethod) && (
+                          <div className="mt-1 flex items-center gap-1">
+                            {item.authProvider && (
+                              <span className="inline-flex items-center rounded-md bg-blue-50 px-2 py-0.5 text-[10px] font-medium text-blue-700 ring-1 ring-inset ring-blue-700/10">
+                                {item.authProvider.toUpperCase()}
+                              </span>
+                            )}
+                          </div>
+                        )}
                         <p className="mt-1 font-mono text-[11px] text-slate-400">{item.id}</p>
                       </td>
                       <td className="px-4 py-4 align-top">
