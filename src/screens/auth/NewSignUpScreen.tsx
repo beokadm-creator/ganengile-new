@@ -15,8 +15,8 @@ import {
   type TextInputProps,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { createUserWithEmailAndPassword, sendEmailVerification } from 'firebase/auth';
-import { doc, serverTimestamp, setDoc, Timestamp } from 'firebase/firestore';
+import { createUserWithEmailAndPassword, sendEmailVerification, fetchSignInMethodsForEmail } from 'firebase/auth';
+import { doc, serverTimestamp, setDoc, Timestamp, getDoc } from 'firebase/firestore';
 
 import { Colors, Typography } from '../../theme';
 import { auth, db } from '../../services/firebase';
@@ -45,14 +45,9 @@ type SignUpForm = {
   confirmPassword: string;
 };
 
-const STEP_ORDER: Step[] = ['name', 'email', 'password', 'terms'];
+const STEP_ORDER: Step[] = ['email', 'password', 'name', 'terms'];
 
 const STEP_COPY: Record<Step, { title: string; subtitle: string; cta: string }> = {
-  name: {
-    title: '이름만 먼저 알려주세요',
-    subtitle: '지금은 계정만 빠르게 만들고, 실제 서비스 이용 준비는 첫 배송 요청 직전에 이어집니다.',
-    cta: '다음',
-  },
   email: {
     title: '로그인할 이메일을 입력해주세요',
     subtitle: '계정 확인용 메일을 보내드리고, 이후 로그인 계정으로 그대로 사용됩니다.',
@@ -63,10 +58,15 @@ const STEP_COPY: Record<Step, { title: string; subtitle: string; cta: string }> 
     subtitle: '계정 생성은 여기서 거의 끝납니다. 연락처 확인은 첫 배송 요청 직전에만 진행합니다.',
     cta: '다음',
   },
+  name: {
+    title: '이름만 먼저 알려주세요',
+    subtitle: '지금은 계정만 빠르게 만들고, 실제 서비스 이용 준비는 첫 배송 요청 직전에 이어집니다.',
+    cta: '다음',
+  },
   terms: {
     title: '계정 생성에 필요한 동의만 마치면 됩니다',
     subtitle: '이 단계는 계정 생성입니다. 요청자 이용 시작 준비와 길러 절차는 이후에 분리되어 진행됩니다.',
-    cta: '계정 만들기',
+    cta: '이메일로 가입하기',
   },
 };
 
@@ -203,11 +203,6 @@ export default function NewSignUpScreen({ navigation }: Props) {
   }, []);
 
   function validateCurrentStep() {
-    if (step === 'name' && !form.name.trim()) {
-      Alert.alert('이름이 필요합니다', '이름을 입력해주세요.');
-      return false;
-    }
-
     if (step === 'email') {
       if (!form.email.trim()) {
         Alert.alert('이메일이 필요합니다', '이메일을 입력해주세요.');
@@ -232,6 +227,11 @@ export default function NewSignUpScreen({ navigation }: Props) {
       }
     }
 
+    if (step === 'name' && !form.name.trim()) {
+      Alert.alert('이름이 필요합니다', '이름을 입력해주세요.');
+      return false;
+    }
+
     if (step === 'terms') {
       if (loadingTemplates || consentTemplates.length === 0) {
         Alert.alert('약관을 불러오는 중입니다', '약관 정보를 모두 불러온 뒤 다시 시도해 주세요.');
@@ -247,9 +247,36 @@ export default function NewSignUpScreen({ navigation }: Props) {
     return true;
   }
 
-  function handleNext() {
+  async function handleNext() {
     if (!validateCurrentStep()) {
       return;
+    }
+
+    const currentStep = STEP_ORDER[stepIndex];
+
+    if (currentStep === 'email') {
+      setLoading(true);
+      try {
+        const methods = await fetchSignInMethodsForEmail(auth, form.email.trim());
+        if (methods.length > 0) {
+          Alert.alert(
+            '이미 가입된 이메일입니다',
+            '이 이메일로 가입된 계정이 있습니다. 로그인 화면으로 이동합니다.',
+            [
+              {
+                text: '로그인하기',
+                onPress: () => navigation.navigate('Login'),
+              },
+            ]
+          );
+          setLoading(false);
+          return;
+        }
+      } catch (error) {
+        // If email enumeration protection is enabled, it throws an error. We just proceed.
+        console.warn('fetchSignInMethodsForEmail failed, continuing signup flow', error);
+      }
+      setLoading(false);
     }
 
     if (stepIndex < STEP_ORDER.length - 1) {
@@ -293,44 +320,48 @@ export default function NewSignUpScreen({ navigation }: Props) {
           title: t.title,
         }));
 
-      await setDoc(
-        doc(db, 'users', userCredential.user.uid),
-        {
-          uid: userCredential.user.uid,
-          email: form.email.trim(),
-          name: form.name.trim(),
-          role: UserRole.GLER,
-          signupMethod: 'email',
-          authProvider: 'email',
-          hasCompletedOnboarding: false,
-          isActive: true,
-          phoneVerification: {
-            verified: false,
-          },
-          emailVerification: {
-            verified: false,
-            sentAt: new Date().toISOString(),
-            email: form.email.trim(),
-          },
-          agreedTerms,
-          consentHistory: consentRecords,
-          gillerApplicationStatus: 'none',
-          isVerified: false,
-          pointBalance: 0,
-          walletBalances: {
-            chargeBalance: 0,
-            earnedBalance: 0,
-            promoBalance: 0,
-            lockedChargeBalance: 0,
-            lockedEarnedBalance: 0,
-            lockedPromoBalance: 0,
-            pendingWithdrawalBalance: 0,
-          },
-          createdAt: serverTimestamp(),
-          updatedAt: serverTimestamp(),
+      const updateData: any = {
+        uid: userCredential.user.uid,
+        email: form.email.trim(),
+        name: form.name.trim(),
+        signupMethod: 'email',
+        authProvider: 'email',
+        hasCompletedOnboarding: false,
+        isActive: true,
+        phoneVerification: {
+          verified: false,
         },
-        { merge: true },
-      );
+        emailVerification: {
+          verified: false,
+          sentAt: new Date().toISOString(),
+          email: form.email.trim(),
+        },
+        agreedTerms,
+        consentHistory: consentRecords,
+        gillerApplicationStatus: 'none',
+        updatedAt: serverTimestamp(),
+      };
+
+      const userRef = doc(db, 'users', userCredential.user.uid);
+      const userSnap = await getDoc(userRef);
+
+      if (!userSnap.exists()) {
+        updateData.role = UserRole.GLER;
+        updateData.isVerified = false;
+        updateData.pointBalance = 0;
+        updateData.walletBalances = {
+          chargeBalance: 0,
+          earnedBalance: 0,
+          promoBalance: 0,
+          lockedChargeBalance: 0,
+          lockedEarnedBalance: 0,
+          lockedPromoBalance: 0,
+          pendingWithdrawalBalance: 0,
+        };
+        updateData.createdAt = serverTimestamp();
+      }
+
+      await setDoc(userRef, updateData, { merge: true });
 
       await autoIssueCouponsByTrigger(userCredential.user.uid, 'signup').catch(console.error);
 

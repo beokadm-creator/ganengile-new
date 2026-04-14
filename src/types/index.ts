@@ -1,6 +1,4 @@
-export * from './business-contract';
 export * from './delivery-partner';
-export * from './tax-invoice';
 export * from './point';
 export {
   PackageWeight,

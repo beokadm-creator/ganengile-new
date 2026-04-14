@@ -1,8 +1,10 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import type { JSX } from 'react';
 import {
   ActivityIndicator,
   Alert,
+  AppState,
+  Linking,
   RefreshControl,
   ScrollView,
   StyleSheet,
@@ -271,6 +273,36 @@ export default function DeliveryTrackingScreen(): JSX.Element {
     }>
   >([]);
 
+  const loadTracking = useCallback(async () => {
+    try {
+      const delivery = (await getDeliveryByRequestId(requestId)) as DeliveryLookup | null;
+      if (delivery) {
+        setTrackingData(toTrackingModel(delivery));
+        const dispatchSummary = await deliveryPartnerService.getDispatchSummary({
+          requestId,
+          ...(delivery.deliveryId ? { deliveryId: delivery.deliveryId } : {}),
+        }).catch(() => []);
+        setPartnerDispatches(dispatchSummary);
+        return;
+      }
+
+      const request = await getRequestById(requestId);
+      if (request) {
+        setTrackingData(toTrackingModel(request));
+        const dispatchSummary = await deliveryPartnerService.getDispatchSummary({
+          requestId,
+          ...(request.primaryDeliveryId ? { deliveryId: request.primaryDeliveryId } : {}),
+        }).catch(() => []);
+        setPartnerDispatches(dispatchSummary);
+      }
+    } catch (error) {
+      console.error('Failed to load tracking', error);
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
+  }, [requestId]);
+
   useEffect(() => {
     let fallbackUnsubscribe: (() => void) | null = null;
 
@@ -302,46 +334,22 @@ export default function DeliveryTrackingScreen(): JSX.Element {
       });
     });
 
+    const appStateSubscription = AppState.addEventListener('change', (nextAppState) => {
+      if (nextAppState === 'active') {
+        void loadTracking();
+      }
+    });
+
     return () => {
       unsubscribeDelivery();
       fallbackUnsubscribe?.();
+      appStateSubscription.remove();
     };
-  }, [requestId]);
-
-  async function loadTracking() {
-    try {
-      const delivery = (await getDeliveryByRequestId(requestId)) as DeliveryLookup | null;
-      if (delivery) {
-        setTrackingData(toTrackingModel(delivery));
-        const dispatchSummary = await deliveryPartnerService.getDispatchSummary({
-          requestId,
-          ...(delivery.deliveryId ? { deliveryId: delivery.deliveryId } : {}),
-        }).catch(() => []);
-        setPartnerDispatches(dispatchSummary);
-        return;
-      }
-
-      const request = await getRequestById(requestId);
-      if (request) {
-        setTrackingData(toTrackingModel(request));
-        const dispatchSummary = await deliveryPartnerService.getDispatchSummary({
-          requestId,
-          ...(request.primaryDeliveryId ? { deliveryId: request.primaryDeliveryId } : {}),
-        }).catch(() => []);
-        setPartnerDispatches(dispatchSummary);
-      }
-    } catch (error) {
-      console.error('Failed to load tracking', error);
-    } finally {
-      setLoading(false);
-      setRefreshing(false);
-    }
-  }
+  }, [requestId, loadTracking]);
 
   async function openChat() {
     try {
       let room = await getChatRoomByRequestId(requestId);
-
       if (!room) {
         const request = await getRequestById(requestId);
         if (request?.requesterId && request?.matchedGillerId) {

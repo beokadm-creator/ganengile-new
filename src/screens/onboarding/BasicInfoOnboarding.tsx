@@ -24,6 +24,7 @@ import {
 import { BorderRadius, Colors, Shadows, Spacing, Typography } from '../../theme';
 import { ConsentDisplayItem, ConsentKey, ConsentRecord } from '../../types/consent';
 import { UserRole } from '../../types/user';
+import { usePhoneVerification } from '../../hooks/usePhoneVerification';
 
 function buildRequesterAgreedTerms(consents: Record<string, boolean>) {
   return {
@@ -36,7 +37,7 @@ function buildRequesterAgreedTerms(consents: Record<string, boolean>) {
   };
 }
 
-export default function BasicInfoOnboarding() {
+export default function BasicInfoOnboarding({ navigation }: any) {
   const { user, completeOnboarding } = useUser();
   const [loading, setLoading] = useState(false);
   const [name, setName] = useState(user?.name ?? '');
@@ -46,19 +47,46 @@ export default function BasicInfoOnboarding() {
   const [loadingTemplates, setLoadingTemplates] = useState(true);
   const [expandedItems, setExpandedItems] = useState<Set<string>>(new Set());
 
+  const [verifiedPhoneOverride, setVerifiedPhoneOverride] = useState<string | null>(null);
+
+  const {
+    otpCode,
+    setOtpCode,
+    otpSessionId,
+    otpSending,
+    otpVerifying,
+    otpHintCode,
+    isPhoneVerified,
+    hasLockedVerifiedPhone,
+    handlePhoneChange,
+    handleRequestOtp,
+    handleVerifyOtp,
+  } = usePhoneVerification({
+    contactPhoneNumber: phoneNumber,
+    setContactPhoneNumber: setPhoneNumber,
+    verifiedPhoneOverride,
+    setVerifiedPhoneOverride,
+  });
+
   const cleanedPhone = useMemo(() => phoneNumber.replace(/[^0-9]/g, ''), [phoneNumber]);
 
   useEffect(() => {
     let cancelled = false;
     async function load() {
       setLoadingTemplates(true);
+      let timeoutId: NodeJS.Timeout;
       try {
+        const timeoutPromise = new Promise<ConsentDisplayItem[]>((_, reject) => {
+          timeoutId = setTimeout(() => reject(new Error('timeout')), 6000);
+        });
+
         const templates = await Promise.race([
           fetchConsentTemplates(),
-          new Promise<ConsentDisplayItem[]>((_, reject) => {
-            setTimeout(() => reject(new Error('timeout')), 6000);
-          }),
+          timeoutPromise,
         ]);
+        
+        clearTimeout(timeoutId!);
+        
         if (cancelled) return;
         if (templates.length > 0) {
           setConsentTemplates(templates);
@@ -66,6 +94,7 @@ export default function BasicInfoOnboarding() {
           setConsentTemplates(getFallbackConsentItems());
         }
       } catch {
+        clearTimeout(timeoutId!);
         if (!cancelled) {
           setConsentTemplates(getFallbackConsentItems());
         }
@@ -125,6 +154,11 @@ export default function BasicInfoOnboarding() {
       return false;
     }
 
+    if (!isPhoneVerified) {
+      Alert.alert('휴대폰 인증 필요', '휴대폰 번호 인증을 완료해 주세요.');
+      return false;
+    }
+
     if (!checkRequiredConsents(consents, consentTemplates)) {
       Alert.alert('필수 약관 동의가 필요합니다', '모든 필수 약관에 동의해 주세요.');
       return false;
@@ -136,6 +170,23 @@ export default function BasicInfoOnboarding() {
     }
 
     return true;
+  }
+
+  async function completeAndGoBack() {
+    await completeOnboarding();
+    
+    // Give context time to update before attempting navigation
+    setTimeout(() => {
+      if (navigation?.canGoBack?.()) {
+        navigation.goBack();
+      } else if (navigation?.navigate) {
+        // Fallback to home if no back history exists
+        navigation.navigate('Main', {
+          screen: 'Tabs',
+          params: { screen: 'Home' },
+        });
+      }
+    }, 50);
   }
 
   async function handleSubmit() {
@@ -182,7 +233,7 @@ export default function BasicInfoOnboarding() {
         { merge: true },
       );
 
-      await completeOnboarding();
+      await completeAndGoBack();
     } catch (error) {
       console.error('Failed to complete basic onboarding', error);
       Alert.alert('저장에 실패했습니다', '잠시 후 다시 시도해 주세요.');
@@ -215,14 +266,78 @@ export default function BasicInfoOnboarding() {
             onChangeText={setName}
             autoCapitalize="words"
           />
-          <Field
-            label="휴대폰 번호"
-            placeholder="01012345678"
-            value={phoneNumber}
-            onChangeText={setPhoneNumber}
-            keyboardType="number-pad"
-            helper="배송 연락과 본인 확인 진행에 사용합니다."
-          />
+          <View style={styles.fieldWrap}>
+            <Text style={styles.fieldLabel}>휴대폰 번호</Text>
+            {hasLockedVerifiedPhone ? (
+              <View style={styles.verifiedPhoneBox}>
+                <Text style={styles.verifiedPhoneText}>
+                  ✅ {phoneNumber} (인증됨)
+                </Text>
+              </View>
+            ) : (
+              <>
+                <View style={styles.otpRow}>
+                  <TextInput
+                    style={[styles.input, styles.flex1]}
+                    value={phoneNumber}
+                    onChangeText={handlePhoneChange}
+                    keyboardType="phone-pad"
+                    placeholder="01012345678"
+                    placeholderTextColor={Colors.gray400}
+                  />
+                  <TouchableOpacity
+                    style={styles.otpButton}
+                    onPress={() => void handleRequestOtp()}
+                    disabled={otpSending}
+                  >
+                    {otpSending ? (
+                      <ActivityIndicator color={Colors.white} />
+                    ) : (
+                      <Text style={styles.otpButtonText}>
+                        {otpSessionId ? '재전송' : '인증 요청'}
+                      </Text>
+                    )}
+                  </TouchableOpacity>
+                </View>
+
+                {otpSessionId && !isPhoneVerified ? (
+                  <View style={styles.otpRow}>
+                    <TextInput
+                      style={[styles.input, styles.flex1]}
+                      value={otpCode}
+                      onChangeText={setOtpCode}
+                      keyboardType="number-pad"
+                      placeholder="인증번호 6자리"
+                      placeholderTextColor={Colors.gray400}
+                      maxLength={6}
+                    />
+                    <TouchableOpacity
+                      style={[
+                        styles.otpButton,
+                        otpCode.length < 6 && { backgroundColor: Colors.gray400 },
+                      ]}
+                      onPress={() => void handleVerifyOtp()}
+                      disabled={otpCode.length < 6 || otpVerifying}
+                    >
+                      {otpVerifying ? (
+                        <ActivityIndicator color={Colors.white} />
+                      ) : (
+                        <Text style={styles.otpButtonText}>인증 확인</Text>
+                      )}
+                    </TouchableOpacity>
+                  </View>
+                ) : null}
+
+                {otpHintCode ? (
+                  <Text style={styles.devHintText}>[개발] 인증번호: {otpHintCode}</Text>
+                ) : null}
+
+                {isPhoneVerified && !hasLockedVerifiedPhone ? (
+                  <Text style={styles.successText}>✅ 인증이 완료되었습니다.</Text>
+                ) : null}
+              </>
+            )}
+          </View>
         </View>
 
         <View style={styles.card}>
@@ -512,4 +627,12 @@ const styles = StyleSheet.create({
   },
   submitButtonDisabled: { opacity: 0.6 },
   submitButtonText: { color: Colors.white, fontSize: 16, fontWeight: '800' },
+  verifiedPhoneBox: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', backgroundColor: Colors.gray50, padding: Spacing.md, borderRadius: BorderRadius.md },
+  verifiedPhoneText: { color: Colors.primary, fontWeight: 'bold' },
+  otpRow: { flexDirection: 'row', gap: Spacing.sm, marginBottom: Spacing.sm },
+  flex1: { flex: 1, marginBottom: 0 },
+  otpButton: { backgroundColor: Colors.primary, paddingHorizontal: 16, borderRadius: BorderRadius.md, justifyContent: 'center', alignItems: 'center' },
+  otpButtonText: { color: Colors.white, fontWeight: 'bold', fontSize: 14 },
+  devHintText: { color: Colors.primary, fontWeight: 'bold', fontSize: 12 },
+  successText: { color: Colors.primary, fontWeight: 'bold', marginTop: Spacing.xs },
 });

@@ -48,18 +48,15 @@ import GillerDropoffAtLockerScreen from '../screens/giller/GillerDropoffAtLocker
 import GillerPickupAtLockerScreen from '../screens/giller/GillerPickupAtLockerScreen';
 import LockerMapScreen from '../screens/main/LockerMapScreen';
 import DisputeReportScreen from '../screens/main/DisputeReportScreen';
-import GillerLevelUpgradeScreen from '../screens/main/GillerLevelUpgradeScreen';
 import GillerApplyScreen from '../screens/main/GillerApplyScreen';
 import IdentityVerificationScreen from '../screens/main/IdentityVerificationScreen';
 import DisputeResolutionScreen from '../screens/main/DisputeResolutionScreen';
-import LevelBenefitsScreen from '../screens/main/LevelBenefitsScreen';
 import UnlockLockerScreen from '../screens/main/UnlockLockerScreen';
 import QRCodeScannerScreen from '../screens/main/QRCodeScannerScreen';
 import RequesterDropoffLockerScreen from '../screens/requester/RequesterDropoffLockerScreen';
 import RealtimeTrackingScreen from '../screens/main/RealtimeTrackingScreen';
-import OnetimeModeScreen from '../screens/main/OnetimeModeScreen';
-import CreateAuctionScreen from '../screens/main/CreateAuctionScreen';
-import AuctionListScreen from '../screens/main/AuctionListScreen';
+
+
 
 const Tab = createBottomTabNavigator<MainTabParamList>();
 const Stack = createStackNavigator<MainStackParamList>();
@@ -90,7 +87,6 @@ const SCREEN_TITLES: Record<string, string> = {
   Earnings: '정산 관리',
   MyRating: '내 평점',
   BadgeCollection: '배지 컬렉션',
-  GillerLevelUpgrade: '길러 승급',
   CustomerService: '고객센터',
   Terms: '약관 및 정책',
   AddressBook: '주소록 관리',
@@ -103,12 +99,11 @@ const SCREEN_TITLES: Record<string, string> = {
   IdentityVerification: '본인 확인',
   LockerSelection: '사물함 선택',
   DisputeResolution: '분쟁 처리',
-  LevelBenefits: '레벨 혜택',
   UnlockLocker: '사물함 열기',
   RequesterDropoffLocker: '사물함 보관',
-  OnetimeMode: '일회성 매칭',
-  CreateAuction: '경매 생성',
-  AuctionList: '경매 목록',
+
+
+
 };
 
 function TabBarIcon({ name, focused }: { name: string; focused: boolean }) {
@@ -273,6 +268,7 @@ export default function MainNavigator() {
       />
       <Stack.Screen name="AddRoute" component={AddRouteScreen} options={{ headerShown: false }} />
       <Stack.Screen name="EditRoute" component={EditRouteScreen} options={{ headerShown: false }} />
+
       <Stack.Screen
         name="RequestDetail"
         component={RequestDetailScreen}
@@ -351,11 +347,6 @@ export default function MainNavigator() {
         options={{ headerShown: true }}
       />
       <Stack.Screen
-        name="GillerLevelUpgrade"
-        component={GillerLevelUpgradeScreen}
-        options={{ headerShown: true }}
-      />
-      <Stack.Screen
         name="CustomerService"
         component={CustomerServiceScreen}
         options={{ headerShown: true }}
@@ -412,11 +403,6 @@ export default function MainNavigator() {
         options={{ headerShown: true }}
       />
       <Stack.Screen
-        name="LevelBenefits"
-        component={LevelBenefitsScreen}
-        options={{ headerShown: true }}
-      />
-      <Stack.Screen
         name="UnlockLocker"
         component={UnlockLockerScreen}
         options={{ headerShown: false }}
@@ -436,21 +422,7 @@ export default function MainNavigator() {
         component={RealtimeTrackingScreen}
         options={{ headerShown: false }}
       />
-      <Stack.Screen
-        name="OnetimeMode"
-        component={OnetimeModeScreen}
-        options={{ headerShown: true }}
-      />
-      <Stack.Screen
-        name="CreateAuction"
-        component={CreateAuctionScreen}
-        options={{ headerShown: true }}
-      />
-      <Stack.Screen
-        name="AuctionList"
-        component={AuctionListScreen}
-        options={{ headerShown: true }}
-      />
+    
     </Stack.Navigator>
   );
 }

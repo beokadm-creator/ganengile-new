@@ -1,7 +1,10 @@
 import type { MissionCard, MissionGroup } from './mission-board-types';
 
+const MAX_EXPOSURE_SCORE_MINUTES = 60;
+const FEATURED_WAITING_THRESHOLD_MINUTES = 20;
+
 export function isImmediateMission(card: MissionCard): boolean {
-  return card.selectionState === 'available' || card.windowLabel.includes('지금');
+  return card.selectionState === 'available' && (card.windowLabel?.includes('지금') ?? false);
 }
 
 function sortMissionOptions(left: MissionCard, right: MissionCard): number {
@@ -23,7 +26,7 @@ function sortMissionOptions(left: MissionCard, right: MissionCard): number {
 export function getMissionPriorityScore(group: MissionGroup): number {
   const topOption = group.options[0];
   const rewardScore = group.rewardAmount;
-  const exposureScore = Math.min(group.ageMinutes, 60) * 40;
+  const exposureScore = Math.min(group.ageMinutes, MAX_EXPOSURE_SCORE_MINUTES) * 40;
   const territoryScore = group.requiresExternalPartner ? 0 : 600;
   const instantScore = isImmediateMission(topOption ?? ({} as MissionCard)) ? 1200 : 0;
   return rewardScore + exposureScore + territoryScore + instantScore;
@@ -33,7 +36,7 @@ export function groupMissionCards(cards: MissionCard[]): MissionGroup[] {
   const groups = new Map<string, MissionGroup>();
 
   cards.forEach((card) => {
-    const key = String(card.deliveryId ?? card.bundleId ?? card.id);
+    const key = String(card.bundleId ?? card.deliveryId ?? card.id);
     const existing = groups.get(key);
 
     if (!existing) {
@@ -136,7 +139,7 @@ export function buildQuickFacts(group: MissionGroup): string {
 }
 
 export function buildFeaturedReason(group: MissionGroup): string {
-  if (group.ageMinutes >= 20) {
+  if (group.ageMinutes > FEATURED_WAITING_THRESHOLD_MINUTES) {
     return '오래 기다린 미션';
   }
 
@@ -152,7 +155,7 @@ export function getNextActionLabel(group: MissionGroup): string | null {
     return null;
   }
 
-  const status = group.status.toLowerCase();
+  const status = group.status?.toLowerCase() ?? '';
   if (status.includes('arrival_pending')) {
     return '도착 확인';
   }

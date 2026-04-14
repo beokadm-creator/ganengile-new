@@ -82,7 +82,7 @@ export default function RouteManagementScreen() {
             '길러 신청 후 권역을 추가할 수 있습니다.',
         [
           { text: '닫기', style: 'cancel' },
-          { text: '신청하기', onPress: () => navigation.navigate('Profile') }
+          { text: '신청하기', onPress: () => navigation.navigate('Tabs', { screen: 'Profile' }) }
         ]
       );
       return;
@@ -114,7 +114,7 @@ export default function RouteManagementScreen() {
         '길러 신청 후 권역을 변경할 수 있습니다.',
         [
           { text: '닫기', style: 'cancel' },
-          { text: '신청하기', onPress: () => navigation.navigate('Profile') }
+          { text: '신청하기', onPress: () => navigation.navigate('Tabs', { screen: 'Profile' }) }
         ]
       );
       return;
@@ -153,7 +153,7 @@ export default function RouteManagementScreen() {
         '길러 신청 후 동선을 삭제할 수 있습니다.',
         [
           { text: '닫기', style: 'cancel' },
-          { text: '신청하기', onPress: () => navigation.navigate('Profile') }
+          { text: '신청하기', onPress: () => navigation.navigate('Tabs', { screen: 'Profile' }) }
         ]
       );
       return;
@@ -332,7 +332,7 @@ export default function RouteManagementScreen() {
                   '길러 신청 후 동선을 추가할 수 있습니다.',
                       [
                         { text: '닫기', style: 'cancel' },
-                        { text: '신청하기', onPress: () => navigation.navigate('Profile') }
+                        { text: '신청하기', onPress: () => navigation.navigate('Tabs', { screen: 'Profile' }) }
                       ]
                     );
                     return;
@@ -372,7 +372,7 @@ export default function RouteManagementScreen() {
                               '길러 신청 후 동선을 수정할 수 있습니다.',
                               [
                                 { text: '닫기', style: 'cancel' },
-                                { text: '신청하기', onPress: () => navigation.navigate('Profile') }
+                                { text: '신청하기', onPress: () => navigation.navigate('Tabs', { screen: 'Profile' }) }
                               ]
                             );
                             return;
@@ -413,7 +413,7 @@ export default function RouteManagementScreen() {
               '길러 신청 후 동선을 추가할 수 있습니다.',
                 [
                   { text: '닫기', style: 'cancel' },
-                  { text: '신청하기', onPress: () => navigation.navigate('Profile') }
+                  { text: '신청하기', onPress: () => navigation.navigate('Tabs', { screen: 'Profile' }) }
                 ]
               );
               return;

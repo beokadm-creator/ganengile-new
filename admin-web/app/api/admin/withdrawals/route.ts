@@ -75,6 +75,7 @@ export async function GET(req: NextRequest) {
       const snap = await db.collection('withdraw_requests')
         .where('status', '==', status)
         .orderBy('createdAt', 'desc')
+        .limit(100)
         .get();
       withdrawalsDocs = snap.docs;
     } catch (dbError: any) {
@@ -86,6 +87,7 @@ export async function GET(req: NextRequest) {
         console.warn('Withdrawals API: Missing index for status + createdAt, falling back to client-side sort');
         const fallbackSnap = await db.collection('withdraw_requests')
           .where('status', '==', status)
+          .limit(100)
           .get();
           
         withdrawalsDocs = fallbackSnap.docs.sort((a, b) => {

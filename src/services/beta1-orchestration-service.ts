@@ -322,14 +322,11 @@ async function rankCandidateGillersForBundle(params: {
       const routeBonus = computeRouteFitBonus(routes, params.originRef, params.destinationRef);
       const territoryBonus = computeTerritoryBonus(user?.gillerProfile?.territories, params.originRef, params.destinationRef);
       const gillerType = user?.gillerProfile?.type;
-      const professionalismBonus =
-        params.hasAddressLeg && gillerType === 'master'
-          ? 10
-          : params.hasAddressLeg && gillerType === 'professional'
-            ? 6
-            : !params.hasAddressLeg && gillerType === 'master'
-              ? 4
-              : 0;
+      
+      let professionalismBonus = 0;
+      if (gillerType === 'professional') {
+        professionalismBonus = params.hasAddressLeg ? 10 : 6;
+      }
 
       return {
         gillerId: match.gillerId,

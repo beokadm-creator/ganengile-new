@@ -24,6 +24,7 @@ export type MainTabParamList = {
   Requests: undefined;
   GillerRequests: undefined;
   RouteManagement: { justAddedRouteId?: string } | undefined;
+
   ChatList: undefined;
   Profile: undefined;
 };
@@ -116,7 +117,6 @@ export type MainStackParamList = {
   };
   Earnings: undefined;
   MyRating: undefined;
-  GillerLevelUpgrade: undefined;
   CustomerService: undefined;
   Terms: undefined;
   AddressBook: undefined;
@@ -140,6 +140,7 @@ export type MainStackParamList = {
   PointHistory: undefined;
   PointWithdraw: undefined;
   GillerApply: undefined;
+  B2BPartnerApply: undefined;
   IdentityVerification: undefined;
   LockerSelection: {
     stationId?: string;
@@ -150,7 +151,6 @@ export type MainStackParamList = {
   DisputeResolution: {
     disputeId: string;
   };
-  LevelBenefits: undefined;
   UnlockLocker: {
     deliveryId: string;
   };
@@ -162,9 +162,8 @@ export type MainStackParamList = {
     pickupStation: { name: string; latitude: number; longitude: number };
     dropoffStation: { name: string; latitude: number; longitude: number };
   };
-  OnetimeMode: undefined;
-  CreateAuction: undefined;
-  AuctionList: undefined;
+
+
 };
 
 export type MainTabNavigationProp = BottomTabNavigationProp<MainTabParamList>;

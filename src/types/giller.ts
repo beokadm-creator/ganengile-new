@@ -1,11 +1,11 @@
 /**
  * Giller Types
- * 길러 등급, 배지, 승급/강감 관련 타입
+ * 길러 등급(B2B 파트너 포함), 혜택, 승급 관련 타입
  */
 
 export enum GillerType {
-  REGULAR = 'regular',      // 일반 길러
-  PROFESSIONAL = 'professional',  // 전문 길러
+  REGULAR = 'regular',      // 일반 개인 길러
+  PROFESSIONAL = 'professional',  // B2B 전문 배송업체 (API 연동)
 }
 
 export enum GillerStatus {

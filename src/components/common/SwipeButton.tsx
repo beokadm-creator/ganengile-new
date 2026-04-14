@@ -1,5 +1,15 @@
 import React, { useRef, useState } from 'react';
-import { View, Text, StyleSheet, Animated, PanResponder, Dimensions, LayoutChangeEvent } from 'react-native';
+import { 
+  View, 
+  Text, 
+  StyleSheet, 
+  Animated, 
+  PanResponder, 
+  Dimensions, 
+  LayoutChangeEvent,
+  GestureResponderEvent,
+  PanResponderGestureState 
+} from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { Colors, Spacing, BorderRadius, Typography, Shadows } from '../../theme';
@@ -21,6 +31,7 @@ export function SwipeButton({ onComplete, title = '밀어서 완료하기', disa
   const opacity = useRef(new Animated.Value(1)).current;
 
   const maxSlide = Math.max(0, containerWidth - THUMB_SIZE - PADDING * 2);
+  const interpolateMax = Math.max(1, maxSlide);
 
   const panResponder = useRef(
     PanResponder.create({
@@ -28,21 +39,15 @@ export function SwipeButton({ onComplete, title = '밀어서 완료하기', disa
       onMoveShouldSetPanResponder: () => !disabled && !completed,
       onPanResponderGrant: () => {
         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
-        pan.setOffset({ x: (pan.x as any)._value, y: 0 });
-        pan.setValue({ x: 0, y: 0 });
+        pan.extractOffset();
       },
-      onPanResponderMove: Animated.event([null, { dx: pan.x }], {
-        useNativeDriver: false,
-        listener: (e, gestureState) => {
-          // Limit thumb movement between 0 and maxSlide
-          if (gestureState.dx > maxSlide) {
-            pan.setValue({ x: maxSlide, y: 0 });
-          } else if (gestureState.dx < 0) {
-            pan.setValue({ x: 0, y: 0 });
-          }
-        },
-      }),
-      onPanResponderRelease: async (e, gestureState) => {
+      onPanResponderMove: (e: GestureResponderEvent, gestureState: PanResponderGestureState) => {
+        let newX = gestureState.dx;
+        if (newX > maxSlide) newX = maxSlide;
+        if (newX < 0) newX = 0;
+        pan.setValue({ x: newX, y: 0 });
+      },
+      onPanResponderRelease: (e: GestureResponderEvent, gestureState: PanResponderGestureState) => {
         pan.flattenOffset();
         
         if (gestureState.dx > maxSlide * 0.8) {
@@ -62,22 +67,24 @@ export function SwipeButton({ onComplete, title = '밀어서 완료하기', disa
             useNativeDriver: false,
           }).start();
 
-          try {
-            await onComplete();
-          } catch (err) {
-            // Revert on error
-            setCompleted(false);
-            Animated.timing(opacity, {
-              toValue: 1,
-              duration: 200,
-              useNativeDriver: false,
-            }).start();
-            Animated.spring(pan, {
-              toValue: { x: 0, y: 0 },
-              useNativeDriver: false,
-              friction: 5,
-            }).start();
-          }
+          (async () => {
+            try {
+              await onComplete();
+            } catch (err) {
+              // Revert on error
+              setCompleted(false);
+              Animated.timing(opacity, {
+                toValue: 1,
+                duration: 200,
+                useNativeDriver: false,
+              }).start();
+              Animated.spring(pan, {
+                toValue: { x: 0, y: 0 },
+                useNativeDriver: false,
+                friction: 5,
+              }).start();
+            }
+          })();
         } else {
           // Revert back
           Animated.spring(pan, {
@@ -114,8 +121,8 @@ export function SwipeButton({ onComplete, title = '밀어서 완료하기', disa
               transform: [
                 {
                   translateX: pan.x.interpolate({
-                    inputRange: [0, maxSlide],
-                    outputRange: [0, maxSlide],
+                    inputRange: [0, interpolateMax],
+                    outputRange: [0, interpolateMax],
                     extrapolate: 'clamp',
                   }),
                 },

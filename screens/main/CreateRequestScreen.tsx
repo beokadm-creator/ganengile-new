@@ -37,8 +37,12 @@ export default function CreateRequestScreen({
     let isMounted = true;
     calculateFeeAsync().then((fee) => {
       if (isMounted) setEstimatedFee(fee);
+    }).catch((err) => {
+      console.error('Failed to calculate fee in useEffect:', err);
     });
-    return () => { isMounted = false; };
+    return () => {
+      isMounted = false;
+    };
   }, [packageSize, packageWeight]);
 
   const packageSizes = [

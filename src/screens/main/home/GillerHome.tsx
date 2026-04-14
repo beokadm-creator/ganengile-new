@@ -109,7 +109,7 @@ export function GillerHome({
       {isPreviewMode && (
         <TouchableOpacity 
           style={localStyles.previewBanner}
-          onPress={() => navigation.navigate('Profile')}
+          onPress={() => navigation.navigate('Tabs', { screen: 'Profile' })}
           activeOpacity={0.9}
         >
           <MaterialIcons name="visibility" size={16} color="#FFFFFF" style={{ marginRight: 6 }} />

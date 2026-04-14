@@ -152,6 +152,11 @@ function toDate(value: unknown): Date | null {
 
 function mapUser(docId: string, data: UserDoc): User {
   const agreedTermsSource = (data.agreedTerms ?? {}) as AgreedTermsShape;
+  
+  // Backward compatibility: Treat users with name and phoneNumber as having completed onboarding
+  // if the hasCompletedOnboarding field is explicitly missing.
+  const isLegacyUserCompleted = Boolean(data.name && data.phoneNumber);
+  const hasCompletedOnboarding = data.hasCompletedOnboarding ?? isLegacyUserCompleted;
 
   return {
     uid: docId,
@@ -174,7 +179,7 @@ function mapUser(docId: string, data: UserDoc): User {
     createdAt: (data.createdAt ?? null) as User['createdAt'],
     updatedAt: (data.updatedAt ?? null) as User['updatedAt'],
     isActive: data.isActive ?? true,
-    hasCompletedOnboarding: data.hasCompletedOnboarding ?? false,
+    hasCompletedOnboarding,
     rating: data.rating,
     totalRatings: data.totalRatings,
     profilePhoto: data.profilePhoto,

@@ -8,41 +8,13 @@ import { useCreateRequestStore } from '../store/useCreateRequestStore';
 import { SafeNumberIntegrationConfig } from '../../../../services/integration-config-service';
 
 type Props = {
-  setShowLockerLocator: (visible: boolean) => void;
-  recipientPrivacyConfig: any;
-  handleContactPhoneChange: (value: string) => void;
-  hasLockedVerifiedPhone: boolean;
-  isPhoneVerified: boolean;
-  contactOtpCode: string;
-  setContactOtpCode: (code: string) => void;
-  contactOtpSessionId: string | null;
-  contactOtpSending: boolean;
-  contactOtpVerifying: boolean;
-  contactOtpDestination: string;
-  contactOtpExpiresAt: string | null;
-  contactOtpHintCode: string | null;
-  handleRequestContactOtp: () => Promise<void>;
-  handleVerifyContactOtp: () => Promise<void>;
-  onNavigateToProfile: () => void;
+  setShowLockerLocator: (val: boolean) => void;
+  recipientPrivacyConfig: { useVirtualNumber: boolean; thirdPartyConsentRequired: boolean };
 };
 
 export function Step3Recipient({
   setShowLockerLocator,
   recipientPrivacyConfig,
-  handleContactPhoneChange,
-  hasLockedVerifiedPhone,
-  isPhoneVerified,
-  contactOtpCode,
-  setContactOtpCode,
-  contactOtpSessionId,
-  contactOtpSending,
-  contactOtpVerifying,
-  contactOtpDestination,
-  contactOtpExpiresAt,
-  contactOtpHintCode,
-  handleRequestContactOtp,
-  handleVerifyContactOtp,
-  onNavigateToProfile,
 }: Props) {
   const store = useCreateRequestStore();
   const inputRef = useRef<TextInput>(null);
@@ -73,8 +45,7 @@ export function Step3Recipient({
         console.log('Values:', {
           name: store.recipientName,
           phone: store.recipientPhone,
-          consent: store.recipientConsentChecked,
-          isPhoneVerified
+          consent: store.recipientConsentChecked
         });
         if (!store.recipientName || !store.recipientPhone || !store.recipientConsentChecked) {
           if (Platform.OS === 'web') window.alert('수령인 정보와 개인정보 제공 동의를 완료해 주세요.');
@@ -89,11 +60,6 @@ export function Step3Recipient({
           return;
         }
         
-        if (!isPhoneVerified) {
-          if (Platform.OS === 'web') window.alert('휴대폰 본인 인증을 완료해 주세요.');
-          else Alert.alert('인증 필요', '휴대폰 본인 인증을 완료해 주세요.');
-          return;
-        }
         console.log('[Step3] Validations passed, calling setActiveStep(4)');
         store.setActiveStep(4);
       }} 
@@ -168,81 +134,6 @@ export function Step3Recipient({
             </Text>
           </TouchableOpacity>
         </View>
-      </Block>
-
-      <Block title="휴대폰 인증">
-        {hasLockedVerifiedPhone ? (
-          <View style={styles.verifiedPhoneBox}>
-            <Text style={styles.verifiedPhoneText}>
-              ✅ {store.contactPhoneNumber} (인증됨)
-            </Text>
-            <TouchableOpacity onPress={onNavigateToProfile}>
-              <Text style={styles.linkText}>번호 변경하기</Text>
-            </TouchableOpacity>
-          </View>
-        ) : (
-          <>
-            <View style={styles.otpRow}>
-              <TextInput
-                style={[styles.input, styles.flex1]}
-                value={store.contactPhoneNumber}
-                onChangeText={handleContactPhoneChange}
-                keyboardType="phone-pad"
-                placeholder="본인 명의 휴대폰 번호"
-                placeholderTextColor={Colors.gray400}
-              />
-              <TouchableOpacity
-                style={styles.otpButton}
-                onPress={() => void handleRequestContactOtp()}
-                disabled={contactOtpSending}
-              >
-                {contactOtpSending ? (
-                  <ActivityIndicator color={Colors.white} />
-                ) : (
-                  <Text style={styles.otpButtonText}>
-                    {contactOtpSessionId ? '재전송' : '인증 요청'}
-                  </Text>
-                )}
-              </TouchableOpacity>
-            </View>
-
-            {contactOtpSessionId && !isPhoneVerified ? (
-              <View style={styles.otpRow}>
-                <TextInput
-                  style={[styles.input, styles.flex1]}
-                  value={contactOtpCode}
-                  onChangeText={setContactOtpCode}
-                  keyboardType="number-pad"
-                  placeholder="인증번호 6자리"
-                  placeholderTextColor={Colors.gray400}
-                  maxLength={6}
-                />
-                <TouchableOpacity
-                  style={[
-                    styles.otpButton,
-                    contactOtpCode.length < 6 && { backgroundColor: Colors.gray400 },
-                  ]}
-                  onPress={() => void handleVerifyContactOtp()}
-                  disabled={contactOtpCode.length < 6 || contactOtpVerifying}
-                >
-                  {contactOtpVerifying ? (
-                    <ActivityIndicator color={Colors.white} />
-                  ) : (
-                    <Text style={styles.otpButtonText}>인증 확인</Text>
-                  )}
-                </TouchableOpacity>
-              </View>
-            ) : null}
-            
-            {contactOtpHintCode ? (
-              <Text style={styles.devHintText}>[개발] 인증번호: {contactOtpHintCode}</Text>
-            ) : null}
-
-            {isPhoneVerified && !hasLockedVerifiedPhone ? (
-              <Text style={styles.successText}>✅ 인증이 완료되었습니다.</Text>
-            ) : null}
-          </>
-        )}
       </Block>
     </StepContainer>
   );

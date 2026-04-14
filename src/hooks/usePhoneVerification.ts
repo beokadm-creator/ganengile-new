@@ -1,18 +1,23 @@
 import { useState } from 'react';
 import { Alert } from 'react-native';
-import { useUser } from '../../../../contexts/UserContext';
-import { requestPhoneOtp, confirmPhoneOtp } from '../../../../services/otp-service';
-import { useCreateRequestStore } from '../store/useCreateRequestStore';
-import { normalizePhoneNumber, formatPhoneDigits } from '../../../../utils/format';
+import { useUser } from '../contexts/UserContext';
+import { requestPhoneOtp, confirmPhoneOtp } from '../services/otp-service';
+import { normalizePhoneNumber, formatPhoneDigits } from '../utils/format';
 
-export function usePhoneVerification() {
+export interface PhoneVerificationProps {
+  contactPhoneNumber: string;
+  setContactPhoneNumber: (phone: string) => void;
+  verifiedPhoneOverride: string | null;
+  setVerifiedPhoneOverride: (phone: string | null) => void;
+}
+
+export function usePhoneVerification({
+  contactPhoneNumber,
+  setContactPhoneNumber,
+  verifiedPhoneOverride,
+  setVerifiedPhoneOverride,
+}: PhoneVerificationProps) {
   const { user, refreshUser } = useUser();
-  const {
-    contactPhoneNumber,
-    setContactPhoneNumber,
-    verifiedPhoneOverride,
-    setVerifiedPhoneOverride,
-  } = useCreateRequestStore();
 
   const resetOtpState = () => {
     setContactOtpSessionId(null);
@@ -139,19 +144,19 @@ export function usePhoneVerification() {
   }
 
   return {
-    contactOtpSessionId,
-    contactOtpCode,
-    setContactOtpCode,
-    contactOtpHintCode,
-    contactOtpDestination,
-    contactOtpExpiresAt,
-    contactOtpSending,
-    contactOtpVerifying,
+    otpSessionId: contactOtpSessionId,
+    otpCode: contactOtpCode,
+    setOtpCode: setContactOtpCode,
+    otpHintCode: contactOtpHintCode,
+    otpDestination: contactOtpDestination,
+    otpExpiresAt: contactOtpExpiresAt,
+    otpSending: contactOtpSending,
+    otpVerifying: contactOtpVerifying,
     hasLockedVerifiedPhone,
     isPhoneVerified,
-    handleContactPhoneChange,
-    handleRequestContactOtp,
-    handleVerifyContactOtp,
+    handlePhoneChange: handleContactPhoneChange,
+    handleRequestOtp: handleRequestContactOtp,
+    handleVerifyOtp: handleVerifyContactOtp,
     resetOtpState,
   };
 }

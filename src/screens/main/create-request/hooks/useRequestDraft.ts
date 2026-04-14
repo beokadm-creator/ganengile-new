@@ -88,7 +88,7 @@ export function useRequestDraft() {
 
       store.setDraftSaving(true);
       void saveCreateRequestProgress(buildDraftPayload()).finally(() => store.setDraftSaving(false));
-    }, 500);
+    }, 2000);
 
     return () => {
       if (draftSaveTimerRef.current) {

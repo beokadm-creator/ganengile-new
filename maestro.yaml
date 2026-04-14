@@ -10,6 +10,3 @@ appId: com.ganengile.app
 - flow:
     - giller-flow
 
-# B2B 신규 기업 고객 플로우
-- flow:
-    - b2b-flow

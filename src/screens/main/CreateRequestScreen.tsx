@@ -63,7 +63,7 @@ import {
   type CreateRequestDraft,
 } from '../../utils/draft-storage';
 import { useCreateRequestStore } from './create-request/store/useCreateRequestStore';
-import { usePhoneVerification } from './create-request/hooks/usePhoneVerification';
+import { usePhoneVerification } from '../../hooks/usePhoneVerification';
 import { usePricingQuotes } from './create-request/hooks/usePricingQuotes';
 import { useLocationResolution } from './create-request/hooks/useLocationResolution';
 import { useRequestDraft } from './create-request/hooks/useRequestDraft';
@@ -272,40 +272,6 @@ export default function CreateRequestScreen({ navigation, route }: Props) {
   const [reservationCalendarVisible, setReservationCalendarVisible] = useState(false);
 
   const {
-    resolvingLocation,
-    resolvingAddressStation,
-    nearbyPicker,
-    setNearbyPicker,
-    pickerVisible,
-    setPickerVisible,
-    pickerType,
-    setPickerType,
-    handleUseCurrentLocation,
-    handleRecommendStationFromAddress,
-  } = useLocationResolution(stations);
-  
-  const {
-    // Note: this hook manages OTP internal state so we don't return them here anymore.
-    contactOtpSessionId,
-    contactOtpCode,
-    setContactOtpCode,
-    contactOtpHintCode,
-    contactOtpDestination,
-    contactOtpExpiresAt,
-    contactOtpSending,
-    contactOtpVerifying,
-    hasLockedVerifiedPhone,
-    isPhoneVerified,
-    handleRequestContactOtp,
-    handleVerifyContactOtp,
-    resetOtpState,
-  } = usePhoneVerification();
-
-  const [recipientPrivacyConfig, setRecipientPrivacyConfig] = useState<RecipientContactPrivacyConfig>(
-    FALLBACK_RECIPIENT_PRIVACY_CONFIG
-  );
-
-  const {
     activeStep, setActiveStep,
     transitionLockUntil,
     requestMode, setRequestMode,
@@ -346,6 +312,45 @@ export default function CreateRequestScreen({ navigation, route }: Props) {
     draftSaving, setDraftSaving,
     hydrateFromDraft, hydrateFromPrefill, clearForm
   } = useCreateRequestStore();
+
+  const {
+    resolvingLocation,
+    resolvingAddressStation,
+    nearbyPicker,
+    setNearbyPicker,
+    pickerVisible,
+    setPickerVisible,
+    pickerType,
+    setPickerType,
+    handleUseCurrentLocation,
+    handleRecommendStationFromAddress,
+  } = useLocationResolution(stations);
+  
+  const {
+    otpSessionId: contactOtpSessionId,
+    otpCode: contactOtpCode,
+    setOtpCode: setContactOtpCode,
+    otpHintCode: contactOtpHintCode,
+    otpDestination: contactOtpDestination,
+    otpExpiresAt: contactOtpExpiresAt,
+    otpSending: contactOtpSending,
+    otpVerifying: contactOtpVerifying,
+    hasLockedVerifiedPhone,
+    isPhoneVerified,
+    handlePhoneChange: handleContactPhoneChange,
+    handleRequestOtp: handleRequestContactOtp,
+    handleVerifyOtp: handleVerifyContactOtp,
+    resetOtpState,
+  } = usePhoneVerification({
+    contactPhoneNumber,
+    setContactPhoneNumber,
+    verifiedPhoneOverride,
+    setVerifiedPhoneOverride,
+  });
+
+  const [recipientPrivacyConfig, setRecipientPrivacyConfig] = useState<RecipientContactPrivacyConfig>(
+    FALLBACK_RECIPIENT_PRIVACY_CONFIG
+  );
 
   useEffect(() => {
     if (prefill || params?.mode === 'reservation') {
@@ -531,19 +536,7 @@ export default function CreateRequestScreen({ navigation, route }: Props) {
 
 
 
-  const handleContactPhoneChange = (value: string) => {
-    if (hasLockedVerifiedPhone) {
-      return;
-    }
-    const formatted = formatPhoneDigits(value);
-    setContactPhoneNumber(formatted);
-    if (normalizePhoneNumber(formatted) !== normalizePhoneNumber(
-      verifiedPhoneOverride ?? user?.phoneVerification?.phoneNumber ?? ''
-    )) {
-      setVerifiedPhoneOverride(null);
-      resetOtpState();
-    }
-  };
+
   useEffect(() => {
     const unsubscribe = navigation.addListener('beforeRemove', (e) => {
       // 1단계보다 더 진행된 상태라면 화면이 닫히는 것을 막고 이전 단계로 이동
@@ -565,7 +558,7 @@ export default function CreateRequestScreen({ navigation, route }: Props) {
 
   useEffect(() => {
     // 활성화된 스텝이 변경될 때 스크롤 제어
-    setTimeout(() => {
+    const timeoutId = setTimeout(() => {
       if (activeStep === 4) {
         // 4단계(견적 확인)일 때는 화면 맨 아래로 스크롤하여 결제 요약이 보이게 함
         scrollViewRef.current?.scrollToEnd({ animated: true });
@@ -574,6 +567,8 @@ export default function CreateRequestScreen({ navigation, route }: Props) {
         scrollViewRef.current?.scrollTo({ y: 0, animated: true });
       }
     }, 100);
+
+    return () => clearTimeout(timeoutId);
   }, [activeStep]);
 
   function handleBack() {
@@ -698,7 +693,17 @@ export default function CreateRequestScreen({ navigation, route }: Props) {
     }
 
     if (!isOnboardingComplete) {
-      Alert.alert('이용 시작 준비가 필요합니다', '첫 배송 요청 전에 이용자 정보와 약관 동의를 완료해 주세요.');
+      Alert.alert(
+        '이용자 정보 확인이 필요합니다',
+        '첫 배송 요청을 위해 약관 동의와 연락처 확인을 완료해 주세요.',
+        [
+          { text: '취소', style: 'cancel' },
+          { 
+            text: '입력하러 가기', 
+            onPress: () => (navigation as any).navigate('Onboarding') 
+          },
+        ]
+      );
       return;
     }
 
@@ -814,8 +819,8 @@ export default function CreateRequestScreen({ navigation, route }: Props) {
 
   const renderStep1Summary = () => {
     if (activeStep <= 1) return null;
-    const pickup = pickupMode === 'address' && pickupRoadAddress ? `${pickupRoadAddress} (${pickupStation?.stationName})` : pickupStation?.stationName;
-    const delivery = deliveryMode === 'address' && deliveryRoadAddress ? `${deliveryRoadAddress} (${deliveryStation?.stationName})` : deliveryStation?.stationName;
+    const pickup = pickupMode === 'address' && pickupRoadAddress ? `${formatDetailedAddress(pickupRoadAddress, pickupDetailAddress)} (${pickupStation?.stationName})` : pickupStation?.stationName;
+    const delivery = deliveryMode === 'address' && deliveryRoadAddress ? `${formatDetailedAddress(deliveryRoadAddress, deliveryDetailAddress)} (${deliveryStation?.stationName})` : deliveryStation?.stationName;
     return (
       <StepSummaryCard
         step={1}
@@ -891,21 +896,7 @@ export default function CreateRequestScreen({ navigation, route }: Props) {
         {renderStep3Summary()}
         <Step3Recipient
           setShowLockerLocator={setShowLockerLocator}
-          recipientPrivacyConfig={recipientPrivacyConfig}
-          handleContactPhoneChange={handleContactPhoneChange}
-          hasLockedVerifiedPhone={hasLockedVerifiedPhone}
-          isPhoneVerified={isPhoneVerified}
-          contactOtpCode={contactOtpCode}
-          setContactOtpCode={setContactOtpCode}
-          contactOtpSessionId={contactOtpSessionId}
-          contactOtpSending={contactOtpSending}
-          contactOtpVerifying={contactOtpVerifying}
-          contactOtpDestination={contactOtpDestination}
-          contactOtpExpiresAt={contactOtpExpiresAt}
-          contactOtpHintCode={contactOtpHintCode}
-          handleRequestContactOtp={handleRequestContactOtp}
-          handleVerifyContactOtp={handleVerifyContactOtp}
-          onNavigateToProfile={() => navigation.navigate('ProfileEdit')}
+          recipientPrivacyConfig={recipientPrivacyConfig as any}
         />
 
         <Step4Quote

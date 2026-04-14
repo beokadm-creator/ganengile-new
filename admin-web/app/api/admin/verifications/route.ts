@@ -34,10 +34,11 @@ export async function GET(req: NextRequest) {
       .collectionGroup('verification')
       .where('status', '==', status)
       .orderBy('submittedAt', 'desc')
+      .limit(100)
       .get();
   } catch (error) {
     console.error('Verification query with submittedAt ordering failed, falling back to local sort', error);
-    snap = await db.collectionGroup('verification').where('status', '==', status).get();
+    snap = await db.collectionGroup('verification').where('status', '==', status).limit(100).get();
   }
 
   const items = snap.docs.map((doc) => {

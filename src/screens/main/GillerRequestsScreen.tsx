@@ -47,6 +47,8 @@ import { BorderRadius, Colors, Shadows, Spacing, Typography } from '../../theme'
 import type { MainStackNavigationProp } from '../../types/navigation';
 import { GillerType } from '../../types/user';
 
+const PREVIEW_SEARCH_RADIUS_METERS = 6000;
+
 export default function GillerRequestsScreen() {
   const navigation = useNavigation<MainStackNavigationProp>();
   const { user } = useUser();
@@ -136,15 +138,15 @@ export default function GillerRequestsScreen() {
       } else if (isPreviewMode && currentLocation) {
         centerLat = currentLocation.latitude;
         centerLng = currentLocation.longitude;
-        radiusMeters = 6000; // 미리보기 모드 시 내 주변 6km 기본 적용
+        radiusMeters = PREVIEW_SEARCH_RADIUS_METERS; // 미리보기 모드 시 내 주변 6km 기본 적용
       } else {
         return groups;
       }
 
       return groups.filter((group) => {
-        const points = [group.originPoint, group.destinationPoint].filter(
-          (point): point is NonNullable<MissionGroup['originPoint']> => point != null
-        );
+        const points = group.options
+          .flatMap((option) => [option.originPoint, option.destinationPoint])
+          .filter((point): point is NonNullable<MissionGroup['originPoint']> => point != null);
 
         if (!points.length) {
           return true;
@@ -162,32 +164,25 @@ export default function GillerRequestsScreen() {
     [activeTerritory, isPreviewMode, currentLocation]
   );
 
-  const immediateMissionGroups = useMemo(
-    () =>
-      filterByTerritory(
-        groupMissionCards(
-        (snapshot?.missionCards ?? []).filter(
-          (card) => card.selectionState === 'available' && isImmediateMission(card)
-        )
-        )
-      ),
-    [filterByTerritory, snapshot]
-  );
-  const ongoingMissionGroups = useMemo(
-    () => filterByTerritory(groupMissionCards((snapshot?.missionCards ?? []).filter((card) => card.selectionState === 'accepted'))),
-    [filterByTerritory, snapshot]
-  );
-  const suggestedMissionGroups = useMemo(
-    () =>
-      filterByTerritory(
-        groupMissionCards(
-        (snapshot?.missionCards ?? []).filter(
-          (card) => card.selectionState !== 'accepted' && !isImmediateMission(card)
-        )
-        )
-      ),
-    [filterByTerritory, snapshot]
-  );
+  const allGroups = useMemo(() => {
+    return filterByTerritory(groupMissionCards(snapshot?.missionCards ?? []));
+  }, [filterByTerritory, snapshot?.missionCards]);
+
+  const ongoingMissionGroups = useMemo(() => {
+    return allGroups.filter((group) => group.selectionState === 'accepted');
+  }, [allGroups]);
+
+  const immediateMissionGroups = useMemo(() => {
+    return allGroups.filter(
+      (group) => group.selectionState === 'available' && isImmediateMission(group.options[0] ?? ({} as any))
+    );
+  }, [allGroups]);
+
+  const suggestedMissionGroups = useMemo(() => {
+    return allGroups.filter(
+      (group) => group.selectionState === 'available' && !isImmediateMission(group.options[0] ?? ({} as any))
+    );
+  }, [allGroups]);
   const featuredMissionGroup = immediateMissionGroups[0] ?? null;
 
   const handleAccept = useCallback(
@@ -198,7 +193,7 @@ export default function GillerRequestsScreen() {
           '수락은 길러 신청 후 이용할 수 있습니다.',
           [
             { text: '닫기', style: 'cancel' },
-            { text: '신청하기', onPress: () => navigation.navigate('Profile') }
+            { text: '신청하기', onPress: () => navigation.navigate('Tabs', { screen: 'Profile' }) }
           ]
         );
         return;
@@ -225,7 +220,7 @@ export default function GillerRequestsScreen() {
               void (async () => {
                 try {
                   setSubmittingBundleId(bundleId);
-                  await acceptMissionBundleForGiller(bundleId, user.uid);
+                  await acceptMissionBundleForGiller(bundleId, user!.uid);
                   await loadSnapshot('refresh');
                 } catch (error) {
                   const message = error instanceof Error ? error.message : '구간 수락에 실패했습니다.';
@@ -250,7 +245,7 @@ export default function GillerRequestsScreen() {
           '수락 취소는 길러 신청 후 이용할 수 있습니다.',
           [
             { text: '닫기', style: 'cancel' },
-            { text: '신청하기', onPress: () => navigation.navigate('Profile') }
+            { text: '신청하기', onPress: () => navigation.navigate('Tabs', { screen: 'Profile' }) }
           ]
         );
         return;
@@ -273,7 +268,7 @@ export default function GillerRequestsScreen() {
               void (async () => {
                 try {
                   setSubmittingBundleId(card.bundleId ?? null);
-                  await releaseMissionBundleForGiller(card.bundleId!, user.uid);
+                  await releaseMissionBundleForGiller(card.bundleId!, user!.uid);
                   await loadSnapshot('refresh');
                 } catch (error) {
                   const message = error instanceof Error ? error.message : '수락 취소에 실패했습니다.';
@@ -298,7 +293,7 @@ export default function GillerRequestsScreen() {
           '다음 작업은 길러 신청 후 진행할 수 있습니다.',
           [
             { text: '닫기', style: 'cancel' },
-            { text: '신청하기', onPress: () => navigation.navigate('Profile') }
+            { text: '신청하기', onPress: () => navigation.navigate('Tabs', { screen: 'Profile' }) }
           ]
         );
         return;

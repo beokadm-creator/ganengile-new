@@ -575,72 +575,6 @@ service cloud.firestore {
 
     // ==================== ChatRooms Collection ====================
 
-    // ==================== B2B Collections ====================
-
-    match /b2b_requests/{requestId} {
-      // 읽기: B2B 회사 또는 길러
-      allow read: if isAuthenticated() &&
-                  (isOwner(resource.data.companyId) ||
-                   request.auth.uid in resource.data.availableGillers);
-
-      // 쓰기: B2B 회사만 (delete 방어를 위해 create, update로 명시적 분리)
-      allow create, update: if isOwner(resource.data.companyId) &&
-                    // 보안: 임의로 완료 상태 변경 불가 (결제 우회 방지)
-                    request.resource.data.status != 'completed';
-
-      // 삭제: B2B 회사만
-      allow delete: if isOwner(resource.data.companyId);
-    }
-
-    match /b2b_gillers/{gillerId} {
-      // 읽기: 인증된 사용자
-      allow read: if isAuthenticated();
-
-      // 쓰기: 본인(gller/giller)만
-      allow write: if isOwner(gillerId);
-
-      // 삭제: 본인만
-      allow delete: if isOwner(gillerId);
-    }
-
-    match /b2b_settlements/{settlementId} {
-      // 읽기: B2B 회사만
-      allow read: if isOwner(resource.data.companyId);
-
-      // 쓰기: 시스템만 (Admin SDK)
-      allow write: if false;
-
-      // 삭제: 시스템만
-      allow delete: if false;
-    }
-
-    match /b2b_deliveries/{deliveryId} {
-      // 읽기: B2B 회사 또는 길러
-      allow read: if isAuthenticated() &&
-                  (isOwner(resource.data.companyId) ||
-                   (resource.data.gllerId != null && isOwner(resource.data.gllerId)));
-
-      // 쓰기: B2B 회사만 (delete 방어를 위해 명시적 분리)
-      allow create, update: if isOwner(resource.data.companyId) &&
-                    // 보안: 임의로 완료 상태 변경 불가 (결제 우회 방지)
-                    request.resource.data.status != 'completed';
-
-      // 삭제: B2B 회사만
-      allow delete: if isOwner(resource.data.companyId);
-    }
-
-    match /b2b_tax_invoices/{invoiceId} {
-      // 읽기: B2B 회사 또는 관리자
-      allow read: if isAuthenticated() &&
-                  (isOwner(resource.data.companyId) || isAdmin());
-
-      // 쓰기: 관리자만 (Admin SDK)
-      allow write: if isAdmin();
-
-      // 삭제: 관리자만
-      allow delete: if isAdmin();
-    }
-
     // ==================== Lockers Collection ====================
 
     match /lockers/{lockerId} {
@@ -665,39 +599,6 @@ service cloud.firestore {
       allow delete: if false;
     }
 
-    // ==================== Auctions Collection ====================
-
-    match /auctions/{auctionId} {
-      // 읽기: 인증된 사용자
-      allow read: if isAuthenticated();
-
-      // 생성: 길러 본인만 (gllerId 바인딩)
-      allow create: if isAuthenticated() &&
-                    request.resource.data.gllerId == request.auth.uid;
-
-      // 업데이트: 생성자만
-      allow update: if isOwner(resource.data.gllerId);
-
-      // 삭제: 생성자만
-      allow delete: if isOwner(resource.data.gllerId);
-    }
-
-    // ==================== Bids Collection ====================
-
-    match /bids/{bidId} {
-      // 읽기: 인증된 사용자
-      allow read: if isAuthenticated();
-
-      // 생성: 입찰자 본인만 (gllerId 바인딩)
-      allow create: if isAuthenticated() &&
-                    request.resource.data.gllerId == request.auth.uid;
-
-      // 업데이트: 입찰자만
-      allow update: if isOwner(resource.data.gllerId);
-
-      // 삭제: 입찰자만
-      allow delete: if isOwner(resource.data.gllerId);
-    }
 
     // ==================== Chat Rooms Collection ====================
 

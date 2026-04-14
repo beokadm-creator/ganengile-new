@@ -604,7 +604,7 @@ export const deliveryLifecycleService = {
         const depositDoc = depositsSnap.docs[0];
         const refundResult = await DepositService.refundDeposit(depositDoc.id);
         if (!refundResult.success) {
-          console.error(`Failed to refund deposit ${depositDoc.id} during giller cancellation:`, (refundResult as any).error || refundResult.message);
+          console.error(`Failed to refund deposit ${depositDoc.id} during giller cancellation:`, refundResult.error);
           depositStatus = 'failed';
         } else {
           depositStatus = 'refunded';

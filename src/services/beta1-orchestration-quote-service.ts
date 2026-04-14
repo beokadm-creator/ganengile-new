@@ -86,6 +86,8 @@ type QuotePricingOverrides = Partial<
     | 'addressPickupFee'
     | 'addressDropoffFee'
     | 'serviceFee'
+    | 'dynamicAdjustment'
+    | 'manualAdjustment'
     | 'vat'
   >
 >;
@@ -139,6 +141,8 @@ function buildQuotePricing(
     addressPickupFee: overrides.addressPickupFee ?? 0,
     addressDropoffFee: overrides.addressDropoffFee ?? 0,
     serviceFee: overrides.serviceFee ?? base.serviceFee,
+    dynamicAdjustment: overrides.dynamicAdjustment ?? base.dynamicAdjustment,
+    manualAdjustment: overrides.manualAdjustment ?? base.manualAdjustment,
     vat: overrides.vat ?? base.vat,
   };
 
@@ -153,6 +157,8 @@ function buildQuotePricing(
     pricing.addressPickupFee +
     pricing.addressDropoffFee +
     pricing.serviceFee +
+    (pricing.dynamicAdjustment ?? 0) +
+    (pricing.manualAdjustment ?? 0) +
     pricing.vat;
 
   return pricing;
@@ -209,9 +215,7 @@ export function buildBeta1BasePricing(
       context: {
         requestedHour,
         weather: input.pricingContextOverride?.weather,
-        isPeakTime:
-          input.pricingContextOverride?.isPeakTime ??
-          (input.requestMode === 'reservation' ? false : undefined),
+        isPeakTime: input.pricingContextOverride?.isPeakTime,
         isProfessionalPeak: input.pricingContextOverride?.isProfessionalPeak,
         nearbyGillerCount: input.pricingContextOverride?.nearbyGillerCount ?? undefined,
       },
@@ -299,7 +303,7 @@ export function buildBeta1QuoteCards(
     context: {
       requestedHour,
       weather: input.pricingContextOverride?.weather,
-      isPeakTime: input.pricingContextOverride?.isPeakTime ?? (reservationMode ? false : undefined),
+      isPeakTime: input.pricingContextOverride?.isPeakTime,
       isProfessionalPeak: input.pricingContextOverride?.isProfessionalPeak,
       nearbyGillerCount: input.pricingContextOverride?.nearbyGillerCount ?? undefined,
     },
@@ -319,7 +323,7 @@ export function buildBeta1QuoteCards(
       : base.urgencySurcharge,
     lockerFee:
       input.directParticipationMode === 'locker_assisted'
-        ? (input.actualLockerFee ?? resolvedPolicy?.quoteAdjustments?.balancedLockerAssistedFee ?? 1000)
+        ? (resolvedPolicy?.quoteAdjustments?.balancedLockerAssistedFee ?? input.actualLockerFee ?? 1000)
         : 0,
     addressPickupFee,
     addressDropoffFee,
@@ -334,7 +338,7 @@ export function buildBeta1QuoteCards(
           ? (resolvedPolicy?.quoteAdjustments?.lowestPriceReservationUrgencyDiscount ?? 600)
           : (resolvedPolicy?.quoteAdjustments?.lowestPriceImmediateUrgencyDiscount ?? 200))
     ),
-    lockerFee: input.actualLockerFee ?? resolvedPolicy?.quoteAdjustments?.lowestPriceLockerFee ?? 700,
+    lockerFee: resolvedPolicy?.quoteAdjustments?.lowestPriceLockerFee ?? input.actualLockerFee ?? 700,
     addressPickupFee: Math.round(addressPickupFee * (resolvedPolicy?.quoteAdjustments?.lowestPriceAddressPickupDiscountRate ?? 0.6)),
     addressDropoffFee: Math.round(addressDropoffFee * (resolvedPolicy?.quoteAdjustments?.lowestPriceAddressDropoffDiscountRate ?? 0.6)),
     serviceFee: Math.max(0, base.serviceFee - (resolvedPolicy?.quoteAdjustments?.lowestPriceServiceFeeDiscount ?? 150)),
@@ -346,7 +350,7 @@ export function buildBeta1QuoteCards(
 
   const lockerIncludedPricing = buildQuotePricing(base, input, {
     lockerFee:
-      (input.actualLockerFee ?? resolvedPolicy?.quoteAdjustments?.lockerIncludedBaseFee ?? 1200) +
+      (resolvedPolicy?.quoteAdjustments?.lockerIncludedBaseFee ?? input.actualLockerFee ?? 1200) +
       (reservationMode
         ? (resolvedPolicy?.quoteAdjustments?.lockerIncludedReservationExtraFee ?? 200)
         : (resolvedPolicy?.quoteAdjustments?.lockerIncludedImmediateExtraFee ?? 500)),

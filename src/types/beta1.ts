@@ -263,6 +263,8 @@ export interface PricingQuote {
     addressPickupFee: number;
     addressDropoffFee: number;
     serviceFee: number;
+    dynamicAdjustment?: number;
+    manualAdjustment?: number;
     vat: number;
   };
   status: PricingQuoteStatus;

@@ -140,11 +140,10 @@ function AppNavigatorContent() {
       <Stack.Navigator screenOptions={{ headerShown: false }}>
         {!user ? (
           <Stack.Screen name="Auth" component={AuthNavigator} />
-        ) : !user.hasCompletedOnboarding ? (
-          <Stack.Screen name="Onboarding" component={BasicInfoOnboarding} />
         ) : (
           <>
             <Stack.Screen name="Main" component={MainNavigator} />
+            <Stack.Screen name="Onboarding" component={BasicInfoOnboarding} />
           </>
         )}
       </Stack.Navigator>

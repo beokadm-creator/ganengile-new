@@ -1070,7 +1070,7 @@ export async function rejectMatch(
  * @returns 동선과 일정이 맞는 요청 목록
  */
 export async function filterRequestsByGillerRoutes(
-  requests: RouteMatchableRequest[],
+  requests: DeliveryRequest[],
   gillerId: string
 ): Promise<RouteFilteredRequest[]> {
   try {
@@ -1100,8 +1100,21 @@ export async function filterRequestsByGillerRoutes(
     for (const request of requests) {
       const matchResults: { route: Route; score: RouteMatchScore }[] = [];
 
+      const reqAny = request as any;
+      const scoreRequest: RouteScoreRequest = {
+        pickupStation: { 
+          stationName: reqAny.pickupStation?.stationName ?? request.pickupStationName 
+        },
+        deliveryStation: { 
+          stationName: reqAny.deliveryStation?.stationName ?? request.deliveryStationName 
+        },
+        preferredTime: { 
+          departureTime: reqAny.preferredTime?.departureTime ?? request.pickupStartTime 
+        },
+      };
+
       for (const route of routesToMatch) {
-        const score = calculateRouteMatchScore(request, route);
+        const score = calculateRouteMatchScore(scoreRequest, route);
         if (score.score >= MIN_MATCH_SCORE) {
           matchResults.push({ route, score });
         }
@@ -1111,7 +1124,19 @@ export async function filterRequestsByGillerRoutes(
         // 가장 높은 점수를 가진 동선을 우선 사용합니다.
         matchResults.sort((a, b) => b.score.score - a.score.score);
         const bestMatch = matchResults[0];
-        const requestWithFallback = request as RouteMatchableRequest & Partial<RouteFilteredRequest>;
+        const requestWithFallback = request as DeliveryRequest & Partial<RouteFilteredRequest> & {
+          initialNegotiationFee?: number;
+          deadline?: Date;
+          fee?: { totalFee: number };
+          requestId?: string;
+          requesterId?: string;
+          gllerId?: string;
+          deliveryType?: string;
+          packageInfo?: any;
+          status?: string;
+          createdAt?: Date;
+          updatedAt?: Date;
+        };
 
         matchedRequests.push({
           ...requestWithFallback,

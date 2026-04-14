@@ -240,22 +240,30 @@ export async function getBeta1HomeSnapshot(userId: string, role: 'requester' | '
       : query(collection(db, 'requests'), where('status', '==', 'pending'));
 
   const missionQuery = query(collection(db, 'missions'), where('assignedGillerUserId', '==', userId), limit(50));
+  const openMissionQuery = role === 'giller' ? query(collection(db, 'missions'), where('status', 'in', ['queued', 'offered']), limit(50)) : null;
+  const missionBundleQuery = role === 'giller' ? query(collection(db, 'mission_bundles'), limit(50)) : null;
 
   const deliveryQuery =
     role === 'requester'
       ? query(collection(db, 'deliveries'), where('requesterId', '==', userId), limit(50))
       : query(collection(db, 'deliveries'), where('gillerId', '==', userId), limit(50));
 
-  const [requestSnapshot, missionSnapshot, deliverySnapshot, wallet] = await Promise.all([
+  const [requestSnapshot, missionSnapshot, openMissionSnapshot, missionBundleSnapshot, deliverySnapshot, wallet] = await Promise.all([
     safeGetDocs(requestQuery),
     safeGetDocs(missionQuery),
+    openMissionQuery ? safeGetDocs(openMissionQuery) : Promise.resolve(null),
+    missionBundleQuery ? safeGetDocs(missionBundleQuery) : Promise.resolve(null),
     safeGetDocs(deliveryQuery),
     safeGetWallet(),
   ]);
 
-  const allMissionDocs = (missionSnapshot?.docs ?? []).map(
-    (docItem) => ({ id: docItem.id, ...asRecord(docItem.data()) }) as Beta1MissionDoc
-  );
+  const allMissionDocs = [
+    ...(missionSnapshot?.docs ?? []),
+    ...(openMissionSnapshot?.docs ?? []),
+  ]
+    .filter((docItem, index, self) => self.findIndex((d) => d.id === docItem.id) === index)
+    .map((docItem) => ({ id: docItem.id, ...asRecord(docItem.data()) }) as Beta1MissionDoc);
+
   const missionsById = new Map(allMissionDocs.map((mission) => [String(mission.id), mission] as const));
 
   const allRequests = (requestSnapshot?.docs ?? [])
@@ -270,9 +278,17 @@ export async function getBeta1HomeSnapshot(userId: string, role: 'requester' | '
       return String(request.status ?? '') === 'pending';
     });
 
-  const missions = allMissionDocs.filter((mission) => mission.assignedGillerUserId === userId);
+  const missions = allMissionDocs.filter((mission) => {
+    if (role === 'requester') return false;
+    return mission.assignedGillerUserId === userId || mission.status === 'queued' || mission.status === 'offered';
+  });
 
-  const missionBundles: Beta1MissionBundleDoc[] = [];
+  const missionBundles = (missionBundleSnapshot?.docs ?? []).map(
+    (docItem) => ({ missionBundleId: docItem.id, ...asRecord(docItem.data()) }) as Beta1MissionBundleDoc
+  ).filter((bundle) => {
+    if (role === 'requester') return false;
+    return bundle.selectedGillerUserId === userId || !bundle.selectedGillerUserId;
+  });
 
   const deliveries = (deliverySnapshot?.docs ?? [])
     .map((docItem) => ({ id: docItem.id, ...asRecord(docItem.data()) }) as Beta1DeliveryDoc)
@@ -400,7 +416,10 @@ export async function getBeta1HomeSnapshot(userId: string, role: 'requester' | '
     };
   });
 
-  const missionCardsFromMissions = activeMissions.map((mission) => {
+  const bundledMissionIds = new Set(missionBundles.flatMap(b => b.missionIds ?? []));
+  const missionCardsFromMissions = activeMissions
+    .filter(m => !bundledMissionIds.has(String(m.id)))
+    .map((mission) => {
     const request = mission.requestId ? requestsById.get(String(mission.requestId)) : undefined;
     const missionType = String(mission.missionType ?? 'mission');
     const missionStatus = String(mission.status ?? 'queued');
@@ -420,6 +439,10 @@ export async function getBeta1HomeSnapshot(userId: string, role: 'requester' | '
         : isOpenMission
           ? '길러 위치와 다음 이동 동선을 기준으로 번들 가능성과 수락 성공률을 함께 보고 있습니다.'
           : '이미 수락된 미션이라 다음 인계 시점과 ETA를 안정적으로 유지하는 쪽이 우선입니다.';
+
+    const isAssignedToUser = mission.assignedGillerUserId === userId;
+    const selectionState: 'available' | 'accepted' | 'fallback' = isAssignedToUser ? 'accepted' : 'available';
+    const actionLabel = isAssignedToUser ? '진행 상태 보기' : '이 구간 수행하기';
 
     return {
       id: String(mission.id),
@@ -444,13 +467,13 @@ export async function getBeta1HomeSnapshot(userId: string, role: 'requester' | '
       specialInstructions: request?.specialInstructions,
       strategyTitle,
       strategyBody,
-      actionLabel: '진행 상태 보기',
+      actionLabel,
       segmentLabel: `${mission.sequence ?? 1}구간`,
       startSequence: mission.sequence,
       endSequence: mission.sequence,
       originPoint: toMapPoint(mission.originRef ?? null),
       destinationPoint: toMapPoint(mission.destinationRef ?? null),
-      selectionState: 'accepted' as const,
+      selectionState,
     };
   });
 

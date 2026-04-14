@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   ActivityIndicator,
   Alert,
+  AppState,
   Modal,
   Platform,
   Pressable,
@@ -239,8 +240,17 @@ export default function RequestDetailScreen() {
       }
     });
 
-    return unsubscribe;
-  }, [requestId]);
+    const appStateSubscription = AppState.addEventListener('change', (nextAppState) => {
+      if (nextAppState === 'active') {
+        void loadRequest();
+      }
+    });
+
+    return () => {
+      unsubscribe();
+      appStateSubscription.remove();
+    };
+  }, [requestId, loadRequest]);
 
   async function onRefresh() {
     setRefreshing(true);

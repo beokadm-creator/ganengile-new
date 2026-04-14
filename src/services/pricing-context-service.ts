@@ -103,13 +103,13 @@ async function inferSupplyContext(input: {
   const activeToday = routes.filter((route) => route.daysOfWeek.includes(dayOfWeek));
   const exactCandidates = activeToday.filter(
     (route) =>
-      namesLooselyEqual(route.departureStation, input.pickupStationName) &&
-      namesLooselyEqual(route.arrivalStation, input.deliveryStationName)
+      namesLooselyEqual(route.startStation.stationName, input.pickupStationName) &&
+      namesLooselyEqual(route.endStation.stationName, input.deliveryStationName)
   );
   const partialCandidates = activeToday.filter(
     (route) =>
-      namesLooselyEqual(route.departureStation, input.pickupStationName) ||
-      namesLooselyEqual(route.arrivalStation, input.deliveryStationName)
+      namesLooselyEqual(route.startStation.stationName, input.pickupStationName) ||
+      namesLooselyEqual(route.endStation.stationName, input.deliveryStationName)
   );
 
   const candidatePool = exactCandidates.length > 0 ? exactCandidates : partialCandidates;

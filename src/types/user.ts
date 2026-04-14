@@ -29,12 +29,12 @@ export enum AuthProviderType {
 }
 
 /**
- * 길러 등급 (P1 신규)
+ * 길러 등급 (B2B 파트너 포함)
  */
 export enum GillerType {
-  REGULAR = 'regular',      // 일반 길러
-  PROFESSIONAL = 'professional',  // 전문 길러
-  MASTER = 'master',        // 마스터 길러
+  REGULAR = 'regular',      // 일반 개인 길러
+  PROFESSIONAL = 'professional',  // B2B 전문 배송업체 (API 연동)
+  MASTER = 'master',
 }
 
 /**

@@ -240,6 +240,13 @@ export default function ProfileScreen({ navigation }: { navigation: MainStackNav
         icon: 'edit',
         onPress: () => navigation.navigate('ProfileEdit'),
       },
+      {
+        key: 'b2b-apply',
+        title: 'B2B 파트너 신청',
+        subtitle: '전문 배송업체 API 연동',
+        icon: 'business',
+        onPress: () => (navigation.navigate as any)('B2BPartnerApply'),
+      },
     ],
     [navigation]
   );

@@ -49,9 +49,6 @@ import {
   type Beta1PricingQuoteInput,
   type Beta1RequestDraftAnalysisInput,
 } from './beta1-ai';
-import { taxInvoiceScheduler } from './scheduled/tax-invoice-scheduler';
-import { gillerSettlementScheduler } from './scheduled/settlement-scheduler';
-import { partnerSettlementScheduler } from './scheduled/partner-settlement-scheduler';
 import { fareCacheScheduler } from './scheduled/fare-cache-scheduler';
 export { onNotificationCreated } from './notifications';
 export { onRatingCreated } from './ratings';
@@ -2387,64 +2384,7 @@ export const completeMatch = functions.https.onCall(
   }
 );
 
-// ==================== P3: B2B Scheduled Functions ====================
-
-/**
- * Scheduled Function: Tax Invoice Scheduler
- * 留ㅼ썡 1??00:00???ㅽ뻾?섏뼱 B2B 怨꾩빟 湲곗뾽???멸툑怨꾩궛?쒕? ?먮룞 諛쒗뻾?⑸땲??
- */
-export const scheduledTaxInvoice = functions.pubsub
-  .schedule('0 0 1 * *')
-  .timeZone('Asia/Seoul')
-  .onRun(async (_context) => {
-    console.warn('?㎨ [Scheduled Tax Invoice] Triggered at:', new Date().toISOString());
-    try {
-      const result = await taxInvoiceScheduler();
-      console.warn('??Tax invoice scheduler completed:', result);
-      return null;
-    } catch (error) {
-      console.error('??Tax invoice scheduler error:', error);
-      return null;
-    }
-  });
-
-/**
- * Scheduled Function: Giller Settlement Scheduler
- * 留ㅼ썡 5??00:00???ㅽ뻾?섏뼱 B2B 湲몃윭???붽컙 ?뺤궛???먮룞 泥섎━?⑸땲??
- */
-export const scheduledGillerSettlement = functions.pubsub
-  .schedule('0 0 5 * *')
-  .timeZone('Asia/Seoul')
-  .onRun(async (_context) => {
-    console.warn('?뮥 [Scheduled Giller Settlement] Triggered at:', new Date().toISOString());
-    try {
-      const result = await gillerSettlementScheduler();
-      console.warn('??Giller settlement scheduler completed:', result);
-      return null;
-    } catch (error) {
-      console.error('??Giller settlement scheduler error:', error);
-      return null;
-    }
-  });
-
-/**
- * Scheduled Function: Partner Settlement Scheduler
- * 매월 5일 01:00에 실행되어 외부 B2B 배송업체의 월간 정산을 자동 처리합니다.
- */
-export const scheduledPartnerSettlement = functions.pubsub
-  .schedule('0 1 5 * *')
-  .timeZone('Asia/Seoul')
-  .onRun(async (_context) => {
-    console.warn('🏢 [Scheduled Partner Settlement] Triggered at:', new Date().toISOString());
-    try {
-      const result = await partnerSettlementScheduler();
-      console.warn('✅ Partner settlement scheduler completed:', result);
-      return null;
-    } catch (error) {
-      console.error('❌ Partner settlement scheduler error:', error);
-      return null;
-    }
-  });
+// ==================== P3: B2B Scheduled Functions Removed ====================
 
 /**
  * Scheduled Function: Fare Cache Scheduler
@@ -2915,7 +2855,9 @@ export const issueKakaoCustomToken = functions.https.onCall(
           updatedAt: now,
           isActive: true,
           isVerified: existingDataTx.isVerified ?? false,
-          hasCompletedOnboarding: existingTx.exists ? existingDataTx.hasCompletedOnboarding ?? false : false,
+          hasCompletedOnboarding: existingTx.exists 
+            ? (existingDataTx.hasCompletedOnboarding ?? Boolean(existingDataTx.name && existingDataTx.phoneNumber)) 
+            : false,
           agreedTerms: existingTx.exists
             ? existingDataTx.agreedTerms ?? { giller: false, gller: false, privacy: false, marketing: false }
             : { giller: false, gller: false, privacy: false, marketing: false },

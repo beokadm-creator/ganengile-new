@@ -58,6 +58,12 @@ export function useMatchingTimeout({
     }
   }, []);
 
+  const callbacksRef = useRef({ onTick, onTimeout });
+  
+  useEffect(() => {
+    callbacksRef.current = { onTick, onTimeout };
+  }, [onTick, onTimeout]);
+
   const start = useCallback(() => {
     clearTimers();
     setIsActive(true);
@@ -65,22 +71,24 @@ export function useMatchingTimeout({
     setRemainingSeconds(timeoutSeconds);
 
     intervalRef.current = setInterval(() => {
-      setRemainingSeconds((prev) => {
-        const nextValue = prev - 1;
-        onTick?.(nextValue);
-
-        if (nextValue <= 0) {
-          clearTimers();
-          setIsActive(false);
-          setIsExpired(true);
-          onTimeout?.();
-          return 0;
-        }
-
-        return nextValue;
-      });
+      setRemainingSeconds((prev) => prev - 1);
     }, 1000);
-  }, [clearTimers, onTick, onTimeout, timeoutSeconds]);
+  }, [clearTimers, timeoutSeconds]);
+
+  useEffect(() => {
+    if (!isActive) return;
+
+    if (remainingSeconds < timeoutSeconds) {
+      callbacksRef.current.onTick?.(remainingSeconds);
+    }
+
+    if (remainingSeconds <= 0) {
+      clearTimers();
+      setIsActive(false);
+      setIsExpired(true);
+      callbacksRef.current.onTimeout?.();
+    }
+  }, [remainingSeconds, isActive, timeoutSeconds, clearTimers]);
 
   const reset = useCallback(() => {
     clearTimers();

@@ -164,17 +164,27 @@ export default function LockerLocator({ selectedStationId, onLockerSelect, onClo
     [lockers]
   );
 
-  const mapCenter = featuredMapRows[0]
-    ? {
-        latitude: featuredMapRows[0].latitude!,
-        longitude: featuredMapRows[0].longitude!,
-        label: featuredMapRows[0].stationName ?? featuredMapRows[0].name,
-      }
-    : {
-        latitude: 37.5665,
-        longitude: 126.978,
-        label: 'Seoul',
-      };
+  const mapCenter = useMemo(() => {
+    return featuredMapRows[0]
+      ? {
+          latitude: featuredMapRows[0].latitude!,
+          longitude: featuredMapRows[0].longitude!,
+          label: featuredMapRows[0].stationName ?? featuredMapRows[0].name,
+        }
+      : {
+          latitude: 37.5665,
+          longitude: 126.978,
+          label: 'Seoul',
+        };
+  }, [featuredMapRows]);
+
+  const mapMarkers = useMemo(() => {
+    return featuredMapRows.map((item, index) => ({
+      latitude: item.latitude!,
+      longitude: item.longitude!,
+      label: String(index + 1),
+    }));
+  }, [featuredMapRows]);
 
   const handleLockerSelect = (locker: LockerMapRow): void => {
     const summary: LockerSummary = {
@@ -292,11 +302,7 @@ export default function LockerLocator({ selectedStationId, onLockerSelect, onClo
         <View style={styles.mapContainer}>
           <NaverMapCard
             center={mapCenter}
-            markers={featuredMapRows.map((item, index) => ({
-              latitude: item.latitude!,
-              longitude: item.longitude!,
-              label: String(index + 1),
-            }))}
+            markers={mapMarkers}
             title="가까운 사물함 지도"
             subtitle="현재 위치가 있으면 가까운 순서로, 없으면 선택 역 기준으로 보여줍니다."
           />

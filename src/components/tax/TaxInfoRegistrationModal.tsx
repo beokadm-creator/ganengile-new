@@ -1,7 +1,6 @@
 import React, { useState } from 'react';
 import { View, Text, TextInput, TouchableOpacity, StyleSheet, ActivityIndicator, Alert } from 'react-native';
-import { httpsCallable } from 'firebase/functions';
-import { functions } from '../../config/firebase';
+import { getFunctions, httpsCallable } from 'firebase/functions';
 import { Colors, Spacing, BorderRadius, Typography } from '../../theme';
 import Modal from '../common/Modal';
 
@@ -37,7 +36,7 @@ export function TaxInfoRegistrationModal({ visible, onClose, onSuccess }: TaxInf
 
     try {
       setLoading(true);
-      const registerTaxInfo = httpsCallable(functions, 'registerTaxInfo');
+      const registerTaxInfo = httpsCallable(getFunctions(), 'registerTaxInfo');
       
       await registerTaxInfo({
         residentNumber: residentNumber.replace(/[^0-9]/g, ''),
@@ -141,7 +140,7 @@ export function TaxInfoRegistrationModal({ visible, onClose, onSuccess }: TaxInf
 const styles = StyleSheet.create({
   container: {
     padding: Spacing.xl,
-    paddingBottom: Spacing.xxxl,
+    paddingBottom: Spacing['3xl'],
   },
   title: {
     fontSize: Typography.fontSize.lg,

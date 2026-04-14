@@ -16,7 +16,7 @@ declare global {
     naver?: {
       maps?: {
         LatLng: new (lat: number, lng: number) => unknown;
-        Map: new (element: HTMLElement, options: { center: unknown; zoom: number }) => unknown;
+        Map: new (element: HTMLElement, options: { center: unknown; zoom: number }) => { destroy: () => void };
         Marker: new (options: { position: unknown; map: unknown; title?: string }) => unknown;
         Polyline: new (options: { map: unknown; path: unknown[]; strokeColor?: string; strokeWeight?: number; strokeOpacity?: number }) => unknown;
       };
@@ -91,6 +91,8 @@ export function NaverMapCard({
     }
 
     let cancelled = false;
+    let mapInstance: { destroy: () => void } | null = null;
+
     void ensureNaverMapScript(sdkUrl)
       .then(() => {
         if (cancelled) return;
@@ -98,7 +100,7 @@ export function NaverMapCard({
         const target = document.getElementById(mapId);
         if (!mapApi || !target) return;
 
-        const map = new mapApi.Map(target, {
+        mapInstance = new mapApi.Map(target, {
           center: new mapApi.LatLng(center.latitude, center.longitude),
           zoom: 13,
         });
@@ -106,14 +108,14 @@ export function NaverMapCard({
         markers.forEach((marker) => {
           new mapApi.Marker({
             position: new mapApi.LatLng(marker.latitude, marker.longitude),
-            map,
+            map: mapInstance,
             title: marker.label,
           });
         });
 
         if (path.length > 1) {
           new mapApi.Polyline({
-            map,
+            map: mapInstance,
             path: path.map((point) => new mapApi.LatLng(point.latitude, point.longitude)),
             strokeColor: '#0F766E',
             strokeWeight: 5,
@@ -124,11 +126,16 @@ export function NaverMapCard({
         setDynamicReady(true);
       })
       .catch(() => {
-        setDynamicReady(false);
+        if (!cancelled) {
+          setDynamicReady(false);
+        }
       });
 
     return () => {
       cancelled = true;
+      if (mapInstance) {
+        mapInstance.destroy();
+      }
     };
   }, [center.latitude, center.longitude, mapId, markers, path]);
 
