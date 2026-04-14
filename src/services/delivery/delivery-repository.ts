@@ -12,7 +12,11 @@ import {
 import { db } from '../../config/firebase';
 import { Delivery } from '../../types/delivery';
 
-export type DeliveryDoc = Delivery & { id: string };
+export type DeliveryDoc = Delivery & { 
+  id: string;
+  pickupLockerId?: string | null;
+  dropoffLockerId?: string | null;
+};
 
 export const deliveryRepository = {
   async getDeliveryById(deliveryId: string): Promise<DeliveryDoc | null> {

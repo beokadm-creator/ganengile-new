@@ -151,6 +151,8 @@ type DeliveryDocLike = {
   gllerId?: string;
   status?: string;
   lockerId?: string;
+  pickupLockerId?: string | null;
+  dropoffLockerId?: string | null;
   reservationId?: string;
   fee?: LegacyFeeInput;
   recipientInfo?: {

@@ -230,6 +230,13 @@ export interface DeliveryRequest {
   /** Special requests */
   specialRequests?: string[];
 
+  storageLocation?: string | null;
+  lockerId?: string | null;
+  pickupLockerId?: string | null;
+  dropoffLockerId?: string | null;
+  pickupStorageLocation?: string | null;
+  dropoffStorageLocation?: string | null;
+
   /** Request status */
   status: DeliveryStatus;
 

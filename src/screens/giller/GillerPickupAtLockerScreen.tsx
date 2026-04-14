@@ -55,6 +55,9 @@ export default function GillerPickupAtLockerScreen() {
       const reservations = await getDeliveryReservations(deliveryId);
       let pickupReservation = reservations.find((item) => item.type === 'giller_pickup') ?? null;
 
+      // Beta1 구조: pickupLockerId 우선, 없으면 하위 호환을 위해 lockerId 사용
+      const targetLockerId = delivery.pickupLockerId || delivery.lockerId;
+
       if (!pickupReservation) {
         // Create giller_pickup reservation if it doesn't exist
         const userId = requireUserId();
@@ -63,7 +66,7 @@ export default function GillerPickupAtLockerScreen() {
         const endTime = new Date(startTime.getTime() + 4 * 60 * 60 * 1000);
 
         pickupReservation = await createLockerReservation(
-          delivery.lockerId,
+          targetLockerId,
           delivery.requestId,
           deliveryId,
           userId,

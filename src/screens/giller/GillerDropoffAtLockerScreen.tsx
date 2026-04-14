@@ -48,14 +48,17 @@ export default function GillerDropoffAtLockerScreen() {
         const delivery = await getDeliveryById(deliveryId);
         if (delivery) {
           setRequestId(delivery.requestId || null);
-          if (delivery.lockerId) {
-            // If it's a lazy allocated area, don't try to fetch a specific locker, just go to select mode
-            if (delivery.lockerId.startsWith('AREA::')) {
+          
+          const targetLockerId = delivery.dropoffLockerId || delivery.lockerId;
+
+          if (targetLockerId) {
+            // If it's a lazy allocated area, don't try to fetch a specific locker
+            if (targetLockerId.startsWith('AREA::')) {
               setStep('select');
               return;
             }
 
-            const lockerDetail = await getLocker(delivery.lockerId);
+            const lockerDetail = await getLocker(targetLockerId);
             if (lockerDetail) {
               setSelectedLocker({
                 lockerId: lockerDetail.lockerId,
