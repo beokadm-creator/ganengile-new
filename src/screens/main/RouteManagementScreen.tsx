@@ -77,18 +77,6 @@ export default function RouteManagementScreen() {
   const activeTerritoryId = localActiveTerritoryId;
 
   const handleRegisterTerritory = () => {
-    if (isPreviewMode) {
-      Alert.alert(
-        '길러 전용',
-            '길러 신청 후 권역을 추가할 수 있습니다.',
-        [
-          { text: '닫기', style: 'cancel' },
-          { text: '신청하기', onPress: () => navigation.navigate('Tabs', { screen: 'Profile' }) }
-        ]
-      );
-      return;
-    }
-
     if (!user?.uid) {
       return;
     }
@@ -109,18 +97,6 @@ export default function RouteManagementScreen() {
   };
 
   const handleActivateTerritory = (territoryId: string) => {
-    if (isPreviewMode) {
-      Alert.alert(
-        '길러 전용',
-        '길러 신청 후 권역을 변경할 수 있습니다.',
-        [
-          { text: '닫기', style: 'cancel' },
-          { text: '신청하기', onPress: () => navigation.navigate('Tabs', { screen: 'Profile' }) }
-        ]
-      );
-      return;
-    }
-
     if (!user?.uid) {
       return;
     }
@@ -246,15 +222,13 @@ export default function RouteManagementScreen() {
             <TouchableOpacity
               style={[
                 styles.inlinePrimaryButton, 
-                (territoryLoading || isPreviewMode) && styles.inlineButtonDisabled,
-                isPreviewMode && styles.previewButton
+                territoryLoading && styles.inlineButtonDisabled
               ]}
               activeOpacity={0.9}
               disabled={territoryLoading || territories.length >= MAX_TERRITORIES}
               onPress={handleRegisterTerritory}
             >
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
-                {isPreviewMode && <MaterialIcons name="lock" size={14} color={Colors.primary} />}
                 <Text style={styles.inlinePrimaryButtonText}>
                   {territoryLoading ? '확인 중...' : '현재 위치로 추가'}
                 </Text>

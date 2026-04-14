@@ -93,14 +93,14 @@ function onboardingDescription(item: UserItem) {
   }
 
   if (item.gillerApplicationStatus === 'pending') {
-    return '본인 확인과 계좌 준비가 끝나 심사 대기 중입니다. 운영 검토가 필요한 구간입니다.';
+    return '본인 확인이 끝나 심사 대기 중입니다. 운영 검토가 필요한 구간입니다.';
   }
 
   if (
     item.identityVerificationStatus === 'approved' ||
     item.identityVerificationStatus === 'approved_test_bypass'
   ) {
-    return '본인 확인은 준비됐습니다. 다음 단계는 정산 계좌 확인과 길러 신청입니다.';
+    return '본인 확인은 준비됐습니다. 다음 단계는 길러 신청입니다.';
   }
 
   return '회원가입 이후 본인 확인부터 길러 승급 준비까지의 현재 위치입니다.';

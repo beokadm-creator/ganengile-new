@@ -32,7 +32,7 @@ import AppTopBar from '../../components/common/AppTopBar';
 import BankSelectModal from '../../components/common/BankSelectModal';
 import { createProtectedBankAccount } from '../../../shared/bank-account';
 
-const TOTAL_STEPS = 3;
+const TOTAL_STEPS = 2;
 const ACCENT = Colors.primary;
 
 export default function GillerApplyScreen({ navigation }: { navigation: MainStackNavigationProp }) {
@@ -42,17 +42,10 @@ export default function GillerApplyScreen({ navigation }: { navigation: MainStac
   const [verificationLoading, setVerificationLoading] = useState(false);
   const [verification, setVerification] = useState<UserVerification | null>(null);
   const [identityConfig, setIdentityConfig] = useState<IdentityIntegrationConfig | null>(null);
-  const [bankConfig, setBankConfig] = useState<BankIntegrationConfig | null>(null);
   const [submitHint, setSubmitHint] = useState('');
-  const [bankModalVisible, setBankModalVisible] = useState(false);
-
-  const [bankName, setBankName] = useState('');
-  const [accountNumber, setAccountNumber] = useState('');
-  const [accountHolder, setAccountHolder] = useState(user?.name ?? '');
 
   const verificationDisplay = useMemo(() => getVerificationStatusDisplay(verification), [verification]);
   const identityTestMode = identityConfig?.testMode ?? true;
-  const bankTestMode = bankConfig?.testMode ?? true;
 
   const load = useCallback(async () => {
     if (!user?.uid) {
@@ -61,14 +54,12 @@ export default function GillerApplyScreen({ navigation }: { navigation: MainStac
 
     setVerificationLoading(true);
     try {
-      const [verificationData, identityData, bankData] = await Promise.all([
+      const [verificationData, identityData] = await Promise.all([
         getUserVerification(user.uid),
         getIdentityIntegrationConfig(),
-        getBankIntegrationConfig(),
       ]);
       setVerification(verificationData);
       setIdentityConfig(identityData);
-      setBankConfig(bankData);
     } catch (error) {
       console.error('Failed to load giller apply screen', error);
     } finally {
@@ -88,11 +79,11 @@ export default function GillerApplyScreen({ navigation }: { navigation: MainStac
 
   useEffect(() => {
     if (step === 2 && (verification?.status === 'approved' || verification?.status === 'pending' || verification?.status === 'under_review')) {
-      setStep(3);
+      // Allow them to stay on step 2 and submit from there.
     }
   }, [step, verification?.status]);
 
-  const steps = ['안내', '본인확인', '정산 계좌'];
+  const steps = ['안내', '본인확인'];
 
   const validateIdentityStep = () => {
     if (!identityConfig?.requiredForGillerUpgrade) {
@@ -108,7 +99,7 @@ export default function GillerApplyScreen({ navigation }: { navigation: MainStac
           '현재 테스트 모드입니다. 본인확인 절차를 건너뛰고 다음 단계로 진행하시겠습니까?',
           [
             { text: '취소', style: 'cancel' },
-            { text: '건너뛰기', onPress: () => setStep(3) },
+            { text: '건너뛰기', onPress: () => handleSubmit() },
           ]
         );
         return false;
@@ -120,39 +111,13 @@ export default function GillerApplyScreen({ navigation }: { navigation: MainStac
     return true;
   };
 
-  const validateBankStep = () => {
-    if (!bankName.trim()) {
-      setSubmitHint('은행을 선택해 주세요.');
-      Alert.alert('입력 확인', '은행을 선택해 주세요.');
-      return false;
-    }
 
-    if (!accountNumber.trim()) {
-      setSubmitHint('계좌번호를 입력해 주세요.');
-      Alert.alert('입력 확인', '계좌번호를 입력해 주세요.');
-      return false;
-    }
-
-    if (accountNumber.replace(/-/g, '').length < 10) {
-      setSubmitHint('계좌번호를 확인해 주세요.');
-      Alert.alert('입력 확인', '계좌번호를 확인해 주세요.');
-      return false;
-    }
-
-    if (!accountHolder.trim()) {
-      setSubmitHint('예금주명을 입력해 주세요.');
-      Alert.alert('입력 확인', '예금주명을 입력해 주세요.');
-      return false;
-    }
-
-    return true;
-  };
 
   const handleNext = async () => {
-    if (step === 2 && !validateIdentityStep()) {
-      return;
-    }
-    if (step === 3) {
+    if (step === 2) {
+      if (!validateIdentityStep()) {
+        return;
+      }
       await handleSubmit();
       return;
     }
@@ -179,9 +144,6 @@ export default function GillerApplyScreen({ navigation }: { navigation: MainStac
 
   const handleSubmit = async () => {
     setSubmitHint('');
-    if (!validateBankStep()) {
-      return;
-    }
     if (!user?.uid) {
       Alert.alert('로그인 필요', '사용자 정보를 찾을 수 없습니다.');
       return;
@@ -191,15 +153,6 @@ export default function GillerApplyScreen({ navigation }: { navigation: MainStac
     setSubmitHint('신청을 접수하고 있습니다.');
 
     try {
-      const bankVerificationStatus =
-        bankTestMode && bankConfig?.allowTestBypass ? 'approved_test_bypass' : 'manual_review';
-      const protectedBankAccount = createProtectedBankAccount({
-        bankName,
-        accountNumber,
-        accountHolder,
-        verificationStatus: bankVerificationStatus,
-      });
-
       await addDoc(collection(db, 'giller_applications'), {
         userId: user.uid,
         userName: user.name,
@@ -209,19 +162,11 @@ export default function GillerApplyScreen({ navigation }: { navigation: MainStac
             ? 'approved_test_bypass'
             : verification?.status ?? 'not_submitted',
         verificationProvider: verification?.externalAuth?.provider ?? null,
-        bankAccount: protectedBankAccount,
         integrationSnapshot: {
           identity: {
             testMode: identityTestMode,
             liveReady: identityConfig?.liveReady ?? false,
             allowTestBypass: identityConfig?.allowTestBypass ?? true,
-          },
-          bank: {
-            testMode: bankTestMode,
-            liveReady: bankConfig?.liveReady ?? false,
-            allowTestBypass: bankConfig?.allowTestBypass ?? true,
-            provider: bankConfig?.provider ?? 'manual_review',
-            verificationMode: bankConfig?.verificationMode ?? 'manual_review',
           },
         },
         status: 'pending',
@@ -233,7 +178,6 @@ export default function GillerApplyScreen({ navigation }: { navigation: MainStac
         {
           gillerApplicationStatus: 'pending',
           gillerInfo: {
-            bankAccount: protectedBankAccount,
             identityVerificationStatus:
               identityTestMode && identityConfig?.allowTestBypass
                 ? 'approved_test_bypass'
@@ -285,7 +229,6 @@ export default function GillerApplyScreen({ navigation }: { navigation: MainStac
 
             <View style={[styles.card, styles.alertCard]}>
               <Text style={styles.alertText}>본인확인: {identityTestMode ? '테스트 가능' : '실서비스 대기'}</Text>
-              <Text style={styles.alertText}>정산 계좌 확인: {bankTestMode ? '테스트 또는 수동 검토' : '실서비스 대기'}</Text>
             </View>
           </ScrollView>
         );
@@ -305,8 +248,8 @@ export default function GillerApplyScreen({ navigation }: { navigation: MainStac
             </View>
 
             {verification?.status === 'approved' ? (
-              <TouchableOpacity style={styles.secondaryAction} onPress={() => setStep(3)} activeOpacity={0.9}>
-                <Text style={styles.secondaryActionText}>다음 단계</Text>
+              <TouchableOpacity style={styles.secondaryAction} onPress={() => handleSubmit()} activeOpacity={0.9}>
+                <Text style={styles.secondaryActionText}>길러 전환 신청하기</Text>
               </TouchableOpacity>
             ) : (
               <>
@@ -323,7 +266,7 @@ export default function GillerApplyScreen({ navigation }: { navigation: MainStac
                 {identityTestMode && identityConfig?.allowTestBypass ? (
                   <TouchableOpacity
                     style={[styles.secondaryAction, { marginTop: 16 }]}
-                    onPress={() => setStep(3)}
+                    onPress={() => handleSubmit()}
                     activeOpacity={0.9}
                   >
                     <Text style={styles.secondaryActionText}>[테스트용] 본인확인 건너뛰기</Text>
@@ -334,43 +277,7 @@ export default function GillerApplyScreen({ navigation }: { navigation: MainStac
           </ScrollView>
         );
       default:
-        return (
-          <ScrollView style={styles.stepContent} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
-            <Text style={styles.stepTitle}>정산 계좌</Text>
-            <Text style={styles.stepDescription}>계좌 정보를 입력해 주세요.</Text>
-
-            <View style={[styles.card, styles.infoCard]}>
-              <Text style={styles.cardTitle}>{bankTestMode ? '테스트 또는 수동 검토' : '실서비스 준비 상태'}</Text>
-              <Text style={styles.statusBody}>
-                {bankConfig?.statusMessage ?? '관리자 설정 상태를 불러오고 있습니다.'}
-              </Text>
-            </View>
-
-            <View style={styles.field}>
-              <Text style={styles.label}>은행</Text>
-              <TouchableOpacity style={styles.bankButton} onPress={() => setBankModalVisible(true)} activeOpacity={0.9}>
-                <Text style={[styles.bankButtonText, !bankName && styles.bankPlaceholder]}>
-                  {bankName || '은행 선택'}
-                </Text>
-                <Text style={styles.bankButtonArrow}>{'>'}</Text>
-              </TouchableOpacity>
-            </View>
-
-            <InputField
-              label="계좌번호"
-              value={accountNumber}
-              onChangeText={setAccountNumber}
-              placeholder="숫자만 입력"
-              keyboardType="number-pad"
-            />
-            <InputField
-              label="예금주명"
-              value={accountHolder}
-              onChangeText={setAccountHolder}
-              placeholder="예금주명"
-            />
-          </ScrollView>
-        );
+        return null;
     }
   };
 
@@ -433,16 +340,6 @@ export default function GillerApplyScreen({ navigation }: { navigation: MainStac
         </TouchableOpacity>
         {submitHint ? <Text style={styles.submitHint}>{submitHint}</Text> : null}
       </View>
-
-      <BankSelectModal
-        visible={bankModalVisible}
-        selectedBank={bankName}
-        onClose={() => setBankModalVisible(false)}
-        onSelect={(selectedBank: string) => {
-          setBankName(selectedBank);
-          setBankModalVisible(false);
-        }}
-      />
     </KeyboardAvoidingView>
   );
 }

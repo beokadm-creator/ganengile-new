@@ -2984,9 +2984,12 @@ export const naverStaticMapProxy = functions
       path: path ?? undefined,
     });
 
+    const referer = req.get('Referer') || 'https://ganengile.web.app';
+
     const imageResponse = await fetchBinary(naverUrl, {
       'X-NCP-APIGW-API-KEY-ID': clientId,
       'X-NCP-APIGW-API-KEY': clientSecret,
+      'Referer': referer,
     });
 
     if (imageResponse.statusCode >= 400) {
@@ -3049,12 +3052,15 @@ export const naverGeocodeProxy = functions
       return;
     }
 
+    const referer = req.get('Referer') || 'https://ganengile.web.app';
+
     const naverUrl = buildNaverGeocodeUrl({ address });
     const payload = (await fetchJson(naverUrl, {
       headers: {
         Accept: 'application/json',
         'X-NCP-APIGW-API-KEY-ID': clientId,
         'X-NCP-APIGW-API-KEY': clientSecret,
+        'Referer': referer,
       },
     })) as {
       status?: string;
@@ -3143,12 +3149,15 @@ export const naverReverseGeocodeProxy = functions
       return;
     }
 
+    const referer = req.get('Referer') || 'https://ganengile.web.app';
+
     const naverUrl = buildNaverReverseGeocodeUrl({ coords });
     const payload = (await fetchJson(naverUrl, {
       headers: {
         Accept: 'application/json',
         'X-NCP-APIGW-API-KEY-ID': clientId,
         'X-NCP-APIGW-API-KEY': clientSecret,
+        'Referer': referer,
       },
     })) as {
       status?: { code: number; name: string; message: string };
@@ -3273,12 +3282,15 @@ export const naverDirectionsProxy = functions
       return;
     }
 
+    const referer = req.get('Referer') || 'https://ganengile.web.app';
+
     const directionsUrl = buildNaverDirectionsUrl({ start, goal, option });
     const payload = (await fetchJson(directionsUrl, {
       headers: {
         Accept: 'application/json',
         'X-NCP-APIGW-API-KEY-ID': clientId,
         'X-NCP-APIGW-API-KEY': clientSecret,
+        'Referer': referer,
       },
     })) as {
       code?: number;

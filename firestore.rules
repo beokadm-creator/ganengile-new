@@ -139,10 +139,13 @@ service cloud.firestore {
                      
       allow update: if isOwner(userId) &&
                     !request.resource.data.diff(resource.data).affectedKeys().hasAny([
-                      'pointBalance', 'totalEarnedPoints', 'totalSpentPoints', 'isVerified', 'admin', 'status', 'gillerApplicationStatus', 'gillerProfile'
+                      'pointBalance', 'totalEarnedPoints', 'totalSpentPoints', 'isVerified', 'admin', 'status', 'gillerApplicationStatus'
               ]) &&
                     (!request.resource.data.diff(resource.data).affectedKeys().hasAny(['role']) ||
-                     !('role' in resource.data));
+                     !('role' in resource.data)) &&
+                    (!request.resource.data.diff(resource.data).affectedKeys().hasAny(['gillerProfile']) ||
+                     (!('gillerProfile' in resource.data) && !request.resource.data.gillerProfile.keys().hasAny(['type', 'status', 'limits', 'benefits', 'promotion'])) ||
+                     ('gillerProfile' in resource.data && !request.resource.data.gillerProfile.diff(resource.data.gillerProfile).affectedKeys().hasAny(['type', 'status', 'limits', 'benefits', 'promotion'])));
       
       // 삭제: 본인만
       allow delete: if isOwner(userId);

@@ -145,10 +145,6 @@ export default function PointWithdrawScreen({ navigation }: Props) {
           label="본인 확인 또는 테스트 우회 준비가 반영되어 있어야 합니다."
         />
         <GuardRow
-          ok={!eligibilityReasons.includes(WithdrawalEligibilityStatus.PAYOUT_ACCOUNT_UNVERIFIED)}
-          label="정산 계좌 인증 또는 운영 확인이 필요합니다."
-        />
-        <GuardRow
           ok={!eligibilityReasons.includes(WithdrawalEligibilityStatus.DISPUTE_OPEN)}
           label="열려 있는 분쟁이 없어야 합니다."
         />

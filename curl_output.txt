@@ -1,0 +1,12 @@
+HTTP/2 403 
+access-control-allow-origin: *
+access-control-allow-methods: GET,OPTIONS
+access-control-allow-headers: Content-Type
+content-type: text/html; charset=utf-8
+function-execution-id: vjcr5p011amw
+x-cloud-trace-context: f775713a9c1038c5bb201fd3ea3ff25d;o=1
+date: Tue, 14 Apr 2026 05:59:35 GMT
+server: Google Frontend
+content-length: 0
+alt-svc: h3=":443"; ma=2592000,h3-29=":443"; ma=2592000
+

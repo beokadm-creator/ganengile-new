@@ -30,16 +30,14 @@ describe('withdrawal-guards', () => {
         earnedBalance: 25000,
       },
       isIdentityVerified: false,
-      isPayoutAccountVerified: false,
-      payoutAccountOwnerMatchesUser: false,
+      isPayoutAccountVerified: true,
+      payoutAccountOwnerMatchesUser: true,
       hasRiskHold: true,
     });
 
     expect(decision.allowed).toBe(false);
     expect(decision.reasons).toEqual([
       WithdrawalEligibilityStatus.IDENTITY_UNVERIFIED,
-      WithdrawalEligibilityStatus.PAYOUT_ACCOUNT_UNVERIFIED,
-      WithdrawalEligibilityStatus.ACCOUNT_OWNER_MISMATCH,
       WithdrawalEligibilityStatus.RISK_REVIEW_REQUIRED,
     ]);
   });

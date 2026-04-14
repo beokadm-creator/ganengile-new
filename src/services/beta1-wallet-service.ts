@@ -89,14 +89,6 @@ export function evaluateWithdrawalEligibility(input: WithdrawalEligibilityInput)
     reasons.push(WithdrawalEligibilityStatus.IDENTITY_UNVERIFIED);
   }
 
-  if (!input.isPayoutAccountVerified) {
-    reasons.push(WithdrawalEligibilityStatus.PAYOUT_ACCOUNT_UNVERIFIED);
-  }
-
-  if (!input.payoutAccountOwnerMatchesUser) {
-    reasons.push(WithdrawalEligibilityStatus.ACCOUNT_OWNER_MISMATCH);
-  }
-
   if (input.hasOpenDispute) {
     reasons.push(WithdrawalEligibilityStatus.DISPUTE_OPEN);
   }
@@ -176,9 +168,8 @@ export async function getWithdrawalEligibility(userId: string, amount?: number):
     balances: walletLedger.balances,
     minimumAmount: WITHDRAW_MIN_AMOUNT,
     isIdentityVerified: identityStatus === 'approved' || identityStatus === 'approved_test_bypass',
-    isPayoutAccountVerified:
-      bankStatus === 'verified' || bankStatus === 'approved' || bankStatus === 'approved_test_bypass',
-    payoutAccountOwnerMatchesUser: Boolean(bankAccount.accountHolder),
+    isPayoutAccountVerified: true, // Not required anymore before withdrawal
+    payoutAccountOwnerMatchesUser: true, // Not required anymore before withdrawal
     hasOpenDispute: !disputesSnap.empty,
     requiresManualReview: Boolean(userData.manualWithdrawalHold ?? false),
     hasRiskHold: Boolean(userData.riskHold ?? false),

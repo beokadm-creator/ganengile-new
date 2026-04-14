@@ -23,14 +23,6 @@ export function evaluateWithdrawalEligibility(
     reasons.push(WithdrawalEligibilityStatus.IDENTITY_UNVERIFIED);
   }
 
-  if (!input.isPayoutAccountVerified) {
-    reasons.push(WithdrawalEligibilityStatus.PAYOUT_ACCOUNT_UNVERIFIED);
-  }
-
-  if (!input.payoutAccountOwnerMatchesUser) {
-    reasons.push(WithdrawalEligibilityStatus.ACCOUNT_OWNER_MISMATCH);
-  }
-
   if (input.hasOpenDispute) {
     reasons.push(WithdrawalEligibilityStatus.DISPUTE_OPEN);
   }

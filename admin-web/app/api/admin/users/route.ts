@@ -49,16 +49,12 @@ function getOnboardingStage(data: UserDoc) {
   const applicationStatus =
     typeof data.gillerApplicationStatus === 'string' ? data.gillerApplicationStatus : 'none';
   const identityStatus = getIdentityStatus(data);
-  const bankStatus = getBankStatus(data);
   const isIdentityApproved =
     identityStatus === 'approved' || identityStatus === 'approved_test_bypass';
-  const isBankApproved =
-    bankStatus === 'approved' || bankStatus === 'approved_test_bypass' || bankStatus === 'verified';
 
   if (applicationStatus === 'approved') return '길러 활성';
   if (applicationStatus === 'pending') return '길러 심사 대기';
-  if (isIdentityApproved && isBankApproved) return '승급 준비 완료';
-  if (isIdentityApproved) return '계좌 인증 대기';
+  if (isIdentityApproved) return '승급 준비 완료';
   return '본인 확인 대기';
 }
 

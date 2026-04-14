@@ -185,6 +185,11 @@ export async function PATCH(req: NextRequest) {
           throw new Error('이미 완료되거나 취소된 요청입니다.');
         }
 
+        // 진행중인 매칭이 있다면 모두 반려(rejected) 처리하기 위해 미리 조회
+        const matchesSnap = await tx.get(
+          db.collection('matches').where('requestId', '==', requestId).where('status', '==', 'pending')
+        );
+
         tx.update(reqRef, {
           status: 'cancelled',
           cancellationReason: reason,
@@ -192,10 +197,6 @@ export async function PATCH(req: NextRequest) {
           updatedAt: new Date(),
         });
 
-        // 진행중인 매칭이 있다면 모두 반려(rejected) 처리
-        const matchesSnap = await tx.get(
-          db.collection('matches').where('requestId', '==', requestId).where('status', '==', 'pending')
-        );
         matchesSnap.forEach((matchDoc) => {
           tx.update(matchDoc.ref, {
             status: 'rejected',
