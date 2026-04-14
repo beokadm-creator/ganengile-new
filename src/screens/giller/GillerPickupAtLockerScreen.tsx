@@ -44,7 +44,7 @@ export default function GillerPickupAtLockerScreen() {
       setLoading(true);
       
       const delivery = await getDeliveryById(deliveryId);
-      if (!delivery || !delivery.lockerId || !delivery.requestId) {
+      if (!delivery?.lockerId || !delivery.requestId) {
         Alert.alert('배송 정보 오류', '사물함 정보를 찾을 수 없습니다.', [
           { text: '닫기', onPress: () => navigation.goBack() },
         ]);

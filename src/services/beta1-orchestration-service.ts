@@ -1468,7 +1468,7 @@ export async function releaseMissionBundleForGiller(bundleId: string, gillerUser
       candidateIds.map((candidateId) =>
         sendMissionBundleAvailableNotification(
           candidateId as string,
-          bundle.requestId!,
+          bundle.requestId,
           String(pickupStationRecord.stationName ?? '출발역'),
           String(deliveryStationRecord.stationName ?? '도착역'),
           Number(feeRecord.totalFee ?? 0),

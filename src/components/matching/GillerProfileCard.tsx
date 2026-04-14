@@ -196,7 +196,7 @@ const styles = StyleSheet.create({
   rankText: {
     color: Colors.white,
     fontSize: Typography.fontSize.sm,
-    fontWeight: Typography.fontWeight.bold as any,
+    fontWeight: Typography.fontWeight.bold,
   },
   scoreBadge: {
     backgroundColor: Colors.accent,
@@ -207,7 +207,7 @@ const styles = StyleSheet.create({
   scoreText: {
     color: Colors.white,
     fontSize: Typography.fontSize.sm,
-    fontWeight: Typography.fontWeight.bold as any,
+    fontWeight: Typography.fontWeight.bold,
   },
   profileSection: {
     flexDirection: 'row',
@@ -233,7 +233,7 @@ const styles = StyleSheet.create({
   },
   defaultAvatarText: {
     fontSize: Typography.fontSize['3xl'],
-    fontWeight: Typography.fontWeight.bold as any,
+    fontWeight: Typography.fontWeight.bold,
     color: Colors.primary,
   },
   profileInfo: {
@@ -247,7 +247,7 @@ const styles = StyleSheet.create({
   },
   gillerName: {
     fontSize: Typography.fontSize.lg,
-    fontWeight: Typography.fontWeight.bold as any,
+    fontWeight: Typography.fontWeight.bold,
     color: Colors.textPrimary,
   },
   completedBadge: {
@@ -259,7 +259,7 @@ const styles = StyleSheet.create({
   completedText: {
     color: Colors.white,
     fontSize: Typography.fontSize.xs,
-    fontWeight: Typography.fontWeight.semibold as any,
+    fontWeight: Typography.fontWeight.semibold,
   },
   rating: {
     flexDirection: 'row',
@@ -287,7 +287,7 @@ const styles = StyleSheet.create({
   infoText: {
     fontSize: Typography.fontSize.sm,
     color: Colors.textSecondary,
-    fontWeight: Typography.fontWeight.medium as any,
+    fontWeight: Typography.fontWeight.medium,
   },
   reasonsContainer: {
     marginBottom: Spacing.sm,
@@ -301,7 +301,7 @@ const styles = StyleSheet.create({
   reasonBullet: {
     color: Colors.success,
     fontSize: Typography.fontSize.sm,
-    fontWeight: Typography.fontWeight.bold as any,
+    fontWeight: Typography.fontWeight.bold,
   },
   reasonText: {
     flex: 1,
@@ -319,7 +319,7 @@ const styles = StyleSheet.create({
   selectButtonText: {
     color: Colors.white,
     fontSize: Typography.fontSize.base,
-    fontWeight: Typography.fontWeight.semibold as any,
+    fontWeight: Typography.fontWeight.semibold,
   },
 });
 

@@ -1,7 +1,7 @@
 # 운영/관리자/배포 (Ops & Admin)
 
 ## 1) 관리자 웹(Admin Web)
-관리자 웹은 운영자가 “민감 구간”을 통제하기 위한 기능을 제공한다.
+관리자 웹은 운영자가 "민감 구간"을 통제하기 위한 기능을 제공한다.
 
 ### 주요 메뉴(코드 기준)
 > 경로는 `admin-web/app/(admin)/...` 기준
@@ -34,7 +34,7 @@
 - 문서: [`../admin-web/README.md`](../admin-web/README.md)
 
 ## 2) 배포(요약)
-운영/배포 작업은 아래 런북을 “항상” 기준으로 한다.
+운영/배포 작업은 아래 런북을 "항상" 기준으로 한다.
 
 - 배포 전 점검: [`../docs/deployment-preflight.md`](../docs/deployment-preflight.md)
 - CI/CD 가이드: [`../docs/ops/cicd-pipeline-guide.md`](../docs/ops/cicd-pipeline-guide.md)
@@ -49,7 +49,19 @@
 - [`../docs/ops/deployment-and-env.md`](../docs/ops/deployment-and-env.md)
 
 ## 4) 운영 포인트(현 상태에서 보이는 것)
-- 대시보드에서 “대기열/지표”를 운영할 수 있는 구조가 존재한다(출금/분쟁/심사/배송 진행/AI 검토 등).
+- 대시보드에서 "대기열/지표"를 운영할 수 있는 구조가 존재한다(출금/분쟁/심사/배송 진행/AI 검토 등).
 - beta1 관련 운영 지표/리뷰 페이지가 존재한다(`beta1/ai-review`).
 - 지도/연동 실패는 env 누락이 원인인 경우가 많다 → preflight 체크리스트를 먼저 확인한다.
+
+## 5) Firestore Rules 업데이트 (2026-04)
+- gillerProfile role 체크 정렬 및 권한 정비 (`9ea5b83`)
+- coupons/user_coupons 컬렉션 권한 추가 — 체크아웃 권한 에러 수정 (`d5c8eb7`)
+- notification settings 허용 (`10e40ef`)
+- allowed docs 쿼리로 권한 에러 수정 (`4247ac7`)
+- requester 매치 생성 허용 (`4521390`)
+- undefined values Firestore write 방어 (`1faccaf`, `kDScU8fT`)
+
+## 6) 보증금/환불 수정
+- Admin 웹 deposit 환불 처리 이슈 수정 (`34c7800`)
+- 픽업 완료 후 취소 시 보증금 전액 공제 로직 강화 (`7f46ed8`)
 

@@ -168,7 +168,7 @@ const styles = StyleSheet.create({
   headerTitle: {
     color: Colors.primary,
     fontSize: Typography.fontSize.sm,
-    fontWeight: Typography.fontWeight.semibold as any,
+    fontWeight: Typography.fontWeight.semibold,
     flex: 1,
   },
   timeBadge: {
@@ -180,7 +180,7 @@ const styles = StyleSheet.create({
   timeText: {
     color: Colors.white,
     fontSize: Typography.fontSize.sm,
-    fontWeight: Typography.fontWeight.bold as any,
+    fontWeight: Typography.fontWeight.bold,
   },
   connector: {
     bottom: -20,
@@ -209,7 +209,7 @@ const styles = StyleSheet.create({
   lineText: {
     color: Colors.white,
     fontSize: Typography.fontSize.xs,
-    fontWeight: Typography.fontWeight.medium as any,
+    fontWeight: Typography.fontWeight.medium,
   },
   routeContainer: {
     gap: Spacing.sm,
@@ -243,7 +243,7 @@ const styles = StyleSheet.create({
   stationName: {
     color: Colors.textPrimary,
     fontSize: Typography.fontSize.base,
-    fontWeight: Typography.fontWeight.semibold as any,
+    fontWeight: Typography.fontWeight.semibold,
     marginBottom: 4,
   },
   timeTag: {
@@ -258,7 +258,7 @@ const styles = StyleSheet.create({
   timeTagText: {
     color: Colors.gray600,
     fontSize: Typography.fontSize.xs,
-    fontWeight: Typography.fontWeight.medium as any,
+    fontWeight: Typography.fontWeight.medium,
   },
   transferBadge: {
     alignItems: 'center',
@@ -274,6 +274,6 @@ const styles = StyleSheet.create({
   transferText: {
     color: Colors.white,
     fontSize: Typography.fontSize.xs,
-    fontWeight: Typography.fontWeight.bold as any,
+    fontWeight: Typography.fontWeight.bold,
   },
 });

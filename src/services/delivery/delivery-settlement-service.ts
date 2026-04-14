@@ -52,7 +52,7 @@ export const deliverySettlementService = {
 
       // 1. 보증금 환불 처리
       const deposit = await DepositService.getDepositByRequestId(requestId);
-      if (deposit && deposit.status === 'paid' && deposit.depositId) {
+      if (deposit?.status === 'paid' && deposit.depositId) {
         try {
           await DepositService.refundDeposit(deposit.depositId);
         } catch (e) {

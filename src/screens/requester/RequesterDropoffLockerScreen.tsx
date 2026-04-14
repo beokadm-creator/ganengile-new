@@ -42,7 +42,7 @@ export default function RequesterDropoffLockerScreen() {
     async function init() {
       try {
         const request = await getRequestById(requestId);
-        if (request && request.lockerId) {
+        if (request?.lockerId) {
           if (request.lockerId.startsWith('AREA::')) {
             setStep('select');
             return;

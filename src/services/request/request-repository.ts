@@ -392,7 +392,7 @@ export function validateRequest(userId: string, pickupStation: StationInfo, deli
 
 export async function getRequest(requestId: string, userId: string): Promise<Request | null> {
   const request = await getRequestById(requestId);
-  if (!request || request.requesterId !== userId) return null;
+  if (request?.requesterId !== userId) return null;
   return request;
 }
 
@@ -432,7 +432,7 @@ export async function deleteRequest(requestId: string, userId?: string): Promise
   if (userId !== undefined) {
     try {
       const request = await getRequestById(requestId);
-      if (!request || request.requesterId !== userId) return false;
+      if (request?.requesterId !== userId) return false;
       await deleteRequestInternal(requestId);
       return true;
     } catch { return false; }

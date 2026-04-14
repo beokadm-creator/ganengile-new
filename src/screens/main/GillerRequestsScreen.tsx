@@ -551,6 +551,7 @@ const styles = StyleSheet.create({
     fontSize: Typography.fontSize.base,
     fontWeight: Typography.fontWeight.extrabold,
   },
+  headerStatValuePrimary: {
     color: Colors.primary,
     fontSize: Typography.fontSize.base,
     fontWeight: Typography.fontWeight.extrabold,

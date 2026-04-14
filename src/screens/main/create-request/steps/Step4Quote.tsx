@@ -47,7 +47,17 @@ export function Step4Quote({
     return () => clearTimeout(timer);
   }, [store.activeStep]);
 
-  const isStepInteractionLocked = store.activeStep === 4 && store.transitionLockUntil > Date.now();
+  const [now, setNow] = useState(() => Date.now()); 
+  
+  useEffect(() => {
+    let interval: NodeJS.Timeout;
+    if (store.activeStep === 4) {
+      interval = setInterval(() => setNow(Date.now()), 1000);
+    }
+    return () => clearInterval(interval);
+  }, [store.activeStep]);
+
+  const isStepInteractionLocked = store.activeStep === 4 && store.transitionLockUntil > now;
 
   useEffect(() => {
     if (!user?.uid) return;

@@ -12,7 +12,7 @@ export function CompactRoleToggle({
   isGiller: boolean;
   onToggle: (role: UserRole) => void;
 }) {
-  const slideAnim = useRef(new Animated.Value(isGiller ? 1 : 0)).current;
+  const [slideAnim] = React.useState(new Animated.Value(isGiller ? 1 : 0));
 
   useEffect(() => {
     Animated.spring(slideAnim, {
