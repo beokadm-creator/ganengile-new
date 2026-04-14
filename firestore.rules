@@ -372,7 +372,8 @@ service cloud.firestore {
 
     match /missions/{missionId} {
       allow read: if isAuthenticated() &&
-        (isAdmin() ||
+        (resource.data.status in ['queued', 'offered'] ||
+         isAdmin() ||
          isRequestParticipantById(resource.data.requestId) ||
          isDeliveryParticipantById(resource.data.deliveryId) ||
          isOwner(resource.data.assignedGillerUserId));
@@ -393,7 +394,8 @@ service cloud.firestore {
 
     match /mission_bundles/{missionBundleId} {
       allow read: if isAuthenticated() &&
-        (isAdmin() ||
+        (resource.data.status == 'active' ||
+         isAdmin() ||
          isRequestParticipantById(resource.data.requestId) ||
          isDeliveryParticipantById(resource.data.deliveryId));
 

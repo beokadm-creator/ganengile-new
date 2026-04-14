@@ -1,4 +1,4 @@
-import { collection, getDocs, limit, orderBy, query, where } from 'firebase/firestore';
+import { collection, doc, getDoc, getDocs, limit, orderBy, query, where } from 'firebase/firestore';
 import { db } from './firebase';
 import { getWalletLedger } from './beta1-wallet-service';
 import { getMissionExposurePricing } from './mission-exposure-pricing-service';
@@ -241,7 +241,7 @@ export async function getBeta1HomeSnapshot(userId: string, role: 'requester' | '
 
   const missionQuery = query(collection(db, 'missions'), where('assignedGillerUserId', '==', userId), limit(50));
   const openMissionQuery = role === 'giller' ? query(collection(db, 'missions'), where('status', 'in', ['queued', 'offered']), limit(50)) : null;
-  const missionBundleQuery = role === 'giller' ? query(collection(db, 'mission_bundles'), limit(50)) : null;
+  const missionBundleQuery = role === 'giller' ? query(collection(db, 'mission_bundles'), where('status', '==', 'active'), limit(50)) : null;
 
   const deliveryQuery =
     role === 'requester'
@@ -542,17 +542,21 @@ export async function getBeta1HomeSnapshot(userId: string, role: 'requester' | '
 }
 
 export async function getBeta1ChatContext(chatRoomId: string): Promise<Beta1ChatContext | null> {
-  const chatSnapshot = await getDocs(collection(db, 'chatRooms'));
-  const room = chatSnapshot.docs.find((docItem) => docItem.id === chatRoomId);
-  if (!room) {
+  const roomDoc = await getDoc(doc(db, 'chatRooms', chatRoomId));
+  if (!roomDoc.exists()) {
     return null;
   }
 
-  const roomData = room.data() as Beta1ChatRoomDoc;
+  const roomData = roomDoc.data() as Beta1ChatRoomDoc;
   const requestId = roomData.requestId;
-  const requestSnapshot = await getDocs(collection(db, 'requests'));
-  const requestDoc = requestSnapshot.docs.find((docItem) => docItem.id === requestId);
-  const request = requestDoc?.data() as Beta1RequestChatDoc | undefined;
+  let request: Beta1RequestChatDoc | undefined;
+  
+  if (requestId) {
+    const requestDoc = await getDoc(doc(db, 'requests', requestId));
+    if (requestDoc.exists()) {
+      request = requestDoc.data() as Beta1RequestChatDoc;
+    }
+  }
 
   const status = String(request?.beta1RequestStatus ?? request?.status ?? roomData.status ?? 'pending');
   const minimalRecipient = request?.recipientName
