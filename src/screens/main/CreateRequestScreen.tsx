@@ -68,12 +68,9 @@ import { usePhoneVerification } from '../../hooks/usePhoneVerification';
 import { usePricingQuotes } from './create-request/hooks/usePricingQuotes';
 import { useLocationResolution } from './create-request/hooks/useLocationResolution';
 import { useRequestDraft } from './create-request/hooks/useRequestDraft';
-import { Step1Location } from './create-request/steps/Step1Location';
-import { Step2Item } from './create-request/steps/Step2Item';
-import { Step3Recipient } from './create-request/steps/Step3Recipient';
-import { Step4Quote } from './create-request/steps/Step4Quote';
-import { StepSummaryCard } from './create-request/components/StepSummaryCard';
+import CreateRequestFunnel from './create-request/funnel/CreateRequestFunnel';
 import type { LocationMode, PackageSize, PickerType, AddressTarget, NearbyPickerState } from './create-request/types';
+// Legacy imports removed
 
 type Props = {
   navigation: MainStackNavigationProp;
@@ -833,108 +830,31 @@ export default function CreateRequestScreen({ navigation, route }: Props) {
   const balancedQuote = quotes.find(q => q.quoteType === 'balanced') || quotes[0];
   const currentPrice = balancedQuote ? balancedQuote.pricing.publicPrice : 0;
 
-  const renderStep1Summary = () => {
-    if (activeStep <= 1) return null;
-    const pickup = pickupMode === 'address' && pickupRoadAddress ? `${formatDetailedAddress(pickupRoadAddress, pickupDetailAddress)} (${pickupStation?.stationName})` : pickupStation?.stationName;
-    const delivery = deliveryMode === 'address' && deliveryRoadAddress ? `${formatDetailedAddress(deliveryRoadAddress, deliveryDetailAddress)} (${deliveryStation?.stationName})` : deliveryStation?.stationName;
-    return (
-      <StepSummaryCard
-        step={1}
-        title="출발/도착지 정보"
-        summary={[`출발: ${pickup || '-'}`, `도착: ${delivery || '-'}`]}
-        onEdit={() => !saving && !isStepInteractionLocked && setActiveStep(1)}
-        disabled={saving || isStepInteractionLocked}
-      />
-    );
-  };
-
-  const renderStep2Summary = () => {
-    if (activeStep <= 2) return null;
-    return (
-      <StepSummaryCard
-        step={2}
-        title="물품 정보"
-        summary={[
-          `분류: ${packageCategory || '-'}`,
-          `상세: ${packageItemName || '-'}`,
-          `크기/무게: ${packageSize || '-'} / ${weightKg ? `${weightKg}kg` : '-'}`,
-        ]}
-        onEdit={() => !saving && !isStepInteractionLocked && setActiveStep(2)}
-        disabled={saving || isStepInteractionLocked}
-      />
-    );
-  };
-
-  const renderStep3Summary = () => {
-    if (activeStep <= 3) return null;
-    return (
-      <StepSummaryCard
-        step={3}
-        title="수령인 및 요청사항"
-        summary={[
-          `수령인: ${recipientName || '-'}`,
-          `요청사항: ${specialInstructions || '없음'}`,
-        ]}
-        onEdit={() => !saving && !isStepInteractionLocked && setActiveStep(3)}
-        disabled={saving || isStepInteractionLocked}
-      />
-    );
-  };
-
   return (
     <KeyboardAvoidingView style={styles.container} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
       <AppTopBar title="배송 요청" onBack={handleBack} />
 
-      <ScrollView ref={scrollViewRef} contentContainerStyle={[styles.content, { paddingBottom: 100 }]} showsVerticalScrollIndicator={false}>
-        {renderStep1Summary()}
-        <Step1Location
-          savedAddresses={savedAddresses}
-          recentAddresses={recentAddresses}
-          setAddressTarget={setAddressTarget}
-          resolvingAddressStation={resolvingAddressStation}
-          handleRecommendStationFromAddress={handleRecommendStationFromAddress}
-          setPickerType={setPickerType}
-          setPickerVisible={setPickerVisible}
-          resolvingLocation={resolvingLocation}
-          handleUseCurrentLocation={handleUseCurrentLocation}
-        />
-
-        {renderStep2Summary()}
-        <Step2Item
-          handleUploadPhotoFromCamera={handleUploadPhotoFromCamera}
-          handleUploadPhotoFromLibrary={handleUploadPhotoFromLibrary}
-          handleAI={handleAI}
-          aiResult={aiResult}
-          setReservationCalendarVisible={setReservationCalendarVisible}
-          hasItemValue={hasItemValue}
-          quotes={quotes}
-        />
-
-        {renderStep3Summary()}
-        <Step3Recipient
-          recipientPrivacyConfig={recipientPrivacyConfig as any}
-          setShowPickupLockerLocator={() => setLockerLocatorTarget('pickup')}
-          setShowDropoffLockerLocator={() => setLockerLocatorTarget('dropoff')}
-        />
-
-        <Step4Quote
-          quotes={quotes}
-          missingItems={missingItems}
-          handleClearDraft={handleClearDraft}
-          submitDisabled={submitDisabled}
-          handleSubmit={handleSubmit}
-          saving={saving}
-          handleSaveDraftNow={handleSaveDraftNow}
-        />
-       </ScrollView>
-
-       {/* 하단 실시간 예상 요금바 */}
-       {currentPrice > 0 && activeStep < 4 && (
-        <View style={[styles.floatingPriceBar, { paddingBottom: Math.max(insets.bottom, Spacing.md) }]}>
-          <Text style={styles.floatingPriceLabel}>예상 배송비</Text>
-          <Text style={styles.floatingPriceValue}>{currentPrice.toLocaleString()}원</Text>
-        </View>
-       )}
+      <CreateRequestFunnel
+        savedAddresses={savedAddresses}
+        recentAddresses={recentAddresses}
+        setAddressTarget={setAddressTarget}
+        handleRecommendStationFromAddress={handleRecommendStationFromAddress}
+        setPickerType={setPickerType}
+        setPickerVisible={setPickerVisible}
+        handleUseCurrentLocation={handleUseCurrentLocation}
+        handleUploadPhotoFromCamera={handleUploadPhotoFromCamera}
+        handleUploadPhotoFromLibrary={handleUploadPhotoFromLibrary}
+        handleAI={handleAI}
+        aiResult={aiResult}
+        setReservationCalendarVisible={setReservationCalendarVisible}
+        setLockerLocatorTarget={setLockerLocatorTarget}
+        quotes={quotes}
+        missingItems={missingItems}
+        submitDisabled={submitDisabled}
+        handleSubmit={handleSubmit}
+        saving={saving}
+        recipientPrivacyConfig={recipientPrivacyConfig}
+      />
 
       <OptimizedStationSelectModal
         visible={pickerVisible}
