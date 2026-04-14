@@ -121,26 +121,7 @@ export {
   splitRewardAcrossLegs,
 } from './beta1-orchestration-leg-service';
 
-const PARTNER_QUOTES: PartnerMissionQuote[] = [
-  {
-    partnerId: 'partner-a',
-    estimatedPickupMinutes: 18,
-    estimatedCompletionMinutes: 42,
-    quotedCost: 7800,
-    successRate: 0.93,
-    coverageScore: 0.91,
-    available: true,
-  },
-  {
-    partnerId: 'partner-b',
-    estimatedPickupMinutes: 12,
-    estimatedCompletionMinutes: 39,
-    quotedCost: 9200,
-    successRate: 0.96,
-    coverageScore: 0.88,
-    available: true,
-  },
-];
+
 
 type Beta1LegDoc = DeliveryLeg & { id?: string };
 
@@ -804,6 +785,9 @@ export async function createBeta1Request(input: Beta1RequestCreateInput): Promis
       legDefinitions.length
     );
 
+    const activePartners = await deliveryPartnerService.getActivePartners();
+    const fallbackPartnerId = activePartners.length > 0 ? activePartners[0].partnerId : undefined;
+
     for (let index = 0; index < legDefinitions.length; index += 1) {
       const definition = legDefinitions[index];
       const deliveryLeg = await createDeliveryLegRecord({
@@ -829,7 +813,7 @@ export async function createBeta1Request(input: Beta1RequestCreateInput): Promis
         deliveryLegId: deliveryLeg.deliveryLegId,
         interventionLevel: requiresAddressHandling(definition.legType) ? 'guarded_execute' : 'recommend',
         selectedActorType: requiresAddressHandling(definition.legType) ? ActorType.EXTERNAL_PARTNER : ActorType.GILLER,
-        selectedPartnerId: requiresAddressHandling(definition.legType) ? PARTNER_QUOTES[0]?.partnerId : undefined,
+        selectedPartnerId: requiresAddressHandling(definition.legType) ? fallbackPartnerId : undefined,
         selectionReason: requiresAddressHandling(definition.legType)
           ? '주소 구간이라 길러 선택이 없으면 external partner fallback을 우선 검토합니다.'
           : '역간 이동 구간이라 길러 수행을 우선 제안합니다.',
@@ -884,13 +868,13 @@ export async function createBeta1Request(input: Beta1RequestCreateInput): Promis
   };
 }
 
-export function selectActorForMission(params: {
+export async function selectActorForMission(params: {
   requestId: string;
   missionType: Mission['missionType'];
   preferLocker: boolean;
   requiresAddressHandling: boolean;
   urgency: 'normal' | 'fast' | 'urgent';
-}): Omit<ActorSelectionDecision, 'decisionId' | 'createdAt' | 'updatedAt'> {
+}): Promise<Omit<ActorSelectionDecision, 'decisionId' | 'createdAt' | 'updatedAt'>> {
   const interventionLevel: AIInterventionLevel = params.requiresAddressHandling ? 'guarded_execute' : 'recommend';
   let selectedActorType: ActorSelectionActorType = ActorType.GILLER;
   let selectedPartnerId: string | undefined;
@@ -901,8 +885,9 @@ export function selectActorForMission(params: {
     selectedActorType = ActorType.LOCKER;
     selectionReason = '비대면 인계가 유리해 보관함 연계를 우선 적용합니다.';
   } else if (params.requiresAddressHandling || params.urgency === 'urgent') {
+    const activePartners = await deliveryPartnerService.getActivePartners();
     selectedActorType = ActorType.EXTERNAL_PARTNER;
-    selectedPartnerId = PARTNER_QUOTES[0].partnerId;
+    selectedPartnerId = activePartners.length > 0 ? activePartners[0].partnerId : undefined;
     selectionReason = '주소 기반 즉시 처리 구간이라 외부 파트너를 우선 검토합니다.';
   }
 

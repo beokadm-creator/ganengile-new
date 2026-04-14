@@ -1089,7 +1089,7 @@ export const onRequestStatusChanged = functions.firestore
         console.error('Error storing request pricing history:', error);
       }
 
-      // 1. 湲몃윭 ?섏씡 ?덉퐫???앹꽦 (?뚮옯???섏닔猷?15% + ?먯쿇吏뺤닔??3.3%)
+      // 1. 길러 수익 레코드 생성 (플랫폼 수수료율 15% + 원천징수세율 3.3%)
       if (gillerId) {
         try {
           const totalFee: number = after.fee?.totalFee ?? 0;
@@ -1155,12 +1155,12 @@ export const onRequestStatusChanged = functions.firestore
             console.warn(`?좑툘 No fee info for request ${requestId}, skipping earning creation`);
           }
         } catch (error) {
-          console.error('??Error creating giller earning:', error);
-          // ?섏씡 ?앹꽦 ?ㅽ뙣?대룄 ?뚮┝? 怨꾩냽 ?꾩넚
+          console.error('Error creating giller earning:', error);
+          // 수익 생성 실패해도 알림은 계속 전송
         }
       }
 
-      // 2. ?댁슜??gller)?먭쾶 諛곗넚 ?꾨즺 FCM ?뚮┝ ?꾩넚
+      // 2. 이용자(gller)에게 배송 완료 FCM 알림 전송
       if (!gllerId) {
         console.warn('?좑툘 No gller ID for notification');
         return null;
@@ -1439,7 +1439,7 @@ export const onChatMessageCreated = functions.firestore
       return null;
     }
 
-    // ?쒖뒪??硫붿떆吏??FCM ?뚮┝ ?꾩넚 遺덊븘??
+    // 시스템 메시지는 FCM 알림 전송 안 함
     if (message.type === 'system') {
       return null;
     }
@@ -2068,7 +2068,7 @@ export const acceptMatch = functions.https.onCall(
       // Check if match is still pending
       if (match.status !== 'pending') {
         console.warn('?좑툘 Match not in pending status:', match.status);
-        return { success: false, message: '?대? 泥섎━???붿껌?낅땲??' };
+        return { success: false, message: '이미 처리된 요청입니다.' };
       }
 
       // 2. Create delivery document
@@ -2188,7 +2188,7 @@ export const rejectMatch = functions.https.onCall(
       // Check if match is still pending
       if (match.status !== 'pending') {
         console.warn('?좑툘 Match not in pending status:', match.status);
-        return { success: false, message: '?대? 泥섎━???붿껌?낅땲??' };
+        return { success: false, message: '이미 처리된 요청입니다.' };
       }
 
       // 2. Transactionally update match and check if request needs reset
@@ -3477,7 +3477,7 @@ export const ciVerificationCallback = functions.https.onRequest(async (req, res)
         {
           status: 'rejected',
           verificationMethod: 'ci',
-          rejectionReason: '蹂몄씤?몄쬆??痍⑥냼?섏뿀嫄곕굹 ?ㅽ뙣?덉뒿?덈떎.',
+          rejectionReason: '본인인증이 취소되었거나 실패했습니다.',
           externalAuth: {
             provider,
             status: 'failed',
@@ -3512,7 +3512,7 @@ export const ciVerificationCallback = functions.https.onRequest(async (req, res)
 });
 
 /**
- * Callable: ?뚯뒪???섍꼍?먯꽌 ?몄쬆 ?꾨즺 媛뺤젣 泥섎━
+ * Callable: 테스트 환경에서 인증 완료 강제 처리
  */
 export const completeCiVerificationTest = functions.https.onCall(
   async (data: CompleteCiVerificationTestData, context): Promise<{ ok: boolean; ciHash: string }> => {

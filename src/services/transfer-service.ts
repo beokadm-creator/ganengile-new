@@ -80,14 +80,38 @@ export class TransferService {
   }
 
   /**
-   * 경로 소요 시간 계산 (단순 예시)
+   * 경로 소요 시간 계산
+   * 직선 거리를 기준으로 평균 지하철 이동 속도(약 30km/h)를 적용해 소요 시간(분)을 추정합니다.
    * @param route 경로
    * @returns 소요 시간 (분)
    */
-  private calculateTravelTime(_route: Route): Promise<number> {
-    // 실제로는 config_travel_times 테이블에서 조회
-    // 여기서는 단순화를 위해 고정 시간 반환
-    return Promise.resolve(30); // 30분 가정
+  private async calculateTravelTime(route: Route): Promise<number> {
+    if (!route.startStation.lat || !route.startStation.lng || !route.endStation.lat || !route.endStation.lng) {
+      return 30; // 좌표가 없는 경우 기본값
+    }
+    
+    // 직선 거리 계산 (단위: km)
+    const lat1 = route.startStation.lat;
+    const lon1 = route.startStation.lng;
+    const lat2 = route.endStation.lat;
+    const lon2 = route.endStation.lng;
+    
+    const R = 6371; // 지구 반경 (km)
+    const dLat = (lat2 - lat1) * Math.PI / 180;
+    const dLon = (lon2 - lon1) * Math.PI / 180;
+    const a = 
+      Math.sin(dLat/2) * Math.sin(dLat/2) +
+      Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * 
+      Math.sin(dLon/2) * Math.sin(dLon/2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+    const distanceKm = R * c;
+    
+    // 평균 지하철 이동 속도 30km/h 가정
+    // 소요 시간(분) = (거리 / 속도) * 60
+    // 여기에 기본 대기 시간 5분 추가
+    const estimatedMinutes = Math.round((distanceKm / 30) * 60) + 5;
+    
+    return Math.max(5, estimatedMinutes);
   }
 
   /**
@@ -102,13 +126,11 @@ export class TransferService {
     transferStation: Station,
     requestRoute: Route
   ): Promise<number> {
-    // 환승 경로:
-    // 1. 길러 경로 (예: 강남역 → 역삼역)
-    // 2. 환승역에서 걸어가기 (예: 역삼역 → 학동역)
-    // 3. 요청 경로 (예: 학동역 → 목적역)
-
     const gillerRouteTime = await this.calculateTravelTime(gillerRoute);
-    const walkingTime = 3; // 3분 가정
+    
+    // 환승 도보 시간 추정: 환승역 정보가 있으면 5분, 기본 5분 적용
+    const walkingTime = 5;
+    
     const requestRouteTime = await this.calculateTravelTime(requestRoute);
 
     return gillerRouteTime + walkingTime + requestRouteTime;

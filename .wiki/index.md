@@ -1,31 +1,30 @@
-# 가는길 (ganengile) — 배달/수거/출장 매칭 플랫폼
+# 가는길에 (ganengile) 위키
 
-## Stack
-- **Mobile**: React Native + Expo (Expo Router) ~76K lines
+> 이 위키는 “지금 코드에 존재하는 기능”을 기준으로 현재 상태를 정리하고, 기획 의도/운영 관점까지 같이 정렬하기 위한 문서입니다.  
+> 최신 개발 문서 인덱스는 `docs/README.md`입니다.
+
+## Quick Links
+- 서비스(웹앱): https://ganengile.web.app/
+- 개발 문서 인덱스: [`../docs/README.md`](../docs/README.md)
+- 루트 README(로컬 실행): [`../README.md`](../README.md)
+- 작업 규칙/거버넌스: [`../CLAUDE.md`](../CLAUDE.md)
+
+## Wiki Pages
+1. 제품/서비스 개요: [`01-product-overview.md`](01-product-overview.md)
+2. 시스템 아키텍처(개발): [`02-system-architecture.md`](02-system-architecture.md)
+3. 기능 분석(현재 구현 기준): [`03-feature-analysis.md`](03-feature-analysis.md)
+4. 기획 의도/원칙(문서 기반): [`04-planning-intent.md`](04-planning-intent.md)
+5. 운영/관리자/배포: [`05-ops-and-admin.md`](05-ops-and-admin.md)
+6. 로드맵/오픈 이슈: [`06-roadmap-and-open-questions.md`](06-roadmap-and-open-questions.md)
+
+## Stack (현재 코드 기준)
+- **App**: React Native + Expo (Web 포함)
 - **Admin Web**: Next.js (App Router) + TypeScript
-- **Backend**: Firebase Cloud Functions (Node.js 22)
-- **DB**: Firestore, **인증**: Firebase Auth, **지도**: 네이버맵, **결제**: 카카오페이
+- **Backend**: Firebase Cloud Functions
+- **DB/Auth**: Firestore + Firebase Auth
+- **Maps**: 네이버 지도(프록시/정적 지도 포함)
 
-## Key Files
-- `functions/src/index.ts` — 전체 API (~5K lines, 리팩토링 필요)
-- `src/services/` — DepositService, BadgeService, FCMService, KakaoPayService, LocationService
-
-## 핵심 기능
-- 이중 역할: 의뢰인(Requester) / 실무자(Giller)
-- 서비스 매칭 → 수행 → 리뷰
-- 카카오페이 결제, 보증금, QR 락커
-- FCM 푸시, 네이버맵 반경 검색
-
-## 알려진 이슈
-- functions/index.ts 단일 파일 5K줄 → 분리 필요
-- 환경변수 9개 미설정 → 배포 블로커
-- enterprise-legacy 레거시 코드 존재
-
-## 환경변수 (배포 시 설정 필요)
-- CI_PASS_URL, CI_KAKAO_URL
-- NAVER_MAP_CLIENT_ID, NAVER_MAP_CLIENT_SECRET
-- JUSO_API_KEY
-- SEOUL_FARE_API_URL, SEOUL_FARE_SERVICE_KEY
-
-## Analysis
-- 문서 인덱스: `docs/README.md`
+## 문서 기준(참고)
+- 회원 진입/온보딩 표준: [`../docs/USER-ENTRY-FLOW-STANDARD.md`](../docs/USER-ENTRY-FLOW-STANDARD.md)
+- 운영/배포 사전점검: [`../docs/deployment-preflight.md`](../docs/deployment-preflight.md)
+- CI/CD: [`../docs/ops/cicd-pipeline-guide.md`](../docs/ops/cicd-pipeline-guide.md)
