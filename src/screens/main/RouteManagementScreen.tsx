@@ -462,14 +462,14 @@ const styles = StyleSheet.create({
   heroKicker: {
     color: Colors.primary,
     fontSize: Typography.fontSize.sm,
-    fontWeight: '800',
+    fontWeight: Typography.fontWeight.extrabold,
     textTransform: 'uppercase',
     letterSpacing: 0.8,
   },
   heroTitle: {
     color: Colors.textPrimary,
     fontSize: Typography.fontSize['2xl'],
-    fontWeight: '800',
+    fontWeight: Typography.fontWeight.extrabold,
     marginTop: 4,
     marginBottom: 6,
   },
@@ -493,7 +493,7 @@ const styles = StyleSheet.create({
   metricValue: {
     color: Colors.textPrimary,
     fontSize: Typography.fontSize.lg,
-    fontWeight: '800',
+    fontWeight: Typography.fontWeight.extrabold,
   },
   boardShortcut: {
     backgroundColor: Colors.surface,
@@ -512,7 +512,7 @@ const styles = StyleSheet.create({
   boardShortcutTitle: {
     color: Colors.textPrimary,
     fontSize: Typography.fontSize.base,
-    fontWeight: '800',
+    fontWeight: Typography.fontWeight.extrabold,
   },
   boardShortcutBody: {
     color: Colors.textSecondary,
@@ -534,7 +534,7 @@ const styles = StyleSheet.create({
   sectionTitle: {
     color: Colors.textPrimary,
     fontSize: Typography.fontSize.lg,
-    fontWeight: '800',
+    fontWeight: Typography.fontWeight.extrabold,
   },
   sectionSubtitle: {
     color: Colors.textSecondary,
@@ -550,7 +550,7 @@ const styles = StyleSheet.create({
   inlinePrimaryButtonText: {
     color: Colors.primary,
     fontSize: Typography.fontSize.sm,
-    fontWeight: '800',
+    fontWeight: Typography.fontWeight.extrabold,
   },
   inlineButtonDisabled: {
     opacity: 0.6,
@@ -572,7 +572,7 @@ const styles = StyleSheet.create({
   rulePillText: {
     color: Colors.textSecondary,
     fontSize: Typography.fontSize.xs,
-    fontWeight: '700',
+    fontWeight: Typography.fontWeight.bold,
   },
   territoryList: {
     gap: Spacing.sm,
@@ -597,7 +597,7 @@ const styles = StyleSheet.create({
   territoryName: {
     color: Colors.textPrimary,
     fontSize: Typography.fontSize.base,
-    fontWeight: '800',
+    fontWeight: Typography.fontWeight.extrabold,
     flex: 1,
   },
   territoryMeta: {
@@ -607,7 +607,7 @@ const styles = StyleSheet.create({
   territoryBadge: {
     color: Colors.primary,
     fontSize: Typography.fontSize.xs,
-    fontWeight: '800',
+    fontWeight: Typography.fontWeight.extrabold,
   },
   emptyInlineText: {
     color: Colors.textSecondary,
@@ -624,7 +624,7 @@ const styles = StyleSheet.create({
   emptyTitle: {
     color: Colors.textPrimary,
     fontSize: Typography.fontSize.lg,
-    fontWeight: '800',
+    fontWeight: Typography.fontWeight.extrabold,
     marginBottom: 6,
   },
   emptySubtitle: { color: Colors.textSecondary, ...Typography.body, textAlign: 'center' },
@@ -635,7 +635,7 @@ const styles = StyleSheet.create({
     paddingVertical: 14,
     paddingHorizontal: 24,
   },
-  addButtonText: { color: Colors.white, fontSize: Typography.fontSize.base, fontWeight: '800' },
+  addButtonText: { color: Colors.white, fontSize: Typography.fontSize.base, fontWeight: Typography.fontWeight.extrabold },
   listContainer: { gap: Spacing.md },
   routeCard: {
     backgroundColor: Colors.surface,
@@ -654,13 +654,13 @@ const styles = StyleSheet.create({
   routeName: {
     color: Colors.textPrimary,
     fontSize: Typography.fontSize.lg,
-    fontWeight: '800',
+    fontWeight: Typography.fontWeight.extrabold,
     flex: 1,
   },
   routeTime: {
     color: Colors.primary,
     fontSize: Typography.fontSize.base,
-    fontWeight: '800',
+    fontWeight: Typography.fontWeight.extrabold,
   },
   routeDays: { color: Colors.textSecondary, ...Typography.bodySmall },
   actionButtons: {
@@ -680,9 +680,9 @@ const styles = StyleSheet.create({
     borderWidth: 1,
   },
   editActionButton: { backgroundColor: Colors.surface, borderColor: Colors.border },
-  editActionButtonText: { color: Colors.textPrimary, fontWeight: '700' },
+  editActionButtonText: { color: Colors.textPrimary, fontWeight: Typography.fontWeight.bold },
   deleteActionButton: { backgroundColor: Colors.surface, borderColor: Colors.error },
-  deleteActionButtonText: { color: Colors.error, fontWeight: '700' },
+  deleteActionButtonText: { color: Colors.error, fontWeight: Typography.fontWeight.bold },
   limitBanner: {
     backgroundColor: Colors.warningLight,
     borderRadius: BorderRadius.xl,
@@ -693,7 +693,7 @@ const styles = StyleSheet.create({
   limitText: {
     color: Colors.warningDark,
     textAlign: 'center',
-    fontWeight: '700',
+    fontWeight: Typography.fontWeight.bold,
     fontSize: Typography.fontSize.sm,
   },
   fab: {
@@ -708,7 +708,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     ...Shadows.md,
   },
-  fabLabel: { color: Colors.white, fontSize: 32, fontWeight: '300', marginTop: -4 },
+  fabLabel: { color: Colors.white, fontSize: Typography.fontSize['5xl'], fontWeight: Typography.fontWeight.regular, marginTop: -4 },
   previewButton: {
     backgroundColor: Colors.gray100,
     borderWidth: 1,

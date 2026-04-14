@@ -8,7 +8,7 @@ import {
   getBeta1HomeSnapshot,
   type Beta1HomeSnapshot,
 } from '../../services/beta1-orchestration-service';
-import { Colors } from '../../theme';
+import { Colors , Typography } from '../../theme';
 import type { MainStackNavigationProp } from '../../types/navigation';
 import { UserRole } from '../../types/user';
 import { loadCreateRequestProgress } from '../../utils/draft-storage';
@@ -127,7 +127,7 @@ const styles = StyleSheet.create({
   },
   emptyTitle: {
     color: Colors.textPrimary,
-    fontSize: 16,
-    fontWeight: '700',
+    fontSize: Typography.fontSize.lg,
+    fontWeight: Typography.fontWeight.bold,
   },
 });

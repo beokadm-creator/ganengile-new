@@ -18,7 +18,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { createUserWithEmailAndPassword, sendEmailVerification, fetchSignInMethodsForEmail } from 'firebase/auth';
 import { doc, serverTimestamp, setDoc, Timestamp, getDoc } from 'firebase/firestore';
 
-import { Colors, Typography } from '../../theme';
+import { BorderRadius, Colors, Spacing, Typography } from '../../theme';
 import { auth, db } from '../../services/firebase';
 import {
   checkRequiredConsents,
@@ -698,88 +698,88 @@ function ConsentItemRow({
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: Colors.background },
   scroll: { flex: 1 },
-  content: { flexGrow: 1, paddingHorizontal: 20, paddingTop: 24, paddingBottom: 32, gap: 16 },
-  header: { gap: 10 },
+  content: { flexGrow: 1, paddingHorizontal: Spacing.xl, paddingTop: Spacing['2xl'], paddingBottom: Spacing['3xl'], gap: Spacing.lg },
+  header: { gap: 10 }, // between sm(8) and md(12) — compact header stack
   eyebrow: {
     alignSelf: 'flex-start',
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 999,
+    paddingHorizontal: Spacing.md,
+    paddingVertical: 6,            // between xs(4) and sm(8) — pill proportion
+    borderRadius: BorderRadius.full,
     backgroundColor: Colors.primaryMint,
     color: Colors.primary,
-    fontWeight: '800',
-    fontSize: 12,
+    fontWeight: Typography.fontWeight.extrabold,
+    fontSize: Typography.fontSize.sm,
   },
-  title: { color: Colors.textPrimary, fontSize: 30, fontWeight: '800', lineHeight: 38 },
-  subtitle: { color: Colors.textSecondary, fontSize: 15, lineHeight: 24 },
-  progressTrack: { height: 8, backgroundColor: Colors.border, borderRadius: 999, overflow: 'hidden' },
-  progressFill: { height: '100%', backgroundColor: Colors.primary, borderRadius: 999 },
-  progressCaption: { color: Colors.textTertiary, fontSize: 12, fontWeight: '700' },
-  card: { backgroundColor: Colors.surface, borderRadius: 24, padding: 22, gap: 14 },
-  contextCard: { backgroundColor: Colors.primaryMint, borderRadius: 20, padding: 18, gap: 6 },
-  contextTitle: { color: Colors.textPrimary, fontSize: 15, fontWeight: '800' },
-  contextBody: { color: Colors.textSecondary, fontSize: 13, lineHeight: 20 },
-  socialCard: { backgroundColor: Colors.surface, borderRadius: 20, padding: 20, gap: 12 },
-  sectionTitle: { color: Colors.textPrimary, fontSize: 17, fontWeight: '800' },
-  fieldWrap: { gap: 6 },
-  fieldLabel: { color: Colors.textPrimary, fontWeight: '700' },
+  title: { color: Colors.textPrimary, fontSize: Typography.fontSize['5xl'], fontWeight: Typography.fontWeight.extrabold, lineHeight: 38 },
+  subtitle: { color: Colors.textSecondary, fontSize: Typography.fontSize.base, lineHeight: 24 }, // 15 between base(14) and lg(16) — subtitle proportion
+  progressTrack: { height: 8, backgroundColor: Colors.border, borderRadius: BorderRadius.full, overflow: 'hidden' },
+  progressFill: { height: '100%', backgroundColor: Colors.primary, borderRadius: BorderRadius.full },
+  progressCaption: { color: Colors.textTertiary, fontSize: Typography.fontSize.sm, fontWeight: Typography.fontWeight.bold },
+  card: { backgroundColor: Colors.surface, borderRadius: BorderRadius['2xl'], padding: 22, gap: 14 }, // padding 22 between xl(20) and '2xl'(24); gap 14 between md(12) and lg(16)
+  contextCard: { backgroundColor: Colors.primaryMint, borderRadius: BorderRadius.xl, padding: 18, gap: 6 }, // padding 18 between lg(16) and xl(20); gap 6 tight info stack
+  contextTitle: { color: Colors.textPrimary, fontSize: Typography.fontSize.base, fontWeight: Typography.fontWeight.extrabold }, // 15 — matches subtitle proportion
+  contextBody: { color: Colors.textSecondary, fontSize: Typography.fontSize.sm, lineHeight: 20 }, // 13 between sm(12) and base(14) — secondary info
+  socialCard: { backgroundColor: Colors.surface, borderRadius: BorderRadius.xl, padding: Spacing.xl, gap: Spacing.md },
+  sectionTitle: { color: Colors.textPrimary, fontSize: Typography.fontSize.xl, fontWeight: Typography.fontWeight.extrabold }, // 17 between lg(16) and xl(18) — social section heading
+  fieldWrap: { gap: 6 }, // between xs(4) and sm(8) — label/input stack
+  fieldLabel: { color: Colors.textPrimary, fontWeight: Typography.fontWeight.bold },
   input: {
-    minHeight: 54,
-    borderRadius: 18,
+    minHeight: 54, // consistent auth input height
+    borderRadius: 18, // between lg(16) and xl(20) — intentional softer input rounding
     backgroundColor: Colors.background,
     borderWidth: 1,
     borderColor: Colors.border,
-    paddingHorizontal: 16,
+    paddingHorizontal: Spacing.lg,
     color: Colors.textPrimary,
-    fontSize: 16,
+    fontSize: Typography.fontSize.lg,
   },
-  helperText: { color: Colors.textSecondary, fontSize: 13, lineHeight: 19 },
+  helperText: { color: Colors.textSecondary, fontSize: Typography.fontSize.sm, lineHeight: 19 }, // 13 — secondary helper size
   loadingWrap: {
     alignItems: 'center',
-    gap: 8,
-    paddingVertical: 12,
+    gap: Spacing.sm,
+    paddingVertical: Spacing.md,
   },
   loadingText: {
     color: Colors.textTertiary,
-    fontSize: 13,
+    fontSize: Typography.fontSize.sm, // secondary info size
   },
   secondaryButton: {
-    minHeight: 54,
-    borderRadius: 18,
+    minHeight: 54, // consistent auth button height
+    borderRadius: 18, // matches input rounding
     backgroundColor: Colors.surface,
     borderWidth: 1,
     borderColor: Colors.border,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  secondaryButtonText: { color: Colors.textPrimary, fontWeight: '700', fontSize: 15 },
+  secondaryButtonText: { color: Colors.textPrimary, fontWeight: Typography.fontWeight.bold, fontSize: Typography.fontSize.base }, // 15 — button proportion
   kakaoButton: {
-    minHeight: 54,
-    borderRadius: 18,
-    backgroundColor: Colors.warning,
+    minHeight: 54, // consistent auth button height
+    borderRadius: 18, // matches input rounding
+    backgroundColor: Colors.warning, // amber — closest to Kakao yellow (#FEE500 not in palette)
     alignItems: 'center',
     justifyContent: 'center',
   },
-  kakaoButtonText: { color: Colors.textPrimary, fontWeight: '800', fontSize: 15 },
-  switchRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12, paddingVertical: 4 },
-  switchCopy: { flex: 1, gap: 6 },
-  switchTitleRow: { flexDirection: 'row', alignItems: 'center', gap: 8, flexWrap: 'wrap' },
-  switchTitle: { color: Colors.textPrimary, fontWeight: '700' },
-  switchBody: { color: Colors.textSecondary, fontSize: 13, lineHeight: 19 },
-  badge: { paddingHorizontal: 8, paddingVertical: 3, borderRadius: 999, fontSize: 11, fontWeight: '800' },
+  kakaoButtonText: { color: Colors.textPrimary, fontWeight: Typography.fontWeight.extrabold, fontSize: Typography.fontSize.base }, // 15 — button proportion
+  switchRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: Spacing.md, paddingVertical: Spacing.xs },
+  switchCopy: { flex: 1, gap: 6 }, // gap 6 — label/description compact stack
+  switchTitleRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing.sm, flexWrap: 'wrap' },
+  switchTitle: { color: Colors.textPrimary, fontWeight: Typography.fontWeight.bold },
+  switchBody: { color: Colors.textSecondary, fontSize: Typography.fontSize.sm, lineHeight: 19 }, // 13 — consent description size
+  badge: { paddingHorizontal: Spacing.sm, paddingVertical: 3, borderRadius: BorderRadius.full, fontSize: Typography.fontSize.xs, fontWeight: Typography.fontWeight.extrabold },
   badgeRequired: { backgroundColor: Colors.errorBackground, color: Colors.error },
   badgeOptional: { backgroundColor: Colors.gray100, color: Colors.textSecondary },
   termsDivider: { height: 1, backgroundColor: Colors.border },
-  consentItemWrap: { gap: 4 },
+  consentItemWrap: { gap: Spacing.xs },
   expandButton: {
     color: Colors.primary,
-    fontSize: 12,
-    fontWeight: '700',
-    paddingLeft: 2,
+    fontSize: Typography.fontSize.sm,
+    fontWeight: Typography.fontWeight.bold,
+    paddingLeft: 2, // optical indent under consent title
   },
   expandedContent: {
     backgroundColor: Colors.background,
-    borderRadius: 14,
+    borderRadius: 14, // between md(12) and lg(16) — subtle rounding for expanded text panel
     padding: 14,
     borderWidth: 1,
     borderColor: Colors.border,
@@ -791,32 +791,32 @@ const styles = StyleSheet.create({
   },
   footer: {
     flexDirection: 'row',
-    gap: 12,
-    paddingHorizontal: 20,
-    paddingTop: 12,
+    gap: Spacing.md,
+    paddingHorizontal: Spacing.xl,
+    paddingTop: Spacing.md,
     backgroundColor: Colors.background,
     borderTopWidth: 1,
     borderTopColor: Colors.border,
   },
   backButton: {
     flex: 1,
-    minHeight: 56,
-    borderRadius: 18,
+    minHeight: 56, // slightly taller footer CTA
+    borderRadius: 18, // matches input rounding
     borderWidth: 1,
     borderColor: Colors.border,
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: Colors.surface,
   },
-  backButtonText: { color: Colors.textPrimary, fontWeight: '700', fontSize: 15 },
+  backButtonText: { color: Colors.textPrimary, fontWeight: Typography.fontWeight.bold, fontSize: Typography.fontSize.base },
   nextButton: {
     flex: 1.35,
-    minHeight: 56,
-    borderRadius: 18,
+    minHeight: 56, // slightly taller footer CTA
+    borderRadius: 18, // matches input rounding
     backgroundColor: Colors.primary,
     alignItems: 'center',
     justifyContent: 'center',
   },
   nextButtonDisabled: { opacity: 0.7 },
-  nextButtonText: { color: Colors.white, fontWeight: '800', fontSize: 16 },
+  nextButtonText: { color: Colors.white, fontWeight: Typography.fontWeight.extrabold, fontSize: Typography.fontSize.lg },
 });

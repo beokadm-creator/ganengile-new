@@ -1,44 +1,151 @@
-import React from 'react';
-import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import React, { useEffect, useRef } from 'react';
+import { Animated, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { BorderRadius, Colors, Shadows, Spacing, Typography } from '../../../../theme';
+import { UserRole } from '../../../../types/user';
 
-export function MetricCard({ label, value }: { label: string; value: string }) {
+// ─── Compact Role Toggle ─────────────────────────────────────────────────────
+export function CompactRoleToggle({
+  isGiller,
+  onToggle,
+}: {
+  isGiller: boolean;
+  onToggle: (role: UserRole) => void;
+}) {
+  const slideAnim = useRef(new Animated.Value(isGiller ? 1 : 0)).current;
+
+  useEffect(() => {
+    Animated.spring(slideAnim, {
+      toValue: isGiller ? 1 : 0,
+      useNativeDriver: true,
+      bounciness: 0,
+      speed: 14,
+    }).start();
+  }, [isGiller, slideAnim]);
+
+  const toggleWidth = 120;
+  const padding = 2; // tighter than xs(4) — compact pill proportion
+  const sliderWidth = toggleWidth / 2 - padding;
+
+  const translateX = slideAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: [padding, toggleWidth / 2],
+  });
+
   return (
-    <View style={sharedStyles.metricCard}>
-      <Text style={sharedStyles.metricLabel}>{label}</Text>
-      <Text style={sharedStyles.metricValue}>{value}</Text>
+    <View style={[sharedStyles.compactToggleContainer, { width: toggleWidth }]}>
+      <Animated.View
+        style={[
+          sharedStyles.compactToggleSlider,
+          {
+            width: sliderWidth,
+            transform: [{ translateX }],
+          },
+        ]}
+      />
+      <TouchableOpacity
+        style={sharedStyles.compactToggleOption}
+        activeOpacity={1}
+        onPress={() => {
+          if (isGiller) onToggle(UserRole.GLER);
+        }}
+      >
+        <Text style={[sharedStyles.compactToggleText, !isGiller && sharedStyles.compactToggleTextActive]}>
+          요청
+        </Text>
+      </TouchableOpacity>
+      <TouchableOpacity
+        style={sharedStyles.compactToggleOption}
+        activeOpacity={1}
+        onPress={() => {
+          if (!isGiller) onToggle(UserRole.GILLER);
+        }}
+      >
+        <Text style={[sharedStyles.compactToggleText, isGiller && sharedStyles.compactToggleTextActive]}>
+          배송
+        </Text>
+      </TouchableOpacity>
     </View>
   );
 }
 
-export function ActionCard({
-  icon,
+// ─── Primary Action Button ───────────────────────────────────────────────────
+export function PrimaryActionButton({
   title,
   subtitle,
   onPress,
 }: {
-  icon: keyof typeof MaterialIcons.glyphMap;
   title: string;
-  subtitle: string;
+  subtitle?: string;
   onPress: () => void;
 }) {
   return (
-    <TouchableOpacity 
-      style={sharedStyles.actionCard} 
-      onPress={onPress} 
+    <TouchableOpacity
+      style={sharedStyles.primaryActionButton}
+      onPress={onPress}
       activeOpacity={0.88}
-      hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
     >
-      <View style={sharedStyles.actionIconWrap}>
-        <MaterialIcons name={icon} size={22} color={Colors.primaryDark} />
+      <View style={sharedStyles.primaryActionContent}>
+        <Text style={sharedStyles.primaryActionTitle}>{title}</Text>
+        {subtitle ? (
+          <Text style={sharedStyles.primaryActionSubtitle}>{subtitle}</Text>
+        ) : null}
       </View>
-      <Text style={sharedStyles.actionTitle}>{title}</Text>
-      <Text style={sharedStyles.actionSubtitle}>{subtitle}</Text>
+      <MaterialIcons name="arrow-forward" size={22} color={Colors.textWhite} />
     </TouchableOpacity>
   );
 }
 
+// ─── Quick Link ──────────────────────────────────────────────────────────────
+export function QuickLinkRow({
+  icon,
+  title,
+  onPress,
+  disabled,
+}: {
+  icon: keyof typeof MaterialIcons.glyphMap;
+  title: string;
+  onPress: () => void;
+  disabled?: boolean;
+}) {
+  return (
+    <TouchableOpacity
+      style={sharedStyles.quickLinkRow}
+      onPress={onPress}
+      activeOpacity={0.88}
+      hitSlop={{ top: 4, bottom: 4, left: 8, right: 8 }}
+    >
+      <MaterialIcons
+        name={icon}
+        size={20}
+        color={disabled ? Colors.textDisabled : Colors.primary}
+      />
+      <Text
+        style={[
+          sharedStyles.quickLinkText,
+          disabled && sharedStyles.quickLinkDisabled,
+        ]}
+      >
+        {title}
+      </Text>
+      <MaterialIcons
+        name="chevron-right"
+        size={20}
+        color={disabled ? Colors.textDisabled : Colors.textTertiary}
+      />
+    </TouchableOpacity>
+  );
+}
+
+export function QuickLinkPanel({ children }: { children: React.ReactNode }) {
+  return <View style={sharedStyles.quickLinkPanel}>{children}</View>;
+}
+
+export function QuickLinkDivider() {
+  return <View style={sharedStyles.quickLinkDivider} />;
+}
+
+// ─── Badges ──────────────────────────────────────────────────────────────────
 export function ModeBadge({ label }: { label: string }) {
   return (
     <View style={sharedStyles.modeBadge}>
@@ -47,13 +154,26 @@ export function ModeBadge({ label }: { label: string }) {
   );
 }
 
-export function StatusPill({ label, tone }: { label: string; tone: 'request' | 'mission' }) {
+export function StatusPill({
+  label,
+  tone,
+}: {
+  label: string;
+  tone: 'request' | 'mission';
+}) {
   return (
-    <View style={[sharedStyles.statusPill, tone === 'request' ? sharedStyles.requestPill : sharedStyles.missionPill]}>
+    <View
+      style={[
+        sharedStyles.statusPill,
+        tone === 'request' ? sharedStyles.requestPill : sharedStyles.missionPill,
+      ]}
+    >
       <Text
         style={[
           sharedStyles.statusPillText,
-          tone === 'request' ? sharedStyles.requestPillText : sharedStyles.missionPillText,
+          tone === 'request'
+            ? sharedStyles.requestPillText
+            : sharedStyles.missionPillText,
         ]}
       >
         {label}
@@ -62,27 +182,66 @@ export function StatusPill({ label, tone }: { label: string; tone: 'request' | '
   );
 }
 
-export function EmptyCard({ title, subtitle }: { title: string; subtitle: string }) {
+// ─── Empty Card ──────────────────────────────────────────────────────────────
+export function EmptyCard({
+  title,
+  subtitle,
+  actionLabel,
+  onAction,
+}: {
+  title: string;
+  subtitle: string;
+  actionLabel?: string;
+  onAction?: () => void;
+}) {
   return (
     <View style={sharedStyles.emptyCard}>
       <Text style={sharedStyles.emptyCardTitle}>{title}</Text>
       <Text style={sharedStyles.emptyCardSubtitle}>{subtitle}</Text>
+      {actionLabel && onAction ? (
+        <TouchableOpacity
+          style={sharedStyles.emptyCardAction}
+          onPress={onAction}
+          activeOpacity={0.88}
+          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+        >
+          <Text style={sharedStyles.emptyCardActionText}>{actionLabel}</Text>
+        </TouchableOpacity>
+      ) : null}
     </View>
   );
 }
 
-export function WalletRow({ label, value, strong }: { label: string; value: number; strong?: boolean }) {
+// ─── Wallet Compact ──────────────────────────────────────────────────────────
+export function WalletCompact({
+  balance,
+  onPress,
+}: {
+  balance: number;
+  onPress: () => void;
+}) {
   return (
-    <View style={sharedStyles.walletRow}>
-      <Text style={[sharedStyles.walletLabel, strong && sharedStyles.walletLabelStrong]}>{label}</Text>
-      <Text style={[sharedStyles.walletValue, strong && sharedStyles.walletValueStrong]}>
-        {value.toLocaleString()}원
-      </Text>
+    <View style={sharedStyles.walletCompact}>
+      <Text style={sharedStyles.walletCompactLabel}>출금 가능</Text>
+      <TouchableOpacity
+        style={sharedStyles.walletCompactRight}
+        onPress={onPress}
+        activeOpacity={0.88}
+        hitSlop={{ top: 8, bottom: 8, left: 16, right: 8 }}
+      >
+        <Text style={sharedStyles.walletCompactValue}>
+          {balance.toLocaleString()}원
+        </Text>
+        <Text style={sharedStyles.walletCompactMore}>자세히</Text>
+        <MaterialIcons name="chevron-right" size={16} color={Colors.textTertiary} />
+      </TouchableOpacity>
     </View>
   );
 }
 
+// ─── Styles ──────────────────────────────────────────────────────────────────
 export const sharedStyles = StyleSheet.create({
+  // Layout
   container: {
     flex: 1,
     backgroundColor: Colors.background,
@@ -92,17 +251,8 @@ export const sharedStyles = StyleSheet.create({
     padding: Spacing.lg,
     paddingBottom: Spacing['5xl'],
   },
-  emptyState: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: Colors.background,
-  },
-  emptyTitle: {
-    color: Colors.textPrimary,
-    fontSize: Typography.fontSize.base,
-    fontWeight: '700',
-  },
+
+  // Hero
   hero: {
     backgroundColor: Colors.primaryMint,
     borderRadius: BorderRadius.xl,
@@ -112,8 +262,8 @@ export const sharedStyles = StyleSheet.create({
   heroTop: {
     flexDirection: 'row',
     gap: Spacing.md,
+    alignItems: 'flex-start',
     justifyContent: 'space-between',
-    marginBottom: Spacing.lg,
   },
   heroCopy: {
     flex: 1,
@@ -121,62 +271,30 @@ export const sharedStyles = StyleSheet.create({
   heroKicker: {
     color: Colors.primary,
     fontSize: Typography.fontSize.sm,
-    fontWeight: '700',
-    letterSpacing: 1.2,
+    fontWeight: Typography.fontWeight.bold,
     marginBottom: Spacing.xs,
-    textTransform: 'uppercase',
   },
   heroTitle: {
     color: Colors.textPrimary,
     fontSize: Typography.fontSize['3xl'],
-    fontWeight: '800',
-    marginBottom: Spacing.xs,
+    fontWeight: Typography.fontWeight.extrabold,
   },
-  roleChip: {
-    alignItems: 'center',
-    alignSelf: 'flex-start',
-    backgroundColor: Colors.surface,
-    borderRadius: BorderRadius.full,
-    flexDirection: 'row',
-    gap: 6,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-  },
-  roleChipText: {
-    color: Colors.textPrimary,
-    fontSize: Typography.fontSize.sm,
-    fontWeight: '700',
-  },
-  metricRow: {
-    flexDirection: 'row',
-    gap: Spacing.sm,
-    marginBottom: Spacing.md,
-  },
-  metricCard: {
-    backgroundColor: Colors.surface,
-    borderRadius: BorderRadius.lg,
-    flex: 1,
-    padding: Spacing.md,
-  },
-  metricLabel: {
-    color: Colors.textTertiary,
-    fontSize: Typography.fontSize.sm,
-    marginBottom: 6,
-  },
-  metricValue: {
-    color: Colors.textPrimary,
-    fontSize: Typography.fontSize.lg,
-    fontWeight: '800',
-  },
+
+  // Section
   section: {
     gap: Spacing.md,
+  },
+  sectionTitle: {
+    color: Colors.textPrimary,
+    fontSize: Typography.fontSize.xl,
+    fontWeight: Typography.fontWeight.extrabold,
   },
   resumeInline: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     gap: Spacing.sm,
-    paddingHorizontal: 4,
+    paddingHorizontal: Spacing.xs,
   },
   resumeInlineText: {
     flex: 1,
@@ -186,42 +304,66 @@ export const sharedStyles = StyleSheet.create({
   resumeInlineAction: {
     color: Colors.primary,
     fontSize: Typography.fontSize.sm,
-    fontWeight: '800',
+    fontWeight: Typography.fontWeight.extrabold,
   },
-  sectionTitle: {
-    color: Colors.textPrimary,
-    fontSize: Typography.fontSize.xl,
-    fontWeight: '800',
+
+  // Primary Action Button
+  primaryActionButton: {
+    backgroundColor: Colors.primary,
+    borderRadius: BorderRadius.xl,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: Spacing.lg,
+    paddingHorizontal: Spacing.xl,
+    minHeight: 56,
+    ...Shadows.md,
   },
-  actionGrid: {
-    gap: Spacing.md,
+  primaryActionContent: {
+    flex: 1,
+    gap: 2, // tighter than xs(4) — kicker/subtitle stack
   },
-  actionCard: {
+  primaryActionTitle: {
+    color: Colors.textWhite,
+    fontSize: Typography.fontSize.lg,
+    fontWeight: Typography.fontWeight.extrabold,
+  },
+  primaryActionSubtitle: {
+    color: 'rgba(255,255,255,0.72)', // translucent white on primary bg — intentional
+    fontSize: Typography.fontSize.sm,
+  },
+
+  // Quick Link
+  quickLinkPanel: {
     backgroundColor: Colors.surface,
     borderRadius: BorderRadius.xl,
-    padding: Spacing.lg,
+    overflow: 'hidden',
     ...Shadows.sm,
   },
-  actionIconWrap: {
+  quickLinkRow: {
+    flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: Colors.secondaryLight,
-    borderRadius: 14,
-    height: 42,
-    justifyContent: 'center',
-    marginBottom: Spacing.md,
-    width: 42,
+    gap: Spacing.md,
+    paddingVertical: Spacing.lg,
+    paddingHorizontal: Spacing.lg,
+    minHeight: 52,
   },
-  actionTitle: {
+  quickLinkText: {
+    flex: 1,
     color: Colors.textPrimary,
-    fontSize: Typography.fontSize.lg,
-    fontWeight: '700',
-    marginBottom: 4,
+    fontSize: Typography.fontSize.base,
+    fontWeight: Typography.fontWeight.semibold,
   },
-  actionSubtitle: {
-    color: Colors.textSecondary,
-    fontSize: Typography.fontSize.sm,
-    lineHeight: 20,
+  quickLinkDisabled: {
+    color: Colors.textDisabled,
   },
+  quickLinkDivider: {
+    height: 1,
+    backgroundColor: Colors.border,
+    marginHorizontal: Spacing.lg,
+  },
+
+  // Recommendation panel
   panel: {
     backgroundColor: Colors.surface,
     borderRadius: BorderRadius.xl,
@@ -239,11 +381,14 @@ export const sharedStyles = StyleSheet.create({
     fontSize: Typography.fontSize.sm,
     lineHeight: 20,
   },
+
+  // Board card
   boardCard: {
     backgroundColor: Colors.surface,
     borderRadius: BorderRadius.xl,
-    gap: 8,
+    gap: Spacing.sm,
     padding: Spacing.lg,
+    ...Shadows.sm,
   },
   boardHeader: {
     alignItems: 'center',
@@ -254,45 +399,13 @@ export const sharedStyles = StyleSheet.create({
   boardHeaderRight: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
+    gap: Spacing.sm,
   },
   boardTitle: {
     color: Colors.textPrimary,
     flex: 1,
     fontSize: Typography.fontSize.base,
-    fontWeight: '700',
-  },
-  modeBadge: {
-    backgroundColor: Colors.infoLight,
-    borderRadius: BorderRadius.full,
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-  },
-  modeBadgeText: {
-    color: Colors.infoDark,
-    fontSize: Typography.fontSize.xs,
-    fontWeight: '800',
-  },
-  statusPill: {
-    borderRadius: BorderRadius.full,
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-  },
-  requestPill: {
-    backgroundColor: Colors.successLight,
-  },
-  missionPill: {
-    backgroundColor: Colors.infoLight,
-  },
-  statusPillText: {
-    fontSize: Typography.fontSize.xs,
-    fontWeight: '800',
-  },
-  requestPillText: {
-    color: Colors.successDark,
-  },
-  missionPillText: {
-    color: Colors.info,
+    fontWeight: Typography.fontWeight.bold,
   },
   boardBody: {
     color: Colors.gray700,
@@ -303,96 +416,145 @@ export const sharedStyles = StyleSheet.create({
     color: Colors.textTertiary,
     fontSize: Typography.fontSize.sm,
   },
-  boardHint: {
-    color: Colors.primary,
-    fontSize: Typography.fontSize.xs,
-    fontWeight: '700',
-    marginTop: 2,
-  },
   rewardText: {
     color: Colors.primary,
     fontSize: Typography.fontSize.lg,
-    fontWeight: '800',
+    fontWeight: Typography.fontWeight.extrabold,
   },
-  strategyCard: {
-    backgroundColor: Colors.gray50,
-    borderRadius: BorderRadius.lg,
-    padding: Spacing.md,
-    gap: 4,
+
+  // Strategy note — flat, no nested card
+  strategyNote: {
+    borderTopWidth: 1,
+    borderTopColor: Colors.border,
+    paddingTop: Spacing.sm,
+    gap: 2, // tighter than xs(4) — compact label/body stack
+    marginTop: Spacing.xs,
   },
-  strategyCardTitle: {
-    color: Colors.textPrimary,
-    fontSize: Typography.fontSize.sm,
-    fontWeight: '800',
-  },
-  strategyCardBody: {
+  strategyNoteTitle: {
     color: Colors.textSecondary,
+    fontSize: Typography.fontSize.sm,
+    fontWeight: Typography.fontWeight.bold,
+  },
+  strategyNoteBody: {
+    color: Colors.textTertiary,
     fontSize: Typography.fontSize.sm,
     lineHeight: 20,
   },
+
+  // Badges
+  modeBadge: {
+    backgroundColor: Colors.infoLight,
+    borderRadius: BorderRadius.full,
+    paddingHorizontal: 10, // between sm(8) and md(12) — badge pill proportion
+    paddingVertical: 6,    // between xs(4) and sm(8) — badge pill proportion
+  },
+  modeBadgeText: {
+    color: Colors.infoDark,
+    fontSize: Typography.fontSize.xs,
+    fontWeight: Typography.fontWeight.extrabold,
+  },
+  statusPill: {
+    borderRadius: BorderRadius.full,
+    paddingHorizontal: 10, // between sm(8) and md(12) — pill proportion
+    paddingVertical: 6,    // between xs(4) and sm(8) — pill proportion
+  },
+  requestPill: {
+    backgroundColor: Colors.successLight,
+  },
+  missionPill: {
+    backgroundColor: Colors.infoLight,
+  },
+  statusPillText: {
+    fontSize: Typography.fontSize.xs,
+    fontWeight: Typography.fontWeight.extrabold,
+  },
+  requestPillText: {
+    color: Colors.successDark,
+  },
+  missionPillText: {
+    color: Colors.info,
+  },
+
+  // Empty card
   emptyCard: {
     backgroundColor: Colors.surface,
     borderRadius: BorderRadius.xl,
     padding: Spacing.xl,
-    gap: 6,
+    gap: 6, // between xs(4) and sm(8) — intentional compact card rhythm
+    ...Shadows.sm,
   },
   emptyCardTitle: {
     color: Colors.textPrimary,
     fontSize: Typography.fontSize.base,
-    fontWeight: '700',
+    fontWeight: Typography.fontWeight.bold,
   },
   emptyCardSubtitle: {
     color: Colors.textTertiary,
     fontSize: Typography.fontSize.sm,
     lineHeight: 20,
   },
+  emptyCardAction: {
+    alignSelf: 'flex-start',
+    marginTop: Spacing.sm,
+    paddingVertical: Spacing.xs,
+  },
+  emptyCardActionText: {
+    color: Colors.primary,
+    fontSize: Typography.fontSize.sm,
+    fontWeight: Typography.fontWeight.bold,
+  },
+
+  // More link
   moreLink: {
     alignSelf: 'flex-start',
-    paddingVertical: 12,
-    paddingHorizontal: 8,
-    minHeight: 44,
+    paddingVertical: Spacing.md,
+    paddingHorizontal: Spacing.sm,
+    minHeight: 44, // WCAG minimum touch target
     justifyContent: 'center',
   },
   moreLinkText: {
     color: Colors.primary,
     fontSize: Typography.fontSize.sm,
-    fontWeight: '700',
+    fontWeight: Typography.fontWeight.bold,
   },
-  walletCard: {
+
+  // Wallet compact
+  walletCompact: {
     backgroundColor: Colors.surface,
     borderRadius: BorderRadius.xl,
-    gap: Spacing.sm,
-    padding: Spacing.xl,
-  },
-  walletRow: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: Spacing.lg,
+    paddingHorizontal: Spacing.xl,
+    ...Shadows.sm,
   },
-  walletLabel: {
+  walletCompactLabel: {
+    color: Colors.textSecondary,
+    fontSize: Typography.fontSize.sm,
+    fontWeight: Typography.fontWeight.semibold,
+  },
+  walletCompactRight: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6, // between xs(4) and sm(8) — tight value/label cluster
+  },
+  walletCompactValue: {
+    color: Colors.primary,
+    fontSize: Typography.fontSize.lg,
+    fontWeight: Typography.fontWeight.extrabold,
+  },
+  walletCompactMore: {
     color: Colors.textTertiary,
     fontSize: Typography.fontSize.sm,
+    fontWeight: Typography.fontWeight.semibold,
   },
-  walletLabelStrong: {
-    color: Colors.textPrimary,
-    fontWeight: '700',
-  },
-  walletValue: {
-    color: Colors.textPrimary,
-    fontSize: Typography.fontSize.base,
-    fontWeight: '700',
-  },
-  walletValueStrong: {
-    color: Colors.primary,
-  },
-  walletDivider: {
-    height: 1,
-    backgroundColor: Colors.border,
-    marginVertical: 4,
-  },
+
+  // Role toggle
   compactToggleContainer: {
     flexDirection: 'row',
-    backgroundColor: 'rgba(0, 0, 0, 0.08)',
+    backgroundColor: 'rgba(0, 0, 0, 0.08)', // subtle scrim on mint bg — intentional
+
     borderRadius: BorderRadius.full,
     padding: 2,
     alignSelf: 'flex-start',
@@ -415,7 +577,7 @@ export const sharedStyles = StyleSheet.create({
   },
   compactToggleText: {
     fontSize: Typography.fontSize.xs,
-    fontWeight: '700',
+    fontWeight: Typography.fontWeight.bold,
     color: Colors.textSecondary,
   },
   compactToggleTextActive: {

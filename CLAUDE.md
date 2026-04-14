@@ -100,7 +100,37 @@ env:
 - 릴리즈 태그, 런타임 상태, 최근 실험 결과, 임시 메모는 항상 재확인 대상으로 본다.
 - 문서와 구현이 어긋나 보이면 먼저 코드와 상태 계약을 확인한 뒤 필요한 문서를 갱신한다.
 
+## Design Context
+
+> 상세 내용은 `.impeccable.md` 참고. 아래는 코드 작업 시 항상 적용할 핵심 요약.
+
+### Users
+- **요청자**: 이동 중 짐을 보내고 싶은 사람. 감정 목표: 신뢰·안심.
+- **길러**: 통근 중 배달을 수행하는 사람. 빠른 수락·완료 처리 핵심.
+- 공통: 모바일, 한 손 조작, 인지 부하 최소화.
+
+### Brand Personality
+**따뜻 · 연결 · 지속** — 낯선 사람 사이의 신뢰를 잇는 서비스.
+
+### Design Principles
+1. **신뢰는 명확성에서 온다** — 상태(요청 중/매칭됨/이동 중/완료)를 항상 명시.
+2. **카드가 정보의 단위다** — `#FFF` 카드, `borderRadius` 12–16, 미세 shadow.
+3. **틸은 행동 신호다** — `#0F766E`는 CTA·브랜드 마크·활성 탭에만.
+4. **이동 중 읽힌다** — 최소 터치 44px, 핵심 동작은 하단 배치, WCAG AA 이상.
+5. **따뜻함은 구조에서 온다** — 여백·둥근 모서리·명확한 완료 피드백으로 표현.
+
+### Token Quick Reference
+```
+primary:     #0F766E  (CTA, 브랜드만)
+primaryMint: #D7F2EC  (히어로 bg, 그라데이션 시작)
+background:  #F4F7F5  (앱 bg)
+surface:     #FFFFFF  (카드)
+success:     #16A34A  (완료 상태)
+warning:     #D97706  (경고, 화면당 최대 1곳)
+```
+
 ## Changelog
+- 2026-04-14: teach-impeccable 스킬로 Design Context 섹션 추가.
 - 2026-04-03: 코덱스 진입용 루트 오버뷰로 재작성. `precedence 99`, `memory-type overview`, `required-for code-change/repo-navigation` 반영.
 - 2026-04-03: `[STATIC]`와 `[DYNAMIC]`를 분리하고 shared include 3개를 참조하도록 정리.
 - 2026-04-13: 실제 저장소에 존재하는 문서 기준으로 Read Order/Source Of Truth 링크를 갱신.

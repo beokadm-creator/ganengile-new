@@ -9,7 +9,7 @@ import {
   View,
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { Colors } from '../../theme';
+import { BorderRadius, Colors, Spacing, Typography } from '../../theme';
 
 import { signInWithEmailAndPassword } from 'firebase/auth';
 import { auth } from '../../services/firebase';
@@ -138,7 +138,7 @@ export default function LoginScreen({ navigation }: LoginScreenProps) {
           </TouchableOpacity>
 
           <TouchableOpacity style={styles.primaryButton} onPress={() => void handleEmailLogin()} disabled={emailLoading}>
-            {emailLoading ? <ActivityIndicator color={Colors.white} /> : <Text style={styles.primaryButtonText}>이메일로 로그인</Text>}
+            {emailLoading ? <ActivityIndicator color={Colors.textWhite} /> : <Text style={styles.primaryButtonText}>이메일로 로그인</Text>}
           </TouchableOpacity>
 
           <TouchableOpacity style={styles.kakaoButton} onPress={() => void handleKakaoLoginPress()} disabled={kakaoLoading}>
@@ -151,7 +151,7 @@ export default function LoginScreen({ navigation }: LoginScreenProps) {
         </View>
 
         <TouchableOpacity onPress={() => navigation.navigate('NewSignUp')} activeOpacity={0.8}>
-          <Text style={styles.footerLink}>계정이 없다면 계정 만들기</Text>
+          <Text style={styles.footerLink}>아직 계정이 없어요</Text>
         </TouchableOpacity>
       </View>
     </View>
@@ -160,24 +160,36 @@ export default function LoginScreen({ navigation }: LoginScreenProps) {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: Colors.background },
-  content: { flex: 1, justifyContent: 'center', padding: 24 },
-  title: { color: Colors.textPrimary, fontSize: 32, fontWeight: '800', textAlign: 'center', marginBottom: 12 },
-  subtitle: { color: Colors.textSecondary, fontSize: 15, lineHeight: 22, textAlign: 'center', marginBottom: 28 },
-  form: { gap: 12 },
+  content: { flex: 1, justifyContent: 'center', padding: Spacing['2xl'] },
+  title: {
+    color: Colors.textPrimary,
+    fontSize: Typography.fontSize['5xl'],
+    fontWeight: Typography.fontWeight.extrabold,
+    textAlign: 'center',
+    marginBottom: Spacing.md,
+  },
+  subtitle: {
+    color: Colors.textSecondary,
+    fontSize: Typography.fontSize.base,
+    lineHeight: 22,
+    textAlign: 'center',
+    marginBottom: Spacing.xxl,
+  },
+  form: { gap: Spacing.md },
   input: {
-    minHeight: 54,
+    minHeight: 54, // consistent auth button/input height
     backgroundColor: Colors.surface,
     borderWidth: 1,
     borderColor: Colors.border,
-    borderRadius: 16,
-    paddingHorizontal: 16,
+    borderRadius: BorderRadius.lg,
+    paddingHorizontal: Spacing.lg,
     color: Colors.textPrimary,
   },
-  inlineRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 4 },
+  inlineRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing.sm, marginTop: Spacing.xs },
   checkbox: {
     width: 22,
     height: 22,
-    borderRadius: 6,
+    borderRadius: 6, // between xs(4) and sm(8) — checkbox rounding
     borderWidth: 1.5,
     borderColor: Colors.border,
     alignItems: 'center',
@@ -185,33 +197,33 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.surface,
   },
   checkboxActive: { backgroundColor: Colors.primary, borderColor: Colors.primary },
-  checkmark: { color: Colors.surface, fontWeight: '800' },
-  inlineLabel: { color: Colors.textSecondary, fontSize: 14 },
+  checkmark: { color: Colors.surface, fontWeight: Typography.fontWeight.extrabold },
+  inlineLabel: { color: Colors.textSecondary, fontSize: Typography.fontSize.base },
   primaryButton: {
-    minHeight: 54,
-    borderRadius: 16,
-    backgroundColor: Colors.textPrimary,
+    minHeight: 54, // consistent auth button height
+    borderRadius: BorderRadius.lg,
+    backgroundColor: Colors.primary,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  primaryButtonText: { color: Colors.surface, fontSize: 16, fontWeight: '800' },
+  primaryButtonText: { color: Colors.textWhite, fontSize: Typography.fontSize.lg, fontWeight: Typography.fontWeight.extrabold },
   kakaoButton: {
-    minHeight: 54,
-    borderRadius: 16,
-    backgroundColor: Colors.warning,
+    minHeight: 54, // consistent auth button height
+    borderRadius: BorderRadius.lg,
+    backgroundColor: Colors.warning, // amber — closest token to Kakao yellow (#FEE500 not in palette)
     alignItems: 'center',
     justifyContent: 'center',
   },
-  kakaoButtonText: { color: Colors.textPrimary, fontSize: 16, fontWeight: '800' },
+  kakaoButtonText: { color: Colors.textPrimary, fontSize: Typography.fontSize.lg, fontWeight: Typography.fontWeight.extrabold },
   secondaryButton: {
-    minHeight: 54,
-    borderRadius: 16,
+    minHeight: 54, // consistent auth button height
+    borderRadius: BorderRadius.lg,
     borderWidth: 1,
     borderColor: Colors.border,
     backgroundColor: Colors.surface,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  secondaryButtonText: { color: Colors.textPrimary, fontSize: 16, fontWeight: '700' },
-  footerLink: { color: Colors.primary, fontWeight: '700', textAlign: 'center', marginTop: 20 },
+  secondaryButtonText: { color: Colors.textPrimary, fontSize: Typography.fontSize.lg, fontWeight: Typography.fontWeight.bold },
+  footerLink: { color: Colors.primary, fontWeight: Typography.fontWeight.bold, textAlign: 'center', marginTop: Spacing.xl },
 });

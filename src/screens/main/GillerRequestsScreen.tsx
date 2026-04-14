@@ -354,8 +354,23 @@ export default function GillerRequestsScreen() {
       refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => void loadSnapshot('refresh')} />}
     >
       <View style={styles.header}>
-        <Text style={styles.kicker}>GOING BOARD</Text>
-        <Text style={styles.title}>미션 보드</Text>
+        <Text style={styles.kicker}>미션 보드</Text>
+        <View style={styles.headerStats}>
+          <Text style={styles.headerStatItem}>
+            <Text style={styles.headerStatValue}>{ongoingMissionGroups.length}</Text>
+            <Text style={styles.headerStatLabel}> 진행 중</Text>
+          </Text>
+          <Text style={styles.headerStatDot}>·</Text>
+          <Text style={styles.headerStatItem}>
+            <Text style={styles.headerStatValue}>{immediateMissionGroups.length}</Text>
+            <Text style={styles.headerStatLabel}> 선택 가능</Text>
+          </Text>
+          <Text style={styles.headerStatDot}>·</Text>
+          <Text style={styles.headerStatItem}>
+            <Text style={styles.headerStatValue}>{(snapshot?.pendingRewardTotal ?? 0).toLocaleString()}원</Text>
+            <Text style={styles.headerStatLabel}> 예상 보상</Text>
+          </Text>
+        </View>
         <Text style={styles.subtitle}>권역으로 보고, 동선이 맞는 미션을 먼저 잡는 화면입니다.</Text>
       </View>
 
@@ -393,13 +408,6 @@ export default function GillerRequestsScreen() {
             : null
         }
       />
-
-      <View style={styles.metricRow}>
-        <MetricCard label="진행 중" value={ongoingMissionGroups.length} />
-        <MetricCard label="즉시 선택" value={immediateMissionGroups.length} />
-        <MetricCard label="추가 제안" value={suggestedMissionGroups.length} />
-        <MetricCard label="예상 보상" value={`${(snapshot?.pendingRewardTotal ?? 0).toLocaleString()}원`} />
-      </View>
 
       <MissionBoardSection
         title="내 진행 중"
@@ -497,15 +505,6 @@ export default function GillerRequestsScreen() {
   );
 }
 
-function MetricCard({ label, value }: { label: string; value: string | number }) {
-  return (
-    <View style={styles.metricCard}>
-      <Text style={styles.metricLabel}>{label}</Text>
-      <Text style={styles.metricValue}>{value}</Text>
-    </View>
-  );
-}
-
 const styles = StyleSheet.create({
   container: {
     flex: 1,
@@ -531,55 +530,54 @@ const styles = StyleSheet.create({
     borderRadius: BorderRadius.xl,
     padding: Spacing.xl,
     ...Shadows.sm,
-    gap: 6,
+    gap: Spacing.sm,
   },
   kicker: {
-    color: Colors.primary,
-    fontSize: Typography.fontSize.sm,
-    fontWeight: Typography.fontWeight.bold,
-    letterSpacing: 1,
-  },
-  title: {
     color: Colors.textPrimary,
     fontSize: Typography.fontSize['2xl'],
-    fontWeight: Typography.fontWeight.bold,
+    fontWeight: Typography.fontWeight.extrabold,
+  },
+  headerStats: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.sm,
+  },
+  headerStatItem: {
+    flexDirection: 'row',
+    alignItems: 'baseline',
+  },
+  headerStatValue: {
+    color: Colors.textPrimary,
+    fontSize: Typography.fontSize.base,
+    fontWeight: Typography.fontWeight.extrabold,
+  },
+    color: Colors.primary,
+    fontSize: Typography.fontSize.base,
+    fontWeight: Typography.fontWeight.extrabold,
+  },
+  headerStatLabel: {
+    color: Colors.textTertiary,
+    fontSize: Typography.fontSize.sm,
+  },
+  headerStatDot: {
+    color: Colors.border,
+    fontSize: Typography.fontSize.sm,
   },
   subtitle: {
     color: Colors.textSecondary,
     fontSize: Typography.fontSize.sm,
     lineHeight: 20,
   },
-  metricRow: {
-    flexDirection: 'row',
-    gap: Spacing.sm,
-  },
-  metricCard: {
-    flex: 1,
-    backgroundColor: Colors.surface,
-    borderRadius: BorderRadius.lg,
-    padding: Spacing.md,
-    ...Shadows.sm,
-    gap: 4,
-  },
-  metricLabel: {
-    color: Colors.textSecondary,
-    fontSize: Typography.fontSize.xs,
-  },
-  metricValue: {
-    color: Colors.textPrimary,
-    fontSize: Typography.fontSize.lg,
-    fontWeight: Typography.fontWeight.bold,
-  },
   section: {
     gap: Spacing.md,
   },
   sectionHeader: {
-    gap: 4,
+    gap: Spacing.xs,
   },
   sectionTitle: {
     color: Colors.textPrimary,
     fontSize: Typography.fontSize.xl,
-    fontWeight: Typography.fontWeight.bold,
+    fontWeight: Typography.fontWeight.extrabold,
   },
   sectionSubtitle: {
     color: Colors.textSecondary,
