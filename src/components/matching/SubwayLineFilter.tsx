@@ -5,7 +5,7 @@
 
 import React from 'react';
 import { ScrollView, TouchableOpacity, Text, StyleSheet } from 'react-native';
-import { Typography } from '../../theme';
+import { Typography } from '../../theme/typography';
 
 interface Props {
   selectedLines: string[];

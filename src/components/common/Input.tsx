@@ -8,7 +8,8 @@ import {
   TextInputProps,
   Animated,
 } from 'react-native';
-import { Colors, Spacing, BorderRadius, Typography } from '../../theme';
+import { Colors, Spacing, BorderRadius } from '../../theme';
+import { Typography } from '../../theme/typography';
 
 type InputVariant = 'default' | 'outlined' | 'filled';
 type InputState = 'default' | 'error' | 'success';

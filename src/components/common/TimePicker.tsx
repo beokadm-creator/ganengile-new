@@ -8,7 +8,8 @@ import {
   ScrollView,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { Colors, Spacing, Typography, BorderRadius } from '../../theme';
+import { Colors, Spacing, BorderRadius } from '../../theme';
+import { Typography } from '../../theme/typography';
 
 interface TimePickerProps {
   value: string;

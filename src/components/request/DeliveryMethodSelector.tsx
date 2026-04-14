@@ -6,7 +6,8 @@
 import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, ScrollView } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { Colors, Spacing, Typography, BorderRadius } from '../../theme';
+import { Colors, Spacing, BorderRadius } from '../../theme';
+import { Typography } from '../../theme/typography';
 import type { DeliveryMethod } from '../../types/delivery-method';
 import { DELIVERY_METHODS } from '../../types/delivery-method';
 

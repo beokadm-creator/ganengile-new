@@ -1,7 +1,8 @@
 import React, { useMemo, useState } from 'react';
 import { Modal, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { BorderRadius, Colors, Spacing, Typography } from '../../theme';
+import { BorderRadius, Colors, Spacing } from '../../theme';
+import { Typography } from '../../theme/typography';
 
 interface DatePickerModalProps {
   visible: boolean;

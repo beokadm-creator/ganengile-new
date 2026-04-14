@@ -9,7 +9,8 @@ import Animated, {
   Easing,
   withDelay,
 } from 'react-native-reanimated';
-import { Colors, Typography } from '../../../../theme';
+import { Colors } from '../../../../theme';
+import { Typography } from '../../../../theme/typography';
 
 export interface TrackingStep {
   key: string;

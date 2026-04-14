@@ -1,4 +1,5 @@
-import { Colors , Typography } from '../../theme';
+import { Colors } from '../../theme';
+import { Typography } from '../../theme/typography';
 import React, { useCallback, useEffect, useState } from 'react';
 import {
   ActivityIndicator,

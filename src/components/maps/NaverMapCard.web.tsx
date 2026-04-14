@@ -4,7 +4,7 @@ import type { CSSProperties, ReactElement } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import { canUseDynamicWebMap, getNaverWebSdkUrl } from '../../config/map-config';
 import StaticMapPreview from './StaticMapPreview';
-import { Typography } from '../../theme';
+import { Typography } from '../../theme/typography';
 
 type Marker = {
   latitude: number;

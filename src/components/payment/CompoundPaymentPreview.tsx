@@ -7,7 +7,8 @@ import { getUserCoupons } from '../../services/coupon-service';
 import { PointService } from '../../services/PointService';
 import type { UserCoupon } from '../../types/coupon';
 import Modal from '../common/Modal';
-import { Colors, Spacing, BorderRadius, Typography } from '../../theme';
+import { Colors, Spacing, BorderRadius } from '../../theme';
+import { Typography } from '../../theme/typography';
 
 interface CompoundPaymentPreviewProps {
   requestId: string;

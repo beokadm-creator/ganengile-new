@@ -9,7 +9,8 @@ import {
   View,
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { BorderRadius, Colors, Spacing, Typography } from '../../theme';
+import { BorderRadius, Colors, Spacing } from '../../theme';
+import { Typography } from '../../theme/typography';
 
 import { signInWithEmailAndPassword } from 'firebase/auth';
 import { auth } from '../../services/firebase';

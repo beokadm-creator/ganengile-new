@@ -8,7 +8,7 @@ import {
 } from 'react-native';
 import { MaterialIcons as Icon } from '@expo/vector-icons';
 import { Image } from 'expo-image';
-import { Typography } from '../../theme';
+import { Typography } from '../../theme/typography';
 
 const { width: _width } = Dimensions.get('window');
 

@@ -22,7 +22,8 @@ import { takePhoto, uploadPhotoWithThumbnail } from '../../services/photo-servic
 import QRCodeService from '../../services/qrcode-service';
 import type { LockerSummary } from '../../types/locker';
 import type { MainStackNavigationProp, MainStackParamList } from '../../types/navigation';
-import { BorderRadius, Colors, Shadows, Spacing, Typography } from '../../theme';
+import { BorderRadius, Colors, Shadows, Spacing } from '../../theme';
+import { Typography } from '../../theme/typography';
 import LockerLocator from '../../components/delivery/LockerLocator';
 
 type DropoffRoute = RouteProp<MainStackParamList, 'GillerDropoffAtLocker'>;

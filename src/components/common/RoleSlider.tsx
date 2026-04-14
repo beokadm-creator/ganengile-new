@@ -1,7 +1,8 @@
 import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Dimensions, Platform } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { Colors, Spacing, BorderRadius, Typography } from '../../theme';
+import { Colors, Spacing, BorderRadius } from '../../theme';
+import { Typography } from '../../theme/typography';
 
 const _SCREEN_WIDTH = Dimensions.get('window').width;
 

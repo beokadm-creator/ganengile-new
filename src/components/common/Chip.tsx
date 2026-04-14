@@ -6,7 +6,8 @@ import {
   TouchableOpacity,
   GestureResponderEvent,
 } from 'react-native';
-import { Colors, Spacing, BorderRadius, Typography } from '../../theme';
+import { Colors, Spacing, BorderRadius } from '../../theme';
+import { Typography } from '../../theme/typography';
 
 type ChipVariant = 'filled' | 'outlined';
 type ChipSize = 'small' | 'medium';

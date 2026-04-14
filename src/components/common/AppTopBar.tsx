@@ -2,7 +2,8 @@ import React from 'react';
 import { View, Text, Pressable, StyleSheet, ViewStyle } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Colors , Typography } from '../../theme';
+import { Colors } from '../../theme';
+import { Typography } from '../../theme/typography';
 
 interface AppTopBarProps {
   title: string;

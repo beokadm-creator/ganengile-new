@@ -6,7 +6,7 @@
 import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { Typography } from '../../theme';
+import { Typography } from '../../theme/typography';
 
 interface Props {
   distance: number; // meters

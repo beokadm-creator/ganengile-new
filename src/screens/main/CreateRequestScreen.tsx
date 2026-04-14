@@ -50,7 +50,8 @@ import { resolvePricingContextForRequest } from '../../services/pricing-context-
 import LockerLocator from '../../components/delivery/LockerLocator';
 import { getRoutePricingOverrideByStations } from '../../services/route-pricing-override-service';
 import { addRecentAddress, getRecentAddresses, getSavedAddresses } from '../../services/profile-service';
-import { BorderRadius, Colors, Shadows, Spacing, Typography } from '../../theme';
+import { BorderRadius, Colors, Shadows, Spacing } from '../../theme';
+import { Typography } from '../../theme/typography';
 import type { Station } from '../../types/config';
 import type { MainStackNavigationProp, MainStackParamList } from '../../types/navigation';
 import type { SavedAddress } from '../../types/profile';

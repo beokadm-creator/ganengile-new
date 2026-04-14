@@ -6,7 +6,7 @@
 import React, { useEffect, useState } from 'react';
 import { View, Text, StyleSheet, Animated } from 'react-native';
 import { useNetInfo } from '@react-native-community/netinfo';
-import { Typography } from '../theme';
+import { Typography } from '../theme/typography';
 
 interface OfflineIndicatorProps {
   height?: number;

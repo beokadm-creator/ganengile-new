@@ -6,7 +6,7 @@ import {
   TouchableOpacity,
   Modal,
 } from 'react-native';
-import { Typography } from '../../theme';
+import { Typography } from '../../theme/typography';
 
 interface RejectionReasonModalProps {
   visible: boolean;

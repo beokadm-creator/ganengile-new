@@ -12,7 +12,8 @@ import {
 } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
-import { Colors, Spacing, BorderRadius, Typography, Shadows } from '../../theme';
+import { Colors, Spacing, BorderRadius, Shadows } from '../../theme';
+import { Typography } from '../../theme/typography';
 
 interface SwipeButtonProps {
   onComplete: () => void | Promise<void>;

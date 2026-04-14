@@ -8,7 +8,7 @@ import {
   TouchableOpacity,
   ActivityIndicator,
 } from 'react-native';
-import { Typography } from '../../theme';
+import { Typography } from '../../theme/typography';
 
 interface TextInputModalProps {
   visible: boolean;

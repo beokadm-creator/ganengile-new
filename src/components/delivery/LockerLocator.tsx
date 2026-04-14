@@ -22,7 +22,8 @@ import {
 import type { Station } from '../../types/config';
 import type { Locker, LockerSummary } from '../../types/locker';
 import { LockerStatus } from '../../types/locker';
-import { BorderRadius, Colors, Spacing , Typography } from '../../theme';
+import { BorderRadius, Colors, Spacing } from '../../theme';
+import { Typography } from '../../theme/typography';
 
 const FONT_XS = 12;
 const FONT_SM = 14;

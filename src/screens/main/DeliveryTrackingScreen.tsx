@@ -33,7 +33,8 @@ import {
   type RouteCoordinate,
 } from '../../services/naver-route-service';
 import { getRequestById, subscribeToRequest } from '../../services/request-service';
-import { BorderRadius, Colors, Shadows, Spacing , Typography } from '../../theme';
+import { BorderRadius, Colors, Shadows, Spacing } from '../../theme';
+import { Typography } from '../../theme/typography';
 import type { MainStackNavigationProp, MainStackParamList } from '../../types/navigation';
 import { formatWeightDisplay } from '../../utils/package-weight';
 import { toTrackingModel, type TrackingEvent, type TrackingModel } from '../../utils/request-adapters';

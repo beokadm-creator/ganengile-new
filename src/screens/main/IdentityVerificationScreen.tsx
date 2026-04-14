@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, Alert, Platform, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
-import { Colors , Typography } from '../../theme';
+import { Colors } from '../../theme';
+import { Typography } from '../../theme/typography';
 
 import * as Crypto from 'expo-crypto';
 import * as WebBrowser from 'expo-web-browser';

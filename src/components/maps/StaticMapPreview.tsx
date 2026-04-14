@@ -3,7 +3,7 @@ import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
 
 import { getStaticMapProxyUrl, isMapEnabled } from '../../config/map-config';
 import { Image } from 'expo-image';
-import { Typography } from '../../theme';
+import { Typography } from '../../theme/typography';
 
 export type StaticMapMarker = {
   latitude: number;

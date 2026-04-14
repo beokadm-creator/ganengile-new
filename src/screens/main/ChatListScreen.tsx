@@ -14,7 +14,8 @@ import { Timestamp } from 'firebase/firestore';
 import { useUser } from '../../contexts/UserContext';
 import { createChatService } from '../../services/chat-service';
 import { getBeta1ChatContext, type Beta1ChatContext } from '../../services/beta1-orchestration-service';
-import { BorderRadius, Colors, Shadows, Spacing, Typography } from '../../theme';
+import { BorderRadius, Colors, Shadows, Spacing } from '../../theme';
+import { Typography } from '../../theme/typography';
 import type { MainStackNavigationProp } from '../../types/navigation';
 import { ChatRoomStatus, type ChatParticipant, type ChatRoom } from '../../types/chat';
 

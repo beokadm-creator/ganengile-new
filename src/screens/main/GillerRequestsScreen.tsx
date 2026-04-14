@@ -43,7 +43,8 @@ import {
   buildProfessionalMissionBridgeReason,
   resolveGillerMissionExecutionMode,
 } from '../../services/giller-mission-execution-service';
-import { BorderRadius, Colors, Shadows, Spacing, Typography } from '../../theme';
+import { BorderRadius, Colors, Shadows, Spacing } from '../../theme';
+import { Typography } from '../../theme/typography';
 import type { MainStackNavigationProp } from '../../types/navigation';
 import { GillerType } from '../../types/user';
 

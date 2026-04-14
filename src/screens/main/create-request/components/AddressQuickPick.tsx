@@ -1,6 +1,7 @@
 import React from 'react';
 import { View, Text, ScrollView, TouchableOpacity, StyleSheet } from 'react-native';
-import { BorderRadius, Colors, Spacing, Typography } from '../../../../theme';
+import { BorderRadius, Colors, Spacing } from '../../../../theme';
+import { Typography } from '../../../../theme/typography';
 import type { SavedAddress } from '../../../../types/profile';
 
 type Props = {

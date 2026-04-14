@@ -22,7 +22,8 @@ import { getQRCodeRemainingTime, verifyQRCode, QRCodeService } from '../../servi
 import { takePhoto, uploadPhotoWithThumbnail } from '../../services/photo-service';
 import type { LockerReservation } from '../../types/locker';
 import type { MainStackNavigationProp, MainStackParamList } from '../../types/navigation';
-import { BorderRadius, Colors, Shadows, Spacing, Typography } from '../../theme';
+import { BorderRadius, Colors, Shadows, Spacing } from '../../theme';
+import { Typography } from '../../theme/typography';
 
 type PickupRoute = RouteProp<MainStackParamList, 'GillerPickupAtLocker'>;
 type Step = 'verify' | 'pickup' | 'photo' | 'complete';

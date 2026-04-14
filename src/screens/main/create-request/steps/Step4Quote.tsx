@@ -2,7 +2,8 @@ import React, { useEffect, useState } from 'react';
 import { View, Text, TouchableOpacity, ActivityIndicator, StyleSheet, FlatList } from 'react-native';
 import { StepContainer } from '../components/StepContainer';
 import { QuoteBreakdownRow } from '../components/QuoteBreakdownRow';
-import { Colors, Spacing, BorderRadius, Typography } from '../../../../theme';
+import { Colors, Spacing, BorderRadius } from '../../../../theme';
+import { Typography } from '../../../../theme/typography';
 import { useCreateRequestStore } from '../store/useCreateRequestStore';
 import type { Beta1QuoteCard } from '../../../../services/beta1-orchestration-service';
 

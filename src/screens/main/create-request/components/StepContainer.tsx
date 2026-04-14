@@ -1,7 +1,8 @@
 import React, { useRef } from 'react';
 import { View, TouchableOpacity, Text, StyleSheet, Keyboard } from 'react-native';
 import * as Haptics from 'expo-haptics';
-import { BorderRadius, Colors, Shadows, Spacing, Typography } from '../../../../theme';
+import { BorderRadius, Colors, Shadows, Spacing } from '../../../../theme';
+import { Typography } from '../../../../theme/typography';
 
 type Props = {
   step: number;

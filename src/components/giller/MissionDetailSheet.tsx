@@ -5,7 +5,8 @@ import { MaterialIcons } from '@expo/vector-icons';
 import { NaverMapCard } from '../maps/NaverMapCard';
 import type { MissionCard, MissionGroup } from './mission-board-types';
 import { buildMissionExecutionGuideFromCard } from '../../services/giller-mission-execution-service';
-import { BorderRadius, Colors, Spacing, Typography } from '../../theme';
+import { BorderRadius, Colors, Spacing } from '../../theme';
+import { Typography } from '../../theme/typography';
 
 type MissionDetailSheetProps = {
   group: MissionGroup | null;

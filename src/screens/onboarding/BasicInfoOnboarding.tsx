@@ -21,7 +21,8 @@ import {
   fetchConsentTemplates,
   getFallbackConsentItems,
 } from '../../services/consent-service';
-import { BorderRadius, Colors, Shadows, Spacing, Typography } from '../../theme';
+import { BorderRadius, Colors, Shadows, Spacing } from '../../theme';
+import { Typography } from '../../theme/typography';
 import { ConsentDisplayItem, ConsentKey, ConsentRecord } from '../../types/consent';
 import { UserRole } from '../../types/user';
 import { usePhoneVerification } from '../../hooks/usePhoneVerification';

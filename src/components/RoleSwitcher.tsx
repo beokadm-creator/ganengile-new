@@ -12,7 +12,8 @@ import {
   Animated,
   Dimensions,
 } from 'react-native';
-import { Colors, Spacing, Typography, BorderRadius } from '../theme';
+import { Colors, Spacing, BorderRadius } from '../theme';
+import { Typography } from '../theme/typography';
 import { UserRole } from '../types/user';
 
 const { width } = Dimensions.get('window');

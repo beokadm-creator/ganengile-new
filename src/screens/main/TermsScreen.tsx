@@ -10,7 +10,8 @@ import {
 import { ParamListBase } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
 import { getPolicyHistoryConfigs } from '../../services/config-service';
-import { Colors , Typography } from '../../theme';
+import { Colors } from '../../theme';
+import { Typography } from '../../theme/typography';
 
 type NavigationProp = StackNavigationProp<ParamListBase>;
 

@@ -19,7 +19,8 @@ import { getAllStations } from '../src/services/config-service';
 import { createRoute, updateRoute, validateRouteForUpdate } from '../src/services/route-service';
 import type { Station } from '../src/types/config';
 import type { StationInfo } from '../src/types/route';
-import { Colors, Spacing, Typography, BorderRadius } from '../src/theme';
+import { Colors, Spacing, BorderRadius } from '../src/theme';
+import { Typography } from '../src/theme/typography';
 import { useRoute } from '@react-navigation/native';
 
 export default function AddRouteScreen() {

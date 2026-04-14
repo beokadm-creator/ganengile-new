@@ -13,7 +13,8 @@ import { RouteProp, useNavigation, useRoute } from '@react-navigation/native';
 import { requireUserId } from '../../services/firebase';
 import { createPhotoService, takePhoto, uploadPhotoWithThumbnail } from '../../services/photo-service';
 import type { MainStackNavigationProp, MainStackParamList } from '../../types/navigation';
-import { Colors, Spacing, Typography, BorderRadius } from '../../theme';
+import { Colors, Spacing, BorderRadius } from '../../theme';
+import { Typography } from '../../theme/typography';
 
 type DisputeRoute = RouteProp<MainStackParamList, 'DisputeReport'>;
 type DisputeType = 'damage' | 'loss' | 'delay' | 'other';

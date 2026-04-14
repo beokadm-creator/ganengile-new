@@ -6,7 +6,7 @@
 import React, { useEffect, useState } from 'react';
 import { View, StyleSheet, Text, ActivityIndicator, TouchableOpacity } from 'react-native';
 import { CameraView, Camera } from 'expo-camera';
-import { Typography } from '../../theme';
+import { Typography } from '../../theme/typography';
 
 interface Props {
   onScan: (data: string) => void;

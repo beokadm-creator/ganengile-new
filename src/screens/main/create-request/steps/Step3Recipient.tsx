@@ -3,7 +3,8 @@ import { View, Text, TouchableOpacity, TextInput, ActivityIndicator, Alert, Styl
 import { Ionicons } from '@expo/vector-icons';
 import { StepContainer } from '../components/StepContainer';
 import { Block } from '../components/Block';
-import { Colors, Spacing, BorderRadius, Typography } from '../../../../theme';
+import { Colors, Spacing, BorderRadius } from '../../../../theme';
+import { Typography } from '../../../../theme/typography';
 import { useCreateRequestStore } from '../store/useCreateRequestStore';
 import { SafeNumberIntegrationConfig } from '../../../../services/integration-config-service';
 

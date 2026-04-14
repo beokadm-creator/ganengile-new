@@ -15,7 +15,8 @@ import {
 import { doc, onSnapshot, updateDoc } from 'firebase/firestore';
 import { db } from '../../core/firebase';
 import { useAuth } from '../../contexts/AuthContext';
-import { Colors, Typography, Spacing, BorderRadius, Shadows } from '../../theme';
+import { Colors, Spacing, BorderRadius, Shadows } from '../../theme';
+import { Typography } from '../../theme/typography';
 
 interface ModeToggleSwitchProps {
   onModeChange?: (onetime: boolean) => void;

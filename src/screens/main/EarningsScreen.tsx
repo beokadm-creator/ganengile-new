@@ -26,7 +26,8 @@ import {
   getRuntimeSettlementPolicy,
   type RuntimeSettlementPolicy,
 } from '../../services/settlement-policy-service';
-import { BorderRadius, Colors, Shadows, Spacing, Typography } from '../../theme';
+import { BorderRadius, Colors, Shadows, Spacing } from '../../theme';
+import { Typography } from '../../theme/typography';
 
 type NavigationProp = StackNavigationProp<ParamListBase>;
 

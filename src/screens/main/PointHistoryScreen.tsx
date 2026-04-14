@@ -3,7 +3,8 @@ import { RefreshControl, ScrollView, StyleSheet, Text, TouchableOpacity, View } 
 import { useUser } from '../../contexts/UserContext';
 import { getBeta1HomeSnapshot } from '../../services/beta1-orchestration-service';
 import { PointService } from '../../services/PointService';
-import { BorderRadius, Colors, Spacing, Typography } from '../../theme';
+import { BorderRadius, Colors, Spacing } from '../../theme';
+import { Typography } from '../../theme/typography';
 import { WithdrawalEligibilityStatus } from '../../types/beta1-wallet';
 import type { MainStackNavigationProp } from '../../types/navigation';
 

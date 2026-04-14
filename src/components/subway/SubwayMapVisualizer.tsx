@@ -11,7 +11,8 @@ import {
   Dimensions,
 } from 'react-native';
 import { Svg, Line, Circle, Text as SvgText } from 'react-native-svg';
-import { Colors, Typography } from '../../theme';
+import { Colors } from '../../theme';
+import { Typography } from '../../theme/typography';
 
 interface Station {
   stationId: string;

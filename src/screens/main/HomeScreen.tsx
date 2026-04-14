@@ -8,7 +8,8 @@ import {
   getBeta1HomeSnapshot,
   type Beta1HomeSnapshot,
 } from '../../services/beta1-orchestration-service';
-import { Colors , Typography } from '../../theme';
+import { Colors } from '../../theme';
+import { Typography } from '../../theme/typography';
 import type { MainStackNavigationProp } from '../../types/navigation';
 import { UserRole } from '../../types/user';
 import { loadCreateRequestProgress } from '../../utils/draft-storage';

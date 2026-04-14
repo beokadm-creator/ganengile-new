@@ -12,7 +12,8 @@ import {
   Dimensions,
   Easing,
 } from 'react-native';
-import { Colors, Typography, Spacing, BorderRadius } from '../theme';
+import { Colors, Spacing, BorderRadius } from '../theme';
+import { Typography } from '../theme/typography';
 
 const { width } = Dimensions.get('window');
 

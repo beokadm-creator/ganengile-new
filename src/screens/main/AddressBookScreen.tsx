@@ -20,7 +20,8 @@ import {
   setDefaultSavedAddress,
   toggleFavoriteSavedAddress,
 } from '../../services/profile-service';
-import { BorderRadius, Colors, Shadows, Spacing, Typography } from '../../theme';
+import { BorderRadius, Colors, Shadows, Spacing } from '../../theme';
+import { Typography } from '../../theme/typography';
 import type { MainStackNavigationProp } from '../../types/navigation';
 import type { SavedAddress } from '../../types/profile';
 

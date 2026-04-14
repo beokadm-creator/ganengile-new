@@ -22,7 +22,8 @@ import { getQRCodeRemainingTime, verifyQRCode } from '../../services/qrcode-serv
 import { takePhoto, uploadPhotoWithThumbnail } from '../../services/photo-service';
 import type { LockerReservation } from '../../types/locker';
 import type { MainStackNavigationProp, MainStackParamList } from '../../types/navigation';
-import { BorderRadius, Colors, Spacing, Typography } from '../../theme';
+import { BorderRadius, Colors, Spacing } from '../../theme';
+import { Typography } from '../../theme/typography';
 
 type UnlockLockerRoute = RouteProp<MainStackParamList, 'UnlockLocker'>;
 type Step = 'verify' | 'collect' | 'photo' | 'complete';

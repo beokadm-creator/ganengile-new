@@ -9,7 +9,8 @@ import {
   Alert,
 } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
-import { BorderRadius, Colors, Spacing, Typography } from '../../../theme';
+import { BorderRadius, Colors, Spacing } from '../../../theme';
+import { Typography } from '../../../theme/typography';
 import { UserRole } from '../../../types/user';
 import type { Beta1HomeSnapshot } from '../../../services/beta1-orchestration-service';
 import type { MainStackNavigationProp } from '../../../types/navigation';

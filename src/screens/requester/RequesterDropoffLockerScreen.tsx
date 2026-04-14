@@ -22,7 +22,8 @@ import QRCodeService from '../../services/qrcode-service';
 import LockerLocator from '../../components/delivery/LockerLocator';
 import type { LockerSummary } from '../../types/locker';
 import type { MainStackNavigationProp, MainStackParamList } from '../../types/navigation';
-import { BorderRadius, Colors, Shadows, Spacing, Typography } from '../../theme';
+import { BorderRadius, Colors, Shadows, Spacing } from '../../theme';
+import { Typography } from '../../theme/typography';
 
 type DropoffRoute = RouteProp<MainStackParamList, 'RequesterDropoffLocker'>;
 type Step = 'loading' | 'select' | 'reserve' | 'photo' | 'complete';

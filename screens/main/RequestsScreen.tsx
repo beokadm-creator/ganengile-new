@@ -32,7 +32,8 @@ import {
   Button,
   Chip,
 } from '../../src/components';
-import { Colors, Spacing, Typography, BorderRadius } from '../../src/theme';
+import { Colors, Spacing, BorderRadius } from '../../src/theme';
+import { Typography } from '../../src/theme/typography';
 
 interface Request {
   id: string;

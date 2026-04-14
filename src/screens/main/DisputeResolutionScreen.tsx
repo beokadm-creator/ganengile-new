@@ -12,7 +12,8 @@ import { RouteProp, useRoute } from '@react-navigation/native';
 import { collection, doc, getDoc, getDocs, query, where } from 'firebase/firestore';
 import { db } from '../../services/firebase';
 import type { MainStackParamList } from '../../types/navigation';
-import { Colors, Spacing, Typography, BorderRadius } from '../../theme';
+import { Colors, Spacing, BorderRadius } from '../../theme';
+import { Typography } from '../../theme/typography';
 
 type DisputeResolutionRoute = RouteProp<MainStackParamList, 'DisputeResolution'>;
 type DisputeType = 'damage' | 'loss' | 'delay' | 'other' | 'quality';

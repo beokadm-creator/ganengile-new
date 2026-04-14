@@ -1,6 +1,7 @@
 import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
-import { BorderRadius, Colors, Shadows, Spacing, Typography } from '../../../../theme';
+import { BorderRadius, Colors, Shadows, Spacing } from '../../../../theme';
+import { Typography } from '../../../../theme/typography';
 
 type Props = {
   title: string;

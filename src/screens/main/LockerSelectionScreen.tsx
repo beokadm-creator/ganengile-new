@@ -15,7 +15,8 @@ import { requireUserId } from '../../services/firebase';
 import { QRCodeService } from '../../services/qrcode-service';
 import type { Locker } from '../../types/locker';
 import type { MainStackNavigationProp, MainStackParamList } from '../../types/navigation';
-import { Colors, Spacing, Typography, BorderRadius } from '../../theme';
+import { Colors, Spacing, BorderRadius } from '../../theme';
+import { Typography } from '../../theme/typography';
 
 type LockerSelectionRoute = RouteProp<MainStackParamList, 'LockerSelection'>;
 

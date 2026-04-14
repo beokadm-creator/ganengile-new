@@ -1,7 +1,7 @@
 import React, { Component, ErrorInfo, ReactNode } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import * as Sentry from '@sentry/react-native';
-import { Typography } from '../../theme';
+import { Typography } from '../../theme/typography';
 
 interface Props {
   children: ReactNode;

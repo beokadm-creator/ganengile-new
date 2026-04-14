@@ -21,7 +21,8 @@ import {
   getUserVerification,
   getVerificationStatusDisplay,
 } from '../../services/verification-service';
-import { BorderRadius, Colors, Shadows, Spacing, Typography } from '../../theme';
+import { BorderRadius, Colors, Shadows, Spacing } from '../../theme';
+import { Typography } from '../../theme/typography';
 import type { MainStackNavigationProp } from '../../types/navigation';
 import { UserRole } from '../../types/user';
 

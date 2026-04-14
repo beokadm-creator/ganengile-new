@@ -24,7 +24,8 @@ import {
   Button,
   RoleSwitcher,
 } from '../../src/components';
-import { Colors, Spacing, Typography, BorderRadius } from '../../src/theme';
+import { Colors, Spacing, BorderRadius } from '../../src/theme';
+import { Typography } from '../../src/theme/typography';
 import { useUser } from '../../src/contexts/UserContext';
 import { UserRole } from '../../src/types/user';
 

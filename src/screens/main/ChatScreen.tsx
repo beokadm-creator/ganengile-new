@@ -18,7 +18,8 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { createChatService } from '../../services/chat-service';
 import { getBeta1ChatContext, type Beta1ChatContext } from '../../services/beta1-orchestration-service';
 import { useUser } from '../../contexts/UserContext';
-import { BorderRadius, Colors, Spacing, Typography } from '../../theme';
+import { BorderRadius, Colors, Spacing } from '../../theme';
+import { Typography } from '../../theme/typography';
 import { MessageType, type ChatMessage, type ChatRoom } from '../../types/chat';
 import type { MainStackParamList } from '../../types/navigation';
 

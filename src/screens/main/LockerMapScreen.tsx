@@ -17,7 +17,8 @@ import { getAvailableLockers } from '../../services/locker-service';
 import type { Station } from '../../types/config';
 import type { Locker } from '../../types/locker';
 import type { MainStackNavigationProp } from '../../types/navigation';
-import { Colors, Spacing, Typography, BorderRadius } from '../../theme';
+import { Colors, Spacing, BorderRadius } from '../../theme';
+import { Typography } from '../../theme/typography';
 
 type LockerMapItem = {
   locker: Locker;

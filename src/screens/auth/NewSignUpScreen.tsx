@@ -18,7 +18,8 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { createUserWithEmailAndPassword, sendEmailVerification, fetchSignInMethodsForEmail } from 'firebase/auth';
 import { doc, serverTimestamp, setDoc, Timestamp, getDoc } from 'firebase/firestore';
 
-import { BorderRadius, Colors, Spacing, Typography } from '../../theme';
+import { BorderRadius, Colors, Spacing } from '../../theme';
+import { Typography } from '../../theme/typography';
 import { auth, db } from '../../services/firebase';
 import {
   checkRequiredConsents,

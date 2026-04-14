@@ -16,7 +16,8 @@ import { getBankIntegrationConfig } from '../../services/integration-config-serv
 import { getWithdrawalEligibility } from '../../services/beta1-wallet-service';
 import { WithdrawalEligibilityStatus } from '../../types/beta1-wallet';
 import type { MainStackNavigationProp } from '../../types/navigation';
-import { BorderRadius, Colors, Spacing, Typography } from '../../theme';
+import { BorderRadius, Colors, Spacing } from '../../theme';
+import { Typography } from '../../theme/typography';
 import { TaxInfoRegistrationModal } from '../../components/tax/TaxInfoRegistrationModal';
 
 type Props = {

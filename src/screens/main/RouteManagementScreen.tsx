@@ -23,7 +23,8 @@ import { deleteRoute, getUserRoutes } from '../../services/route-service';
 import { DAY_LABELS } from '../../components/common/DaySelector';
 import type { Route } from '../../types/route';
 import type { MainStackNavigationProp } from '../../types/navigation';
-import { Colors, Spacing, BorderRadius, Typography, Shadows } from '../../theme';
+import { Colors, Spacing, BorderRadius, Shadows } from '../../theme';
+import { Typography } from '../../theme/typography';
 import AppTopBar from '../../components/common/AppTopBar';
 
 const MAX_ROUTES = 5;

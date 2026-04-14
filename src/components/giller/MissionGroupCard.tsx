@@ -6,7 +6,8 @@ import * as Haptics from 'expo-haptics';
 import { MissionSignalPill, MissionStatusBadge } from './MissionBoardBadges';
 import type { MissionCard, MissionGroup } from './mission-board-types';
 import { NaverMapCard } from '../maps/NaverMapCard';
-import { BorderRadius, Colors, Shadows, Spacing, Typography } from '../../theme';
+import { BorderRadius, Colors, Shadows, Spacing } from '../../theme';
+import { Typography } from '../../theme/typography';
 
 type MissionGroupCardProps = {
   group: MissionGroup;

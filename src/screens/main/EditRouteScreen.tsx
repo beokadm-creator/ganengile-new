@@ -16,7 +16,8 @@ import { getRoute, updateRoute, validateRouteForUpdate } from '../../services/ro
 import type { MainStackNavigationProp, MainStackParamList } from '../../types/navigation';
 import type { Station } from '../../types/config';
 import type { StationInfo, Route } from '../../types/route';
-import { Colors, Spacing, Typography, BorderRadius } from '../../theme';
+import { Colors, Spacing, BorderRadius } from '../../theme';
+import { Typography } from '../../theme/typography';
 import Button from '../../components/common/Button';
 import TimePicker from '../../components/common/TimePicker';
 import DaySelector, { DAY_LABELS } from '../../components/common/DaySelector';

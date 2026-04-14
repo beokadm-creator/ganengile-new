@@ -2,7 +2,7 @@ import React, { useRef, useEffect } from 'react';
 import { View, StyleSheet, ActivityIndicator, Text } from 'react-native';
 import { WebView } from 'react-native-webview';
 import { mapConfig } from '../../config/map-config';
-import { Typography } from '../../theme';
+import { Typography } from '../../theme/typography';
 
 export type InteractiveMapMarker = {
   latitude: number;

@@ -6,7 +6,7 @@
 import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import type { RouteMatchScore } from '../../types/matching-extended';
-import { Typography } from '../../theme';
+import { Typography } from '../../theme/typography';
 
 interface Props {
   score: RouteMatchScore;

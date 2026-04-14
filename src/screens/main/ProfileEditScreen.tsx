@@ -16,7 +16,8 @@ import AppTopBar from '../../components/common/AppTopBar';
 import { useUser } from '../../contexts/UserContext';
 import { confirmPhoneOtp, requestPhoneOtp } from '../../services/otp-service';
 import { updateUserProfile } from '../../services/user-service';
-import { BorderRadius, Colors, Shadows, Spacing, Typography } from '../../theme';
+import { BorderRadius, Colors, Shadows, Spacing } from '../../theme';
+import { Typography } from '../../theme/typography';
 import type { MainStackNavigationProp } from '../../types/navigation';
 
 function normalizePhoneNumber(phoneNumber: string): string {

@@ -17,6 +17,3 @@ export { default as RoleSlider } from './common/RoleSlider';
 
 export { RoleSwitcher } from './RoleSwitcher';
 export { default as StationSelectModal } from './StationSelectModal';
-
-export { theme } from './theme';
-export { Colors, Typography, Spacing, BorderRadius, Shadows } from './theme';

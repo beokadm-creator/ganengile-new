@@ -15,7 +15,7 @@ import {
   Alert,
 } from 'react-native';
 import BankSelectModal from './BankSelectModal';
-import { Typography } from '../../theme';
+import { Typography } from '../../theme/typography';
 
 interface Props {
   visible: boolean;

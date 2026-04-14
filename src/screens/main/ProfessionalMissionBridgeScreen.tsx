@@ -4,7 +4,8 @@ import { MaterialIcons } from '@expo/vector-icons';
 import { RouteProp, useNavigation, useRoute } from '@react-navigation/native';
 
 import { deliveryPartnerService } from '../../services/delivery-partner-service';
-import { BorderRadius, Colors, Shadows, Spacing, Typography } from '../../theme';
+import { BorderRadius, Colors, Shadows, Spacing } from '../../theme';
+import { Typography } from '../../theme/typography';
 import type { MainStackNavigationProp, MainStackParamList } from '../../types/navigation';
 
 type BridgeRoute = RouteProp<MainStackParamList, 'ProfessionalMissionBridge'>;

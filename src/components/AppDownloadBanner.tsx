@@ -15,7 +15,7 @@ import {
   Linking,
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { Typography } from '../theme';
+import { Typography } from '../theme/typography';
 
 interface AppDownloadBannerProps {
   visible?: boolean;

@@ -16,7 +16,8 @@ import {
   getDrivingRoute,
   type RouteCoordinate,
 } from '../../services/naver-route-service';
-import { BorderRadius, Colors, Shadows, Spacing, Typography } from '../../theme';
+import { BorderRadius, Colors, Shadows, Spacing } from '../../theme';
+import { Typography } from '../../theme/typography';
 import type { MainStackNavigationProp, MainStackParamList } from '../../types/navigation';
 
 type RealtimeTrackingRoute = RouteProp<MainStackParamList, 'RealtimeTracking'>;

@@ -13,7 +13,8 @@ import {
 import { doc, onSnapshot, updateDoc } from 'firebase/firestore';
 import { db } from '../core/firebase';
 import { useAuth } from '../contexts/AuthContext';
-import { BorderRadius, Colors, Shadows, Spacing, Typography } from '../theme';
+import { BorderRadius, Colors, Shadows, Spacing } from '../theme';
+import { Typography } from '../theme/typography';
 
 export type GillerMode = 'regular' | 'onetime';
 

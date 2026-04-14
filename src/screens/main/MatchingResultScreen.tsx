@@ -13,7 +13,8 @@ import {
 import { useNavigation, useRoute, type RouteProp } from '@react-navigation/native';
 import { NaverMapCard } from '../../components/maps/NaverMapCard';
 import { CompoundPaymentPreview } from '../../components/payment/CompoundPaymentPreview';
-import { BorderRadius, Colors, Spacing , Typography } from '../../theme';
+import { BorderRadius, Colors, Spacing } from '../../theme';
+import { Typography } from '../../theme/typography';
 import { fetchUserInfo } from '../../services/matching-service';
 import { requireUserId } from '../../services/firebase';
 import { getDrivingRoute, type RouteCoordinate } from '../../services/naver-route-service';

@@ -39,7 +39,8 @@ import {
   getRequesterProgressDescription,
   getRequesterStatusLabel,
 } from '../../services/request-status-presentation-service';
-import { BorderRadius, Colors, Shadows, Spacing , Typography } from '../../theme';
+import { BorderRadius, Colors, Shadows, Spacing } from '../../theme';
+import { Typography } from '../../theme/typography';
 import type { MainStackNavigationProp, MainStackParamList } from '../../types/navigation';
 import { RequestStatus, type Request } from '../../types/request';
 import { Image } from 'expo-image';

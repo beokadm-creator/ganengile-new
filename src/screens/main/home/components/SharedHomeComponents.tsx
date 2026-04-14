@@ -1,7 +1,8 @@
 import React, { useEffect, useRef } from 'react';
 import { Animated, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
-import { BorderRadius, Colors, Shadows, Spacing, Typography } from '../../../../theme';
+import { BorderRadius, Colors, Shadows, Spacing } from '../../../../theme';
+import { Typography } from '../../../../theme/typography';
 import { UserRole } from '../../../../types/user';
 
 

@@ -55,7 +55,7 @@ import UnlockLockerScreen from '../screens/main/UnlockLockerScreen';
 import QRCodeScannerScreen from '../screens/main/QRCodeScannerScreen';
 import RequesterDropoffLockerScreen from '../screens/requester/RequesterDropoffLockerScreen';
 import RealtimeTrackingScreen from '../screens/main/RealtimeTrackingScreen';
-import { Typography } from '../theme';
+import { Typography } from '../theme/typography';
 
 const styles = StyleSheet.create({
   stackBackIconWrap: {

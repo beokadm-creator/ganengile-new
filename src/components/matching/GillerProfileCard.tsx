@@ -7,7 +7,8 @@ import {
   Animated,
 } from 'react-native';
 import RatingStars from '../common/RatingStars';
-import { Colors, Spacing, BorderRadius, Typography } from '../../theme';
+import { Colors, Spacing, BorderRadius } from '../../theme';
+import { Typography } from '../../theme/typography';
 import { Image } from 'expo-image';
 
 export interface GillerMatch {

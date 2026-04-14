@@ -1,6 +1,7 @@
 import React from 'react';
 import { Platform, StyleSheet, Text, View, type StyleProp, type ViewStyle } from 'react-native';
-import { BorderRadius, Colors, Spacing, Typography } from '../theme';
+import { BorderRadius, Colors, Spacing } from '../theme';
+import { Typography } from '../theme/typography';
 
 export interface TransferInfo {
   hasTransfer: boolean;

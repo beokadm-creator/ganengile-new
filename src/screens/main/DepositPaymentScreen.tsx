@@ -5,7 +5,8 @@ import { DepositService } from '../../services/DepositService';
 import { PointService } from '../../services/PointService';
 import { getPaymentIntegrationConfig } from '../../services/integration-config-service';
 import { DEPOSIT_RATE, DepositPaymentMethod } from '../../types/point';
-import { BorderRadius, Colors, Shadows, Spacing, Typography } from '../../theme';
+import { BorderRadius, Colors, Shadows, Spacing } from '../../theme';
+import { Typography } from '../../theme/typography';
 import type { MainStackNavigationProp, MainStackParamList } from '../../types/navigation';
 
 type DepositPaymentRouteProp = RouteProp<MainStackParamList, 'DepositPayment'>;

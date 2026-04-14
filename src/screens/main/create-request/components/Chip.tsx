@@ -1,7 +1,8 @@
 import React from 'react';
 import { TouchableOpacity, Text, StyleSheet } from 'react-native';
 import * as Haptics from 'expo-haptics';
-import { BorderRadius, Colors, Spacing, Typography } from '../../../../theme';
+import { BorderRadius, Colors, Spacing } from '../../../../theme';
+import { Typography } from '../../../../theme/typography';
 
 type Props = {
   label: string;
