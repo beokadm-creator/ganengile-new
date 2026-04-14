@@ -117,7 +117,7 @@ export type MainStackParamList = {
   };
   Earnings: undefined;
   MyRating: undefined;
-  CustomerService: undefined;
+
   Terms: undefined;
   AddressBook: undefined;
   ProfileEdit: undefined;
@@ -140,7 +140,6 @@ export type MainStackParamList = {
   PointHistory: undefined;
   PointWithdraw: undefined;
   GillerApply: undefined;
-  B2BPartnerApply: undefined;
   IdentityVerification: undefined;
   LockerSelection: {
     stationId?: string;
