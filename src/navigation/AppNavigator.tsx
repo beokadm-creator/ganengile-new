@@ -20,6 +20,15 @@ import {
   syncStoredChannelAttributionToUser,
 } from '../services/channel-attribution-service';
 
+const styles = StyleSheet.create({
+  loadingContainer: {
+    alignItems: 'center',
+    backgroundColor: '#fff',
+    flex: 1,
+    justifyContent: 'center',
+  },
+});
+
 const Stack = createStackNavigator<RootStackParamList>();
 const linking = buildLinkingConfig();
 
@@ -162,12 +171,3 @@ export default function AppNavigator() {
     </SafeAreaProvider>
   );
 }
-
-const styles = StyleSheet.create({
-  loadingContainer: {
-    alignItems: 'center',
-    backgroundColor: '#fff',
-    flex: 1,
-    justifyContent: 'center',
-  },
-});

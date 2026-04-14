@@ -16,6 +16,20 @@ import { loadCreateRequestProgress } from '../../utils/draft-storage';
 import { RequesterHome } from './home/RequesterHome';
 import { GillerHome } from './home/GillerHome';
 
+const styles = StyleSheet.create({
+  emptyState: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: Colors.background,
+  },
+  emptyTitle: {
+    color: Colors.textPrimary,
+    fontSize: Typography.fontSize.lg,
+    fontWeight: Typography.fontWeight.bold,
+  },
+});
+
 export default function HomeScreen({ navigation }: { navigation: MainStackNavigationProp }) {
   const { user, currentRole, switchRole } = useUser();
   const { canAccessGiller } = useGillerAccess();
@@ -93,6 +107,7 @@ export default function HomeScreen({ navigation }: { navigation: MainStackNaviga
   if (isRequesterView) {
     return (
       <RequesterHome
+        user={user}
         snapshot={snapshot}
         navigation={navigation}
         refreshing={refreshing}
@@ -107,6 +122,7 @@ export default function HomeScreen({ navigation }: { navigation: MainStackNaviga
 
   return (
     <GillerHome
+      user={user}
       snapshot={snapshot}
       navigation={navigation}
       refreshing={refreshing}
@@ -117,17 +133,3 @@ export default function HomeScreen({ navigation }: { navigation: MainStackNaviga
     />
   );
 }
-
-const styles = StyleSheet.create({
-  emptyState: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: Colors.background,
-  },
-  emptyTitle: {
-    color: Colors.textPrimary,
-    fontSize: Typography.fontSize.lg,
-    fontWeight: Typography.fontWeight.bold,
-  },
-});

@@ -57,7 +57,18 @@ import RequesterDropoffLockerScreen from '../screens/requester/RequesterDropoffL
 import RealtimeTrackingScreen from '../screens/main/RealtimeTrackingScreen';
 import { Typography } from '../theme';
 
-
+const styles = StyleSheet.create({
+  stackBackIconWrap: {
+    alignItems: 'center',
+    backgroundColor: '#F3F4F6',
+    borderColor: '#E5E7EB',
+    borderRadius: 18,
+    borderWidth: 1,
+    height: 36,
+    justifyContent: 'center',
+    width: 36,
+  },
+});
 
 const Tab = createBottomTabNavigator<MainTabParamList>();
 const Stack = createStackNavigator<MainStackParamList>();
@@ -407,16 +418,3 @@ export default function MainNavigator() {
     </Stack.Navigator>
   );
 }
-
-const styles = StyleSheet.create({
-  stackBackIconWrap: {
-    alignItems: 'center',
-    backgroundColor: '#F3F4F6',
-    borderColor: '#E5E7EB',
-    borderRadius: 18,
-    borderWidth: 1,
-    height: 36,
-    justifyContent: 'center',
-    width: 36,
-  },
-});

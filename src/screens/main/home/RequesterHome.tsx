@@ -30,6 +30,7 @@ interface RequesterHomeProps {
 }
 
 export function RequesterHome({
+  user,
   snapshot,
   navigation,
   refreshing,
@@ -38,7 +39,7 @@ export function RequesterHome({
   onSwitchRole,
   hasRequestDraft,
   canAccessGiller,
-}: RequesterHomeProps) {
+}: RequesterHomeProps & { user: any }) {
   return (
     <ScrollView
       style={styles.container}
@@ -169,7 +170,7 @@ export function RequesterHome({
 
       {/* ── Wallet Compact ───────────────────────────────────── */}
       <WalletCompact
-        balance={snapshot?.wallet.withdrawableBalance ?? 0}
+        balance={user?.pointBalance ?? snapshot?.wallet.withdrawableBalance ?? 0}
         onPress={() => navigation.navigate('PointHistory')}
       />
     </ScrollView>

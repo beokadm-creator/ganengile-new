@@ -54,6 +54,7 @@ const localStyles = StyleSheet.create({
 });
 
 export function GillerHome({
+  user,
   snapshot,
   navigation,
   refreshing,
@@ -61,7 +62,7 @@ export function GillerHome({
   showRoleSwitch,
   onSwitchRole,
   canAccessGiller,
-}: GillerHomeProps) {
+}: GillerHomeProps & { user: any }) {
   const isPreviewMode = !canAccessGiller;
 
   return (
@@ -222,7 +223,7 @@ export function GillerHome({
 
       {/* ── Wallet Compact ───────────────────────────────────── */}
       <WalletCompact
-        balance={snapshot?.wallet.withdrawableBalance ?? 0}
+        balance={user?.pointBalance ?? snapshot?.wallet.withdrawableBalance ?? 0}
         onPress={() => {
           if (isPreviewMode) {
             Alert.alert('미리보기 모드', '포인트 내역은 길러 신청 후 확인할 수 있습니다.');
