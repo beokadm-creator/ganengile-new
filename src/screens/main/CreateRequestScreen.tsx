@@ -491,6 +491,7 @@ export default function CreateRequestScreen({ navigation, route }: Props) {
   }, [requestMode, pickupStation?.stationId, deliveryStation?.stationId]);
 
   const submitDisabled =
+    isStepInteractionLocked ||
     !user?.uid ||
     !isOnboardingComplete ||
     !pickupStation ||
@@ -855,6 +856,17 @@ export default function CreateRequestScreen({ navigation, route }: Props) {
         handleSubmit={handleSubmit}
         saving={saving}
         recipientPrivacyConfig={recipientPrivacyConfig}
+        
+        // Phone Verification
+        contactPhoneNumber={contactPhoneNumber}
+        handleContactPhoneChange={handleContactPhoneChange}
+        handleRequestContactOtp={handleRequestContactOtp}
+        handleVerifyContactOtp={handleVerifyContactOtp}
+        contactOtpCode={contactOtpCode}
+        setContactOtpCode={setContactOtpCode}
+        isPhoneVerified={isPhoneVerified}
+        otpSending={false}
+        otpVerifying={false}
       />
 
       <OptimizedStationSelectModal

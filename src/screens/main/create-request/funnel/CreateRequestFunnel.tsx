@@ -11,6 +11,7 @@ import type { Beta1AIAnalysisResponse } from '../../../../services/beta1-ai-serv
 import type { Beta1QuoteCard } from '../../../../services/beta1-orchestration-service';
 import { formatDetailedAddress } from '../../../../services/beta1-orchestration-leg-service';
 import { QuoteBreakdownRow } from '../components/QuoteBreakdownRow';
+import TimePicker from '../../../../components/common/TimePicker';
 import type { PackageSize } from '../types';
 
 const CLEAN_SIZE_OPTIONS: Array<{ value: PackageSize; label: string }> = [
@@ -44,6 +45,17 @@ type Props = {
   saving: boolean;
   
   recipientPrivacyConfig: any;
+  
+  // Phone Verification Props
+  contactPhoneNumber: string;
+  handleContactPhoneChange: (text: string) => void;
+  handleRequestContactOtp: () => Promise<void>;
+  handleVerifyContactOtp: () => Promise<void>;
+  contactOtpCode: string;
+  setContactOtpCode: (code: string) => void;
+  isPhoneVerified: boolean;
+  otpSending: boolean;
+  otpVerifying: boolean;
 };
 
 export default function CreateRequestFunnel(props: Props) {
@@ -403,12 +415,36 @@ export default function CreateRequestFunnel(props: Props) {
   };
 
   const renderItemInfo = () => {
-    const hasValue = !!store.packageItemName && !!store.packageSize && !!store.weightKg;
+    const hasValue = !!store.packageItemName && !!store.packageDescription && !!store.packageSize && !!store.weightKg;
 
     return renderQuestionBox(
       7,
       '어떤 물건인가요?',
       <View style={{ gap: Spacing.md }}>
+        {/* 예약 시간 입력 (예약 모드일 때만) */}
+        {store.requestMode === 'reservation' && (
+          <View>
+            <Text style={styles.label}>예약 날짜</Text>
+        <TouchableOpacity 
+          style={[styles.inputBox, { marginBottom: Spacing.sm }]} 
+          onPress={() => props.setReservationCalendarVisible(true)}
+        >
+          <Text style={{ color: store.preferredPickupDate ? Colors.textPrimary : Colors.textSecondary }}>
+            {store.preferredPickupDate || '날짜 선택하기'}
+          </Text>
+        </TouchableOpacity>
+
+        <Text style={styles.label}>희망 픽업 시간</Text>
+        <View style={{ marginBottom: Spacing.sm }}>
+          <TimePicker
+            value={store.preferredPickupTime}
+            onChange={store.setPreferredPickupTime}
+            placeholder="시간을 선택하세요"
+          />
+        </View>
+          </View>
+        )}
+
         {/* 사진 업로드 */}
         <View style={styles.row}>
           <TouchableOpacity style={styles.photoButton} onPress={props.handleUploadPhotoFromCamera}>
@@ -423,11 +459,32 @@ export default function CreateRequestFunnel(props: Props) {
         {store.photoUrl ? <Image source={{ uri: store.photoUrl }} style={styles.previewImage} /> : null}
 
         {/* 물품명 */}
+        <Text style={styles.label}>물품명</Text>
         <TextInput
           style={styles.inputBox}
           placeholder="물품명 (예: 노트북, 케이크)"
           value={store.packageItemName}
           onChangeText={store.setPackageItemName}
+        />
+
+        {/* 상세 설명 */}
+        <Text style={styles.label}>상세 설명</Text>
+        <TextInput
+          style={[styles.inputBox, { height: 80, textAlignVertical: 'top' }]}
+          placeholder="물품에 대한 상세 설명"
+          multiline
+          value={store.packageDescription}
+          onChangeText={store.setPackageDescription}
+        />
+
+        {/* 물품 가치 */}
+        <Text style={styles.label}>물품 가치 (보상 기준점)</Text>
+        <TextInput
+          style={styles.inputBox}
+          placeholder="가치 입력 (원)"
+          keyboardType="numeric"
+          value={store.itemValue ? store.itemValue.toString() : ''}
+          onChangeText={(text) => store.setItemValue(text.replace(/[^0-9]/g, ''))}
         />
 
         {/* 크기 선택 */}
@@ -464,18 +521,29 @@ export default function CreateRequestFunnel(props: Props) {
   };
 
   const renderRecipientInfo = () => {
-    const hasValue = !!store.recipientName && !!store.recipientPhone && store.recipientConsentChecked;
+    const hasValue = !!store.recipientName && !!store.recipientPhone && store.recipientConsentChecked && props.isPhoneVerified;
 
     return renderQuestionBox(
       8,
       '누구에게 전달하나요?',
       <View style={{ gap: Spacing.md }}>
+        <Text style={styles.label}>상세 픽업 위치</Text>
+        <TextInput
+          style={styles.inputBox}
+          placeholder="출발지 상세 위치 설명 (예: 1번 출구 앞)"
+          value={store.pickupLocationDetail}
+          onChangeText={store.setPickupLocationDetail}
+        />
+
+        <Text style={styles.label}>수령인 이름</Text>
         <TextInput
           style={styles.inputBox}
           placeholder="수령인 이름"
           value={store.recipientName}
           onChangeText={store.setRecipientName}
         />
+
+        <Text style={styles.label}>수령인 연락처</Text>
         <TextInput
           style={styles.inputBox}
           placeholder="수령인 연락처 (010-0000-0000)"
@@ -483,6 +551,8 @@ export default function CreateRequestFunnel(props: Props) {
           value={store.recipientPhone}
           onChangeText={store.setRecipientPhone}
         />
+
+        <Text style={styles.label}>추가 요청사항</Text>
         <TextInput
           style={[styles.inputBox, { height: 80, textAlignVertical: 'top' }]}
           placeholder="길러에게 전달할 추가 요청사항 (선택)"
@@ -490,6 +560,49 @@ export default function CreateRequestFunnel(props: Props) {
           value={store.specialInstructions}
           onChangeText={store.setSpecialInstructions}
         />
+
+        {/* 본인 인증 (Phone Verification) */}
+        <Text style={styles.label}>보내는 분(본인) 연락처 인증</Text>
+        <View style={styles.row}>
+          <TextInput
+            style={[styles.inputBox, { flex: 1 }]}
+            placeholder="본인 연락처 (010-0000-0000)"
+            keyboardType="phone-pad"
+            value={props.contactPhoneNumber}
+            onChangeText={props.handleContactPhoneChange}
+            editable={!props.isPhoneVerified}
+          />
+          <TouchableOpacity 
+            style={[styles.nextButton, { marginTop: 0, justifyContent: 'center' }]} 
+            onPress={props.handleRequestContactOtp}
+            disabled={props.isPhoneVerified || props.otpSending || !props.contactPhoneNumber}
+          >
+            <Text style={styles.nextButtonText}>
+              {props.isPhoneVerified ? '인증완료' : (props.otpSending ? '전송중...' : '인증요청')}
+            </Text>
+          </TouchableOpacity>
+        </View>
+
+        {!props.isPhoneVerified && props.contactPhoneNumber ? (
+          <View style={styles.row}>
+            <TextInput
+              style={[styles.inputBox, { flex: 1 }]}
+              placeholder="인증번호 6자리"
+              keyboardType="number-pad"
+              value={props.contactOtpCode}
+              onChangeText={props.setContactOtpCode}
+            />
+            <TouchableOpacity 
+              style={[styles.nextButton, { marginTop: 0, justifyContent: 'center' }]} 
+              onPress={props.handleVerifyContactOtp}
+              disabled={props.otpVerifying || !props.contactOtpCode}
+            >
+              <Text style={styles.nextButtonText}>
+                {props.otpVerifying ? '확인중...' : '확인'}
+              </Text>
+            </TouchableOpacity>
+          </View>
+        ) : null}
 
         {props.recipientPrivacyConfig?.thirdPartyConsentRequired && (
           <TouchableOpacity
