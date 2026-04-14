@@ -309,6 +309,7 @@ export default function LockerLocator({ selectedStationId, deliveryStationId, on
 
       {viewMode === 'list' ? (
         <FlatList
+          style={{ flex: 1 }}
           data={lockers}
           keyExtractor={(item) => item.lockerId}
           renderItem={renderLockerItem}

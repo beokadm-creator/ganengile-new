@@ -843,6 +843,7 @@ export default function CreateRequestScreen({ navigation, route }: Props) {
         handleRecommendStationFromAddress={handleRecommendStationFromAddress}
         setPickerType={setPickerType}
         setPickerVisible={setPickerVisible}
+        resolvingLocation={!!resolvingLocation}
         handleUseCurrentLocation={handleUseCurrentLocation}
         handleUploadPhotoFromCamera={handleUploadPhotoFromCamera}
         handleUploadPhotoFromLibrary={handleUploadPhotoFromLibrary}
@@ -953,7 +954,7 @@ export default function CreateRequestScreen({ navigation, route }: Props) {
       </Modal>
       <Modal visible={lockerLocatorTarget !== null} animationType="slide" transparent>
         <View style={styles.modalBackdrop}>
-          <View style={[styles.modalCard, { width: '90%', height: '80%', padding: 0, overflow: 'hidden' }]}>
+          <View style={[styles.modalCard, { width: '90%', height: '80%', padding: 0, overflow: 'hidden', alignItems: 'stretch' }]}>
             <LockerLocator
               initialTargetStationType={lockerLocatorTarget === 'pickup' ? 'pickup' : 'delivery'}
               selectedStationId={pickupStation?.stationId}
