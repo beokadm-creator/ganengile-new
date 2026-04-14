@@ -13,17 +13,14 @@ export function useLocationResolution(stations: Station[]) {
   const [pickerType, setPickerType] = useState<PickerType>('pickup');
 
   const buildNearbyRecommendations = useCallback((latitude: number, longitude: number): NearbyStationRecommendation[] => {
-    // flatten station list (extracting sub-station structures if necessary)
-    const candidates = stations.flatMap((s) =>
-      s.lines.map((lineId) => ({
-        station: s,
-        lineId,
-        name: s.stationName,
-        line: lineId,
-        latitude: s.location.latitude,
-        longitude: s.location.longitude,
-      }))
-    );
+    // 1. 역(Station) 단위로 거리 계산 및 정렬 (환승역 중복 방지)
+    const candidates = stations.map((s) => ({
+      station: s,
+      name: s.stationName,
+      line: s.lines[0]?.lineId ?? '', // Required by StationLocation
+      latitude: s.location.latitude,
+      longitude: s.location.longitude,
+    }));
 
     return locationService
       .findNearestStations(
@@ -35,11 +32,11 @@ export function useLocationResolution(stations: Station[]) {
           speed: null,
           heading: null,
         },
-        candidates as any,
+        candidates,
         4
       )
       .map((item) => ({
-        station: (item.station as any).station,
+        station: item.station.station,
         distanceMeters: item.distanceMeters,
       }));
   }, [stations]);
