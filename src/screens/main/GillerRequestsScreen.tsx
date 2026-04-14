@@ -220,7 +220,7 @@ export default function GillerRequestsScreen() {
               void (async () => {
                 try {
                   setSubmittingBundleId(bundleId);
-                  await acceptMissionBundleForGiller(bundleId, user!.uid);
+                  await acceptMissionBundleForGiller(bundleId, user.uid);
                   await loadSnapshot('refresh');
                 } catch (error) {
                   const message = error instanceof Error ? error.message : '구간 수락에 실패했습니다.';
@@ -268,7 +268,7 @@ export default function GillerRequestsScreen() {
               void (async () => {
                 try {
                   setSubmittingBundleId(card.bundleId ?? null);
-                  await releaseMissionBundleForGiller(card.bundleId!, user!.uid);
+                  await releaseMissionBundleForGiller(card.bundleId!, user.uid);
                   await loadSnapshot('refresh');
                 } catch (error) {
                   const message = error instanceof Error ? error.message : '수락 취소에 실패했습니다.';

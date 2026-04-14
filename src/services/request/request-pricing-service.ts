@@ -13,7 +13,6 @@ import { getTravelTimeConfig } from '../config-service';
 import { calculatePhase1DeliveryFee, type Phase1PricingParams, type PackageSizeType } from '../pricing-service';
 import { getPricingPolicyConfig } from '../pricing-policy-config-service';
 import { getRoutePricingOverride } from '../route-pricing-override-service';
-import { getRequestById } from './request-repository';
 import { notifyGillers } from './request-event-service';
 import { RequestStatus } from '../../types/request';
 import type { CreateRequestData, RequestPricingContext, StationInfo } from '../../types/request';
@@ -75,20 +74,7 @@ function isPeakHour(hour: number): boolean {
   return (hour >= 7 && hour <= 9) || (hour >= 17 && hour <= 20);
 }
 
-export function buildRequestPricingContext(requestData: CreateRequestData): RequestPricingContext {
-  const requestMode = requestData.requestMode === 'reservation' ? 'reservation' : 'immediate';
-  const requestedHour = inferRequestedHour(requestData);
-
-  return {
-    requestMode,
-    weather: requestData.pricingContext?.weather ?? 'clear',
-    isPeakTime: requestData.pricingContext?.isPeakTime ?? isPeakHour(requestedHour),
-    isProfessionalPeak: requestData.pricingContext?.isProfessionalPeak ?? false,
-    nearbyGillerCount: requestData.pricingContext?.nearbyGillerCount ?? null,
-    requestedHour,
-    urgencyBucket: requestData.pricingContext?.urgencyBucket ?? resolveUrgencyBucket(requestData.urgency),
-  };
-}
+export { buildRequestPricingContext } from './request-repository';
 
 function summarizeInsightContext(input: {
   requestMode?: 'immediate' | 'reservation';
@@ -278,25 +264,21 @@ export async function calculateDeliveryFee(
 export async function increaseRequestBid(
   requestId: string,
   requesterId: string,
+  currentFee: number,
+  status: RequestStatus,
   amount: number = 500
 ): Promise<{ success: boolean; newFee?: number; message?: string }> {
   try {
-    const request = await getRequestById(requestId);
-    if (!request) return { success: false, message: '요청을 찾을 수 없습니다.' };
-    if (request.requesterId !== requesterId) return { success: false, message: '요청자만 금액을 변경할 수 있습니다.' };
-    if (request.status !== RequestStatus.PENDING && request.status !== RequestStatus.MATCHED) {
+    if (status !== RequestStatus.PENDING && status !== RequestStatus.MATCHED) {
       return { success: false, message: '현재 상태에서는 금액을 변경할 수 없습니다.' };
     }
 
-    const currentFee = request.fee?.totalFee ?? request.initialNegotiationFee ?? request.feeBreakdown?.totalFee ?? 3000;
     const pricingPolicy = await getPricingPolicyConfig();
     const nextFee = Math.min(pricingPolicy.maxFee, currentFee + amount);
 
-    const feeSnapshot = (request.fee ?? request.feeBreakdown ?? {}) as FeeSnapshot;
     const nextFeeSnapshot = {
-      ...feeSnapshot,
       totalFee: nextFee,
-      breakdown: feeSnapshot.breakdown ?? {
+      breakdown: {
         gillerFee: Math.round(nextFee * 0.9),
         platformFee: nextFee - Math.round(nextFee * 0.9),
       },

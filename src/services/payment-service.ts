@@ -28,7 +28,6 @@ import {
   Timestamp,
 } from 'firebase/firestore';
 import { db } from './firebase';
-import { calculateBadgeBonus } from './matching-service';
 import { getRuntimeSettlementPolicy } from './settlement-policy-service';
 import { markCouponAsUsed } from './coupon-service';
 
@@ -231,12 +230,14 @@ export async function createGillerEarning(
     couponDiscountApplied?: number;
     pointOffsetApplied?: number;
     userCouponId?: string;
+    preCalculatedBadgeBonusRate?: number;
   }
 ): Promise<string> {
   try {
     const settlementPolicy = await getRuntimeSettlementPolicy();
     // 0. 배지 보너스 계산 (P2-9)
-    const { feeBonus: badgeBonus } = await calculateBadgeBonus(userId);
+    // 순환 참조 방지를 위해 외부에서 계산된 보너스율을 주입받음
+    const badgeBonus = options?.preCalculatedBadgeBonusRate ?? 0;
     const baseAmount = amount;
     const bonusAmount = Math.round(baseAmount * badgeBonus);
     const totalAmount = baseAmount + bonusAmount; // 배지 보너스가 포함된 총 금액

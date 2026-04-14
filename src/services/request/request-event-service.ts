@@ -1,7 +1,7 @@
 import { doc, onSnapshot } from 'firebase/firestore';
 import { getFunctions, httpsCallable } from 'firebase/functions';
 import { db } from '../firebase';
-import { getRequestById, normalizeRequestDoc, type RequestDocShape } from './request-repository';
+import { normalizeRequestDoc, type RequestDocShape } from './request-repository';
 import type { Request } from '../../types/request';
 
 export function getErrorMessage(error: unknown, fallback: string): string {
@@ -42,11 +42,6 @@ export function subscribeToRequest(
 
 export async function notifyGillers(requestId: string): Promise<{ success: boolean; error?: string }> {
   try {
-    const request = await getRequestById(requestId);
-    if (!request) {
-      return { success: false, error: '요청을 찾을 수 없습니다.' };
-    }
-
     const functionsInstance = getFunctions();
     const triggerMatching = httpsCallable<{ requestId: string }, { success: boolean; matchesFound?: number }>(
       functionsInstance,

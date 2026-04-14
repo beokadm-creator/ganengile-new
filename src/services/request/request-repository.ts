@@ -18,7 +18,6 @@ import { db } from '../firebase';
 import { generateShortId } from '../../utils/id-generator';
 import { bootstrapRequestCreationEngine } from '../beta1-engine-service';
 import { getPricingPolicyConfig } from '../pricing-policy-config-service';
-import { buildRequestPricingContext } from './request-pricing-service';
 import type {
   Request,
   CreateRequestData,
@@ -142,6 +141,29 @@ export function normalizeRequestDoc(requestId: string, raw: RequestDocShape): Re
     selectedPhotoIds,
     packageInfo: { ...raw.packageInfo, imageUrl },
   } as Request;
+}
+
+export function buildRequestPricingContext(requestData: CreateRequestData): RequestPricingContext {
+  const requestMode = requestData.requestMode === 'reservation' ? 'reservation' : 'immediate';
+  let requestedHour = new Date().getHours();
+  const departureTime = requestData.preferredTime?.departureTime;
+  if (typeof departureTime === 'string') {
+    const [hourText] = departureTime.split(':');
+    const hour = Number(hourText);
+    if (Number.isFinite(hour) && hour >= 0 && hour <= 23) {
+      requestedHour = hour;
+    }
+  }
+
+  return {
+    requestMode,
+    weather: requestData.pricingContext?.weather ?? 'clear',
+    isPeakTime: requestData.pricingContext?.isPeakTime ?? ((requestedHour >= 7 && requestedHour <= 9) || (requestedHour >= 17 && requestedHour <= 20)),
+    isProfessionalPeak: requestData.pricingContext?.isProfessionalPeak ?? false,
+    nearbyGillerCount: requestData.pricingContext?.nearbyGillerCount ?? null,
+    requestedHour,
+    urgencyBucket: requestData.pricingContext?.urgencyBucket ?? (requestData.urgency === 'high' ? 'urgent' : requestData.urgency === 'medium' ? 'fast' : 'normal'),
+  };
 }
 
 export async function createRequest(requestData: CreateRequestData): Promise<Request>;

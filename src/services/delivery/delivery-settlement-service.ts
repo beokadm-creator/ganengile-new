@@ -5,6 +5,7 @@ import { doc, getDoc, updateDoc } from 'firebase/firestore';
 import { DepositService } from '../DepositService';
 import { createGillerEarning } from '../payment-service';
 import { getUserStats } from '../user-service';
+import { calculateBadgeBonus } from '../matching-service';
 import { autoIssueCouponsByTrigger } from '../coupon-service';
 
 export interface RequesterConfirmationData {
@@ -64,11 +65,13 @@ export const deliverySettlementService = {
       if (deliveryData.gillerId) {
         try {
           const totalFee = deliveryData.fee?.totalFee || 0;
+          const { feeBonus } = await calculateBadgeBonus(deliveryData.gillerId);
           await createGillerEarning(
             deliveryData.gillerId,
             requestId,
             totalFee,
-            true
+            true,
+            { preCalculatedBadgeBonusRate: feeBonus }
           );
         } catch (e) {
           console.error('길러 수익 창출 실패:', e);

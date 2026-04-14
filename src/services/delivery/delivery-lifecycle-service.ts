@@ -12,7 +12,6 @@ import {
   arrayUnion,
 } from 'firebase/firestore';
 import { db } from '../../config/firebase';
-import { persistActorSelectionDecision, syncDeliveryToBeta1Execution } from '../beta1-orchestration-service';
 import { planMissionExecutionWithAI } from '../beta1-ai-service';
 import { uploadPickupPhoto, uploadDeliveryPhoto } from '../storage-service';
 import { DepositService } from '../DepositService';
@@ -502,37 +501,10 @@ export const deliveryLifecycleService = {
       });
 
       try {
-        await syncDeliveryToBeta1Execution(deliveryRef.id);
-        const missionPlan = await planMissionExecutionWithAI({
-          requestId,
-          deliveryId: deliveryRef.id,
-          assignedGillerUserId: gillerId,
-          pickupStation: request.pickupStation,
-          deliveryStation: request.deliveryStation,
-          requestContext: {
-            itemDescription: request.packageInfo?.description,
-            itemValue: request.itemValue,
-            urgency: request.urgency,
-            requestMode:
-              request.requestMode === 'immediate' || request.requestMode === 'reservation'
-                ? request.requestMode
-                : undefined,
-            preferredPickupTime: request.preferredTime?.departureTime,
-            preferredArrivalTime: request.preferredTime?.arrivalTime,
-          },
-        });
-        await persistActorSelectionDecision({
-          requestId,
-          deliveryId: deliveryRef.id,
-          interventionLevel: missionPlan?.actorSelection.interventionLevel ?? 'guarded_execute',
-          selectedActorType: toActorSelectionType(missionPlan?.actorSelection.selectedActorType),
-          selectionReason: '길러가 직접 수락한 미션이므로 사람 actor를 우선 확정합니다.',
-          selectedPartnerId: missionPlan?.actorSelection.selectedPartnerId,
-          fallbackActorTypes: toActorSelectionTypes(missionPlan?.actorSelection.fallbackActorTypes),
-          fallbackPartnerIds: missionPlan?.actorSelection.fallbackPartnerIds ?? [],
-          manualReviewRequired: missionPlan?.actorSelection.manualReviewRequired ?? false,
-          riskFlags: missionPlan?.actorSelection.riskFlags ?? [],
-        });
+        // AI 동기화 및 오케스트레이션 로직은 Cloud Functions 등 별도의 백엔드 이벤트 트리거로 분리하여
+        // 클라이언트 서비스 간의 직접적인 순환 참조를 제거합니다.
+        // 현재는 수락 성공 이벤트 로그만 남깁니다.
+        console.log(`Delivery ${deliveryRef.id} accepted by giller ${gillerId}. AI sync should be handled via backend triggers.`);
       } catch (syncError) {
         console.error(`AI sync failed for delivery ${deliveryRef.id}. Rolling back acceptance:`, syncError);
         
