@@ -50,14 +50,24 @@ type RequestDetailRoute = RouteProp<MainStackParamList, 'RequestDetail'>;
 
 type WorkingState = 'cancel' | 'rematch' | 'confirm' | null;
 
-function toDate(value?: Timestamp | Date | null): Date | null {
+function toDate(value?: any): Date | null {
   if (!value) return null;
-  return value instanceof Timestamp ? value.toDate() : value;
+  if (value instanceof Date) return value;
+  if (value instanceof Timestamp || (typeof value === 'object' && typeof value.toDate === 'function')) {
+    return value.toDate();
+  }
+  if (typeof value === 'object' && 'seconds' in value) {
+    return new Date(value.seconds * 1000);
+  }
+  if (typeof value === 'string' || typeof value === 'number') {
+    return new Date(value);
+  }
+  return null;
 }
 
-function formatDateTime(value?: Timestamp | Date | null): string {
+function formatDateTime(value?: any): string {
   const resolved = toDate(value);
-  if (!resolved || Number.isNaN(resolved.getTime())) return '-';
+  if (!(resolved instanceof Date) || Number.isNaN(resolved.getTime())) return '-';
   return resolved.toLocaleString('ko-KR', {
     year: 'numeric',
     month: '2-digit',

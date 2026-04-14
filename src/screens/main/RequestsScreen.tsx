@@ -640,20 +640,22 @@ function getRequestAmount(request: Request): number {
   );
 }
 
-function toDate(value?: Timestamp | { toDate?: () => Date } | null): Date | null {
-  if (!value) {
-    return null;
-  }
-  if (value instanceof Timestamp) {
+function toDate(value?: any): Date | null {
+  if (!value) return null;
+  if (value instanceof Date) return value;
+  if (value instanceof Timestamp || (typeof value === 'object' && typeof value.toDate === 'function')) {
     return value.toDate();
   }
-  if (typeof value.toDate === 'function') {
-    return value.toDate();
+  if (typeof value === 'object' && 'seconds' in value) {
+    return new Date(value.seconds * 1000);
+  }
+  if (typeof value === 'string' || typeof value === 'number') {
+    return new Date(value);
   }
   return null;
 }
 
-function formatDateTime(value?: Timestamp | null): string {
+function formatDateTime(value?: any): string {
   const date = toDate(value);
   if (!(date instanceof Date) || Number.isNaN(date.getTime())) {
     return '-';
@@ -675,7 +677,7 @@ function formatPreferredTime(request: Request): string {
   return `${request.preferredTime.departureTime} 출발 · ${request.preferredTime.arrivalTime ?? '-'} 도착`;
 }
 
-function formatRelativeTime(value?: Timestamp | null): string {
+function formatRelativeTime(value?: any): string {
   const date = toDate(value);
   if (!(date instanceof Date) || Number.isNaN(date.getTime())) {
     return '-';

@@ -348,20 +348,21 @@ function eventTitle(type: string): string {
   }
 }
 
-function toDateOrUndefined(
-  value:
-    | Date
-    | Timestamp
-    | { toDate?: () => Date; toMillis?: () => number }
-    | undefined
-    | null
-): Date | undefined {
+function toDateOrUndefined(value?: any): Date | undefined {
   if (!value) return undefined;
   if (value instanceof Date) return value;
-  if (value instanceof Timestamp) return value.toDate();
-  if (typeof value.toDate === 'function') return value.toDate();
-  if (typeof value.toMillis === 'function') {
+  if (value instanceof Timestamp || (typeof value === 'object' && typeof value.toDate === 'function')) {
+    return value.toDate();
+  }
+  if (typeof value === 'object' && typeof value.toMillis === 'function') {
     return new Date(value.toMillis());
+  }
+  if (typeof value === 'object' && 'seconds' in value) {
+    return new Date(value.seconds * 1000);
+  }
+  if (typeof value === 'string' || typeof value === 'number') {
+    const parsed = new Date(value);
+    if (!Number.isNaN(parsed.getTime())) return parsed;
   }
   return undefined;
 }
