@@ -76,6 +76,35 @@ export function calculateSharedDistanceFee(
   return resolved.baseDistanceFee + (stationCount - resolved.baseStations) * resolved.feePerStation;
 }
 
+export function calculateB2BAddressFee(
+  distanceMeters: number,
+  policy?: Partial<SharedPricingPolicyConfig>
+): number {
+  const resolved = resolvePolicy(policy);
+  const adjustments = resolved.quoteAdjustments;
+  
+  if (!adjustments?.b2bBaseDistanceMeters || !adjustments?.b2bBaseFee) {
+    return adjustments?.addressPickupFee ?? 900; // Fallback
+  }
+
+  // 제한 거리 초과 시 거절 (또는 최대 요금 부과)
+  if (distanceMeters > (adjustments.b2bMaxDistanceMeters ?? 5000)) {
+    throw new Error('배달 가능 거리를 초과했습니다.');
+  }
+
+  // 1km 이내는 기본 요금
+  if (distanceMeters <= adjustments.b2bBaseDistanceMeters) {
+    return adjustments.b2bBaseFee;
+  }
+
+  // 초과 거리 요금 계산
+  const extraDistance = distanceMeters - adjustments.b2bBaseDistanceMeters;
+  const extraSegments = Math.ceil(extraDistance / 100);
+  const extraFee = extraSegments * (adjustments.b2bExtraFeePer100m ?? 100);
+
+  return adjustments.b2bBaseFee + extraFee;
+}
+
 export function calculateSharedWeightFee(
   weight: number,
   policy?: Partial<SharedPricingPolicyConfig>

@@ -40,6 +40,11 @@ export interface SharedPricingQuoteAdjustments {
   lockerIncludedAddressPickupDiscountRate: number;
   lockerIncludedAddressDropoffDiscountRate: number;
   balancedReservationUrgencyOffset: number;
+
+  b2bBaseDistanceMeters?: number;
+  b2bBaseFee?: number;
+  b2bMaxDistanceMeters?: number;
+  b2bExtraFeePer100m?: number;
 }
 
 export interface SharedPricingRecommendationRules {
@@ -135,8 +140,14 @@ export const DEFAULT_SHARED_PRICING_POLICY: SharedPricingPolicyConfig = {
     masterBonusRate: 0.35,
   },
   quoteAdjustments: {
-    addressPickupFee: 900,
-    addressDropoffFee: 800,
+    addressPickupFee: 900, // Legacy fallback
+    addressDropoffFee: 800, // Legacy fallback
+    // B2B Dynamic Pricing Configuration
+    b2bBaseDistanceMeters: 1000, // 1km 기본 거리
+    b2bBaseFee: 1500, // 기본 거리 내 배달 대행료 (예: 1500원)
+    b2bExtraFeePer100m: 100, // 100m 초과 시 추가 요금 (예: 100원)
+    b2bMaxDistanceMeters: 5000, // 최대 지원 거리 (5km)
+
     fastestReservationSurcharge: 900,
     fastestImmediateSurcharge: 2500,
     balancedLockerAssistedFee: 1000,

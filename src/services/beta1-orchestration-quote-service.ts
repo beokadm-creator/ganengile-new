@@ -19,6 +19,10 @@ export interface Beta1RequestCreateInput {
   pickupDetailAddress?: string;
   deliveryRoadAddress?: string;
   deliveryDetailAddress?: string;
+  pickupAddressLat?: number;
+  pickupAddressLng?: number;
+  deliveryAddressLat?: number;
+  deliveryAddressLng?: number;
   selectedPhotoIds?: string[];
   packageItemName?: string;
   packageCategory?: string;
@@ -58,6 +62,10 @@ export interface Beta1RequestCreateInput {
   pricingPolicyVersion?: string;
   pricingContextOverride?: Partial<RequestPricingContext>;
   selectedCouponId?: string;
+  pickupLocationLat?: number;
+  pickupLocationLng?: number;
+  deliveryLocationLat?: number;
+  deliveryLocationLng?: number;
 }
 
 export interface Beta1QuoteCard {
@@ -291,8 +299,30 @@ export function buildBeta1QuoteCards(
   const destinationType = input.destinationType ?? 'station';
   const hasAddressPickup = originType === 'address';
   const hasAddressDropoff = destinationType === 'address';
-  const addressPickupFee = hasAddressPickup ? (resolvedPolicy?.quoteAdjustments?.addressPickupFee ?? 900) : 0;
-  const addressDropoffFee = hasAddressDropoff ? (resolvedPolicy?.quoteAdjustments?.addressDropoffFee ?? 800) : 0;
+
+  // Calculate B2B dynamic address pickup/dropoff fees based on actual distance
+  let addressPickupFee = 0;
+  if (hasAddressPickup && input.pickupLocationLat && input.pickupLocationLng && input.pickupStation?.lat && input.pickupStation?.lng) {
+    const distMeters = calculateStraightLineDistance(
+      input.pickupLocationLat, input.pickupLocationLng,
+      input.pickupStation.lat, input.pickupStation.lng
+    );
+    addressPickupFee = calculateB2BAddressFee(distMeters, pricingPolicy);
+  } else if (hasAddressPickup) {
+    addressPickupFee = resolvedPolicy?.quoteAdjustments?.addressPickupFee ?? 900;
+  }
+
+  let addressDropoffFee = 0;
+  if (hasAddressDropoff && input.deliveryLocationLat && input.deliveryLocationLng && input.deliveryStation?.lat && input.deliveryStation?.lng) {
+    const distMeters = calculateStraightLineDistance(
+      input.deliveryLocationLat, input.deliveryLocationLng,
+      input.deliveryStation.lat, input.deliveryStation.lng
+    );
+    addressDropoffFee = calculateB2BAddressFee(distMeters, pricingPolicy);
+  } else if (hasAddressDropoff) {
+    addressDropoffFee = resolvedPolicy?.quoteAdjustments?.addressDropoffFee ?? 800;
+  }
+
   const stationCount = resolveEstimatedStationCount(input);
   const requestedHour = input.pricingContextOverride?.requestedHour ?? resolveRequestedHour(input);
   const base = calculatePhase1DeliveryFee({

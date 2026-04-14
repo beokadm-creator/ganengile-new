@@ -18,13 +18,22 @@ class NetworkCache {
   private cache: Map<string, CacheEntry<any>> = new Map();
   private maxSize: number;
   private defaultTTL: number;
+  private cleanupIntervalId?: NodeJS.Timeout;
 
   constructor(maxSize: number = 100, defaultTTL: number = 5 * 60 * 1000) {
     this.maxSize = maxSize;
     this.defaultTTL = defaultTTL;
 
     // 주기적으로 만료된 캐시 정리
-    setInterval(() => this.cleanupExpired(), 60 * 1000);
+    this.cleanupIntervalId = setInterval(() => this.cleanupExpired(), 60 * 1000);
+  }
+
+  public destroy(): void {
+    if (this.cleanupIntervalId) {
+      clearInterval(this.cleanupIntervalId);
+      this.cleanupIntervalId = undefined;
+    }
+    this.cache.clear();
   }
 
   /**

@@ -100,7 +100,7 @@ export type MainStackParamList = {
     otherUserName: string;
     requestInfo?: { from: string; to: string; urgency: string };
   };
-  NotificationSettings: undefined;
+
   GillerPickupFromLocker: {
     requestId: string;
   };
@@ -116,20 +116,11 @@ export type MainStackParamList = {
     matchId?: string;
   };
   Earnings: undefined;
-  MyRating: undefined;
+
 
   Terms: undefined;
   AddressBook: undefined;
   ProfileEdit: undefined;
-  RequestConfirmation: {
-    requestId: string;
-    pickupStationName?: string;
-    deliveryStationName?: string;
-    deliveryFee?: {
-      totalFee: number;
-      estimatedTime: number;
-    };
-  };
   DepositPayment: {
     gillerId: string;
     requesterId: string;
@@ -146,7 +137,7 @@ export type MainStackParamList = {
     stationName?: string;
     lockerId?: string;
   };
-  BadgeCollection: undefined;
+
   DisputeResolution: {
     disputeId: string;
   };

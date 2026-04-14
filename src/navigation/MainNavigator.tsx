@@ -19,7 +19,7 @@ import EditRouteScreen from '../screens/main/EditRouteScreen';
 import RequestsScreen from '../screens/main/RequestsScreen';
 import ProfileScreen from '../screens/main/ProfileScreen';
 import CreateRequestScreen from '../screens/main/CreateRequestScreen';
-import RequestConfirmationScreen from '../screens/main/RequestConfirmationScreen';
+
 import RequestDetailScreen from '../screens/main/RequestDetailScreen';
 import GillerRequestsScreen from '../screens/main/GillerRequestsScreen';
 import DeliveryTrackingScreen from '../screens/main/DeliveryTrackingScreen';
@@ -31,11 +31,11 @@ import ProfessionalMissionBridgeScreen from '../screens/main/ProfessionalMission
 import RatingScreen from '../screens/main/RatingScreen';
 import ChatListScreen from '../screens/main/ChatListScreen';
 import ChatScreen from '../screens/main/ChatScreen';
-import NotificationSettingsScreen from '../screens/main/NotificationSettingsScreen';
+
 import EarningsScreen from '../screens/main/EarningsScreen';
-import MyRatingScreen from '../screens/main/MyRatingScreen';
-import BadgeCollectionScreen from '../screens/main/BadgeCollectionScreen';
-import CustomerServiceScreen from '../screens/main/CustomerServiceScreen';
+
+
+
 import TermsScreen from '../screens/main/TermsScreen';
 import AddressBookScreen from '../screens/main/AddressBookScreen';
 import ProfileEditScreen from '../screens/main/ProfileEditScreen';
@@ -71,7 +71,7 @@ const TAB_LABELS: Record<keyof MainTabParamList, string> = {
 };
 
 const SCREEN_TITLES: Record<string, string> = {
-  RequestConfirmation: '요청 확인',
+
   AddRoute: '경로 등록',
   MatchingResult: '매칭 진행',
   PickupVerification: '픽업 확인',
@@ -83,11 +83,11 @@ const SCREEN_TITLES: Record<string, string> = {
   Rating: '평가 남기기',
   Chat: '미션 채팅',
   ChatList: '채팅 목록',
-  NotificationSettings: '알림 설정',
+
   Earnings: '정산 관리',
-  MyRating: '내 평점',
-  BadgeCollection: '배지 컬렉션',
-  CustomerService: '고객센터',
+
+
+
   Terms: '약관 및 정책',
   AddressBook: '주소록 관리',
   ProfileEdit: '프로필 정보 변경',
@@ -261,11 +261,7 @@ export default function MainNavigator() {
         component={CreateRequestScreen}
         options={{ headerShown: false }}
       />
-      <Stack.Screen
-        name="RequestConfirmation"
-        component={RequestConfirmationScreen}
-        options={{ headerShown: true }}
-      />
+    
       <Stack.Screen name="AddRoute" component={AddRouteScreen} options={{ headerShown: false }} />
       <Stack.Screen name="EditRoute" component={EditRouteScreen} options={{ headerShown: false }} />
 
@@ -326,31 +322,15 @@ export default function MainNavigator() {
         component={ChatListScreen}
         options={{ headerShown: true }}
       />
-      <Stack.Screen
-        name="NotificationSettings"
-        component={NotificationSettingsScreen}
-        options={{ headerShown: true }}
-      />
+    
       <Stack.Screen
         name="Earnings"
         component={EarningsScreen}
         options={{ headerShown: true }}
       />
-      <Stack.Screen
-        name="MyRating"
-        component={MyRatingScreen}
-        options={{ headerShown: true }}
-      />
-      <Stack.Screen
-        name="BadgeCollection"
-        component={BadgeCollectionScreen}
-        options={{ headerShown: true }}
-      />
-      <Stack.Screen
-        name="CustomerService"
-        component={CustomerServiceScreen}
-        options={{ headerShown: true }}
-      />
+    
+    
+    
       <Stack.Screen name="Terms" component={TermsScreen} options={{ headerShown: true }} />
       <Stack.Screen
         name="AddressBook"
