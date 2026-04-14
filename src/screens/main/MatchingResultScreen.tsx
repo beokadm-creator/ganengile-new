@@ -13,7 +13,7 @@ import {
 import { useNavigation, useRoute, type RouteProp } from '@react-navigation/native';
 import { NaverMapCard } from '../../components/maps/NaverMapCard';
 import { CompoundPaymentPreview } from '../../components/payment/CompoundPaymentPreview';
-import { BorderRadius, Colors, Spacing } from '../../theme';
+import { BorderRadius, Colors, Spacing , Typography } from '../../theme';
 import { fetchUserInfo } from '../../services/matching-service';
 import { requireUserId } from '../../services/firebase';
 import { getDrivingRoute, type RouteCoordinate } from '../../services/naver-route-service';
@@ -448,11 +448,11 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: Colors.background },
   content: { padding: Spacing.xl, gap: Spacing.lg },
   centerState: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: Colors.background },
-  centerText: { marginTop: Spacing.md, color: Colors.textSecondary, fontSize: 16 },
+  centerText: { marginTop: Spacing.md, color: Colors.textSecondary, fontSize: Typography.fontSize.lg },
   hero: { backgroundColor: Colors.primaryMint, borderRadius: BorderRadius.xl, padding: Spacing.xl, gap: Spacing.sm },
-  kicker: { color: Colors.primary, fontSize: 12, fontWeight: '800', textTransform: 'uppercase', letterSpacing: 1 },
-  title: { color: Colors.textPrimary, fontSize: 24, fontWeight: '800', lineHeight: 32 },
-  subtitle: { color: Colors.textSecondary, fontSize: 14, lineHeight: 22 },
+  kicker: { color: Colors.primary, fontSize: Typography.fontSize.sm, fontWeight: Typography.fontWeight.extrabold, textTransform: 'uppercase', letterSpacing: 1 },
+  title: { color: Colors.textPrimary, fontSize: Typography.fontSize['3xl'], fontWeight: Typography.fontWeight.extrabold, lineHeight: 32 },
+  subtitle: { color: Colors.textSecondary, fontSize: Typography.fontSize.base, lineHeight: 22 },
   searchPanel: {
     marginTop: Spacing.md,
     flexDirection: 'row',
@@ -482,27 +482,27 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.primary,
   },
   searchCopy: { flex: 1, gap: 4 },
-  searchTitle: { color: Colors.textPrimary, fontSize: 15, fontWeight: '800' },
-  searchBody: { color: Colors.textSecondary, fontSize: 13, lineHeight: 20 },
+  searchTitle: { color: Colors.textPrimary, fontSize: Typography.fontSize.base, fontWeight: Typography.fontWeight.extrabold },
+  searchBody: { color: Colors.textSecondary, fontSize: Typography.fontSize.sm, lineHeight: 20 },
   card: { backgroundColor: Colors.surface, borderRadius: BorderRadius.xl, padding: Spacing.xl, gap: Spacing.md, borderWidth: 1, borderColor: Colors.border },
-  cardTitle: { color: Colors.textPrimary, fontSize: 18, fontWeight: '800', marginBottom: 4 },
-  insightBody: { color: Colors.textSecondary, fontSize: 14, lineHeight: 22 },
+  cardTitle: { color: Colors.textPrimary, fontSize: Typography.fontSize.xl, fontWeight: Typography.fontWeight.extrabold, marginBottom: 4 },
+  insightBody: { color: Colors.textSecondary, fontSize: Typography.fontSize.base, lineHeight: 22 },
   inlineHint: {
     marginTop: Spacing.xs,
     borderRadius: BorderRadius.lg,
     backgroundColor: Colors.gray50,
     padding: Spacing.md,
   },
-  inlineHintText: { color: Colors.textPrimary, fontSize: 14, fontWeight: '600', lineHeight: 20 },
-  inlineHintSubtext: { color: Colors.textSecondary, fontSize: 12, lineHeight: 18, marginTop: 6 },
+  inlineHintText: { color: Colors.textPrimary, fontSize: Typography.fontSize.base, fontWeight: Typography.fontWeight.semibold, lineHeight: 20 },
+  inlineHintSubtext: { color: Colors.textSecondary, fontSize: Typography.fontSize.sm, lineHeight: 18, marginTop: 6 },
   infoRow: { flexDirection: 'row', justifyContent: 'space-between', gap: Spacing.md },
-  infoLabel: { color: Colors.textTertiary, fontSize: 14, fontWeight: '600' },
-  infoValue: { color: Colors.textPrimary, fontSize: 16, fontWeight: '700' },
+  infoLabel: { color: Colors.textTertiary, fontSize: Typography.fontSize.base, fontWeight: Typography.fontWeight.semibold },
+  infoValue: { color: Colors.textPrimary, fontSize: Typography.fontSize.lg, fontWeight: Typography.fontWeight.bold },
   actionGroup: { gap: Spacing.sm, marginTop: Spacing.sm },
   primaryButton: { minHeight: 52, borderRadius: BorderRadius.full, backgroundColor: Colors.primary, alignItems: 'center', justifyContent: 'center' },
-  primaryButtonText: { color: Colors.white, fontSize: 16, fontWeight: '800' },
+  primaryButtonText: { color: Colors.white, fontSize: Typography.fontSize.lg, fontWeight: Typography.fontWeight.extrabold },
   secondaryButton: { minHeight: 52, borderRadius: BorderRadius.full, backgroundColor: Colors.surface, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: Colors.border },
-  secondaryButtonText: { color: Colors.textPrimary, fontSize: 16, fontWeight: '700' },
+  secondaryButtonText: { color: Colors.textPrimary, fontSize: Typography.fontSize.lg, fontWeight: Typography.fontWeight.bold },
   ghostButton: { minHeight: 52, borderRadius: BorderRadius.full, alignItems: 'center', justifyContent: 'center' },
-  ghostButtonText: { color: Colors.textSecondary, fontSize: 16, fontWeight: '700' },
+  ghostButtonText: { color: Colors.textSecondary, fontSize: Typography.fontSize.lg, fontWeight: Typography.fontWeight.bold },
 });

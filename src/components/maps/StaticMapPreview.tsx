@@ -3,6 +3,7 @@ import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
 
 import { getStaticMapProxyUrl, isMapEnabled } from '../../config/map-config';
 import { Image } from 'expo-image';
+import { Typography } from '../../theme';
 
 export type StaticMapMarker = {
   latitude: number;
@@ -173,12 +174,12 @@ const styles = StyleSheet.create({
   },
   title: {
     color: '#0F172A',
-    fontSize: 17,
-    fontWeight: '800',
+    fontSize: Typography.fontSize.xl,
+    fontWeight: Typography.fontWeight.extrabold,
   },
   subtitle: {
     color: '#64748B',
-    fontSize: 13,
+    fontSize: Typography.fontSize.sm,
     lineHeight: 18,
   },
   image: {
@@ -196,8 +197,8 @@ const styles = StyleSheet.create({
   },
   badgeText: {
     color: '#0F766E',
-    fontSize: 12,
-    fontWeight: '700',
+    fontSize: Typography.fontSize.sm,
+    fontWeight: Typography.fontWeight.bold,
   },
   emptyCard: {
     backgroundColor: '#FFFFFF',
@@ -207,12 +208,12 @@ const styles = StyleSheet.create({
   },
   emptyTitle: {
     color: '#0F172A',
-    fontSize: 17,
-    fontWeight: '800',
+    fontSize: Typography.fontSize.xl,
+    fontWeight: Typography.fontWeight.extrabold,
   },
   emptyBody: {
     color: '#64748B',
-    fontSize: 14,
+    fontSize: Typography.fontSize.base,
     lineHeight: 20,
   },
 });

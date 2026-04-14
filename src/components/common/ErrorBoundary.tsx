@@ -1,6 +1,7 @@
 import React, { Component, ErrorInfo, ReactNode } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import * as Sentry from '@sentry/react-native';
+import { Typography } from '../../theme';
 
 interface Props {
   children: ReactNode;
@@ -75,16 +76,16 @@ const styles = StyleSheet.create({
     marginBottom: 24,
   },
   icon: {
-    fontSize: 32,
+    fontSize: Typography.fontSize['5xl'],
   },
   title: {
-    fontSize: 20,
+    fontSize: Typography.fontSize['2xl'],
     fontWeight: 'bold',
     color: '#111827',
     marginBottom: 12,
   },
   message: {
-    fontSize: 14,
+    fontSize: Typography.fontSize.base,
     color: '#6B7280',
     textAlign: 'center',
     lineHeight: 20,
@@ -98,7 +99,7 @@ const styles = StyleSheet.create({
   },
   buttonText: {
     color: '#FFFFFF',
-    fontSize: 14,
-    fontWeight: '600',
+    fontSize: Typography.fontSize.base,
+    fontWeight: Typography.fontWeight.semibold,
   },
 });

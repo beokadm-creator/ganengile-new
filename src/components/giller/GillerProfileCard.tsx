@@ -8,6 +8,7 @@ import {
 } from 'react-native';
 import { MaterialIcons as Icon } from '@expo/vector-icons';
 import { Image } from 'expo-image';
+import { Typography } from '../../theme';
 
 const { width: _width } = Dimensions.get('window');
 
@@ -187,7 +188,7 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   name: {
-    fontSize: 24,
+    fontSize: Typography.fontSize['3xl'],
     fontWeight: 'bold',
     color: '#333',
     textAlign: 'center',
@@ -224,11 +225,11 @@ const styles = StyleSheet.create({
     borderColor: '#CD7F32',
   },
   rankBadgeEmoji: {
-    fontSize: 14,
+    fontSize: Typography.fontSize.base,
     marginRight: 4,
   },
   rankBadgeText: {
-    fontSize: 12,
+    fontSize: Typography.fontSize.sm,
     fontWeight: 'bold',
     color: '#666',
   },
@@ -239,14 +240,14 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   rating: {
-    fontSize: 18,
+    fontSize: Typography.fontSize.xl,
     fontWeight: 'bold',
     color: '#333',
     marginLeft: 8,
     marginRight: 16,
   },
   deliveries: {
-    fontSize: 14,
+    fontSize: Typography.fontSize.base,
     color: '#666',
   },
   row: {
@@ -256,12 +257,12 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
   },
   rowText: {
-    fontSize: 16,
+    fontSize: Typography.fontSize.lg,
     color: '#666',
     marginLeft: 8,
   },
   feeText: {
-    fontSize: 18,
+    fontSize: Typography.fontSize.xl,
     fontWeight: 'bold',
     color: '#4CAF50',
     marginLeft: 8,
@@ -284,15 +285,15 @@ const styles = StyleSheet.create({
     borderColor: '#E0E0E0',
   },
   rejectButtonText: {
-    fontSize: 16,
-    fontWeight: '600',
+    fontSize: Typography.fontSize.lg,
+    fontWeight: Typography.fontWeight.semibold,
     color: '#666',
   },
   acceptButton: {
     backgroundColor: '#00BCD4',
   },
   acceptButtonText: {
-    fontSize: 16,
+    fontSize: Typography.fontSize.lg,
     fontWeight: 'bold',
     color: '#fff',
   },

@@ -15,6 +15,7 @@ import {
   Linking,
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { Typography } from '../theme';
 
 interface AppDownloadBannerProps {
   visible?: boolean;
@@ -198,20 +199,20 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   bannerEmoji: {
-    fontSize: 32,
+    fontSize: Typography.fontSize['5xl'],
     marginRight: 12,
   },
   bannerTextContainer: {
     flex: 1,
   },
   bannerTitle: {
-    fontSize: 14,
+    fontSize: Typography.fontSize.base,
     fontWeight: 'bold',
     color: '#1976D2',
     marginBottom: 2,
   },
   bannerSubtitle: {
-    fontSize: 12,
+    fontSize: Typography.fontSize.sm,
     color: '#1976D2',
     opacity: 0.8,
     lineHeight: 16,
@@ -229,14 +230,14 @@ const styles = StyleSheet.create({
   },
   downloadButtonText: {
     color: '#fff',
-    fontSize: 12,
-    fontWeight: '600',
+    fontSize: Typography.fontSize.sm,
+    fontWeight: Typography.fontWeight.semibold,
   },
   dismissButton: {
     padding: 4,
   },
   dismissButtonText: {
-    fontSize: 16,
+    fontSize: Typography.fontSize.lg,
     color: '#1976D2',
     opacity: 0.6,
   },
@@ -260,12 +261,12 @@ const styles = StyleSheet.create({
     borderBottomColor: '#f0f0f0',
   },
   modalTitle: {
-    fontSize: 20,
+    fontSize: Typography.fontSize['2xl'],
     fontWeight: 'bold',
     color: '#333',
   },
   modalCloseButton: {
-    fontSize: 24,
+    fontSize: Typography.fontSize['3xl'],
     color: '#999',
   },
   modalBody: {
@@ -277,17 +278,17 @@ const styles = StyleSheet.create({
     marginBottom: 20,
   },
   featureEmoji: {
-    fontSize: 32,
+    fontSize: Typography.fontSize['5xl'],
     marginRight: 12,
   },
   featureTitle: {
-    fontSize: 16,
+    fontSize: Typography.fontSize.lg,
     fontWeight: 'bold',
     color: '#333',
     marginBottom: 4,
   },
   featureDescription: {
-    fontSize: 14,
+    fontSize: Typography.fontSize.base,
     color: '#666',
     lineHeight: 20,
     flex: 1,
@@ -310,13 +311,13 @@ const styles = StyleSheet.create({
   },
   storeButtonText: {
     color: '#fff',
-    fontSize: 16,
+    fontSize: Typography.fontSize.lg,
     fontWeight: 'bold',
     marginBottom: 4,
   },
   storeButtonSubtext: {
     color: 'rgba(255, 255, 255, 0.8)',
-    fontSize: 12,
+    fontSize: Typography.fontSize.sm,
   },
   continueWebButton: {
     backgroundColor: '#f5f5f5',
@@ -326,8 +327,8 @@ const styles = StyleSheet.create({
     marginTop: 12,
   },
   continueWebButtonText: {
-    fontSize: 14,
-    fontWeight: '600',
+    fontSize: Typography.fontSize.base,
+    fontWeight: Typography.fontWeight.semibold,
     color: '#666',
   },
   dontShowAgainButton: {
@@ -336,7 +337,7 @@ const styles = StyleSheet.create({
     marginTop: 8,
   },
   dontShowAgainText: {
-    fontSize: 12,
+    fontSize: Typography.fontSize.sm,
     color: '#999',
   },
 });

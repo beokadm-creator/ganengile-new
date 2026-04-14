@@ -232,7 +232,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   defaultAvatarText: {
-    fontSize: 24,
+    fontSize: Typography.fontSize['3xl'],
     fontWeight: Typography.fontWeight.bold as any,
     color: Colors.primary,
   },
@@ -282,7 +282,7 @@ const styles = StyleSheet.create({
     borderRadius: BorderRadius.sm,
   },
   infoEmoji: {
-    fontSize: 14,
+    fontSize: Typography.fontSize.base,
   },
   infoText: {
     fontSize: Typography.fontSize.sm,

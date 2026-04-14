@@ -30,18 +30,18 @@ export default function RequestMatchScoreBadge({ score, size = 'medium' }: Props
   const sizeStyles = {
     small: {
       container: { paddingHorizontal: 8, paddingVertical: 4 },
-      score: { fontSize: 14 },
-      label: { fontSize: 9 },
+      score: { fontSize: Typography.fontSize.base },
+      label: { fontSize: 9 } // badge micro-label,
     },
     medium: {
       container: { paddingHorizontal: 12, paddingVertical: 6 },
-      score: { fontSize: 18 },
-      label: { fontSize: 10 },
+      score: { fontSize: Typography.fontSize.xl },
+      label: { fontSize: 10 } // badge micro-label,
     },
     large: {
       container: { paddingHorizontal: 16, paddingVertical: 8 },
-      score: { fontSize: 22 },
-      label: { fontSize: 12 },
+      score: { fontSize: Typography.fontSize['3xl'] },
+      label: { fontSize: Typography.fontSize.sm },
     },
   };
 

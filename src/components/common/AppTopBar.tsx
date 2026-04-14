@@ -2,7 +2,7 @@ import React from 'react';
 import { View, Text, Pressable, StyleSheet, ViewStyle } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Colors } from '../../theme';
+import { Colors , Typography } from '../../theme';
 
 interface AppTopBarProps {
   title: string;
@@ -63,8 +63,8 @@ const styles = StyleSheet.create({
   title: {
     color: Colors.textPrimary,
     flex: 1,
-    fontSize: 19,
-    fontWeight: '800',
+    fontSize: Typography.fontSize.xl,
+    fontWeight: Typography.fontWeight.extrabold,
     marginHorizontal: 12,
     textAlign: 'center',
   },

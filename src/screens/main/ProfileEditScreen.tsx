@@ -299,7 +299,7 @@ const styles = StyleSheet.create({
   title: {
     color: Colors.textPrimary,
     fontSize: Typography.fontSize.lg,
-    fontWeight: '800',
+    fontWeight: Typography.fontWeight.extrabold,
   },
   input: {
     minHeight: 52,
@@ -330,8 +330,8 @@ const styles = StyleSheet.create({
   },
   primaryButtonText: {
     color: Colors.white,
-    fontSize: 16,
-    fontWeight: '800',
+    fontSize: Typography.fontSize.lg,
+    fontWeight: Typography.fontWeight.extrabold,
   },
   secondaryButton: {
     minHeight: 48,
@@ -344,7 +344,7 @@ const styles = StyleSheet.create({
   },
   secondaryButtonText: {
     color: Colors.primary,
-    fontWeight: '800',
+    fontWeight: Typography.fontWeight.extrabold,
   },
   dangerCard: {
     backgroundColor: Colors.surface,
@@ -356,7 +356,7 @@ const styles = StyleSheet.create({
   dangerTitle: {
     color: Colors.textPrimary,
     fontSize: Typography.fontSize.base,
-    fontWeight: '800',
+    fontWeight: Typography.fontWeight.extrabold,
   },
   dangerBody: {
     color: Colors.textSecondary,
@@ -371,6 +371,6 @@ const styles = StyleSheet.create({
   },
   dangerButtonText: {
     color: Colors.error,
-    fontWeight: '800',
+    fontWeight: Typography.fontWeight.extrabold,
   },
 });

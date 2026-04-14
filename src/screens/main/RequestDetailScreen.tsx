@@ -39,7 +39,7 @@ import {
   getRequesterProgressDescription,
   getRequesterStatusLabel,
 } from '../../services/request-status-presentation-service';
-import { BorderRadius, Colors, Shadows, Spacing } from '../../theme';
+import { BorderRadius, Colors, Shadows, Spacing , Typography } from '../../theme';
 import type { MainStackNavigationProp, MainStackParamList } from '../../types/navigation';
 import { RequestStatus, type Request } from '../../types/request';
 import { Image } from 'expo-image';
@@ -942,12 +942,12 @@ const styles = StyleSheet.create({
   centerText: {
     marginTop: Spacing.md,
     color: Colors.textSecondary,
-    fontSize: 16,
+    fontSize: Typography.fontSize.lg,
   },
   errorText: {
     color: Colors.error,
-    fontSize: 16,
-    fontWeight: '700',
+    fontSize: Typography.fontSize.lg,
+    fontWeight: Typography.fontWeight.bold,
   },
   emptyStateButton: {
     marginTop: Spacing.md,
@@ -960,8 +960,8 @@ const styles = StyleSheet.create({
   },
   emptyStateButtonText: {
     color: Colors.white,
-    fontSize: 15,
-    fontWeight: '800',
+    fontSize: Typography.fontSize.base,
+    fontWeight: Typography.fontWeight.extrabold,
   },
   hero: {
     backgroundColor: Colors.primaryMint,
@@ -971,20 +971,20 @@ const styles = StyleSheet.create({
   },
   kicker: {
     color: Colors.primary,
-    fontSize: 12,
-    fontWeight: '800',
+    fontSize: Typography.fontSize.sm,
+    fontWeight: Typography.fontWeight.extrabold,
     letterSpacing: 1,
     textTransform: 'uppercase',
   },
   title: {
     color: Colors.textPrimary,
-    fontSize: 24,
-    fontWeight: '800',
+    fontSize: Typography.fontSize['3xl'],
+    fontWeight: Typography.fontWeight.extrabold,
     lineHeight: 32,
   },
   subtitle: {
     color: Colors.textSecondary,
-    fontSize: 15,
+    fontSize: Typography.fontSize.base,
     lineHeight: 22,
   },
   panel: {
@@ -998,8 +998,8 @@ const styles = StyleSheet.create({
   },
   panelTitle: {
     color: Colors.textPrimary,
-    fontSize: 18,
-    fontWeight: '800',
+    fontSize: Typography.fontSize.xl,
+    fontWeight: Typography.fontWeight.extrabold,
     marginBottom: 4,
   },
   infoRow: {
@@ -1009,15 +1009,15 @@ const styles = StyleSheet.create({
   },
   infoLabel: {
     color: Colors.textTertiary,
-    fontSize: 14,
-    fontWeight: '600',
+    fontSize: Typography.fontSize.base,
+    fontWeight: Typography.fontWeight.semibold,
   },
   infoValue: {
     flex: 1,
     textAlign: 'right',
     color: Colors.textPrimary,
-    fontSize: 15,
-    fontWeight: '700',
+    fontSize: Typography.fontSize.base,
+    fontWeight: Typography.fontWeight.bold,
   },
   actionSection: {
     gap: 10,
@@ -1054,8 +1054,8 @@ const styles = StyleSheet.create({
   },
   actionButtonText: {
     color: Colors.primary,
-    fontSize: 15,
-    fontWeight: '800',
+    fontSize: Typography.fontSize.base,
+    fontWeight: Typography.fontWeight.extrabold,
   },
   actionButtonTextPrimary: {
     color: Colors.white,
@@ -1073,8 +1073,8 @@ const styles = StyleSheet.create({
   },
   topShortcutText: {
     color: Colors.primary,
-    fontSize: 13,
-    fontWeight: '800',
+    fontSize: Typography.fontSize.sm,
+    fontWeight: Typography.fontWeight.extrabold,
   },
   modalBackdrop: {
     flex: 1,
@@ -1094,12 +1094,12 @@ const styles = StyleSheet.create({
   },
   modalTitle: {
     color: Colors.textPrimary,
-    fontSize: 18,
-    fontWeight: '800',
+    fontSize: Typography.fontSize.xl,
+    fontWeight: Typography.fontWeight.extrabold,
   },
   modalMessage: {
     color: Colors.textSecondary,
-    fontSize: 15,
+    fontSize: Typography.fontSize.base,
     lineHeight: 22,
   },
   modalActions: {
@@ -1118,8 +1118,8 @@ const styles = StyleSheet.create({
   },
   modalActionText: {
     color: Colors.primary,
-    fontSize: 15,
-    fontWeight: '800',
+    fontSize: Typography.fontSize.base,
+    fontWeight: Typography.fontWeight.extrabold,
   },
   modalActionTextDanger: {
     color: Colors.error,
@@ -1129,7 +1129,7 @@ const styles = StyleSheet.create({
   },
   modalSecondaryText: {
     color: Colors.textPrimary,
-    fontSize: 15,
-    fontWeight: '700',
+    fontSize: Typography.fontSize.base,
+    fontWeight: Typography.fontWeight.bold,
   },
 });

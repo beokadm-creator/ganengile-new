@@ -22,7 +22,7 @@ import {
 import type { Station } from '../../types/config';
 import type { Locker, LockerSummary } from '../../types/locker';
 import { LockerStatus } from '../../types/locker';
-import { BorderRadius, Colors, Spacing } from '../../theme';
+import { BorderRadius, Colors, Spacing , Typography } from '../../theme';
 
 const FONT_XS = 12;
 const FONT_SM = 14;
@@ -343,7 +343,7 @@ const styles = StyleSheet.create({
     paddingVertical: Spacing.sm,
   },
   filterButtonActive: { backgroundColor: Colors.primary },
-  filterText: { fontSize: FONT_SM, fontWeight: '700', color: Colors.gray700 },
+  filterText: { fontSize: FONT_SM, fontWeight: Typography.fontWeight.bold, color: Colors.gray700 },
   filterTextActive: { color: Colors.white },
   header: { gap: Spacing.md, padding: Spacing.lg },
   headerTop: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
@@ -355,7 +355,7 @@ const styles = StyleSheet.create({
     borderRadius: BorderRadius.full,
     backgroundColor: Colors.gray900,
   },
-  title: { fontSize: FONT_XL, fontWeight: '800', color: Colors.gray900 },
+  title: { fontSize: FONT_XL, fontWeight: Typography.fontWeight.extrabold, color: Colors.gray900 },
   viewToggle: { flexDirection: 'row', gap: Spacing.sm },
   toggleButton: {
     flexDirection: 'row',
@@ -367,7 +367,7 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.gray200,
   },
   toggleButtonActive: { backgroundColor: Colors.primary },
-  toggleText: { fontSize: FONT_SM, fontWeight: '700', color: Colors.gray700 },
+  toggleText: { fontSize: FONT_SM, fontWeight: Typography.fontWeight.bold, color: Colors.gray700 },
   toggleTextActive: { color: Colors.white },
   listContent: { paddingBottom: 48, paddingHorizontal: Spacing.lg },
   lockerItem: {
@@ -389,14 +389,14 @@ const styles = StyleSheet.create({
   },
   lockerInfo: { flex: 1, gap: 4 },
   titleRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: Spacing.sm },
-  lockerName: { flex: 1, fontSize: FONT_MD, fontWeight: '800', color: Colors.gray900 },
-  distanceBadge: { fontSize: FONT_XS, fontWeight: '700', color: Colors.primary },
+  lockerName: { flex: 1, fontSize: FONT_MD, fontWeight: Typography.fontWeight.extrabold, color: Colors.gray900 },
+  distanceBadge: { fontSize: FONT_XS, fontWeight: Typography.fontWeight.bold, color: Colors.primary },
   detailText: { fontSize: FONT_SM, color: Colors.gray600 },
-  emptyTitle: { marginTop: Spacing.md, fontSize: FONT_LG, fontWeight: '800', color: Colors.gray900 },
+  emptyTitle: { marginTop: Spacing.md, fontSize: FONT_LG, fontWeight: Typography.fontWeight.extrabold, color: Colors.gray900 },
   emptySubtitle: { marginTop: Spacing.xs, fontSize: FONT_SM, lineHeight: 20, textAlign: 'center', color: Colors.gray600 },
   mapContainer: { gap: Spacing.lg, padding: Spacing.lg },
   mapListCard: { borderRadius: BorderRadius.xl, backgroundColor: Colors.white, padding: Spacing.lg, gap: Spacing.sm },
-  mapTitle: { fontSize: FONT_LG, fontWeight: '800', color: Colors.gray900 },
+  mapTitle: { fontSize: FONT_LG, fontWeight: Typography.fontWeight.extrabold, color: Colors.gray900 },
   mapSubtitle: { fontSize: FONT_SM, lineHeight: 20, color: Colors.gray600 },
   mapRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing.md, borderRadius: BorderRadius.lg, backgroundColor: Colors.gray50, padding: Spacing.md },
   mapRowIndex: {
@@ -407,9 +407,9 @@ const styles = StyleSheet.create({
     borderRadius: BorderRadius.full,
     backgroundColor: Colors.primary,
   },
-  mapRowIndexText: { fontSize: FONT_XS, fontWeight: '800', color: Colors.white },
+  mapRowIndexText: { fontSize: FONT_XS, fontWeight: Typography.fontWeight.extrabold, color: Colors.white },
   mapRowBody: { flex: 1, gap: 2 },
-  mapRowTitle: { fontSize: FONT_SM, fontWeight: '700', color: Colors.gray900 },
+  mapRowTitle: { fontSize: FONT_SM, fontWeight: Typography.fontWeight.bold, color: Colors.gray900 },
   mapRowMeta: { fontSize: FONT_XS, color: Colors.gray600 },
 });
 

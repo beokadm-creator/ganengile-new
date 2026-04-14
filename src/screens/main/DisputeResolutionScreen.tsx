@@ -399,7 +399,7 @@ const styles = StyleSheet.create({
   },
   emptyTitle: {
     fontSize: Typography.fontSize.xl,
-    fontWeight: '700',
+    fontWeight: Typography.fontWeight.bold,
     color: Colors.textPrimary,
   },
   emptyDescription: {
@@ -432,7 +432,7 @@ const styles = StyleSheet.create({
   },
   title: {
     fontSize: Typography.fontSize['2xl'],
-    fontWeight: '800',
+    fontWeight: Typography.fontWeight.extrabold,
     color: Colors.textPrimary,
   },
   subtitle: {
@@ -440,7 +440,7 @@ const styles = StyleSheet.create({
     color: Colors.textSecondary,
   },
   urgencyText: {
-    fontWeight: '700',
+    fontWeight: Typography.fontWeight.bold,
   },
   statusBadge: {
     alignSelf: 'flex-start',
@@ -450,7 +450,7 @@ const styles = StyleSheet.create({
   },
   statusText: {
     fontSize: Typography.fontSize.sm,
-    fontWeight: '700',
+    fontWeight: Typography.fontWeight.bold,
   },
   card: {
     backgroundColor: Colors.surface,
@@ -460,7 +460,7 @@ const styles = StyleSheet.create({
   },
   sectionTitle: {
     fontSize: Typography.fontSize.xl,
-    fontWeight: '800',
+    fontWeight: Typography.fontWeight.extrabold,
     color: Colors.textPrimary,
   },
   description: {
@@ -482,7 +482,7 @@ const styles = StyleSheet.create({
   },
   historyTitle: {
     fontSize: Typography.fontSize.base,
-    fontWeight: '700',
+    fontWeight: Typography.fontWeight.bold,
     color: Colors.textPrimary,
   },
   historyMeta: {

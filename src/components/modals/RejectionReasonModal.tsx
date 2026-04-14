@@ -79,14 +79,14 @@ const styles = StyleSheet.create({
     maxWidth: 360,
   },
   title: {
-    fontSize: 20,
+    fontSize: Typography.fontSize['2xl'],
     fontWeight: 'bold',
     color: '#333',
     textAlign: 'center',
     marginBottom: 8,
   },
   subtitle: {
-    fontSize: 14,
+    fontSize: Typography.fontSize.base,
     color: '#666',
     textAlign: 'center',
     marginBottom: 24,
@@ -103,11 +103,11 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   reasonIcon: {
-    fontSize: 24,
+    fontSize: Typography.fontSize['3xl'],
     marginRight: 16,
   },
   reasonLabel: {
-    fontSize: 16,
+    fontSize: Typography.fontSize.lg,
     color: '#333',
     flex: 1,
   },
@@ -117,7 +117,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   cancelButtonText: {
-    fontSize: 16,
+    fontSize: Typography.fontSize.lg,
     color: '#666',
   },
 });

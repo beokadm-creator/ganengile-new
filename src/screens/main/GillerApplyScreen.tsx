@@ -1,4 +1,4 @@
-import { Colors } from '../../theme';
+import { Colors , Typography } from '../../theme';
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
@@ -506,8 +506,8 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     paddingTop: 12,
     color: Colors.textSecondary,
-    fontSize: 13,
-    fontWeight: '700',
+    fontSize: Typography.fontSize.sm,
+    fontWeight: Typography.fontWeight.bold,
   },
   stepContent: {
     flex: 1,
@@ -515,13 +515,13 @@ const styles = StyleSheet.create({
     paddingTop: 16,
   },
   stepTitle: {
-    fontSize: 28,
-    fontWeight: '800',
+    fontSize: Typography.fontSize['4xl'],
+    fontWeight: Typography.fontWeight.extrabold,
     color: Colors.textPrimary,
     marginBottom: 8,
   },
   stepDescription: {
-    fontSize: 15,
+    fontSize: Typography.fontSize.base,
     lineHeight: 22,
     color: Colors.textSecondary,
     marginBottom: 20,
@@ -542,8 +542,8 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.primaryMint,
   },
   cardTitle: {
-    fontSize: 17,
-    fontWeight: '800',
+    fontSize: Typography.fontSize.xl,
+    fontWeight: Typography.fontWeight.extrabold,
     color: Colors.textPrimary,
   },
   field: {
@@ -551,8 +551,8 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   label: {
-    fontSize: 14,
-    fontWeight: '700',
+    fontSize: Typography.fontSize.base,
+    fontWeight: Typography.fontWeight.bold,
     color: Colors.textPrimary,
   },
   input: {
@@ -563,13 +563,13 @@ const styles = StyleSheet.create({
     paddingVertical: 14,
     backgroundColor: Colors.surface,
     color: Colors.textPrimary,
-    fontSize: 15,
+    fontSize: Typography.fontSize.base,
   },
   textArea: {
     minHeight: 120,
   },
   helperText: {
-    fontSize: 13,
+    fontSize: Typography.fontSize.sm,
     lineHeight: 19,
     color: Colors.textSecondary,
   },
@@ -587,30 +587,30 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.primaryMint,
   },
   timelineIndexText: {
-    fontSize: 14,
-    fontWeight: '800',
+    fontSize: Typography.fontSize.base,
+    fontWeight: Typography.fontWeight.extrabold,
     color: Colors.primary,
   },
   timelineText: {
     flex: 1,
-    fontSize: 15,
+    fontSize: Typography.fontSize.base,
     color: Colors.textPrimary,
   },
   alertCard: {
     backgroundColor: Colors.warningLight,
   },
   alertText: {
-    fontSize: 14,
+    fontSize: Typography.fontSize.base,
     lineHeight: 20,
     color: Colors.warningDark,
   },
   statusHeadline: {
-    fontSize: 20,
-    fontWeight: '800',
+    fontSize: Typography.fontSize['2xl'],
+    fontWeight: Typography.fontWeight.extrabold,
     color: Colors.textPrimary,
   },
   statusBody: {
-    fontSize: 14,
+    fontSize: Typography.fontSize.base,
     lineHeight: 21,
     color: Colors.textSecondary,
   },
@@ -623,8 +623,8 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   primaryActionText: {
-    fontSize: 15,
-    fontWeight: '800',
+    fontSize: Typography.fontSize.base,
+    fontWeight: Typography.fontWeight.extrabold,
     color: Colors.surface,
   },
   secondaryAction: {
@@ -636,8 +636,8 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   secondaryActionText: {
-    fontSize: 15,
-    fontWeight: '800',
+    fontSize: Typography.fontSize.base,
+    fontWeight: Typography.fontWeight.extrabold,
     color: Colors.primary,
   },
   bankButton: {
@@ -652,16 +652,16 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
   },
   bankButtonText: {
-    fontSize: 15,
+    fontSize: Typography.fontSize.base,
     color: Colors.textPrimary,
   },
   bankPlaceholder: {
     color: Colors.textTertiary,
   },
   bankButtonArrow: {
-    fontSize: 18,
+    fontSize: Typography.fontSize.xl,
     color: Colors.textSecondary,
-    fontWeight: '700',
+    fontWeight: Typography.fontWeight.bold,
   },
   footer: {
     paddingHorizontal: 20,
@@ -682,13 +682,13 @@ const styles = StyleSheet.create({
     opacity: 0.6,
   },
   footerButtonText: {
-    fontSize: 16,
-    fontWeight: '800',
+    fontSize: Typography.fontSize.lg,
+    fontWeight: Typography.fontWeight.extrabold,
     color: Colors.surface,
   },
   submitHint: {
     marginTop: 10,
-    fontSize: 13,
+    fontSize: Typography.fontSize.sm,
     lineHeight: 18,
     color: Colors.error,
   },

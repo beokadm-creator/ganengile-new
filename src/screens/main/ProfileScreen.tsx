@@ -456,14 +456,14 @@ const styles = StyleSheet.create({
   },
   kicker: {
     fontSize: Typography.fontSize.sm,
-    fontWeight: '700',
+    fontWeight: Typography.fontWeight.bold,
     color: Colors.primary,
     textTransform: 'uppercase',
     letterSpacing: 1,
   },
   name: {
     fontSize: Typography.fontSize['2xl'],
-    fontWeight: '800',
+    fontWeight: Typography.fontWeight.extrabold,
     color: Colors.textPrimary,
   },
   subtitle: { color: Colors.textSecondary, ...Typography.body },
@@ -477,7 +477,7 @@ const styles = StyleSheet.create({
   badgeText: {
     color: Colors.primary,
     fontSize: Typography.fontSize.xs,
-    fontWeight: '700',
+    fontWeight: Typography.fontWeight.bold,
   },
   switchButton: {
     marginTop: Spacing.xs,
@@ -491,7 +491,7 @@ const styles = StyleSheet.create({
   },
   switchButtonText: {
     color: Colors.textPrimary,
-    fontWeight: '700',
+    fontWeight: Typography.fontWeight.bold,
     fontSize: Typography.fontSize.base,
   },
   statGrid: {
@@ -511,12 +511,12 @@ const styles = StyleSheet.create({
   miniTitle: {
     color: Colors.textTertiary,
     fontSize: Typography.fontSize.xs,
-    fontWeight: '700',
+    fontWeight: Typography.fontWeight.bold,
   },
   miniValue: {
     color: Colors.textPrimary,
     fontSize: Typography.fontSize.base,
-    fontWeight: '800',
+    fontWeight: Typography.fontWeight.extrabold,
   },
   section: {
     gap: Spacing.sm,
@@ -524,7 +524,7 @@ const styles = StyleSheet.create({
   sectionTitle: {
     color: Colors.textPrimary,
     fontSize: Typography.fontSize.lg,
-    fontWeight: '800',
+    fontWeight: Typography.fontWeight.extrabold,
   },
   linkCard: {
     backgroundColor: Colors.surface,
@@ -547,7 +547,7 @@ const styles = StyleSheet.create({
   linkTitle: {
     color: Colors.textPrimary,
     fontSize: Typography.fontSize.base,
-    fontWeight: '700',
+    fontWeight: Typography.fontWeight.bold,
   },
   linkSubtitle: {
     color: Colors.textTertiary,
@@ -564,7 +564,7 @@ const styles = StyleSheet.create({
   actionButtonText: {
     color: Colors.white,
     fontSize: Typography.fontSize.base,
-    fontWeight: '800',
+    fontWeight: Typography.fontWeight.extrabold,
   },
   logoutButton: {
     minHeight: 52,
@@ -575,7 +575,7 @@ const styles = StyleSheet.create({
   },
   logoutText: {
     color: Colors.textPrimary,
-    fontWeight: '700',
+    fontWeight: Typography.fontWeight.bold,
     fontSize: Typography.fontSize.base,
   },
 });

@@ -5,6 +5,7 @@
 
 import React from 'react';
 import { ScrollView, TouchableOpacity, Text, StyleSheet } from 'react-native';
+import { Typography } from '../../theme';
 
 interface Props {
   selectedLines: string[];
@@ -98,8 +99,8 @@ const styles = StyleSheet.create({
   },
   lineButtonText: {
     color: '#333',
-    fontSize: 14,
-    fontWeight: '600',
+    fontSize: Typography.fontSize.base,
+    fontWeight: Typography.fontWeight.semibold,
   },
   lineButtonTextActive: {
     color: '#fff',

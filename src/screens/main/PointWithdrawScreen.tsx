@@ -275,8 +275,8 @@ const styles = StyleSheet.create({
     padding: Spacing.xl,
   },
   kicker: {
-    fontSize: 11,
-    fontWeight: '800',
+    fontSize: Typography.fontSize.xs,
+    fontWeight: Typography.fontWeight.extrabold,
     color: Colors.warning,
     textTransform: 'uppercase',
     letterSpacing: 1.2,
@@ -284,7 +284,7 @@ const styles = StyleSheet.create({
   },
   title: {
     fontSize: Typography.fontSize['2xl'],
-    fontWeight: '800',
+    fontWeight: Typography.fontWeight.extrabold,
     color: Colors.textPrimary,
     marginBottom: 8,
   },
@@ -300,7 +300,7 @@ const styles = StyleSheet.create({
   },
   noticeTitle: {
     fontSize: Typography.fontSize.base,
-    fontWeight: '800',
+    fontWeight: Typography.fontWeight.extrabold,
     color: Colors.warningDark,
     marginBottom: 8,
   },
@@ -317,7 +317,7 @@ const styles = StyleSheet.create({
   },
   guardTitle: {
     fontSize: Typography.fontSize.base,
-    fontWeight: '800',
+    fontWeight: Typography.fontWeight.extrabold,
     color: Colors.textPrimary,
   },
   guardRow: {
@@ -327,7 +327,7 @@ const styles = StyleSheet.create({
   },
   guardState: {
     fontSize: Typography.fontSize.xs,
-    fontWeight: '800',
+    fontWeight: Typography.fontWeight.extrabold,
     minWidth: 60,
   },
   guardStateOk: {
@@ -354,7 +354,7 @@ const styles = StyleSheet.create({
   },
   balanceValue: {
     fontSize: Typography.fontSize['3xl'],
-    fontWeight: '800',
+    fontWeight: Typography.fontWeight.extrabold,
     color: Colors.textPrimary,
   },
   quickActions: {
@@ -371,7 +371,7 @@ const styles = StyleSheet.create({
   secondaryButtonText: {
     color: Colors.success,
     fontSize: Typography.fontSize.sm,
-    fontWeight: '800',
+    fontWeight: Typography.fontWeight.extrabold,
   },
   formCard: {
     backgroundColor: Colors.surface,
@@ -384,7 +384,7 @@ const styles = StyleSheet.create({
   },
   fieldLabel: {
     fontSize: Typography.fontSize.sm,
-    fontWeight: '700',
+    fontWeight: Typography.fontWeight.bold,
     color: Colors.gray700,
   },
   input: {
@@ -409,6 +409,6 @@ const styles = StyleSheet.create({
   submitButtonText: {
     color: Colors.white,
     fontSize: Typography.fontSize.base,
-    fontWeight: '800',
+    fontWeight: Typography.fontWeight.extrabold,
   },
 });

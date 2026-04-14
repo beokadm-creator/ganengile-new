@@ -15,6 +15,7 @@ import {
   Alert,
 } from 'react-native';
 import BankSelectModal from './BankSelectModal';
+import { Typography } from '../../theme';
 
 interface Props {
   visible: boolean;
@@ -197,7 +198,7 @@ const styles = StyleSheet.create({
     borderBottomColor: '#E0E0E0',
   },
   title: {
-    fontSize: 18,
+    fontSize: Typography.fontSize.xl,
     fontWeight: 'bold',
     color: '#333',
   },
@@ -205,7 +206,7 @@ const styles = StyleSheet.create({
     padding: 4,
   },
   closeButtonText: {
-    fontSize: 20,
+    fontSize: Typography.fontSize['2xl'],
     color: '#666',
   },
   content: {
@@ -215,8 +216,8 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   label: {
-    fontSize: 14,
-    fontWeight: '600',
+    fontSize: Typography.fontSize.base,
+    fontWeight: Typography.fontWeight.semibold,
     color: '#333',
     marginBottom: 8,
   },
@@ -229,18 +230,18 @@ const styles = StyleSheet.create({
     borderRadius: 8,
   },
   value: {
-    fontSize: 16,
+    fontSize: Typography.fontSize.lg,
     color: '#333',
   },
   arrow: {
-    fontSize: 20,
+    fontSize: Typography.fontSize['2xl'],
     color: '#999',
   },
   textInput: {
     padding: 12,
     backgroundColor: '#F5F5F5',
     borderRadius: 8,
-    fontSize: 16,
+    fontSize: Typography.fontSize.lg,
     color: '#333',
   },
   noticeBox: {
@@ -251,12 +252,12 @@ const styles = StyleSheet.create({
     marginTop: 8,
   },
   noticeIcon: {
-    fontSize: 16,
+    fontSize: Typography.fontSize.lg,
     marginRight: 8,
   },
   noticeText: {
     flex: 1,
-    fontSize: 12,
+    fontSize: Typography.fontSize.sm,
     color: '#1976D2',
     lineHeight: 18,
   },
@@ -278,16 +279,16 @@ const styles = StyleSheet.create({
     backgroundColor: '#F5F5F5',
   },
   cancelButtonText: {
-    fontSize: 16,
-    fontWeight: '600',
+    fontSize: Typography.fontSize.lg,
+    fontWeight: Typography.fontWeight.semibold,
     color: '#666',
   },
   saveButton: {
     backgroundColor: '#2196F3',
   },
   saveButtonText: {
-    fontSize: 16,
-    fontWeight: '600',
+    fontSize: Typography.fontSize.lg,
+    fontWeight: Typography.fontWeight.semibold,
     color: '#fff',
   },
 });

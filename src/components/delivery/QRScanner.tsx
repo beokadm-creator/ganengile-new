@@ -6,6 +6,7 @@
 import React, { useEffect, useState } from 'react';
 import { View, StyleSheet, Text, ActivityIndicator, TouchableOpacity } from 'react-native';
 import { CameraView, Camera } from 'expo-camera';
+import { Typography } from '../../theme';
 
 interface Props {
   onScan: (data: string) => void;
@@ -120,7 +121,7 @@ const styles = StyleSheet.create({
   },
   closeButtonText: {
     color: '#fff',
-    fontSize: 20,
+    fontSize: Typography.fontSize['2xl'],
     fontWeight: 'bold',
   },
   container: {
@@ -173,21 +174,21 @@ const styles = StyleSheet.create({
   },
   errorText: {
     color: '#fff',
-    fontSize: 18,
+    fontSize: Typography.fontSize.xl,
     fontWeight: 'bold',
     marginBottom: 12,
     textAlign: 'center',
   },
   instruction: {
     color: '#fff',
-    fontSize: 16,
-    fontWeight: '600',
+    fontSize: Typography.fontSize.lg,
+    fontWeight: Typography.fontWeight.semibold,
     marginTop: 24,
     textAlign: 'center',
   },
   message: {
     color: '#fff',
-    fontSize: 16,
+    fontSize: Typography.fontSize.lg,
     marginTop: 12,
   },
   overlay: {
@@ -206,7 +207,7 @@ const styles = StyleSheet.create({
   },
   rescanButtonText: {
     color: '#fff',
-    fontSize: 16,
+    fontSize: Typography.fontSize.lg,
     fontWeight: 'bold',
   },
   scanArea: {
@@ -216,7 +217,7 @@ const styles = StyleSheet.create({
   },
   subText: {
     color: '#999',
-    fontSize: 14,
+    fontSize: Typography.fontSize.base,
     marginTop: 8,
     paddingHorizontal: 32,
     textAlign: 'center',

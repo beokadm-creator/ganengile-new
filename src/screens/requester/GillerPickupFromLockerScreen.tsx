@@ -1,4 +1,4 @@
-import { Colors } from '../../theme';
+import { Colors , Typography } from '../../theme';
 import React, { useCallback, useEffect, useState } from 'react';
 import {
   ActivityIndicator,
@@ -339,13 +339,13 @@ const styles = StyleSheet.create({
   },
   emptyTitle: {
     marginTop: 12,
-    fontSize: 20,
-    fontWeight: '700',
+    fontSize: Typography.fontSize['2xl'],
+    fontWeight: Typography.fontWeight.bold,
     color: Colors.textPrimary,
   },
   emptyDescription: {
     marginTop: 8,
-    fontSize: 14,
+    fontSize: Typography.fontSize.base,
     lineHeight: 20,
     textAlign: 'center',
     color: Colors.textSecondary,
@@ -367,18 +367,18 @@ const styles = StyleSheet.create({
     borderRadius: 999,
     backgroundColor: Colors.primaryMint,
     color: Colors.primary,
-    fontSize: 12,
-    fontWeight: '700',
+    fontSize: Typography.fontSize.sm,
+    fontWeight: Typography.fontWeight.bold,
   },
   heroTitle: {
     marginTop: 14,
-    fontSize: 24,
-    fontWeight: '800',
+    fontSize: Typography.fontSize['3xl'],
+    fontWeight: Typography.fontWeight.extrabold,
     color: Colors.textPrimary,
   },
   heroSubtitle: {
     marginTop: 8,
-    fontSize: 14,
+    fontSize: Typography.fontSize.base,
     lineHeight: 21,
     color: Colors.textSecondary,
   },
@@ -405,15 +405,15 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.primaryMint,
   },
   summaryChipText: {
-    fontSize: 13,
-    fontWeight: '700',
+    fontSize: Typography.fontSize.sm,
+    fontWeight: Typography.fontWeight.bold,
     color: Colors.textSecondary,
   },
   summaryChipTextActive: {
     color: Colors.primary,
   },
   summaryText: {
-    fontSize: 14,
+    fontSize: Typography.fontSize.base,
     lineHeight: 20,
     color: Colors.textSecondary,
   },
@@ -428,8 +428,8 @@ const styles = StyleSheet.create({
     elevation: 3,
   },
   sectionTitle: {
-    fontSize: 18,
-    fontWeight: '800',
+    fontSize: Typography.fontSize.xl,
+    fontWeight: Typography.fontWeight.extrabold,
     color: Colors.textPrimary,
     marginBottom: 16,
   },
@@ -437,13 +437,13 @@ const styles = StyleSheet.create({
     marginBottom: 14,
   },
   infoLabel: {
-    fontSize: 13,
-    fontWeight: '700',
+    fontSize: Typography.fontSize.sm,
+    fontWeight: Typography.fontWeight.bold,
     color: Colors.textSecondary,
     marginBottom: 6,
   },
   infoValue: {
-    fontSize: 15,
+    fontSize: Typography.fontSize.base,
     lineHeight: 22,
     color: Colors.textPrimary,
   },
@@ -467,13 +467,13 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   timelineTitle: {
-    fontSize: 15,
-    fontWeight: '700',
+    fontSize: Typography.fontSize.base,
+    fontWeight: Typography.fontWeight.bold,
     color: Colors.textPrimary,
   },
   timelineDescription: {
     marginTop: 4,
-    fontSize: 14,
+    fontSize: Typography.fontSize.base,
     lineHeight: 20,
     color: Colors.textSecondary,
   },
@@ -486,8 +486,8 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   primaryButtonText: {
-    fontSize: 15,
-    fontWeight: '700',
+    fontSize: Typography.fontSize.base,
+    fontWeight: Typography.fontWeight.bold,
     color: Colors.surface,
   },
   completeCard: {
@@ -498,13 +498,13 @@ const styles = StyleSheet.create({
   },
   completeTitle: {
     marginTop: 10,
-    fontSize: 20,
-    fontWeight: '800',
+    fontSize: Typography.fontSize['2xl'],
+    fontWeight: Typography.fontWeight.extrabold,
     color: Colors.primary,
   },
   completeDescription: {
     marginTop: 8,
-    fontSize: 14,
+    fontSize: Typography.fontSize.base,
     lineHeight: 21,
     color: Colors.primary,
   },
@@ -518,8 +518,8 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.surface,
   },
   secondaryButtonText: {
-    fontSize: 14,
-    fontWeight: '700',
+    fontSize: Typography.fontSize.base,
+    fontWeight: Typography.fontWeight.bold,
     color: Colors.primary,
   },
 });

@@ -298,12 +298,12 @@ const styles = StyleSheet.create({
   },
   checkmark: {
     color: Colors.white,
-    fontSize: 60,
+    fontSize: 60, // checkmark glyph — intentionally large
     fontWeight: 'bold',
   },
   message: {
     color: Colors.white,
-    fontSize: 18,
+    fontSize: Typography.fontSize.xl,
     fontWeight: Typography.fontWeight.bold,
     marginTop: Spacing.lg,
     textAlign: 'center',
@@ -346,19 +346,19 @@ const styles = StyleSheet.create({
   },
   overlayIconText: {
     color: Colors.white,
-    fontSize: 30,
+    fontSize: Typography.fontSize['5xl'],
     fontWeight: 'bold',
   },
   overlayMessage: {
     color: Colors.textPrimary,
-    fontSize: 18,
+    fontSize: Typography.fontSize.xl,
     fontWeight: Typography.fontWeight.bold,
     marginBottom: Spacing.sm,
     textAlign: 'center',
   },
   overlaySubmessage: {
     color: Colors.textSecondary,
-    fontSize: 14,
+    fontSize: Typography.fontSize.base,
     textAlign: 'center',
   },
 });

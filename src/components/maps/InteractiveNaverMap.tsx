@@ -209,6 +209,6 @@ const styles = StyleSheet.create({
   },
   fallbackText: {
     color: '#64748B',
-    fontSize: 14,
+    fontSize: Typography.fontSize.base,
   }
 });

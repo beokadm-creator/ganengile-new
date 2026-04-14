@@ -117,7 +117,7 @@ const styles = StyleSheet.create({
     width: 48,
   },
   methodEmoji: {
-    fontSize: 24,
+    fontSize: Typography.fontSize['3xl'],
   },
   methodInfo: {
     flex: 1,

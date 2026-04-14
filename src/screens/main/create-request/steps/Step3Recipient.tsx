@@ -144,7 +144,7 @@ const styles = StyleSheet.create({
   multilineInput: { height: 100, textAlignVertical: 'top' },
   noticeBox: { backgroundColor: Colors.gray50, padding: Spacing.lg, borderRadius: BorderRadius.md, marginTop: Spacing.xs },
   noticeTitle: { color: Colors.textPrimary, fontWeight: Typography.fontWeight.bold, marginBottom: Spacing.sm },
-  noticeText: { color: Colors.textSecondary, fontSize: 13, marginBottom: Spacing.xs },
+  noticeText: { color: Colors.textSecondary, fontSize: Typography.fontSize.sm, marginBottom: Spacing.xs },
   checkboxRow: { flexDirection: 'row', alignItems: 'center', marginTop: Spacing.md, gap: Spacing.sm },
   checkboxText: { flex: 1, color: Colors.textPrimary, fontSize: Typography.fontSize.base, fontWeight: Typography.fontWeight.semibold },
   verifiedPhoneBox: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', backgroundColor: Colors.gray50, padding: Spacing.lg, borderRadius: BorderRadius.md },
@@ -154,6 +154,6 @@ const styles = StyleSheet.create({
   flex1: { flex: 1, marginBottom: 0 },
   otpButton: { backgroundColor: Colors.primary, paddingHorizontal: 20, borderRadius: BorderRadius.md, justifyContent: 'center', alignItems: 'center' },
   otpButtonText: { color: Colors.white, fontWeight: Typography.fontWeight.bold },
-  devHintText: { color: Colors.primary, fontWeight: Typography.fontWeight.bold, fontSize: 12 },
+  devHintText: { color: Colors.primary, fontWeight: Typography.fontWeight.bold, fontSize: Typography.fontSize.sm },
   successText: { color: Colors.primary, fontWeight: Typography.fontWeight.bold, marginTop: Spacing.sm },
 });

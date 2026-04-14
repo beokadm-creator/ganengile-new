@@ -266,7 +266,7 @@ const styles = StyleSheet.create({
   exposureText: {
     color: Colors.error,
     fontSize: Typography.fontSize.xs,
-    fontWeight: '700',
+    fontWeight: Typography.fontWeight.bold,
   },
   detailButton: {
     paddingHorizontal: Spacing.sm,
@@ -277,21 +277,21 @@ const styles = StyleSheet.create({
   detailButtonText: {
     color: '#4E5968', // Secondary
     fontSize: Typography.fontSize.xs,
-    fontWeight: '600',
+    fontWeight: Typography.fontWeight.semibold,
   },
   mainContent: {
     marginBottom: Spacing.md,
   },
   routeLabel: {
-    fontSize: 20,
-    fontWeight: '700',
+    fontSize: Typography.fontSize['2xl'],
+    fontWeight: Typography.fontWeight.bold,
     color: '#191F28', // Primary
     marginBottom: 4,
     letterSpacing: -0.3,
   },
   windowLabel: {
-    fontSize: 14,
-    fontWeight: '500',
+    fontSize: Typography.fontSize.base,
+    fontWeight: Typography.fontWeight.medium,
     color: '#8B95A1', // Tertiary
     marginBottom: Spacing.lg,
   },
@@ -301,8 +301,8 @@ const styles = StyleSheet.create({
     gap: Spacing.sm,
   },
   rewardAmount: {
-    fontSize: 28,
-    fontWeight: '800',
+    fontSize: Typography.fontSize['4xl'],
+    fontWeight: Typography.fontWeight.extrabold,
     color: '#191F28', // 강렬한 텍스트
     letterSpacing: -0.5,
   },
@@ -314,8 +314,8 @@ const styles = StyleSheet.create({
   },
   rewardBoostText: {
     color: '#E53E3E',
-    fontSize: 12,
-    fontWeight: '800',
+    fontSize: Typography.fontSize.sm,
+    fontWeight: Typography.fontWeight.extrabold,
   },
   strategyContainer: {
     backgroundColor: '#F9FAFB',
@@ -324,13 +324,13 @@ const styles = StyleSheet.create({
     marginBottom: Spacing.md,
   },
   strategyTitle: {
-    fontSize: 14,
-    fontWeight: '700',
+    fontSize: Typography.fontSize.base,
+    fontWeight: Typography.fontWeight.bold,
     color: '#4E5968',
     marginBottom: 2,
   },
   strategyBody: {
-    fontSize: 13,
+    fontSize: Typography.fontSize.sm,
     color: '#8B95A1',
     lineHeight: 20,
   },
@@ -348,8 +348,8 @@ const styles = StyleSheet.create({
   },
   nextActionText: {
     color: Colors.primaryDark,
-    fontSize: 14,
-    fontWeight: '700',
+    fontSize: Typography.fontSize.base,
+    fontWeight: Typography.fontWeight.bold,
     textAlign: 'center',
   },
   mapWrap: {
@@ -379,13 +379,13 @@ const styles = StyleSheet.create({
     marginBottom: Spacing.xs,
   },
   optionTitle: {
-    fontSize: 15,
-    fontWeight: '700',
+    fontSize: Typography.fontSize.base,
+    fontWeight: Typography.fontWeight.bold,
     color: '#191F28',
   },
   optionReward: {
-    fontSize: 16,
-    fontWeight: '800',
+    fontSize: Typography.fontSize.lg,
+    fontWeight: Typography.fontWeight.extrabold,
     color: Colors.primary,
   },
   optionSignalRow: {
@@ -395,7 +395,7 @@ const styles = StyleSheet.create({
     marginBottom: Spacing.sm,
   },
   optionSummary: {
-    fontSize: 13,
+    fontSize: Typography.fontSize.sm,
     color: '#4E5968',
     marginBottom: Spacing.md,
     lineHeight: 20,
@@ -411,8 +411,8 @@ const styles = StyleSheet.create({
   },
   actionButtonText: {
     color: Colors.white,
-    fontSize: 14,
-    fontWeight: '700',
+    fontSize: Typography.fontSize.base,
+    fontWeight: Typography.fontWeight.bold,
   },
   actionButtonTextDisabled: {
     color: '#B0B8C1',
@@ -424,8 +424,8 @@ const styles = StyleSheet.create({
   },
   inlineSecondaryButtonText: {
     color: '#8B95A1',
-    fontSize: 13,
-    fontWeight: '600',
+    fontSize: Typography.fontSize.sm,
+    fontWeight: Typography.fontWeight.semibold,
     textDecorationLine: 'underline',
   },
   primaryAcceptButton: {
@@ -438,8 +438,8 @@ const styles = StyleSheet.create({
   },
   primaryAcceptButtonText: {
     color: Colors.white,
-    fontSize: 16,
-    fontWeight: '700',
+    fontSize: Typography.fontSize.lg,
+    fontWeight: Typography.fontWeight.bold,
   },
   previewButton: {
     backgroundColor: '#F2F4F6',

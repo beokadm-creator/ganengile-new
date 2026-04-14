@@ -97,7 +97,7 @@ const styles = StyleSheet.create({
   },
   cancelText: {
     color: '#333',
-    fontSize: 14,
+    fontSize: Typography.fontSize.base,
     fontWeight: 'bold',
   },
   confirm: {
@@ -105,7 +105,7 @@ const styles = StyleSheet.create({
   },
   confirmText: {
     color: '#fff',
-    fontSize: 14,
+    fontSize: Typography.fontSize.base,
     fontWeight: 'bold',
   },
   container: {
@@ -124,7 +124,7 @@ const styles = StyleSheet.create({
     maxHeight: 120,
     padding: 12,
     textAlignVertical: 'top',
-    fontSize: 14,
+    fontSize: Typography.fontSize.base,
   },
   overlay: {
     alignItems: 'center',
@@ -135,12 +135,12 @@ const styles = StyleSheet.create({
   },
   subtitle: {
     color: '#666',
-    fontSize: 13,
+    fontSize: Typography.fontSize.sm,
     marginBottom: 12,
   },
   title: {
     color: '#333',
-    fontSize: 18,
+    fontSize: Typography.fontSize.xl,
     fontWeight: 'bold',
     marginBottom: 8,
   },

@@ -194,7 +194,7 @@ const styles = StyleSheet.create({
   },
   timeLarge: {
     color: Colors.primary,
-    fontSize: 48,
+    fontSize: 48, // time digit display — intentionally large
     fontWeight: Typography.fontWeight.bold,
     letterSpacing: 2,
   },

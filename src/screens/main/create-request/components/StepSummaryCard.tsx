@@ -72,13 +72,13 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   badgeText: {
-    fontSize: 12,
-    fontWeight: '700',
+    fontSize: Typography.fontSize.sm,
+    fontWeight: Typography.fontWeight.bold,
     color: Colors.textSecondary,
   },
   title: {
     fontSize: Typography.fontSize.sm,
-    fontWeight: '700',
+    fontWeight: Typography.fontWeight.bold,
     color: Colors.textPrimary,
   },
   content: {

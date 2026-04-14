@@ -226,8 +226,8 @@ const styles = StyleSheet.create({
   },
   label: {
     marginTop: 8,
-    fontSize: 12,
-    fontWeight: '700',
+    fontSize: Typography.fontSize.sm,
+    fontWeight: Typography.fontWeight.bold,
     textAlign: 'center',
   },
   labelActive: {

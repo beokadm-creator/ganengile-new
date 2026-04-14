@@ -6,6 +6,7 @@
 import React, { useEffect, useState } from 'react';
 import { View, Text, StyleSheet, Animated } from 'react-native';
 import { useNetInfo } from '@react-native-community/netinfo';
+import { Typography } from '../theme';
 
 interface OfflineIndicatorProps {
   height?: number;
@@ -77,13 +78,13 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16
   },
   icon: {
-    fontSize: 18,
+    fontSize: Typography.fontSize.xl,
     marginRight: 8
   },
   text: {
     color: '#ffffff',
-    fontSize: 14,
-    fontWeight: '600',
+    fontSize: Typography.fontSize.base,
+    fontWeight: Typography.fontWeight.semibold,
     textAlign: 'center'
   }
 });

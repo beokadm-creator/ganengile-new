@@ -1,4 +1,4 @@
-import { Colors } from '../../theme';
+import { Colors , Typography } from '../../theme';
 import React, { useMemo, useState } from 'react';
 import {
   ActivityIndicator,
@@ -166,12 +166,12 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   title: {
-    fontSize: 28,
-    fontWeight: '800',
+    fontSize: Typography.fontSize['4xl'],
+    fontWeight: Typography.fontWeight.extrabold,
     color: Colors.textPrimary,
   },
   subtitle: {
-    fontSize: 15,
+    fontSize: Typography.fontSize.base,
     lineHeight: 22,
     color: Colors.textSecondary,
   },
@@ -187,8 +187,8 @@ const styles = StyleSheet.create({
     elevation: 3,
   },
   sectionTitle: {
-    fontSize: 18,
-    fontWeight: '800',
+    fontSize: Typography.fontSize.xl,
+    fontWeight: Typography.fontWeight.extrabold,
     color: Colors.textPrimary,
   },
   starRow: {
@@ -199,7 +199,7 @@ const styles = StyleSheet.create({
     padding: 8,
   },
   starText: {
-    fontSize: 38,
+    fontSize: 38, // star rating display — intentionally large
     color: Colors.border,
   },
   starTextActive: {
@@ -220,8 +220,8 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.primaryMint,
   },
   tagButtonText: {
-    fontSize: 13,
-    fontWeight: '700',
+    fontSize: Typography.fontSize.sm,
+    fontWeight: Typography.fontWeight.bold,
     color: Colors.textSecondary,
   },
   tagButtonTextActive: {
@@ -233,7 +233,7 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     paddingHorizontal: 16,
     paddingVertical: 14,
-    fontSize: 15,
+    fontSize: Typography.fontSize.base,
     backgroundColor: Colors.surface,
     color: Colors.textPrimary,
   },
@@ -252,7 +252,7 @@ const styles = StyleSheet.create({
     gap: 4,
   },
   helperText: {
-    fontSize: 14,
+    fontSize: Typography.fontSize.base,
     lineHeight: 20,
     color: Colors.textSecondary,
   },
@@ -264,8 +264,8 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.primary,
   },
   primaryButtonText: {
-    fontSize: 15,
-    fontWeight: '700',
+    fontSize: Typography.fontSize.base,
+    fontWeight: Typography.fontWeight.bold,
     color: Colors.surface,
   },
 });

@@ -33,7 +33,7 @@ import {
   type RouteCoordinate,
 } from '../../services/naver-route-service';
 import { getRequestById, subscribeToRequest } from '../../services/request-service';
-import { BorderRadius, Colors, Shadows, Spacing } from '../../theme';
+import { BorderRadius, Colors, Shadows, Spacing , Typography } from '../../theme';
 import type { MainStackNavigationProp, MainStackParamList } from '../../types/navigation';
 import { formatWeightDisplay } from '../../utils/package-weight';
 import { toTrackingModel, type TrackingEvent, type TrackingModel } from '../../utils/request-adapters';
@@ -721,7 +721,7 @@ const styles = StyleSheet.create({
   centerText: {
     marginTop: Spacing.md,
     color: Colors.textSecondary,
-    fontSize: 16,
+    fontSize: Typography.fontSize.lg,
   },
   hero: {
     backgroundColor: Colors.white,
@@ -733,14 +733,14 @@ const styles = StyleSheet.create({
     ...Shadows.sm,
   },
   heroKicker: {
-    fontSize: 12,
-    fontWeight: '800',
+    fontSize: Typography.fontSize.sm,
+    fontWeight: Typography.fontWeight.extrabold,
     color: Colors.primary,
     letterSpacing: 0.5,
   },
   heroTitle: {
-    fontSize: 22,
-    fontWeight: '800',
+    fontSize: Typography.fontSize['3xl'],
+    fontWeight: Typography.fontWeight.extrabold,
     color: Colors.textPrimary,
     lineHeight: 30,
     letterSpacing: -0.5,
@@ -758,13 +758,13 @@ const styles = StyleSheet.create({
   },
   panelTitle: {
     color: Colors.textPrimary,
-    fontSize: 18,
-    fontWeight: '800',
+    fontSize: Typography.fontSize.xl,
+    fontWeight: Typography.fontWeight.extrabold,
     marginBottom: 4,
   },
   panelBody: {
     color: Colors.textSecondary,
-    fontSize: 14,
+    fontSize: Typography.fontSize.base,
     lineHeight: 22,
   },
   infoRow: {
@@ -774,15 +774,15 @@ const styles = StyleSheet.create({
   },
   infoLabel: {
     color: Colors.textTertiary,
-    fontSize: 14,
-    fontWeight: '600',
+    fontSize: Typography.fontSize.base,
+    fontWeight: Typography.fontWeight.semibold,
   },
   infoValue: {
     flex: 1,
     textAlign: 'right',
     color: Colors.textPrimary,
-    fontSize: 15,
-    fontWeight: '700',
+    fontSize: Typography.fontSize.base,
+    fontWeight: Typography.fontWeight.bold,
   },
   partnerRow: {
     paddingVertical: 4,
@@ -792,17 +792,17 @@ const styles = StyleSheet.create({
   },
   partnerTitle: {
     color: Colors.textPrimary,
-    fontSize: 14,
-    fontWeight: '800',
+    fontSize: Typography.fontSize.base,
+    fontWeight: Typography.fontWeight.extrabold,
   },
   partnerMeta: {
     color: Colors.textSecondary,
-    fontSize: 13,
+    fontSize: Typography.fontSize.sm,
     lineHeight: 18,
   },
   partnerMemo: {
     color: Colors.textSecondary,
-    fontSize: 13,
+    fontSize: Typography.fontSize.sm,
     lineHeight: 18,
   },
   stepRow: {
@@ -834,22 +834,22 @@ const styles = StyleSheet.create({
   },
   stepLabel: {
     color: Colors.textPrimary,
-    fontSize: 15,
-    fontWeight: '800',
+    fontSize: Typography.fontSize.base,
+    fontWeight: Typography.fontWeight.extrabold,
   },
   stepState: {
     color: Colors.textTertiary,
-    fontSize: 12,
-    fontWeight: '700',
+    fontSize: Typography.fontSize.sm,
+    fontWeight: Typography.fontWeight.bold,
   },
   stepDescription: {
     color: Colors.textSecondary,
-    fontSize: 14,
+    fontSize: Typography.fontSize.base,
     lineHeight: 20,
   },
   stepTimestamp: {
     color: Colors.textTertiary,
-    fontSize: 12,
+    fontSize: Typography.fontSize.sm,
   },
 
   actionSection: {
@@ -867,8 +867,8 @@ const styles = StyleSheet.create({
   },
   primaryActionText: {
     color: Colors.white,
-    fontSize: 15,
-    fontWeight: '800',
+    fontSize: Typography.fontSize.base,
+    fontWeight: Typography.fontWeight.extrabold,
   },
   secondaryAction: {
     minHeight: 52,
@@ -883,8 +883,8 @@ const styles = StyleSheet.create({
   },
   secondaryActionText: {
     color: Colors.primary,
-    fontSize: 15,
-    fontWeight: '800',
+    fontSize: Typography.fontSize.base,
+    fontWeight: Typography.fontWeight.extrabold,
   },
   disabledAction: {
     opacity: 0.55,

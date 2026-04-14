@@ -187,7 +187,7 @@ const styles = StyleSheet.create({
   },
   totalValue: {
     fontSize: Typography.fontSize['3xl'],
-    fontWeight: '800',
+    fontWeight: Typography.fontWeight.extrabold,
     color: Colors.textPrimary,
   },
   totalActions: {
@@ -205,7 +205,7 @@ const styles = StyleSheet.create({
   primaryButtonText: {
     color: Colors.white,
     fontSize: Typography.fontSize.sm,
-    fontWeight: '800',
+    fontWeight: Typography.fontWeight.extrabold,
   },
   secondaryButton: {
     alignSelf: 'flex-start',
@@ -217,7 +217,7 @@ const styles = StyleSheet.create({
   secondaryButtonText: {
     color: Colors.success,
     fontSize: Typography.fontSize.sm,
-    fontWeight: '800',
+    fontWeight: Typography.fontWeight.extrabold,
   },
   guardCard: {
     backgroundColor: Colors.surface,
@@ -227,7 +227,7 @@ const styles = StyleSheet.create({
   },
   guardTitle: {
     fontSize: Typography.fontSize.base,
-    fontWeight: '800',
+    fontWeight: Typography.fontWeight.extrabold,
     color: Colors.textPrimary,
   },
   guardRow: {
@@ -237,7 +237,7 @@ const styles = StyleSheet.create({
   },
   guardState: {
     fontSize: Typography.fontSize.xs,
-    fontWeight: '800',
+    fontWeight: Typography.fontWeight.extrabold,
     minWidth: 60,
   },
   guardStateOk: {
@@ -265,12 +265,12 @@ const styles = StyleSheet.create({
   },
   rowLabel: {
     fontSize: Typography.fontSize.base,
-    fontWeight: '700',
+    fontWeight: Typography.fontWeight.bold,
     color: Colors.textPrimary,
   },
   rowValue: {
     fontSize: Typography.fontSize.base,
-    fontWeight: '800',
+    fontWeight: Typography.fontWeight.extrabold,
     color: Colors.textPrimary,
   },
 });

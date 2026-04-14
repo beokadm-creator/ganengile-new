@@ -250,7 +250,7 @@ const styles = StyleSheet.create({
   changeButtonText: {
     fontSize: Typography.fontSize.xs,
     color: Colors.textSecondary,
-    fontWeight: '600',
+    fontWeight: Typography.fontWeight.semibold,
   },
   couponNameHint: {
     fontSize: Typography.fontSize.xs,
@@ -264,12 +264,12 @@ const styles = StyleSheet.create({
   value: {
     fontSize: Typography.fontSize.sm,
     color: Colors.textPrimary,
-    fontWeight: '600',
+    fontWeight: Typography.fontWeight.semibold,
   },
   discountValue: {
     fontSize: Typography.fontSize.sm,
     color: Colors.primary,
-    fontWeight: '600',
+    fontWeight: Typography.fontWeight.semibold,
   },
   divider: {
     height: 1,
@@ -279,24 +279,24 @@ const styles = StyleSheet.create({
   finalLabel: {
     fontSize: Typography.fontSize.base,
     color: Colors.textPrimary,
-    fontWeight: '700',
+    fontWeight: Typography.fontWeight.bold,
   },
   finalValue: {
     fontSize: Typography.fontSize.lg,
     color: Colors.primary,
-    fontWeight: '800',
+    fontWeight: Typography.fontWeight.extrabold,
   },
   sheetContainer: { padding: Spacing.xl, minHeight: 300, maxHeight: 500 },
-  sheetTitle: { fontSize: Typography.fontSize.lg, fontWeight: '700', color: Colors.textPrimary, marginBottom: Spacing.md },
+  sheetTitle: { fontSize: Typography.fontSize.lg, fontWeight: Typography.fontWeight.bold, color: Colors.textPrimary, marginBottom: Spacing.md },
   sheetLoading: { flex: 1, justifyContent: 'center', alignItems: 'center' },
   couponList: { paddingBottom: Spacing.xl },
   couponItem: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: Spacing.md, borderRadius: BorderRadius.md, backgroundColor: Colors.white, borderWidth: 1, borderColor: Colors.gray200, marginBottom: Spacing.sm },
   couponItemSelected: { borderColor: Colors.primary, backgroundColor: `${Colors.primary}08` },
-  couponName: { fontSize: Typography.fontSize.base, fontWeight: '600', color: Colors.textPrimary, marginBottom: 2 },
+  couponName: { fontSize: Typography.fontSize.base, fontWeight: Typography.fontWeight.semibold, color: Colors.textPrimary, marginBottom: 2 },
   couponNameSelected: { color: Colors.primary },
   couponDesc: { fontSize: Typography.fontSize.xs, color: Colors.gray500 },
   couponRight: { alignItems: 'flex-end' },
-  couponDiscount: { fontSize: Typography.fontSize.base, fontWeight: '700', color: Colors.textPrimary },
+  couponDiscount: { fontSize: Typography.fontSize.base, fontWeight: Typography.fontWeight.bold, color: Colors.textPrimary },
   couponDiscountSelected: { color: Colors.primary },
   couponExpiry: { fontSize: Typography.fontSize.xs, color: Colors.gray400, marginTop: 2 },
 });

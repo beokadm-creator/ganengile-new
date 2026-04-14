@@ -133,15 +133,15 @@ const styles = StyleSheet.create({
     gap: 6,
   },
   eyebrow: {
-    fontSize: 12,
-    fontWeight: '700',
+    fontSize: Typography.fontSize.sm,
+    fontWeight: Typography.fontWeight.bold,
     letterSpacing: 1,
     color: Colors.primary,
     textTransform: 'uppercase',
   },
   title: {
-    fontSize: 22,
-    fontWeight: '800',
+    fontSize: Typography.fontSize['3xl'],
+    fontWeight: Typography.fontWeight.extrabold,
     color: Colors.textPrimary,
   },
   description: {
@@ -187,12 +187,12 @@ const styles = StyleSheet.create({
   },
   lineChipText: {
     color: Colors.white,
-    fontSize: 11,
-    fontWeight: '700',
+    fontSize: Typography.fontSize.xs,
+    fontWeight: Typography.fontWeight.bold,
   },
   stationName: {
-    fontSize: 18,
-    fontWeight: '700',
+    fontSize: Typography.fontSize.xl,
+    fontWeight: Typography.fontWeight.bold,
     color: Colors.textPrimary,
   },
   stationMeta: {
@@ -206,6 +206,6 @@ const styles = StyleSheet.create({
   },
   distanceText: {
     color: Colors.primary,
-    fontWeight: '700',
+    fontWeight: Typography.fontWeight.bold,
   },
 });

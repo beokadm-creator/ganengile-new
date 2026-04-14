@@ -769,14 +769,14 @@ const styles = StyleSheet.create({
   },
   heroKicker: {
     fontSize: Typography.fontSize.xs,
-    fontWeight: '800',
+    fontWeight: Typography.fontWeight.extrabold,
     color: Colors.primary,
     textTransform: 'uppercase',
     letterSpacing: 1,
   },
   heroTitle: {
     fontSize: Typography.fontSize['2xl'],
-    fontWeight: '800',
+    fontWeight: Typography.fontWeight.extrabold,
     color: Colors.textPrimary,
     lineHeight: 32,
   },
@@ -799,7 +799,7 @@ const styles = StyleSheet.create({
   },
   summaryValue: {
     fontSize: Typography.fontSize.xl,
-    fontWeight: '800',
+    fontWeight: Typography.fontWeight.extrabold,
     color: Colors.textPrimary,
   },
   summaryLabel: {
@@ -820,7 +820,7 @@ const styles = StyleSheet.create({
   primaryActionText: {
     color: Colors.white,
     fontSize: Typography.fontSize.base,
-    fontWeight: '800',
+    fontWeight: Typography.fontWeight.extrabold,
   },
   emptyCard: {
     backgroundColor: Colors.surface,
@@ -832,7 +832,7 @@ const styles = StyleSheet.create({
   emptyTitle: {
     color: Colors.textPrimary,
     fontSize: Typography.fontSize.xl,
-    fontWeight: '700',
+    fontWeight: Typography.fontWeight.bold,
   },
   emptySubtitle: {
     color: Colors.textTertiary,
@@ -852,7 +852,7 @@ const styles = StyleSheet.create({
   },
   phaseLabel: {
     color: Colors.primary,
-    fontWeight: '800',
+    fontWeight: Typography.fontWeight.extrabold,
     fontSize: Typography.fontSize.sm,
   },
   requestTime: {
@@ -862,7 +862,7 @@ const styles = StyleSheet.create({
   routeTitle: {
     color: Colors.textPrimary,
     fontSize: Typography.fontSize.xl,
-    fontWeight: '800',
+    fontWeight: Typography.fontWeight.extrabold,
   },
   routeSubtitle: {
     color: Colors.textSecondary,
@@ -886,7 +886,7 @@ const styles = StyleSheet.create({
   },
   stepPillText: {
     fontSize: Typography.fontSize.xs,
-    fontWeight: '700',
+    fontWeight: Typography.fontWeight.bold,
   },
   stepPillTextActive: {
     color: Colors.primary,
@@ -934,7 +934,7 @@ const styles = StyleSheet.create({
   secondaryActionText: {
     color: Colors.primary,
     fontSize: Typography.fontSize.sm,
-    fontWeight: '700',
+    fontWeight: Typography.fontWeight.bold,
   },
   warningAction: {
     backgroundColor: '#FEE2E2',
@@ -964,7 +964,7 @@ const styles = StyleSheet.create({
   modalTitle: {
     color: Colors.textPrimary,
     fontSize: Typography.fontSize.lg,
-    fontWeight: '800',
+    fontWeight: Typography.fontWeight.extrabold,
   },
   modalMessage: {
     color: Colors.textSecondary,
@@ -987,7 +987,7 @@ const styles = StyleSheet.create({
   modalActionText: {
     color: Colors.primary,
     fontSize: Typography.fontSize.base,
-    fontWeight: '800',
+    fontWeight: Typography.fontWeight.extrabold,
   },
   modalActionTextDanger: {
     color: Colors.error,
@@ -998,6 +998,6 @@ const styles = StyleSheet.create({
   modalSecondaryText: {
     color: Colors.textPrimary,
     fontSize: Typography.fontSize.base,
-    fontWeight: '700',
+    fontWeight: Typography.fontWeight.bold,
   },
 });

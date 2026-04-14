@@ -127,7 +127,7 @@ const styles = StyleSheet.create({
   infoValue: {
     ...Typography.body,
     color: Colors.text.primary,
-    fontWeight: '600',
+    fontWeight: Typography.fontWeight.semibold,
   },
   feeContainer: {
     flexDirection: 'row',
@@ -147,7 +147,7 @@ const styles = StyleSheet.create({
   },
   feeValue: {
     ...Typography.body,
-    fontWeight: '700',
+    fontWeight: Typography.fontWeight.bold,
   },
   feeValuePositive: {
     color: Colors.success,

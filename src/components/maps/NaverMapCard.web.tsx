@@ -4,6 +4,7 @@ import type { CSSProperties, ReactElement } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import { canUseDynamicWebMap, getNaverWebSdkUrl } from '../../config/map-config';
 import StaticMapPreview from './StaticMapPreview';
+import { Typography } from '../../theme';
 
 type Marker = {
   latitude: number;
@@ -190,13 +191,13 @@ const styles = StyleSheet.create({
     width: '100%',
   },
   title: {
-    fontSize: 16,
-    fontWeight: '700',
+    fontSize: Typography.fontSize.lg,
+    fontWeight: Typography.fontWeight.bold,
     color: '#0f172a',
   },
   subtitle: {
     marginTop: 4,
-    fontSize: 13,
+    fontSize: Typography.fontSize.sm,
     color: '#64748b',
   },
   fallbackWrap: {

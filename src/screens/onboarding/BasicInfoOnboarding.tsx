@@ -478,14 +478,14 @@ const styles = StyleSheet.create({
   eyebrow: {
     color: Colors.primary,
     fontSize: Typography.fontSize.xs,
-    fontWeight: '800',
+    fontWeight: Typography.fontWeight.extrabold,
     letterSpacing: 1,
     textTransform: 'uppercase',
   },
   title: {
     color: Colors.textPrimary,
     fontSize: Typography.fontSize['2xl'],
-    fontWeight: '800',
+    fontWeight: Typography.fontWeight.extrabold,
     lineHeight: 32,
   },
   description: {
@@ -504,12 +504,12 @@ const styles = StyleSheet.create({
   sectionTitle: {
     color: Colors.textPrimary,
     fontSize: Typography.fontSize.lg,
-    fontWeight: '800',
+    fontWeight: Typography.fontWeight.extrabold,
   },
   fieldWrap: { gap: Spacing.xs },
   fieldLabel: {
     color: Colors.textTertiary,
-    fontWeight: '700',
+    fontWeight: Typography.fontWeight.bold,
     fontSize: Typography.fontSize.sm,
   },
   input: {
@@ -544,7 +544,7 @@ const styles = StyleSheet.create({
   agreementCopy: { flex: 1, gap: 2 },
   agreementTitle: {
     color: Colors.textPrimary,
-    fontWeight: '700',
+    fontWeight: Typography.fontWeight.bold,
     fontSize: Typography.fontSize.base,
   },
   agreementSubtitle: {
@@ -561,7 +561,7 @@ const styles = StyleSheet.create({
     paddingVertical: 2,
     borderRadius: 999,
     fontSize: 10,
-    fontWeight: '800',
+    fontWeight: Typography.fontWeight.extrabold,
     overflow: 'hidden',
   },
   badgeRequired: {
@@ -582,7 +582,7 @@ const styles = StyleSheet.create({
   expandButton: {
     color: Colors.primary,
     fontSize: Typography.fontSize.xs,
-    fontWeight: '700',
+    fontWeight: Typography.fontWeight.bold,
     paddingLeft: 2,
   },
   expandedContent: {
@@ -605,7 +605,7 @@ const styles = StyleSheet.create({
   },
   noticeTitle: {
     color: Colors.warningDark,
-    fontWeight: '800',
+    fontWeight: Typography.fontWeight.extrabold,
     fontSize: Typography.fontSize.sm,
   },
   noticeBody: {
@@ -626,13 +626,13 @@ const styles = StyleSheet.create({
     ...Shadows.sm,
   },
   submitButtonDisabled: { opacity: 0.6 },
-  submitButtonText: { color: Colors.white, fontSize: 16, fontWeight: '800' },
+  submitButtonText: { color: Colors.white, fontSize: Typography.fontSize.lg, fontWeight: Typography.fontWeight.extrabold },
   verifiedPhoneBox: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', backgroundColor: Colors.gray50, padding: Spacing.md, borderRadius: BorderRadius.md },
   verifiedPhoneText: { color: Colors.primary, fontWeight: 'bold' },
   otpRow: { flexDirection: 'row', gap: Spacing.sm, marginBottom: Spacing.sm },
   flex1: { flex: 1, marginBottom: 0 },
   otpButton: { backgroundColor: Colors.primary, paddingHorizontal: 16, borderRadius: BorderRadius.md, justifyContent: 'center', alignItems: 'center' },
-  otpButtonText: { color: Colors.white, fontWeight: 'bold', fontSize: 14 },
-  devHintText: { color: Colors.primary, fontWeight: 'bold', fontSize: 12 },
+  otpButtonText: { color: Colors.white, fontWeight: 'bold', fontSize: Typography.fontSize.base },
+  devHintText: { color: Colors.primary, fontWeight: 'bold', fontSize: Typography.fontSize.sm },
   successText: { color: Colors.primary, fontWeight: 'bold', marginTop: Spacing.xs },
 });

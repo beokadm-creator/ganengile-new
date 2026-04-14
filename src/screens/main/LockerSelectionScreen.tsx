@@ -189,7 +189,7 @@ const styles = StyleSheet.create({
   },
   title: {
     fontSize: Typography.fontSize['3xl'],
-    fontWeight: '800',
+    fontWeight: Typography.fontWeight.extrabold,
     color: Colors.textPrimary,
   },
   subtitle: {
@@ -205,7 +205,7 @@ const styles = StyleSheet.create({
   },
   emptyTitle: {
     fontSize: Typography.fontSize.xl,
-    fontWeight: '800',
+    fontWeight: Typography.fontWeight.extrabold,
     color: Colors.textPrimary,
   },
   emptyBody: {
@@ -234,12 +234,12 @@ const styles = StyleSheet.create({
   cardTitle: {
     flex: 1,
     fontSize: Typography.fontSize.lg,
-    fontWeight: '800',
+    fontWeight: Typography.fontWeight.extrabold,
     color: Colors.textPrimary,
   },
   badge: {
     fontSize: Typography.fontSize.xs,
-    fontWeight: '700',
+    fontWeight: Typography.fontWeight.bold,
     color: Colors.primary,
     backgroundColor: Colors.primaryMint,
     borderRadius: BorderRadius.full,
@@ -264,7 +264,7 @@ const styles = StyleSheet.create({
   },
   primaryButtonText: {
     fontSize: Typography.fontSize.base,
-    fontWeight: '700',
+    fontWeight: Typography.fontWeight.bold,
     color: Colors.surface,
   },
 });

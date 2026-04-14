@@ -10,7 +10,7 @@ import {
 import { ParamListBase } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
 import { getPolicyHistoryConfigs } from '../../services/config-service';
-import { Colors } from '../../theme';
+import { Colors , Typography } from '../../theme';
 
 type NavigationProp = StackNavigationProp<ParamListBase>;
 
@@ -157,7 +157,7 @@ const styles = StyleSheet.create({
   loadingText: {
     marginTop: 12,
     color: Colors.textSecondary,
-    fontSize: 14,
+    fontSize: Typography.fontSize.base,
   },
   header: {
     backgroundColor: Colors.textPrimary,
@@ -169,20 +169,20 @@ const styles = StyleSheet.create({
   },
   headerKicker: {
     color: Colors.accent,
-    fontSize: 11,
-    fontWeight: '700',
+    fontSize: Typography.fontSize.xs,
+    fontWeight: Typography.fontWeight.bold,
     letterSpacing: 1.2,
   },
   headerTitle: {
     marginTop: 8,
     color: Colors.surface,
-    fontSize: 26,
-    fontWeight: '700',
+    fontSize: Typography.fontSize['4xl'],
+    fontWeight: Typography.fontWeight.bold,
   },
   headerSubtitle: {
     marginTop: 8,
     color: Colors.border,
-    fontSize: 14,
+    fontSize: Typography.fontSize.base,
     lineHeight: 20,
   },
   contentContainer: {
@@ -208,8 +208,8 @@ const styles = StyleSheet.create({
   },
   sidebarItemText: {
     color: Colors.textPrimary,
-    fontSize: 14,
-    fontWeight: '600',
+    fontSize: Typography.fontSize.base,
+    fontWeight: Typography.fontWeight.semibold,
   },
   sidebarItemTextActive: {
     color: Colors.surface,
@@ -230,20 +230,20 @@ const styles = StyleSheet.create({
   },
   policyTitle: {
     color: Colors.textPrimary,
-    fontSize: 22,
-    fontWeight: '700',
+    fontSize: Typography.fontSize['3xl'],
+    fontWeight: Typography.fontWeight.bold,
   },
   policyDate: {
     marginTop: 6,
     color: Colors.textSecondary,
-    fontSize: 13,
+    fontSize: Typography.fontSize.sm,
   },
   policyBody: {
     gap: 10,
   },
   policyParagraph: {
     color: Colors.textPrimary,
-    fontSize: 15,
+    fontSize: Typography.fontSize.base,
     lineHeight: 24,
   },
   policyParagraphSpacing: {
@@ -257,13 +257,13 @@ const styles = StyleSheet.create({
   },
   infoTitle: {
     color: Colors.textPrimary,
-    fontSize: 15,
-    fontWeight: '700',
+    fontSize: Typography.fontSize.base,
+    fontWeight: Typography.fontWeight.bold,
   },
   infoText: {
     marginTop: 6,
     color: Colors.textSecondary,
-    fontSize: 13,
+    fontSize: Typography.fontSize.sm,
     lineHeight: 20,
   },
 });

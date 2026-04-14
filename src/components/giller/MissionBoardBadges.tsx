@@ -63,8 +63,8 @@ const styles = StyleSheet.create({
   },
   statusBadgeText: {
     color: '#3182F6', // 쨍한 블루
-    fontSize: 13,
-    fontWeight: '700',
+    fontSize: Typography.fontSize.sm,
+    fontWeight: Typography.fontWeight.bold,
   },
   signalPill: {
     flexDirection: 'row',
@@ -84,8 +84,8 @@ const styles = StyleSheet.create({
     backgroundColor: '#F2F4F6',
   },
   signalPillText: {
-    fontSize: 12,
-    fontWeight: '600',
+    fontSize: Typography.fontSize.sm,
+    fontWeight: Typography.fontWeight.semibold,
   },
   signalPillTextPositive: {
     color: '#00B26F',

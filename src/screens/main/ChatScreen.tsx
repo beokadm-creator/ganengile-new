@@ -263,7 +263,7 @@ const styles = StyleSheet.create({
   },
   chatTitle: {
     fontSize: Typography.fontSize.xl,
-    fontWeight: '800',
+    fontWeight: Typography.fontWeight.extrabold,
     color: Colors.textPrimary,
   },
   chatSubtitle: {
@@ -283,7 +283,7 @@ const styles = StyleSheet.create({
   },
   contextLabel: {
     fontSize: Typography.fontSize.sm,
-    fontWeight: '800',
+    fontWeight: Typography.fontWeight.extrabold,
     color: Colors.primary,
     textTransform: 'uppercase',
   },
@@ -300,7 +300,7 @@ const styles = StyleSheet.create({
   },
   badgeText: {
     fontSize: Typography.fontSize.xs,
-    fontWeight: '700',
+    fontWeight: Typography.fontWeight.bold,
     color: Colors.successDark,
   },
   contextRecipient: {
@@ -418,7 +418,7 @@ const styles = StyleSheet.create({
   sendButtonText: {
     color: Colors.white,
     fontSize: Typography.fontSize.sm,
-    fontWeight: '800',
+    fontWeight: Typography.fontWeight.extrabold,
   },
   loaderWrap: {
     flex: 1,

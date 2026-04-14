@@ -55,6 +55,7 @@ import UnlockLockerScreen from '../screens/main/UnlockLockerScreen';
 import QRCodeScannerScreen from '../screens/main/QRCodeScannerScreen';
 import RequesterDropoffLockerScreen from '../screens/requester/RequesterDropoffLockerScreen';
 import RealtimeTrackingScreen from '../screens/main/RealtimeTrackingScreen';
+import { Typography } from '../theme';
 
 
 
@@ -166,8 +167,8 @@ function TabNavigator() {
           alignItems: 'center',
         },
         tabBarLabelStyle: {
-          fontSize: 11,
-          fontWeight: '700',
+          fontSize: Typography.fontSize.xs,
+          fontWeight: Typography.fontWeight.bold,
           letterSpacing: 0.1,
           lineHeight: 14,
           marginTop: 0,
@@ -231,7 +232,7 @@ export default function MainNavigator() {
         headerBackTitle: '뒤로',
         headerBackTitleVisible: false,
         headerTitleAlign: 'center',
-        headerTitleStyle: { fontWeight: '800', fontSize: 18 },
+        headerTitleStyle: { fontWeight: Typography.fontWeight.extrabold, fontSize: Typography.fontSize.xl },
         headerStyle: {
           backgroundColor: '#FFFFFF',
           shadowColor: '#0F172A',

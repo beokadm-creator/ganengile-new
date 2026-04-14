@@ -1,5 +1,6 @@
 import React, { useMemo, useState } from 'react';
 import { Modal, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { Typography } from '../../theme';
 
 interface Props {
   visible: boolean;
@@ -107,14 +108,14 @@ const styles = StyleSheet.create({
     borderBottomColor: '#E2E8F0',
   },
   title: {
-    fontSize: 18,
-    fontWeight: '800',
+    fontSize: Typography.fontSize.xl,
+    fontWeight: Typography.fontWeight.extrabold,
     color: '#0F172A',
   },
   closeButton: {
-    fontSize: 14,
+    fontSize: Typography.fontSize.base,
     color: '#64748B',
-    fontWeight: '700',
+    fontWeight: Typography.fontWeight.bold,
   },
   searchContainer: {
     paddingHorizontal: 20,
@@ -122,8 +123,8 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   searchLabel: {
-    fontSize: 13,
-    fontWeight: '700',
+    fontSize: Typography.fontSize.sm,
+    fontWeight: Typography.fontWeight.bold,
     color: '#64748B',
   },
   searchInput: {
@@ -132,7 +133,7 @@ const styles = StyleSheet.create({
     borderRadius: 14,
     paddingHorizontal: 14,
     paddingVertical: 12,
-    fontSize: 15,
+    fontSize: Typography.fontSize.base,
     color: '#0F172A',
   },
   bankList: {
@@ -151,16 +152,16 @@ const styles = StyleSheet.create({
     backgroundColor: '#F0FDFA',
   },
   bankName: {
-    fontSize: 16,
+    fontSize: Typography.fontSize.lg,
     color: '#0F172A',
   },
   bankNameSelected: {
     color: '#0F766E',
-    fontWeight: '800',
+    fontWeight: Typography.fontWeight.extrabold,
   },
   checkIcon: {
-    fontSize: 12,
+    fontSize: Typography.fontSize.sm,
     color: '#0F766E',
-    fontWeight: '800',
+    fontWeight: Typography.fontWeight.extrabold,
   },
 });

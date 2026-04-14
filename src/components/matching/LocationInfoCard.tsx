@@ -6,6 +6,7 @@
 import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { Typography } from '../../theme';
 
 interface Props {
   distance: number; // meters
@@ -82,14 +83,14 @@ const styles = StyleSheet.create({
   },
   label: {
     color: '#666',
-    fontSize: 13,
+    fontSize: Typography.fontSize.sm,
     marginLeft: 8,
     flex: 1,
   },
   value: {
     color: '#333',
-    fontSize: 14,
-    fontWeight: '600',
+    fontSize: Typography.fontSize.base,
+    fontWeight: Typography.fontWeight.semibold,
   },
   rankBadge: {
     position: 'absolute',
@@ -97,6 +98,6 @@ const styles = StyleSheet.create({
     top: 8,
   },
   rankText: {
-    fontSize: 14,
+    fontSize: Typography.fontSize.base,
   },
 });

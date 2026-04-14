@@ -194,7 +194,7 @@ const styles = StyleSheet.create({
   },
   optionText: {
     ...Typography.body,
-    fontWeight: '600',
+    fontWeight: Typography.fontWeight.semibold,
     color: Colors.gray600,
   },
   activeText: {
@@ -206,13 +206,13 @@ const styles = StyleSheet.create({
     marginTop: Spacing.sm,
   },
   statusIcon: {
-    fontSize: 16,
+    fontSize: Typography.fontSize.lg,
     marginRight: Spacing.xs,
   },
   statusText: {
     ...Typography.bodySmall,
     color: Colors.text.primary,
-    fontWeight: '600',
+    fontWeight: Typography.fontWeight.semibold,
   },
   description: {
     ...Typography.bodySmall,

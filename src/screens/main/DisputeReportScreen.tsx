@@ -207,7 +207,7 @@ const styles = StyleSheet.create({
   },
   title: {
     fontSize: Typography.fontSize['3xl'],
-    fontWeight: '800',
+    fontWeight: Typography.fontWeight.extrabold,
     color: Colors.textPrimary,
   },
   subtitle: {
@@ -223,7 +223,7 @@ const styles = StyleSheet.create({
   },
   sectionTitle: {
     fontSize: Typography.fontSize.xl,
-    fontWeight: '800',
+    fontWeight: Typography.fontWeight.extrabold,
     color: Colors.textPrimary,
   },
   chipGrid: {
@@ -242,7 +242,7 @@ const styles = StyleSheet.create({
   },
   chipText: {
     fontSize: Typography.fontSize.sm,
-    fontWeight: '700',
+    fontWeight: Typography.fontWeight.bold,
     color: Colors.textSecondary,
   },
   chipTextActive: {
@@ -275,7 +275,7 @@ const styles = StyleSheet.create({
   },
   secondaryButtonText: {
     fontSize: Typography.fontSize.base,
-    fontWeight: '700',
+    fontWeight: Typography.fontWeight.bold,
     color: Colors.primary,
   },
   evidenceItem: {
@@ -292,7 +292,7 @@ const styles = StyleSheet.create({
   },
   primaryButtonText: {
     fontSize: Typography.fontSize.base,
-    fontWeight: '700',
+    fontWeight: Typography.fontWeight.bold,
     color: Colors.surface,
   },
 });

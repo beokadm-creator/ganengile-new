@@ -2,6 +2,7 @@ import React, { memo } from 'react';
 import { FlatList, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { MaterialIcons as Icon } from '@expo/vector-icons';
 import { Image } from 'expo-image';
+import { Typography } from '../../theme';
 
 interface GillerProfileCardProps {
   giller: {
@@ -260,7 +261,7 @@ const styles = StyleSheet.create({
   },
   name: {
     color: '#333',
-    fontSize: 24,
+    fontSize: Typography.fontSize['3xl'],
     fontWeight: 'bold',
     marginBottom: 12,
     textAlign: 'center',
@@ -273,14 +274,14 @@ const styles = StyleSheet.create({
   },
   rating: {
     color: '#333',
-    fontSize: 18,
+    fontSize: Typography.fontSize.xl,
     fontWeight: 'bold',
     marginLeft: 8,
     marginRight: 16,
   },
   deliveries: {
     color: '#666',
-    fontSize: 14,
+    fontSize: Typography.fontSize.base,
   },
   row: {
     alignItems: 'center',
@@ -290,12 +291,12 @@ const styles = StyleSheet.create({
   },
   rowText: {
     color: '#666',
-    fontSize: 16,
+    fontSize: Typography.fontSize.lg,
     marginLeft: 8,
   },
   feeText: {
     color: '#4CAF50',
-    fontSize: 18,
+    fontSize: Typography.fontSize.xl,
     fontWeight: 'bold',
     marginLeft: 8,
   },
@@ -318,15 +319,15 @@ const styles = StyleSheet.create({
   },
   rejectButtonText: {
     color: '#666',
-    fontSize: 16,
-    fontWeight: '600',
+    fontSize: Typography.fontSize.lg,
+    fontWeight: Typography.fontWeight.semibold,
   },
   acceptButton: {
     backgroundColor: '#00BCD4',
   },
   acceptButtonText: {
     color: '#fff',
-    fontSize: 16,
+    fontSize: Typography.fontSize.lg,
     fontWeight: 'bold',
   },
   buttonDisabled: {
@@ -352,12 +353,12 @@ const styles = StyleSheet.create({
   },
   routeText: {
     color: '#333',
-    fontSize: 16,
+    fontSize: Typography.fontSize.lg,
     fontWeight: 'bold',
   },
   routeSubtext: {
     color: '#666',
-    fontSize: 14,
+    fontSize: Typography.fontSize.base,
     marginTop: 4,
   },
   routeActions: {
@@ -384,7 +385,7 @@ const styles = StyleSheet.create({
   },
   requestText: {
     color: '#333',
-    fontSize: 16,
+    fontSize: Typography.fontSize.lg,
     fontWeight: 'bold',
   },
   statusBadge: {
@@ -394,7 +395,7 @@ const styles = StyleSheet.create({
   },
   statusText: {
     color: '#fff',
-    fontSize: 12,
+    fontSize: Typography.fontSize.sm,
     fontWeight: 'bold',
   },
   requestDetails: {
@@ -404,11 +405,11 @@ const styles = StyleSheet.create({
   },
   requestSubtext: {
     color: '#666',
-    fontSize: 14,
+    fontSize: Typography.fontSize.base,
   },
   requestFee: {
     color: '#4CAF50',
-    fontSize: 16,
+    fontSize: Typography.fontSize.lg,
     fontWeight: 'bold',
   },
 });

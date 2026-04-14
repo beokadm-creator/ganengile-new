@@ -1,4 +1,4 @@
-import { Colors } from '../../theme';
+import { Colors , Typography } from '../../theme';
 import React, { useCallback, useEffect, useState } from 'react';
 import {
   ActivityIndicator,
@@ -335,19 +335,19 @@ const styles = StyleSheet.create({
   },
   loadingText: {
     marginTop: 12,
-    fontSize: 14,
+    fontSize: Typography.fontSize.base,
     color: Colors.textSecondary,
   },
   header: {
     gap: 8,
   },
   title: {
-    fontSize: 28,
-    fontWeight: '800',
+    fontSize: Typography.fontSize['4xl'],
+    fontWeight: Typography.fontWeight.extrabold,
     color: Colors.textPrimary,
   },
   subtitle: {
-    fontSize: 15,
+    fontSize: Typography.fontSize.base,
     lineHeight: 22,
     color: Colors.textSecondary,
   },
@@ -374,15 +374,15 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.primaryMint,
   },
   summaryChipText: {
-    fontSize: 13,
-    fontWeight: '700',
+    fontSize: Typography.fontSize.sm,
+    fontWeight: Typography.fontWeight.bold,
     color: Colors.textSecondary,
   },
   summaryChipTextActive: {
     color: Colors.primary,
   },
   summaryText: {
-    fontSize: 14,
+    fontSize: Typography.fontSize.base,
     lineHeight: 20,
     color: Colors.textSecondary,
   },
@@ -398,12 +398,12 @@ const styles = StyleSheet.create({
     elevation: 3,
   },
   sectionTitle: {
-    fontSize: 18,
-    fontWeight: '800',
+    fontSize: Typography.fontSize.xl,
+    fontWeight: Typography.fontWeight.extrabold,
     color: Colors.textPrimary,
   },
   statusText: {
-    fontSize: 15,
+    fontSize: Typography.fontSize.base,
     color: Colors.textPrimary,
   },
   codeBox: {
@@ -415,8 +415,8 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.surface,
   },
   codeLabel: {
-    fontSize: 14,
-    fontWeight: '700',
+    fontSize: Typography.fontSize.base,
+    fontWeight: Typography.fontWeight.bold,
     color: Colors.textPrimary,
   },
   codeRow: {
@@ -434,8 +434,8 @@ const styles = StyleSheet.create({
     borderColor: Colors.border,
   },
   codeChipText: {
-    fontSize: 15,
-    fontWeight: '800',
+    fontSize: Typography.fontSize.base,
+    fontWeight: Typography.fontWeight.extrabold,
     color: Colors.primary,
   },
   input: {
@@ -444,7 +444,7 @@ const styles = StyleSheet.create({
     borderRadius: 14,
     paddingHorizontal: 14,
     paddingVertical: 12,
-    fontSize: 15,
+    fontSize: Typography.fontSize.base,
     color: Colors.textPrimary,
     backgroundColor: Colors.surface,
   },
@@ -456,15 +456,15 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.border,
   },
   secondaryActionText: {
-    fontSize: 14,
-    fontWeight: '700',
+    fontSize: Typography.fontSize.base,
+    fontWeight: Typography.fontWeight.bold,
     color: Colors.textPrimary,
   },
   block: {
     gap: 12,
   },
   helperText: {
-    fontSize: 14,
+    fontSize: Typography.fontSize.base,
     lineHeight: 20,
     color: Colors.textSecondary,
   },
@@ -482,8 +482,8 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.primaryMint,
   },
   photoButtonText: {
-    fontSize: 14,
-    fontWeight: '700',
+    fontSize: Typography.fontSize.base,
+    fontWeight: Typography.fontWeight.bold,
     color: Colors.primary,
   },
   notesCard: {
@@ -495,7 +495,7 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.surface,
   },
   notesText: {
-    fontSize: 14,
+    fontSize: Typography.fontSize.base,
     lineHeight: 20,
     color: Colors.textSecondary,
   },
@@ -511,8 +511,8 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.primary,
   },
   primaryButtonText: {
-    fontSize: 15,
-    fontWeight: '700',
+    fontSize: Typography.fontSize.base,
+    fontWeight: Typography.fontWeight.bold,
     color: Colors.surface,
   },
   secondaryButton: {
@@ -523,8 +523,8 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.primaryMint,
   },
   secondaryButtonText: {
-    fontSize: 14,
-    fontWeight: '700',
+    fontSize: Typography.fontSize.base,
+    fontWeight: Typography.fontWeight.bold,
     color: Colors.primary,
   },
 });

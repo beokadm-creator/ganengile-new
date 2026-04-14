@@ -224,8 +224,8 @@ const styles = StyleSheet.create({
   },
   modeIcon: {
     color: Colors.text.secondary,
-    fontSize: 18,
-    fontWeight: '700',
+    fontSize: Typography.fontSize.xl,
+    fontWeight: Typography.fontWeight.bold,
     marginBottom: Spacing.xs,
     opacity: 0.6,
   },
@@ -241,7 +241,7 @@ const styles = StyleSheet.create({
   },
   modeTitleActive: {
     color: Colors.text.primary,
-    fontWeight: '700',
+    fontWeight: Typography.fontWeight.bold,
   },
   modeDescription: {
     ...Typography.bodySmall,
@@ -273,7 +273,7 @@ const styles = StyleSheet.create({
   },
   infoBullet: {
     color: Colors.primary,
-    fontWeight: '700',
+    fontWeight: Typography.fontWeight.bold,
     marginRight: Spacing.xs,
   },
   infoText: {

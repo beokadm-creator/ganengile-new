@@ -115,7 +115,7 @@ const styles = StyleSheet.create({
     width: '100%',
   },
   emojiIcon: {
-    fontSize: 28,
+    fontSize: Typography.fontSize['4xl'],
     marginBottom: Spacing.xs,
   },
   half: {

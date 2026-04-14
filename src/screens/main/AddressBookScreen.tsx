@@ -328,7 +328,7 @@ const styles = StyleSheet.create({
   center: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   content: { padding: Spacing.lg, gap: Spacing.md, paddingBottom: Spacing['4xl'] },
   card: { backgroundColor: Colors.surface, borderRadius: BorderRadius.xl, padding: Spacing.lg, gap: 10, ...Shadows.sm },
-  cardTitle: { color: Colors.textPrimary, fontSize: Typography.fontSize.lg, fontWeight: '800' },
+  cardTitle: { color: Colors.textPrimary, fontSize: Typography.fontSize.lg, fontWeight: Typography.fontWeight.extrabold },
   input: {
     minHeight: 52,
     borderRadius: BorderRadius.lg,
@@ -359,7 +359,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  primaryButtonText: { color: Colors.white, fontWeight: '800' },
+  primaryButtonText: { color: Colors.white, fontWeight: Typography.fontWeight.extrabold },
   secondaryButton: {
     flex: 1,
     minHeight: 48,
@@ -370,9 +370,9 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     backgroundColor: Colors.gray50,
   },
-  secondaryButtonText: { color: Colors.primary, fontWeight: '800' },
+  secondaryButtonText: { color: Colors.primary, fontWeight: Typography.fontWeight.extrabold },
   section: { gap: 10 },
-  sectionTitle: { color: Colors.textPrimary, fontSize: Typography.fontSize.lg, fontWeight: '800' },
+  sectionTitle: { color: Colors.textPrimary, fontSize: Typography.fontSize.lg, fontWeight: Typography.fontWeight.extrabold },
   emptyCard: { backgroundColor: Colors.surface, borderRadius: BorderRadius.xl, padding: Spacing.lg, ...Shadows.sm },
   emptyText: { color: Colors.textSecondary, ...Typography.bodySmall },
   addressCard: {
@@ -385,7 +385,7 @@ const styles = StyleSheet.create({
   },
   addressCopy: { flex: 1, gap: 4 },
   badgeRow: { flexDirection: 'row', alignItems: 'center', gap: 6, flexWrap: 'wrap' },
-  addressLabel: { color: Colors.textPrimary, fontWeight: '800' },
+  addressLabel: { color: Colors.textPrimary, fontWeight: Typography.fontWeight.extrabold },
   addressText: { color: Colors.textPrimary, ...Typography.bodySmall },
   addressDetail: { color: Colors.textSecondary, ...Typography.caption },
   badge: {
@@ -395,7 +395,7 @@ const styles = StyleSheet.create({
   },
   primaryBadge: { backgroundColor: Colors.primaryMint },
   neutralBadge: { backgroundColor: Colors.gray100 },
-  badgeText: { fontSize: 12, fontWeight: '800' },
+  badgeText: { fontSize: Typography.fontSize.sm, fontWeight: Typography.fontWeight.extrabold },
   primaryBadgeText: { color: Colors.primary },
   neutralBadgeText: { color: Colors.textSecondary },
   actionColumn: { gap: 8, alignItems: 'flex-end' },
@@ -414,8 +414,8 @@ const styles = StyleSheet.create({
   },
   miniActionText: {
     color: Colors.textPrimary,
-    fontSize: 12,
-    fontWeight: '700',
+    fontSize: Typography.fontSize.sm,
+    fontWeight: Typography.fontWeight.bold,
   },
   miniActionTextDanger: {
     color: Colors.error,

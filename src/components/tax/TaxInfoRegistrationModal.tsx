@@ -144,7 +144,7 @@ const styles = StyleSheet.create({
   },
   title: {
     fontSize: Typography.fontSize.lg,
-    fontWeight: '700',
+    fontWeight: Typography.fontWeight.bold,
     color: Colors.textPrimary,
     marginBottom: Spacing.xs,
   },
@@ -162,7 +162,7 @@ const styles = StyleSheet.create({
   },
   label: {
     fontSize: Typography.fontSize.sm,
-    fontWeight: '600',
+    fontWeight: Typography.fontWeight.semibold,
     color: Colors.textPrimary,
     marginBottom: Spacing.xs,
   },
@@ -194,11 +194,11 @@ const styles = StyleSheet.create({
   },
   checkboxText: {
     fontSize: Typography.fontSize.sm,
-    fontWeight: '600',
+    fontWeight: Typography.fontWeight.semibold,
     color: Colors.textPrimary,
   },
   legalHint: {
-    fontSize: 12,
+    fontSize: Typography.fontSize.sm,
     color: Colors.textSecondary,
     marginLeft: 28,
     marginBottom: Spacing.xl,
@@ -215,6 +215,6 @@ const styles = StyleSheet.create({
   submitButtonText: {
     color: Colors.white,
     fontSize: Typography.fontSize.base,
-    fontWeight: '700',
+    fontWeight: Typography.fontWeight.bold,
   },
 });

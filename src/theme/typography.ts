@@ -40,19 +40,19 @@ export const Typography = {
   },
 
   // ─── Shorthand presets ─────────────────────────────────
-  h1: { fontSize: 28, fontWeight: '800' as const, lineHeight: 36 },
-  h2: { fontSize: 24, fontWeight: '800' as const, lineHeight: 30 },
-  h3: { fontSize: 20, fontWeight: '700' as const, lineHeight: 28 },
-  h4: { fontSize: 16, fontWeight: '700' as const, lineHeight: 24 },
-  body: { fontSize: 14, fontWeight: '400' as const, lineHeight: 22 },
-  body1: { fontSize: 14, fontWeight: '400' as const, lineHeight: 22 },
-  body2: { fontSize: 12, fontWeight: '400' as const, lineHeight: 18 },
-  bodyBold: { fontSize: 14, fontWeight: '600' as const, lineHeight: 22 },
-  bodyMedium: { fontSize: 14, fontWeight: '500' as const, lineHeight: 22 },
-  bodySmall: { fontSize: 12, fontWeight: '400' as const, lineHeight: 18 },
-  bodyLarge: { fontSize: 16, fontWeight: '400' as const, lineHeight: 24 },
-  caption: { fontSize: 11, fontWeight: '400' as const, lineHeight: 16 },
-  label: { fontSize: 12, fontWeight: '600' as const, lineHeight: 16 },
+  h1: { fontSize: Typography.fontSize['4xl'], fontWeight: '800' as const, lineHeight: 36 },
+  h2: { fontSize: Typography.fontSize['3xl'], fontWeight: '800' as const, lineHeight: 30 },
+  h3: { fontSize: Typography.fontSize['2xl'], fontWeight: '700' as const, lineHeight: 28 },
+  h4: { fontSize: Typography.fontSize.lg, fontWeight: '700' as const, lineHeight: 24 },
+  body: { fontSize: Typography.fontSize.base, fontWeight: '400' as const, lineHeight: 22 },
+  body1: { fontSize: Typography.fontSize.base, fontWeight: '400' as const, lineHeight: 22 },
+  body2: { fontSize: Typography.fontSize.sm, fontWeight: '400' as const, lineHeight: 18 },
+  bodyBold: { fontSize: Typography.fontSize.base, fontWeight: '600' as const, lineHeight: 22 },
+  bodyMedium: { fontSize: Typography.fontSize.base, fontWeight: '500' as const, lineHeight: 22 },
+  bodySmall: { fontSize: Typography.fontSize.sm, fontWeight: '400' as const, lineHeight: 18 },
+  bodyLarge: { fontSize: Typography.fontSize.lg, fontWeight: '400' as const, lineHeight: 24 },
+  caption: { fontSize: Typography.fontSize.xs, fontWeight: '400' as const, lineHeight: 16 },
+  label: { fontSize: Typography.fontSize.sm, fontWeight: '600' as const, lineHeight: 16 },
 };
 
 export const FontFamily = {

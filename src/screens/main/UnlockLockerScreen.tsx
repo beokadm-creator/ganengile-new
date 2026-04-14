@@ -259,19 +259,19 @@ const styles = StyleSheet.create({
   },
   loadingText: {
     marginTop: 12,
-    fontSize: 14,
+    fontSize: Typography.fontSize.base,
     color: Colors.textSecondary,
   },
   header: {
     gap: 8,
   },
   title: {
-    fontSize: 28,
-    fontWeight: '800',
+    fontSize: Typography.fontSize['4xl'],
+    fontWeight: Typography.fontWeight.extrabold,
     color: Colors.textPrimary,
   },
   subtitle: {
-    fontSize: 15,
+    fontSize: Typography.fontSize.base,
     lineHeight: 22,
     color: Colors.textSecondary,
   },
@@ -283,7 +283,7 @@ const styles = StyleSheet.create({
   },
   sectionTitle: {
     fontSize: Typography.fontSize.lg,
-    fontWeight: '800',
+    fontWeight: Typography.fontWeight.extrabold,
     color: Colors.textPrimary,
   },
   infoText: {
@@ -314,7 +314,7 @@ const styles = StyleSheet.create({
   stepLabel: {
     fontSize: Typography.fontSize.sm,
     color: Colors.textPrimary,
-    fontWeight: '700',
+    fontWeight: Typography.fontWeight.bold,
   },
   primaryButton: {
     alignItems: 'center',
@@ -324,8 +324,8 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.primary,
   },
   primaryButtonText: {
-    fontSize: 15,
-    fontWeight: '700',
+    fontSize: Typography.fontSize.base,
+    fontWeight: Typography.fontWeight.bold,
     color: Colors.surface,
   },
 });

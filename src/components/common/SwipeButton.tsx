@@ -152,7 +152,7 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     color: Colors.white,
     fontSize: Typography.fontSize.lg,
-    fontWeight: '700',
+    fontWeight: Typography.fontWeight.bold,
     zIndex: 1,
   },
   thumb: {

@@ -310,7 +310,7 @@ const styles = StyleSheet.create({
   headerKicker: {
     color: Colors.primary,
     fontSize: Typography.fontSize.xs,
-    fontWeight: '700',
+    fontWeight: Typography.fontWeight.bold,
     textTransform: 'uppercase',
     letterSpacing: 1.2,
   },
@@ -318,7 +318,7 @@ const styles = StyleSheet.create({
     marginTop: Spacing.sm,
     color: Colors.textPrimary,
     fontSize: Typography.fontSize['3xl'],
-    fontWeight: '800',
+    fontWeight: Typography.fontWeight.extrabold,
   },
   heroSubtitle: {
     marginTop: Spacing.sm,
@@ -350,7 +350,7 @@ const styles = StyleSheet.create({
   },
   heroTitle: {
     fontSize: Typography.fontSize.xl,
-    fontWeight: '700',
+    fontWeight: Typography.fontWeight.bold,
     color: Colors.textPrimary,
   },
   heroCount: {
@@ -368,7 +368,7 @@ const styles = StyleSheet.create({
   },
   sectionTitle: {
     fontSize: Typography.fontSize.xl,
-    fontWeight: '700',
+    fontWeight: Typography.fontWeight.bold,
     color: Colors.textPrimary,
     marginBottom: Spacing.md,
   },
@@ -388,16 +388,16 @@ const styles = StyleSheet.create({
     color: Colors.textTertiary,
   },
   rowLabelStrong: {
-    fontWeight: '700',
+    fontWeight: Typography.fontWeight.bold,
     color: Colors.textPrimary,
   },
   rowValue: {
     fontSize: Typography.fontSize.base,
-    fontWeight: '600',
+    fontWeight: Typography.fontWeight.semibold,
   },
   rowValueStrong: {
     fontSize: Typography.fontSize.xl,
-    fontWeight: '800',
+    fontWeight: Typography.fontWeight.extrabold,
   },
   withdrawButton: {
     backgroundColor: Colors.primary,
@@ -409,7 +409,7 @@ const styles = StyleSheet.create({
   withdrawButtonText: {
     color: Colors.textWhite,
     fontSize: Typography.fontSize.lg,
-    fontWeight: '700',
+    fontWeight: Typography.fontWeight.bold,
   },
   withdrawButtonSubtext: {
     marginTop: 4,
@@ -432,7 +432,7 @@ const styles = StyleSheet.create({
   },
   policyTitle: {
     fontSize: Typography.fontSize.base,
-    fontWeight: '700',
+    fontWeight: Typography.fontWeight.bold,
     color: Colors.textPrimary,
   },
   policyBody: {
@@ -449,7 +449,7 @@ const styles = StyleSheet.create({
   },
   noticeTitle: {
     fontSize: Typography.fontSize.sm,
-    fontWeight: '700',
+    fontWeight: Typography.fontWeight.bold,
     color: Colors.warningDark,
   },
   noticeText: {
@@ -469,7 +469,7 @@ const styles = StyleSheet.create({
   },
   emptyTitle: {
     fontSize: Typography.fontSize.lg,
-    fontWeight: '700',
+    fontWeight: Typography.fontWeight.bold,
     color: Colors.textSecondary,
   },
   emptySubtitle: {
@@ -494,7 +494,7 @@ const styles = StyleSheet.create({
   },
   recordDate: {
     fontSize: Typography.fontSize.lg,
-    fontWeight: '700',
+    fontWeight: Typography.fontWeight.bold,
     color: Colors.textPrimary,
   },
   recordDescription: {
@@ -510,7 +510,7 @@ const styles = StyleSheet.create({
   },
   statusText: {
     fontSize: Typography.fontSize.xs,
-    fontWeight: '700',
+    fontWeight: Typography.fontWeight.bold,
     color: Colors.successDark,
   },
   previewButtonAlt: {

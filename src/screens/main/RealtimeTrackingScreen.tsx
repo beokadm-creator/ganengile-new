@@ -353,15 +353,15 @@ const styles = StyleSheet.create({
   },
   heroKicker: {
     color: Colors.primary,
-    fontSize: 12,
-    fontWeight: '700',
+    fontSize: Typography.fontSize.sm,
+    fontWeight: Typography.fontWeight.bold,
     letterSpacing: 1,
     textTransform: 'uppercase',
   },
   heroTitle: {
     color: Colors.textPrimary,
-    fontSize: 22,
-    fontWeight: '800',
+    fontSize: Typography.fontSize['3xl'],
+    fontWeight: Typography.fontWeight.extrabold,
   },
   heroSubtitle: {
     color: Colors.textSecondary,
@@ -382,8 +382,8 @@ const styles = StyleSheet.create({
   },
   routeTitle: {
     color: Colors.textPrimary,
-    fontSize: 18,
-    fontWeight: '700',
+    fontSize: Typography.fontSize.xl,
+    fontWeight: Typography.fontWeight.bold,
   },
   metricRow: {
     flexDirection: 'row',
@@ -399,13 +399,13 @@ const styles = StyleSheet.create({
   },
   metricLabel: {
     color: Colors.gray500,
-    fontSize: 11,
-    fontWeight: '700',
+    fontSize: Typography.fontSize.xs,
+    fontWeight: Typography.fontWeight.bold,
   },
   metricValue: {
     color: Colors.textPrimary,
-    fontSize: 14,
-    fontWeight: '800',
+    fontSize: Typography.fontSize.base,
+    fontWeight: Typography.fontWeight.extrabold,
   },
   routeHint: {
     color: Colors.textSecondary,
@@ -416,8 +416,8 @@ const styles = StyleSheet.create({
   },
   sectionTitle: {
     color: Colors.textPrimary,
-    fontSize: 18,
-    fontWeight: '800',
+    fontSize: Typography.fontSize.xl,
+    fontWeight: Typography.fontWeight.extrabold,
   },
   timelineCard: {
     backgroundColor: Colors.surface,
