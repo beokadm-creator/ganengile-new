@@ -1,4 +1,5 @@
 import React, { useEffect, useRef } from 'react';
+
 import { View, Text, TouchableOpacity, TextInput, Alert, StyleSheet } from 'react-native';
 import { Image } from 'expo-image';
 import { StepContainer } from '../components/StepContainer';
@@ -10,6 +11,7 @@ import { Typography } from '../../../../theme/typography';
 import { useCreateRequestStore } from '../store/useCreateRequestStore';
 import type { PackageSize } from '../types';
 import type { Beta1AIAnalysisResponse } from '../../../../services/beta1-ai-service';
+import type { Beta1QuoteCard } from '../../../../services/beta1-orchestration-service';
 
 export const CLEAN_SIZE_OPTIONS: Array<{ value: PackageSize; label: string }> = [
   { value: 'small', label: '소형' },
@@ -26,6 +28,7 @@ type Props = {
   aiResult: Beta1AIAnalysisResponse | null;
   setReservationCalendarVisible: (visible: boolean) => void;
   hasItemValue: boolean;
+  quotes: Beta1QuoteCard[];
 };
 
 export function Step2Item({
@@ -35,8 +38,15 @@ export function Step2Item({
   aiResult,
   setReservationCalendarVisible,
   hasItemValue,
+  quotes,
 }: Props) {
   const store = useCreateRequestStore();
+
+  useEffect(() => {
+    if (store.pickupMode === 'station' && store.directMode === 'none') {
+      store.setDirectMode('requester_to_station');
+    }
+  }, [store.pickupMode, store.directMode, store.setDirectMode]);
   const inputRef = useRef<TextInput>(null);
 
   useEffect(() => {
@@ -183,18 +193,50 @@ export function Step2Item({
           </View>
         )}
         <View style={styles.column}>
-          <Chip label="길러에게 맡기기" active={store.directMode === 'none'} onPress={() => { store.setDirectMode('none'); }} />
+          {store.pickupMode === 'address' && (
+            <Chip 
+              label="길러에게 방문 픽업 요청" 
+              active={store.directMode === 'none'} 
+              onPress={() => { store.setDirectMode('none'); }} 
+            />
+          )}
           <Chip
-            label="출발역까지 직접 전달"
+            label="출발역에서 직접 전달"
             active={store.directMode === 'requester_to_station'}
             onPress={() => { store.setDirectMode('requester_to_station'); }}
           />
           <Chip
-            label="사물함 포함"
+            label="사물함에 보관"
             active={store.directMode === 'locker_assisted'}
             onPress={() => { store.setDirectMode('locker_assisted'); }}
           />
         </View>
+        
+        {/* 선택한 배송 방식에 대한 실시간 요금 카드 */}
+        {(() => {
+          const card = quotes.find((q) => q.quoteType === 'balanced') || quotes[0];
+          if (!card) return null;
+
+          return (
+            <View style={styles.singleQuoteCard}>
+              <View style={styles.quoteHeader}>
+                <View style={styles.quoteTextWrap}>
+                  <Text style={styles.quoteLabel}>예상 결제 금액</Text>
+                  <Text style={styles.quoteHeadline}>
+                    {store.directMode === 'none' ? '길러가 계신 곳으로 방문합니다.' : 
+                     store.directMode === 'requester_to_station' ? '출발역에서 길러에게 직접 전달합니다.' : '사물함에 보관하고 길러가 수거합니다.'}
+                  </Text>
+                  {store.aiQuotesLoading ? <Text style={styles.quoteEngineHint}>요금 계산 중...</Text> : null}
+                </View>
+                <View style={styles.quotePriceWrap}>
+                  <Text style={styles.quotePrice}>{card.pricing.publicPrice.toLocaleString()}원</Text>
+                  <Text style={styles.muted}>{card.etaLabel}</Text>
+                </View>
+              </View>
+            </View>
+          );
+        })()}
+
       </Block>
     </StepContainer>
   );
@@ -213,9 +255,17 @@ const styles = StyleSheet.create({
   secondaryButtonText: { color: Colors.textSecondary, fontWeight: Typography.fontWeight.bold },
   flexButton: { flex: 1 },
   disabled: { opacity: 0.5 },
+  singleQuoteCard: { marginTop: Spacing.md, backgroundColor: Colors.surface, borderRadius: BorderRadius.lg, padding: Spacing.lg, borderWidth: 1, borderColor: Colors.primary },
+  quoteHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  quoteTextWrap: { flex: 1, paddingRight: Spacing.md },
+  quoteLabel: { color: Colors.primary, fontWeight: Typography.fontWeight.bold, fontSize: Typography.fontSize.sm, marginBottom: 2 },
+  quoteHeadline: { color: Colors.textPrimary, fontWeight: Typography.fontWeight.semibold, fontSize: Typography.fontSize.base, marginBottom: 2 },
+  quoteEngineHint: { color: Colors.primary, fontSize: Typography.fontSize.xs, marginTop: 2 },
+  quotePriceWrap: { alignItems: 'flex-end' },
+  quotePrice: { color: Colors.textPrimary, fontWeight: Typography.fontWeight.extrabold, fontSize: Typography.fontSize.lg },
   muted: { color: Colors.textSecondary, fontSize: Typography.fontSize.sm, marginTop: Spacing.xs },
   errorText: { color: Colors.error, fontSize: Typography.fontSize.sm, marginTop: Spacing.xs, fontWeight: Typography.fontWeight.bold },
   previewImage: { width: '100%', height: 200, borderRadius: BorderRadius.md, marginTop: Spacing.sm },
-  aiBox: { padding: Spacing.md, backgroundColor: Colors.gray50, borderRadius: BorderRadius.sm, borderWidth: 1, borderColor: Colors.border },
-  aiTitle: { color: Colors.primary, fontWeight: Typography.fontWeight.bold, marginBottom: Spacing.xs },
+  aiBox: { backgroundColor: Colors.surface, padding: Spacing.md, borderRadius: BorderRadius.md, borderWidth: 1, borderColor: Colors.primary },
+  aiTitle: { color: Colors.primary, fontWeight: Typography.fontWeight.bold, fontSize: Typography.fontSize.sm },
 });

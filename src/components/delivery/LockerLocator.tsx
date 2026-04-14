@@ -33,6 +33,7 @@ const FONT_XL = 22;
 
 interface LockerLocatorProps {
   selectedStationId?: string;
+  deliveryStationId?: string;
   onLockerSelect: (locker: LockerSummary) => void;
   onClose: () => void;
   mode?: 'grouped' | 'specific';
@@ -78,11 +79,12 @@ function buildRow(locker: Locker, station: Station | null, currentLocation: Loca
   };
 }
 
-export default function LockerLocator({ selectedStationId, onLockerSelect, onClose, mode = 'grouped' }: LockerLocatorProps) {
+export default function LockerLocator({ selectedStationId, deliveryStationId, onLockerSelect, onClose, mode = 'grouped' }: LockerLocatorProps) {
   const [lockers, setLockers] = useState<LockerMapRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [viewMode, setViewMode] = useState<'list' | 'map'>('list');
   const [includeNonSubway, setIncludeNonSubway] = useState(false);
+  const [targetStationType, setTargetStationType] = useState<'pickup' | 'delivery'>('pickup');
 
   const loadLockers = useCallback(async (): Promise<void> => {
     try {
@@ -92,11 +94,13 @@ export default function LockerLocator({ selectedStationId, onLockerSelect, onClo
         getAllStations(),
       ]);
 
+      const activeStationId = targetStationType === 'pickup' ? selectedStationId : deliveryStationId;
+
       let lockerList: Locker[] = [];
       if (includeNonSubway) {
         lockerList = await getNonSubwayLockers();
-      } else if (selectedStationId) {
-        lockerList = await getLockersByStation(selectedStationId);
+      } else if (activeStationId) {
+        lockerList = await getLockersByStation(activeStationId);
       } else {
         lockerList = await getAvailableLockers();
       }
@@ -152,7 +156,7 @@ export default function LockerLocator({ selectedStationId, onLockerSelect, onClo
     } finally {
       setLoading(false);
     }
-  }, [includeNonSubway, selectedStationId]);
+  }, [includeNonSubway, selectedStationId, deliveryStationId, targetStationType]);
 
   useFocusEffect(
     useCallback(() => {
@@ -266,6 +270,23 @@ export default function LockerLocator({ selectedStationId, onLockerSelect, onClo
           <Text style={styles.title}>사물함 선택</Text>
           <View style={styles.closeButton} />
         </View>
+
+        {deliveryStationId ? (
+          <View style={[styles.filterRow, { marginBottom: 12 }]}>
+            <TouchableOpacity
+              style={[styles.filterButton, targetStationType === 'pickup' && styles.filterButtonActive]}
+              onPress={() => setTargetStationType('pickup')}
+            >
+              <Text style={[styles.filterText, targetStationType === 'pickup' && styles.filterTextActive]}>출발역 주변</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.filterButton, targetStationType === 'delivery' && styles.filterButtonActive]}
+              onPress={() => setTargetStationType('delivery')}
+            >
+              <Text style={[styles.filterText, targetStationType === 'delivery' && styles.filterTextActive]}>도착역 주변</Text>
+            </TouchableOpacity>
+          </View>
+        ) : null}
 
         <View style={styles.viewToggle}>
           <TouchableOpacity

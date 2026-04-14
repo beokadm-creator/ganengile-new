@@ -141,9 +141,9 @@ export default function LockerMapScreen(): JSX.Element {
       ListHeaderComponent={
         <>
           <View style={styles.hero}>
-            <Text style={styles.title}>보관함 지도</Text>
+            <Text style={styles.title}>주변 사물함 보기</Text>
             <Text style={styles.subtitle}>
-              가까운 보관함 위치를 먼저 지도 기준으로 보여주고, 바로 예약 화면으로 이어집니다.
+              내 주변이나 지하철역 근처에 있는 사용 가능한 사물함을 확인할 수 있습니다.
             </Text>
           </View>
 

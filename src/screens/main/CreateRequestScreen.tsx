@@ -733,6 +733,8 @@ export default function CreateRequestScreen({ navigation, route }: Props) {
         });
       }
 
+      const selectedQuoteTypeForSubmit = 'balanced' as const;
+
       const result = await createBeta1Request({
         requesterUserId: user?.uid ?? requireUserId(),
         requestMode,
@@ -759,7 +761,7 @@ export default function CreateRequestScreen({ navigation, route }: Props) {
         lockerId: lockerId || undefined,
         specialInstructions: specialInstructions || undefined,
         urgency: requestMode === 'reservation' ? 'normal' : urgency,
-        selectedQuoteType,
+        selectedQuoteType: selectedQuoteTypeForSubmit,
         directParticipationMode: directMode,
         preferredPickupTime: resolvedPreferredPickupTime,
         preferredArrivalTime: preferredArrivalTime || undefined,
@@ -778,7 +780,8 @@ export default function CreateRequestScreen({ navigation, route }: Props) {
         selectedCouponId: useCreateRequestStore.getState().selectedCoupon?.id,
       });
 
-      const selected = result.quoteCards.find((card) => card.quoteType === selectedQuoteType) ?? result.quoteCards[0];
+      const selected =
+        result.quoteCards.find((card) => card.quoteType === selectedQuoteTypeForSubmit) ?? result.quoteCards[0];
       await deleteCreateRequestProgress();
       setDraftRestored(false);
 
@@ -816,7 +819,8 @@ export default function CreateRequestScreen({ navigation, route }: Props) {
     );
   }
 
-  const minQuotePrice = quotes.length > 0 ? Math.min(...quotes.map((q) => q.pricing.publicPrice)) : 0;
+  const balancedQuote = quotes.find(q => q.quoteType === 'balanced') || quotes[0];
+  const currentPrice = balancedQuote ? balancedQuote.pricing.publicPrice : 0;
 
   const renderStep1Summary = () => {
     if (activeStep <= 1) return null;
@@ -892,17 +896,17 @@ export default function CreateRequestScreen({ navigation, route }: Props) {
           aiResult={aiResult}
           setReservationCalendarVisible={setReservationCalendarVisible}
           hasItemValue={hasItemValue}
+          quotes={quotes}
         />
 
         {renderStep3Summary()}
         <Step3Recipient
-          setShowLockerLocator={setShowLockerLocator}
           recipientPrivacyConfig={recipientPrivacyConfig as any}
+          setShowLockerLocator={setShowLockerLocator}
         />
 
         <Step4Quote
           quotes={quotes}
-          quoteSelectionTouchedRef={quoteSelectionTouchedRef}
           missingItems={missingItems}
           handleClearDraft={handleClearDraft}
           submitDisabled={submitDisabled}
@@ -913,10 +917,10 @@ export default function CreateRequestScreen({ navigation, route }: Props) {
        </ScrollView>
 
        {/* 하단 실시간 예상 요금바 */}
-       {minQuotePrice > 0 && activeStep < 4 && (
+       {currentPrice > 0 && activeStep < 4 && (
         <View style={[styles.floatingPriceBar, { paddingBottom: Math.max(insets.bottom, Spacing.md) }]}>
-          <Text style={styles.floatingPriceLabel}>최소 예상 요금</Text>
-          <Text style={styles.floatingPriceValue}>{minQuotePrice.toLocaleString()}원~</Text>
+          <Text style={styles.floatingPriceLabel}>예상 배송비</Text>
+          <Text style={styles.floatingPriceValue}>{currentPrice.toLocaleString()}원</Text>
         </View>
        )}
 
@@ -1007,6 +1011,7 @@ export default function CreateRequestScreen({ navigation, route }: Props) {
           <View style={[styles.modalCard, { width: '90%', height: '80%', padding: 0, overflow: 'hidden' }]}>
             <LockerLocator
               selectedStationId={pickupStation?.stationId}
+              deliveryStationId={deliveryStation?.stationId}
               onLockerSelect={(locker) => {
               setLockerId(locker.lockerId);
               setActualLockerFee(locker.pricePerHour ?? null);

@@ -121,7 +121,7 @@ export default function LockerSelectionScreen() {
       <View style={styles.header}>
         <Text style={styles.title}>{stationName ?? '사물함 선택'}</Text>
         <Text style={styles.subtitle}>
-          픽업과 전달에 쓸 사물함을 고릅니다. 현재는 빠른 운영 연결을 위해 기본 4시간 예약 기준으로 처리합니다.
+          사물함 정보를 확인하거나 예약을 진행해 보세요.
         </Text>
       </View>
 
@@ -158,7 +158,7 @@ export default function LockerSelectionScreen() {
         {reserving ? (
           <ActivityIndicator size="small" color={Colors.surface} />
         ) : (
-          <Text style={styles.primaryButtonText}>선택한 사물함으로 예약</Text>
+          <Text style={styles.primaryButtonText}>선택한 사물함 예약하기</Text>
         )}
       </TouchableOpacity>
     </ScrollView>

@@ -15,7 +15,6 @@ import Modal from '../../../../components/common/Modal';
 
 type Props = {
   quotes: Beta1QuoteCard[];
-  quoteSelectionTouchedRef: React.MutableRefObject<boolean>;
   missingItems: string[];
   handleClearDraft: () => Promise<void>;
   submitDisabled: boolean;
@@ -26,7 +25,6 @@ type Props = {
 
 export function Step4Quote({
   quotes,
-  quoteSelectionTouchedRef,
   missingItems,
   handleClearDraft,
   submitDisabled,
@@ -117,8 +115,11 @@ export function Step4Quote({
         </Text>
       </TouchableOpacity>
 
-      <Text style={styles.sectionHeader}>예상 금액</Text>
-      {quotes.map((card) => {
+      <Text style={styles.sectionHeader}>최종 결제 금액</Text>
+      {(() => {
+        const card = quotes.find((q) => q.quoteType === 'balanced') || quotes[0];
+        if (!card) return null;
+
         const price = card.pricing.publicPrice;
         const discount = getCouponDiscount(price);
         const afterCouponAmount = Math.max(0, price - discount);
@@ -126,32 +127,24 @@ export function Step4Quote({
         const finalPrice = Math.max(0, afterCouponAmount - pointCoverage);
 
         return (
-          <TouchableOpacity
-          key={card.quoteType}
-          style={[styles.quoteCard, store.selectedQuoteType === card.quoteType && styles.quoteCardSelected]}
-          onPress={() => {
-            quoteSelectionTouchedRef.current = true;
-            store.setSelectedQuoteType(card.quoteType);
-          }}
-        >
-          <View style={styles.quoteHeader}>
-            <View style={styles.quoteTextWrap}>
-              <Text style={styles.quoteLabel}>{card.label}</Text>
-              <Text style={styles.quoteHeadline}>{card.headline}</Text>
-              {store.aiQuotesLoading ? <Text style={styles.quoteEngineHint}>추천 엔진 반영 중</Text> : null}
-              <Text style={styles.muted}>{card.recommendationReason}</Text>
-              {(card.pricing as any).dynamicAdjustment && (card.pricing as any).dynamicAdjustment > 0 ? (
-                <View style={styles.surchargeBadge}>
-                  <Text style={styles.surchargeBadgeText}>⚡️ 수요/공급 할증 적용</Text>
-                </View>
-              ) : null}
+          <View style={styles.singleQuoteCard}>
+            <View style={styles.quoteHeader}>
+              <View style={styles.quoteTextWrap}>
+                <Text style={styles.quoteLabel}>
+                  {store.directMode === 'none' ? '길러 전담 배송' : 
+                   store.directMode === 'requester_to_station' ? '출발역 직접 전달' : '사물함 포함 배송'}
+                </Text>
+                <Text style={styles.quoteHeadline}>
+                  선택하신 방식에 따른 예상 결제 금액입니다.
+                </Text>
+                {store.aiQuotesLoading ? <Text style={styles.quoteEngineHint}>금액 계산 중...</Text> : null}
+              </View>
+              <View style={styles.quotePriceWrap}>
+                <Text style={styles.quotePrice}>{price.toLocaleString()}원</Text>
+                <Text style={styles.muted}>{card.etaLabel}</Text>
+              </View>
             </View>
-            <View style={styles.quotePriceWrap}>
-              <Text style={styles.quotePrice}>{card.priceLabel}</Text>
-              <Text style={styles.muted}>{card.etaLabel}</Text>
-            </View>
-          </View>
-          <View style={styles.quoteBreakdown}>
+            <View style={styles.quoteBreakdown}>
               <QuoteBreakdownRow label="기본요금" value={card.pricing.baseFee} />
               <QuoteBreakdownRow label="거리요금" value={card.pricing.distanceFee} />
               <QuoteBreakdownRow label="무게요금" value={card.pricing.weightFee} />
@@ -178,9 +171,9 @@ export function Step4Quote({
               <View style={styles.quoteDivider} />
               <QuoteBreakdownRow label="최종 결제 예정 금액" value={finalPrice} strong />
             </View>
-          </TouchableOpacity>
+          </View>
         );
-      })}
+      })()}
 
       {missingItems.length > 0 && (
         <View style={styles.missingCard}>
@@ -322,4 +315,5 @@ const styles = StyleSheet.create({
   secondaryButton: { minHeight: 56, borderRadius: BorderRadius.full, backgroundColor: Colors.gray100, alignItems: 'center', justifyContent: 'center' },
   secondaryButtonText: { color: Colors.textSecondary, fontWeight: Typography.fontWeight.bold, fontSize: Typography.fontSize.lg },
   disabled: { opacity: 0.5 },
+  singleQuoteCard: { backgroundColor: Colors.surface, borderRadius: BorderRadius.lg, padding: Spacing.xl, borderWidth: 2, borderColor: Colors.primary },
 });

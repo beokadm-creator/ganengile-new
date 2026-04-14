@@ -103,7 +103,7 @@ export function RequesterHome({
           <QuickLinkDivider />
           <QuickLinkRow
             icon="inventory-2"
-            title="사물함 보기"
+            title="주변 사물함 보기"
             onPress={() => navigation.navigate('LockerMap')}
           />
         </QuickLinkPanel>

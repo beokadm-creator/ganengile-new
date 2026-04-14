@@ -6,16 +6,15 @@ import { Block } from '../components/Block';
 import { Colors, Spacing, BorderRadius } from '../../../../theme';
 import { Typography } from '../../../../theme/typography';
 import { useCreateRequestStore } from '../store/useCreateRequestStore';
-import { SafeNumberIntegrationConfig } from '../../../../services/integration-config-service';
 
 type Props = {
-  setShowLockerLocator: (val: boolean) => void;
   recipientPrivacyConfig: { useVirtualNumber: boolean; thirdPartyConsentRequired: boolean };
+  setShowLockerLocator: (val: boolean) => void;
 };
 
 export function Step3Recipient({
-  setShowLockerLocator,
   recipientPrivacyConfig,
+  setShowLockerLocator,
 }: Props) {
   const store = useCreateRequestStore();
   const inputRef = useRef<TextInput>(null);
