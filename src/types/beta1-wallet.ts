@@ -1,4 +1,8 @@
-import { Timestamp } from 'firebase/firestore';
+export type FirestoreTimestamp = {
+  seconds: number;
+  nanoseconds: number;
+  toDate?: () => Date;
+};
 
 export enum WalletBalancePolicy {
   CHARGE_FIRST = 'charge_first',
@@ -72,7 +76,7 @@ export interface WalletLedger {
   userId: string;
   balances: WalletBalances;
   summary: WalletSummary;
-  updatedAt: Timestamp;
+  updatedAt: FirestoreTimestamp;
 }
 
 export interface WalletEntry {
@@ -91,7 +95,7 @@ export interface WalletEntry {
   relatedPaymentId?: string;
   relatedWithdrawalRequestId?: string;
   metadata?: Record<string, unknown>;
-  createdAt: Timestamp;
+  createdAt: FirestoreTimestamp;
 }
 
 export interface WithdrawalEligibilityInput {
