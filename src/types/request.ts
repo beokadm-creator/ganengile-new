@@ -118,6 +118,10 @@ export interface Request {
   pickupLocationDetail?: string;
   storageLocation?: string;
   lockerId?: string;
+  pickupLockerId?: string;
+  dropoffLockerId?: string;
+  pickupStorageLocation?: string;
+  dropoffStorageLocation?: string;
   reservationId?: string;
   specialInstructions?: string;
 

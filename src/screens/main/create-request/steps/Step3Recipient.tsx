@@ -9,12 +9,14 @@ import { useCreateRequestStore } from '../store/useCreateRequestStore';
 
 type Props = {
   recipientPrivacyConfig: { useVirtualNumber: boolean; thirdPartyConsentRequired: boolean };
-  setShowLockerLocator: (val: boolean) => void;
+  setShowPickupLockerLocator: () => void;
+  setShowDropoffLockerLocator: () => void;
 };
 
 export function Step3Recipient({
   recipientPrivacyConfig,
-  setShowLockerLocator,
+  setShowPickupLockerLocator,
+  setShowDropoffLockerLocator,
 }: Props) {
   const store = useCreateRequestStore();
   const inputRef = useRef<TextInput>(null);
@@ -78,13 +80,24 @@ export function Step3Recipient({
           }
           placeholderTextColor={Colors.gray400}
         />
-        {store.directMode === 'locker_assisted' ? (
+        {store.directMode === 'locker_assisted' && store.pickupMode === 'station' ? (
           <TouchableOpacity
             style={[styles.input, { justifyContent: 'center' }]}
-            onPress={() => setShowLockerLocator(true)}
+            onPress={setShowPickupLockerLocator}
           >
-            <Text style={{ color: store.storageLocation ? Colors.gray900 : Colors.gray400 }}>
-              {store.storageLocation || '보관할 사물함을 선택해 주세요'}
+            <Text style={{ color: store.pickupStorageLocation ? Colors.gray900 : Colors.gray400 }}>
+              {store.pickupStorageLocation || '출발역 보관 사물함을 선택해 주세요'}
+            </Text>
+          </TouchableOpacity>
+        ) : null}
+        
+        {store.directMode === 'locker_assisted' && store.deliveryMode === 'station' ? (
+          <TouchableOpacity
+            style={[styles.input, { justifyContent: 'center' }]}
+            onPress={setShowDropoffLockerLocator}
+          >
+            <Text style={{ color: store.dropoffStorageLocation ? Colors.gray900 : Colors.gray400 }}>
+              {store.dropoffStorageLocation || '도착역 전달 사물함을 선택해 주세요'}
             </Text>
           </TouchableOpacity>
         ) : null}

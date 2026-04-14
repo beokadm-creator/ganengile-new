@@ -35,6 +35,10 @@ export interface Beta1RequestCreateInput {
   pickupLocationDetail?: string;
   storageLocation?: string;
   lockerId?: string;
+  pickupLockerId?: string;
+  dropoffLockerId?: string;
+  pickupStorageLocation?: string;
+  dropoffStorageLocation?: string;
   actualLockerFee?: number;
   specialInstructions?: string;
   urgency?: 'normal' | 'fast' | 'urgent';

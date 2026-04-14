@@ -45,8 +45,12 @@ export function Step2Item({
   useEffect(() => {
     if (store.pickupMode === 'station' && store.directMode === 'none') {
       store.setDirectMode('requester_to_station');
+    } else if (store.pickupMode === 'address' && store.directMode === 'requester_to_station') {
+      store.setDirectMode('none');
+    } else if (store.pickupMode === 'address' && store.deliveryMode === 'address' && store.directMode === 'locker_assisted') {
+      store.setDirectMode('none');
     }
-  }, [store.pickupMode, store.directMode, store.setDirectMode]);
+  }, [store.pickupMode, store.deliveryMode, store.directMode, store.setDirectMode]);
   const inputRef = useRef<TextInput>(null);
 
   useEffect(() => {
@@ -200,16 +204,20 @@ export function Step2Item({
               onPress={() => { store.setDirectMode('none'); }} 
             />
           )}
-          <Chip
-            label="출발역에서 직접 전달"
-            active={store.directMode === 'requester_to_station'}
-            onPress={() => { store.setDirectMode('requester_to_station'); }}
-          />
-          <Chip
-            label="사물함에 보관"
-            active={store.directMode === 'locker_assisted'}
-            onPress={() => { store.setDirectMode('locker_assisted'); }}
-          />
+          {store.pickupMode === 'station' && (
+            <Chip
+              label="출발역에서 직접 전달"
+              active={store.directMode === 'requester_to_station'}
+              onPress={() => { store.setDirectMode('requester_to_station'); }}
+            />
+          )}
+          {store.pickupMode === 'station' || store.deliveryMode === 'station' ? (
+            <Chip
+              label="사물함에 보관"
+              active={store.directMode === 'locker_assisted'}
+              onPress={() => { store.setDirectMode('locker_assisted'); }}
+            />
+          ) : null}
         </View>
         
         {/* 선택한 배송 방식에 대한 실시간 요금 카드 */}
@@ -224,7 +232,7 @@ export function Step2Item({
                   <Text style={styles.quoteLabel}>예상 결제 금액</Text>
                   <Text style={styles.quoteHeadline}>
                     {store.directMode === 'none' ? '길러가 계신 곳으로 방문합니다.' : 
-                     store.directMode === 'requester_to_station' ? '출발역에서 길러에게 직접 전달합니다.' : '사물함에 보관하고 길러가 수거합니다.'}
+                     store.directMode === 'requester_to_station' ? '출발역에서 길러에게 직접 전달합니다.' : '사물함에 보관하고 길러가 수거하거나, 길러가 사물함에 보관합니다.'}
                   </Text>
                   {store.aiQuotesLoading ? <Text style={styles.quoteEngineHint}>요금 계산 중...</Text> : null}
                 </View>

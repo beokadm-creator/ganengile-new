@@ -37,6 +37,7 @@ interface LockerLocatorProps {
   onLockerSelect: (locker: LockerSummary) => void;
   onClose: () => void;
   mode?: 'grouped' | 'specific';
+  initialTargetStationType?: 'pickup' | 'delivery';
 }
 
 type LockerMapRow = ReturnType<typeof createLockerLocation> & {
@@ -79,12 +80,12 @@ function buildRow(locker: Locker, station: Station | null, currentLocation: Loca
   };
 }
 
-export default function LockerLocator({ selectedStationId, deliveryStationId, onLockerSelect, onClose, mode = 'grouped' }: LockerLocatorProps) {
+export default function LockerLocator({ selectedStationId, deliveryStationId, onLockerSelect, onClose, mode = 'grouped', initialTargetStationType = 'pickup' }: LockerLocatorProps) {
   const [lockers, setLockers] = useState<LockerMapRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [viewMode, setViewMode] = useState<'list' | 'map'>('list');
   const [includeNonSubway, setIncludeNonSubway] = useState(false);
-  const [targetStationType, setTargetStationType] = useState<'pickup' | 'delivery'>('pickup');
+  const [targetStationType, setTargetStationType] = useState<'pickup' | 'delivery'>(initialTargetStationType);
 
   const loadLockers = useCallback(async (): Promise<void> => {
     try {

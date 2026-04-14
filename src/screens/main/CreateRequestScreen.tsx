@@ -269,7 +269,7 @@ export default function CreateRequestScreen({ navigation, route }: Props) {
   const [savedAddresses, setSavedAddresses] = useState<SavedAddress[]>([]);
   const [recentAddresses, setRecentAddresses] = useState<SavedAddress[]>([]);
   const [aiResult, setAiResult] = useState<Beta1AIAnalysisResponse | null>(null);
-  const [showLockerLocator, setShowLockerLocator] = useState(false);
+  const [lockerLocatorTarget, setLockerLocatorTarget] = useState<'pickup' | 'dropoff' | null>(null);
   const [reservationCalendarVisible, setReservationCalendarVisible] = useState(false);
 
   const {
@@ -304,6 +304,10 @@ export default function CreateRequestScreen({ navigation, route }: Props) {
     directMode, setDirectMode,
     storageLocation, setStorageLocation,
     lockerId, setLockerId,
+    pickupLockerId, setPickupLockerId,
+    dropoffLockerId, setDropoffLockerId,
+    pickupStorageLocation, setPickupStorageLocation,
+    dropoffStorageLocation, setDropoffStorageLocation,
     actualLockerFee, setActualLockerFee,
     contactPhoneNumber, setContactPhoneNumber,
     verifiedPhoneOverride, setVerifiedPhoneOverride,
@@ -759,6 +763,11 @@ export default function CreateRequestScreen({ navigation, route }: Props) {
         pickupLocationDetail: pickupLocationDetail || undefined,
         storageLocation: storageLocation || undefined,
         lockerId: lockerId || undefined,
+        pickupLockerId: useCreateRequestStore.getState().pickupLockerId || undefined,
+        dropoffLockerId: useCreateRequestStore.getState().dropoffLockerId || undefined,
+        pickupStorageLocation: useCreateRequestStore.getState().pickupStorageLocation || undefined,
+        dropoffStorageLocation: useCreateRequestStore.getState().dropoffStorageLocation || undefined,
+        actualLockerFee: actualLockerFee || undefined,
         specialInstructions: specialInstructions || undefined,
         urgency: requestMode === 'reservation' ? 'normal' : urgency,
         selectedQuoteType: selectedQuoteTypeForSubmit,
@@ -902,7 +911,8 @@ export default function CreateRequestScreen({ navigation, route }: Props) {
         {renderStep3Summary()}
         <Step3Recipient
           recipientPrivacyConfig={recipientPrivacyConfig as any}
-          setShowLockerLocator={setShowLockerLocator}
+          setShowPickupLockerLocator={() => setLockerLocatorTarget('pickup')}
+          setShowDropoffLockerLocator={() => setLockerLocatorTarget('dropoff')}
         />
 
         <Step4Quote
@@ -1006,21 +1016,32 @@ export default function CreateRequestScreen({ navigation, route }: Props) {
           </View>
         </View>
       </Modal>
-      <Modal visible={showLockerLocator} animationType="slide" transparent>
+      <Modal visible={lockerLocatorTarget !== null} animationType="slide" transparent>
         <View style={styles.modalBackdrop}>
           <View style={[styles.modalCard, { width: '90%', height: '80%', padding: 0, overflow: 'hidden' }]}>
             <LockerLocator
+              initialTargetStationType={lockerLocatorTarget === 'pickup' ? 'pickup' : 'delivery'}
               selectedStationId={pickupStation?.stationId}
               deliveryStationId={deliveryStation?.stationId}
               onLockerSelect={(locker) => {
-              setLockerId(locker.lockerId);
-              setActualLockerFee(locker.pricePerHour ?? null);
-              setStorageLocation(
-                `${locker.stationName} ${locker.lockerId.startsWith('AREA::') ? '사물함 구역' : locker.lockerId} (상태: ${locker.status})`
-              );
-              setShowLockerLocator(false);
-            }}
-              onClose={() => setShowLockerLocator(false)}
+                if (lockerLocatorTarget === 'pickup') {
+                  setPickupLockerId(locker.lockerId);
+                  setPickupStorageLocation(
+                    `${locker.stationName} ${locker.lockerId.startsWith('AREA::') ? '사물함 구역' : locker.lockerId} (상태: ${locker.status})`
+                  );
+                  // 기존 하위 호환을 위해 lockerId와 storageLocation도 업데이트 (첫 번째 선택 기준)
+                  setLockerId(locker.lockerId);
+                  setStorageLocation(`${locker.stationName} ${locker.lockerId}`);
+                } else {
+                  setDropoffLockerId(locker.lockerId);
+                  setDropoffStorageLocation(
+                    `${locker.stationName} ${locker.lockerId.startsWith('AREA::') ? '사물함 구역' : locker.lockerId} (상태: ${locker.status})`
+                  );
+                }
+                setActualLockerFee(locker.pricePerHour ?? null);
+                setLockerLocatorTarget(null);
+              }}
+              onClose={() => setLockerLocatorTarget(null)}
             />
           </View>
         </View>

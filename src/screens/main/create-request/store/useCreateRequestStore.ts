@@ -95,6 +95,17 @@ export interface CreateRequestState {
   setStorageLocation: (location: string) => void;
   lockerId: string | null;
   setLockerId: (id: string | null) => void;
+  
+  pickupLockerId: string | null;
+  setPickupLockerId: (id: string | null) => void;
+  pickupStorageLocation: string;
+  setPickupStorageLocation: (location: string) => void;
+  
+  dropoffLockerId: string | null;
+  setDropoffLockerId: (id: string | null) => void;
+  dropoffStorageLocation: string;
+  setDropoffStorageLocation: (location: string) => void;
+
   actualLockerFee: number | null;
   setActualLockerFee: (fee: number | null) => void;
 
@@ -154,6 +165,10 @@ const initialState = {
   directMode: 'none' as DirectMode,
   storageLocation: '',
   lockerId: null as string | null,
+  pickupLockerId: null as string | null,
+  pickupStorageLocation: '',
+  dropoffLockerId: null as string | null,
+  dropoffStorageLocation: '',
   actualLockerFee: null as number | null,
   contactPhoneNumber: '',
   verifiedPhoneOverride: null,
@@ -221,6 +236,10 @@ export const useCreateRequestStore = create<CreateRequestState>((set) => ({
   setDirectMode: (mode) => set({ directMode: mode }),
   setStorageLocation: (loc) => set({ storageLocation: loc }),
   setLockerId: (id) => set({ lockerId: id }),
+  setPickupLockerId: (id) => set({ pickupLockerId: id }),
+  setPickupStorageLocation: (location) => set({ pickupStorageLocation: location }),
+  setDropoffLockerId: (id) => set({ dropoffLockerId: id }),
+  setDropoffStorageLocation: (location) => set({ dropoffStorageLocation: location }),
   setActualLockerFee: (fee) => set({ actualLockerFee: fee }),
   
   setContactPhoneNumber: (phone) => set({ contactPhoneNumber: phone }),
