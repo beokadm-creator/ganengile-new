@@ -1,4 +1,4 @@
-import React, { useCallback, useMemo, useState } from 'react';
+import React, { useCallback, useMemo, useState, useEffect } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -89,25 +89,36 @@ export default function LockerLocator({ selectedStationId, deliveryStationId, on
   const [targetStationType, setTargetStationType] = useState<'pickup' | 'delivery'>(initialTargetStationType);
   const [userLocation, setUserLocation] = useState<LocationData | null>(null);
 
-  const loadLockers = useCallback(async (): Promise<void> => {
-    try {
-      setLoading(true);
-      const [currentLocation, stations] = await Promise.all([
-        locationService.getCurrentLocation(),
-        getAllStations(),
-      ]);
-      setUserLocation(currentLocation);
+  useEffect(() => {
+    setTargetStationType(initialTargetStationType);
+  }, [initialTargetStationType]);
 
-      const activeStationId = targetStationType === 'pickup' ? selectedStationId : deliveryStationId;
+  const loadLockers = useCallback(
+    async (abortSignal?: AbortSignal): Promise<void> => {
+      try {
+        setLoading(true);
+        const [currentLocation, stations] = await Promise.all([
+          locationService.getCurrentLocation(),
+          getAllStations(),
+        ]);
 
-      let lockerList: Locker[] = [];
-      if (includeNonSubway) {
-        lockerList = await getNonSubwayLockers();
-      } else if (activeStationId) {
-        lockerList = await getLockersByStation(activeStationId);
-      } else {
-        lockerList = await getAvailableLockers();
-      }
+        if (abortSignal?.aborted) return;
+
+        setUserLocation(currentLocation);
+
+        const activeStationId = targetStationType === 'pickup' ? selectedStationId : deliveryStationId;
+
+        let lockerList: Locker[] = [];
+        if (includeNonSubway) {
+          lockerList = await getNonSubwayLockers();
+        } else if (activeStationId) {
+          lockerList = await getLockersByStation(activeStationId);
+        } else {
+          // If no station is selected, don't fetch all lockers to avoid massive data load
+          lockerList = [];
+        }
+
+        if (abortSignal?.aborted) return;
 
       const stationMap = new Map(stations.map((station) => [station.stationId, station]));
       
@@ -148,6 +159,8 @@ export default function LockerLocator({ selectedStationId, deliveryStationId, on
           .map((locker) => buildRow(locker, stationMap.get(locker.location.stationId) ?? null, currentLocation));
       }
 
+      if (abortSignal?.aborted) return;
+
       rows.sort(
         (left, right) =>
           (left.distanceMeters ?? Number.MAX_SAFE_INTEGER) - (right.distanceMeters ?? Number.MAX_SAFE_INTEGER)
@@ -155,21 +168,28 @@ export default function LockerLocator({ selectedStationId, deliveryStationId, on
 
       setLockers(rows);
     } catch (error) {
+      if (abortSignal?.aborted) return;
       console.error('Error loading lockers:', error);
-      Alert.alert('?ㅻ쪟', '?щЪ??紐⑸줉??遺덈윭?ㅼ? 紐삵뻽?듬땲??');
+      Alert.alert('오류', '보관함 목록을 불러오지 못했습니다.');
     } finally {
-      setLoading(false);
+      if (!abortSignal?.aborted) {
+        setLoading(false);
+      }
     }
   }, [includeNonSubway, selectedStationId, deliveryStationId, targetStationType]);
 
   useFocusEffect(
     useCallback(() => {
-      void loadLockers();
+      const abortController = new AbortController();
+      void loadLockers(abortController.signal);
+      return () => {
+        abortController.abort();
+      };
     }, [loadLockers])
   );
 
   const featuredMapRows = useMemo(
-    () => lockers.slice(0, 4).filter((item) => item.latitude && item.longitude),
+    () => lockers.filter((item) => item.latitude && item.longitude).slice(0, 4),
     [lockers]
   );
 

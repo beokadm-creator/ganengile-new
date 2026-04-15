@@ -955,31 +955,33 @@ export default function CreateRequestScreen({ navigation, route }: Props) {
       <Modal visible={lockerLocatorTarget !== null} animationType="slide" transparent>
         <View style={styles.modalBackdrop}>
           <View style={[styles.modalCard, { width: '90%', height: '80%', padding: 0, overflow: 'hidden', alignItems: 'stretch' }]}>
-            <LockerLocator
-              initialTargetStationType={lockerLocatorTarget === 'pickup' ? 'pickup' : 'delivery'}
-              selectedStationId={pickupStation?.stationId}
-              deliveryStationId={deliveryStation?.stationId}
-              onLockerSelect={(locker) => {
-                if (lockerLocatorTarget === 'pickup') {
-                  setPickupLockerId(locker.lockerId);
-                  setPickupStorageLocation(
-                    `${locker.stationName} ${locker.lockerId.startsWith('AREA::') ? '사물함 구역' : locker.lockerId} (상태: ${locker.status})`
-                  );
-                  // 기존 하위 호환을 위해 lockerId와 storageLocation도 업데이트 (첫 번째 선택 기준)
-                  setLockerId(locker.lockerId);
-                  setStorageLocation(`${locker.stationName} ${locker.lockerId}`);
-                  setPickupLockerFee(locker.pricePerHour ?? null);
-                } else {
-                  setDropoffLockerId(locker.lockerId);
-                  setDropoffStorageLocation(
-                    `${locker.stationName} ${locker.lockerId.startsWith('AREA::') ? '사물함 구역' : locker.lockerId} (상태: ${locker.status})`
-                  );
-                  setDropoffLockerFee(locker.pricePerHour ?? null);
-                }
-                setLockerLocatorTarget(null);
-              }}
-              onClose={() => setLockerLocatorTarget(null)}
-            />
+            {lockerLocatorTarget !== null && (
+              <LockerLocator
+                initialTargetStationType={lockerLocatorTarget === 'pickup' ? 'pickup' : 'delivery'}
+                selectedStationId={pickupStation?.stationId}
+                deliveryStationId={deliveryStation?.stationId}
+                onLockerSelect={(locker) => {
+                  if (lockerLocatorTarget === 'pickup') {
+                    setPickupLockerId(locker.lockerId);
+                    setPickupStorageLocation(
+                      `${locker.stationName} ${locker.lockerId.startsWith('AREA::') ? '사물함 구역' : locker.lockerId} (상태: ${locker.status})`
+                    );
+                    // 기존 하위 호환을 위해 lockerId와 storageLocation도 업데이트 (첫 번째 선택 기준)
+                    setLockerId(locker.lockerId);
+                    setStorageLocation(`${locker.stationName} ${locker.lockerId}`);
+                    setPickupLockerFee(locker.pricePerHour ?? null);
+                  } else {
+                    setDropoffLockerId(locker.lockerId);
+                    setDropoffStorageLocation(
+                      `${locker.stationName} ${locker.lockerId.startsWith('AREA::') ? '사물함 구역' : locker.lockerId} (상태: ${locker.status})`
+                    );
+                    setDropoffLockerFee(locker.pricePerHour ?? null);
+                  }
+                  setLockerLocatorTarget(null);
+                }}
+                onClose={() => setLockerLocatorTarget(null)}
+              />
+            )}
           </View>
         </View>
       </Modal>
