@@ -312,7 +312,7 @@ export default function RequestDetailScreen() {
 
     try {
       setWorking('rematch');
-      const result = await increaseRequestBid(request.requestId, requireUserId(), amount);
+      const result = await increaseRequestBid(request.requestId, requireUserId(), request.fee?.totalFee ?? 0, request.status, amount);
 
       if (!result.success) {
         Alert.alert('금액 조정 실패', result.message ?? '지금은 조정할 수 없습니다.');

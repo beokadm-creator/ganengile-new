@@ -86,15 +86,15 @@ export class TransferService {
    * @returns 소요 시간 (분)
    */
   private async calculateTravelTime(route: Route): Promise<number> {
-    if (!route.startStation.lat || !route.startStation.lng || !route.endStation.lat || !route.endStation.lng) {
+    if (!route.startStation.location?.latitude || !route.startStation.location?.longitude || !route.endStation.location?.latitude || !route.endStation.location?.longitude) {
       return 30; // 좌표가 없는 경우 기본값
     }
     
     // 직선 거리 계산 (단위: km)
-    const lat1 = route.startStation.lat;
-    const lon1 = route.startStation.lng;
-    const lat2 = route.endStation.lat;
-    const lon2 = route.endStation.lng;
+    const lat1 = route.startStation.location.latitude;
+    const lon1 = route.startStation.location.longitude;
+    const lat2 = route.endStation.location.latitude;
+    const lon2 = route.endStation.location.longitude;
     
     const R = 6371; // 지구 반경 (km)
     const dLat = (lat2 - lat1) * Math.PI / 180;

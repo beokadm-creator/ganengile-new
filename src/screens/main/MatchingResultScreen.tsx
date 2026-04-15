@@ -216,7 +216,7 @@ export function MatchingResultScreen() {
 
     try {
       setIncreasingBid(true);
-      const result = await increaseRequestBid(request.requestId, requireUserId(), amount);
+      const result = await increaseRequestBid(request.requestId, requireUserId(), request.fee?.totalFee ?? 0, request.status, amount);
       const errorMessage = readStringField(result, 'error');
       const newFee = readNumberField(result, 'newFee');
       if (!result.success) {
