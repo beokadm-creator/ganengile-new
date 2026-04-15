@@ -107,6 +107,7 @@ export default function LockerLocator({
   const [viewMode, setViewMode] = useState<'list' | 'map'>('list');
   const [includeNonSubway, setIncludeNonSubway] = useState(false);
   const [userLocation, setUserLocation] = useState<LocationData | null>(null);
+  const [isFallback, setIsFallback] = useState(false);
 
   const loadLockers = useCallback(
     async (abortSignal?: AbortSignal): Promise<void> => {
@@ -136,11 +137,13 @@ export default function LockerLocator({
 
         let lockerList: Locker[] = [];
         if (includeNonSubway) {
+          setIsFallback(false);
           lockerList = await getNonSubwayLockers();
         } else if (activeStationId) {
           lockerList = await getLockersByStation(activeStationId);
 
           if (lockerList.length === 0) {
+            setIsFallback(true);
             const allLockers = await getAvailableLockers();
             const targetStation = stationMap.get(activeStationId);
 
@@ -175,9 +178,12 @@ export default function LockerLocator({
                 .slice(0, 10)
                 .map(item => item.locker);
             }
+          } else {
+            setIsFallback(false);
           }
         } else {
           // If no station is selected, don't fetch all lockers to avoid massive data load
+          setIsFallback(false);
           lockerList = [];
         }
 
@@ -390,6 +396,14 @@ export default function LockerLocator({
         </View>
       </View>
 
+      {isFallback && !loading && (
+        <View style={styles.fallbackBanner}>
+          <Text style={styles.fallbackBannerText}>
+            선택하신 역에 이용 가능한 사물함이 없어 가장 가까운 주변 사물함을 보여드립니다.
+          </Text>
+        </View>
+      )}
+
       {viewMode === 'list' ? (
         <FlatList
           style={{ flex: 1 }}
@@ -518,6 +532,8 @@ const styles = StyleSheet.create({
   mapRowBody: { flex: 1, gap: 2 },
   mapRowTitle: { fontSize: FONT_SM, fontWeight: Typography.fontWeight.bold, color: Colors.gray900 },
   mapRowMeta: { fontSize: FONT_XS, color: Colors.gray600 },
+  fallbackBanner: { backgroundColor: Colors.warningLight, padding: Spacing.md, borderBottomWidth: 1, borderColor: Colors.warning },
+  fallbackBannerText: { color: Colors.warningDark, fontSize: Typography.fontSize.sm, fontWeight: Typography.fontWeight.bold, textAlign: 'center' },
 });
 
 
