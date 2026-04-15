@@ -91,7 +91,7 @@ export default function LockerMapScreen(): JSX.Element {
   const mapItems = useMemo<LockerMapItem[]>(() => {
     const stationMap = new Map(stations.map((station) => [station.stationId, station]));
 
-    return lockers
+    const items = lockers
       .map((locker) => {
         const station = stationMap.get(locker.location.stationId) ?? null;
         return {
@@ -100,20 +100,24 @@ export default function LockerMapScreen(): JSX.Element {
           distanceMeters: getLockerDistance(locker, station, currentLocation),
         };
       })
-      .sort(
-        (left, right) =>
-          (left.distanceMeters ?? Number.MAX_SAFE_INTEGER) - (right.distanceMeters ?? Number.MAX_SAFE_INTEGER)
-      )
-      .slice(0, 12);
+      .sort((left, right) => {
+        if (currentLocation) {
+          return (left.distanceMeters ?? Number.MAX_SAFE_INTEGER) - (right.distanceMeters ?? Number.MAX_SAFE_INTEGER);
+        }
+
+        const leftName = left.station?.stationName ?? left.locker.location.stationName;
+        const rightName = right.station?.stationName ?? right.locker.location.stationName;
+        return leftName.localeCompare(rightName, 'ko');
+      });
+
+    return items.slice(0, 12);
   }, [currentLocation, lockers, stations]);
 
   const featured = mapItems.slice(0, 4).filter((item) => item.station);
-  const mapCenter =
-    featured[0]?.station?.location ??
-    currentLocation ?? {
-      latitude: 37.5665,
-      longitude: 126.978,
-    };
+  const mapCenter = currentLocation ?? {
+    latitude: 37.5665,
+    longitude: 126.978,
+  };
 
   const handleSelect = (item: LockerMapItem): void => {
     navigation.navigate('LockerSelection', {
