@@ -61,23 +61,36 @@ function formatDistance(distanceMeters: number | null): string {
   return `${(distanceMeters / 1000).toFixed(1)}km`;
 }
 
-function buildRow(locker: Locker, station: Station | null, currentLocation: LocationData | null): LockerMapRow {
+function getStationLat(station: Station | null): number | undefined {
+  if (!station?.location) return undefined;
+  return station.location.latitude ?? (station.location as any).lat;
+}
+
+function getStationLng(station: Station | null): number | undefined {
+  if (!station?.location) return undefined;
+  return station.location.longitude ?? (station.location as any).lng;
+}
+
+function buildRow(
+  locker: Locker,
+  station: Station | null,
+  currentLocation: LocationData | null
+): LockerMapRow {
   const base = createLockerLocation(locker);
+  const stationLat = getStationLat(station);
+  const stationLng = getStationLng(station);
+
   const distanceMeters =
-    station && currentLocation
-      ? locationService.calculateDistance(
-          currentLocation.latitude,
-          currentLocation.longitude,
-          station.location.latitude,
-          station.location.longitude
-        )
+    stationLat != null && stationLng != null && currentLocation
+      ? locationService.calculateDistance(currentLocation.latitude, currentLocation.longitude, stationLat, stationLng)
       : null;
 
   return {
     ...base,
     distanceMeters,
-    latitude: station?.location.latitude,
-    longitude: station?.location.longitude,
+    latitude: stationLat,
+    longitude: stationLng,
+    stationId: locker.location.stationId,
   };
 }
 
@@ -109,12 +122,60 @@ export default function LockerLocator({
         setUserLocation(currentLocation);
 
         const activeStationId = initialTargetStationType === 'pickup' ? selectedStationId : deliveryStationId;
+        const stationMap = new Map(stations.map((station) => [station.stationId, station]));
+
+        let referenceLocation = currentLocation;
+        const targetStation = activeStationId ? stationMap.get(activeStationId) : null;
+        if (!includeNonSubway && targetStation) {
+          const lat = getStationLat(targetStation);
+          const lng = getStationLng(targetStation);
+          if (lat != null && lng != null) {
+            referenceLocation = { latitude: lat, longitude: lng, accuracy: 0, altitude: null, speed: null, heading: null };
+          }
+        }
 
         let lockerList: Locker[] = [];
         if (includeNonSubway) {
           lockerList = await getNonSubwayLockers();
         } else if (activeStationId) {
           lockerList = await getLockersByStation(activeStationId);
+
+          if (lockerList.length === 0) {
+            const allLockers = await getAvailableLockers();
+            const targetStation = stationMap.get(activeStationId);
+
+            if (targetStation) {
+              const targetLat = getStationLat(targetStation);
+              const targetLng = getStationLng(targetStation);
+
+              const lockersWithDistance = allLockers.map((locker) => {
+                const lockerStation = stationMap.get(locker.location.stationId);
+                if (!lockerStation) return { locker, distance: Infinity };
+
+                const lockerLat = getStationLat(lockerStation);
+                const lockerLng = getStationLng(lockerStation);
+
+                if (targetLat == null || targetLng == null || lockerLat == null || lockerLng == null) {
+                  return { locker, distance: Infinity };
+                }
+
+                const distance = locationService.calculateDistance(
+                  targetLat,
+                  targetLng,
+                  lockerLat,
+                  lockerLng
+                );
+
+                return { locker, distance };
+              });
+
+              lockerList = lockersWithDistance
+                .filter(item => item.distance !== Infinity)
+                .sort((a, b) => a.distance - b.distance)
+                .slice(0, 10)
+                .map(item => item.locker);
+            }
+          }
         } else {
           // If no station is selected, don't fetch all lockers to avoid massive data load
           lockerList = [];
@@ -122,9 +183,7 @@ export default function LockerLocator({
 
         if (abortSignal?.aborted) return;
 
-      const stationMap = new Map(stations.map((station) => [station.stationId, station]));
-      
-      let rows: LockerMapRow[] = [];
+        let rows: LockerMapRow[] = [];
 
       if (mode === 'grouped') {
         const areaGroups = new Map<string, LockerMapRow>();
@@ -134,7 +193,7 @@ export default function LockerLocator({
           .forEach((locker) => {
             const areaKey = `AREA::${locker.location.stationId}::${locker.location.section || 'default'}`;
             const station = stationMap.get(locker.location.stationId) ?? null;
-            const row = buildRow(locker, station, currentLocation);
+            const row = buildRow(locker, station, referenceLocation);
             
             if (!areaGroups.has(areaKey)) {
               areaGroups.set(areaKey, {
@@ -158,7 +217,7 @@ export default function LockerLocator({
       } else {
         rows = lockerList
           .filter((locker) => locker.status === LockerStatus.AVAILABLE && (locker.availability?.available ?? 1) > 0)
-          .map((locker) => buildRow(locker, stationMap.get(locker.location.stationId) ?? null, currentLocation));
+          .map((locker) => buildRow(locker, stationMap.get(locker.location.stationId) ?? null, referenceLocation));
       }
 
       if (abortSignal?.aborted) return;
@@ -196,6 +255,13 @@ export default function LockerLocator({
   );
 
   const mapCenter = useMemo(() => {
+    if (featuredMapRows[0]) {
+      return {
+        latitude: featuredMapRows[0].latitude!,
+        longitude: featuredMapRows[0].longitude!,
+        label: featuredMapRows[0].stationName ?? featuredMapRows[0].name,
+      };
+    }
     if (userLocation) {
       return {
         latitude: userLocation.latitude,
@@ -203,17 +269,11 @@ export default function LockerLocator({
         label: '현재 위치',
       };
     }
-    return featuredMapRows[0]
-      ? {
-          latitude: featuredMapRows[0].latitude!,
-          longitude: featuredMapRows[0].longitude!,
-          label: featuredMapRows[0].stationName ?? featuredMapRows[0].name,
-        }
-      : {
-          latitude: 37.5665,
-          longitude: 126.978,
-          label: 'Seoul',
-        };
+    return {
+      latitude: 37.5665,
+      longitude: 126.978,
+      label: 'Seoul',
+    };
   }, [featuredMapRows, userLocation]);
 
   const mapMarkers = useMemo(() => {
