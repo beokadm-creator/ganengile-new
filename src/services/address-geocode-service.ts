@@ -39,14 +39,22 @@ export async function geocodeRoadAddress(roadAddress: string): Promise<GeocodedA
     throw new Error(payload.message ?? '주소 좌표를 찾지 못했습니다.');
   }
 
-  if (!payload.ok || !payload.address?.latitude || !payload.address?.longitude) {
+  const latitude = payload.address?.latitude;
+  const longitude = payload.address?.longitude;
+  if (
+    !payload.ok ||
+    typeof latitude !== 'number' ||
+    typeof longitude !== 'number' ||
+    !Number.isFinite(latitude) ||
+    !Number.isFinite(longitude)
+  ) {
     return null;
   }
 
   return {
     roadAddress: payload.address.roadAddress ?? query,
     jibunAddress: payload.address.jibunAddress,
-    latitude: payload.address.latitude,
-    longitude: payload.address.longitude,
+    latitude,
+    longitude,
   };
 }

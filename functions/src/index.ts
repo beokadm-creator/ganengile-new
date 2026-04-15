@@ -3365,12 +3365,6 @@ export const naverDirectionsProxy = functions
  */
 export const jusoAddressSearchProxy = functions.https.onRequest(async (req, res) => {
   const ip = getClientIp(req);
-  if (checkRateLimit(ip, 'jusoAddressSearchProxy', 10, 60)) {
-    console.warn(`[rate-limit] jusoAddressSearchProxy blocked for ip=${ip}`);
-    res.status(429).send('Too many requests');
-    return;
-  }
-
   try {
     res.set('Access-Control-Allow-Origin', '*');
     res.set('Access-Control-Allow-Methods', 'GET,OPTIONS');
@@ -3378,6 +3372,12 @@ export const jusoAddressSearchProxy = functions.https.onRequest(async (req, res)
 
     if (req.method === 'OPTIONS') {
       res.status(204).send('');
+      return;
+    }
+
+    if (checkRateLimit(ip, 'jusoAddressSearchProxy', 10, 60)) {
+      console.warn(`[rate-limit] jusoAddressSearchProxy blocked for ip=${ip}`);
+      res.status(429).json({ ok: false, message: '요청이 너무 많습니다. 잠시 후 다시 시도해 주세요.' });
       return;
     }
 

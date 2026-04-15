@@ -99,7 +99,12 @@ export async function searchRoadAddresses(
 
   const response = await fetch(requestUrl.toString());
   if (!response.ok) {
-    throw new Error('도로명 주소 검색에 실패했습니다.');
+    const errorPayload = (await response.json().catch(() => null)) as
+      | { message?: string; results?: { common?: { errorMessage?: string } } }
+      | null;
+    throw new Error(
+      errorPayload?.message ?? errorPayload?.results?.common?.errorMessage ?? '도로명 주소 검색에 실패했습니다.'
+    );
   }
 
   const payload = (await response.json()) as JusoSearchResponse;
