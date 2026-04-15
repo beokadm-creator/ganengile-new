@@ -3383,7 +3383,10 @@ export const jusoAddressSearchProxy = functions.https.onRequest(async (req, res)
 
     const apiKey = getFirstNonEmptyString(JUSO_API_KEY_PARAM.value(), process.env.JUSO_API_KEY);
     if (!apiKey) {
-      res.status(503).json({ ok: false, message: 'juso api key is not configured' });
+      res.status(503).json({
+        ok: false,
+        message: 'JUSO API 키가 설정되지 않았습니다. Functions 환경변수(JUSO_API_KEY)를 설정해 주세요.',
+      });
       return;
     }
 
