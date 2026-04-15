@@ -480,6 +480,7 @@ function buildSupplementalFallbackStations(): Station[] {
       },
       isActive: true,
       region: 'seoul',
+      kric: { lineCode: '8' },
       priority: 100,
       createdAt: toFallbackDate(),
       updatedAt: toFallbackDate(),
@@ -622,6 +623,12 @@ export async function getStationConfig(stationId: string): Promise<Station | nul
     const docSnapshot = await getDoc(docRef);
 
     if (!docSnapshot.exists()) {
+      const fallbackStations = buildSupplementalFallbackStations();
+      const fallback = fallbackStations.find(s => s.stationId === stationId);
+      if (fallback) {
+        cache.set(cacheKey, fallback);
+        return fallback;
+      }
       return null;
     }
 
