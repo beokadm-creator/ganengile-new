@@ -399,7 +399,7 @@ export default function LockerLocator({
       {isFallback && !loading && (
         <View style={styles.fallbackBanner}>
           <Text style={styles.fallbackBannerText}>
-            선택하신 역에 이용 가능한 사물함이 없어 가장 가까운 주변 사물함을 보여드립니다.
+            선택하신 역의 사물함 정보를 불러올 수 없어 가장 가까운 주변 사물함을 보여드립니다.
           </Text>
         </View>
       )}

@@ -480,7 +480,7 @@ function buildSupplementalFallbackStations(): Station[] {
       },
       isActive: true,
       region: 'seoul',
-      kric: { lineCode: '8', stationCode: '0818' },
+      kric: { lineCode: '8', stationCode: '818' },
       priority: 100,
       createdAt: toFallbackDate(),
       updatedAt: toFallbackDate(),
