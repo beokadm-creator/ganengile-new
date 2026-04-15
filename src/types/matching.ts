@@ -69,10 +69,15 @@ export interface TransferRoute {
   totalTransferTime: number; // 총 환승 시간 (분)
   transferCount: number;    // 환승 횟수
 
-  // 지하첗 요금
+  // 지하철 요금
   baseFare: number;         // 기본 요금
   transferBonus: number;    // 환승 보너스
   totalFare: number;        // 총 요금
+
+  // KRIC 환승 세부 정보 (API 연동 후 사용)
+  transferDistance?: string;      // 환승 거리 (KRIC: chtnDst)
+  transferStartLocation?: string; // 환승 시작 위치 (KRIC: stLocCont)
+  transferEndLocation?: string;   // 환승 종료 위치 (KRIC: clsLocCont)
 }
 
 /**

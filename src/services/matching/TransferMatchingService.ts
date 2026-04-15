@@ -6,6 +6,7 @@
 import { DeliveryRequestP1, MatchingResult, TransferRoute, TransferStation } from '../../types/matching';
 import { doc, getDoc, collection, getDocs, query, where } from 'firebase/firestore';
 import { db } from '../../core/firebase';
+import { fetchKricTransferInfo } from '../transfer-info-service';
 
 /**
  * 환승 매칭 서비스
@@ -231,6 +232,23 @@ export class TransferMatchingService {
       return null;
     }
 
+    // 2.5 KRIC 환승 정보 조회
+    const kricInfos = await fetchKricTransferInfo(transferStation.stationId);
+    let transferDistance, transferStartLocation, transferEndLocation;
+    
+    if (kricInfos.length > 0) {
+      // 이상적으로는 pickupStation.lineCode 와 deliveryStation.lineCode 를 chtnLn 등과 매칭해야 하지만,
+      // 일단 첫 번째 정보를 사용하거나 매칭되는 것을 찾습니다.
+      const matchedInfo = kricInfos.find(info => 
+        info.chtnLn.includes(deliveryStation.lineCode) || 
+        info.chtnLn.includes(pickupStation.lineCode)
+      ) || kricInfos[0];
+
+      transferDistance = matchedInfo.chtnDst;
+      transferStartLocation = matchedInfo.stLocCont;
+      transferEndLocation = matchedInfo.clsLocCont;
+    }
+
     // 3. 경로 생성
     const route: TransferRoute = {
       pickupStation,
@@ -256,6 +274,10 @@ export class TransferMatchingService {
       baseFare: 1400, // 기본 요금
       transferBonus: 500, // 환승 보너스
       totalFare: 1400 + 500, // 환승 할인 적용
+      
+      transferDistance,
+      transferStartLocation,
+      transferEndLocation,
     };
 
     return route;

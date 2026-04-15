@@ -15,6 +15,11 @@ export interface TransferPossibility {
   transferRoute?: Route;
   additionalTime?: number;    // 환승 추가 시간 (분)
   totalTravelTime?: number;   // 총 소요 시간 (분)
+
+  // KRIC 환승 세부 정보
+  transferDistance?: string;      // 환승 거리 (KRIC: chtnDst)
+  transferStartLocation?: string; // 환승 시작 위치 (KRIC: stLocCont)
+  transferEndLocation?: string;   // 환승 종료 위치 (KRIC: clsLocCont)
 }
 
 /**
