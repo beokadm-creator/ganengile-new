@@ -3,6 +3,7 @@ import {
   ActivityIndicator,
   Alert,
   FlatList,
+  ScrollView,
   StyleSheet,
   Text,
   TouchableOpacity,
@@ -86,6 +87,7 @@ export default function LockerLocator({ selectedStationId, deliveryStationId, on
   const [viewMode, setViewMode] = useState<'list' | 'map'>('list');
   const [includeNonSubway, setIncludeNonSubway] = useState(false);
   const [targetStationType, setTargetStationType] = useState<'pickup' | 'delivery'>(initialTargetStationType);
+  const [userLocation, setUserLocation] = useState<LocationData | null>(null);
 
   const loadLockers = useCallback(async (): Promise<void> => {
     try {
@@ -94,6 +96,7 @@ export default function LockerLocator({ selectedStationId, deliveryStationId, on
         locationService.getCurrentLocation(),
         getAllStations(),
       ]);
+      setUserLocation(currentLocation);
 
       const activeStationId = targetStationType === 'pickup' ? selectedStationId : deliveryStationId;
 
@@ -171,6 +174,13 @@ export default function LockerLocator({ selectedStationId, deliveryStationId, on
   );
 
   const mapCenter = useMemo(() => {
+    if (userLocation) {
+      return {
+        latitude: userLocation.latitude,
+        longitude: userLocation.longitude,
+        label: '현재 위치',
+      };
+    }
     return featuredMapRows[0]
       ? {
           latitude: featuredMapRows[0].latitude!,
@@ -182,15 +192,23 @@ export default function LockerLocator({ selectedStationId, deliveryStationId, on
           longitude: 126.978,
           label: 'Seoul',
         };
-  }, [featuredMapRows]);
+  }, [featuredMapRows, userLocation]);
 
   const mapMarkers = useMemo(() => {
-    return featuredMapRows.map((item, index) => ({
+    const markers = featuredMapRows.map((item, index) => ({
       latitude: item.latitude!,
       longitude: item.longitude!,
       label: String(index + 1),
     }));
-  }, [featuredMapRows]);
+    if (userLocation) {
+      markers.push({
+        latitude: userLocation.latitude,
+        longitude: userLocation.longitude,
+        label: '📍',
+      });
+    }
+    return markers;
+  }, [featuredMapRows, userLocation]);
 
   const handleLockerSelect = (locker: LockerMapRow): void => {
     const summary: LockerSummary = {
@@ -323,7 +341,7 @@ export default function LockerLocator({ selectedStationId, deliveryStationId, on
           }
         />
       ) : (
-        <View style={styles.mapContainer}>
+        <ScrollView style={{ flex: 1 }} contentContainerStyle={styles.mapContainer}>
           <NaverMapCard
             center={mapCenter}
             markers={mapMarkers}
@@ -348,7 +366,7 @@ export default function LockerLocator({ selectedStationId, deliveryStationId, on
               </TouchableOpacity>
             ))}
           </View>
-        </View>
+        </ScrollView>
       )}
     </View>
   );

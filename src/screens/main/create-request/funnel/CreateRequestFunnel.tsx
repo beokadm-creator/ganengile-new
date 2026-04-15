@@ -28,6 +28,7 @@ type Props = {
   handleRecommendStationFromAddress: (target: 'pickup' | 'delivery', address: string) => void;
   setPickerType: (type: 'pickup' | 'delivery') => void;
   setPickerVisible: (visible: boolean) => void;
+  resolvingLocation: boolean;
   handleUseCurrentLocation: (target: 'pickup' | 'delivery') => void;
   
   handleUploadPhotoFromCamera: () => Promise<void>;
@@ -233,6 +234,19 @@ export default function CreateRequestFunnel(props: Props) {
           </View>
         )}
 
+        {!isAddress && (
+          <TouchableOpacity 
+            style={styles.currentLocationButton} 
+            onPress={() => props.handleUseCurrentLocation('pickup')}
+            disabled={props.resolvingLocation}
+          >
+            <MaterialIcons name="my-location" size={18} color={Colors.primary} />
+            <Text style={styles.currentLocationText}>
+              {props.resolvingLocation ? '현재 위치 확인 중...' : '현재 내 위치 기준으로 역 찾기'}
+            </Text>
+          </TouchableOpacity>
+        )}
+
         {isAddress && hasRoadAddress && !hasStation && props.resolvingAddressStation !== 'pickup' && (
           <Text style={styles.errorText}>인근에 서비스 가능한 지하철역이 없습니다. 다른 주소를 선택해주세요.</Text>
         )}
@@ -357,6 +371,19 @@ export default function CreateRequestFunnel(props: Props) {
             <ActivityIndicator size="small" color={Colors.primary} />
             <Text style={styles.loadingText}>가까운 지하철역을 찾는 중입니다...</Text>
           </View>
+        )}
+
+        {!isAddress && (
+          <TouchableOpacity 
+            style={styles.currentLocationButton} 
+            onPress={() => props.handleUseCurrentLocation('delivery')}
+            disabled={props.resolvingLocation}
+          >
+            <MaterialIcons name="my-location" size={18} color={Colors.primary} />
+            <Text style={styles.currentLocationText}>
+              {props.resolvingLocation ? '현재 위치 확인 중...' : '현재 내 위치 기준으로 역 찾기'}
+            </Text>
+          </TouchableOpacity>
         )}
 
         {isAddress && hasRoadAddress && !hasStation && props.resolvingAddressStation !== 'delivery' && (
@@ -720,4 +747,6 @@ const styles = StyleSheet.create({
   loadingRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing.sm, marginTop: Spacing.xs },
   loadingText: { color: Colors.primary, fontSize: Typography.fontSize.sm, fontWeight: Typography.fontWeight.bold },
   errorText: { color: Colors.error, fontSize: Typography.fontSize.sm, fontWeight: Typography.fontWeight.bold, marginTop: Spacing.xs },
+  currentLocationButton: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', padding: Spacing.md, backgroundColor: Colors.surface, borderRadius: BorderRadius.md, borderWidth: 1, borderColor: Colors.primary, borderStyle: 'dashed', gap: Spacing.xs, marginTop: Spacing.xs },
+  currentLocationText: { color: Colors.primary, fontSize: Typography.fontSize.sm, fontWeight: Typography.fontWeight.bold },
 });
