@@ -3,10 +3,17 @@ import { signInWithCustomToken } from 'firebase/auth';
 import { getFunctions, httpsCallable } from 'firebase/functions';
 import { auth } from './firebase';
 import { AuthProviderType, UserRole, type User } from '../types/user';
+import { getIdentityIntegrationConfig } from './integration-config-service';
 
-const KAKAO_APP_KEY = process.env.EXPO_PUBLIC_KAKAO_APP_KEY ?? '';
-const KAKAO_REDIRECT_URI =
+// Fallback to env if admin config is missing
+const FALLBACK_KAKAO_APP_KEY = process.env.EXPO_PUBLIC_KAKAO_APP_KEY ?? '';
+const FALLBACK_KAKAO_REDIRECT_URI =
   process.env.EXPO_PUBLIC_KAKAO_REDIRECT_URI ?? 'https://ganengile.firebaseapp.com/__/auth/handler';
+
+// State 파라미터 생성 헬퍼
+function generateState(): string {
+  return Math.random().toString(36).substring(2, 15);
+}
 
 WebBrowser.maybeCompleteAuthSession();
 
@@ -46,21 +53,22 @@ function getErrorMessage(error: unknown, fallback: string): string {
   return fallback;
 }
 
-function getKakaoAuthUrl(): string {
-  const state = Math.random().toString(36).slice(2);
-  return `https://kauth.kakao.com/oauth/authorize?client_id=${KAKAO_APP_KEY}&redirect_uri=${encodeURIComponent(KAKAO_REDIRECT_URI)}&response_type=code&state=${state}`;
+// 1. 카카오 로그인 인가 코드(Auth Code)를 받아오기 위한 URL 생성
+function getKakaoAuthUrl(clientId: string, redirectUri: string, state: string): string {
+  return `https://kauth.kakao.com/oauth/authorize?client_id=${clientId}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=code&state=${state}`;
 }
 
-async function exchangeKakaoCode(code: string): Promise<string> {
+// 2. 받아온 인가 코드로 카카오 Access Token 요청
+async function exchangeKakaoCode(code: string, clientId: string, redirectUri: string): Promise<string> {
   const response = await fetch('https://kauth.kakao.com/oauth/token', {
     method: 'POST',
     headers: {
-      'Content-Type': 'application/x-www-form-urlencoded',
+      'Content-Type': 'application/x-www-form-urlencoded;charset=utf-8',
     },
     body: new URLSearchParams({
       grant_type: 'authorization_code',
-      client_id: KAKAO_APP_KEY,
-      redirect_uri: KAKAO_REDIRECT_URI,
+      client_id: clientId,
+      redirect_uri: redirectUri,
       code,
     }).toString(),
   });
@@ -110,12 +118,23 @@ async function issueCustomToken(payload: KakaoCallablePayload): Promise<KakaoCal
   return result.data;
 }
 
+/**
+ * 카카오 로그인을 수행하고 사용자 정보를 반환합니다.
+ */
 export async function signInWithKakao(): Promise<KakaoUserInfo> {
-  if (!KAKAO_APP_KEY) {
-    throw new Error('카카오 앱 키가 설정되지 않았습니다.');
+  // 1. Get configs from Firestore Admin Settings
+  const identityConfig = await getIdentityIntegrationConfig();
+  const clientId = identityConfig?.providers?.kakao?.clientId || FALLBACK_KAKAO_APP_KEY;
+  const redirectUri = identityConfig?.providers?.kakao?.redirectUri || identityConfig?.providers?.kakao?.callbackUrl || FALLBACK_KAKAO_REDIRECT_URI;
+
+  if (!clientId) {
+    throw new Error('카카오 API 키(Client ID)가 설정되어 있지 않습니다.');
   }
 
-  const result = await WebBrowser.openAuthSessionAsync(getKakaoAuthUrl(), KAKAO_REDIRECT_URI);
+  // 2. 카카오 로그인 페이지(웹뷰) 오픈
+  const state = generateState();
+  const authUrl = getKakaoAuthUrl(clientId, redirectUri, state);
+  const result = await WebBrowser.openAuthSessionAsync(authUrl, redirectUri);
   if (result.type !== 'success') {
     if (result.type === 'cancel') {
       throw new Error('카카오 로그인이 취소되었습니다.');
@@ -129,10 +148,15 @@ export async function signInWithKakao(): Promise<KakaoUserInfo> {
     throw new Error('카카오 인증 코드를 받지 못했습니다.');
   }
 
-  const accessToken = await exchangeKakaoCode(code);
+  const accessToken = await exchangeKakaoCode(code, clientId, redirectUri);
   return fetchKakaoUserInfo(accessToken);
 }
 
+/**
+ * 카카오 로그인 (통합 파이프라인)
+ * 1. 카카오 로그인 및 토큰 발급
+ * 2. Firebase Cloud Function을 통한 Custom Token 발급 및 로그인
+ */
 export async function loginWithKakao(): Promise<{ success: boolean; uid?: string; needsOnboarding?: boolean }> {
   const kakaoUser = await signInWithKakao();
   const issued = await issueCustomToken({
@@ -184,7 +208,7 @@ export async function linkKakaoToFirebase(
 }
 
 export function getKakaoAuthSetupMessage(): string {
-  return KAKAO_APP_KEY
+  return FALLBACK_KAKAO_APP_KEY
     ? '카카오 로그인 설정이 연결되어 있습니다.'
     : '카카오 앱 키를 설정하면 카카오 로그인을 사용할 수 있습니다.';
 }

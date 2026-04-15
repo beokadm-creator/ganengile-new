@@ -143,6 +143,8 @@ export async function PATCH(req: NextRequest) {
         liveReady: kakaoReady,
         startUrl: privatePayload.kakao.startUrl,
         callbackUrl: privatePayload.kakao.callbackUrl,
+        clientId: privatePayload.kakao.clientId, // 클라이언트 앱에서 카카오 로그인 창을 띄우기 위해 필요
+        redirectUri: privatePayload.kakao.callbackUrl, // 클라이언트 앱에서 카카오 로그인 후 돌아올 주소
       },
     },
     updatedAt: new Date(),

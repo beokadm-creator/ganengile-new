@@ -3,10 +3,12 @@ import { db } from './firebase';
 
 export interface IntegrationProviderPublicConfig {
   enabled: boolean;
-  label: string;
-  liveReady: boolean;
+  label?: string;
+  liveReady?: boolean;
   startUrl?: string;
   callbackUrl?: string;
+  clientId?: string;
+  redirectUri?: string;
 }
 
 export interface IdentityIntegrationConfig {
@@ -190,6 +192,14 @@ export async function getIdentityIntegrationConfig(): Promise<IdentityIntegratio
             typeof data?.providers?.kakao?.callbackUrl === 'string'
               ? data.providers.kakao.callbackUrl
               : fallback.providers.kakao.callbackUrl,
+          clientId:
+            typeof data?.providers?.kakao?.clientId === 'string'
+              ? data.providers.kakao.clientId
+              : fallback.providers.kakao.clientId,
+          redirectUri:
+            typeof data?.providers?.kakao?.redirectUri === 'string'
+              ? data.providers.kakao.redirectUri
+              : fallback.providers.kakao.redirectUri,
         },
       },
     };
