@@ -28,7 +28,10 @@ function parseEnvFile(filePath) {
 }
 
 function readProjectEnv() {
-  const rootEnv = parseEnvFile(path.join(cwd, '.env'));
+  const rootEnv = {
+    ...parseEnvFile(path.join(cwd, '.env')),
+    ...parseEnvFile(path.join(cwd, '.env.local')),
+  };
   const functionsEnv = parseEnvFile(path.join(cwd, 'functions', '.env.ganengile'));
   return { rootEnv, functionsEnv };
 }
@@ -53,7 +56,6 @@ const appRequired = [
   'EXPO_PUBLIC_FIREBASE_FUNCTIONS_REGION',
   'EXPO_PUBLIC_MAP_PROVIDER',
   'EXPO_PUBLIC_NAVER_MAP_ENABLED',
-  'EXPO_PUBLIC_NAVER_MAP_CLIENT_ID',
 ];
 
 const dynamicOptional = [
@@ -61,7 +63,6 @@ const dynamicOptional = [
   'EXPO_PUBLIC_NAVER_MAP_WEB_CLIENT_ID',
 ];
 
-const functionsRequired = ['NAVER_MAP_CLIENT_ID', 'NAVER_MAP_CLIENT_SECRET'];
 
 for (const key of appRequired) {
   statusLine(key, hasNonEmpty(rootEnv, key), hasNonEmpty(rootEnv, key) ? 'configured' : 'set this before deploy');
@@ -73,14 +74,6 @@ for (const key of dynamicOptional) {
   const configured = hasNonEmpty(rootEnv, key);
   statusLine(key, configured, configured ? 'configured' : 'optional for web dynamic maps');
 }
-
-console.log('');
-
-for (const key of functionsRequired) {
-  statusLine(key, hasNonEmpty(functionsEnv, key), hasNonEmpty(functionsEnv, key) ? 'configured' : 'set this before deploy');
-}
-
-console.log('');
 
 const provider = rootEnv.EXPO_PUBLIC_MAP_PROVIDER ?? 'unset';
 console.log(`Map provider: ${provider}`);

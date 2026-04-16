@@ -1,4 +1,5 @@
 import { getApps } from 'firebase/app';
+import { PUBLIC_NAVER_MAP_CLIENT_ID } from './public-env';
 
 export type SupportedMapProvider = 'naver-static' | 'naver-web' | 'none';
 
@@ -8,13 +9,13 @@ function readEnv(value: string | undefined): string {
 
 export const mapConfig = {
   provider: (readEnv(process.env.EXPO_PUBLIC_MAP_PROVIDER) || 'naver-static') as SupportedMapProvider,
-  publicClientId: readEnv(process.env.EXPO_PUBLIC_NAVER_MAP_CLIENT_ID),
+  publicClientId: readEnv(process.env.EXPO_PUBLIC_NAVER_MAP_CLIENT_ID) || PUBLIC_NAVER_MAP_CLIENT_ID,
   staticMapProxyBaseUrl: readEnv(process.env.EXPO_PUBLIC_NAVER_STATIC_MAP_PROXY_URL),
   geocodeProxyBaseUrl: readEnv(process.env.EXPO_PUBLIC_NAVER_GEOCODE_PROXY_URL),
   reverseGeocodeProxyBaseUrl: readEnv(process.env.EXPO_PUBLIC_NAVER_REVERSE_GEOCODE_PROXY_URL),
   directionsProxyBaseUrl: readEnv(process.env.EXPO_PUBLIC_NAVER_DIRECTIONS_PROXY_URL),
   webClientId: readEnv(process.env.EXPO_PUBLIC_NAVER_MAP_WEB_CLIENT_ID),
-  dynamicWebEnabled: readEnv(process.env.EXPO_PUBLIC_NAVER_WEB_MAP_ENABLED) === 'true',
+  dynamicWebEnabled: readEnv(process.env.EXPO_PUBLIC_NAVER_WEB_MAP_ENABLED) !== 'false',
   enabled: readEnv(process.env.EXPO_PUBLIC_NAVER_MAP_ENABLED) !== 'false',
 };
 
@@ -26,8 +27,8 @@ export function canUseDynamicWebMap(): boolean {
   return (
     mapConfig.enabled &&
     mapConfig.dynamicWebEnabled &&
-    mapConfig.provider === 'naver-web' &&
-    mapConfig.webClientId.length > 0
+    mapConfig.provider !== 'none' &&
+    (mapConfig.webClientId.length > 0 || mapConfig.publicClientId.length > 0)
   );
 }
 
@@ -91,11 +92,12 @@ export function getNaverDirectionsProxyUrl(): string {
 }
 
 export function getNaverWebSdkUrl(): string {
-  if (!mapConfig.webClientId) {
+  const clientId = mapConfig.webClientId || mapConfig.publicClientId;
+  if (!clientId) {
     return '';
   }
 
   return `https://oapi.map.naver.com/openapi/v3/maps.js?ncpClientId=${encodeURIComponent(
-    mapConfig.webClientId
+    clientId
   )}`;
 }

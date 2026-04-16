@@ -158,14 +158,9 @@ export function NaverMapCard({
         {createElement('div', { id: mapId, style: buildWebMapStyle(height) })}
         {!dynamicReady ? (
           <View style={styles.fallbackWrap}>
-            <StaticMapPreview
-              title={title}
-              subtitle={subtitle}
-              center={center}
-              markers={markerSummary}
-              path={path}
-              height={height}
-            />
+            <View style={[styles.loadingPlaceholder, { height }]}>
+              <Text style={styles.loadingText}>지도를 불러오는 중</Text>
+            </View>
           </View>
         ) : null}
       </View>
@@ -202,5 +197,17 @@ const styles = StyleSheet.create({
   },
   fallbackWrap: {
     marginTop: 12,
+  },
+  loadingPlaceholder: {
+    width: '100%',
+    borderRadius: 20,
+    overflow: 'hidden',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#e2e8f0',
+  },
+  loadingText: {
+    color: '#64748b',
+    fontSize: Typography.fontSize.sm,
   },
 });
