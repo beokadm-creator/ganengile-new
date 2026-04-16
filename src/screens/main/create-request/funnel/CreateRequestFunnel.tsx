@@ -579,6 +579,26 @@ export default function CreateRequestFunnel(props: Props) {
           onChangeText={store.setRecipientPhone}
         />
 
+        {(props.recipientPrivacyConfig?.safeNumberEnabled || props.recipientPrivacyConfig?.thirdPartyConsentRequired) &&
+        String(props.recipientPrivacyConfig?.guidance ?? '').trim() ? (
+          <View style={styles.privacyNoticeBox}>
+            <Text style={styles.privacyNoticeText}>{String(props.recipientPrivacyConfig.guidance).trim()}</Text>
+            {String(props.recipientPrivacyConfig?.providerName ?? '').trim() ||
+            String(props.recipientPrivacyConfig?.policyTitle ?? '').trim() ||
+            String(props.recipientPrivacyConfig?.policyEffectiveDate ?? '').trim() ? (
+              <Text style={styles.privacyNoticeMeta}>
+                {[props.recipientPrivacyConfig?.providerName, props.recipientPrivacyConfig?.policyTitle]
+                  .map((value) => String(value ?? '').trim())
+                  .filter(Boolean)
+                  .join(' · ')}
+                {String(props.recipientPrivacyConfig?.policyEffectiveDate ?? '').trim()
+                  ? ` (${String(props.recipientPrivacyConfig.policyEffectiveDate).trim()})`
+                  : ''}
+              </Text>
+            ) : null}
+          </View>
+        ) : null}
+
         <Text style={styles.label}>추가 요청사항</Text>
         <TextInput
           style={[styles.inputBox, { height: 80, textAlignVertical: 'top' }]}
@@ -744,6 +764,9 @@ const styles = StyleSheet.create({
   disabledButton: { opacity: 0.5 },
   consentBox: { flexDirection: 'row', alignItems: 'center', gap: Spacing.xs, marginTop: Spacing.sm },
   consentText: { fontSize: Typography.fontSize.sm, color: Colors.textSecondary },
+  privacyNoticeBox: { backgroundColor: Colors.gray100, borderRadius: BorderRadius.md, padding: Spacing.md },
+  privacyNoticeText: { color: Colors.textSecondary, fontSize: Typography.fontSize.sm, lineHeight: 18 },
+  privacyNoticeMeta: { color: Colors.gray500, fontSize: Typography.fontSize.xs, marginTop: Spacing.xs, lineHeight: 16 },
   loadingRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing.sm, marginTop: Spacing.xs },
   loadingText: { color: Colors.primary, fontSize: Typography.fontSize.sm, fontWeight: Typography.fontWeight.bold },
   errorText: { color: Colors.error, fontSize: Typography.fontSize.sm, fontWeight: Typography.fontWeight.bold, marginTop: Spacing.xs },

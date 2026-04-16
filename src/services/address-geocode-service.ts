@@ -39,10 +39,12 @@ export async function geocodeRoadAddress(roadAddress: string): Promise<GeocodedA
     throw new Error(payload.message ?? '주소 좌표를 찾지 못했습니다.');
   }
 
-  const latitude = payload.address?.latitude;
-  const longitude = payload.address?.longitude;
+  const address = payload.address;
+  const latitude = address?.latitude;
+  const longitude = address?.longitude;
   if (
     !payload.ok ||
+    !address ||
     typeof latitude !== 'number' ||
     typeof longitude !== 'number' ||
     !Number.isFinite(latitude) ||
@@ -52,8 +54,8 @@ export async function geocodeRoadAddress(roadAddress: string): Promise<GeocodedA
   }
 
   return {
-    roadAddress: payload.address.roadAddress ?? query,
-    jibunAddress: payload.address.jibunAddress,
+    roadAddress: address.roadAddress ?? query,
+    jibunAddress: address.jibunAddress,
     latitude,
     longitude,
   };
