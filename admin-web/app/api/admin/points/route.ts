@@ -4,70 +4,79 @@ import { isAdmin } from '@/lib/auth';
 import { getWalletSummary } from '../../../../../src/utils/wallet-balance';
 
 export async function GET(req: NextRequest) {
-  if (!(await isAdmin())) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  try {
+    if (!(await isAdmin())) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
-  const db = getAdminDb();
-  const { searchParams } = new URL(req.url);
-  const search = searchParams.get('search') ?? '';
+    const db = getAdminDb();
+    const { searchParams } = new URL(req.url);
+    const search = searchParams.get('search') ?? '';
 
-  let query = db.collection('users').orderBy('pointBalance', 'desc').limit(50);
-  const snap = await query.get();
+    let query = db.collection('users').orderBy('pointBalance', 'desc').limit(50);
+    const snap = await query.get();
 
-  const userIds = snap.docs.map((doc) => doc.id);
-  
-  // Fetch wallet ledgers for these users
-  const ledgersSnap = userIds.length > 0 
-    ? await db.collection('wallet_ledgers').where('userId', 'in', userIds).get()
-    : { docs: [] };
+    const userIds = snap.docs.map((doc) => doc.id);
     
-  const ledgersMap = new Map(ledgersSnap.docs.map((d) => [d.data().userId, d.data()]));
+    // Fetch wallet ledgers for these users
+    const ledgersSnap = userIds.length > 0 
+      ? await db.collection('wallet_ledgers').where('userId', 'in', userIds).get()
+      : { docs: [] };
+      
+    const ledgersMap = new Map(ledgersSnap.docs.map((d) => [d.data().userId, d.data()]));
 
-  let items = snap.docs.map((doc) => {
-    const userData = doc.data();
-    const ledger = ledgersMap.get(doc.id);
-    
-    // Fallback logic similar to normalizeWalletBalances
-    const rawBalances = ledger?.balances ?? userData.walletBalances ?? {};
-    const balances = {
-      chargeBalance: Number(rawBalances.chargeBalance ?? 0),
-      earnedBalance: Number(rawBalances.earnedBalance ?? userData.pointBalance ?? 0),
-      promoBalance: Number(rawBalances.promoBalance ?? 0),
-      lockedChargeBalance: Number(rawBalances.lockedChargeBalance ?? 0),
-      lockedEarnedBalance: Number(rawBalances.lockedEarnedBalance ?? 0),
-      lockedPromoBalance: Number(rawBalances.lockedPromoBalance ?? 0),
-      pendingWithdrawalBalance: Number(rawBalances.pendingWithdrawalBalance ?? 0),
-    };
-    
-    const summary = getWalletSummary(balances as any);
+    let items = snap.docs.map((doc) => {
+      const userData = doc.data();
+      const ledger = ledgersMap.get(doc.id);
+      
+      // Fallback logic similar to normalizeWalletBalances
+      const rawBalances = ledger?.balances ?? userData.walletBalances ?? {};
+      const balances = {
+        chargeBalance: Number(rawBalances.chargeBalance ?? 0),
+        earnedBalance: Number(rawBalances.earnedBalance ?? userData.pointBalance ?? 0),
+        promoBalance: Number(rawBalances.promoBalance ?? 0),
+        lockedChargeBalance: Number(rawBalances.lockedChargeBalance ?? 0),
+        lockedEarnedBalance: Number(rawBalances.lockedEarnedBalance ?? 0),
+        lockedPromoBalance: Number(rawBalances.lockedPromoBalance ?? 0),
+        pendingWithdrawalBalance: Number(rawBalances.pendingWithdrawalBalance ?? 0),
+      };
+      
+      const summary = getWalletSummary(balances as Record<string, unknown>);
 
-    return {
-      id: doc.id,
-      displayName: userData.displayName ?? userData.name ?? '(이름없음)',
-      email: userData.email ?? '',
-      pointBalance: summary.totalUsableBalance, // Show total usable balance as main balance
-      withdrawableBalance: summary.withdrawableBalance,
-      balances: {
-        charge: balances.chargeBalance,
-        earned: balances.earnedBalance,
-        promo: balances.promoBalance,
-      },
-      totalEarnedPoints: userData.totalEarnedPoints ?? 0,
-      totalSpentPoints: userData.totalSpentPoints ?? 0,
-      updatedAt: ledger?.updatedAt?.toDate() ?? userData.updatedAt?.toDate() ?? null,
-    };
-  });
+      return {
+        id: doc.id,
+        displayName: userData.displayName ?? userData.name ?? '(이름없음)',
+        email: userData.email ?? '',
+        pointBalance: summary.totalUsableBalance, // Show total usable balance as main balance
+        withdrawableBalance: summary.withdrawableBalance,
+        balances: {
+          charge: balances.chargeBalance,
+          earned: balances.earnedBalance,
+          promo: balances.promoBalance,
+        },
+        totalEarnedPoints: userData.totalEarnedPoints ?? 0,
+        totalSpentPoints: userData.totalSpentPoints ?? 0,
+        updatedAt: ledger?.updatedAt?.toDate() ?? userData.updatedAt?.toDate() ?? null,
+      };
+    });
 
-  if (search) {
-    items = items.filter(
-      (u) => u.displayName.includes(search) || u.email.includes(search) || u.id.includes(search)
+    if (search) {
+      items = items.filter(
+        (u) => u.displayName.includes(search) || u.email.includes(search) || u.id.includes(search)
+      );
+    }
+
+    return NextResponse.json({ items });
+  } catch (error: unknown) {
+    console.error('Points GET error:', error);
+    return NextResponse.json(
+      { ok: false, error: error instanceof Error ? error.message : 'Unknown error' },
+      { status: 500 }
     );
   }
-
-  return NextResponse.json({ items });
 }
 
 export async function PATCH(req: NextRequest) {
-  if (!(await isAdmin())) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  try {
+    if (!(await isAdmin())) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
   const { userId, type, amount, reason, fundingSource = 'promo' } = await req.json();
   if (!userId || !type || !amount || !reason) return NextResponse.json({ error: 'Missing fields' }, { status: 400 });
@@ -96,7 +105,7 @@ export async function PATCH(req: NextRequest) {
     pendingWithdrawalBalance: Number(rawBalances.pendingWithdrawalBalance ?? 0),
   };
 
-  const oldSummary = getWalletSummary(currentBalances as any);
+  const oldSummary = getWalletSummary(currentBalances as Record<string, unknown>);
   const requestedDelta = type === 'earn' ? Number(amount) : -Number(amount);
 
   // 3. Apply changes to the specific funding source
@@ -114,7 +123,7 @@ export async function PATCH(req: NextRequest) {
     actualDelta = newBalances.promoBalance - currentBalances.promoBalance;
   }
 
-  const newSummary = getWalletSummary(newBalances as any);
+  const newSummary = getWalletSummary(newBalances as Record<string, unknown>);
   const now = new Date();
 
   // 4. Batch write to both users and wallet_ledgers to maintain backward compatibility
@@ -172,4 +181,11 @@ export async function PATCH(req: NextRequest) {
   await batch.commit();
 
   return NextResponse.json({ ok: true, newBalance: newSummary.totalUsableBalance });
+  } catch (error: unknown) {
+    console.error('Point adjustment failed:', error);
+    return NextResponse.json(
+      { ok: false, error: error instanceof Error ? error.message : 'Unknown error' },
+      { status: 500 }
+    );
+  }
 }

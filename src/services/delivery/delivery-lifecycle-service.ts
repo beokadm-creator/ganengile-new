@@ -25,6 +25,7 @@ import { getPricingPolicyConfig } from '../pricing-policy-config-service';
 import { sendRequestExecutionNotification } from '../matching-notification';
 import type { DeliveryStatus, DeliveryRequest } from '../../types/delivery';
 import { ActorSelectionActorType } from '../../types/beta1';
+import { getReservationByRequestId, cancelLockerReservation } from '../locker-service';
 
 // ============================================================================
 // Helper Functions & Types
@@ -341,6 +342,19 @@ async function getDeliveryByRequestId(requestId: string): Promise<DeliveryDocLik
 // Delivery Lifecycle Functions
 // ============================================================================
 
+async function cancelAllReservations(requestId: string) {
+  try {
+    const reservations = await getReservationByRequestId(requestId);
+    for (const res of reservations) {
+      if (res.status === 'pending' || res.status === 'pending_allocation' || res.status === 'active') {
+        await cancelLockerReservation(res.reservationId);
+      }
+    }
+  } catch(e) {
+    console.error('Failed to cancel reservations', e);
+  }
+}
+
 export const deliveryLifecycleService = {
   async gillerAcceptRequest(
     requestId: string,
@@ -639,6 +653,7 @@ export const deliveryLifecycleService = {
       const delivery = await getDeliveryByRequestId(args.requestId);
 
       if (!delivery) {
+        await cancelAllReservations(args.requestId);
         await updateDoc(requestRef, {
           status: 'cancelled',
           matchedGillerId: deleteField(),
@@ -689,6 +704,8 @@ export const deliveryLifecycleService = {
           cancelledAt: serverTimestamp(),
           updatedAt: serverTimestamp(),
         });
+
+        await cancelAllReservations(args.requestId);
 
         await updateDoc(requestRef, {
           status: 'cancelled',
@@ -776,6 +793,7 @@ export const deliveryLifecycleService = {
             updatedAt: serverTimestamp(),
           });
 
+          await cancelAllReservations(args.requestId);
           await updateDoc(requestRef, {
             status: 'cancelled',
             matchedGillerId: deleteField(),
@@ -819,6 +837,7 @@ export const deliveryLifecycleService = {
         updatedAt: serverTimestamp(),
       });
 
+      await cancelAllReservations(args.requestId);
       await updateDoc(requestRef, {
         status: 'cancelled',
         matchedGillerId: deleteField(),
@@ -1092,7 +1111,12 @@ export const deliveryLifecycleService = {
     deliveryId: string,
     gillerId: string,
     lockerId: string,
-    reservationId: string
+    reservationId: string,
+    lockerCredentials?: {
+      lockerNumber?: string;
+      password?: string;
+      qrCodeUrl?: string;
+    }
   ): Promise<{ success: boolean; message: string }> {
     try {
       const deliveryRef = doc(db, 'deliveries', deliveryId);
@@ -1107,13 +1131,20 @@ export const deliveryLifecycleService = {
         return { success: false, message: '배송 데이터를 찾을 수 없습니다.' };
       }
 
-      if (delivery.gillerId !== gillerId) {
+      // 레거시 gllerId 속성 호환
+      if ((delivery.gillerId ?? delivery.gllerId) !== gillerId) {
         return { success: false, message: '권한이 없습니다.' };
       }
 
-      await updateDoc(deliveryRef, {
+      const credentialsData = lockerCredentials ? {
+        ...lockerCredentials,
+        savedAt: new Date()
+      } : null;
+
+      const updateData: Record<string, unknown> = {
         status: 'at_locker' as DeliveryStatus,
         lockerId,
+        dropoffLockerId: lockerId,
         reservationId,
         'tracking.events': [
           ...getTrackingEvents(delivery),
@@ -1126,21 +1157,94 @@ export const deliveryLifecycleService = {
         ],
         'tracking.progress': 60,
         updatedAt: serverTimestamp(),
-      });
+      };
+
+      if (credentialsData) {
+        updateData.lockerCredentials = credentialsData;
+        updateData.dropoffLockerCredentials = credentialsData;
+      }
+
+      await updateDoc(deliveryRef, updateData);
 
       if (delivery.requestId) {
         const requestRef = doc(db, 'requests', delivery.requestId);
-        await updateDoc(requestRef, {
+        const reqUpdateData: Record<string, unknown> = {
           status: 'at_locker' as DeliveryStatus,
           lockerId,
+          dropoffLockerId: lockerId,
           reservationId,
           updatedAt: serverTimestamp(),
-        });
+        };
+        if (credentialsData) {
+          reqUpdateData.dropoffLockerCredentials = credentialsData;
+        }
+        await updateDoc(requestRef, reqUpdateData);
       }
 
       return { success: true, message: '사물함 인계가 완료되었습니다.' };
     } catch (error) {
       console.error('Error marking as dropped at locker:', error);
+      return { success: false, message: '사물함 인계 처리에 실패했습니다.' };
+    }
+  },
+
+  async markAsRequesterDroppedAtLocker(
+    requestId: string,
+    lockerId: string,
+    reservationId: string,
+    lockerCredentials?: {
+      lockerNumber?: string;
+      password?: string;
+    }
+  ): Promise<{ success: boolean; message: string }> {
+    try {
+      const requestRef = doc(db, 'requests', requestId);
+      const requestDoc = await getDoc(requestRef);
+
+      if (!requestDoc.exists()) {
+        return { success: false, message: '요청 정보를 찾을 수 없습니다.' };
+      }
+
+      const credentialsData = lockerCredentials ? {
+        ...lockerCredentials,
+        savedAt: new Date()
+      } : null;
+
+      const reqUpdateData: Record<string, unknown> = {
+        status: 'at_locker' as DeliveryStatus,
+        lockerId: lockerId,
+        pickupLockerId: lockerId,
+        reservationId,
+        updatedAt: serverTimestamp(),
+      };
+      
+      if (credentialsData) {
+        reqUpdateData.pickupLockerCredentials = credentialsData;
+      }
+      
+      await updateDoc(requestRef, reqUpdateData);
+
+      // If delivery already exists, update it too
+      const delivery = await getDeliveryByRequestId(requestId);
+      if (delivery && delivery.deliveryId) {
+        const deliveryRef = doc(db, 'deliveries', delivery.deliveryId);
+        const delUpdateData: Record<string, unknown> = {
+          status: 'at_locker' as DeliveryStatus,
+          lockerId,
+          pickupLockerId: lockerId,
+          updatedAt: serverTimestamp(),
+        };
+        
+        if (credentialsData) {
+          delUpdateData.pickupLockerCredentials = credentialsData;
+        }
+        
+        await updateDoc(deliveryRef, delUpdateData);
+      }
+
+      return { success: true, message: '사물함 인계가 완료되었습니다.' };
+    } catch (error) {
+      console.error('Error marking requester dropoff at locker:', error);
       return { success: false, message: '사물함 인계 처리에 실패했습니다.' };
     }
   },

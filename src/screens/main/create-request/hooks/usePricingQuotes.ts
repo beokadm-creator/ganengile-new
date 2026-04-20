@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect, useMemo } from 'react';
 import { useCreateRequestStore } from '../store/useCreateRequestStore';
+import { calculateAreaLockerFee } from '../../../../services/locker-service';
 import { useUser } from '../../../../contexts/UserContext';
 import { getPricingPolicyConfig } from '../../../../services/pricing-policy-config-service';
 import { getRoutePricingOverrideByStations } from '../../../../services/route-pricing-override-service';
@@ -21,6 +22,7 @@ export function usePricingQuotes() {
   const { user } = useUser();
   const store = useCreateRequestStore();
 
+
   const [pricingPolicy, setPricingPolicy] = useState<SharedPricingPolicyConfig | null>(null);
   const [routeOverride, setRouteOverride] = useState<Awaited<ReturnType<typeof getRoutePricingOverrideByStations>>>(null);
   const [pricingContext, setPricingContext] = useState<RequestPricingContext | null>(null);
@@ -41,6 +43,47 @@ export function usePricingQuotes() {
       : store.preferredPickupTime || 'now';
 
   // Fetch Pricing Policy
+  useEffect(() => {
+    let unmounted = false;
+
+    // Calculate dynamic average locker fees for AREA:: assignment
+    const resolveLockerFees = async () => {
+      try {
+        if (store.usePickupLocker && store.pickupStation && !store.pickupLockerFee) {
+          const areaLockerId = `AREA::${store.pickupStation.stationId}`;
+          const fees = await calculateAreaLockerFee(areaLockerId);
+          if (fees && !unmounted) {
+            store.setPickupLockerFee(fees.averageFee);
+          }
+        }
+        if (store.useDropoffLocker && store.deliveryStation && !store.dropoffLockerFee) {
+          const areaLockerId = `AREA::${store.deliveryStation.stationId}`;
+          const fees = await calculateAreaLockerFee(areaLockerId);
+          if (fees && !unmounted) {
+            store.setDropoffLockerFee(fees.averageFee);
+          }
+        }
+      } catch (error) {
+        console.warn('Failed to calculate dynamic locker fees:', error);
+      }
+    };
+
+    void resolveLockerFees();
+
+    return () => {
+      unmounted = true;
+    };
+  }, [store.usePickupLocker, store.pickupStation, store.useDropoffLocker, store.deliveryStation]);
+
+  // 역(station) 변경 시 캐시된 사물함 수수료 무효화
+  useEffect(() => {
+    store.setPickupLockerFee(null);
+  }, [store.pickupStation?.stationId]);
+
+  useEffect(() => {
+    store.setDropoffLockerFee(null);
+  }, [store.deliveryStation?.stationId]);
+
   useEffect(() => {
     void getPricingPolicyConfig().then(setPricingPolicy).catch((error) => {
       console.error('Failed to load pricing policy config', error);
@@ -135,12 +178,10 @@ export function usePricingQuotes() {
       recipientName: store.recipientName || '수령인',
       recipientPhone: store.recipientPhone || '010-0000-0000',
       pickupLocationDetail: store.pickupLocationDetail || undefined,
-      pickupLockerId: store.pickupLockerId ?? undefined,
-      dropoffLockerId: store.dropoffLockerId ?? undefined,
+      usePickupLocker: store.usePickupLocker,
+      useDropoffLocker: store.useDropoffLocker,
       pickupStorageLocation: store.pickupStorageLocation ?? undefined,
       dropoffStorageLocation: store.dropoffStorageLocation ?? undefined,
-      pickupLockerFee: store.pickupLockerFee ?? undefined,
-      dropoffLockerFee: store.dropoffLockerFee ?? undefined,
       specialInstructions: store.specialInstructions || undefined,
       urgency: store.requestMode === 'reservation' ? 'normal' : store.urgency,
       selectedQuoteType: 'balanced' as const,
@@ -182,10 +223,8 @@ export function usePricingQuotes() {
     store.pickupDetailAddress,
     store.deliveryRoadAddress,
     store.deliveryDetailAddress,
-    store.pickupLockerId,
-    store.dropoffLockerId,
-    store.pickupLockerFee,
-    store.dropoffLockerFee,
+    store.usePickupLocker,
+    store.useDropoffLocker,
   ]);
 
   // Apply AI Quote Response to deterministic quotes
@@ -252,6 +291,7 @@ export function usePricingQuotes() {
             requesterUserId: user.uid,
             pickupStation: store.pickupStation as StationInfo,
             deliveryStation: store.deliveryStation as StationInfo,
+            useDropoffLocker: store.useDropoffLocker,
             packageDescription: store.packageDescription || '물품 설명',
             itemValue: Number(store.itemValue || 0),
             weightKg: Math.max(0.1, Number(store.weightKg || 0)),
@@ -323,7 +363,10 @@ export function usePricingQuotes() {
     store.recipientPhone,
     store.pickupLocationDetail,
     store.storageLocation,
+    store.lockerId,
     store.specialInstructions,
+    store.useDropoffLocker,
+    deterministicQuotes,
     routeOverride,
   ]);
 

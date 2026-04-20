@@ -96,9 +96,9 @@ export async function POST(req: Request) {
     });
 
     return NextResponse.json({ success: true });
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Failed to execute AI review decision:', error);
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    return NextResponse.json({ error: error instanceof Error ? error.message : 'Unknown error' }, { status: 500 });
   }
 }
 
@@ -107,7 +107,8 @@ export async function GET(req: Request) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
-  const { searchParams } = new URL(req.url);
+  try {
+    const { searchParams } = new URL(req.url);
   const limitCount = Number(searchParams.get('limit')) || 50;
 
   const db = getAdminDb();
@@ -253,4 +254,12 @@ export async function GET(req: Request) {
     decisions,
     missions,
   });
+  } catch (error: unknown) {
+    console.error('Failed to get ai review list:', error);
+    return NextResponse.json(
+      { error: 'Internal Server Error', details: error instanceof Error ? error.message : 'Unknown error' },
+      { status: 500 }
+    );
+  }
 }
+

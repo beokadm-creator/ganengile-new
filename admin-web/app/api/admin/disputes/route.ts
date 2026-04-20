@@ -108,11 +108,13 @@ export async function GET(req: NextRequest) {
     );
 
     return NextResponse.json({ items });
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Failed to fetch disputes:', error);
     
-    if (error.message?.includes('FAILED_PRECONDITION') && error.message?.includes('requires an index')) {
-      const linkMatch = error.message.match(/https:\/\/console\.firebase\.google\.com[^\s]*/);
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+
+    if (errorMessage.includes('FAILED_PRECONDITION') && errorMessage.includes('requires an index')) {
+      const linkMatch = errorMessage.match(/https:\/\/console\.firebase\.google\.com[^\s]*/);
       const indexLink = linkMatch ? linkMatch[0] : null;
       
       return NextResponse.json(
@@ -126,7 +128,7 @@ export async function GET(req: NextRequest) {
     }
     
     return NextResponse.json(
-      { error: '데이터를 불러오는데 실패했습니다.', details: error.message }, 
+      { error: '데이터를 불러오는데 실패했습니다.', details: errorMessage }, 
       { status: 500 }
     );
   }
@@ -192,12 +194,12 @@ export async function PATCH(req: NextRequest) {
             pendingWithdrawalBalance: Number(rawBalances.pendingWithdrawalBalance ?? 0),
           };
 
-          const oldSummary = getWalletSummary(currentBalances as any);
+          const oldSummary = getWalletSummary(currentBalances as Record<string, unknown>);
           const newBalances = {
             ...currentBalances,
             promoBalance: currentBalances.promoBalance + compensationAmount, // 보상금은 프로모션 포인트로 지급
           };
-          const newSummary = getWalletSummary(newBalances as any);
+          const newSummary = getWalletSummary(newBalances as Record<string, unknown>);
           const now = new Date();
           
           transaction.update(userRef, {
@@ -256,8 +258,8 @@ export async function PATCH(req: NextRequest) {
     });
 
     return NextResponse.json({ ok: true });
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Transaction failed in dispute resolution:', error);
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    return NextResponse.json({ error: error instanceof Error ? error.message : 'Unknown error' }, { status: 500 });
   }
 }

@@ -78,14 +78,20 @@ export default function CreateRequestFunnel(props: Props) {
 
   // Automatically derive directMode based on current selections
   useEffect(() => {
-    if (store.pickupLockerId || store.dropoffLockerId) {
+    // directMode 추론
+    if (store.usePickupLocker || store.useDropoffLocker) {
       store.setDirectMode('locker_assisted');
-    } else if (store.pickupMode === 'station') {
+    } else if (store.pickupMode === 'station' && store.deliveryMode === 'station') {
       store.setDirectMode('requester_to_station');
     } else {
       store.setDirectMode('none');
     }
-  }, [store.pickupMode, store.pickupLockerId, store.dropoffLockerId]);
+  }, [
+    store.pickupMode,
+    store.usePickupLocker,
+    store.deliveryMode,
+    store.useDropoffLocker,
+  ]);
 
   const scrollToBottom = () => {
     setTimeout(() => {
@@ -167,22 +173,35 @@ export default function CreateRequestFunnel(props: Props) {
     return renderQuestionBox(
       1,
       '물건은 어디서 출발하나요?',
-      <View style={styles.row}>
+      <View style={{ gap: Spacing.sm }}>
         <Chip
-          label="계신 곳(주소)에서 픽업"
+          label="받는 분(길러)이 출발지로 직접 방문"
           active={store.pickupMode === 'address'}
           onPress={() => {
             store.setPickupMode('address');
+            store.setUsePickupLocker(false);
             store.setPickupLockerId(null);
             store.setPickupLockerFee(null);
             advanceTo(2);
           }}
         />
         <Chip
-          label="출발역으로 직접 이동"
-          active={store.pickupMode === 'station'}
+          label="출발역에서 길러를 만나서 전달"
+          active={store.pickupMode === 'station' && !store.usePickupLocker}
           onPress={() => {
             store.setPickupMode('station');
+            store.setUsePickupLocker(false);
+            store.setPickupLockerId(null);
+            store.setPickupLockerFee(null);
+            advanceTo(2);
+          }}
+        />
+        <Chip
+          label="출발역 사물함에 미리 보관 (비대면)"
+          active={store.pickupMode === 'station' && store.usePickupLocker}
+          onPress={() => {
+            store.setPickupMode('station');
+            store.setUsePickupLocker(true);
             advanceTo(2);
           }}
         />
@@ -261,72 +280,46 @@ export default function CreateRequestFunnel(props: Props) {
     );
   };
 
-  const renderPickupLocker = () => {
-    if (store.pickupMode !== 'station') return null; // Skip if address
-    const hasValue = !!store.pickupLockerId || store.directMode === 'requester_to_station';
-
-    return renderQuestionBox(
-      3,
-      '출발역에서 어떻게 전달하실 건가요?',
-      <View>
-        <View style={styles.row}>
-          <Chip
-            label="직접 만나서 전달"
-            active={!store.pickupLockerId}
-            onPress={() => {
-              store.setPickupLockerId(null);
-              store.setPickupLockerFee(null);
-              advanceTo(4);
-            }}
-          />
-          <Chip
-            label="사물함에 미리 보관"
-            active={!!store.pickupLockerId}
-            onPress={() => {
-              props.setLockerLocatorTarget('pickup');
-            }}
-          />
-        </View>
-        {store.pickupLockerId && (
-          <View style={styles.selectedBox}>
-            <Text style={styles.selectedBoxText}>선택됨: {store.pickupStorageLocation}</Text>
-          </View>
-        )}
-        {hasValue && currentStep === 3 && (
-          <TouchableOpacity style={styles.nextButton} onPress={() => advanceTo(4)}>
-            <Text style={styles.nextButtonText}>다음</Text>
-          </TouchableOpacity>
-        )}
-      </View>,
-      currentStep === 3
-    );
-  };
+  const renderPickupLocker = () => null; // Removed
 
   const renderDeliveryMode = () => {
     return renderQuestionBox(
-      4,
+      3,
       '어디로 보내시나요?',
-      <View style={styles.row}>
+      <View style={{ gap: Spacing.sm }}>
         <Chip
-          label="받는 분 주소로 배송"
+          label="길러가 도착지로 직접 방문"
           active={store.deliveryMode === 'address'}
           onPress={() => {
             store.setDeliveryMode('address');
+            store.setUseDropoffLocker(false);
             store.setDropoffLockerId(null);
             store.setDropoffLockerFee(null);
-            advanceTo(5);
+            advanceTo(4);
           }}
         />
         <Chip
-          label="도착역으로 배송"
-          active={store.deliveryMode === 'station'}
+          label="도착역에서 길러가 수령인에게 전달"
+          active={store.deliveryMode === 'station' && !store.useDropoffLocker}
           onPress={() => {
             store.setDeliveryMode('station');
-            advanceTo(5);
+            store.setUseDropoffLocker(false);
+            store.setDropoffLockerId(null);
+            store.setDropoffLockerFee(null);
+            advanceTo(4);
+          }}
+        />
+        <Chip
+          label="도착역 사물함에 보관 (비대면)"
+          active={store.deliveryMode === 'station' && store.useDropoffLocker}
+          onPress={() => {
+            store.setDeliveryMode('station');
+            store.setUseDropoffLocker(true);
+            advanceTo(4);
           }}
         />
       </View>,
-      currentStep === 4
+      currentStep === 3
     );
   };
 
@@ -340,7 +333,7 @@ export default function CreateRequestFunnel(props: Props) {
       : store.deliveryStation?.stationName || '';
 
     return renderQuestionBox(
-      5,
+      4,
       isAddress ? '도착지 주소를 알려주세요.' : '어느 역으로 도착하나요?',
       <View style={{ gap: Spacing.sm }}>
         <TouchableOpacity
@@ -390,62 +383,23 @@ export default function CreateRequestFunnel(props: Props) {
           <Text style={styles.errorText}>인근에 서비스 가능한 지하철역이 없습니다. 다른 주소를 선택해주세요.</Text>
         )}
 
-        {hasValue && currentStep === 5 && (
-          <TouchableOpacity style={styles.nextButton} onPress={() => advanceTo(isAddress ? 7 : 6)}>
+        {hasValue && currentStep === 4 && (
+          <TouchableOpacity style={styles.nextButton} onPress={() => advanceTo(5)}>
             <Text style={styles.nextButtonText}>다음</Text>
           </TouchableOpacity>
         )}
       </View>,
-      currentStep === 5
+      currentStep === 4
     );
   };
 
-  const renderDeliveryLocker = () => {
-    if (store.deliveryMode !== 'station') return null; // Skip if address
-    const hasValue = !!store.dropoffLockerId || store.directMode === 'requester_to_station' || store.directMode === 'none';
-
-    return renderQuestionBox(
-      6,
-      '도착역에서 받는 분이 어떻게 수령하시나요?',
-      <View>
-        <View style={styles.row}>
-          <Chip
-            label="길러가 직접 전달"
-            active={!store.dropoffLockerId}
-            onPress={() => {
-              store.setDropoffLockerId(null);
-              store.setDropoffLockerFee(null);
-              advanceTo(7);
-            }}
-          />
-          <Chip
-            label="도착역 사물함에 보관"
-            active={!!store.dropoffLockerId}
-            onPress={() => {
-              props.setLockerLocatorTarget('dropoff');
-            }}
-          />
-        </View>
-        {store.dropoffLockerId && (
-          <View style={styles.selectedBox}>
-            <Text style={styles.selectedBoxText}>선택됨: {store.dropoffStorageLocation}</Text>
-          </View>
-        )}
-        {hasValue && currentStep === 6 && (
-          <TouchableOpacity style={styles.nextButton} onPress={() => advanceTo(7)}>
-            <Text style={styles.nextButtonText}>다음</Text>
-          </TouchableOpacity>
-        )}
-      </View>,
-      currentStep === 6
-    );
-  };
+  const renderDeliveryLocker = () => null; // Removed
 
   const renderItemInfo = () => {
     const hasValue = !!store.packageItemName && !!store.packageDescription && !!store.packageSize && !!store.weightKg;
 
     return renderQuestionBox(
-      7,
+      5,
       '어떤 물건인가요?',
       <View style={{ gap: Spacing.md }}>
         {/* 예약 시간 입력 (예약 모드일 때만) */}
@@ -537,13 +491,13 @@ export default function CreateRequestFunnel(props: Props) {
           onChangeText={(text) => store.setWeightKg(text.replace(/[^0-9.]/g, ''))}
         />
 
-        {hasValue && currentStep === 7 && (
-          <TouchableOpacity style={styles.nextButton} onPress={() => advanceTo(8)}>
+        {hasValue && currentStep === 5 && (
+          <TouchableOpacity style={styles.nextButton} onPress={() => advanceTo(6)}>
             <Text style={styles.nextButtonText}>다음</Text>
           </TouchableOpacity>
         )}
       </View>,
-      currentStep === 7
+      currentStep === 5
     );
   };
 
@@ -551,7 +505,7 @@ export default function CreateRequestFunnel(props: Props) {
     const hasValue = !!store.recipientName && !!store.recipientPhone && store.recipientConsentChecked && props.isPhoneVerified;
 
     return renderQuestionBox(
-      8,
+      6,
       '누구에게 전달하나요?',
       <View style={{ gap: Spacing.md }}>
         <Text style={styles.label}>상세 픽업 위치</Text>
@@ -665,18 +619,18 @@ export default function CreateRequestFunnel(props: Props) {
           </TouchableOpacity>
         )}
 
-        {hasValue && currentStep === 8 && (
-          <TouchableOpacity style={styles.nextButton} onPress={() => advanceTo(9)}>
+        {hasValue && currentStep === 6 && (
+          <TouchableOpacity style={styles.nextButton} onPress={() => advanceTo(7)}>
             <Text style={styles.nextButtonText}>다음</Text>
           </TouchableOpacity>
         )}
       </View>,
-      currentStep === 8
+      currentStep === 6
     );
   };
 
   const renderQuote = () => {
-    if (currentStep < 9) return null;
+    if (currentStep < 7) return null;
 
     const card = props.quotes.find((q) => q.quoteType === 'balanced') || props.quotes[0];
     if (!card) return null;

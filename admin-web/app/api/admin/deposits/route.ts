@@ -100,13 +100,15 @@ export async function GET(req: NextRequest) {
     });
 
     return NextResponse.json({ items });
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Failed to fetch deposits:', error);
     
+    const errorMessage = error instanceof Error ? error.message : '';
+    
     // Check if this is an index error from Firestore
-    if (error.message?.includes('FAILED_PRECONDITION') && error.message?.includes('requires an index')) {
+    if (errorMessage.includes('FAILED_PRECONDITION') && errorMessage.includes('requires an index')) {
       // Extract the link from the error message if possible to show to the user
-      const linkMatch = error.message.match(/https:\/\/console\.firebase\.google\.com[^\s]*/);
+      const linkMatch = errorMessage.match(/https:\/\/console\.firebase\.google\.com[^\s]*/);
       const indexLink = linkMatch ? linkMatch[0] : null;
       
       return NextResponse.json(
@@ -120,7 +122,7 @@ export async function GET(req: NextRequest) {
     }
     
     return NextResponse.json(
-      { error: '데이터를 불러오는데 실패했습니다.', details: error.message }, 
+      { error: '데이터를 불러오는데 실패했습니다.', details: error instanceof Error ? error.message : 'Unknown error' }, 
       { status: 500 }
     );
   }
@@ -218,7 +220,7 @@ export async function PATCH(req: NextRequest) {
               pendingWithdrawalBalance: Number(rawBalances.pendingWithdrawalBalance ?? 0),
             };
 
-            const oldSummary = getWalletSummary(currentBalances as any);
+            const oldSummary = getWalletSummary(currentBalances as Record<string, unknown>);
             const pointAmount = data.pointAmount ?? 0;
             
             // Refund goes back to earnedBalance by default for deposits
@@ -226,7 +228,7 @@ export async function PATCH(req: NextRequest) {
               ...currentBalances,
               earnedBalance: currentBalances.earnedBalance + pointAmount,
             };
-            const newSummary = getWalletSummary(newBalances as any);
+            const newSummary = getWalletSummary(newBalances as Record<string, unknown>);
             const now = new Date();
 
             transaction.update(userRef, {
@@ -272,12 +274,20 @@ export async function PATCH(req: NextRequest) {
           }
         }
       });
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Transaction failed during deposit refund:', error);
-      return NextResponse.json({ error: `포인트 환급 트랜잭션 실패: ${error.message}` }, { status: 500 });
+      return NextResponse.json({ error: `포인트 환급 트랜잭션 실패: ${error instanceof Error ? error.message : 'Unknown error'}` }, { status: 500 });
     }
   } else if (payload.action === 'deduct') {
-    await ref.update({ status: 'deducted', deductedAt: new Date(), updatedAt: new Date() });
+    try {
+      await ref.update({ status: 'deducted', deductedAt: new Date(), updatedAt: new Date() });
+    } catch (error: unknown) {
+      console.error('Failed to update deposit:', error);
+      return NextResponse.json(
+        { error: 'Failed to update deposit', details: error instanceof Error ? error.message : 'Unknown error' },
+        { status: 500 }
+      );
+    }
   }
 
   return NextResponse.json({ ok: true });

@@ -5,6 +5,7 @@ import {
   ScrollView,
   StyleSheet,
   Text,
+  TextInput,
   TouchableOpacity,
   View,
 } from 'react-native';
@@ -16,6 +17,8 @@ import {
   createLockerReservation,
   getLocker,
   updateReservationStatus,
+  getReservationByRequestId,
+  assignLockerToReservation,
 } from '../../services/locker-service';
 import { markAsDroppedAtLocker } from '../../services/delivery-service';
 import { takePhoto, uploadPhotoWithThumbnail } from '../../services/photo-service';
@@ -27,7 +30,7 @@ import { Typography } from '../../theme/typography';
 import LockerLocator from '../../components/delivery/LockerLocator';
 
 type DropoffRoute = RouteProp<MainStackParamList, 'GillerDropoffAtLocker'>;
-type Step = 'loading' | 'select' | 'reserve' | 'photo' | 'complete';
+type Step = 'loading' | 'select' | 'reserve' | 'photo' | 'info' | 'complete';
 
 export default function GillerDropoffAtLockerScreen() {
   const navigation = useNavigation<MainStackNavigationProp>();
@@ -39,6 +42,10 @@ export default function GillerDropoffAtLockerScreen() {
   const [selectedLocker, setSelectedLocker] = useState<LockerSummary | null>(null);
   const [reservationId, setReservationId] = useState<string | null>(null);
   const [dropoffPhotoUrl, setDropoffPhotoUrl] = useState<string | null>(null);
+
+  // New states for locker info
+  const [lockerNumber, setLockerNumber] = useState('');
+  const [lockerPassword, setLockerPassword] = useState('');
 
   const [requestId, setRequestId] = useState<string | null>(null);
 
@@ -110,19 +117,27 @@ export default function GillerDropoffAtLockerScreen() {
       setWorking(true);
       const userId = requireUserId();
       const qrCode = QRCodeService.generatePickupQRCode(deliveryId, userId);
-      const startTime = new Date();
-      const endTime = new Date(startTime.getTime() + 4 * 60 * 60 * 1000);
-
-      const reservation = await createLockerReservation(
-        selectedLocker.lockerId,
-        requestId,
-        deliveryId,
-        userId,
-        'giller_dropoff',
-        startTime,
-        endTime,
-        qrCode
-      );
+      const reservations = await getReservationByRequestId(requestId);
+      const pendingAlloc = reservations.find(r => r.status === 'pending_allocation');
+      
+      let reservation;
+      if (pendingAlloc) {
+        await assignLockerToReservation(pendingAlloc.reservationId, selectedLocker.lockerId);
+        reservation = pendingAlloc;
+      } else {
+        const startTime = new Date();
+        const endTime = new Date(startTime.getTime() + 4 * 60 * 60 * 1000);
+        reservation = await createLockerReservation(
+          selectedLocker.lockerId,
+          requestId,
+          deliveryId,
+          userId,
+          'giller_dropoff',
+          startTime,
+          endTime,
+          qrCode
+        );
+      }
 
       setReservationId(reservation.reservationId);
       setStep('photo');
@@ -145,13 +160,25 @@ export default function GillerDropoffAtLockerScreen() {
       const userId = requireUserId();
       const uploaded = await uploadPhotoWithThumbnail(photoUri, userId, 'locker-dropoff');
       setDropoffPhotoUrl(uploaded.url);
-      setStep('complete');
+      setStep('info');
     } catch (error) {
       console.error('Failed to take dropoff photo:', error);
       Alert.alert('보관 사진 촬영 실패', '잠시 후 다시 시도해 주세요.');
     } finally {
       setWorking(false);
     }
+  };
+
+  const handleCompleteInfo = () => {
+    if (!lockerNumber.trim()) {
+      Alert.alert('정보 부족', '사물함 번호를 입력해주세요.');
+      return;
+    }
+    if (!lockerPassword.trim()) {
+      Alert.alert('정보 부족', '사물함 비밀번호를 입력해주세요.');
+      return;
+    }
+    setStep('complete');
   };
 
   const handleComplete = async (): Promise<void> => {
@@ -168,7 +195,19 @@ export default function GillerDropoffAtLockerScreen() {
       }
 
       await updateReservationStatus(reservationId, 'completed');
-      const result = await markAsDroppedAtLocker(deliveryId, userId, selectedLocker.lockerId, reservationId);
+      
+      const lockerCredentials = {
+        lockerNumber: lockerNumber.trim(),
+        password: lockerPassword.trim(),
+      };
+
+      const result = await markAsDroppedAtLocker(
+        deliveryId, 
+        userId, 
+        selectedLocker.lockerId, 
+        reservationId,
+        lockerCredentials
+      );
 
       if (!result.success) {
         Alert.alert('보관 완료 실패', result.message);
@@ -211,13 +250,14 @@ export default function GillerDropoffAtLockerScreen() {
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
       <View style={styles.hero}>
         <Text style={styles.kicker}>사물함 보관</Text>
-        <Text style={styles.title}>선택, 예약, 사진, 완료 순서로 진행합니다.</Text>
+        <Text style={styles.title}>선택, 예약, 사진, 정보, 완료 순서로 진행합니다.</Text>
       </View>
 
       <View style={styles.summaryCard}>
         <View style={styles.summaryRow}>
           <SummaryChip label={step === 'reserve' ? '예약 필요' : '예약 확인'} active={step === 'reserve'} />
           <SummaryChip label={step === 'photo' ? '사진 필요' : '사진 확인'} active={step === 'photo'} />
+          <SummaryChip label={step === 'info' ? '정보 입력' : '정보 확인'} active={step === 'info'} />
           <SummaryChip label={step === 'complete' ? '완료 처리' : '완료 대기'} active={step === 'complete'} />
         </View>
         <Text style={styles.summaryText}>지금 필요한 단계만 진행하면 됩니다.</Text>
@@ -237,8 +277,44 @@ export default function GillerDropoffAtLockerScreen() {
 
       {step === 'photo' ? (
         <TouchableOpacity style={styles.primaryButton} onPress={() => void handleTakePhoto()} disabled={working}>
-          {working ? <ActivityIndicator size="small" color={Colors.white} /> : <Text style={styles.primaryButtonText}>보관 사진 촬영</Text>}
+          {working ? <ActivityIndicator size="small" color={Colors.white} /> : <Text style={styles.primaryButtonText}>보관 사진 촬영 (영수증)</Text>}
         </TouchableOpacity>
+      ) : null}
+
+      {step === 'info' ? (
+        <View style={styles.card}>
+          <Text style={styles.sectionTitle}>보관함 인증 정보</Text>
+          <Text style={styles.bodyText}>수령인이 물품을 찾을 때 필요한 정보를 정확히 입력해주세요.</Text>
+          
+          <View style={{ marginTop: 16, gap: 12 }}>
+            <View>
+              <Text style={styles.inputLabel}>사물함 번호</Text>
+              <TextInput
+                style={styles.input}
+                placeholder="예: A-12, 15번"
+                value={lockerNumber}
+                onChangeText={setLockerNumber}
+                placeholderTextColor={Colors.textSecondary}
+              />
+            </View>
+
+            <View>
+              <Text style={styles.inputLabel}>비밀번호 (PIN)</Text>
+              <TextInput
+                style={styles.input}
+                placeholder="예: 123456"
+                value={lockerPassword}
+                onChangeText={setLockerPassword}
+                keyboardType="number-pad"
+                placeholderTextColor={Colors.textSecondary}
+              />
+            </View>
+          </View>
+
+          <TouchableOpacity style={styles.primaryButton} onPress={handleCompleteInfo}>
+            <Text style={styles.primaryButtonText}>다음 단계</Text>
+          </TouchableOpacity>
+        </View>
       ) : null}
 
       {step === 'complete' ? (
@@ -274,6 +350,8 @@ const styles = StyleSheet.create({
   card: { backgroundColor: Colors.surface, borderRadius: BorderRadius.xl, padding: Spacing.xl, gap: Spacing.md, borderWidth: 1, borderColor: Colors.border },
   sectionTitle: { color: Colors.textPrimary, fontSize: Typography.fontSize.lg, fontWeight: Typography.fontWeight.extrabold, marginBottom: 4 },
   bodyText: { color: Colors.textSecondary, fontSize: Typography.fontSize.base, fontWeight: Typography.fontWeight.semibold },
+  inputLabel: { color: Colors.textPrimary, fontSize: Typography.fontSize.sm, fontWeight: Typography.fontWeight.bold, marginBottom: 8 },
+  input: { backgroundColor: Colors.background, borderRadius: BorderRadius.md, padding: Spacing.md, color: Colors.textPrimary, fontSize: Typography.fontSize.base, borderWidth: 1, borderColor: Colors.border },
   primaryButton: { minHeight: 52, borderRadius: BorderRadius.full, backgroundColor: Colors.primary, alignItems: 'center', justifyContent: 'center', marginTop: Spacing.sm },
   primaryButtonText: { color: Colors.white, fontSize: Typography.fontSize.lg, fontWeight: Typography.fontWeight.extrabold },
 });

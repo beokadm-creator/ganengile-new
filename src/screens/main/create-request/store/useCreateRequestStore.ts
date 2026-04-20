@@ -33,6 +33,8 @@ export interface CreateRequestState {
   // Origin (Step 1)
   pickupMode: LocationMode;
   setPickupMode: (mode: LocationMode) => void;
+  usePickupLocker: boolean;
+  setUsePickupLocker: (use: boolean) => void;
   pickupStation: StationInfo | null;
   setPickupStation: (station: StationInfo | null) => void;
   pickupRoadAddress: string;
@@ -43,6 +45,8 @@ export interface CreateRequestState {
   // Destination (Step 1)
   deliveryMode: LocationMode;
   setDeliveryMode: (mode: LocationMode) => void;
+  useDropoffLocker: boolean;
+  setUseDropoffLocker: (use: boolean) => void;
   deliveryStation: StationInfo | null;
   setDeliveryStation: (station: StationInfo | null) => void;
   deliveryRoadAddress: string;
@@ -140,10 +144,12 @@ const initialState = {
   transitionLockUntil: 0,
   requestMode: 'immediate' as RequestMode,
   pickupMode: 'station' as LocationMode,
+  usePickupLocker: false,
   pickupStation: null,
   pickupRoadAddress: '',
   pickupDetailAddress: '',
   deliveryMode: 'station' as LocationMode,
+  useDropoffLocker: false,
   deliveryStation: null,
   deliveryRoadAddress: '',
   deliveryDetailAddress: '',
@@ -209,10 +215,12 @@ export const useCreateRequestStore = create<CreateRequestState>((set) => ({
   },
   setRequestMode: (mode) => set({ requestMode: mode }),
   setPickupMode: (mode) => set({ pickupMode: mode }),
+  setUsePickupLocker: (use) => set({ usePickupLocker: use }),
   setPickupStation: (station) => set({ pickupStation: station }),
   setPickupRoadAddress: (address) => set({ pickupRoadAddress: address }),
   setPickupDetailAddress: (address) => set({ pickupDetailAddress: address }),
   setDeliveryMode: (mode) => set({ deliveryMode: mode }),
+  setUseDropoffLocker: (use) => set({ useDropoffLocker: use }),
   setDeliveryStation: (station) => set({ deliveryStation: station }),
   setDeliveryRoadAddress: (address) => set({ deliveryRoadAddress: address }),
   setDeliveryDetailAddress: (address) => set({ deliveryDetailAddress: address }),

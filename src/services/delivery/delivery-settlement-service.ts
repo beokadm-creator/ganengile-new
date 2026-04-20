@@ -64,14 +64,19 @@ export const deliverySettlementService = {
       // 2. 길러 수익 정산 (payment-service 위임)
       if (deliveryData.gillerId) {
         try {
-          const totalFee = deliveryData.fee?.totalFee || 0;
+          const fee = deliveryData.fee;
+          const totalFee = fee?.totalFee || 0;
+          const dropoffLockerFee = fee?.lockerFee ?? fee?.addressDropoffFee ?? 0;
+          const pickupLockerFee = fee?.addressPickupFee ?? 0;
+          const lockerReimbursement = pickupLockerFee + dropoffLockerFee;
+
           const { feeBonus } = await calculateBadgeBonus(deliveryData.gillerId);
           await createGillerEarning(
             deliveryData.gillerId,
             requestId,
             totalFee,
             true,
-            { preCalculatedBadgeBonusRate: feeBonus }
+            { preCalculatedBadgeBonusRate: feeBonus, reimbursementAmount: lockerReimbursement }
           );
         } catch (e) {
           console.error('길러 수익 창출 실패:', e);

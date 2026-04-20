@@ -11,6 +11,7 @@ import {
   TouchableOpacity,
   Animated,
   Dimensions,
+  Platform,
 } from 'react-native';
 import { Colors, Spacing, BorderRadius } from '../theme';
 import { Typography } from '../theme/typography';
@@ -37,7 +38,7 @@ export const RoleSwitcher: React.FC<RoleSwitcherProps> = ({
     Animated.timing(translateX, {
       toValue: currentRole === UserRole.GLER ? 0 : (width * 0.5 - 80),
       duration: 300,
-      useNativeDriver: true,
+      useNativeDriver: Platform.OS !== 'web',
     }).start();
   }, [currentRole, translateX]);
 

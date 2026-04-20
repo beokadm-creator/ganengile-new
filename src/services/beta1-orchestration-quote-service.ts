@@ -35,7 +35,9 @@ export interface Beta1RequestCreateInput {
   pickupLocationDetail?: string;
   storageLocation?: string;
   lockerId?: string;
+  usePickupLocker?: boolean;
   pickupLockerId?: string;
+  useDropoffLocker?: boolean;
   dropoffLockerId?: string;
   pickupStorageLocation?: string;
   dropoffStorageLocation?: string;
@@ -354,8 +356,10 @@ export function buildBeta1QuoteCards(
 
   // 1. 출발지 사물함 (Requester가 넣음) -> 요금 청구 X
   // 2. 도착지 사물함 (Giller가 넣음) -> 길러가 본인 돈으로 결제하므로 배송비에 청구 O
-  const dropoffLockerFeeToCharge = input.dropoffLockerId 
-    ? (resolvedPolicy?.quoteAdjustments?.balancedLockerAssistedFee ?? input.dropoffLockerFee ?? 1000) 
+  const hasDropoffLockerFlow =
+    input.useDropoffLocker || Boolean(input.dropoffLockerId) || input.directParticipationMode === 'locker_assisted';
+  const dropoffLockerFeeToCharge = hasDropoffLockerFlow
+    ? (input.dropoffLockerFee ?? resolvedPolicy?.quoteAdjustments?.balancedLockerAssistedFee ?? 1000)
     : 0;
 
   const balancedPricing = buildQuotePricing(base, input, {

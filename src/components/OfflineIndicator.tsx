@@ -4,7 +4,7 @@
  */
 
 import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, Animated } from 'react-native';
+import { View, Text, StyleSheet, Animated, Platform } from 'react-native';
 import { useNetInfo } from '@react-native-community/netinfo';
 import { Typography } from '../theme/typography';
 
@@ -28,14 +28,14 @@ export const OfflineIndicator: React.FC<OfflineIndicatorProps> = ({ height = 40 
       Animated.timing(fadeAnim, {
         toValue: 1,
         duration: 300,
-        useNativeDriver: true
+        useNativeDriver: Platform.OS !== 'web'
       }).start();
     } else if (!offline && isOffline) {
       // 온라인 상태가 되면 fade-out
       Animated.timing(fadeAnim, {
         toValue: 0,
         duration: 300,
-        useNativeDriver: true
+        useNativeDriver: Platform.OS !== 'web'
       }).start(() => {
 
         setIsOffline(false);

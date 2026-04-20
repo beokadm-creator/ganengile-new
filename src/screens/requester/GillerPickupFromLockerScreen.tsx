@@ -12,6 +12,7 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { confirmDeliveryByRequester, getDeliveryByRequestId } from '../../services/delivery-service';
+import { getRequestById } from '../../services/request-service';
 import { createLockerService, getLocker, openLocker, completeLockerReservation } from '../../services/locker-service';
 import { requireUserId } from '../../services/firebase';
 import type { Locker, LockerReservation } from '../../types/locker';
@@ -67,10 +68,23 @@ export default function GillerPickupFromLockerScreen({ route, navigation }: Prop
   const [currentStep, setCurrentStep] = useState<Step>('reservation');
   const [reservation, setReservation] = useState<LockerReservation | null>(null);
   const [locker, setLocker] = useState<Locker | null>(null);
+  const [lockerCredentials, setLockerCredentials] = useState<{ lockerNumber?: string; password?: string } | null>(null);
 
   const loadLockerFlow = useCallback(async (): Promise<void> => {
     try {
       setLoading(true);
+      const delivery = await getDeliveryByRequestId(requestId) as any;
+      if (delivery && delivery.lockerCredentials) {
+        setLockerCredentials(delivery.lockerCredentials);
+      } else if (delivery && delivery.dropoffLockerCredentials) {
+        setLockerCredentials(delivery.dropoffLockerCredentials);
+      }
+
+      const request = await getRequestById(requestId);
+      if (request && request.dropoffLockerCredentials) {
+        setLockerCredentials(request.dropoffLockerCredentials);
+      }
+
       const reservations = await createLockerService().getReservationByRequestId(requestId);
       const targetReservation =
         reservations.find((item) => item.type === 'requester_pickup') ?? reservations[0] ?? null;
@@ -220,6 +234,12 @@ export default function GillerPickupFromLockerScreen({ route, navigation }: Prop
         <InfoRow label="라인" value={locker.location.line} />
         <InfoRow label="위치" value={`${locker.location.floor}층 ${locker.location.section}`} />
         <InfoRow label="운영사" value={locker.operator} />
+        {lockerCredentials?.lockerNumber && (
+          <InfoRow label="보관함 번호" value={lockerCredentials.lockerNumber} />
+        )}
+        {lockerCredentials?.password && (
+          <InfoRow label="비밀번호(PIN)" value={lockerCredentials.password} />
+        )}
         <InfoRow label="예약 상태" value={reservation.status} />
         <InfoRow label="예약 코드" value={reservation.reservationId} />
       </View>

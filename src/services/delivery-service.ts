@@ -20,6 +20,7 @@ export const updateGillerLocation = deliveryLifecycleService.updateGillerLocatio
 export const completeDelivery = deliveryLifecycleService.completeDelivery;
 export const markAsArrived = deliveryLifecycleService.markAsArrived;
 export const markAsDroppedAtLocker = deliveryLifecycleService.markAsDroppedAtLocker;
+export const markAsRequesterDroppedAtLocker = deliveryLifecycleService.markAsRequesterDroppedAtLocker;
 
 // Repository exports
 export const getDeliveryById = deliveryRepository.getDeliveryById;

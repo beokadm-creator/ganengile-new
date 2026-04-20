@@ -1,0 +1,69 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="1200" viewBox="0 0 1600 1200">
+  <!-- NOTE: Figma 호환을 위해 CSS(class/style 블록) 없이 "인라인 속성"만 사용 -->
+
+  <!-- Background -->
+  <rect x="0" y="0" width="1600" height="1200" fill="#F8FAFC"/>
+
+  <!-- Title -->
+  <text x="80" y="60"
+        font-family="Inter, Pretendard, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif"
+        font-size="22" font-weight="800" fill="#101828">
+    가는길에 — 01_Overview / E2E Swimlane (인라인 SVG 테스트)
+  </text>
+  <text x="80" y="86"
+        font-family="Inter, Pretendard, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif"
+        font-size="13" font-weight="600" fill="#667085">
+    Figma에서 Import/드래그로 넣은 뒤, 레이어 선택 후 Shift+2(선택영역로 줌)
+  </text>
+
+  <!-- Outer frame -->
+  <rect x="80" y="120" width="1440" height="1000" rx="16" ry="16"
+        fill="#FFFFFF" stroke="#D0D5DD" stroke-width="2"/>
+
+  <!-- Left swimlane area -->
+  <rect x="112" y="180" width="960" height="900" rx="12" ry="12"
+        fill="#FFFFFF" stroke="#EAECF0" stroke-width="2"/>
+  <line x1="112" y1="480" x2="1072" y2="480" stroke="#EAECF0" stroke-width="2"/>
+  <line x1="112" y1="780" x2="1072" y2="780" stroke="#EAECF0" stroke-width="2"/>
+
+  <text x="140" y="228"
+        font-family="Inter, Pretendard, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif"
+        font-size="14" font-weight="800" fill="#101828">고객</text>
+  <text x="140" y="528"
+        font-family="Inter, Pretendard, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif"
+        font-size="14" font-weight="800" fill="#101828">길러(전문길러=라이더/기사)</text>
+  <text x="140" y="828"
+        font-family="Inter, Pretendard, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif"
+        font-size="14" font-weight="800" fill="#101828">운영(오케스트레이션)</text>
+
+  <text x="140" y="260"
+        font-family="Inter, Pretendard, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif"
+        font-size="13" font-weight="600" fill="#667085">여기에 상태 전이/예외 분기/Leg(문→역→역→문) 표시</text>
+
+  <!-- Right placeholder column -->
+  <rect x="1096" y="180" width="392" height="900" rx="12" ry="12"
+        fill="#FFFFFF" stroke="#EAECF0" stroke-width="2"/>
+  <text x="1120" y="222"
+        font-family="Inter, Pretendard, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif"
+        font-size="13" font-weight="700" fill="#667085">SCREENSHOT PLACEHOLDER</text>
+
+  <!-- Placeholder boxes -->
+  <rect x="1120" y="250" width="344" height="220" rx="12" ry="12"
+        fill="#FFFFFF" stroke="#98A2B3" stroke-width="2" stroke-dasharray="8 6"/>
+  <text x="1136" y="282"
+        font-family="Inter, Pretendard, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif"
+        font-size="13" font-weight="600" fill="#667085">고객 화면(TBD)</text>
+
+  <rect x="1120" y="490" width="344" height="220" rx="12" ry="12"
+        fill="#FFFFFF" stroke="#98A2B3" stroke-width="2" stroke-dasharray="8 6"/>
+  <text x="1136" y="522"
+        font-family="Inter, Pretendard, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif"
+        font-size="13" font-weight="600" fill="#667085">길러 화면(TBD)</text>
+
+  <rect x="1120" y="730" width="344" height="220" rx="12" ry="12"
+        fill="#FFFFFF" stroke="#98A2B3" stroke-width="2" stroke-dasharray="8 6"/>
+  <text x="1136" y="762"
+        font-family="Inter, Pretendard, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif"
+        font-size="13" font-weight="600" fill="#667085">운영 화면(TBD)</text>
+</svg>
+

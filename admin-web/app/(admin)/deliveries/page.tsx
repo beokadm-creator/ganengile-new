@@ -124,8 +124,8 @@ export default function DeliveriesPage() {
             <tbody className="divide-y divide-gray-100">
               {items.map((item) => {
                 const createdAtMs = typeof item.createdAt === 'object' && item.createdAt !== null && 'seconds' in item.createdAt
-                  ? item.createdAt.seconds * 1000
-                  : new Date(item.createdAt as any).getTime();
+                    ? (item.createdAt as { seconds: number }).seconds * 1000
+                    : new Date(item.createdAt as string | number | Date).getTime();
                 const isDelayed = tab === 'active' && item.createdAt && (nowMs - createdAtMs) > 2 * 60 * 60 * 1000;
                 
                 return (

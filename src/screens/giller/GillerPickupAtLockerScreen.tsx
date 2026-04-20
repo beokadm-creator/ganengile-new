@@ -10,6 +10,7 @@ import {
 } from 'react-native';
 import { RouteProp, useNavigation, useRoute } from '@react-navigation/native';
 import { getDeliveryById } from '../../services/delivery-service';
+import { getRequestById } from '../../services/request-service';
 import { requireUserId } from '../../services/firebase';
 import {
   addReservationPhotos,
@@ -39,12 +40,13 @@ export default function GillerPickupAtLockerScreen() {
   const [reservation, setReservation] = useState<LockerReservation | null>(null);
   const [pickupPhotoUrl, setPickupPhotoUrl] = useState<string | null>(null);
   const [remainingMinutes, setRemainingMinutes] = useState(0);
+  const [lockerCredentials, setLockerCredentials] = useState<{ lockerNumber?: string; password?: string } | null>(null);
 
   const loadReservation = useCallback(async (): Promise<void> => {
     try {
       setLoading(true);
       
-      const delivery = await getDeliveryById(deliveryId);
+      const delivery = await getDeliveryById(deliveryId) as any;
       if (!delivery?.lockerId || !delivery.requestId) {
         Alert.alert('배송 정보 오류', '사물함 정보를 찾을 수 없습니다.', [
           { text: '닫기', onPress: () => navigation.goBack() },
@@ -52,11 +54,27 @@ export default function GillerPickupAtLockerScreen() {
         return;
       }
 
+      if (delivery.lockerCredentials) {
+        setLockerCredentials(delivery.lockerCredentials);
+      } else if (delivery.pickupLockerCredentials) {
+        setLockerCredentials(delivery.pickupLockerCredentials);
+      }
+
+      const request = await getRequestById(delivery.requestId);
+      if (request && request.pickupLockerCredentials) {
+        setLockerCredentials(request.pickupLockerCredentials);
+      }
+
       const reservations = await getDeliveryReservations(deliveryId);
       let pickupReservation = reservations.find((item) => item.type === 'giller_pickup') ?? null;
 
       // Beta1 구조: pickupLockerId 우선, 없으면 하위 호환을 위해 lockerId 사용
       const targetLockerId = delivery.pickupLockerId || delivery.lockerId;
+
+      if (!targetLockerId || targetLockerId.startsWith('AREA::')) {
+        Alert.alert('사물함 정보 오류', '아직 실제 사물함이 지정되지 않았습니다.');
+        return;
+      }
 
       if (!pickupReservation) {
         // Create giller_pickup reservation if it doesn't exist
@@ -195,6 +213,12 @@ export default function GillerPickupAtLockerScreen() {
       <View style={styles.card}>
         <Text style={styles.sectionTitle}>예약 정보</Text>
         <Text style={styles.bodyText}>사물함: {reservation.lockerId}</Text>
+        {lockerCredentials?.lockerNumber && (
+          <Text style={styles.bodyText}>사물함 번호: {lockerCredentials.lockerNumber}</Text>
+        )}
+        {lockerCredentials?.password && (
+          <Text style={styles.bodyText}>비밀번호(PIN): {lockerCredentials.password}</Text>
+        )}
         <Text style={styles.bodyText}>상태: {reservation.status}</Text>
         <Text style={styles.bodyText}>QR 남은 시간: {remainingMinutes > 0 ? `${remainingMinutes}분` : '만료 또는 확인 불가'}</Text>
       </View>

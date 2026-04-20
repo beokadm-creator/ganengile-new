@@ -144,6 +144,12 @@ export interface DeliveryFee {
   /** Insurance fee (if applicable) */
   insuranceFee?: number;
 
+  lockerFee?: number;
+
+  addressPickupFee?: number;
+
+  addressDropoffFee?: number;
+
   /** Service fee */
   serviceFee: number;
 
@@ -167,7 +173,10 @@ export interface DeliveryFee {
     /** Giller settlement fee (85%) */
     gillerFee: number;
     /** Platform fee (15%) */
-    platformFee: number;
+    platformFee?: number;
+    platformFeeBase?: number;
+    gillerServiceFee?: number;
+    lockerReimbursement?: number;
   };
 
   /** Description text */
@@ -390,6 +399,14 @@ export interface Delivery {
 
   /** Used locker ID */
   lockerId?: string;
+
+  /** Used locker credentials (number, password, qr, etc.) */
+  lockerCredentials?: {
+    lockerNumber?: string;
+    password?: string;
+    qrCodeUrl?: string;
+    savedAt?: Date;
+  };
 
   /** Used reservation ID */
   reservationId?: string;

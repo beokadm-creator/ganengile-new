@@ -1,0 +1,127 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="1200" viewBox="0 0 1600 1200">
+  <rect x="0" y="0" width="1600" height="1200" fill="#F8FAFC"/>
+
+  <text x="80" y="60" font-family="Inter, Pretendard, system-ui" font-size="22" font-weight="800" fill="#101828">
+    01_Overview / E2E Swimlane (Filled)
+  </text>
+  <text x="80" y="86" font-family="Inter, Pretendard, system-ui" font-size="13" font-weight="600" fill="#667085">
+    고객 → 길러(라이더/기사) → 운영(오케스트레이션) 전체 사용자 로직 + 혼합(문-역-역-문) Leg 표시
+  </text>
+
+  <rect x="80" y="120" width="1440" height="1000" rx="16" ry="16" fill="#FFFFFF" stroke="#D0D5DD" stroke-width="2"/>
+
+  <!-- Swimlane container -->
+  <rect x="112" y="184" width="1376" height="904" rx="12" ry="12" fill="#FFFFFF" stroke="#EAECF0" stroke-width="2"/>
+
+  <!-- Lanes -->
+  <line x1="112" y1="476" x2="1488" y2="476" stroke="#EAECF0" stroke-width="2"/>
+  <line x1="112" y1="768" x2="1488" y2="768" stroke="#EAECF0" stroke-width="2"/>
+
+  <text x="140" y="230" font-family="Inter, Pretendard, system-ui" font-size="14" font-weight="800" fill="#101828">고객</text>
+  <text x="140" y="522" font-family="Inter, Pretendard, system-ui" font-size="14" font-weight="800" fill="#101828">길러(전문길러=라이더/기사)</text>
+  <text x="140" y="814" font-family="Inter, Pretendard, system-ui" font-size="14" font-weight="800" fill="#101828">운영(전문 배송업체/오케스트레이션)</text>
+
+  <!-- Steps: use simple rounded boxes -->
+  <!-- Customer steps -->
+  <g>
+    <rect x="220" y="210" width="220" height="56" rx="14" ry="14" fill="#EEF2FF" stroke="#C7D2FE"/>
+    <text x="236" y="236" font-family="Inter, Pretendard, system-ui" font-size="12" font-weight="800" fill="#3538CD">1) 요청 생성</text>
+    <text x="236" y="254" font-family="Inter, Pretendard, system-ui" font-size="11" font-weight="600" fill="#3538CD">Draft → Requested</text>
+
+    <rect x="460" y="210" width="220" height="56" rx="14" ry="14" fill="#EEF2FF" stroke="#C7D2FE"/>
+    <text x="476" y="236" font-family="Inter, Pretendard, system-ui" font-size="12" font-weight="800" fill="#3538CD">2) 결제/확정</text>
+    <text x="476" y="254" font-family="Inter, Pretendard, system-ui" font-size="11" font-weight="600" fill="#3538CD">PaymentPending → Paid</text>
+
+    <rect x="700" y="210" width="220" height="56" rx="14" ry="14" fill="#EEF2FF" stroke="#C7D2FE"/>
+    <text x="716" y="236" font-family="Inter, Pretendard, system-ui" font-size="12" font-weight="800" fill="#3538CD">3) 진행 추적</text>
+    <text x="716" y="254" font-family="Inter, Pretendard, system-ui" font-size="11" font-weight="600" fill="#3538CD">채팅/상태/ETA</text>
+
+    <rect x="940" y="210" width="220" height="56" rx="14" ry="14" fill="#ECFDF3" stroke="#ABEFC6"/>
+    <text x="956" y="236" font-family="Inter, Pretendard, system-ui" font-size="12" font-weight="800" fill="#027A48">4) 완료 확인</text>
+    <text x="956" y="254" font-family="Inter, Pretendard, system-ui" font-size="11" font-weight="600" fill="#027A48">Delivered → Closed</text>
+  </g>
+
+  <!-- Arrows between customer steps -->
+  <g stroke="#98A2B3" stroke-width="2" fill="none">
+    <path d="M440 238 L460 238"/>
+    <path d="M680 238 L700 238"/>
+    <path d="M920 238 L940 238"/>
+  </g>
+  <g fill="#98A2B3">
+    <polygon points="460,238 452,234 452,242"/>
+    <polygon points="700,238 692,234 692,242"/>
+    <polygon points="940,238 932,234 932,242"/>
+  </g>
+
+  <!-- Giller steps -->
+  <g>
+    <rect x="220" y="500" width="220" height="56" rx="14" ry="14" fill="#F0F9FF" stroke="#B9E6FE"/>
+    <text x="236" y="526" font-family="Inter, Pretendard, system-ui" font-size="12" font-weight="800" fill="#026AA2">5) 오퍼 수락</text>
+    <text x="236" y="544" font-family="Inter, Pretendard, system-ui" font-size="11" font-weight="600" fill="#026AA2">Assigned → Accepted</text>
+
+    <rect x="460" y="500" width="220" height="56" rx="14" ry="14" fill="#F0F9FF" stroke="#B9E6FE"/>
+    <text x="476" y="526" font-family="Inter, Pretendard, system-ui" font-size="12" font-weight="800" fill="#026AA2">6) 픽업 + 증빙</text>
+    <text x="476" y="544" font-family="Inter, Pretendard, system-ui" font-size="11" font-weight="600" fill="#026AA2">체크인/사진/QR</text>
+
+    <rect x="700" y="500" width="220" height="56" rx="14" ry="14" fill="#F0F9FF" stroke="#B9E6FE"/>
+    <text x="716" y="526" font-family="Inter, Pretendard, system-ui" font-size="12" font-weight="800" fill="#026AA2">7) 이동(혼합 Leg)</text>
+    <text x="716" y="544" font-family="Inter, Pretendard, system-ui" font-size="11" font-weight="600" fill="#026AA2">문→역→역→문</text>
+
+    <rect x="940" y="500" width="220" height="56" rx="14" ry="14" fill="#F0F9FF" stroke="#B9E6FE"/>
+    <text x="956" y="526" font-family="Inter, Pretendard, system-ui" font-size="12" font-weight="800" fill="#026AA2">8) 전달 + 증빙</text>
+    <text x="956" y="544" font-family="Inter, Pretendard, system-ui" font-size="11" font-weight="600" fill="#026AA2">사진/서명/OTP</text>
+  </g>
+  <!-- arrows -->
+  <g stroke="#98A2B3" stroke-width="2" fill="none">
+    <path d="M440 528 L460 528"/>
+    <path d="M680 528 L700 528"/>
+    <path d="M920 528 L940 528"/>
+  </g>
+  <g fill="#98A2B3">
+    <polygon points="460,528 452,524 452,532"/>
+    <polygon points="700,528 692,524 692,532"/>
+    <polygon points="940,528 932,524 932,532"/>
+  </g>
+
+  <!-- Ops steps -->
+  <g>
+    <rect x="220" y="792" width="260" height="56" rx="14" ry="14" fill="#FFF6ED" stroke="#FEC84B"/>
+    <text x="236" y="818" font-family="Inter, Pretendard, system-ui" font-size="12" font-weight="800" fill="#B54708">A) 주문 검증</text>
+    <text x="236" y="836" font-family="Inter, Pretendard, system-ui" font-size="11" font-weight="600" fill="#B54708">주소/역/시간창/금지품목</text>
+
+    <rect x="500" y="792" width="260" height="56" rx="14" ry="14" fill="#FFF6ED" stroke="#FEC84B"/>
+    <text x="516" y="818" font-family="Inter, Pretendard, system-ui" font-size="12" font-weight="800" fill="#B54708">B) 배차/재배차</text>
+    <text x="516" y="836" font-family="Inter, Pretendard, system-ui" font-size="11" font-weight="600" fill="#B54708">서지/권역확장/파트너전환</text>
+
+    <rect x="780" y="792" width="260" height="56" rx="14" ry="14" fill="#FFF6ED" stroke="#FEC84B"/>
+    <text x="796" y="818" font-family="Inter, Pretendard, system-ui" font-size="12" font-weight="800" fill="#B54708">C) 관제(At Risk)</text>
+    <text x="796" y="836" font-family="Inter, Pretendard, system-ui" font-size="11" font-weight="600" fill="#B54708">체크인/ETA drift 경보</text>
+
+    <rect x="1060" y="792" width="260" height="56" rx="14" ry="14" fill="#FFF6ED" stroke="#FEC84B"/>
+    <text x="1076" y="818" font-family="Inter, Pretendard, system-ui" font-size="12" font-weight="800" fill="#B54708">D) 예외/정산</text>
+    <text x="1076" y="836" font-family="Inter, Pretendard, system-ui" font-size="11" font-weight="600" fill="#B54708">반송/클레임/보상/리포트</text>
+  </g>
+  <g stroke="#98A2B3" stroke-width="2" fill="none">
+    <path d="M480 820 L500 820"/>
+    <path d="M760 820 L780 820"/>
+    <path d="M1040 820 L1060 820"/>
+  </g>
+  <g fill="#98A2B3">
+    <polygon points="500,820 492,816 492,824"/>
+    <polygon points="780,820 772,816 772,824"/>
+    <polygon points="1060,820 1052,816 1052,824"/>
+  </g>
+
+  <!-- Exception branch callout -->
+  <g>
+    <rect x="220" y="318" width="420" height="110" rx="14" ry="14" fill="#FFF1F3" stroke="#FECDD6"/>
+    <text x="236" y="344" font-family="Inter, Pretendard, system-ui" font-size="12" font-weight="800" fill="#B42318">예외(Incident) 공통 분기</text>
+    <text x="236" y="364" font-family="Inter, Pretendard, system-ui" font-size="11" font-weight="600" fill="#B42318">수취인 부재 / 인계 실패 / 주소 오류 / 파손·분실</text>
+    <text x="236" y="384" font-family="Inter, Pretendard, system-ui" font-size="11" font-weight="600" fill="#B42318">→ 운영 개입(콜/재배차/반송/보상) → 고객 공지</text>
+  </g>
+
+  <text x="112" y="1110" font-family="Inter, Pretendard, system-ui" font-size="12" font-weight="700" fill="#667085">
+    이 프레임은 “한 장 요약”용입니다. 보드 상세(컬럼/카드/필드)는 Customer/Giller/Ops 보드에서 구체화합니다.
+  </text>
+</svg>
+

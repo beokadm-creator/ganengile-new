@@ -5,6 +5,7 @@ import {
   ViewStyle,
   Pressable,
   Animated,
+  Platform,
 } from 'react-native';
 import { Colors, Spacing, BorderRadius, Shadows } from '../../theme';
 
@@ -34,7 +35,7 @@ export default function Card({
     if (onPress) {
       Animated.spring(scaleAnim, {
         toValue: 0.98,
-        useNativeDriver: true,
+        useNativeDriver: Platform.OS !== 'web',
         speed: 50,
         bounciness: 4,
       }).start();
@@ -45,7 +46,7 @@ export default function Card({
     if (onPress) {
       Animated.spring(scaleAnim, {
         toValue: 1,
-        useNativeDriver: true,
+        useNativeDriver: Platform.OS !== 'web',
         speed: 50,
         bounciness: 4,
       }).start();

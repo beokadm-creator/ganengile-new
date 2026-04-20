@@ -1,0 +1,118 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="1200" viewBox="0 0 1600 1200">
+  <rect x="0" y="0" width="1600" height="1200" fill="#F8FAFC"/>
+
+  <text x="80" y="60" font-family="Inter, Pretendard, system-ui" font-size="22" font-weight="800" fill="#101828">
+    02_Boards / Ops Board (Filled)
+  </text>
+  <text x="80" y="86" font-family="Inter, Pretendard, system-ui" font-size="13" font-weight="600" fill="#667085">
+    운영/오케스트레이션 — 주문(Shipment) + 미션(Job) 2단 보드, At Risk/재배차까지 “내용 채움”
+  </text>
+
+  <rect x="80" y="120" width="1440" height="1000" rx="16" ry="16" fill="#FFFFFF" stroke="#D0D5DD" stroke-width="2"/>
+  <rect x="112" y="184" width="1376" height="904" rx="12" ry="12" fill="#FFFFFF" stroke="#EAECF0" stroke-width="2"/>
+
+  <!-- Shipment board header -->
+  <text x="132" y="230" font-family="Inter, Pretendard, system-ui" font-size="13" font-weight="800" fill="#101828">주문(Shipment) 보드</text>
+
+  <!-- Shipment columns: startX=132 colW=180 gap=10 (7 cols) -->
+  <g>
+    <rect x="132" y="244" width="180" height="40" rx="10" ry="10" fill="#F2F4F7" stroke="#E4E7EC"/><text x="144" y="270" font-family="Inter, Pretendard, system-ui" font-size="12" font-weight="800" fill="#344054">신규</text>
+    <rect x="322" y="244" width="180" height="40" rx="10" ry="10" fill="#F2F4F7" stroke="#E4E7EC"/><text x="334" y="270" font-family="Inter, Pretendard, system-ui" font-size="12" font-weight="800" fill="#344054">검증 보류</text>
+    <rect x="512" y="244" width="180" height="40" rx="10" ry="10" fill="#F2F4F7" stroke="#E4E7EC"/><text x="524" y="270" font-family="Inter, Pretendard, system-ui" font-size="12" font-weight="800" fill="#344054">배차 설계</text>
+    <rect x="702" y="244" width="180" height="40" rx="10" ry="10" fill="#F2F4F7" stroke="#E4E7EC"/><text x="714" y="270" font-family="Inter, Pretendard, system-ui" font-size="12" font-weight="800" fill="#344054">모니터링</text>
+    <rect x="892" y="244" width="180" height="40" rx="10" ry="10" fill="#F2F4F7" stroke="#E4E7EC"/><text x="904" y="270" font-family="Inter, Pretendard, system-ui" font-size="12" font-weight="800" fill="#344054">예외 대응</text>
+    <rect x="1082" y="244" width="180" height="40" rx="10" ry="10" fill="#F2F4F7" stroke="#E4E7EC"/><text x="1094" y="270" font-family="Inter, Pretendard, system-ui" font-size="12" font-weight="800" fill="#344054">정산/리포트</text>
+    <rect x="1272" y="244" width="180" height="40" rx="10" ry="10" fill="#F2F4F7" stroke="#E4E7EC"/><text x="1284" y="270" font-family="Inter, Pretendard, system-ui" font-size="12" font-weight="800" fill="#344054">클로즈</text>
+  </g>
+
+  <!-- Shipment cards (170x122) -->
+  <g>
+    <rect x="137" y="296" width="170" height="122" rx="12" ry="12" fill="#FFFFFF" stroke="#D0D5DD"/>
+    <text x="149" y="320" font-family="Inter, Pretendard, system-ui" font-size="12" font-weight="800" fill="#101828">REQ-1102</text>
+    <text x="149" y="340" font-family="Inter, Pretendard, system-ui" font-size="11" font-weight="700" fill="#3538CD">Hybrid</text>
+    <text x="149" y="358" font-family="Inter, Pretendard, system-ui" font-size="11" font-weight="600" fill="#475467">SLA: 18:20/19:10</text>
+    <text x="149" y="376" font-family="Inter, Pretendard, system-ui" font-size="11" font-weight="600" fill="#475467">검증: 대기</text>
+    <text x="149" y="396" font-family="Inter, Pretendard, system-ui" font-size="11" font-weight="700" fill="#667085">다음: 검증</text>
+
+    <rect x="327" y="296" width="170" height="122" rx="12" ry="12" fill="#FFF6ED" stroke="#D0D5DD"/>
+    <text x="339" y="320" font-family="Inter, Pretendard, system-ui" font-size="12" font-weight="800" fill="#101828">REQ-1103</text>
+    <text x="339" y="340" font-family="Inter, Pretendard, system-ui" font-size="11" font-weight="800" fill="#B54708">Validation Hold</text>
+    <text x="339" y="358" font-family="Inter, Pretendard, system-ui" font-size="11" font-weight="600" fill="#475467">사유: 주소/역 불명확</text>
+    <text x="339" y="376" font-family="Inter, Pretendard, system-ui" font-size="11" font-weight="600" fill="#475467">요청자 연락 필요</text>
+    <text x="339" y="396" font-family="Inter, Pretendard, system-ui" font-size="11" font-weight="700" fill="#667085">다음: 확인</text>
+
+    <rect x="517" y="296" width="170" height="122" rx="12" ry="12" fill="#FFFFFF" stroke="#D0D5DD"/>
+    <text x="529" y="320" font-family="Inter, Pretendard, system-ui" font-size="12" font-weight="800" fill="#101828">REQ-1098</text>
+    <text x="529" y="340" font-family="Inter, Pretendard, system-ui" font-size="11" font-weight="700" fill="#3538CD">Planning</text>
+    <text x="529" y="358" font-family="Inter, Pretendard, system-ui" font-size="11" font-weight="600" fill="#475467">오퍼: 2회 거절</text>
+    <text x="529" y="376" font-family="Inter, Pretendard, system-ui" font-size="11" font-weight="600" fill="#475467">조치: 서지 +권역확장</text>
+    <text x="529" y="396" font-family="Inter, Pretendard, system-ui" font-size="11" font-weight="700" fill="#667085">다음: 재오퍼</text>
+
+    <rect x="707" y="296" width="170" height="122" rx="12" ry="12" fill="#F0F9FF" stroke="#D0D5DD"/>
+    <text x="719" y="320" font-family="Inter, Pretendard, system-ui" font-size="12" font-weight="800" fill="#101828">REQ-1081</text>
+    <text x="719" y="340" font-family="Inter, Pretendard, system-ui" font-size="11" font-weight="800" fill="#026AA2">Monitoring</text>
+    <text x="719" y="358" font-family="Inter, Pretendard, system-ui" font-size="11" font-weight="600" fill="#475467">At Risk: +8분</text>
+    <text x="719" y="376" font-family="Inter, Pretendard, system-ui" font-size="11" font-weight="600" fill="#475467">원인: 체크인 미발생</text>
+    <text x="719" y="396" font-family="Inter, Pretendard, system-ui" font-size="11" font-weight="700" fill="#667085">다음: 재배차 검토</text>
+  </g>
+
+  <!-- Divider -->
+  <line x1="132" y1="454" x2="1452" y2="454" stroke="#EAECF0" stroke-width="2"/>
+
+  <!-- Job board header -->
+  <text x="132" y="494" font-family="Inter, Pretendard, system-ui" font-size="13" font-weight="800" fill="#101828">미션(Job) 보드</text>
+
+  <!-- Job columns: startX=132 colW=210 gap=10 (6 cols) -->
+  <g>
+    <rect x="132" y="508" width="210" height="40" rx="10" ry="10" fill="#F2F4F7" stroke="#E4E7EC"/><text x="144" y="534" font-family="Inter, Pretendard, system-ui" font-size="12" font-weight="800" fill="#344054">미할당</text>
+    <rect x="352" y="508" width="210" height="40" rx="10" ry="10" fill="#F2F4F7" stroke="#E4E7EC"/><text x="364" y="534" font-family="Inter, Pretendard, system-ui" font-size="12" font-weight="800" fill="#344054">오퍼중</text>
+    <rect x="572" y="508" width="210" height="40" rx="10" ry="10" fill="#F2F4F7" stroke="#E4E7EC"/><text x="584" y="534" font-family="Inter, Pretendard, system-ui" font-size="12" font-weight="800" fill="#344054">수락됨</text>
+    <rect x="792" y="508" width="210" height="40" rx="10" ry="10" fill="#F2F4F7" stroke="#E4E7EC"/><text x="804" y="534" font-family="Inter, Pretendard, system-ui" font-size="12" font-weight="800" fill="#344054">픽업 위험</text>
+    <rect x="1012" y="508" width="210" height="40" rx="10" ry="10" fill="#F2F4F7" stroke="#E4E7EC"/><text x="1024" y="534" font-family="Inter, Pretendard, system-ui" font-size="12" font-weight="800" fill="#344054">배송 위험</text>
+    <rect x="1232" y="508" width="220" height="40" rx="10" ry="10" fill="#F2F4F7" stroke="#E4E7EC"/><text x="1244" y="534" font-family="Inter, Pretendard, system-ui" font-size="12" font-weight="800" fill="#344054">실패/반송</text>
+  </g>
+
+  <!-- Job cards (200x122) -->
+  <g>
+    <rect x="137" y="560" width="200" height="122" rx="12" ry="12" fill="#FFFFFF" stroke="#D0D5DD"/>
+    <text x="149" y="584" font-family="Inter, Pretendard, system-ui" font-size="12" font-weight="800" fill="#101828">JOB-2301</text>
+    <text x="149" y="604" font-family="Inter, Pretendard, system-ui" font-size="11" font-weight="700" fill="#3538CD">Leg: 역→역</text>
+    <text x="149" y="622" font-family="Inter, Pretendard, system-ui" font-size="11" font-weight="600" fill="#475467">오퍼 전(후보 5명)</text>
+    <text x="149" y="642" font-family="Inter, Pretendard, system-ui" font-size="11" font-weight="700" fill="#667085">다음: 오퍼 발행</text>
+
+    <rect x="357" y="560" width="200" height="122" rx="12" ry="12" fill="#FFFFFF" stroke="#D0D5DD"/>
+    <text x="369" y="584" font-family="Inter, Pretendard, system-ui" font-size="12" font-weight="800" fill="#101828">JOB-2302</text>
+    <text x="369" y="604" font-family="Inter, Pretendard, system-ui" font-size="11" font-weight="700" fill="#3538CD">Offering</text>
+    <text x="369" y="622" font-family="Inter, Pretendard, system-ui" font-size="11" font-weight="600" fill="#475467">거절 1 / 타임아웃 1</text>
+    <text x="369" y="642" font-family="Inter, Pretendard, system-ui" font-size="11" font-weight="700" fill="#667085">다음: 서지 +1,000</text>
+
+    <rect x="577" y="560" width="200" height="122" rx="12" ry="12" fill="#FFFFFF" stroke="#D0D5DD"/>
+    <text x="589" y="584" font-family="Inter, Pretendard, system-ui" font-size="12" font-weight="800" fill="#101828">JOB-2291</text>
+    <text x="589" y="604" font-family="Inter, Pretendard, system-ui" font-size="11" font-weight="700" fill="#027A48">Accepted</text>
+    <text x="589" y="622" font-family="Inter, Pretendard, system-ui" font-size="11" font-weight="600" fill="#475467">길러: G-221</text>
+    <text x="589" y="642" font-family="Inter, Pretendard, system-ui" font-size="11" font-weight="700" fill="#667085">다음: 체크인 모니터링</text>
+
+    <rect x="797" y="560" width="200" height="122" rx="12" ry="12" fill="#F0F9FF" stroke="#D0D5DD"/>
+    <text x="809" y="584" font-family="Inter, Pretendard, system-ui" font-size="12" font-weight="800" fill="#101828">JOB-2284</text>
+    <text x="809" y="604" font-family="Inter, Pretendard, system-ui" font-size="11" font-weight="800" fill="#026AA2">Pickup At Risk</text>
+    <text x="809" y="622" font-family="Inter, Pretendard, system-ui" font-size="11" font-weight="600" fill="#475467">SLA -6분, 체크인 없음</text>
+    <text x="809" y="642" font-family="Inter, Pretendard, system-ui" font-size="11" font-weight="700" fill="#667085">다음: 콜/재배차</text>
+
+    <rect x="1017" y="560" width="200" height="122" rx="12" ry="12" fill="#F0F9FF" stroke="#D0D5DD"/>
+    <text x="1029" y="584" font-family="Inter, Pretendard, system-ui" font-size="12" font-weight="800" fill="#101828">JOB-2279</text>
+    <text x="1029" y="604" font-family="Inter, Pretendard, system-ui" font-size="11" font-weight="800" fill="#026AA2">Delivery At Risk</text>
+    <text x="1029" y="622" font-family="Inter, Pretendard, system-ui" font-size="11" font-weight="600" fill="#475467">ETA drift +9분</text>
+    <text x="1029" y="642" font-family="Inter, Pretendard, system-ui" font-size="11" font-weight="700" fill="#667085">다음: 고객 공지</text>
+
+    <rect x="1237" y="560" width="215" height="122" rx="12" ry="12" fill="#FFF1F3" stroke="#D0D5DD"/>
+    <text x="1249" y="584" font-family="Inter, Pretendard, system-ui" font-size="12" font-weight="800" fill="#101828">JOB-2268</text>
+    <text x="1249" y="604" font-family="Inter, Pretendard, system-ui" font-size="11" font-weight="800" fill="#B42318">Fail/Return</text>
+    <text x="1249" y="622" font-family="Inter, Pretendard, system-ui" font-size="11" font-weight="600" fill="#475467">사유: 인계 실패</text>
+    <text x="1249" y="642" font-family="Inter, Pretendard, system-ui" font-size="11" font-weight="700" fill="#667085">다음: 반송/재배송</text>
+  </g>
+
+  <text x="112" y="1110" font-family="Inter, Pretendard, system-ui" font-size="12" font-weight="700" fill="#667085">
+    운영 핵심: “오퍼 실패 자동조치(서지/권역확장/파트너전환)” + “At Risk 선제 경보(콜/재배차/고객공지)” + “예외(반송/클레임) 큐”
+  </text>
+</svg>
+

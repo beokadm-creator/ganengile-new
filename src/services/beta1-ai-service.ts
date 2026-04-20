@@ -133,6 +133,8 @@ export async function generatePricingQuotesWithAI(requestData: CreateRequestData
       requesterUserId: string;
       pickupStation: ReturnType<typeof stationPayload>;
       deliveryStation: ReturnType<typeof stationPayload>;
+      dropoffLockerId?: string;
+      dropoffLockerFee?: number;
       packageDraft: {
         description?: string;
         estimatedValue?: number;
@@ -181,6 +183,8 @@ export async function generatePricingQuotesWithAI(requestData: CreateRequestData
     requesterUserId: requestData.requesterId,
     pickupStation: stationPayload(requestData.pickupStation),
     deliveryStation: stationPayload(requestData.deliveryStation),
+    dropoffLockerId: requestData.dropoffLockerId ?? undefined,
+    dropoffLockerFee: requestData.dropoffLockerFee ?? undefined,
     packageDraft: {
       description: requestData.packageInfo?.description,
       estimatedValue: requestData.itemValue,
@@ -222,6 +226,9 @@ export async function generatePricingQuotesForBeta1Input(input: {
   preferredArrivalTime?: string;
   urgency?: 'normal' | 'fast' | 'urgent';
   directParticipationMode?: 'none' | 'requester_to_station' | 'locker_assisted';
+  useDropoffLocker?: boolean;
+  dropoffLockerId?: string;
+  dropoffLockerFee?: number;
   basePricing: {
     publicPrice: number;
     depositAmount: number;
@@ -241,6 +248,8 @@ export async function generatePricingQuotesForBeta1Input(input: {
       requesterUserId: string;
       pickupStation: ReturnType<typeof stationPayload>;
       deliveryStation: ReturnType<typeof stationPayload>;
+      dropoffLockerId?: string;
+      dropoffLockerFee?: number;
       packageDraft: {
         description?: string;
         estimatedValue?: number;
@@ -272,6 +281,8 @@ export async function generatePricingQuotesForBeta1Input(input: {
     requesterUserId: input.requesterUserId,
     pickupStation: stationPayload(input.pickupStation),
     deliveryStation: stationPayload(input.deliveryStation),
+    dropoffLockerId: input.dropoffLockerId ?? undefined,
+    dropoffLockerFee: input.dropoffLockerFee ?? undefined,
     packageDraft: {
       description: input.packageDescription,
       estimatedValue: input.itemValue,

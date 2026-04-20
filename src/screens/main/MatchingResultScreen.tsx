@@ -9,6 +9,7 @@ import {
   Text,
   TouchableOpacity,
   View,
+  Platform,
 } from 'react-native';
 import { useNavigation, useRoute, type RouteProp } from '@react-navigation/native';
 import { NaverMapCard } from '../../components/maps/NaverMapCard';
@@ -98,13 +99,13 @@ export function MatchingResultScreen() {
           toValue: 1,
           duration: 1100,
           easing: Easing.out(Easing.quad),
-          useNativeDriver: true,
+          useNativeDriver: Platform.OS !== 'web',
         }),
         Animated.timing(pulseAnim, {
           toValue: 0,
           duration: 1100,
           easing: Easing.in(Easing.quad),
-          useNativeDriver: true,
+          useNativeDriver: Platform.OS !== 'web',
         }),
       ])
     );

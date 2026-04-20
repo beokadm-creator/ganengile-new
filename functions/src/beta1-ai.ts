@@ -81,6 +81,9 @@ export interface Beta1PricingQuoteInput {
     stationName?: string;
     line?: string;
   };
+  useDropoffLocker?: boolean;
+  dropoffLockerId?: string;
+  dropoffLockerFee?: number;
   packageDraft?: {
     description?: string;
     estimatedValue?: number;
@@ -481,7 +484,8 @@ function buildPricingFallback(input: Beta1PricingQuoteInput, config: Beta1AIConf
   const deposit = base.depositAmount ?? Math.round(input.packageDraft?.estimatedValue ?? 0);
   const reservationMode = isReservationMode(input.requestMode);
   const urgencyBonus = input.urgency === 'high' ? 1200 : input.urgency === 'medium' ? 400 : 0;
-  const lockerPreferred = input.directParticipationMode === 'locker_assisted';
+  const lockerPreferred = input.useDropoffLocker || input.directParticipationMode === 'locker_assisted';
+  const lockerFee = input.useDropoffLocker || input.dropoffLockerId ? clampCurrency(input.dropoffLockerFee ?? 0) : 0;
 
   const quotes: Beta1PricingQuoteSuggestion[] = [
     {
@@ -527,7 +531,7 @@ function buildPricingFallback(input: Beta1PricingQuoteInput, config: Beta1AIConf
         sizeFee: base.sizeFee,
         urgencySurcharge: clampCurrency(base.urgencySurcharge + Math.round(urgencyBonus * 0.5)),
         publicFare: base.publicFare,
-        lockerFee: lockerPreferred ? 1000 : 0,
+        lockerFee: lockerPreferred ? lockerFee : 0,
         addressPickupFee: 0,
         addressDropoffFee: 700,
         serviceFee: base.serviceFee,
@@ -552,7 +556,7 @@ function buildPricingFallback(input: Beta1PricingQuoteInput, config: Beta1AIConf
         sizeFee: base.sizeFee,
         urgencySurcharge: base.urgencySurcharge,
         publicFare: base.publicFare,
-        lockerFee: 700,
+        lockerFee,
         addressPickupFee: 0,
         addressDropoffFee: 0,
         serviceFee: clampCurrency(base.serviceFee - 150),
@@ -577,7 +581,7 @@ function buildPricingFallback(input: Beta1PricingQuoteInput, config: Beta1AIConf
         sizeFee: base.sizeFee,
         urgencySurcharge: base.urgencySurcharge,
         publicFare: base.publicFare,
-        lockerFee: 1200,
+        lockerFee,
         addressPickupFee: 0,
         addressDropoffFee: 600,
         serviceFee: base.serviceFee,

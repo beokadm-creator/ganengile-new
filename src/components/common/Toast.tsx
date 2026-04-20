@@ -38,7 +38,7 @@ export default function Toast({
     Animated.timing(fadeAnim, {
       toValue: 0,
       duration: 300,
-      useNativeDriver: true,
+      useNativeDriver: Platform.OS !== 'web',
     }).start(() => {
       onHide();
     });
@@ -49,7 +49,7 @@ export default function Toast({
       Animated.timing(fadeAnim, {
         toValue: 1,
         duration: 300,
-        useNativeDriver: true,
+        useNativeDriver: Platform.OS !== 'web',
       }).start();
 
       const timer = setTimeout(() => {

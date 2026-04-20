@@ -11,6 +11,7 @@ import {
   TouchableOpacity,
   Animated,
   LayoutChangeEvent,
+  Platform,
 } from 'react-native';
 import { doc, onSnapshot, updateDoc } from 'firebase/firestore';
 import { db } from '../../core/firebase';
@@ -47,7 +48,7 @@ export default function ModeToggleSwitch({ onModeChange }: ModeToggleSwitchProps
           toValue: enabled ? 0 : 1,
           friction: 8,
           tension: 40,
-          useNativeDriver: true,
+          useNativeDriver: Platform.OS !== 'web',
         }).start();
 
         if (onModeChange) {

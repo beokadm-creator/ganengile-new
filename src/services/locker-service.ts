@@ -124,6 +124,9 @@ function toDate(value: Timestamp | Date | string | number | undefined): Date {
 
 function normalizeLockerSize(value?: string): LockerSize {
   const normalized = (value ?? '').toLowerCase();
+  if (normalized.includes('소')) return LockerSize.SMALL;
+  if (normalized.includes('대')) return LockerSize.LARGE;
+  if (normalized.includes('중')) return LockerSize.MEDIUM;
   if (normalized.includes('small')) return LockerSize.SMALL;
   if (normalized.includes('large')) return LockerSize.LARGE;
   return LockerSize.MEDIUM;
@@ -141,13 +144,21 @@ function normalizeLockerStatus(value?: string): LockerStatus {
 }
 
 function normalizeOperator(value?: string): LockerOperator {
-  switch (value) {
+  if (!value) return LockerOperator.SEOUL_METRO;
+  const normalized = value.toLowerCase();
+  
+  // KRIC 기관 코드 (railOprIsttCd) 처리
+  if (normalized === 'k1') return LockerOperator.KORAIL;
+  if (['i1', 'd1', 'b1', 'g1'].includes(normalized)) return LockerOperator.LOCAL_GOV;
+  if (normalized === 's1') return LockerOperator.SEOUL_METRO;
+
+  switch (normalized) {
     case LockerOperator.KORAIL:
     case LockerOperator.LOCAL_GOV:
     case LockerOperator.CU:
     case LockerOperator.GS25:
     case LockerOperator.LOCKER_BOX:
-      return value;
+      return normalized as LockerOperator;
     default:
       return LockerOperator.SEOUL_METRO;
   }
@@ -317,16 +328,19 @@ async function fetchKricLockers(stationId?: string): Promise<Locker[]> {
         const facilityCount = readNumber(record, 'faclNum') ?? 1;
         const baseFare = readNumber(record, 'utlFare') ?? 0;
         const line = readString(record, 'lnCd');
+        const floorNum = readNumber(record, 'stinFlor') ?? 1;
+        const isUnderground = readString(record, 'grndDvNm') === '지하';
+        const operatorCode = readString(record, 'railOprIsttCd');
 
         return {
           lockerId: `${stationCode}-${index + 1}`,
           type: LockerType.PUBLIC,
-          operator: LockerOperator.SEOUL_METRO,
+          operator: normalizeOperator(operatorCode),
           location: {
             stationId: stationCode,
             stationName,
             line: line ? `${line}호선` : '',
-            floor: readNumber(record, 'stinFlor') ?? 1,
+            floor: isUnderground ? -floorNum : floorNum,
             section: readString(record, 'dtlLoc') ?? `보관함 ${index + 1}`,
             address: '',
             contactPhone: readString(record, 'telNo'),
@@ -567,7 +581,26 @@ export class LockerService {
       updatedAt: serverTimestamp(),
     });
 
-    await this.updateLockerStatus(reservation.lockerId, LockerStatus.AVAILABLE);
+    // Lazy Allocation의 경우 실제 사물함 ID가 아닐 수 있으므로 확인
+    if (!reservation.lockerId.startsWith('AREA::')) {
+      await this.updateLockerStatus(reservation.lockerId, LockerStatus.AVAILABLE);
+    }
+  }
+
+  async cancelReservation(reservationId: string): Promise<void> {
+    const reservation = await this.getReservation(reservationId);
+    if (!reservation) {
+      throw new Error('Reservation not found');
+    }
+
+    await updateDoc(doc(db, RESERVATIONS_COLLECTION, reservationId), {
+      status: 'cancelled',
+      updatedAt: serverTimestamp(),
+    });
+
+    if (!reservation.lockerId.startsWith('AREA::')) {
+      await this.updateLockerStatus(reservation.lockerId, LockerStatus.AVAILABLE);
+    }
   }
 
   private async updateLockerStatus(lockerId: string, status: LockerStatus): Promise<void> {
@@ -585,6 +618,42 @@ export class LockerService {
     const allLockers = await this.getAllLockers();
     return allLockers.filter((locker) => locker.location.stationId === pickupStationId).slice(0, 5);
   }
+}
+
+const FALLBACK_LOCKER_FEE = 1000; // 정책/구성값에 따른 기본 사물함 요금
+
+/**
+ * 지연 할당(Lazy Allocation) ID를 기반으로 사물함의 최소/평균 요금을 계산합니다.
+ * @param areaLockerId "AREA::stationId::section" 형태의 지연 할당 ID
+ */
+export async function calculateAreaLockerFee(areaLockerId: string) {
+  if (!areaLockerId.startsWith('AREA::')) {
+    return null;
+  }
+
+  const parts = areaLockerId.split('::');
+  const stationId = parts[1];
+  const section = parts[2]; // 선택 사항
+
+  if (!stationId) return null;
+
+  const lockers = await getLockersByStation(stationId);
+  
+  const targetLockers = section && section !== 'default' 
+    ? lockers.filter(locker => locker.location.section === section)
+    : lockers;
+
+  if (targetLockers.length === 0) {
+    return { minFee: FALLBACK_LOCKER_FEE, averageFee: FALLBACK_LOCKER_FEE };
+  }
+
+  const basePrices = targetLockers.map(locker => locker.pricing.base);
+  const minFee = Math.min(...basePrices);
+  const averageFee = Math.round(
+    basePrices.reduce((sum, price) => sum + price, 0) / basePrices.length
+  );
+
+  return { minFee, averageFee };
 }
 
 export function createLockerService(): LockerService {
@@ -608,8 +677,16 @@ export async function assignLockerToReservation(reservationId: string, actualLoc
   return lockerService.assignLockerToReservation(reservationId, actualLockerId);
 }
 
+export async function getReservationByRequestId(requestId: string): Promise<LockerReservation[]> {
+  return lockerService.getReservationByRequestId(requestId);
+}
+
 export async function completeLockerReservation(reservationId: string): Promise<void> {
   await lockerService.completeReservation(reservationId);
+}
+
+export async function cancelLockerReservation(reservationId: string): Promise<void> {
+  await lockerService.cancelReservation(reservationId);
 }
 
 export async function addReservationPhotos(
@@ -693,6 +770,26 @@ export async function unlockLocker(
       return { success: false, message: '이 QR 코드는 다른 사물함용입니다.' };
     }
 
+    const reservationId = verification.data?.metadata?.reservationId as string | undefined;
+    if (reservationId) {
+      const reservation = await getLockerReservation(reservationId);
+      if (!reservation) {
+        return { success: false, message: '예약 정보를 찾을 수 없습니다.' };
+      }
+
+      if (reservation.status === 'cancelled' || reservation.status === 'completed') {
+        return { success: false, message: '유효하지 않은 예약입니다 (취소 또는 완료됨).' };
+      }
+
+      const now = new Date();
+      if (reservation.startTime && now < reservation.startTime) {
+        return { success: false, message: '예약 시작 시간이 되지 않았습니다.' };
+      }
+      if (reservation.endTime && now > reservation.endTime) {
+        return { success: false, message: '예약 시간이 만료되었습니다.' };
+      }
+    }
+
     await updateDoc(doc(db, LOCKERS_COLLECTION, lockerId), {
       status: LockerStatus.OCCUPIED,
       updatedAt: serverTimestamp(),
@@ -723,7 +820,9 @@ export function createLockerLocation(locker: Locker): {
   line: string;
   floor: number;
   section: string;
+  size: LockerSize;
   pricePer4Hours: number;
+  baseDurationMinutes: number;
   telNo?: string;
   status: string;
   isAvailable: boolean;
@@ -735,7 +834,9 @@ export function createLockerLocation(locker: Locker): {
     line: locker.location.line,
     floor: locker.location.floor,
     section: locker.location.section,
+    size: locker.size,
     pricePer4Hours: locker.pricing.base,
+    baseDurationMinutes: locker.pricing.baseDuration,
     telNo: locker.location.contactPhone,
     status: locker.status,
     isAvailable: locker.status === LockerStatus.AVAILABLE,

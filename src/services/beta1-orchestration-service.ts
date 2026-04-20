@@ -670,7 +670,7 @@ export async function createBeta1Request(input: Beta1RequestCreateInput): Promis
     recipientPhone: input.recipientPhone ?? null,
     pickupLocationDetail: input.pickupLocationDetail?.trim() || null,
     storageLocation: input.storageLocation?.trim() || null,
-    lockerId: input.lockerId?.trim() || null,
+    lockerId: input.pickupLockerId?.trim() || input.lockerId?.trim() || null,
     pickupLockerId: input.pickupLockerId?.trim() || null,
     dropoffLockerId: input.dropoffLockerId?.trim() || null,
     pickupStorageLocation: input.pickupStorageLocation?.trim() || null,
@@ -710,9 +710,9 @@ export async function createBeta1Request(input: Beta1RequestCreateInput): Promis
     beta1EngineVersion: 'beta1-v2',
     fee: {
       ...selectedCard.pricing,
-      totalFee: selectedCard.pricing.publicPrice,
+      totalFee: Math.max(0, Math.round(selectedCard.pricing.publicPrice)),
     },
-    initialNegotiationFee: selectedCard.pricing.publicPrice,
+    initialNegotiationFee: Math.max(0, Math.round(selectedCard.pricing.publicPrice)),
     itemValue: input.itemValue ?? 0,
     selectedPhotoIds: input.selectedPhotoIds ?? [],
     selectedCouponId: input.selectedCouponId ?? null,
@@ -725,6 +725,14 @@ export async function createBeta1Request(input: Beta1RequestCreateInput): Promis
   const cleanRequestPayload = cleanForFirestore(requestPayload);
   await setDoc(requestRef, cleanRequestPayload);
 
+  const lockerFee = Math.max(0, Math.round(selectedCard.pricing.lockerFee ?? 0));
+  const publicPrice = Math.max(0, Math.round(selectedCard.pricing.publicPrice));
+  const platformFeeRate = pricingPolicy.platformFeeRate ?? 0.3;
+  const platformFeeBase = Math.max(0, publicPrice - lockerFee);
+  const platformFee = Math.max(0, Math.round(platformFeeBase * platformFeeRate));
+  const gillerServiceFee = Math.max(0, platformFeeBase - platformFee);
+  const gillerFee = gillerServiceFee + lockerFee;
+
   const deliveryId = generateShortId('D');
   const deliveryRef = doc(collection(db, 'deliveries'), deliveryId);
   const deliveryPayload = {
@@ -734,7 +742,7 @@ export async function createBeta1Request(input: Beta1RequestCreateInput): Promis
     deliveryStation: input.deliveryStation,
     pickupLocationDetail: input.pickupLocationDetail?.trim() || null,
     storageLocation: input.storageLocation?.trim() || null,
-    lockerId: input.lockerId?.trim() || null,
+    lockerId: input.pickupLockerId?.trim() || input.lockerId?.trim() || null,
     pickupLockerId: input.pickupLockerId?.trim() || null,
     dropoffLockerId: input.dropoffLockerId?.trim() || null,
     pickupStorageLocation: input.pickupStorageLocation?.trim() || null,
@@ -750,9 +758,13 @@ export async function createBeta1Request(input: Beta1RequestCreateInput): Promis
     selectedCouponId: input.selectedCouponId ?? null,
     fee: {
       ...selectedCard.pricing,
-      totalFee: selectedCard.pricing.publicPrice,
+      totalFee: publicPrice,
       breakdown: {
-        gillerFee: Math.round(selectedCard.pricing.publicPrice * (1 - (pricingPolicy.platformFeeRate ?? 0.3))),
+        gillerFee,
+        platformFee,
+        platformFeeBase,
+        gillerServiceFee,
+        lockerReimbursement: lockerFee,
       },
     },
     createdAt: serverTimestamp(),
@@ -793,7 +805,7 @@ export async function createBeta1Request(input: Beta1RequestCreateInput): Promis
       updatedAt: serverTimestamp(),
     });
     const legRewards = splitRewardAcrossLegs(
-      Math.max(0, Math.round(selectedCard.pricing.publicPrice * (1 - (pricingPolicy.platformFeeRate ?? 0.3)))),
+      gillerFee,
       legDefinitions.length
     );
 

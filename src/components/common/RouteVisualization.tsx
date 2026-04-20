@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from 'react';
-import { View, Text, StyleSheet, ViewStyle, Animated } from 'react-native';
+import { View, Text, StyleSheet, ViewStyle, Animated, Platform } from 'react-native';
 import { Colors, Spacing, BorderRadius } from '../../theme';
 import { Typography } from '../../theme/typography';
 import { Ionicons } from '@expo/vector-icons';
@@ -46,7 +46,7 @@ export default function RouteVisualization({
     Animated.timing(fadeAnim, {
       toValue: 1,
       duration: 600,
-      useNativeDriver: true,
+      useNativeDriver: Platform.OS !== 'web',
     }).start();
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);

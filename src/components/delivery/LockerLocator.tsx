@@ -259,7 +259,7 @@ export default function LockerLocator({
       lockerId: locker.lockerId,
       stationId: locker.stationId,
       stationName: locker.stationName ?? locker.name ?? '',
-      size: 'medium' as never,
+      size: locker.size,
       status: locker.isAvailable ? LockerStatus.AVAILABLE : LockerStatus.OCCUPIED,
       available: locker.isAvailable ?? true,
       pricePerHour: locker.isAreaGroup ? locker.basePrice : locker.pricePer4Hours,
@@ -481,5 +481,4 @@ const styles = StyleSheet.create({
   mapRowTitle: { fontSize: FONT_SM, fontWeight: Typography.fontWeight.bold, color: Colors.gray900 },
   mapRowMeta: { fontSize: FONT_XS, color: Colors.gray600 },
 });
-
 

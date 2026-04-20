@@ -352,10 +352,10 @@ export default function AIReviewPage() {
                     <div className="flex items-start justify-between gap-3">
                       <div>
                         <p className="text-sm font-semibold text-slate-900">미션 라우팅 결정: {item.selectedActorType}</p>
-                        <p className="mt-1 text-xs text-slate-500">배송 ID: {(item as any).deliveryId}</p>
+                        <p className="mt-1 text-xs text-slate-500">배송 ID: {String((item as Record<string, unknown>).deliveryId || '')}</p>
                       </div>
                       <div className="flex items-center gap-2">
-                        {item.manualReviewRequired && (item as any).status !== 'executed' && (item as any).status !== 'rejected' && (
+                        {item.manualReviewRequired && (item as Record<string, unknown>).status !== 'executed' && (item as Record<string, unknown>).status !== 'rejected' && (
                           <div className="flex gap-2">
                             <button
                               onClick={async () => {
@@ -404,8 +404,8 @@ export default function AIReviewPage() {
                         <span className={`rounded-full px-3 py-1 text-xs font-semibold ${item.manualReviewRequired ? 'bg-amber-100 text-amber-700' : 'bg-emerald-100 text-emerald-700'}`}>
                           {item.manualReviewRequired ? '수동 검토 요망' : '자동 승인됨'}
                         </span>
-                        <span className={`rounded-full px-3 py-1 text-xs font-semibold ${toneClass((item as any).status || 'pending')}`}>
-                          {(item as any).status || 'pending'}
+                        <span className={`rounded-full px-3 py-1 text-xs font-semibold ${toneClass(String((item as Record<string, unknown>).status || 'pending'))}`}>
+                          {String((item as Record<string, unknown>).status || 'pending')}
                         </span>
                       </div>
                     </div>

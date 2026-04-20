@@ -106,6 +106,7 @@ export interface CreateGillerEarningOptions {
   platformFeeAlreadyDeducted?: boolean;
   /** 정산 스냅샷 보관용 플랫폼 수수료 금액 */
   platformFeeAmount?: number;
+  reimbursementAmount?: number;
 }
 
 /**
@@ -238,9 +239,12 @@ export async function createGillerEarning(
     // 0. 배지 보너스 계산 (P2-9)
     // 순환 참조 방지를 위해 외부에서 계산된 보너스율을 주입받음
     const badgeBonus = options?.preCalculatedBadgeBonusRate ?? 0;
-    const baseAmount = amount;
-    const bonusAmount = Math.round(baseAmount * badgeBonus);
-    const totalAmount = baseAmount + bonusAmount; // 배지 보너스가 포함된 총 금액
+    const baseAmount = Math.max(0, Math.round(amount));
+    const reimbursementAmount = Math.max(0, Math.round(options?.reimbursementAmount ?? 0));
+    const earningBaseAmount = Math.max(0, baseAmount - reimbursementAmount);
+    const bonusAmount = Math.round(earningBaseAmount * badgeBonus);
+    const taxableGrossAmount = earningBaseAmount + bonusAmount;
+    const totalAmount = taxableGrossAmount + reimbursementAmount;
 
     const platformFeeAlreadyDeducted = options?.platformFeeAlreadyDeducted === true;
     const platformFeeSnapshot = options?.platformFeeAmount ?? null;
@@ -250,22 +254,24 @@ export async function createGillerEarning(
     // - 신규: 정산단에서 이미 차감된 금액이면 추가 차감 금지
     const platformFee = platformFeeAlreadyDeducted
       ? 0
-      : Math.round(totalAmount * settlementPolicy.platformFeeRate);
-    const afterFee = totalAmount - platformFee;
+      : Math.round(taxableGrossAmount * settlementPolicy.platformFeeRate);
+    const afterFeeTaxable = taxableGrossAmount - platformFee;
 
     // 2. 세금 계산 (수수료 차감 후 금액 기준)
     let tax = 0;
-    let netAmount = afterFee;
+    let netTaxableAmount = afterFeeTaxable;
 
     if (isTaxable) {
-      tax = Math.round(afterFee * settlementPolicy.combinedWithholdingRate);
-      netAmount = afterFee - tax;
+      tax = Math.round(afterFeeTaxable * settlementPolicy.combinedWithholdingRate);
+      netTaxableAmount = afterFeeTaxable - tax;
     }
 
     const withholdingBreakdown = {
-      businessIncomeTax: Math.round(afterFee * settlementPolicy.businessIncomeTaxRate),
-      localIncomeTax: Math.round(afterFee * settlementPolicy.localIncomeTaxRate),
+      businessIncomeTax: Math.round(afterFeeTaxable * settlementPolicy.businessIncomeTaxRate),
+      localIncomeTax: Math.round(afterFeeTaxable * settlementPolicy.localIncomeTaxRate),
     };
+
+    const netAmount = netTaxableAmount + reimbursementAmount;
 
     const paymentData = {
       userId,
@@ -291,6 +297,8 @@ export async function createGillerEarning(
         baseAmount, // 기본 요금
         bonusAmount, // 배지 보너스
         badgeBonusRate: badgeBonus, // 배지 보너스율
+        reimbursementAmount,
+        taxableGrossAmount,
         // 재무 회계용 메타데이터 기록 (길러 정산 시 참고용)
         accounting: {
           originalGrossAmount: baseAmount,
@@ -627,6 +635,7 @@ export async function getUserMonthlyEarnings(
     let count = 0;
     let platformFee = 0;
     let taxWithheld = 0;
+    let netIncome = 0;
 
     snapshot.forEach((docSnapshot) => {
       const data = docSnapshot.data();
@@ -634,9 +643,9 @@ export async function getUserMonthlyEarnings(
       count++;
       platformFee += data.fee ?? 0;
       taxWithheld += data.tax ?? 0;
+      netIncome += data.netAmount ?? (data.amount - (data.fee ?? 0) - (data.tax ?? 0));
     });
 
-    const netIncome = total - platformFee - taxWithheld;
     const average = count > 0 ? total / count : 0;
 
     return {
@@ -693,6 +702,7 @@ export async function generateAnnualTaxReport(
     let totalEarnings = 0;
     let totalTaxWithheld = 0;
     let totalPlatformFee = 0;
+    let totalNetIncome = 0;
     let paymentCount = 0;
 
     snapshot.forEach((docSnapshot) => {
@@ -700,10 +710,10 @@ export async function generateAnnualTaxReport(
       totalEarnings += data.amount ?? 0;
       totalTaxWithheld += data.tax ?? 0;
       totalPlatformFee += data.fee ?? 0;
+      totalNetIncome += data.netAmount ?? (data.amount - (data.fee ?? 0) - (data.tax ?? 0));
       paymentCount++;
     });
 
-    const totalNetIncome = totalEarnings - totalPlatformFee - totalTaxWithheld;
     const requiresFiling = totalEarnings > TAX_THRESHOLDS.YEARLY_REPORT;
 
     const report: TaxReport = {

@@ -1,0 +1,164 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="1200" viewBox="0 0 1600 1200">
+  <!-- Figma 호환: CSS 없이 인라인 속성만 사용 -->
+  <rect x="0" y="0" width="1600" height="1200" fill="#F8FAFC"/>
+
+  <!-- Title -->
+  <text x="80" y="60" font-family="Inter, Pretendard, system-ui" font-size="22" font-weight="800" fill="#101828">
+    02_Boards / Customer Board (Filled)
+  </text>
+  <text x="80" y="86" font-family="Inter, Pretendard, system-ui" font-size="13" font-weight="600" fill="#667085">
+    배송요청(Shipment) 보드 — 컬럼/카드/액션 예시까지 “내용 채움”
+  </text>
+
+  <!-- Frame -->
+  <rect x="80" y="120" width="1440" height="1000" rx="16" ry="16" fill="#FFFFFF" stroke="#D0D5DD" stroke-width="2"/>
+
+  <!-- Board area -->
+  <rect x="112" y="184" width="1376" height="904" rx="12" ry="12" fill="#FFFFFF" stroke="#EAECF0" stroke-width="2"/>
+
+  <!-- Columns (7) -->
+  <!-- Geometry -->
+  <!-- startX=132 colW=184 gap=10 -->
+  <!-- Column headers -->
+  <g>
+    <rect x="132" y="208" width="184" height="44" rx="10" ry="10" fill="#F2F4F7" stroke="#E4E7EC"/>
+    <text x="144" y="236" font-family="Inter, Pretendard, system-ui" font-size="12" font-weight="800" fill="#344054">작성중 (Draft)</text>
+
+    <rect x="326" y="208" width="184" height="44" rx="10" ry="10" fill="#F2F4F7" stroke="#E4E7EC"/>
+    <text x="338" y="236" font-family="Inter, Pretendard, system-ui" font-size="12" font-weight="800" fill="#344054">결제/확정</text>
+
+    <rect x="520" y="208" width="184" height="44" rx="10" ry="10" fill="#F2F4F7" stroke="#E4E7EC"/>
+    <text x="532" y="236" font-family="Inter, Pretendard, system-ui" font-size="12" font-weight="800" fill="#344054">배차 대기</text>
+
+    <rect x="714" y="208" width="184" height="44" rx="10" ry="10" fill="#F2F4F7" stroke="#E4E7EC"/>
+    <text x="726" y="236" font-family="Inter, Pretendard, system-ui" font-size="12" font-weight="800" fill="#344054">진행중</text>
+
+    <rect x="908" y="208" width="184" height="44" rx="10" ry="10" fill="#F2F4F7" stroke="#E4E7EC"/>
+    <text x="920" y="236" font-family="Inter, Pretendard, system-ui" font-size="12" font-weight="800" fill="#344054">완료</text>
+
+    <rect x="1102" y="208" width="184" height="44" rx="10" ry="10" fill="#F2F4F7" stroke="#E4E7EC"/>
+    <text x="1114" y="236" font-family="Inter, Pretendard, system-ui" font-size="12" font-weight="800" fill="#344054">문제 발생</text>
+
+    <rect x="1296" y="208" width="184" height="44" rx="10" ry="10" fill="#F2F4F7" stroke="#E4E7EC"/>
+    <text x="1308" y="236" font-family="Inter, Pretendard, system-ui" font-size="12" font-weight="800" fill="#344054">취소/반송</text>
+  </g>
+
+  <!-- Card component (simple) helper: each card is 168x130 -->
+  <!-- Draft column cards -->
+  <g>
+    <rect x="140" y="268" width="168" height="138" rx="12" ry="12" fill="#FFFFFF" stroke="#D0D5DD"/>
+    <text x="152" y="292" font-family="Inter, Pretendard, system-ui" font-size="12" font-weight="800" fill="#101828">REQ-1042</text>
+    <text x="152" y="312" font-family="Inter, Pretendard, system-ui" font-size="11" font-weight="700" fill="#3538CD">Hybrid</text>
+    <text x="152" y="332" font-family="Inter, Pretendard, system-ui" font-size="11" font-weight="600" fill="#475467">픽업: 성수역 인근</text>
+    <text x="152" y="350" font-family="Inter, Pretendard, system-ui" font-size="11" font-weight="600" fill="#475467">도착: 홍대입구역</text>
+    <text x="152" y="370" font-family="Inter, Pretendard, system-ui" font-size="11" font-weight="700" fill="#667085">다음 액션: 요청 생성</text>
+
+    <rect x="140" y="418" width="168" height="138" rx="12" ry="12" fill="#FFFFFF" stroke="#D0D5DD"/>
+    <text x="152" y="442" font-family="Inter, Pretendard, system-ui" font-size="12" font-weight="800" fill="#101828">REQ-1043</text>
+    <text x="152" y="462" font-family="Inter, Pretendard, system-ui" font-size="11" font-weight="700" fill="#3538CD">DoorToDoor</text>
+    <text x="152" y="482" font-family="Inter, Pretendard, system-ui" font-size="11" font-weight="600" fill="#475467">픽업: 집(문)</text>
+    <text x="152" y="500" font-family="Inter, Pretendard, system-ui" font-size="11" font-weight="600" fill="#475467">도착: 회사(문)</text>
+    <text x="152" y="520" font-family="Inter, Pretendard, system-ui" font-size="11" font-weight="700" fill="#667085">다음 액션: 주소 확인</text>
+  </g>
+
+  <!-- Payment/Confirm column cards -->
+  <g>
+    <rect x="334" y="268" width="168" height="138" rx="12" ry="12" fill="#FFFFFF" stroke="#D0D5DD"/>
+    <text x="346" y="292" font-family="Inter, Pretendard, system-ui" font-size="12" font-weight="800" fill="#101828">REQ-1038</text>
+    <text x="346" y="312" font-family="Inter, Pretendard, system-ui" font-size="11" font-weight="700" fill="#B42318">PaymentPending</text>
+    <text x="346" y="332" font-family="Inter, Pretendard, system-ui" font-size="11" font-weight="600" fill="#475467">요금: 6,900원</text>
+    <text x="346" y="350" font-family="Inter, Pretendard, system-ui" font-size="11" font-weight="600" fill="#475467">증빙: 사진 필수</text>
+    <text x="346" y="370" font-family="Inter, Pretendard, system-ui" font-size="11" font-weight="700" fill="#667085">다음 액션: 결제하기</text>
+
+    <rect x="334" y="418" width="168" height="138" rx="12" ry="12" fill="#FFFFFF" stroke="#D0D5DD"/>
+    <text x="346" y="442" font-family="Inter, Pretendard, system-ui" font-size="12" font-weight="800" fill="#101828">REQ-1039</text>
+    <text x="346" y="462" font-family="Inter, Pretendard, system-ui" font-size="11" font-weight="700" fill="#B42318">ConfirmNeeded</text>
+    <text x="346" y="482" font-family="Inter, Pretendard, system-ui" font-size="11" font-weight="600" fill="#475467">연락처 미인증</text>
+    <text x="346" y="500" font-family="Inter, Pretendard, system-ui" font-size="11" font-weight="600" fill="#475467">동의 필요(약관)</text>
+    <text x="346" y="520" font-family="Inter, Pretendard, system-ui" font-size="11" font-weight="700" fill="#667085">다음 액션: 인증/동의</text>
+  </g>
+
+  <!-- DispatchPending column cards -->
+  <g>
+    <rect x="528" y="268" width="168" height="138" rx="12" ry="12" fill="#FFFFFF" stroke="#D0D5DD"/>
+    <text x="540" y="292" font-family="Inter, Pretendard, system-ui" font-size="12" font-weight="800" fill="#101828">REQ-1021</text>
+    <text x="540" y="312" font-family="Inter, Pretendard, system-ui" font-size="11" font-weight="700" fill="#027A48">Paid</text>
+    <text x="540" y="332" font-family="Inter, Pretendard, system-ui" font-size="11" font-weight="600" fill="#475467">SLA: 18:20 픽업</text>
+    <text x="540" y="350" font-family="Inter, Pretendard, system-ui" font-size="11" font-weight="600" fill="#475467">SLA: 19:10 도착</text>
+    <text x="540" y="370" font-family="Inter, Pretendard, system-ui" font-size="11" font-weight="700" fill="#667085">다음 액션: 배차 대기</text>
+
+    <rect x="528" y="418" width="168" height="138" rx="12" ry="12" fill="#FFFFFF" stroke="#D0D5DD"/>
+    <text x="540" y="442" font-family="Inter, Pretendard, system-ui" font-size="12" font-weight="800" fill="#101828">REQ-1022</text>
+    <text x="540" y="462" font-family="Inter, Pretendard, system-ui" font-size="11" font-weight="700" fill="#3538CD">StationToStation</text>
+    <text x="540" y="482" font-family="Inter, Pretendard, system-ui" font-size="11" font-weight="600" fill="#475467">출발: 강남역</text>
+    <text x="540" y="500" font-family="Inter, Pretendard, system-ui" font-size="11" font-weight="600" fill="#475467">도착: 잠실역</text>
+    <text x="540" y="520" font-family="Inter, Pretendard, system-ui" font-size="11" font-weight="700" fill="#667085">다음 액션: 배차 대기</text>
+  </g>
+
+  <!-- In progress column cards -->
+  <g>
+    <rect x="722" y="268" width="168" height="138" rx="12" ry="12" fill="#FFFFFF" stroke="#D0D5DD"/>
+    <text x="734" y="292" font-family="Inter, Pretendard, system-ui" font-size="12" font-weight="800" fill="#101828">REQ-1007</text>
+    <text x="734" y="312" font-family="Inter, Pretendard, system-ui" font-size="11" font-weight="700" fill="#3538CD">Assigned</text>
+    <text x="734" y="332" font-family="Inter, Pretendard, system-ui" font-size="11" font-weight="600" fill="#475467">길러: G-221(수락대기)</text>
+    <text x="734" y="350" font-family="Inter, Pretendard, system-ui" font-size="11" font-weight="600" fill="#475467">채팅: ON</text>
+    <text x="734" y="370" font-family="Inter, Pretendard, system-ui" font-size="11" font-weight="700" fill="#667085">다음 액션: 수락 대기</text>
+
+    <rect x="722" y="418" width="168" height="138" rx="12" ry="12" fill="#FFFFFF" stroke="#D0D5DD"/>
+    <text x="734" y="442" font-family="Inter, Pretendard, system-ui" font-size="12" font-weight="800" fill="#101828">REQ-1008</text>
+    <text x="734" y="462" font-family="Inter, Pretendard, system-ui" font-size="11" font-weight="700" fill="#3538CD">InTransit</text>
+    <text x="734" y="482" font-family="Inter, Pretendard, system-ui" font-size="11" font-weight="600" fill="#475467">현재 Leg: 역→역(2호선)</text>
+    <text x="734" y="500" font-family="Inter, Pretendard, system-ui" font-size="11" font-weight="600" fill="#475467">ETA: 12분</text>
+    <text x="734" y="520" font-family="Inter, Pretendard, system-ui" font-size="11" font-weight="700" fill="#667085">다음 액션: 추적 보기</text>
+  </g>
+
+  <!-- Done column cards -->
+  <g>
+    <rect x="916" y="268" width="168" height="138" rx="12" ry="12" fill="#FFFFFF" stroke="#D0D5DD"/>
+    <text x="928" y="292" font-family="Inter, Pretendard, system-ui" font-size="12" font-weight="800" fill="#101828">REQ-0988</text>
+    <text x="928" y="312" font-family="Inter, Pretendard, system-ui" font-size="11" font-weight="700" fill="#027A48">Delivered</text>
+    <text x="928" y="332" font-family="Inter, Pretendard, system-ui" font-size="11" font-weight="600" fill="#475467">증빙: 사진 1장</text>
+    <text x="928" y="350" font-family="Inter, Pretendard, system-ui" font-size="11" font-weight="600" fill="#475467">완료: 18:32</text>
+    <text x="928" y="370" font-family="Inter, Pretendard, system-ui" font-size="11" font-weight="700" fill="#667085">다음 액션: 평가/팁</text>
+
+    <rect x="916" y="418" width="168" height="138" rx="12" ry="12" fill="#FFFFFF" stroke="#D0D5DD"/>
+    <text x="928" y="442" font-family="Inter, Pretendard, system-ui" font-size="12" font-weight="800" fill="#101828">REQ-0989</text>
+    <text x="928" y="462" font-family="Inter, Pretendard, system-ui" font-size="11" font-weight="700" fill="#027A48">Closed</text>
+    <text x="928" y="482" font-family="Inter, Pretendard, system-ui" font-size="11" font-weight="600" fill="#475467">영수증 발행</text>
+    <text x="928" y="500" font-family="Inter, Pretendard, system-ui" font-size="11" font-weight="600" fill="#475467">클레임 기간 종료</text>
+    <text x="928" y="520" font-family="Inter, Pretendard, system-ui" font-size="11" font-weight="700" fill="#667085">다음 액션: 재요청</text>
+  </g>
+
+  <!-- Incident column cards -->
+  <g>
+    <rect x="1110" y="268" width="168" height="138" rx="12" ry="12" fill="#FFFFFF" stroke="#D0D5DD"/>
+    <text x="1122" y="292" font-family="Inter, Pretendard, system-ui" font-size="12" font-weight="800" fill="#101828">REQ-1015</text>
+    <text x="1122" y="312" font-family="Inter, Pretendard, system-ui" font-size="11" font-weight="800" fill="#B42318">Incident: 부재</text>
+    <text x="1122" y="332" font-family="Inter, Pretendard, system-ui" font-size="11" font-weight="600" fill="#475467">사유: 수취인 부재</text>
+    <text x="1122" y="350" font-family="Inter, Pretendard, system-ui" font-size="11" font-weight="600" fill="#475467">옵션: 재시도/반송</text>
+    <text x="1122" y="370" font-family="Inter, Pretendard, system-ui" font-size="11" font-weight="700" fill="#667085">다음 액션: 운영 응답</text>
+  </g>
+
+  <!-- Cancel/Return column cards -->
+  <g>
+    <rect x="1304" y="268" width="168" height="138" rx="12" ry="12" fill="#FFFFFF" stroke="#D0D5DD"/>
+    <text x="1316" y="292" font-family="Inter, Pretendard, system-ui" font-size="12" font-weight="800" fill="#101828">REQ-0971</text>
+    <text x="1316" y="312" font-family="Inter, Pretendard, system-ui" font-size="11" font-weight="800" fill="#B42318">Cancelled</text>
+    <text x="1316" y="332" font-family="Inter, Pretendard, system-ui" font-size="11" font-weight="600" fill="#475467">사유: 요청자 취소</text>
+    <text x="1316" y="350" font-family="Inter, Pretendard, system-ui" font-size="11" font-weight="600" fill="#475467">환불: 정책 적용</text>
+    <text x="1316" y="370" font-family="Inter, Pretendard, system-ui" font-size="11" font-weight="700" fill="#667085">다음 액션: 없음</text>
+
+    <rect x="1304" y="418" width="168" height="138" rx="12" ry="12" fill="#FFFFFF" stroke="#D0D5DD"/>
+    <text x="1316" y="442" font-family="Inter, Pretendard, system-ui" font-size="12" font-weight="800" fill="#101828">REQ-0972</text>
+    <text x="1316" y="462" font-family="Inter, Pretendard, system-ui" font-size="11" font-weight="800" fill="#B42318">Return</text>
+    <text x="1316" y="482" font-family="Inter, Pretendard, system-ui" font-size="11" font-weight="600" fill="#475467">상태: 반송 진행중</text>
+    <text x="1316" y="500" font-family="Inter, Pretendard, system-ui" font-size="11" font-weight="600" fill="#475467">픽업 후 취소 전환</text>
+    <text x="1316" y="520" font-family="Inter, Pretendard, system-ui" font-size="11" font-weight="700" fill="#667085">다음 액션: 수령 확인</text>
+  </g>
+
+  <!-- Footer legend -->
+  <text x="112" y="1110" font-family="Inter, Pretendard, system-ui" font-size="12" font-weight="700" fill="#667085">
+    카드 규격/필드/상태 로직은 설계서(ganengile_mission_board_spec.md) 기준 — 실제 데이터로 교체만 하면 됨
+  </text>
+</svg>
+

@@ -1,0 +1,215 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="4720" viewBox="0 0 1600 4720">
+  <defs>
+    <style>
+      .bg { fill: #F8FAFC; }
+      .frame { fill: #FFFFFF; stroke: #D0D5DD; stroke-width: 2; }
+      .frameTitle { font-family: Inter, Pretendard, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif; font-size: 20px; font-weight: 700; fill: #101828; }
+      .subTitle { font-family: Inter, Pretendard, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif; font-size: 13px; font-weight: 600; fill: #344054; }
+      .hint { font-family: Inter, Pretendard, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif; font-size: 12px; font-weight: 500; fill: #667085; }
+      .laneLabel { font-family: Inter, Pretendard, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif; font-size: 14px; font-weight: 700; fill: #101828; }
+      .colHeader { fill: #F2F4F7; stroke: #E4E7EC; stroke-width: 1; }
+      .colText { font-family: Inter, Pretendard, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif; font-size: 12px; font-weight: 700; fill: #344054; }
+      .placeholder { fill: #FFFFFF; stroke: #98A2B3; stroke-width: 2; stroke-dasharray: 8 6; }
+      .divider { stroke: #EAECF0; stroke-width: 2; }
+      .pill { fill: #EEF2FF; stroke: #C7D2FE; stroke-width: 1; }
+      .pillText { font-family: Inter, Pretendard, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif; font-size: 11px; font-weight: 700; fill: #3538CD; }
+    </style>
+  </defs>
+
+  <!-- Background -->
+  <rect class="bg" x="0" y="0" width="1600" height="4720" />
+
+  <!-- Global header -->
+  <text class="frameTitle" x="80" y="56">가는길에 — Mission Board Template (스크린샷 영역은 플레이스홀더만)</text>
+  <text class="hint" x="80" y="78">Figma에 SVG를 드래그&amp;드롭해서 가져온 뒤, 필요하면 Frame으로 감싸고 텍스트/컴포넌트를 교체하세요.</text>
+
+  <!-- ========================= -->
+  <!-- 01_Overview / E2E Swimlane -->
+  <!-- ========================= -->
+  <g id="overview">
+    <rect class="frame" x="80" y="100" rx="16" ry="16" width="1440" height="1024"/>
+    <text class="frameTitle" x="112" y="150">01_Overview / E2E Swimlane</text>
+    <text class="hint" x="112" y="176">고객 → 길러(라이더/기사) → 운영(오케스트레이션) 상태 전이/예외를 한 장에</text>
+
+    <!-- left swimlane area -->
+    <rect x="112" y="208" width="960" height="864" fill="#FFFFFF" stroke="#EAECF0" stroke-width="2" rx="12" ry="12"/>
+    <line class="divider" x1="112" y1="496" x2="1072" y2="496"/>
+    <line class="divider" x1="112" y1="784" x2="1072" y2="784"/>
+
+    <text class="laneLabel" x="140" y="252">고객</text>
+    <text class="laneLabel" x="140" y="540">길러(전문길러=라이더/기사)</text>
+    <text class="laneLabel" x="140" y="828">운영(전문 배송업체/오케스트레이션)</text>
+
+    <!-- sample state pills -->
+    <g>
+      <rect class="pill" x="220" y="232" rx="999" ry="999" width="120" height="28"/>
+      <text class="pillText" x="236" y="251">Requested</text>
+      <rect class="pill" x="352" y="232" rx="999" ry="999" width="132" height="28"/>
+      <text class="pillText" x="368" y="251">Payment/Paid</text>
+      <rect class="pill" x="496" y="232" rx="999" ry="999" width="140" height="28"/>
+      <text class="pillText" x="512" y="251">DispatchPending</text>
+      <rect class="pill" x="648" y="232" rx="999" ry="999" width="112" height="28"/>
+      <text class="pillText" x="664" y="251">InTransit</text>
+      <rect class="pill" x="772" y="232" rx="999" ry="999" width="112" height="28"/>
+      <text class="pillText" x="792" y="251">Delivered</text>
+    </g>
+
+    <text class="hint" x="140" y="300">여기에: 주요 상태 전이 화살표 + 혼합 모델(D2D/S2S/Hybrid) Leg(문→역→역→문) 표시</text>
+    <text class="hint" x="140" y="328">여기에: 예외(취소/실패/반송) 분기와 운영 개입 포인트(재배차/보상/클레임)</text>
+
+    <!-- right placeholder stack -->
+    <rect x="1096" y="208" width="392" height="864" fill="#FFFFFF" stroke="#EAECF0" stroke-width="2" rx="12" ry="12"/>
+    <text class="subTitle" x="1120" y="242">SCREENSHOT PLACEHOLDER</text>
+    <rect class="placeholder" x="1120" y="266" rx="12" ry="12" width="344" height="194"/>
+    <text class="hint" x="1136" y="296">고객 화면(추적/상태)</text>
+    <rect class="placeholder" x="1120" y="476" rx="12" ry="12" width="344" height="194"/>
+    <text class="hint" x="1136" y="506">길러 화면(미션/수행)</text>
+    <rect class="placeholder" x="1120" y="686" rx="12" ry="12" width="344" height="194"/>
+    <text class="hint" x="1136" y="716">운영 화면(배차/관제)</text>
+    <text class="hint" x="1120" y="922">※ 스크린샷이 없어도 이 영역은 비워둔 채 진행</text>
+  </g>
+
+  <!-- ========================= -->
+  <!-- 02_Boards / Customer Board -->
+  <!-- ========================= -->
+  <g id="customer" transform="translate(0, 1120)">
+    <rect class="frame" x="80" y="100" rx="16" ry="16" width="1440" height="1024"/>
+    <text class="frameTitle" x="112" y="150">02_Boards / Customer Board</text>
+    <text class="hint" x="112" y="176">배송요청(Shipment/Request) 기준 보드 — 고객이 보는 진행/알림/클레임</text>
+
+    <!-- left board area -->
+    <rect x="112" y="208" width="960" height="864" fill="#FFFFFF" stroke="#EAECF0" stroke-width="2" rx="12" ry="12"/>
+    <text class="subTitle" x="132" y="242">보드 컬럼(상태)</text>
+
+    <!-- 7 columns -->
+    <g id="customerCols">
+      <!-- geometry -->
+      <!-- col width 128, gap 8 -->
+      <g transform="translate(132,260)">
+        <rect class="colHeader" x="0" y="0" width="128" height="36" rx="10" ry="10"/>
+        <text class="colText" x="12" y="23">작성중</text>
+
+        <rect class="colHeader" x="136" y="0" width="128" height="36" rx="10" ry="10"/>
+        <text class="colText" x="148" y="23">결제/확정</text>
+
+        <rect class="colHeader" x="272" y="0" width="128" height="36" rx="10" ry="10"/>
+        <text class="colText" x="284" y="23">배차 대기</text>
+
+        <rect class="colHeader" x="408" y="0" width="128" height="36" rx="10" ry="10"/>
+        <text class="colText" x="420" y="23">진행중</text>
+
+        <rect class="colHeader" x="544" y="0" width="128" height="36" rx="10" ry="10"/>
+        <text class="colText" x="556" y="23">완료</text>
+
+        <rect class="colHeader" x="680" y="0" width="128" height="36" rx="10" ry="10"/>
+        <text class="colText" x="692" y="23">문제 발생</text>
+
+        <rect class="colHeader" x="816" y="0" width="128" height="36" rx="10" ry="10"/>
+        <text class="colText" x="828" y="23">취소/반송</text>
+
+        <text class="hint" x="0" y="70">카드(요청): Request ID · 타입(D2D/S2S/Hybrid) · 픽업/도착 · SLA · 결제 · 채팅 · 증빙</text>
+      </g>
+    </g>
+
+    <!-- right placeholders -->
+    <rect x="1096" y="208" width="392" height="864" fill="#FFFFFF" stroke="#EAECF0" stroke-width="2" rx="12" ry="12"/>
+    <text class="subTitle" x="1120" y="242">SCREENSHOT PLACEHOLDER</text>
+    <rect class="placeholder" x="1120" y="266" rx="12" ry="12" width="344" height="240"/>
+    <text class="hint" x="1136" y="296">고객 화면 캡처(TBD)</text>
+    <rect class="placeholder" x="1120" y="522" rx="12" ry="12" width="344" height="240"/>
+    <text class="hint" x="1136" y="552">요청 상세/추적/채팅(TBD)</text>
+    <rect class="placeholder" x="1120" y="778" rx="12" ry="12" width="344" height="240"/>
+    <text class="hint" x="1136" y="808">클레임/이슈(TBD)</text>
+  </g>
+
+  <!-- ========================= -->
+  <!-- 02_Boards / Giller Board -->
+  <!-- ========================= -->
+  <g id="giller" transform="translate(0, 2240)">
+    <rect class="frame" x="80" y="100" rx="16" ry="16" width="1440" height="1024"/>
+    <text class="frameTitle" x="112" y="150">02_Boards / Giller Board</text>
+    <text class="hint" x="112" y="176">미션(Job) 기준 보드 — 전문길러(라이더/기사)의 오퍼/수행/증빙/정산</text>
+
+    <!-- left board area -->
+    <rect x="112" y="208" width="960" height="864" fill="#FFFFFF" stroke="#EAECF0" stroke-width="2" rx="12" ry="12"/>
+    <text class="subTitle" x="132" y="242">보드 컬럼(상태)</text>
+
+    <!-- 8 columns -->
+    <g transform="translate(132,260)">
+      <!-- col width 110, gap 8 -->
+      <rect class="colHeader" x="0" y="0" width="110" height="36" rx="10" ry="10"/><text class="colText" x="12" y="23">오퍼</text>
+      <rect class="colHeader" x="118" y="0" width="110" height="36" rx="10" ry="10"/><text class="colText" x="130" y="23">수락/예정</text>
+      <rect class="colHeader" x="236" y="0" width="110" height="36" rx="10" ry="10"/><text class="colText" x="248" y="23">픽업</text>
+      <rect class="colHeader" x="354" y="0" width="110" height="36" rx="10" ry="10"/><text class="colText" x="366" y="23">이동중</text>
+      <rect class="colHeader" x="472" y="0" width="110" height="36" rx="10" ry="10"/><text class="colText" x="484" y="23">인계/전달</text>
+      <rect class="colHeader" x="590" y="0" width="110" height="36" rx="10" ry="10"/><text class="colText" x="602" y="23">완료</text>
+      <rect class="colHeader" x="708" y="0" width="110" height="36" rx="10" ry="10"/><text class="colText" x="720" y="23">이슈</text>
+      <rect class="colHeader" x="826" y="0" width="110" height="36" rx="10" ry="10"/><text class="colText" x="838" y="23">정산</text>
+
+      <text class="hint" x="0" y="70">카드(미션): Mission ID · Leg 타입(문→역/역→역/역→문) · 마감 · 증빙 체크리스트 · 다음 액션</text>
+    </g>
+
+    <!-- right placeholders -->
+    <rect x="1096" y="208" width="392" height="864" fill="#FFFFFF" stroke="#EAECF0" stroke-width="2" rx="12" ry="12"/>
+    <text class="subTitle" x="1120" y="242">SCREENSHOT PLACEHOLDER</text>
+    <rect class="placeholder" x="1120" y="266" rx="12" ry="12" width="344" height="240"/>
+    <text class="hint" x="1136" y="296">길러 홈/미션 리스트(TBD)</text>
+    <rect class="placeholder" x="1120" y="522" rx="12" ry="12" width="344" height="240"/>
+    <text class="hint" x="1136" y="552">미션 수행/증빙(TBD)</text>
+    <rect class="placeholder" x="1120" y="778" rx="12" ry="12" width="344" height="240"/>
+    <text class="hint" x="1136" y="808">정산/수익(TBD)</text>
+  </g>
+
+  <!-- ========================= -->
+  <!-- 02_Boards / Ops Board -->
+  <!-- ========================= -->
+  <g id="ops" transform="translate(0, 3360)">
+    <rect class="frame" x="80" y="100" rx="16" ry="16" width="1440" height="1024"/>
+    <text class="frameTitle" x="112" y="150">02_Boards / Ops Board (Orchestration)</text>
+    <text class="hint" x="112" y="176">운영 콘솔 — 주문(Shipment) 보드 + 미션(Job) 보드 2단 구성</text>
+
+    <!-- left board area -->
+    <rect x="112" y="208" width="960" height="864" fill="#FFFFFF" stroke="#EAECF0" stroke-width="2" rx="12" ry="12"/>
+
+    <!-- Shipment row -->
+    <text class="subTitle" x="132" y="242">주문(Shipment) 보드</text>
+    <g transform="translate(132,260)">
+      <!-- 7 cols, col width 128 -->
+      <rect class="colHeader" x="0" y="0" width="128" height="36" rx="10" ry="10"/><text class="colText" x="12" y="23">신규</text>
+      <rect class="colHeader" x="136" y="0" width="128" height="36" rx="10" ry="10"/><text class="colText" x="148" y="23">검증 보류</text>
+      <rect class="colHeader" x="272" y="0" width="128" height="36" rx="10" ry="10"/><text class="colText" x="284" y="23">배차 설계</text>
+      <rect class="colHeader" x="408" y="0" width="128" height="36" rx="10" ry="10"/><text class="colText" x="420" y="23">모니터링</text>
+      <rect class="colHeader" x="544" y="0" width="128" height="36" rx="10" ry="10"/><text class="colText" x="556" y="23">예외 대응</text>
+      <rect class="colHeader" x="680" y="0" width="128" height="36" rx="10" ry="10"/><text class="colText" x="692" y="23">정산/리포트</text>
+      <rect class="colHeader" x="816" y="0" width="128" height="36" rx="10" ry="10"/><text class="colText" x="828" y="23">클로즈</text>
+    </g>
+
+    <!-- divider -->
+    <line class="divider" x1="132" y1="420" x2="1044" y2="420"/>
+
+    <!-- Job row -->
+    <text class="subTitle" x="132" y="460">미션(Job) 보드</text>
+    <g transform="translate(132,478)">
+      <!-- 6 cols, col width 150 -->
+      <rect class="colHeader" x="0" y="0" width="150" height="36" rx="10" ry="10"/><text class="colText" x="12" y="23">미할당</text>
+      <rect class="colHeader" x="158" y="0" width="150" height="36" rx="10" ry="10"/><text class="colText" x="170" y="23">오퍼중</text>
+      <rect class="colHeader" x="316" y="0" width="150" height="36" rx="10" ry="10"/><text class="colText" x="328" y="23">수락됨</text>
+      <rect class="colHeader" x="474" y="0" width="150" height="36" rx="10" ry="10"/><text class="colText" x="486" y="23">픽업 위험</text>
+      <rect class="colHeader" x="632" y="0" width="150" height="36" rx="10" ry="10"/><text class="colText" x="644" y="23">배송 위험</text>
+      <rect class="colHeader" x="790" y="0" width="150" height="36" rx="10" ry="10"/><text class="colText" x="802" y="23">실패/반송</text>
+
+      <text class="hint" x="0" y="70">운영 카드 핵심: SLA·At Risk·오퍼횟수·재배차·파트너 전환·클레임/보상</text>
+    </g>
+
+    <!-- right placeholders -->
+    <rect x="1096" y="208" width="392" height="864" fill="#FFFFFF" stroke="#EAECF0" stroke-width="2" rx="12" ry="12"/>
+    <text class="subTitle" x="1120" y="242">SCREENSHOT PLACEHOLDER</text>
+    <rect class="placeholder" x="1120" y="266" rx="12" ry="12" width="344" height="240"/>
+    <text class="hint" x="1136" y="296">운영 대시보드(TBD)</text>
+    <rect class="placeholder" x="1120" y="522" rx="12" ry="12" width="344" height="240"/>
+    <text class="hint" x="1136" y="552">관제/지도(TBD)</text>
+    <rect class="placeholder" x="1120" y="778" rx="12" ry="12" width="344" height="240"/>
+    <text class="hint" x="1136" y="808">이슈/정산(TBD)</text>
+  </g>
+</svg>
+

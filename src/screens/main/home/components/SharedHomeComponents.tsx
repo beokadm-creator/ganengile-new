@@ -1,5 +1,5 @@
 import React, { useEffect, useRef } from 'react';
-import { Animated, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { Animated, StyleSheet, Text, TouchableOpacity, View, Platform } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { BorderRadius, Colors, Shadows, Spacing } from '../../../../theme';
 import { Typography } from '../../../../theme/typography';
@@ -20,7 +20,7 @@ export function CompactRoleToggle({
   useEffect(() => {
     Animated.spring(slideAnim, {
       toValue: isGiller ? 1 : 0,
-      useNativeDriver: true,
+      useNativeDriver: Platform.OS !== 'web',
       bounciness: 0,
       speed: 14,
     }).start();

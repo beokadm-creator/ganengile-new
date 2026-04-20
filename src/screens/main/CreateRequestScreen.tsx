@@ -302,6 +302,8 @@ export default function CreateRequestScreen({ navigation, route }: Props) {
     storageLocation, setStorageLocation,
     lockerId, setLockerId,
     pickupLockerId, setPickupLockerId,
+    usePickupLocker, setUsePickupLocker,
+    useDropoffLocker, setUseDropoffLocker,
     dropoffLockerId, setDropoffLockerId,
     pickupStorageLocation, setPickupStorageLocation,
     dropoffStorageLocation, setDropoffStorageLocation,
@@ -563,11 +565,11 @@ export default function CreateRequestScreen({ navigation, route }: Props) {
   useEffect(() => {
     // 활성화된 스텝이 변경될 때 스크롤 제어
     const timeoutId = setTimeout(() => {
-      if (activeStep === 4) {
-        // 4단계(견적 확인)일 때는 화면 맨 아래로 스크롤하여 결제 요약이 보이게 함
+      if (activeStep === 7) {
+        // 7단계(견적 확인)일 때는 화면 맨 아래로 스크롤하여 결제 요약이 보이게 함
         scrollViewRef.current?.scrollToEnd({ animated: true });
       } else {
-        // 1~3단계일 때는 맨 위로 스크롤
+        // 이전 단계일 때는 맨 위로 스크롤
         scrollViewRef.current?.scrollTo({ y: 0, animated: true });
       }
     }, 100);
@@ -762,12 +764,14 @@ export default function CreateRequestScreen({ navigation, route }: Props) {
         pickupLocationDetail: pickupLocationDetail || undefined,
         storageLocation: storageLocation || undefined,
         lockerId: lockerId || undefined,
-        pickupLockerId: useCreateRequestStore.getState().pickupLockerId || undefined,
-        dropoffLockerId: useCreateRequestStore.getState().dropoffLockerId || undefined,
-        pickupStorageLocation: useCreateRequestStore.getState().pickupStorageLocation || undefined,
-        dropoffStorageLocation: useCreateRequestStore.getState().dropoffStorageLocation || undefined,
-        pickupLockerFee: useCreateRequestStore.getState().pickupLockerFee || undefined,
-        dropoffLockerFee: useCreateRequestStore.getState().dropoffLockerFee || undefined,
+        usePickupLocker,
+        pickupLockerId: usePickupLocker ? `AREA::${pickupStation.stationId}` : undefined,
+        useDropoffLocker,
+        dropoffLockerId: useDropoffLocker ? `AREA::${deliveryStation.stationId}` : undefined,
+        pickupStorageLocation: pickupStorageLocation || undefined,
+        dropoffStorageLocation: dropoffStorageLocation || undefined,
+        pickupLockerFee: usePickupLocker ? (useCreateRequestStore.getState().pickupLockerFee ?? 1000) : 0,
+        dropoffLockerFee: useDropoffLocker ? (useCreateRequestStore.getState().dropoffLockerFee ?? 1000) : 0,
         specialInstructions: specialInstructions || undefined,
         urgency: requestMode === 'reservation' ? 'normal' : urgency,
         selectedQuoteType: selectedQuoteTypeForSubmit,
@@ -850,7 +854,6 @@ export default function CreateRequestScreen({ navigation, route }: Props) {
         handleAI={handleAI}
         aiResult={aiResult}
         setReservationCalendarVisible={setReservationCalendarVisible}
-        setLockerLocatorTarget={setLockerLocatorTarget}
         quotes={quotes}
         missingItems={missingItems}
         submitDisabled={submitDisabled}
@@ -868,6 +871,7 @@ export default function CreateRequestScreen({ navigation, route }: Props) {
         isPhoneVerified={isPhoneVerified}
         otpSending={false}
         otpVerifying={false}
+        setLockerLocatorTarget={() => {}}
       />
 
       <OptimizedStationSelectModal
@@ -877,8 +881,10 @@ export default function CreateRequestScreen({ navigation, route }: Props) {
         onSelectStation={(station: Station) => {
           if (pickerType === 'pickup') {
             setPickupStation(toStationInfo(station));
+            useCreateRequestStore.getState().setUsePickupLocker(false);
           } else {
             setDeliveryStation(toStationInfo(station));
+            useCreateRequestStore.getState().setUseDropoffLocker(false);
           }
           setPickerVisible(false);
         }}
@@ -952,39 +958,7 @@ export default function CreateRequestScreen({ navigation, route }: Props) {
           </View>
         </View>
       </Modal>
-      <Modal visible={lockerLocatorTarget !== null} animationType="slide" transparent>
-        <View style={styles.modalBackdrop}>
-          <View style={[styles.modalCard, { width: '90%', height: '80%', padding: 0, overflow: 'hidden', alignItems: 'stretch' }]}>
-            {lockerLocatorTarget !== null && (
-              <LockerLocator
-                initialTargetStationType={lockerLocatorTarget === 'pickup' ? 'pickup' : 'delivery'}
-                selectedStationId={pickupStation?.stationId}
-                deliveryStationId={deliveryStation?.stationId}
-                onLockerSelect={(locker) => {
-                  if (lockerLocatorTarget === 'pickup') {
-                    setPickupLockerId(locker.lockerId);
-                    setPickupStorageLocation(
-                      `${locker.stationName} ${locker.lockerId.startsWith('AREA::') ? '사물함 구역' : locker.lockerId} (상태: ${locker.status})`
-                    );
-                    // 기존 하위 호환을 위해 lockerId와 storageLocation도 업데이트 (첫 번째 선택 기준)
-                    setLockerId(locker.lockerId);
-                    setStorageLocation(`${locker.stationName} ${locker.lockerId}`);
-                    setPickupLockerFee(locker.pricePerHour ?? null);
-                  } else {
-                    setDropoffLockerId(locker.lockerId);
-                    setDropoffStorageLocation(
-                      `${locker.stationName} ${locker.lockerId.startsWith('AREA::') ? '사물함 구역' : locker.lockerId} (상태: ${locker.status})`
-                    );
-                    setDropoffLockerFee(locker.pricePerHour ?? null);
-                  }
-                  setLockerLocatorTarget(null);
-                }}
-                onClose={() => setLockerLocatorTarget(null)}
-              />
-            )}
-          </View>
-        </View>
-      </Modal>
+
     </KeyboardAvoidingView>
   );
 }

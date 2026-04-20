@@ -93,11 +93,19 @@ export async function PATCH(req: NextRequest) {
     updateData.rejectionReason = reason ?? '';
   }
 
-  await ref.update(updateData);
-  await db.collection('users').doc(userId).update({
-    isVerified: status === 'approved',
-    updatedAt: new Date(),
-  });
+  try {
+    await ref.update(updateData);
+    await db.collection('users').doc(userId).update({
+      isVerified: status === 'approved',
+      updatedAt: new Date(),
+    });
+  } catch (error: unknown) {
+    console.error('Failed to update verification:', error);
+    return NextResponse.json(
+      { error: 'Failed to update verification', details: error instanceof Error ? error.message : 'Unknown error' },
+      { status: 500 }
+    );
+  }
 
   try {
     let appSnap = await db
@@ -110,11 +118,11 @@ export async function PATCH(req: NextRequest) {
     if (!appSnap.empty) {
       await appSnap.docs[0].ref.update({ verificationStatus: status });
     }
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.warn('Giller application query with orderBy failed, falling back to local sort', error);
     
     // Check if this is an index error from Firestore
-    if (error.message?.includes('FAILED_PRECONDITION') && error.message?.includes('requires an index')) {
+    if (error instanceof Error && error.message.includes('FAILED_PRECONDITION') && error.message.includes('requires an index')) {
       const linkMatch = error.message.match(/https:\/\/console\.firebase\.google\.com[^\s]*/);
       if (linkMatch) {
         console.info('Please create the missing index using this link:', linkMatch[0]);

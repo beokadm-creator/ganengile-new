@@ -57,11 +57,20 @@ function normalizeServiceKey(rawKey: string): string {
   }
 }
 
-function normalizeItems(payload: Record<string, any>): FareApiItem[] {
+function normalizeItems(payload: Record<string, unknown>): FareApiItem[] {
+  const responseBody = payload?.response as Record<string, unknown> | undefined;
+  const responseBodyItems = responseBody?.body as Record<string, unknown> | undefined;
+  const responseBodyItemsItem = responseBodyItems?.items as Record<string, unknown> | undefined;
+
+  const payloadBody = payload?.body as Record<string, unknown> | undefined;
+  const payloadBodyItems = payloadBody?.items as Record<string, unknown> | undefined;
+
+  const getRltmFare = payload?.getRltmFare as Record<string, unknown> | undefined;
+
   const candidates =
-    payload?.response?.body?.items?.item ||
-    payload?.body?.items?.item ||
-    payload?.getRltmFare?.row ||
+    responseBodyItemsItem?.item ||
+    payloadBodyItems?.item ||
+    getRltmFare?.row ||
     payload?.row ||
     payload?.items || [];
 
@@ -89,7 +98,7 @@ function parseFareFromItems(items: FareApiItem[]): { fare?: number; raw?: FareAp
   return { fare, raw: item };
 }
 
-function requestJson(url: string): Promise<Record<string, any>> {
+function requestJson(url: string): Promise<Record<string, unknown>> {
   return new Promise((resolve, reject) => {
     const req = https.get(url, (res) => {
       let body = '';
@@ -105,7 +114,7 @@ function requestJson(url: string): Promise<Record<string, any>> {
         }
 
         try {
-          resolve(JSON.parse(body) as Record<string, any>);
+          resolve(JSON.parse(body) as Record<string, unknown>);
         } catch (error) {
           reject(new Error(`JSON parse failed: ${String(error)}`));
         }
@@ -252,7 +261,7 @@ export async function runFareCacheSync(db: Firestore): Promise<FareCacheSyncResu
   });
 
   const routePairs = new Map<string, { fromStationId: string; toStationId: string }>();
-  const resolveStationId = (input: any): string | null => {
+  const resolveStationId = (input: Record<string, unknown> | string | null | undefined): string | null => {
     if (!input) {
       return null;
     }
@@ -300,7 +309,7 @@ export async function runFareCacheSync(db: Firestore): Promise<FareCacheSyncResu
     return byName?.[0] ?? null;
   };
 
-  const addRoutePair = (fromInput: any, toInput: any, source?: 'travel' | 'request' | 'route') => {
+  const addRoutePair = (fromInput: Record<string, unknown> | string | null | undefined, toInput: Record<string, unknown> | string | null | undefined, source?: 'travel' | 'request' | 'route') => {
     const from = resolveStationId(fromInput) ?? '';
     const to = resolveStationId(toInput) ?? '';
 
@@ -325,8 +334,8 @@ export async function runFareCacheSync(db: Firestore): Promise<FareCacheSyncResu
   };
 
   travelTimesSnapshot.docs.forEach((docSnap) => {
-    const item = docSnap.data() as any;
-    addRoutePair(item?.fromStationId, item?.toStationId, 'travel');
+    const item = docSnap.data() as Record<string, unknown>;
+    addRoutePair(item?.fromStationId as string | undefined, item?.toStationId as string | undefined, 'travel');
   });
 
   if (routePairs.size === 0) {
@@ -336,15 +345,15 @@ export async function runFareCacheSync(db: Firestore): Promise<FareCacheSyncResu
     ]);
 
     requestsSnapshot.docs.forEach((docSnap) => {
-      const request = docSnap.data() as any;
-      addRoutePair(request?.pickupStation, request?.deliveryStation, 'request');
-      addRoutePair(request?.deliveryStation, request?.pickupStation, 'request');
+      const request = docSnap.data() as Record<string, unknown>;
+      addRoutePair(request?.pickupStation as string | undefined, request?.deliveryStation as string | undefined, 'request');
+      addRoutePair(request?.deliveryStation as string | undefined, request?.pickupStation as string | undefined, 'request');
     });
 
     routesSnapshot.docs.forEach((docSnap) => {
-      const route = docSnap.data() as any;
-      addRoutePair(route?.startStation, route?.endStation, 'route');
-      addRoutePair(route?.endStation, route?.startStation, 'route');
+      const route = docSnap.data() as Record<string, unknown>;
+      addRoutePair(route?.startStation as string | undefined, route?.endStation as string | undefined, 'route');
+      addRoutePair(route?.endStation as string | undefined, route?.startStation as string | undefined, 'route');
     });
   }
 

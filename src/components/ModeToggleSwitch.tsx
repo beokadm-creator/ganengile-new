@@ -9,6 +9,7 @@ import {
   type DimensionValue,
   type StyleProp,
   type ViewStyle,
+  Platform,
 } from 'react-native';
 import { doc, onSnapshot, updateDoc } from 'firebase/firestore';
 import { db } from '../core/firebase';
@@ -34,7 +35,7 @@ export default function ModeToggleSwitch({ mode, onModeChange, style }: Props) {
       toValue: mode === 'onetime' ? 0 : 1,
       friction: 8,
       tension: 40,
-      useNativeDriver: true,
+      useNativeDriver: Platform.OS !== 'web',
     }).start();
   }, [animValue, mode]);
 

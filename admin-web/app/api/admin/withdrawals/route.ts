@@ -166,11 +166,11 @@ export async function GET(req: NextRequest) {
             : '계좌 인증 API 준비 전에는 운영 수동 검토를 함께 진행합니다.',
       },
     });
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Failed to fetch withdrawals:', error);
     
     return NextResponse.json(
-      { error: '데이터를 불러오는데 실패했습니다.', details: error.message }, 
+      { error: '데이터를 불러오는데 실패했습니다.', details: error instanceof Error ? error.message : 'Unknown error' }, 
       { status: 500 }
     );
   }
@@ -241,7 +241,7 @@ export async function PATCH(req: NextRequest) {
             pendingWithdrawalBalance: Number(rawBalances.pendingWithdrawalBalance ?? 0),
           };
 
-          const oldSummary = getWalletSummary(currentBalances as any);
+          const oldSummary = getWalletSummary(currentBalances as Record<string, unknown>);
           const newBalances = { ...currentBalances };
 
           if (action === 'approve') {
@@ -253,7 +253,7 @@ export async function PATCH(req: NextRequest) {
             newBalances.earnedBalance += amount;
           }
 
-          const newSummary = getWalletSummary(newBalances as any);
+          const newSummary = getWalletSummary(newBalances as Record<string, unknown>);
           const now = new Date();
 
           // 1. 유저 업데이트 (Legacy fallback)
@@ -327,11 +327,11 @@ export async function PATCH(req: NextRequest) {
 
     const newStatus = action === 'approve' ? 'completed' : 'rejected';
     return NextResponse.json({ ok: true, status: newStatus });
-  } catch (error: any) {
-    if (error.message === 'Not found') {
+  } catch (error: unknown) {
+    if (error instanceof Error && error.message === 'Not found') {
       return NextResponse.json({ error: 'Not found' }, { status: 404 });
     }
-    if (error.message === 'Request is not in pending status') {
+    if (error instanceof Error && error.message === 'Request is not in pending status') {
       return NextResponse.json({ error: 'Request is not in pending status' }, { status: 400 });
     }
     console.error('Withdrawal patch transaction failed:', error);

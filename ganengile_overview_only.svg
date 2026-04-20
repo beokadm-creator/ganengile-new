@@ -1,0 +1,39 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="1200" viewBox="0 0 1600 1200">
+  <defs>
+    <style>
+      .bg { fill: #F8FAFC; }
+      .frame { fill: #FFFFFF; stroke: #D0D5DD; stroke-width: 2; }
+      .title { font-family: Inter, Pretendard, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif; font-size: 22px; font-weight: 800; fill: #101828; }
+      .hint { font-family: Inter, Pretendard, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif; font-size: 13px; font-weight: 600; fill: #667085; }
+      .laneLabel { font-family: Inter, Pretendard, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif; font-size: 14px; font-weight: 800; fill: #101828; }
+      .divider { stroke: #EAECF0; stroke-width: 2; }
+      .placeholder { fill: #FFFFFF; stroke: #98A2B3; stroke-width: 2; stroke-dasharray: 8 6; }
+    </style>
+  </defs>
+
+  <rect class="bg" x="0" y="0" width="1600" height="1200"/>
+  <text class="title" x="80" y="60">가는길에 — 01_Overview / E2E Swimlane (단일 프레임 테스트용)</text>
+  <text class="hint" x="80" y="86">이 파일이 Figma에 보이면, 큰 템플릿도 동일하게 보입니다. (Shift+2: 선택 영역로 줌)</text>
+
+  <rect class="frame" x="80" y="120" rx="16" ry="16" width="1440" height="1000"/>
+
+  <!-- left swimlane area -->
+  <rect x="112" y="180" width="960" height="900" fill="#FFFFFF" stroke="#EAECF0" stroke-width="2" rx="12" ry="12"/>
+  <line class="divider" x1="112" y1="480" x2="1072" y2="480"/>
+  <line class="divider" x1="112" y1="780" x2="1072" y2="780"/>
+  <text class="laneLabel" x="140" y="228">고객</text>
+  <text class="laneLabel" x="140" y="528">길러(전문길러=라이더/기사)</text>
+  <text class="laneLabel" x="140" y="828">운영(오케스트레이션)</text>
+  <text class="hint" x="140" y="260">여기에 상태 전이/예외 분기/Leg(문→역→역→문) 표시</text>
+
+  <!-- right placeholders -->
+  <rect x="1096" y="180" width="392" height="900" fill="#FFFFFF" stroke="#EAECF0" stroke-width="2" rx="12" ry="12"/>
+  <text class="hint" x="1120" y="222">SCREENSHOT PLACEHOLDER</text>
+  <rect class="placeholder" x="1120" y="250" rx="12" ry="12" width="344" height="220"/>
+  <text class="hint" x="1136" y="282">고객 화면(TBD)</text>
+  <rect class="placeholder" x="1120" y="490" rx="12" ry="12" width="344" height="220"/>
+  <text class="hint" x="1136" y="522">길러 화면(TBD)</text>
+  <rect class="placeholder" x="1120" y="730" rx="12" ry="12" width="344" height="220"/>
+  <text class="hint" x="1136" y="762">운영 화면(TBD)</text>
+</svg>
+

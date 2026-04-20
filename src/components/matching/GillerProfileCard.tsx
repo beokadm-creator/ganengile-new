@@ -5,6 +5,7 @@ import {
   StyleSheet,
   TouchableOpacity,
   Animated,
+  Platform,
 } from 'react-native';
 import RatingStars from '../common/RatingStars';
 import { Colors, Spacing, BorderRadius } from '../../theme';
@@ -45,21 +46,21 @@ const GillerProfileCard: React.FC<Props> = ({ match, index, onPress }) => {
         toValue: 1,
         duration: 400,
         delay,
-        useNativeDriver: true,
+        useNativeDriver: Platform.OS !== 'web',
       }),
       Animated.spring(slideAnim, {
         toValue: 0,
         tension: 50,
         friction: 7,
         delay,
-        useNativeDriver: true,
+        useNativeDriver: Platform.OS !== 'web',
       }),
       Animated.spring(scaleAnim, {
         toValue: 1,
         tension: 50,
         friction: 7,
         delay,
-        useNativeDriver: true,
+        useNativeDriver: Platform.OS !== 'web',
       }),
     ]).start();
   // eslint-disable-next-line react-hooks/exhaustive-deps

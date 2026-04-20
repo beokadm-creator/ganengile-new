@@ -1,0 +1,134 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="1200" viewBox="0 0 1600 1200">
+  <rect x="0" y="0" width="1600" height="1200" fill="#F8FAFC"/>
+
+  <text x="80" y="60" font-family="Inter, Pretendard, system-ui" font-size="22" font-weight="800" fill="#101828">
+    02_Boards / Giller Board (Filled)
+  </text>
+  <text x="80" y="86" font-family="Inter, Pretendard, system-ui" font-size="13" font-weight="600" fill="#667085">
+    전문길러(라이더/기사) 미션(Job) 보드 — 오퍼/수행/증빙/정산 “내용 채움”
+  </text>
+
+  <rect x="80" y="120" width="1440" height="1000" rx="16" ry="16" fill="#FFFFFF" stroke="#D0D5DD" stroke-width="2"/>
+  <rect x="112" y="184" width="1376" height="904" rx="12" ry="12" fill="#FFFFFF" stroke="#EAECF0" stroke-width="2"/>
+
+  <!-- Columns (8) -->
+  <!-- startX=132 colW=156 gap=10 -->
+  <g>
+    <rect x="132" y="208" width="156" height="44" rx="10" ry="10" fill="#F2F4F7" stroke="#E4E7EC"/>
+    <text x="144" y="236" font-family="Inter, Pretendard, system-ui" font-size="12" font-weight="800" fill="#344054">오퍼</text>
+
+    <rect x="298" y="208" width="156" height="44" rx="10" ry="10" fill="#F2F4F7" stroke="#E4E7EC"/>
+    <text x="310" y="236" font-family="Inter, Pretendard, system-ui" font-size="12" font-weight="800" fill="#344054">수락/예정</text>
+
+    <rect x="464" y="208" width="156" height="44" rx="10" ry="10" fill="#F2F4F7" stroke="#E4E7EC"/>
+    <text x="476" y="236" font-family="Inter, Pretendard, system-ui" font-size="12" font-weight="800" fill="#344054">픽업</text>
+
+    <rect x="630" y="208" width="156" height="44" rx="10" ry="10" fill="#F2F4F7" stroke="#E4E7EC"/>
+    <text x="642" y="236" font-family="Inter, Pretendard, system-ui" font-size="12" font-weight="800" fill="#344054">이동중</text>
+
+    <rect x="796" y="208" width="156" height="44" rx="10" ry="10" fill="#F2F4F7" stroke="#E4E7EC"/>
+    <text x="808" y="236" font-family="Inter, Pretendard, system-ui" font-size="12" font-weight="800" fill="#344054">인계/전달</text>
+
+    <rect x="962" y="208" width="156" height="44" rx="10" ry="10" fill="#F2F4F7" stroke="#E4E7EC"/>
+    <text x="974" y="236" font-family="Inter, Pretendard, system-ui" font-size="12" font-weight="800" fill="#344054">완료</text>
+
+    <rect x="1128" y="208" width="156" height="44" rx="10" ry="10" fill="#F2F4F7" stroke="#E4E7EC"/>
+    <text x="1140" y="236" font-family="Inter, Pretendard, system-ui" font-size="12" font-weight="800" fill="#344054">이슈</text>
+
+    <rect x="1294" y="208" width="156" height="44" rx="10" ry="10" fill="#F2F4F7" stroke="#E4E7EC"/>
+    <text x="1306" y="236" font-family="Inter, Pretendard, system-ui" font-size="12" font-weight="800" fill="#344054">정산</text>
+  </g>
+
+  <!-- Cards: 146x150 -->
+  <!-- Offered -->
+  <g>
+    <rect x="137" y="268" width="146" height="154" rx="12" ry="12" fill="#FFFFFF" stroke="#D0D5DD"/>
+    <text x="149" y="292" font-family="Inter, Pretendard, system-ui" font-size="12" font-weight="800" fill="#101828">JOB-2201</text>
+    <text x="149" y="312" font-family="Inter, Pretendard, system-ui" font-size="11" font-weight="800" fill="#3538CD">Leg: 문→역</text>
+    <text x="149" y="332" font-family="Inter, Pretendard, system-ui" font-size="11" font-weight="600" fill="#475467">SLA: 18:20 픽업</text>
+    <text x="149" y="350" font-family="Inter, Pretendard, system-ui" font-size="11" font-weight="600" fill="#475467">보상: 5,200</text>
+    <text x="149" y="370" font-family="Inter, Pretendard, system-ui" font-size="11" font-weight="700" fill="#667085">다음: 수락/거절</text>
+
+    <rect x="137" y="434" width="146" height="154" rx="12" ry="12" fill="#FFFFFF" stroke="#D0D5DD"/>
+    <text x="149" y="458" font-family="Inter, Pretendard, system-ui" font-size="12" font-weight="800" fill="#101828">JOB-2202</text>
+    <text x="149" y="478" font-family="Inter, Pretendard, system-ui" font-size="11" font-weight="800" fill="#3538CD">Leg: 역→역</text>
+    <text x="149" y="498" font-family="Inter, Pretendard, system-ui" font-size="11" font-weight="600" fill="#475467">2호선(환승 1)</text>
+    <text x="149" y="516" font-family="Inter, Pretendard, system-ui" font-size="11" font-weight="600" fill="#475467">보상: 6,300</text>
+    <text x="149" y="536" font-family="Inter, Pretendard, system-ui" font-size="11" font-weight="700" fill="#667085">다음: 수락/거절</text>
+  </g>
+
+  <!-- Accepted -->
+  <g>
+    <rect x="303" y="268" width="146" height="154" rx="12" ry="12" fill="#FFFFFF" stroke="#D0D5DD"/>
+    <text x="315" y="292" font-family="Inter, Pretendard, system-ui" font-size="12" font-weight="800" fill="#101828">JOB-2191</text>
+    <text x="315" y="312" font-family="Inter, Pretendard, system-ui" font-size="11" font-weight="800" fill="#027A48">Accepted</text>
+    <text x="315" y="332" font-family="Inter, Pretendard, system-ui" font-size="11" font-weight="600" fill="#475467">픽업: 성수역 3번출구</text>
+    <text x="315" y="350" font-family="Inter, Pretendard, system-ui" font-size="11" font-weight="600" fill="#475467">증빙: 사진</text>
+    <text x="315" y="370" font-family="Inter, Pretendard, system-ui" font-size="11" font-weight="700" fill="#667085">다음: 출발</text>
+  </g>
+
+  <!-- Pickup -->
+  <g>
+    <rect x="469" y="268" width="146" height="154" rx="12" ry="12" fill="#FFFFFF" stroke="#D0D5DD"/>
+    <text x="481" y="292" font-family="Inter, Pretendard, system-ui" font-size="12" font-weight="800" fill="#101828">JOB-2184</text>
+    <text x="481" y="312" font-family="Inter, Pretendard, system-ui" font-size="11" font-weight="800" fill="#3538CD">To Pickup</text>
+    <text x="481" y="332" font-family="Inter, Pretendard, system-ui" font-size="11" font-weight="600" fill="#475467">체크인 필요(지오펜스)</text>
+    <text x="481" y="350" font-family="Inter, Pretendard, system-ui" font-size="11" font-weight="600" fill="#475467">SLA: 18:05</text>
+    <text x="481" y="370" font-family="Inter, Pretendard, system-ui" font-size="11" font-weight="700" fill="#667085">다음: 도착/픽업</text>
+  </g>
+
+  <!-- In transit -->
+  <g>
+    <rect x="635" y="268" width="146" height="154" rx="12" ry="12" fill="#FFFFFF" stroke="#D0D5DD"/>
+    <text x="647" y="292" font-family="Inter, Pretendard, system-ui" font-size="12" font-weight="800" fill="#101828">JOB-2179</text>
+    <text x="647" y="312" font-family="Inter, Pretendard, system-ui" font-size="11" font-weight="800" fill="#3538CD">InTransit</text>
+    <text x="647" y="332" font-family="Inter, Pretendard, system-ui" font-size="11" font-weight="600" fill="#475467">Leg: 역→역(2호선)</text>
+    <text x="647" y="350" font-family="Inter, Pretendard, system-ui" font-size="11" font-weight="600" fill="#475467">ETA: 9분</text>
+    <text x="647" y="370" font-family="Inter, Pretendard, system-ui" font-size="11" font-weight="700" fill="#667085">다음: 인계 준비</text>
+  </g>
+
+  <!-- Handoff/Dropoff -->
+  <g>
+    <rect x="801" y="268" width="146" height="154" rx="12" ry="12" fill="#FFFFFF" stroke="#D0D5DD"/>
+    <text x="813" y="292" font-family="Inter, Pretendard, system-ui" font-size="12" font-weight="800" fill="#101828">JOB-2171</text>
+    <text x="813" y="312" font-family="Inter, Pretendard, system-ui" font-size="11" font-weight="800" fill="#3538CD">Dropoff</text>
+    <text x="813" y="332" font-family="Inter, Pretendard, system-ui" font-size="11" font-weight="600" fill="#475467">증빙: OTP 필수</text>
+    <text x="813" y="350" font-family="Inter, Pretendard, system-ui" font-size="11" font-weight="600" fill="#475467">수취인 연락 필요</text>
+    <text x="813" y="370" font-family="Inter, Pretendard, system-ui" font-size="11" font-weight="700" fill="#667085">다음: OTP/완료</text>
+  </g>
+
+  <!-- Done -->
+  <g>
+    <rect x="967" y="268" width="146" height="154" rx="12" ry="12" fill="#FFFFFF" stroke="#D0D5DD"/>
+    <text x="979" y="292" font-family="Inter, Pretendard, system-ui" font-size="12" font-weight="800" fill="#101828">JOB-2155</text>
+    <text x="979" y="312" font-family="Inter, Pretendard, system-ui" font-size="11" font-weight="800" fill="#027A48">Done</text>
+    <text x="979" y="332" font-family="Inter, Pretendard, system-ui" font-size="11" font-weight="600" fill="#475467">증빙: 사진 1장</text>
+    <text x="979" y="350" font-family="Inter, Pretendard, system-ui" font-size="11" font-weight="600" fill="#475467">완료: 18:32</text>
+    <text x="979" y="370" font-family="Inter, Pretendard, system-ui" font-size="11" font-weight="700" fill="#667085">다음: 없음</text>
+  </g>
+
+  <!-- Incidents -->
+  <g>
+    <rect x="1133" y="268" width="146" height="154" rx="12" ry="12" fill="#FFFFFF" stroke="#D0D5DD"/>
+    <text x="1145" y="292" font-family="Inter, Pretendard, system-ui" font-size="12" font-weight="800" fill="#101828">JOB-2168</text>
+    <text x="1145" y="312" font-family="Inter, Pretendard, system-ui" font-size="11" font-weight="800" fill="#B42318">Incident</text>
+    <text x="1145" y="332" font-family="Inter, Pretendard, system-ui" font-size="11" font-weight="600" fill="#475467">사유: 인계 실패</text>
+    <text x="1145" y="350" font-family="Inter, Pretendard, system-ui" font-size="11" font-weight="600" fill="#475467">조치: 운영 호출</text>
+    <text x="1145" y="370" font-family="Inter, Pretendard, system-ui" font-size="11" font-weight="700" fill="#667085">다음: 재배차</text>
+  </g>
+
+  <!-- Settlement -->
+  <g>
+    <rect x="1299" y="268" width="146" height="154" rx="12" ry="12" fill="#FFFFFF" stroke="#D0D5DD"/>
+    <text x="1311" y="292" font-family="Inter, Pretendard, system-ui" font-size="12" font-weight="800" fill="#101828">주간 정산</text>
+    <text x="1311" y="312" font-family="Inter, Pretendard, system-ui" font-size="11" font-weight="700" fill="#3538CD">4/15~4/21</text>
+    <text x="1311" y="332" font-family="Inter, Pretendard, system-ui" font-size="11" font-weight="600" fill="#475467">완료: 21건</text>
+    <text x="1311" y="350" font-family="Inter, Pretendard, system-ui" font-size="11" font-weight="600" fill="#475467">예상: 128,400</text>
+    <text x="1311" y="370" font-family="Inter, Pretendard, system-ui" font-size="11" font-weight="700" fill="#667085">다음: 상세보기</text>
+  </g>
+
+  <text x="112" y="1110" font-family="Inter, Pretendard, system-ui" font-size="12" font-weight="700" fill="#667085">
+    핵심: “다음 액션 1개” + “증빙 체크리스트” + “Leg(문→역/역→역/역→문)” 표시가 길러 UX의 중심
+  </text>
+</svg>
+

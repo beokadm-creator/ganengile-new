@@ -125,6 +125,27 @@ export const scheduledFareCacheSync = functions.pubsub
     }
   });
 
+import { lockerCleanupScheduler } from './scheduled/locker-cleanup-scheduler';
+
+/**
+ * Scheduled Function: Locker Cleanup Scheduler
+ * 매 시간 실행되어 만료된 사물함 예약(pending_allocation 등)을 정리합니다.
+ */
+export const scheduledLockerCleanup = functions.pubsub
+  .schedule('0 * * * *')
+  .timeZone('Asia/Seoul')
+  .onRun(async (_context) => {
+    console.warn('🕒 [Scheduled Locker Cleanup] Triggered at:', new Date().toISOString());
+    try {
+      const result = await lockerCleanupScheduler();
+      console.warn('✅ Locker cleanup completed:', result);
+      return null;
+    } catch (error) {
+      console.error('❌ Locker cleanup error:', error);
+      return null;
+    }
+  });
+
 export { triggerFareCacheSync } from './callables/fare-cache';
 
 export { requestPhoneOtp, confirmPhoneOtp } from './callables/otp';

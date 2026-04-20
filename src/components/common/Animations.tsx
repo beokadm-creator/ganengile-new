@@ -10,6 +10,7 @@ import {
   Animated,
   StyleProp,
   ViewStyle,
+  Platform,
 } from 'react-native';
 
 // ==================== Fade In Animation ====================
@@ -34,7 +35,7 @@ export function FadeIn({
       toValue: 1,
       duration,
       delay,
-      useNativeDriver: true,
+      useNativeDriver: Platform.OS !== 'web',
     }).start();
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -70,7 +71,7 @@ export function SlideUp({
       toValue: 0,
       duration,
       delay,
-      useNativeDriver: true,
+      useNativeDriver: Platform.OS !== 'web',
     }).start();
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -102,7 +103,7 @@ export function ScaleIn({
       toValue: 1,
       tension: 50,
       friction: 7,
-      useNativeDriver: true,
+      useNativeDriver: Platform.OS !== 'web',
     }).start();
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -147,7 +148,7 @@ export function StaggerChildren({
           Animated.timing(animations[index].opacity, {
             toValue: 1,
             duration: 300,
-            useNativeDriver: true,
+            useNativeDriver: Platform.OS !== 'web',
           })
         );
       }
@@ -157,7 +158,7 @@ export function StaggerChildren({
           Animated.timing(animations[index].translateY, {
             toValue: 0,
             duration: 300,
-            useNativeDriver: true,
+            useNativeDriver: Platform.OS !== 'web',
           })
         );
       }
@@ -209,12 +210,12 @@ export function Pulse({
         Animated.timing(pulseAnim, {
           toValue: scale,
           duration: duration / 2,
-          useNativeDriver: true,
+          useNativeDriver: Platform.OS !== 'web',
         }),
         Animated.timing(pulseAnim, {
           toValue: 1,
           duration: duration / 2,
-          useNativeDriver: true,
+          useNativeDriver: Platform.OS !== 'web',
         }),
       ])
     );
@@ -248,7 +249,7 @@ export function Shimmer({ width = '100%', height = 20, style }: ShimmerProps) {
       Animated.timing(shimmerAnim, {
         toValue: 1,
         duration: 1000,
-        useNativeDriver: true,
+        useNativeDriver: Platform.OS !== 'web',
       })
     ).start();
   // eslint-disable-next-line react-hooks/exhaustive-deps

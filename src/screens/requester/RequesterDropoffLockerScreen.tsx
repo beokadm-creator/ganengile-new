@@ -5,17 +5,21 @@ import {
   ScrollView,
   StyleSheet,
   Text,
+  TextInput,
   TouchableOpacity,
   View,
 } from 'react-native';
 import { RouteProp, useNavigation, useRoute } from '@react-navigation/native';
 import { requireUserId } from '../../services/firebase';
-import { getRequestById, updateRequestLockerId } from '../../services/request-service';
+import { getRequestById } from '../../services/request-service';
+import { markAsRequesterDroppedAtLocker } from '../../services/delivery-service';
 import {
   addReservationPhotos,
   createLockerReservation,
   getLocker,
   updateReservationStatus,
+  getReservationByRequestId,
+  assignLockerToReservation,
 } from '../../services/locker-service';
 import { takePhoto, uploadPhotoWithThumbnail } from '../../services/photo-service';
 import QRCodeService from '../../services/qrcode-service';
@@ -26,7 +30,7 @@ import { BorderRadius, Colors, Shadows, Spacing } from '../../theme';
 import { Typography } from '../../theme/typography';
 
 type DropoffRoute = RouteProp<MainStackParamList, 'RequesterDropoffLocker'>;
-type Step = 'loading' | 'select' | 'reserve' | 'photo' | 'complete';
+type Step = 'loading' | 'select' | 'reserve' | 'photo' | 'info' | 'complete';
 
 export default function RequesterDropoffLockerScreen() {
   const navigation = useNavigation<MainStackNavigationProp>();
@@ -38,6 +42,9 @@ export default function RequesterDropoffLockerScreen() {
   const [selectedLocker, setSelectedLocker] = useState<LockerSummary | null>(null);
   const [reservationId, setReservationId] = useState<string | null>(null);
   const [dropoffPhotoUrl, setDropoffPhotoUrl] = useState<string | null>(null);
+
+  const [lockerNumber, setLockerNumber] = useState('');
+  const [lockerPassword, setLockerPassword] = useState('');
 
   useEffect(() => {
     async function init() {
@@ -112,19 +119,27 @@ export default function RequesterDropoffLockerScreen() {
       setWorking(true);
       const userId = requireUserId();
       const qrCode = QRCodeService.generatePickupQRCode(requestId, userId);
-      const startTime = new Date();
-      const endTime = new Date(startTime.getTime() + 4 * 60 * 60 * 1000);
-
-      const reservation = await createLockerReservation(
-        selectedLocker.lockerId,
-        requestId,
-        '', // deliveryId is not needed or empty at this stage
-        userId,
-        'requester_dropoff',
-        startTime,
-        endTime,
-        qrCode
-      );
+      const reservations = await getReservationByRequestId(requestId);
+      const pendingAlloc = reservations.find(r => r.status === 'pending_allocation');
+      
+      let reservation;
+      if (pendingAlloc) {
+        await assignLockerToReservation(pendingAlloc.reservationId, selectedLocker.lockerId);
+        reservation = pendingAlloc;
+      } else {
+        const startTime = new Date();
+        const endTime = new Date(startTime.getTime() + 4 * 60 * 60 * 1000);
+        reservation = await createLockerReservation(
+          selectedLocker.lockerId,
+          requestId,
+          '', // deliveryId is not needed or empty at this stage
+          userId,
+          'requester_dropoff',
+          startTime,
+          endTime,
+          qrCode
+        );
+      }
 
       setReservationId(reservation.reservationId);
       // Automatically open the locker for the requester since they need to put it in
@@ -151,13 +166,25 @@ export default function RequesterDropoffLockerScreen() {
       const userId = requireUserId();
       const uploaded = await uploadPhotoWithThumbnail(photoUri, userId, 'locker-dropoff');
       setDropoffPhotoUrl(uploaded.url);
-      setStep('complete');
+      setStep('info');
     } catch (error) {
       console.error('Failed to take dropoff photo:', error);
       Alert.alert('보관 사진 촬영 실패', '잠시 후 다시 시도해 주세요.');
     } finally {
       setWorking(false);
     }
+  };
+
+  const handleCompleteInfo = () => {
+    if (!lockerNumber.trim()) {
+      Alert.alert('정보 부족', '사물함 번호를 입력해주세요.');
+      return;
+    }
+    if (!lockerPassword.trim()) {
+      Alert.alert('정보 부족', '사물함 비밀번호를 입력해주세요.');
+      return;
+    }
+    setStep('complete');
   };
 
   const handleComplete = async (): Promise<void> => {
@@ -172,13 +199,24 @@ export default function RequesterDropoffLockerScreen() {
         await addReservationPhotos(reservationId, undefined, dropoffPhotoUrl);
       }
 
-      // Mark the reservation as completed, but KEEP the locker OCCUPIED
-      // completeLockerReservation makes it AVAILABLE, so we shouldn't use it here!
-      // We only update the reservation status.
       await updateReservationStatus(reservationId, 'completed');
 
-      // Update the request with the specific lockerId (overwriting the AREA:: id if present)
-      await updateRequestLockerId(requestId, selectedLocker.lockerId);
+      const lockerCredentials = {
+        lockerNumber: lockerNumber.trim(),
+        password: lockerPassword.trim(),
+      };
+
+      const result = await markAsRequesterDroppedAtLocker(
+        requestId,
+        selectedLocker.lockerId,
+        reservationId,
+        lockerCredentials
+      );
+
+      if (!result.success) {
+        Alert.alert('보관 완료 실패', result.message);
+        return;
+      }
 
       Alert.alert('보관 완료', '물품이 사물함에 안전하게 보관되었습니다. 길러가 수거할 예정입니다.', [
         { text: '확인', onPress: () => navigation.goBack() },
@@ -223,6 +261,7 @@ export default function RequesterDropoffLockerScreen() {
         <View style={styles.summaryRow}>
           <SummaryChip label={step === 'reserve' ? '열기 필요' : '문 열림'} active={step === 'reserve'} />
           <SummaryChip label={step === 'photo' ? '사진 필요' : '사진 확인'} active={step === 'photo'} />
+          <SummaryChip label={step === 'info' ? '정보 입력' : '정보 확인'} active={step === 'info'} />
           <SummaryChip label={step === 'complete' ? '완료 처리' : '완료 대기'} active={step === 'complete'} />
         </View>
         <Text style={styles.summaryText}>순서대로 진행해 주세요.</Text>
@@ -244,6 +283,42 @@ export default function RequesterDropoffLockerScreen() {
         <TouchableOpacity style={styles.primaryButton} onPress={() => void handleTakePhoto()} disabled={working}>
           {working ? <ActivityIndicator size="small" color={Colors.white} /> : <Text style={styles.primaryButtonText}>물품을 넣고 사진 촬영</Text>}
         </TouchableOpacity>
+      ) : null}
+
+      {step === 'info' ? (
+        <View style={styles.card}>
+          <Text style={styles.sectionTitle}>보관함 인증 정보</Text>
+          <Text style={styles.bodyText}>길러가 물품을 수거할 때 필요한 정보를 정확히 입력해주세요.</Text>
+          
+          <View style={{ marginTop: 16, gap: 12 }}>
+            <View>
+              <Text style={styles.inputLabel}>사물함 번호</Text>
+              <TextInput
+                style={styles.input}
+                placeholder="예: A-12, 15번"
+                value={lockerNumber}
+                onChangeText={setLockerNumber}
+                placeholderTextColor={Colors.textSecondary}
+              />
+            </View>
+
+            <View>
+              <Text style={styles.inputLabel}>비밀번호 (PIN)</Text>
+              <TextInput
+                style={styles.input}
+                placeholder="예: 123456"
+                value={lockerPassword}
+                onChangeText={setLockerPassword}
+                keyboardType="number-pad"
+                placeholderTextColor={Colors.textSecondary}
+              />
+            </View>
+          </View>
+
+          <TouchableOpacity style={styles.primaryButton} onPress={handleCompleteInfo}>
+            <Text style={styles.primaryButtonText}>다음 단계</Text>
+          </TouchableOpacity>
+        </View>
       ) : null}
 
       {step === 'complete' ? (
@@ -279,6 +354,8 @@ const styles = StyleSheet.create({
   card: { backgroundColor: Colors.surface, borderRadius: BorderRadius.xl, padding: Spacing.xl, gap: Spacing.md, borderWidth: 1, borderColor: Colors.border },
   sectionTitle: { color: Colors.textPrimary, fontSize: Typography.fontSize.lg, fontWeight: Typography.fontWeight.extrabold, marginBottom: 4 },
   bodyText: { color: Colors.textSecondary, fontSize: Typography.fontSize.base, fontWeight: Typography.fontWeight.semibold },
+  inputLabel: { color: Colors.textPrimary, fontSize: Typography.fontSize.sm, fontWeight: Typography.fontWeight.bold, marginBottom: 8 },
+  input: { backgroundColor: Colors.background, borderRadius: BorderRadius.md, padding: Spacing.md, color: Colors.textPrimary, fontSize: Typography.fontSize.base, borderWidth: 1, borderColor: Colors.border },
   primaryButton: { minHeight: 52, borderRadius: BorderRadius.full, backgroundColor: Colors.primary, alignItems: 'center', justifyContent: 'center', marginTop: Spacing.sm },
   primaryButtonText: { color: Colors.white, fontSize: Typography.fontSize.lg, fontWeight: Typography.fontWeight.extrabold },
 });

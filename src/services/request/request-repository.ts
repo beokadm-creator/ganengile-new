@@ -28,6 +28,7 @@ import type {
   RequestPricingContext,
 } from '../../types/request';
 import { PackageSize, PackageWeight, RequestStatus } from '../../types/request';
+import { getReservationByRequestId, cancelLockerReservation } from '../locker-service';
 
 export type LegacyCreateFeeInfo = {
   totalFee?: number;
@@ -73,6 +74,10 @@ export type RequestDocShape = Partial<Request> & {
   pickupLocationDetail?: unknown;
   storageLocation?: unknown;
   lockerId?: unknown;
+  pickupLockerId?: unknown;
+  dropoffLockerId?: unknown;
+  pickupLockerCredentials?: unknown;
+  dropoffLockerCredentials?: unknown;
   specialInstructions?: unknown;
   missionProgress?: Request['missionProgress'];
   createdAt?: TimestampLike;
@@ -138,7 +143,11 @@ export function normalizeRequestDoc(requestId: string, raw: RequestDocShape): Re
     recipientPhone: readString(raw.recipientPhone),
     pickupLocationDetail: readString(raw.pickupLocationDetail),
     storageLocation: readString(raw.storageLocation),
-    lockerId: readString(raw.lockerId),
+    lockerId: readString(raw.pickupLockerId) ?? readString(raw.lockerId),
+    pickupLockerId: readString(raw.pickupLockerId),
+    dropoffLockerId: readString(raw.dropoffLockerId),
+    pickupLockerCredentials: raw.pickupLockerCredentials,
+    dropoffLockerCredentials: raw.dropoffLockerCredentials,
     specialInstructions: readString(raw.specialInstructions),
     selectedPhotoIds,
     packageInfo: { ...raw.packageInfo, imageUrl },
@@ -361,6 +370,18 @@ async function cancelRequestInternal(requestId: string, reason: string, cancelle
   if (request.status !== RequestStatus.PENDING && request.status !== RequestStatus.MATCHED) {
     throw new Error(`Cannot cancel request with status: ${request.status}`);
   }
+  
+  try {
+    const reservations = await getReservationByRequestId(requestId);
+    for (const res of reservations) {
+      if (res.status === 'pending' || res.status === 'pending_allocation' || res.status === 'active') {
+        await cancelLockerReservation(res.reservationId);
+      }
+    }
+  } catch (error) {
+    console.error('Failed to cancel locker reservations for request', error);
+  }
+
   return await updateRequestStatus(requestId, RequestStatus.CANCELLED, { cancellationReason: reason, cancelledBy });
 }
 

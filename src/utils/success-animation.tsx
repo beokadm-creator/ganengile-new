@@ -11,6 +11,7 @@ import {
   Animated,
   Dimensions,
   Easing,
+  Platform,
 } from 'react-native';
 import { Colors, Spacing, BorderRadius } from '../theme';
 import { Typography } from '../theme/typography';
@@ -54,7 +55,7 @@ export function SuccessAnimation({
         Animated.timing(fadeAnim, {
           toValue: 1,
           duration: 300,
-          useNativeDriver: true,
+          useNativeDriver: Platform.OS !== 'web',
         }),
         // Scale up and rotate
         Animated.parallel([
@@ -62,13 +63,13 @@ export function SuccessAnimation({
             toValue: 1,
             friction: 8,
             tension: 40,
-            useNativeDriver: true,
+            useNativeDriver: Platform.OS !== 'web',
           }),
           Animated.timing(rotateAnim, {
             toValue: 1,
             duration: 500,
             easing: Easing.out(Easing.cubic),
-            useNativeDriver: true,
+            useNativeDriver: Platform.OS !== 'web',
           }),
         ]),
         // Pulse effect
@@ -77,12 +78,12 @@ export function SuccessAnimation({
             Animated.timing(pulseAnim, {
               toValue: 1,
               duration: 1000,
-              useNativeDriver: true,
+              useNativeDriver: Platform.OS !== 'web',
             }),
             Animated.timing(pulseAnim, {
               toValue: 0,
               duration: 1000,
-              useNativeDriver: true,
+              useNativeDriver: Platform.OS !== 'web',
             }),
           ])
         ),
@@ -211,7 +212,7 @@ export function Confetti({
           toValue: 1,
           duration: randomDuration,
           delay: randomDelay,
-          useNativeDriver: true,
+          useNativeDriver: Platform.OS !== 'web',
         });
       });
 
@@ -392,19 +393,19 @@ export function SuccessOverlay({
           Animated.timing(fadeAnim, {
             toValue: 1,
             duration: 300,
-            useNativeDriver: true,
+            useNativeDriver: Platform.OS !== 'web',
           }),
           Animated.spring(scaleAnim, {
             toValue: 1,
             friction: 8,
-            useNativeDriver: true,
+            useNativeDriver: Platform.OS !== 'web',
           }),
         ]),
         Animated.delay(duration - 600),
         Animated.timing(fadeAnim, {
           toValue: 0,
           duration: 300,
-          useNativeDriver: true,
+          useNativeDriver: Platform.OS !== 'web',
         }),
       ]);
 

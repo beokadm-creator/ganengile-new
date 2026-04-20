@@ -82,6 +82,13 @@ export interface DetailedAddress {
   fullAddress: string;
 }
 
+export interface LockerCredentials {
+  lockerNumber?: string; // 보관함 번호 (예: A-12)
+  password?: string;     // 보관함 비밀번호
+  qrCodeUrl?: string;    // QR 코드 이미지 URL 또는 데이터
+  savedAt?: Date;        // 정보 저장 시간
+}
+
 /**
  * 배송 요청
  */
@@ -120,6 +127,8 @@ export interface Request {
   lockerId?: string;
   pickupLockerId?: string;
   dropoffLockerId?: string;
+  pickupLockerCredentials?: LockerCredentials;
+  dropoffLockerCredentials?: LockerCredentials;
   pickupStorageLocation?: string;
   dropoffStorageLocation?: string;
   pickupLockerFee?: number;
@@ -226,6 +235,13 @@ export interface CreateRequestData {
   deliveryAddress?: DetailedAddress;
   packageInfo: PackageInfo;
   initialNegotiationFee: number;
+  lockerId?: string;
+  pickupLockerId?: string;
+  dropoffLockerId?: string;
+  pickupStorageLocation?: string;
+  dropoffStorageLocation?: string;
+  pickupLockerFee?: number;
+  dropoffLockerFee?: number;
   feeBreakdown?: {
     baseFee: number;
     distanceFee: number;

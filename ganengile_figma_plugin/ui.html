@@ -1,0 +1,61 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Ganengile Mission Board Generator</title>
+    <style>
+      body {
+        font: 13px/1.4 Inter, system-ui, -apple-system, Segoe UI, Roboto, Arial,
+          sans-serif;
+        margin: 0;
+        padding: 16px;
+        color: #101828;
+      }
+      .muted {
+        color: #667085;
+        margin-top: 6px;
+      }
+      button {
+        appearance: none;
+        border: 0;
+        border-radius: 10px;
+        padding: 10px 12px;
+        background: #3538cd;
+        color: white;
+        font-weight: 700;
+        cursor: pointer;
+        width: 100%;
+      }
+      button:active {
+        transform: translateY(1px);
+      }
+      .warn {
+        margin-top: 10px;
+        padding: 10px 12px;
+        background: #fff6ed;
+        border: 1px solid #fecdca;
+        border-radius: 10px;
+        color: #7a2e0e;
+      }
+    </style>
+  </head>
+  <body>
+    <button id="generate">보드 자동 생성</button>
+    <div class="muted">
+      Mission Board 페이지와 4개 프레임(E2E/Customer/Giller/Ops)을 자동으로
+      만들어줍니다.
+    </div>
+    <div class="warn">
+      생성은 되돌리기(Undo) 가능해요. 이미 같은 이름의 페이지가 있으면 그 페이지에
+      추가됩니다.
+    </div>
+
+    <script>
+      document.getElementById("generate").onclick = () => {
+        parent.postMessage({ pluginMessage: { type: "generate" } }, "*");
+      };
+    </script>
+  </body>
+</html>
+
