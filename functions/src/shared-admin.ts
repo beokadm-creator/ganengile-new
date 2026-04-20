@@ -3,6 +3,10 @@ import * as functions from 'firebase-functions';
 import { defineString, defineSecret } from 'firebase-functions/params';
 import { createHash } from 'crypto';
 
+if (!admin.apps.length) {
+  admin.initializeApp();
+}
+
 export { admin };
 
 export const db = admin.firestore();

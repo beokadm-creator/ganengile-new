@@ -19,8 +19,10 @@ export { matchRequests, acceptMatch, rejectMatch, completeMatch } from './callab
 import { createMatchesForRequest } from './callables/matching';
 import { syncConfigStationsFromSeoulApi } from './station-sync';
 
-// Initialize Firebase Admin
-admin.initializeApp();
+// Initialize Firebase Admin (shared-admin.ts also guards this)
+if (!admin.apps.length) {
+  admin.initializeApp();
+}
 
 const db = admin.firestore();
 
