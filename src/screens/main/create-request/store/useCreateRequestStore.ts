@@ -186,7 +186,7 @@ const initialState = {
 export const useCreateRequestStore = create<CreateRequestState>((set) => ({
   ...initialState,activeStep: 1,
   setActiveStep: (step) => {
-    console.log('[useCreateRequestStore] setActiveStep called with:', step);
+  
     if (Platform.OS !== 'web') {
       LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
     }
@@ -299,8 +299,8 @@ export const useCreateRequestStore = create<CreateRequestState>((set) => ({
       recipientPhone: draft.recipientPhone,
       pickupLocationDetail: draft.pickupLocationDetail,
       storageLocation: draft.storageLocation,
-      lockerId: (draft as any).lockerId ?? null,
-      actualLockerFee: (draft as any).actualLockerFee ?? null,
+      lockerId: (draft as unknown as Record<string, unknown>).lockerId as string | null ?? null,
+      actualLockerFee: (draft as unknown as Record<string, unknown>).actualLockerFee as number | null ?? null,
       specialInstructions: draft.specialInstructions,
       directMode: draft.directMode,
       urgency: draft.urgency,

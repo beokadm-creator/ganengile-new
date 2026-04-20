@@ -28,7 +28,7 @@ export async function fetchKricTransferInfo(stationId: string): Promise<KricTran
   }
 
   try {
-    const stationConfig = await getStationConfig(stationId) as any;
+    const stationConfig = await getStationConfig(stationId);
     const lineCode = stationConfig?.kric?.lineCode ?? stationConfig?.lines?.[0]?.lineCode ?? '';
     const stationCode = stationConfig?.kric?.stationCode ?? stationId;
     const railCode = stationConfig?.kric?.railOprIsttCd ?? KRIC_RAIL_OPR_ISTT_CD;

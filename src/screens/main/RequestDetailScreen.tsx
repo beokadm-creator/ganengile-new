@@ -606,7 +606,7 @@ export default function RequestDetailScreen() {
       RequestStatus.COMPLETED,
     ].includes(request.status);
   
-  const directParticipationMode = (request as any).directParticipationMode;
+  const directParticipationMode = (request as unknown as Record<string, unknown>).directParticipationMode;
 
   const canRequesterDropoffAtLocker =
     directParticipationMode === 'locker_assisted' &&

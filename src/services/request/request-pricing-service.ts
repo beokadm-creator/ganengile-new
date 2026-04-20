@@ -318,19 +318,20 @@ export async function getRoutePriceInsight(params: {
 
     const fees = snapshot.docs
       .map((docSnapshot) => {
-        const data = docSnapshot.data() as any;
+        const data = docSnapshot.data() as Record<string, unknown>;
+        const pricingCtx = data.pricingContext as Record<string, unknown> | undefined;
         const feeCandidate = typeof data.finalFee === 'number' ? data.finalFee : data.totalFee;
         if (typeof feeCandidate !== 'number' || feeCandidate <= 0) return null;
 
         return {
           fee: feeCandidate,
           dynamicAdjustment: typeof data.dynamicAdjustment === 'number' ? data.dynamicAdjustment : 0,
-          isPeakTime: Boolean(data.pricingContext?.isPeakTime),
-          requestMode: data.pricingContext?.requestMode === 'reservation' ? 'reservation' : 'immediate',
+          isPeakTime: Boolean(pricingCtx?.isPeakTime),
+          requestMode: pricingCtx?.requestMode === 'reservation' ? 'reservation' : 'immediate',
           policyVersion: typeof data.policyVersion === 'string' ? data.policyVersion : null,
         };
       })
-      .filter((item): item is any => item !== null);
+      .filter((item): item is NonNullable<typeof item> => item !== null);
 
     if (fees.length === 0) return null;
 

@@ -60,7 +60,7 @@ export async function autoIssueCouponsByTrigger(
     });
 
     await Promise.all(issuePromises);
-    console.log(`[coupon-service] Successfully issued '${triggerEvent}' coupons to user: ${userId}`);
+    console.info(`[coupon-service] Successfully issued '${triggerEvent}' coupons to user: ${userId}`);
   } catch (error) {
     console.error(`[coupon-service] Error issuing '${triggerEvent}' coupons:`, error);
   }

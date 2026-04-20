@@ -22,6 +22,7 @@ import type {
 } from '../types/point';
 import { PointCategory, WITHDRAW_MIN_AMOUNT } from '../types/point';
 import { getWithdrawalEligibility, getWalletLedger } from './beta1-wallet-service';
+import type { WalletBalances } from '../types/beta1-wallet';
 import { getBankIntegrationConfig } from './integration-config-service';
 import { createProtectedBankAccount } from '../../shared/bank-account';
 import { allocateWalletSpend, getWalletSummary } from '../utils/wallet-balance';
@@ -123,7 +124,7 @@ export class PointService {
         pendingWithdrawalBalance: Number(rawBalances.pendingWithdrawalBalance ?? 0),
       };
 
-      const oldSummary = getWalletSummary(currentBalances as any);
+      const oldSummary = getWalletSummary(currentBalances as WalletBalances);
 
       // Decide funding source based on category
       let fundingSource: 'charge' | 'earned' | 'promo' = 'earned';
@@ -138,7 +139,7 @@ export class PointService {
         newBalances.earnedBalance += amount;
       }
 
-      const newSummary = getWalletSummary(newBalances as any);
+      const newSummary = getWalletSummary(newBalances as WalletBalances);
 
       const transactionRef = doc(collection(db, TRANSACTIONS_COLLECTION));
       const transactionData = createTransactionRecord({
@@ -231,14 +232,14 @@ export class PointService {
         pendingWithdrawalBalance: Number(rawBalances.pendingWithdrawalBalance ?? 0),
       };
 
-      const oldSummary = getWalletSummary(currentBalances as any);
+      const oldSummary = getWalletSummary(currentBalances as WalletBalances);
 
       if (oldSummary.totalUsableBalance < amount) {
         throw new Error(`Insufficient points. Usable: ${oldSummary.totalUsableBalance}, Required: ${amount}`);
       }
 
       // Advanced: Allocate spend across charge -> earned -> promo
-      const breakdown = allocateWalletSpend(currentBalances as any, amount);
+      const breakdown = allocateWalletSpend(currentBalances as WalletBalances, amount);
 
       const newBalances = {
         ...currentBalances,
@@ -247,7 +248,7 @@ export class PointService {
         promoBalance: breakdown.remainingPromoBalance,
       };
 
-      const newSummary = getWalletSummary(newBalances as any);
+      const newSummary = getWalletSummary(newBalances as WalletBalances);
 
       const transactionRef = doc(collection(db, TRANSACTIONS_COLLECTION));
       const transactionData = createTransactionRecord({
@@ -502,7 +503,7 @@ export class PointService {
         pendingWithdrawalBalance: Number(rawBalances.pendingWithdrawalBalance ?? 0),
       };
 
-      const oldSummary = getWalletSummary(currentBalances as any);
+      const oldSummary = getWalletSummary(currentBalances as WalletBalances);
 
       // Security Fix: Withdrawals MUST ONLY come from withdrawableBalance (which is purely earnedBalance minus locks)
       if (oldSummary.withdrawableBalance < data.amount) {
@@ -516,7 +517,7 @@ export class PointService {
         pendingWithdrawalBalance: currentBalances.pendingWithdrawalBalance + data.amount,
       };
 
-      const newSummary = getWalletSummary(newBalances as any);
+      const newSummary = getWalletSummary(newBalances as WalletBalances);
       const now = Timestamp.now();
 
       // 1. 포인트 차감 내역 생성 (Legacy)

@@ -3,7 +3,7 @@
  * 웹에서는 Emoji, 네이티브에서는 Vector Icons 사용
  */
 
-import React from 'react';
+import React, { ComponentProps } from 'react';
 import { Platform } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 
@@ -57,7 +57,7 @@ export function Icon({ name, size = 24, color = '#000', style }: IconProps) {
   }
 
   // 네이티브에서는 MaterialIcons 기본 (Ionicons 필요 시 별도 처리)
-  return <MaterialIcons name={name as any} size={size} color={color} style={style} />;
+  return <MaterialIcons name={name as ComponentProps<typeof MaterialIcons>['name']} size={size} color={color} style={style} />;
 }
 
 /**

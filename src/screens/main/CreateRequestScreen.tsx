@@ -544,7 +544,7 @@ export default function CreateRequestScreen({ navigation, route }: Props) {
   useEffect(() => {
     const unsubscribe = navigation.addListener('beforeRemove', (e) => {
       // 1단계보다 더 진행된 상태라면 화면이 닫히는 것을 막고 이전 단계로 이동
-      const actionType = (e as any)?.data?.action?.type as string | undefined;
+      const actionType = (e as unknown as { data?: { action?: { type?: string } } })?.data?.action?.type;
       const isBackAction = actionType === 'GO_BACK' || actionType === 'POP' || actionType === 'POP_TO_TOP';
 
       if (activeStep > 1 && isBackAction) {
@@ -704,7 +704,7 @@ export default function CreateRequestScreen({ navigation, route }: Props) {
           { text: '취소', style: 'cancel' },
           { 
             text: '입력하러 가기', 
-            onPress: () => (navigation as any).navigate('Onboarding') 
+            onPress: () => (navigation as unknown as { navigate: (screen: string) => void }).navigate('Onboarding') 
           },
         ]
       );

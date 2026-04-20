@@ -260,7 +260,7 @@ export function Shimmer({ width = '100%', height = 20, style }: ShimmerProps) {
   });
 
   const containerStyle: ViewStyle = {
-    width: width as any,
+    width: width as unknown as ViewStyle['width'],
     height,
   };
 

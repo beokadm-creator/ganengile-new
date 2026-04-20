@@ -175,13 +175,13 @@ export default function GillerRequestsScreen() {
 
   const immediateMissionGroups = useMemo(() => {
     return allGroups.filter(
-      (group) => group.selectionState === 'available' && isImmediateMission(group.options[0] ?? ({} as any))
+      (group) => group.selectionState === 'available' && isImmediateMission(group.options[0] ?? ({} as Partial<MissionCard>))
     );
   }, [allGroups]);
 
   const suggestedMissionGroups = useMemo(() => {
     return allGroups.filter(
-      (group) => group.selectionState === 'available' && !isImmediateMission(group.options[0] ?? ({} as any))
+      (group) => group.selectionState === 'available' && !isImmediateMission(group.options[0] ?? ({} as Partial<MissionCard>))
     );
   }, [allGroups]);
   const featuredMissionGroup = immediateMissionGroups[0] ?? null;

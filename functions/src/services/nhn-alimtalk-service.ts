@@ -96,7 +96,7 @@ export class NHNAlimtalkService {
       });
 
       if (response.data.header.isSuccessful) {
-        console.log(`[NHN Alimtalk] 발송 성공: ${params.recipientNo}`);
+        console.info(`[NHN Alimtalk] 발송 성공: ${params.recipientNo}`);
         return true;
       } else {
         console.error(`[NHN Alimtalk] 발송 실패:`, response.data.header);

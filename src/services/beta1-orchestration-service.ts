@@ -84,10 +84,10 @@ function cleanForFirestore<T>(value: T): T {
   if (Array.isArray(value)) {
     return value.map(cleanForFirestore) as unknown as T;
   }
-  if (value.constructor.name === 'Timestamp' || value.constructor.name === 'FieldValue' || (value as any)._methodName) {
+  if (value.constructor.name === 'Timestamp' || value.constructor.name === 'FieldValue' || (value as Record<string, unknown>)?._methodName) {
     return value;
   }
-  const cleanObj: any = {};
+  const cleanObj: Record<string, unknown> = {};
   for (const [k, v] of Object.entries(value)) {
     if (v !== undefined) {
       cleanObj[k] = cleanForFirestore(v);

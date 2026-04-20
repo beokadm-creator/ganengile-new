@@ -135,3 +135,8 @@ warning:     #D97706  (경고, 화면당 최대 1곳)
 - 2026-04-03: `[STATIC]`와 `[DYNAMIC]`를 분리하고 shared include 3개를 참조하도록 정리.
 - 2026-04-13: 실제 저장소에 존재하는 문서 기준으로 Read Order/Source Of Truth 링크를 갱신.
 - 2026-04-03: 압축 후에도 유지할 핵심 5개 규칙을 `Essential (Post-Compact)`에 고정.
+## Git Workflow
+- 새 작업 시작: main에서 branch 분기
+- 작업 완료: main에 merge
+- 배포: main에서만
+- 다른 PC에서 작업 시: branch 작업 + push, 스테이징/머지/배포는 메인 PC에서

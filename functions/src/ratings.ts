@@ -68,7 +68,7 @@ export const onRatingCreated = functions.firestore
         ratingUpdatedAt: admin.firestore.FieldValue.serverTimestamp(),
       });
 
-      console.log(`✅ User ${toUserId} rating updated to ${averageRating} (${totalCount} ratings)`);
+      console.info(`✅ User ${toUserId} rating updated to ${averageRating} (${totalCount} ratings)`);
 
     } catch (error) {
       console.error(`❌ Error updating rating for user ${toUserId}:`, error);

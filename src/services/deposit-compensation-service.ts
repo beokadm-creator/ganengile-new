@@ -67,9 +67,9 @@ export class DepositCompensationService {
       }
 
       // 만약 보증금에 쿠폰이 사용된 내역이 있다면 쿠폰 복구 (현재 보증금에 쿠폰이 적용되지 않으나 방어 로직)
-      if ((deposit as any).usedCouponId) {
+      if (deposit.couponId) {
         try {
-          await restoreCoupon((deposit as any).usedCouponId);
+          await restoreCoupon(deposit.couponId);
         } catch (couponError) {
           console.error('Failed to restore coupon on deposit refund:', couponError);
         }

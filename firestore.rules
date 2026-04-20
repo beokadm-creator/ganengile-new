@@ -100,9 +100,21 @@ service cloud.firestore {
     // ==================== Integration Config (비민감 설정만 — testMode 등) ====================
     // API 키는 admin_settings에만 보관. 앱은 여기서 testMode만 읽음.
 
+    // 통합 설정 — 민감 필드(secretKey 등)는 allow read 시 노출되지 않도록
+    // 클라우드 함수(Admin SDK)로만 접근 가능하도록 write 금지
+    // NOTE: Firestore 규칙은 필드 레벨 읽기 제한을 지원하지 않으므로,
+    // secretKey 등 민감 값은 admin_settings 등 별도 보호 컬렉션에만 저장해야 함.
     match /config_integrations/{docId} {
       allow read: if isAuthenticated();
-      allow write: if false; // Admin SDK로만 쓰기
+      allow write: if false;
+    }
+
+    // ==================== Admin Settings (Sensitive — Server Only) ====================
+
+    match /admin_settings/{docId} {
+      // API 키, 시크릿 키 등 민감 설정. Admin SDK(Cloud Functions)로만 접근.
+      allow read: if false;
+      allow write: if false;
     }
 
     match /config_operational/{docId} {

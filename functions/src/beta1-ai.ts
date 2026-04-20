@@ -321,7 +321,7 @@ async function getAIConfig(db: FirestoreDb): Promise<Beta1AIConfig> {
 async function runZaiChatCompletion(config: Beta1AIConfig, model: string, prompt: string, maxTokens: number): Promise<ZaiChatResult> {
   async function perform(resolvedBaseUrl: string): Promise<{ result: ZaiChatResult; json?: Record<string, unknown> }> {
   const startedAt = Date.now();
-  const fetchFn = (globalThis as { fetch?: (input: string, init?: Record<string, unknown>) => Promise<{
+  const fetchFn = (globalThis as { fetch?: (input: string, init?: Record<string, unknown> & { signal?: AbortSignal }) => Promise<{
     ok: boolean;
     json(): Promise<unknown>;
   }> }).fetch;
@@ -363,7 +363,7 @@ async function runZaiChatCompletion(config: Beta1AIConfig, model: string, prompt
         'Content-Type': 'application/json',
       },
       body: JSON.stringify(requestBody),
-      signal: controller.signal as any,
+      signal: controller.signal,
     });
     
     clearTimeout(timeoutId);

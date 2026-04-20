@@ -3,7 +3,7 @@
  * 임시 메시지 표시 (성공, 에러, info)
  */
 
-import React, { useEffect, useState } from 'react';
+import React, { ComponentProps, useEffect, useState } from 'react';
 import {
   Text,
   StyleSheet,
@@ -104,7 +104,7 @@ export default function Toast({
       ]}
     >
       <Ionicons
-        name={getIconName() as any}
+        name={getIconName() as ComponentProps<typeof Ionicons>['name']}
         size={24}
         color={Colors.white}
         style={styles.icon}

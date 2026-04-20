@@ -178,7 +178,7 @@ export const useImagePreload = (imageUrls: string[]) => {
     const preloadImages = async () => {
       try {
         await Promise.all(
-           imageUrls.map(url => (Image as any).prefetch?.(url))
+           imageUrls.map(url => (Image as unknown as { prefetch?: (url: string) => Promise<void> }).prefetch?.(url))
          );
          // Images preloaded
        } catch (error) {
@@ -207,8 +207,9 @@ export const useMemoryMonitor = (intervalMs: number = 10000) => {
     if (typeof performance === 'undefined') return;
 
     const intervalId = setInterval(() => {
-      if ((performance as any).memory) {
-        const { usedJSHeapSize, totalJSHeapSize, jsHeapSizeLimit } = (performance as any).memory;
+      const perfMemory = (performance as unknown as { memory?: { usedJSHeapSize: number; totalJSHeapSize: number; jsHeapSizeLimit: number } }).memory;
+      if (perfMemory) {
+        const { usedJSHeapSize, totalJSHeapSize, jsHeapSizeLimit } = perfMemory;
 
         const _usedMB = (usedJSHeapSize / 1024 / 1024).toFixed(2);
         const _totalMB = (totalJSHeapSize / 1024 / 1024).toFixed(2);

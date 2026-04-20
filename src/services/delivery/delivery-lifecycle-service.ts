@@ -447,8 +447,8 @@ export const deliveryLifecycleService = {
         pickupStation: request.pickupStation,
         deliveryStation: request.deliveryStation,
         deliveryType: request.deliveryType ?? 'standard',
-        lockerId: (request as any).lockerId || undefined,
-        reservationId: (request as any).reservationId || undefined,
+        lockerId: (request as Record<string, unknown>).lockerId as string | undefined || undefined,
+        reservationId: (request as Record<string, unknown>).reservationId as string | undefined || undefined,
         packageInfo: request.packageInfo,
         fee: confirmedFee,
         pricingPolicyVersion: request.pricingPolicyVersion ?? null,
@@ -506,7 +506,7 @@ export const deliveryLifecycleService = {
         // AI 동기화 및 오케스트레이션 로직은 Cloud Functions 등 별도의 백엔드 이벤트 트리거로 분리하여
         // 클라이언트 서비스 간의 직접적인 순환 참조를 제거합니다.
         // 현재는 수락 성공 이벤트 로그만 남깁니다.
-        console.log(`Delivery ${deliveryRef.id} accepted by giller ${gillerId}. AI sync should be handled via backend triggers.`);
+        console.info(`Delivery ${deliveryRef.id} accepted by giller ${gillerId}. AI sync should be handled via backend triggers.`);
       } catch (syncError) {
         console.error(`AI sync failed for delivery ${deliveryRef.id}. Rolling back acceptance:`, syncError);
         

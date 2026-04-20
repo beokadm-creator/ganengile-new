@@ -36,6 +36,9 @@ export interface BankIntegrationConfig {
 }
 
 export interface PaymentIntegrationConfig {
+  /** ⚠️ secretKey는 절대 이 인터페이스에 추가하지 마세요.
+   *  Toss Payments 시크릿 키는 Cloud Functions(서버)에서만 사용해야 합니다.
+   *  클라이언트에 노출되면 심각한 보안 사고입니다. */
   enabled: boolean;
   testMode: boolean;
   allowTestBypass: boolean;

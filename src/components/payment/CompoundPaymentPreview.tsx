@@ -177,7 +177,7 @@ export function CompoundPaymentPreview({
                     ? `${item.discountValue.toLocaleString()}원`
                     : `${item.discountValue}%`;
                   const expiryText = item.expiresAt 
-                    ? (typeof (item.expiresAt as any).toDate === 'function' ? (item.expiresAt as any).toDate().toLocaleDateString() : new Date(item.expiresAt as any).toLocaleDateString())
+                    ? (typeof (item.expiresAt as { toDate?: unknown }).toDate === 'function' ? (item.expiresAt as { toDate: () => Date }).toDate().toLocaleDateString() : new Date(item.expiresAt as unknown as number | string).toLocaleDateString())
                     : '';
                   return (
                     <TouchableOpacity

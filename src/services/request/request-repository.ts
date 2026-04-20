@@ -109,9 +109,10 @@ function readString(value: unknown): string | undefined {
 
 function readDetailedAddress(value: unknown): Request['pickupAddress'] | undefined {
   if (typeof value !== 'object' || value == null) return undefined;
-  const roadAddress = readString((value as any).roadAddress);
-  const detailAddress = readString((value as any).detailAddress) ?? '';
-  const fullAddress = readString((value as any).fullAddress);
+  const source = value as Record<string, unknown>;
+  const roadAddress = readString(source.roadAddress);
+  const detailAddress = readString(source.detailAddress) ?? '';
+  const fullAddress = readString(source.fullAddress);
   if (!roadAddress) return undefined;
   return { roadAddress, detailAddress, fullAddress: fullAddress ?? [roadAddress, detailAddress].filter(Boolean).join(' ') };
 }
@@ -187,7 +188,7 @@ export async function createRequest(
         departureTime: preferredTime ? preferredTime.toTimeString().slice(0, 5) : '09:00',
         arrivalTime: deadline ? deadline.toTimeString().slice(0, 5) : undefined,
       },
-      deadline: deadline ?? new Date(Date.now() + 86400000), urgency: (urgency as any) ?? 'medium',
+      deadline: deadline ?? new Date(Date.now() + 86400000), urgency: (urgency === 'low' || urgency === 'medium' || urgency === 'high') ? urgency : 'medium',
     };
     return await createRequest(requestData);
   } else {
@@ -315,7 +316,7 @@ export async function getPendingRequests(options?: RequestFilterOptions): Promis
 async function updateRequestInternal(requestId: string, updateData: UpdateRequestData): Promise<Request> {
   try {
     const dataToUpdate = { ...updateData, updatedAt: serverTimestamp() };
-    await updateDoc(doc(db, 'requests', requestId), dataToUpdate as any);
+    await updateDoc(doc(db, 'requests', requestId), dataToUpdate as Record<string, unknown>);
     const updated = await getRequestById(requestId);
     if (!updated) throw new Error('Failed to fetch updated request');
     return updated;
@@ -424,7 +425,8 @@ export async function getUserRequests(userId: string): Promise<Request[]> {
 }
 
 function isRequestOwnedByUser(request: Request, userId: string): boolean {
-  return request.requesterId === userId || (request as any).requesterUserId === userId || (request as any).gllerId === userId;
+  const extra = request as unknown as Record<string, unknown>;
+  return request.requesterId === userId || extra.requesterUserId === userId || extra.gllerId === userId;
 }
 
 export async function updateRequest(requestId: string, userId: string, updateData: Partial<UpdateRequestData>): Promise<Request | null>;

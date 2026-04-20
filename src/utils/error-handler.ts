@@ -6,6 +6,41 @@
 import { Alert, Platform } from 'react-native';
 import * as Linking from 'expo-linking';
 
+function isError(value: unknown): value is Error {
+  return value instanceof Error;
+}
+
+function isErrorLike(value: unknown): value is { message?: string; code?: string; stack?: string } {
+  return typeof value === 'object' && value !== null;
+}
+
+function getErrorMessage(error: unknown): string {
+  if (isError(error)) {
+    return error.message;
+  }
+  if (isErrorLike(error) && error.message) {
+    return error.message;
+  }
+  return String(error);
+}
+
+function getErrorCode(error: unknown): string | undefined {
+  if (isErrorLike(error) && error.code) {
+    return String(error.code);
+  }
+  return undefined;
+}
+
+function getErrorStack(error: unknown): string | undefined {
+  if (isError(error)) {
+    return error.stack;
+  }
+  if (isErrorLike(error) && error.stack) {
+    return String(error.stack);
+  }
+  return undefined;
+}
+
 export enum ErrorCode {
   NETWORK_ERROR = 'NETWORK_ERROR',
   TIMEOUT_ERROR = 'TIMEOUT_ERROR',
@@ -44,7 +79,7 @@ export interface AppError {
 /**
  * Get user-friendly message from error
  */
-export function getUserFriendlyMessage(error: any): string {
+export function getUserFriendlyMessage(error: unknown): string {
   const parsedError = parseError(error);
   return parsedError.userMessage;
 }
@@ -81,12 +116,15 @@ export function createPermissionError(message: string = 'Permission denied'): Ap
 /**
  * Parse error and convert to user-friendly message
  */
-export function parseError(error: any): AppError {
+export function parseError(error: unknown): AppError {
+  const errorMessage = getErrorMessage(error);
+  const errorCode = getErrorCode(error);
+
   // Network errors
-  if (error.message?.includes('Network request failed')) {
+  if (errorMessage.includes('Network request failed')) {
     return {
       code: ErrorCode.NETWORK_ERROR,
-      message: error.message,
+      message: errorMessage,
       userMessage: '네트워크 연결을 확인해주세요.',
       actionable: true,
       category: ErrorCategory.NETWORK,
@@ -95,10 +133,10 @@ export function parseError(error: any): AppError {
   }
 
   // Timeout errors
-  if (error.message?.includes('timeout') ?? error.message?.includes('timed out')) {
+  if (errorMessage.includes('timeout') || errorMessage.includes('timed out')) {
     return {
       code: ErrorCode.TIMEOUT_ERROR,
-      message: error.message,
+      message: errorMessage,
       userMessage: '요청 시간이 초과되었습니다. 다시 시도해주세요.',
       actionable: true,
       category: ErrorCategory.TIMEOUT,
@@ -107,20 +145,20 @@ export function parseError(error: any): AppError {
   }
 
   // Firebase errors
-  if (error.code?.startsWith('auth/')) {
+  if (errorCode?.startsWith('auth/')) {
     return {
       code: ErrorCode.FIREBASE_ERROR,
-      message: error.message,
-      userMessage: getFirebaseAuthErrorMessage(error.code),
+      message: errorMessage,
+      userMessage: getFirebaseAuthErrorMessage(errorCode),
       category: ErrorCategory.FIREBASE,
       severity: ErrorSeverity.HIGH,
     };
   }
 
-  if (error.code?.startsWith('firestore/')) {
+  if (errorCode?.startsWith('firestore/')) {
     return {
       code: ErrorCode.FIREBASE_ERROR,
-      message: error.message,
+      message: errorMessage,
       userMessage: '데이터 저장에 실패했습니다. 다시 시도해주세요.',
       actionable: true,
       category: ErrorCategory.FIREBASE,
@@ -129,10 +167,10 @@ export function parseError(error: any): AppError {
   }
 
   // Permission errors
-  if (error.message?.includes('permission') ?? error.message?.includes('Permission')) {
+  if (errorMessage.includes('permission') || errorMessage.includes('Permission')) {
     return {
       code: ErrorCode.PERMISSION_DENIED,
-      message: error.message,
+      message: errorMessage,
       userMessage: '필요한 권한이 거부되었습니다.',
       actionable: true,
       action: () => openAppSettings(),
@@ -144,7 +182,7 @@ export function parseError(error: any): AppError {
   // Default error
   return {
     code: ErrorCode.UNKNOWN_ERROR,
-    message: error.message ?? 'Unknown error',
+    message: errorMessage,
     userMessage: '오류가 발생했습니다. 다시 시도해주세요.',
     actionable: true,
     category: ErrorCategory.UNKNOWN,
@@ -179,7 +217,7 @@ function getFirebaseAuthErrorMessage(code: string): string {
 /**
  * Show error alert with user-friendly message
  */
-export function showErrorAlert(error: any, title: string = '오류', onRetry?: () => void): void {
+export function showErrorAlert(error: unknown, title: string = '오류', onRetry?: () => void): void {
   const parsedError = parseError(error);
 
   if (parsedError.actionable ?? onRetry) {
@@ -206,7 +244,7 @@ export function showErrorAlert(error: any, title: string = '오류', onRetry?: (
  * Show error alert with custom actions
  */
 export function showErrorAlertWithActions(
-  error: any,
+  error: unknown,
   title: string,
   actions: Array<{ text: string; onPress?: () => void; style?: 'default' | 'cancel' | 'destructive' }>
 ): void {
@@ -254,7 +292,7 @@ export function showPermissionDeniedAlert(permission: string): void {
 /**
  * Log error for debugging
  */
-export function logError(error: any, context?: string): void {
+export function logError(error: unknown, context?: string): void {
   const parsedError = parseError(error);
 
   console.group('❌ Error');
@@ -262,7 +300,7 @@ export function logError(error: any, context?: string): void {
   console.error('Code:', parsedError.code);
   console.error('Message:', parsedError.message);
   console.error('User Message:', parsedError.userMessage);
-  console.error('Stack:', error.stack);
+  console.error('Stack:', getErrorStack(error));
   console.groupEnd();
 }
 
@@ -295,11 +333,11 @@ export function withErrorHandling<T extends (...args: any[]) => Promise<any>>(
 /**
  * Check if error is a network error
  */
-export function isNetworkError(error: any): boolean {
+export function isNetworkError(error: unknown): boolean {
   if (!error) return false;
 
-  const errorMessage = error.message?.toLowerCase() ?? '';
-  const errorCode = error.code?.toLowerCase() ?? '';
+  const errorMessage = getErrorMessage(error).toLowerCase();
+  const errorCode = getErrorCode(error)?.toLowerCase() ?? '';
 
   return (
     errorMessage.includes('network') ||
@@ -313,11 +351,11 @@ export function isNetworkError(error: any): boolean {
 /**
  * Check if error is a timeout error
  */
-export function isTimeoutError(error: any): boolean {
+export function isTimeoutError(error: unknown): boolean {
   if (!error) return false;
 
-  const errorMessage = error.message?.toLowerCase() ?? '';
-  const errorCode = error.code?.toLowerCase() ?? '';
+  const errorMessage = getErrorMessage(error).toLowerCase();
+  const errorCode = getErrorCode(error)?.toLowerCase() ?? '';
 
   return (
     errorMessage.includes('timeout') ||
@@ -330,11 +368,11 @@ export function isTimeoutError(error: any): boolean {
 /**
  * Check if error is a permission error
  */
-export function isPermissionError(error: any): boolean {
+export function isPermissionError(error: unknown): boolean {
   if (!error) return false;
 
-  const errorMessage = error.message?.toLowerCase() ?? '';
-  const errorCode = error.code?.toLowerCase() ?? '';
+  const errorMessage = getErrorMessage(error).toLowerCase();
+  const errorCode = getErrorCode(error)?.toLowerCase() ?? '';
 
   return (
     errorMessage.includes('permission') ||
@@ -346,10 +384,10 @@ export function isPermissionError(error: any): boolean {
 /**
  * Check if error is a Firebase error
  */
-export function isFirebaseError(error: any): boolean {
+export function isFirebaseError(error: unknown): boolean {
   if (!error) return false;
 
-  const errorCode = error.code?.toLowerCase() ?? '';
+  const errorCode = getErrorCode(error)?.toLowerCase() ?? '';
 
   return (
     errorCode.startsWith('auth/') ||
@@ -361,7 +399,7 @@ export function isFirebaseError(error: any): boolean {
 /**
  * Categorize error
  */
-export function categorizeError(error: any): ErrorCategory {
+export function categorizeError(error: unknown): ErrorCategory {
   const parsed = parseError(error);
   return parsed.category ?? ErrorCategory.UNKNOWN;
 }
@@ -369,7 +407,7 @@ export function categorizeError(error: any): ErrorCategory {
 /**
  * Assess error severity
  */
-export function assessSeverity(error: any): ErrorSeverity {
+export function assessSeverity(error: unknown): ErrorSeverity {
   const parsed = parseError(error);
   return parsed.severity ?? ErrorSeverity.MEDIUM;
 }

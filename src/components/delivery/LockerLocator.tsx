@@ -62,12 +62,12 @@ function formatDistance(distanceMeters: number | null): string {
 
 function getStationLat(station: Station | null): number | undefined {
   if (!station?.location) return undefined;
-  return station.location.latitude ?? (station.location as any).lat;
+  return station.location.latitude ?? (station.location as unknown as Record<string, unknown>).lat as number | undefined;
 }
 
 function getStationLng(station: Station | null): number | undefined {
   if (!station?.location) return undefined;
-  return station.location.longitude ?? (station.location as any).lng;
+  return station.location.longitude ?? (station.location as unknown as Record<string, unknown>).lng as number | undefined;
 }
 
 function buildRow(
