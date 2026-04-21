@@ -38,6 +38,7 @@ export interface LockerLocatorProps {
   onClose: () => void;
   mode?: 'grouped' | 'specific';
   initialTargetStationType?: 'pickup' | 'delivery';
+  hideHeader?: boolean;
 }
 
 type LockerMapRow = ReturnType<typeof createLockerLocation> & {
@@ -103,6 +104,7 @@ export default function LockerLocator({
   onLockerSelect,
   onClose,
   mode = 'grouped',
+  hideHeader = false,
 }: LockerLocatorProps & { mode?: 'grouped' | 'specific' }) {
   const [lockers, setLockers] = useState<LockerMapRow[]>([]);
   const [loading, setLoading] = useState(true);
@@ -328,32 +330,34 @@ export default function LockerLocator({
         </TouchableOpacity>
       </View>
 
-      <View style={styles.header}>
-        <View style={styles.headerTop}>
-          <TouchableOpacity style={styles.closeButton} onPress={onClose}>
-            <Ionicons name="close" size={24} color={Colors.white} />
-          </TouchableOpacity>
-          <Text style={styles.title}>사물함 선택</Text>
-          <View style={styles.closeButton} />
-        </View>
+      {!hideHeader && (
+        <View style={styles.header}>
+          <View style={styles.headerTop}>
+            <TouchableOpacity style={styles.closeButton} onPress={onClose}>
+              <Ionicons name="close" size={24} color={Colors.white} />
+            </TouchableOpacity>
+            <Text style={styles.title}>사물함 선택</Text>
+            <View style={styles.closeButton} />
+          </View>
 
-        <View style={styles.viewToggle}>
-          <TouchableOpacity
-            style={[styles.toggleButton, viewMode === 'list' && styles.toggleButtonActive]}
-            onPress={() => setViewMode('list')}
-          >
-            <Ionicons name="list" size={18} color={viewMode === 'list' ? Colors.white : Colors.gray600} />
-            <Text style={[styles.toggleText, viewMode === 'list' && styles.toggleTextActive]}>목록</Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={[styles.toggleButton, viewMode === 'map' && styles.toggleButtonActive]}
-            onPress={() => setViewMode('map')}
-          >
-            <Ionicons name="map" size={18} color={viewMode === 'map' ? Colors.white : Colors.gray600} />
-            <Text style={[styles.toggleText, viewMode === 'map' && styles.toggleTextActive]}>지도</Text>
-          </TouchableOpacity>
+          <View style={styles.viewToggle}>
+            <TouchableOpacity
+              style={[styles.toggleButton, viewMode === 'list' && styles.toggleButtonActive]}
+              onPress={() => setViewMode('list')}
+            >
+              <Ionicons name="list" size={18} color={viewMode === 'list' ? Colors.white : Colors.gray600} />
+              <Text style={[styles.toggleText, viewMode === 'list' && styles.toggleTextActive]}>목록</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.toggleButton, viewMode === 'map' && styles.toggleButtonActive]}
+              onPress={() => setViewMode('map')}
+            >
+              <Ionicons name="map" size={18} color={viewMode === 'map' ? Colors.white : Colors.gray600} />
+              <Text style={[styles.toggleText, viewMode === 'map' && styles.toggleTextActive]}>지도</Text>
+            </TouchableOpacity>
+          </View>
         </View>
-      </View>
+      )}
 
       {viewMode === 'list' ? (
         <FlatList

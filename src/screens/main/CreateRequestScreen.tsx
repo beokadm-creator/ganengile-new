@@ -13,6 +13,7 @@ import {
   View,
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
+import { Ionicons } from '@expo/vector-icons';
 import AppTopBar from '../../components/common/AppTopBar';
 import AddressSearchModal from '../../components/common/AddressSearchModal';
 import DatePickerModal from '../../components/common/DatePickerModal';
@@ -959,27 +960,47 @@ export default function CreateRequestScreen({ navigation, route }: Props) {
         </View>
       </Modal>
 
-      <Modal visible={lockerLocatorTarget !== null} animationType="slide">
-        <View style={{ flex: 1 }}>
-          <LockerLocator
-            selectedStationId={lockerLocatorTarget === 'pickup' ? pickupStation?.stationId : deliveryStation?.stationId}
-            mode="specific"
-            initialTargetStationType={lockerLocatorTarget === 'dropoff' ? 'delivery' : lockerLocatorTarget ?? 'pickup'}
-            onLockerSelect={(locker) => {
-              const s = useCreateRequestStore.getState();
-              if (lockerLocatorTarget === 'pickup') {
-                s.setPickupLockerId(locker.lockerId);
-                s.setPickupStorageLocation(locker.stationName);
-                s.setPickupLockerFee(locker.pricePerHour ?? 0);
-              } else {
-                s.setDropoffLockerId(locker.lockerId);
-                s.setDropoffStorageLocation(locker.stationName);
-                s.setDropoffLockerFee(locker.pricePerHour ?? 0);
-              }
-              setLockerLocatorTarget(null);
-            }}
-            onClose={() => setLockerLocatorTarget(null)}
+      <Modal visible={lockerLocatorTarget !== null} animationType="slide" transparent>
+        <View style={styles.bottomSheetOverlay}>
+          <TouchableOpacity
+            style={styles.bottomSheetBackdrop}
+            activeOpacity={1}
+            onPress={() => setLockerLocatorTarget(null)}
           />
+          <View style={styles.bottomSheetContainer}>
+            <View style={styles.bottomSheetHandle} />
+            <View style={styles.bottomSheetHeader}>
+              <Text style={styles.bottomSheetTitle}>사물함 선택</Text>
+              <TouchableOpacity
+                style={styles.bottomSheetClose}
+                onPress={() => setLockerLocatorTarget(null)}
+              >
+                <Ionicons name="close" size={24} color={Colors.textPrimary} />
+              </TouchableOpacity>
+            </View>
+            <View style={{ flex: 1 }}>
+              <LockerLocator
+                selectedStationId={lockerLocatorTarget === 'pickup' ? pickupStation?.stationId : deliveryStation?.stationId}
+                mode="specific"
+                initialTargetStationType={lockerLocatorTarget === 'dropoff' ? 'delivery' : lockerLocatorTarget ?? 'pickup'}
+                hideHeader
+                onLockerSelect={(locker) => {
+                  const s = useCreateRequestStore.getState();
+                  if (lockerLocatorTarget === 'pickup') {
+                    s.setPickupLockerId(locker.lockerId);
+                    s.setPickupStorageLocation(locker.stationName);
+                    s.setPickupLockerFee(locker.pricePerHour ?? 0);
+                  } else {
+                    s.setDropoffLockerId(locker.lockerId);
+                    s.setDropoffStorageLocation(locker.stationName);
+                    s.setDropoffLockerFee(locker.pricePerHour ?? 0);
+                  }
+                  setLockerLocatorTarget(null);
+                }}
+                onClose={() => setLockerLocatorTarget(null)}
+              />
+            </View>
+          </View>
         </View>
       </Modal>
 
@@ -1052,5 +1073,51 @@ const styles = StyleSheet.create({
     color: Colors.primary,
     fontSize: Typography.fontSize['2xl'],
     fontWeight: Typography.fontWeight.extrabold,
+  },
+  bottomSheetOverlay: {
+    flex: 1,
+    justifyContent: 'flex-end',
+  },
+  bottomSheetBackdrop: {
+    flex: 1,
+    backgroundColor: Colors.overlay,
+  },
+  bottomSheetContainer: {
+    height: '75%',
+    backgroundColor: Colors.surface,
+    borderTopLeftRadius: BorderRadius.xl,
+    borderTopRightRadius: BorderRadius.xl,
+    overflow: 'hidden',
+  },
+  bottomSheetHandle: {
+    width: 40,
+    height: 5,
+    borderRadius: 3,
+    backgroundColor: Colors.gray300,
+    alignSelf: 'center',
+    marginTop: Spacing.sm,
+    marginBottom: Spacing.xs,
+  },
+  bottomSheetHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: Spacing.lg,
+    paddingVertical: Spacing.md,
+    borderBottomWidth: 1,
+    borderBottomColor: Colors.border,
+  },
+  bottomSheetTitle: {
+    fontSize: Typography.fontSize.lg,
+    fontWeight: Typography.fontWeight.extrabold,
+    color: Colors.textPrimary,
+  },
+  bottomSheetClose: {
+    width: 36,
+    height: 36,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: 18,
+    backgroundColor: Colors.gray100,
   },
 });
