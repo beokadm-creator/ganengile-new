@@ -61,7 +61,7 @@ type ExternalLockerPayload = UnknownRecord & {
     items?: {
       item?: unknown;
     };
-  };
+  } | unknown[];
 };
 
 function asRecord(value: unknown): UnknownRecord {
@@ -320,9 +320,11 @@ async function fetchKricLockers(stationId?: string): Promise<Locker[]> {
       return [];
     }
 
+    const body = (payload as UnknownRecord).body;
     const rawItems =
       payload.response?.body?.items?.item ??
-      payload.body?.items?.item ??
+      (typeof payload.body === 'object' && payload.body !== null && !Array.isArray(payload.body) && 'items' in payload.body ? (payload.body as { items?: { item?: unknown } }).items?.item : undefined) ??
+      (Array.isArray(body) ? body : undefined) ??
       payload.items ??
       payload.item ??
       payload.stationLocker ??
