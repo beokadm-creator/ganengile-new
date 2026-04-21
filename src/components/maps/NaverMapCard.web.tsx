@@ -14,6 +14,8 @@ type Marker = {
 
 declare global {
   interface Window {
+    __navermapAuthFailureHandlers?: Set<() => void>;
+    navermap_authFailure?: () => void;
     naver?: {
       maps?: {
         LatLng: new (lat: number, lng: number) => unknown;
@@ -83,44 +85,47 @@ export function NaverMapCard({
 }: NaverMapCardProps): ReactElement {
   const mapId = useId().replace(/:/g, '_');
   const [dynamicReady, setDynamicReady] = useState(false);
-  const [authFailed, setAuthFailed] = useState(false);
+  const [fallbackToStatic, setFallbackToStatic] = useState(false);
   const mapInstanceRef = useRef<any>(null);
   const overlaysRef = useRef<any[]>([]);
 
-  // Intercept console.error to detect Naver Maps SDK auth failure
   useEffect(() => {
     if (!canUseDynamicWebMap()) return;
 
-    const originalError = console.error;
-    console.error = (...args: unknown[]) => {
-      const message = args
-        .map((a) => (typeof a === 'string' ? a : String(a)))
-        .join(' ');
-      if (message.includes('인증이 실패') || message.includes('Authentication Failed')) {
-        setAuthFailed(true);
-      }
-      originalError.apply(console, args);
+    const handlers = window.__navermapAuthFailureHandlers ?? new Set<() => void>();
+    window.__navermapAuthFailureHandlers = handlers;
+
+    const onAuthFailure = (): void => {
+      setDynamicReady(false);
+      setFallbackToStatic(true);
+    };
+
+    handlers.add(onAuthFailure);
+    window.navermap_authFailure = () => {
+      handlers.forEach((handler) => handler());
     };
 
     return () => {
-      console.error = originalError;
+      handlers.delete(onAuthFailure);
+      if (handlers.size === 0) {
+        delete window.__navermapAuthFailureHandlers;
+        delete window.navermap_authFailure;
+      }
     };
   }, []);
 
-  // Cleanup map instance when auth fails
   useEffect(() => {
-    if (authFailed && mapInstanceRef.current) {
+    if (fallbackToStatic && mapInstanceRef.current) {
       try {
         mapInstanceRef.current.destroy();
       } catch {
-        // ignore cleanup errors
       }
       mapInstanceRef.current = null;
     }
-  }, [authFailed]);
+  }, [fallbackToStatic]);
 
   useEffect(() => {
-    if (!canUseDynamicWebMap()) {
+    if (!canUseDynamicWebMap() || fallbackToStatic) {
       return;
     }
 
@@ -132,10 +137,11 @@ export function NaverMapCard({
     let cancelled = false;
 
     const timeoutId = setTimeout(() => {
-      if (!cancelled && mapInstanceRef.current) {
+      if (!cancelled) {
         const target = document.getElementById(mapId);
-        if (target && target.children.length === 0) {
-          setAuthFailed(true);
+        if (!window.naver?.maps || (target && target.children.length === 0)) {
+          setDynamicReady(false);
+          setFallbackToStatic(true);
         }
       }
     }, 8000);
@@ -157,6 +163,7 @@ export function NaverMapCard({
       .catch(() => {
         if (!cancelled) {
           setDynamicReady(false);
+          setFallbackToStatic(true);
         }
       });
 
@@ -172,7 +179,7 @@ export function NaverMapCard({
         console.warn('Error during Naver Map cleanup:', e);
       }
     };
-  }, [mapId]); // Only create map once
+  }, [fallbackToStatic, mapId]);
 
   useEffect(() => {
     if (!dynamicReady || !mapInstanceRef.current) return;
@@ -234,7 +241,7 @@ export function NaverMapCard({
     [markers],
   );
 
-  if (authFailed) {
+  if (fallbackToStatic) {
     return (
       <StaticMapPreview
         title={title}

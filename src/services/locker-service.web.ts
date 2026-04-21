@@ -29,13 +29,64 @@ const KRIC_API_BASE_URL = 'https://kric.kr/kric.org/kricketapi';
 type LockerDoc = Partial<Locker> & {
   status?: string;
   operator?: string;
+  stationId?: string;
+  stationName?: string;
+  line?: string;
+  floor?: number | string;
+  section?: string;
+  latitude?: number | string;
+  longitude?: number | string;
+  address?: string;
+  telNo?: string;
+  nearby?: boolean;
+  lockerNumber?: string;
+  basePrice?: number | string;
+  baseDuration?: number | string;
+  extensionPrice?: number | string;
+  maxDuration?: number | string;
+  total?: number | string;
+  occupied?: number | string;
+  available?: number | string;
 };
 
+function asRecord(value: unknown): Record<string, unknown> {
+  return typeof value === 'object' && value !== null ? (value as Record<string, unknown>) : {};
+}
+
+function readString(record: Record<string, unknown>, ...keys: string[]): string | undefined {
+  for (const key of keys) {
+    const value = record[key];
+    if (typeof value === 'string' && value.trim()) {
+      return value.trim();
+    }
+  }
+
+  return undefined;
+}
+
+function readNumber(record: Record<string, unknown>, ...keys: string[]): number | undefined {
+  for (const key of keys) {
+    const value = record[key];
+    if (typeof value === 'number' && Number.isFinite(value)) {
+      return value;
+    }
+
+    if (typeof value === 'string' && value.trim()) {
+      const parsed = Number(value);
+      if (Number.isFinite(parsed)) {
+        return parsed;
+      }
+    }
+  }
+
+  return undefined;
+}
+
 function normalizeOperator(raw: string | undefined): LockerOperator {
-  if (!raw) return LockerOperator.SEOLL_METRO;
+  if (!raw) return LockerOperator.SEOUL_METRO;
   const lower = raw.toLowerCase();
   if (lower.includes('korail') || lower.includes('코레일')) return LockerOperator.KORAIL;
-  if (lower.includes('seoul') || lower.includes('서울')) return LockerOperator.SEOLL_METRO;
+  if (lower.includes('seoul') || lower.includes('서울')) return LockerOperator.SEOUL_METRO;
   return raw as LockerOperator;
 }
 
@@ -56,9 +107,13 @@ function normalizeLockerSize(raw: string | undefined): LockerSize {
 }
 
 function mapFirestoreLocker(lockerId: string, raw: LockerDoc): Locker {
+  const rawRecord = asRecord(raw);
   const location = raw.location;
   const pricing = raw.pricing;
   const availability = raw.availability;
+  const locationRecord = asRecord(location);
+  const pricingRecord = asRecord(pricing);
+  const availabilityRecord = asRecord(availability);
   const status = typeof raw.status === 'string' ? normalizeLockerStatus(raw.status) : raw.status ?? LockerStatus.AVAILABLE;
 
   return {
@@ -66,28 +121,32 @@ function mapFirestoreLocker(lockerId: string, raw: LockerDoc): Locker {
     type: raw.type ?? LockerType.PUBLIC,
     operator: normalizeOperator(typeof raw.operator === 'string' ? raw.operator : undefined),
     location: {
-      stationId: location?.stationId ?? '',
-      stationName: location?.stationName ?? '',
-      line: location?.line ?? '',
-      floor: location?.floor ?? 1,
-      section: location?.section ?? lockerId,
-      latitude: location?.latitude,
-      longitude: location?.longitude,
-      address: location?.address,
-      contactPhone: location?.contactPhone,
-      nearby: location?.nearby ?? false,
+      stationId: readString(locationRecord, 'stationId') ?? readString(rawRecord, 'stationId') ?? '',
+      stationName: readString(locationRecord, 'stationName') ?? readString(rawRecord, 'stationName') ?? '',
+      line: readString(locationRecord, 'line') ?? readString(rawRecord, 'line') ?? '',
+      floor: readNumber(locationRecord, 'floor') ?? readNumber(rawRecord, 'floor') ?? 1,
+      section:
+        readString(locationRecord, 'section') ??
+        readString(rawRecord, 'section', 'lockerNumber') ??
+        lockerId,
+      latitude: readNumber(locationRecord, 'latitude', 'lat') ?? readNumber(rawRecord, 'latitude', 'lat'),
+      longitude: readNumber(locationRecord, 'longitude', 'lng') ?? readNumber(rawRecord, 'longitude', 'lng'),
+      address: readString(locationRecord, 'address') ?? readString(rawRecord, 'address'),
+      contactPhone:
+        readString(locationRecord, 'contactPhone', 'telNo') ?? readString(rawRecord, 'contactPhone', 'telNo'),
+      nearby: location?.nearby ?? raw.nearby ?? false,
     },
     size: raw.size ?? LockerSize.MEDIUM,
     pricing: {
-      base: pricing?.base ?? 0,
-      baseDuration: pricing?.baseDuration ?? 240,
-      extension: pricing?.extension ?? 0,
-      maxDuration: pricing?.maxDuration,
+      base: readNumber(pricingRecord, 'base', 'basePrice', 'utlFare') ?? readNumber(rawRecord, 'base', 'basePrice', 'utlFare') ?? 0,
+      baseDuration: readNumber(pricingRecord, 'baseDuration') ?? readNumber(rawRecord, 'baseDuration') ?? 240,
+      extension: readNumber(pricingRecord, 'extension', 'extensionPrice') ?? readNumber(rawRecord, 'extension', 'extensionPrice') ?? 0,
+      maxDuration: readNumber(pricingRecord, 'maxDuration') ?? readNumber(rawRecord, 'maxDuration'),
     },
     availability: {
-      total: availability?.total ?? 1,
-      occupied: availability?.occupied ?? (status === LockerStatus.OCCUPIED ? 1 : 0),
-      available: availability?.available ?? (status === LockerStatus.AVAILABLE ? 1 : 0),
+      total: readNumber(availabilityRecord, 'total') ?? readNumber(rawRecord, 'total') ?? 1,
+      occupied: readNumber(availabilityRecord, 'occupied') ?? readNumber(rawRecord, 'occupied') ?? (status === LockerStatus.OCCUPIED ? 1 : 0),
+      available: readNumber(availabilityRecord, 'available') ?? readNumber(rawRecord, 'available') ?? (status === LockerStatus.AVAILABLE ? 1 : 0),
     },
     status,
     qrCode: raw.qrCode ?? '',
@@ -210,12 +269,22 @@ export async function getLockerById(lockerId: string): Promise<Locker | null> {
 export async function getLockersByStation(stationId: string): Promise<Locker[]> {
   try {
     const lockersRef = collection(db, 'lockers');
-    const q = query(lockersRef, where('stationId', '==', stationId));
-    const snapshot = await getDocs(q);
+    const [topLevelSnapshot, nestedSnapshot] = await Promise.all([
+      getDocs(query(lockersRef, where('stationId', '==', stationId))),
+      getDocs(query(lockersRef, where('location.stationId', '==', stationId))),
+    ]);
 
-    return snapshot.docs.map((docSnap) =>
-      mapFirestoreLocker(docSnap.id, docSnap.data() as LockerDoc)
-    );
+    const merged = new Map<string, Locker>();
+
+    topLevelSnapshot.docs.forEach((docSnap) => {
+      merged.set(docSnap.id, mapFirestoreLocker(docSnap.id, docSnap.data() as LockerDoc));
+    });
+
+    nestedSnapshot.docs.forEach((docSnap) => {
+      merged.set(docSnap.id, mapFirestoreLocker(docSnap.id, docSnap.data() as LockerDoc));
+    });
+
+    return Array.from(merged.values());
   } catch (error) {
     console.error('[locker-service.web] Error fetching station lockers:', error);
     throw new Error('Failed to fetch station lockers');

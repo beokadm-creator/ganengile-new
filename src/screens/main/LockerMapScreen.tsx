@@ -52,6 +52,21 @@ function formatDistance(distanceMeters: number | null): string {
   return `${(distanceMeters / 1000).toFixed(1)}km`;
 }
 
+function formatLockerPricing(locker: Locker): string {
+  const basePrice = locker.pricing.base;
+  const baseDuration = locker.pricing.baseDuration;
+
+  if (basePrice > 0 && baseDuration > 0) {
+    return `기본 ${basePrice.toLocaleString()}원 / ${baseDuration}분`;
+  }
+
+  if (basePrice > 0) {
+    return `기본 ${basePrice.toLocaleString()}원`;
+  }
+
+  return '요금 정보 확인 중';
+}
+
 export default function LockerMapScreen(): JSX.Element {
   const navigation = useNavigation<MainStackNavigationProp>();
   const [lockers, setLockers] = useState<Locker[]>([]);
@@ -208,9 +223,7 @@ export default function LockerMapScreen(): JSX.Element {
           <Text style={styles.cardBody}>
             {item.locker.location.line ?? '노선 정보 없음'} · {item.locker.location.floor}층 · {item.locker.location.section}
           </Text>
-          <Text style={styles.cardMeta}>
-            기본 {item.locker.pricing.base.toLocaleString()}원 / {item.locker.pricing.baseDuration}분
-          </Text>
+          <Text style={styles.cardMeta}>{formatLockerPricing(item.locker)}</Text>
         </TouchableOpacity>
       )}
     />
