@@ -188,6 +188,8 @@ function mapFirestoreLocker(lockerId: string, raw: LockerDoc): Locker {
       line: location?.line ?? '',
       floor: location?.floor ?? 1,
       section: location?.section ?? lockerId,
+      latitude: location?.latitude,
+      longitude: location?.longitude,
       address: location?.address,
       contactPhone: location?.contactPhone,
       nearby: location?.nearby ?? false,
@@ -232,6 +234,8 @@ function mapExternalLocker(raw: unknown): Locker | null {
       line: readString(record, 'line', 'line_name') ?? '',
       floor: readNumber(record, 'floor') ?? 1,
       section: readString(record, 'section', 'locker_no') ?? lockerId,
+      latitude: readNumber(record, 'latitude', 'lat'),
+      longitude: readNumber(record, 'longitude', 'lng'),
       address: readString(record, 'address'),
       contactPhone: readString(record, 'telNo', 'phone', 'contactPhone'),
       nearby: readBoolean(record, 'nearby') ?? false,
@@ -299,19 +303,23 @@ async function fetchKricLockers(stationId?: string): Promise<Locker[]> {
       return [];
     }
 
-    const url = new URL(KRIC_LOCKER_API_URL);
-    url.searchParams.set('serviceKey', KRIC_SERVICE_KEY);
-    url.searchParams.set('format', 'json');
-    url.searchParams.set('railOprIsttCd', railCode);
-    url.searchParams.set('lnCd', lineCode);
-    url.searchParams.set('stinCd', stationCode);
+    const queryString = `?serviceKey=${KRIC_SERVICE_KEY}&format=json&railOprIsttCd=${railCode}&lnCd=${lineCode}&stinCd=${stationCode}`;
+    const fullUrl = KRIC_LOCKER_API_URL + queryString;
 
-    const response = await fetch(url.toString());
+    const response = await fetch(fullUrl);
     if (!response.ok) {
       return [];
     }
 
-    const payload = (await response.json()) as ExternalLockerPayload;
+    const text = await response.text();
+    let payload: ExternalLockerPayload;
+    try {
+      payload = JSON.parse(text) as ExternalLockerPayload;
+    } catch (e) {
+      console.warn('Failed to parse KRIC Locker API response:', text);
+      return [];
+    }
+
     const rawItems =
       payload.response?.body?.items?.item ??
       payload.body?.items?.item ??
@@ -342,6 +350,8 @@ async function fetchKricLockers(stationId?: string): Promise<Locker[]> {
             line: line ? `${line}호선` : '',
             floor: isUnderground ? -floorNum : floorNum,
             section: readString(record, 'dtlLoc') ?? `보관함 ${index + 1}`,
+            latitude: (stationConfig as any)?.location?.latitude ?? (stationConfig as any)?.location?.lat,
+            longitude: (stationConfig as any)?.location?.longitude ?? (stationConfig as any)?.location?.lng,
             address: '',
             contactPhone: readString(record, 'telNo'),
             nearby: false,

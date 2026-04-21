@@ -114,7 +114,7 @@ async function main() {
 
   const stationByName = new Map<string, { id: string; data: any }[]>();
   for (const station of stations) {
-    const name = station.data.stationName || station.data.name ?? station.id;
+    const name = station.data.stationName ?? station.data.name ?? station.id;
     const key = normalizeName(name);
     if (!stationByName.has(key)) stationByName.set(key, []);
     stationByName.get(key)!.push(station);
@@ -150,7 +150,7 @@ async function main() {
 
       for (const size of sizes) {
         const count = Number(counts[size.key] ?? 0);
-        if (!count ?? count <= 0) continue;
+        if (!count || count <= 0) continue;
 
         const lockerId = sanitizeId(`non_subway_${facilityName}_${lockerName}_${size.key}`);
         const ref = db.collection('non_subway_lockers').doc(lockerId);
@@ -168,6 +168,8 @@ async function main() {
             line: '',
             floor: 1,
             section: detailLocation ?? lockerName,
+            latitude: row.latitude ?? row.lat,
+            longitude: row.longitude ?? row.lng,
             address: '',
             nearby: false,
           },
@@ -254,7 +256,7 @@ async function main() {
 
     const station = matchedCandidates
       .map((c) => ({ station: c, score: scoreStationForLine(c, targetLineDigits) }))
-      .sort((a, b) => b.score - a.score ?? a.station.id.localeCompare(b.station.id))[0].station;
+      .sort((a, b) => (b.score - a.score) || a.station.id.localeCompare(b.station.id))[0].station;
 
     const sizes: Array<{ key: 'small' | 'medium' | 'large'; label: string }> = [
       { key: 'small', label: 'small' },
@@ -264,7 +266,7 @@ async function main() {
 
     for (const size of sizes) {
       const count = Number(counts[size.key] ?? 0);
-      if (!count ?? count <= 0) continue;
+      if (!count || count <= 0) continue;
 
       const lockerId = sanitizeId(`seoul_${line}_${lockerName}_${size.key}`);
       const ref = db.collection('lockers').doc(lockerId);
@@ -275,10 +277,12 @@ async function main() {
         operator: 'seoul_metro',
         location: {
           stationId: station.id,
-          stationName: station.data.stationName || station.data.name ?? '',
+          stationName: station.data.stationName ?? station.data.name ?? '',
           line: `${line}호선`,
           floor: 1,
           section: detailLocation ?? lockerName,
+          latitude: station.data.location?.latitude ?? station.data.location?.lat,
+          longitude: station.data.location?.longitude ?? station.data.location?.lng,
           address: '',
           nearby: false,
         },

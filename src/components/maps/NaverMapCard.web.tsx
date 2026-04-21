@@ -1,5 +1,5 @@
 /* eslint-disable @typescript-eslint/no-unsafe-return */
-import { createElement, useEffect, useId, useMemo, useState } from 'react';
+import { createElement, useEffect, useId, useMemo, useState, useRef } from 'react';
 import type { CSSProperties, ReactElement } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import { canUseDynamicWebMap, getNaverWebSdkUrl } from '../../config/map-config';
@@ -20,6 +20,7 @@ declare global {
         Map: new (element: HTMLElement, options: { center: unknown; zoom: number }) => { destroy: () => void };
         Marker: new (options: { position: unknown; map: unknown; title?: string }) => unknown;
         Polyline: new (options: { map: unknown; path: unknown[]; strokeColor?: string; strokeWeight?: number; strokeOpacity?: number }) => unknown;
+        Event: { addListener: (target: unknown, eventName: string, callback: () => void) => void };
       };
     };
   }
@@ -32,6 +33,7 @@ interface NaverMapCardProps {
   markers: Marker[];
   path?: Marker[];
   height?: number;
+  onMarkerSelect?: (index: number) => void;
 }
 
 function buildWebMapStyle(height: number): CSSProperties {
@@ -77,9 +79,12 @@ export function NaverMapCard({
   markers,
   path = [],
   height = 240,
+  onMarkerSelect,
 }: NaverMapCardProps): ReactElement {
   const mapId = useId().replace(/:/g, '_');
   const [dynamicReady, setDynamicReady] = useState(false);
+  const mapInstanceRef = useRef<any>(null);
+  const overlaysRef = useRef<any[]>([]);
 
   useEffect(() => {
     if (!canUseDynamicWebMap()) {
@@ -92,7 +97,6 @@ export function NaverMapCard({
     }
 
     let cancelled = false;
-    let mapInstance: { destroy: () => void } | null = null;
 
     void ensureNaverMapScript(sdkUrl)
       .then(() => {
@@ -101,28 +105,10 @@ export function NaverMapCard({
         const target = document.getElementById(mapId);
         if (!mapApi || !target) return;
 
-        mapInstance = new mapApi.Map(target, {
+        mapInstanceRef.current = new mapApi.Map(target, {
           center: new mapApi.LatLng(center.latitude, center.longitude),
           zoom: 13,
         });
-
-        markers.forEach((marker) => {
-          new mapApi.Marker({
-            position: new mapApi.LatLng(marker.latitude, marker.longitude),
-            map: mapInstance,
-            title: marker.label,
-          });
-        });
-
-        if (path.length > 1) {
-          new mapApi.Polyline({
-            map: mapInstance,
-            path: path.map((point) => new mapApi.LatLng(point.latitude, point.longitude)),
-            strokeColor: '#0F766E',
-            strokeWeight: 5,
-            strokeOpacity: 0.85,
-          });
-        }
 
         setDynamicReady(true);
       })
@@ -134,11 +120,66 @@ export function NaverMapCard({
 
     return () => {
       cancelled = true;
-      if (mapInstance) {
-        mapInstance.destroy();
+      try {
+        if (mapInstanceRef.current && typeof mapInstanceRef.current.destroy === 'function') {
+          mapInstanceRef.current.destroy();
+          mapInstanceRef.current = null;
+        }
+      } catch (e) {
+        console.warn('Error during Naver Map cleanup:', e);
       }
     };
-  }, [center.latitude, center.longitude, mapId, markers, path]);
+  }, [mapId]); // Only create map once
+
+  useEffect(() => {
+    if (!dynamicReady || !mapInstanceRef.current) return;
+    const mapApi = window.naver?.maps;
+    if (!mapApi) return;
+
+    // Update center
+    mapInstanceRef.current.setCenter(new mapApi.LatLng(center.latitude, center.longitude));
+  }, [center.latitude, center.longitude, dynamicReady]);
+
+  useEffect(() => {
+    if (!dynamicReady || !mapInstanceRef.current) return;
+    const mapApi = window.naver?.maps;
+    if (!mapApi) return;
+
+    // Clear old overlays
+    overlaysRef.current.forEach((overlay: any) => {
+      if (overlay && typeof overlay.setMap === 'function') {
+        overlay.setMap(null);
+      }
+    });
+    overlaysRef.current = [];
+
+    markers.forEach((marker, index) => {
+      const m = new mapApi.Marker({
+        position: new mapApi.LatLng(marker.latitude, marker.longitude),
+        map: mapInstanceRef.current,
+        title: marker.label,
+      });
+
+      if (onMarkerSelect && window.naver?.maps?.Event?.addListener) {
+        window.naver.maps.Event.addListener(m, 'click', () => {
+          onMarkerSelect(index);
+        });
+      }
+
+      overlaysRef.current.push(m);
+    });
+
+    if (path.length > 1) {
+      const p = new mapApi.Polyline({
+        map: mapInstanceRef.current,
+        path: path.map((point) => new mapApi.LatLng(point.latitude, point.longitude)),
+        strokeColor: '#0F766E',
+        strokeWeight: 5,
+        strokeOpacity: 0.85,
+      });
+      overlaysRef.current.push(p);
+    }
+  }, [markers, path, dynamicReady, onMarkerSelect]);
 
   const markerSummary = useMemo(
     () =>

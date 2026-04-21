@@ -27,15 +27,18 @@ type LockerMapItem = {
 };
 
 function getLockerDistance(locker: Locker, station: Station | null, currentLocation: LocationData | null): number | null {
-  if (!station || !currentLocation) {
+  const lat = locker.location.latitude ?? station?.location.latitude;
+  const lng = locker.location.longitude ?? station?.location.longitude;
+
+  if (!lat || !lng || !currentLocation) {
     return null;
   }
 
   return locationService.calculateDistance(
     currentLocation.latitude,
     currentLocation.longitude,
-    station.location.latitude,
-    station.location.longitude
+    lat,
+    lng
   );
 }
 
@@ -110,10 +113,10 @@ export default function LockerMapScreen(): JSX.Element {
         return leftName.localeCompare(rightName, 'ko');
       });
 
-    return items.slice(0, 12);
+    return items;
   }, [currentLocation, lockers, stations]);
 
-  const featured = mapItems.slice(0, 4).filter((item) => item.station);
+  const featured = mapItems.filter((item) => item.locker.location.latitude != null || item.station);
   const mapCenter = currentLocation ?? {
     latitude: 37.5665,
     longitude: 126.978,
@@ -154,10 +157,16 @@ export default function LockerMapScreen(): JSX.Element {
           <NaverMapCard
             center={mapCenter}
             markers={featured.map((item, index) => ({
-              latitude: item.station!.location.latitude,
-              longitude: item.station!.location.longitude,
+              latitude: item.locker.location.latitude ?? item.station!.location.latitude,
+              longitude: item.locker.location.longitude ?? item.station!.location.longitude,
               label: String(index + 1),
             }))}
+            onMarkerSelect={(index) => {
+              const target = featured[index];
+              if (target) {
+                handleSelect(target);
+              }
+            }}
             title="가까운 보관함 지도"
             subtitle={currentLocation ? '현재 위치를 기준으로 가까운 순서를 반영합니다.' : '위치 권한이 없으면 역 기준 목록으로 정렬합니다.'}
           />

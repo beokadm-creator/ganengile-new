@@ -38,20 +38,24 @@ export async function fetchKricTransferInfo(stationId: string): Promise<KricTran
       return [];
     }
 
-    const url = new URL(KRIC_TRANSFER_API_URL);
-    url.searchParams.set('serviceKey', KRIC_SERVICE_KEY);
-    url.searchParams.set('format', 'json');
-    url.searchParams.set('railOprIsttCd', railCode);
-    url.searchParams.set('lnCd', lineCode);
-    url.searchParams.set('stinCd', stationCode);
+    const queryString = `?serviceKey=${KRIC_SERVICE_KEY}&format=json&railOprIsttCd=${railCode}&lnCd=${lineCode}&stinCd=${stationCode}`;
+    const fullUrl = KRIC_TRANSFER_API_URL + queryString;
 
-    const response = await fetch(url.toString());
+    const response = await fetch(fullUrl);
     if (!response.ok) {
       console.error(`KRIC 환승 정보 API 호출 실패: ${response.status}`);
       return [];
     }
 
-    const payload = await response.json();
+    const text = await response.text();
+    let payload: any;
+    try {
+      payload = JSON.parse(text);
+    } catch (e) {
+      console.warn('Failed to parse KRIC Transfer API response:', text);
+      return [];
+    }
+
     const rawItems =
       payload?.response?.body?.items?.item ??
       payload?.body?.items?.item ??

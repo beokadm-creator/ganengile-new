@@ -16,6 +16,7 @@ interface InteractiveNaverMapProps {
   path?: InteractiveMapMarker[];
   height?: number;
   zoom?: number;
+  onMarkerSelect?: (index: number) => void;
 }
 
 export function InteractiveNaverMap({
@@ -24,6 +25,7 @@ export function InteractiveNaverMap({
   path = [],
   height = 320,
   zoom = 14,
+  onMarkerSelect,
 }: InteractiveNaverMapProps) {
   const webViewRef = useRef<WebView>(null);
   const clientId = mapConfig.webClientId || mapConfig.publicClientId; // Use web ID if available, fallback to public
@@ -87,7 +89,7 @@ export function InteractiveNaverMap({
 
           // Add new markers
           if (data.markers && data.markers.length > 0) {
-            data.markers.forEach(function(m) {
+            data.markers.forEach(function(m, idx) {
               var marker = new naver.maps.Marker({
                 position: new naver.maps.LatLng(m.latitude, m.longitude),
                 map: map,
@@ -96,6 +98,15 @@ export function InteractiveNaverMap({
                   anchor: new naver.maps.Point(12, 12)
                 }
               });
+              
+              (function(index) {
+                naver.maps.Event.addListener(marker, 'click', function() {
+                  if (window.ReactNativeWebView) {
+                    window.ReactNativeWebView.postMessage(JSON.stringify({ type: 'markerSelect', index: index }));
+                  }
+                });
+              })(idx);
+
               mapMarkers.push(marker);
             });
           }
@@ -167,11 +178,19 @@ export function InteractiveNaverMap({
       <WebView
         ref={webViewRef}
         originWhitelist={['*']}
-        source={{ html: htmlContent, baseUrl: 'https://oapi.map.naver.com' }}
+        source={{ html: htmlContent, baseUrl: 'https://ganengile.web.app' }}
         style={styles.webview}
         scrollEnabled={false}
         bounces={false}
         startInLoadingState={true}
+        onMessage={(event) => {
+          try {
+            const data = JSON.parse(event.nativeEvent.data);
+            if (data.type === 'markerSelect' && onMarkerSelect) {
+              onMarkerSelect(data.index);
+            }
+          } catch (e) {}
+        }}
         renderLoading={() => (
           <View style={styles.loadingContainer}>
             <ActivityIndicator size="small" color="#3182F6" />

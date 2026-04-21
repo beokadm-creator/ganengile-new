@@ -1,4 +1,4 @@
-import React, { useCallback, useMemo, useState, useEffect } from 'react';
+import React, { useCallback, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -79,16 +79,19 @@ function buildRow(
   const stationLat = getStationLat(station);
   const stationLng = getStationLng(station);
 
+  const lockerLat = locker.location.latitude ?? stationLat;
+  const lockerLng = locker.location.longitude ?? stationLng;
+
   const distanceMeters =
-    stationLat != null && stationLng != null && currentLocation
-      ? locationService.calculateDistance(currentLocation.latitude, currentLocation.longitude, stationLat, stationLng)
+    lockerLat != null && lockerLng != null && currentLocation
+      ? locationService.calculateDistance(currentLocation.latitude, currentLocation.longitude, lockerLat, lockerLng)
       : null;
 
   return {
     ...base,
     distanceMeters,
-    latitude: stationLat,
-    longitude: stationLng,
+    latitude: lockerLat,
+    longitude: lockerLng,
     stationId: locker.location.stationId,
   };
 }
@@ -212,7 +215,7 @@ export default function LockerLocator({
   );
 
   const featuredMapRows = useMemo(
-    () => lockers.filter((item) => item.latitude && item.longitude).slice(0, 4),
+    () => lockers.filter((item) => item.latitude && item.longitude),
     [lockers]
   );
 
@@ -372,6 +375,12 @@ export default function LockerLocator({
           <NaverMapCard
             center={mapCenter}
             markers={mapMarkers}
+            onMarkerSelect={(index) => {
+              const target = featuredMapRows[index];
+              if (target) {
+                handleLockerSelect(target);
+              }
+            }}
             title="가까운 사물함 지도"
             subtitle="현재 위치가 있으면 가까운 순서로, 없으면 선택 역 기준으로 보여줍니다."
           />

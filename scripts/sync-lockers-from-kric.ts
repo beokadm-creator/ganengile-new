@@ -82,22 +82,27 @@ async function main() {
       continue;
     }
 
-    const url = new URL(KRIC_LOCKER_API_URL);
-    url.searchParams.set('serviceKey', KRIC_SERVICE_KEY as string);
-    url.searchParams.set('format', 'json');
-    url.searchParams.set('railOprIsttCd', railCode);
-    url.searchParams.set('lnCd', lineCode);
-    url.searchParams.set('stinCd', stationCode);
+    const queryString = `?serviceKey=${KRIC_SERVICE_KEY}&format=json&railOprIsttCd=${railCode}&lnCd=${lineCode}&stinCd=${stationCode}`;
+    const url = KRIC_LOCKER_API_URL + queryString;
 
     try {
-      const res = await fetch(url.toString());
+      const res = await fetch(url);
       if (!res.ok) {
         console.warn(`⚠️ Fetch failed for ${station.data.stationName || station.id}: HTTP ${res.status}`);
         errorCount++;
         continue;
       }
 
-      const payload = await res.json();
+      const text = await res.text();
+      let payload: any;
+      try {
+        payload = JSON.parse(text);
+      } catch (e) {
+        console.warn(`⚠️ Parse failed for ${station.data.stationName || station.id}:`, text);
+        errorCount++;
+        continue;
+      }
+
       const rawItems = payload?.body || [];
 
       if (!rawItems || rawItems.length === 0 || (payload.header && payload.header.resultCode !== '00')) {
@@ -130,6 +135,8 @@ async function main() {
             line: line ? `${line}호선` : '',
             floor: isUnderground ? -floorNum : floorNum,
             section: record.dtlLoc || `보관함 ${i + 1}`,
+            latitude: station.data.location?.latitude ?? station.data.location?.lat,
+            longitude: station.data.location?.longitude ?? station.data.location?.lng,
             address: '',
             contactPhone: record.telNo || '',
             nearby: false,

@@ -16,6 +16,7 @@ interface NaverMapCardProps {
   markers: Marker[];
   path?: Marker[];
   height?: number;
+  onMarkerSelect?: (index: number) => void;
 }
 
 export function NaverMapCard({
@@ -25,13 +26,14 @@ export function NaverMapCard({
   markers,
   path,
   height = 240,
+  onMarkerSelect,
 }: NaverMapCardProps): ReactElement {
   return (
     <View style={styles.wrapper}>
       {title ? <Text style={styles.title}>{title}</Text> : null}
       {subtitle ? <Text style={styles.subtitle}>{subtitle}</Text> : null}
       <View style={styles.mapWrap}>
-        <InteractiveNaverMap center={center} markers={markers} path={path} height={height} />
+        <InteractiveNaverMap center={center} markers={markers} path={path} height={height} onMarkerSelect={onMarkerSelect} />
       </View>
     </View>
   );
