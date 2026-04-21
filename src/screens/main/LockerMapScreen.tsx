@@ -115,6 +115,7 @@ export default function LockerMapScreen(): JSX.Element {
     const stationMap = new Map(stations.map((station) => [station.stationId, station]));
 
     const items = lockers
+      .filter((locker) => locker.location?.stationId)
       .map((locker) => {
         const station = stationMap.get(locker.location.stationId) ?? null;
         return {

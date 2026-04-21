@@ -17,260 +17,269 @@ import {
 import { db } from './firebase';
 import {
   Locker,
-  LockerAvailability,
+  LockerType,
   LockerOperator,
-  LockerReservation,
   LockerSize,
   LockerStatus,
-  LockerType,
 } from '../types/locker';
-import { getStationConfig } from './config-service';
 
-const LOCKERS_COLLECTION = 'lockers';
-const RESERVATIONS_COLLECTION = 'locker_reservations';
-const KRIC_LOCKER_API_URL = 'https://openapi.kric.go.kr/openapi/convenientInfo/stationLocker';
-const KRIC_SERVICE_KEY = '$2a$10$FFLcKck5QPIznLD7KVsF9.8SrXglQowjj5w8P4FY0bTGwH5G.EZim';
-const KRIC_RAIL_OPR_ISTT_CD = 'S1';
+// KRIC API configuration
+const KRIC_API_BASE_URL = 'https://kric.kr/kric.org/kricketapi';
 
-type UnknownRecord = Record<string, unknown>;
-
-type ExternalLockerPayload = UnknownRecord & {
-  response?: {
-    body?: {
-      items?: {
-        item?: unknown;
-      };
-    };
-  };
-  body?: {
-    items?: {
-      item?: unknown;
-    };
-  } | unknown[];
-  items?: unknown;
-  item?: unknown;
-  stationLocker?: unknown;
+type LockerDoc = Partial<Locker> & {
+  status?: string;
+  operator?: string;
 };
 
-function asRecord(value: unknown): UnknownRecord {
-  return typeof value === 'object' && value !== null ? (value as UnknownRecord) : {};
+function normalizeOperator(raw: string | undefined): LockerOperator {
+  if (!raw) return LockerOperator.SEOLL_METRO;
+  const lower = raw.toLowerCase();
+  if (lower.includes('korail') || lower.includes('코레일')) return LockerOperator.KORAIL;
+  if (lower.includes('seoul') || lower.includes('서울')) return LockerOperator.SEOLL_METRO;
+  return raw as LockerOperator;
 }
 
-function readString(record: UnknownRecord, ...keys: string[]): string | undefined {
-  for (const key of keys) {
-    const value = record[key];
-    if (typeof value === 'string' && value.trim()) {
-      return value;
-    }
-  }
-  return undefined;
-}
-
-function readNumber(record: UnknownRecord, ...keys: string[]): number | undefined {
-  for (const key of keys) {
-    const value = record[key];
-    if (typeof value === 'number' && Number.isFinite(value)) {
-      return value;
-    }
-    if (typeof value === 'string' && value.trim()) {
-      const parsed = Number(value);
-      if (Number.isFinite(parsed)) {
-        return parsed;
-      }
-    }
-  }
-  return undefined;
-}
-
-function toArray<T>(value: unknown): T[] {
-  return Array.isArray(value) ? (value as T[]) : [];
-}
-
-function toDate(value: Timestamp | Date | string | number | undefined): Date {
-  if (value instanceof Timestamp) return value.toDate();
-  if (value instanceof Date) return value;
-  if (typeof value === 'string' || typeof value === 'number') {
-    const date = new Date(value);
-    if (!Number.isNaN(date.getTime())) {
-      return date;
-    }
-  }
-  return new Date();
-}
-
-function normalizeLockerSize(value?: string): LockerSize {
-  const normalized = (value ?? '').toLowerCase();
-  if (normalized.includes('소')) return LockerSize.SMALL;
-  if (normalized.includes('대')) return LockerSize.LARGE;
-  if (normalized.includes('중')) return LockerSize.MEDIUM;
-  if (normalized.includes('small')) return LockerSize.SMALL;
-  if (normalized.includes('large')) return LockerSize.LARGE;
-  return LockerSize.MEDIUM;
-}
-
-function normalizeLockerStatus(value?: string): LockerStatus {
-  const normalized = (value ?? '').toLowerCase();
-  if (normalized.includes('occupied') || normalized.includes('busy') || normalized.includes('in_use')) {
-    return LockerStatus.OCCUPIED;
-  }
-  if (normalized.includes('maintenance') ?? normalized.includes('broken')) {
-    return LockerStatus.MAINTENANCE;
-  }
-  return LockerStatus.AVAILABLE;
-}
-
-function normalizeOperator(value?: string): LockerOperator {
-  if (!value) return LockerOperator.SEOUL_METRO;
-  const normalized = value.toLowerCase();
-  if (normalized === 'k1') return LockerOperator.KORAIL;
-  if (['i1', 'd1', 'b1', 'g1'].includes(normalized)) return LockerOperator.LOCAL_GOV;
-  if (normalized === 's1') return LockerOperator.SEOUL_METRO;
-  switch (normalized) {
-    case LockerOperator.KORAIL:
-    case LockerOperator.LOCAL_GOV:
-    case LockerOperator.CU:
-    case LockerOperator.GS25:
-    case LockerOperator.LOCKER_BOX:
-      return normalized as LockerOperator;
-    default:
-      return LockerOperator.SEOUL_METRO;
+function normalizeLockerStatus(raw: string | undefined): LockerStatus {
+  switch (raw) {
+    case 'occupied': return LockerStatus.OCCUPIED;
+    case 'maintenance': return LockerStatus.MAINTENANCE;
+    default: return LockerStatus.AVAILABLE;
   }
 }
 
-function buildAvailability(total: number, occupied: number, available: number): LockerAvailability {
+function normalizeLockerSize(raw: string | undefined): LockerSize {
+  switch (raw) {
+    case 'small': return LockerSize.SMALL;
+    case 'large': return LockerSize.LARGE;
+    default: return LockerSize.MEDIUM;
+  }
+}
+
+function mapFirestoreLocker(lockerId: string, raw: LockerDoc): Locker {
+  const location = raw.location;
+  const pricing = raw.pricing;
+  const availability = raw.availability;
+  const status = typeof raw.status === 'string' ? normalizeLockerStatus(raw.status) : raw.status ?? LockerStatus.AVAILABLE;
+
   return {
-    total: total > 0 ? total : Math.max(available + occupied, 1),
-    occupied: occupied >= 0 ? occupied : 0,
-    available: available >= 0 ? available : 0,
+    lockerId,
+    type: raw.type ?? LockerType.PUBLIC,
+    operator: normalizeOperator(typeof raw.operator === 'string' ? raw.operator : undefined),
+    location: {
+      stationId: location?.stationId ?? '',
+      stationName: location?.stationName ?? '',
+      line: location?.line ?? '',
+      floor: location?.floor ?? 1,
+      section: location?.section ?? lockerId,
+      latitude: location?.latitude,
+      longitude: location?.longitude,
+      address: location?.address,
+      contactPhone: location?.contactPhone,
+      nearby: location?.nearby ?? false,
+    },
+    size: raw.size ?? LockerSize.MEDIUM,
+    pricing: {
+      base: pricing?.base ?? 0,
+      baseDuration: pricing?.baseDuration ?? 240,
+      extension: pricing?.extension ?? 0,
+      maxDuration: pricing?.maxDuration,
+    },
+    availability: {
+      total: availability?.total ?? 1,
+      occupied: availability?.occupied ?? (status === LockerStatus.OCCUPIED ? 1 : 0),
+      available: availability?.available ?? (status === LockerStatus.AVAILABLE ? 1 : 0),
+    },
+    status,
+    qrCode: raw.qrCode ?? '',
+    accessMethod: raw.accessMethod ?? 'qr',
+    isSubway: raw.isSubway ?? true,
   };
 }
 
-async function fetchKricLockers(stationId?: string): Promise<Locker[]> {
-  if (!stationId) {
-    return [];
-  }
-
+/**
+ * Fetches all lockers from Firestore.
+ * This is a web-specific implementation that forces Metro bundler to include this function.
+ */
+export async function getAllLockers(): Promise<Locker[]> {
   try {
-    const stationConfig = (await getStationConfig(stationId)) as {
-      stationName?: string;
-      kric?: {
-        lineCode?: string;
-        stationCode?: string;
-        railOprIsttCd?: string;
-      };
-      lines?: Array<{ lineCode?: string }>;
-      location?: {
-        latitude?: number;
-        longitude?: number;
-      };
-    } | null;
-    
-    const lineCode = stationConfig?.kric?.lineCode ?? stationConfig?.lines?.[0]?.lineCode ?? '';
-    const stationCode = stationConfig?.kric?.stationCode ?? stationId;
-    const railCode = stationConfig?.kric?.railOprIsttCd ?? KRIC_RAIL_OPR_ISTT_CD;
+    const lockersRef = collection(db, 'lockers');
+    const snapshot = await getDocs(lockersRef);
 
-    if (!lineCode || !stationCode) {
+    if (snapshot.empty) {
+      console.log('[locker-service.web] No lockers found in Firestore');
       return [];
     }
 
-    const queryString = `?serviceKey=${KRIC_SERVICE_KEY}&format=json&railOprIsttCd=${railCode}&lnCd=${lineCode}&stinCd=${stationCode}`;
-    const fullUrl = KRIC_LOCKER_API_URL + queryString;
+    const lockers = snapshot.docs.map((docSnap) =>
+      mapFirestoreLocker(docSnap.id, docSnap.data() as LockerDoc)
+    );
 
-    const response = await fetch(fullUrl);
-    if (!response.ok) {
-      return [];
-    }
-
-    const text = await response.text();
-    let payload: ExternalLockerPayload;
-    try {
-      payload = JSON.parse(text) as ExternalLockerPayload;
-    } catch {
-      return [];
-    }
-
-    const body = (payload as UnknownRecord).body;
-    const rawItems =
-      payload.response?.body?.items?.item ??
-      (typeof payload.body === 'object' && payload.body !== null && !Array.isArray(payload.body) && 'items' in payload.body
-        ? (payload.body as { items?: { item?: unknown } }).items?.item
-        : undefined) ??
-      (Array.isArray(body) ? body : undefined) ??
-      payload.items ??
-      payload.item ??
-      payload.stationLocker ??
-      [];
-
-    const stationName = stationConfig?.stationName ?? '';
-    const lat = stationConfig?.location?.latitude;
-    const lng = stationConfig?.location?.longitude;
-
-    return toArray(rawItems)
-      .map((item, index) => {
-        const record = asRecord(item);
-        const facilityCount = readNumber(record, 'faclNum') ?? 1;
-        const baseFare = readNumber(record, 'utlFare') ?? 0;
-        const line = readString(record, 'lnCd');
-        const floorNum = readNumber(record, 'stinFlor') ?? 1;
-        const isUnderground = readString(record, 'grndDvNm') === '지하';
-        const operatorCode = readString(record, 'railOprIsttCd');
-
-        return {
-          lockerId: `${stationCode}-${index + 1}`,
-          type: LockerType.PUBLIC,
-          operator: normalizeOperator(operatorCode),
-          location: {
-            stationId: stationCode,
-            stationName,
-            line: line ? `${line}호선` : '',
-            floor: isUnderground ? -floorNum : floorNum,
-            section: readString(record, 'dtlLoc') ?? `보관함 ${index + 1}`,
-            latitude: lat,
-            longitude: lng,
-            address: '',
-            contactPhone: readString(record, 'telNo'),
-            nearby: false,
-          },
-          size: normalizeLockerSize(readString(record, 'szNm')),
-          pricing: {
-            base: baseFare,
-            baseDuration: 240,
-            extension: 0,
-          },
-          availability: buildAvailability(facilityCount, 0, facilityCount),
-          status: LockerStatus.AVAILABLE,
-          qrCode: '',
-          accessMethod: 'qr',
-          isSubway: true,
-        } satisfies Locker;
-      })
-      .filter(Boolean);
-  } catch {
-    return [];
+    console.log(`[locker-service.web] Fetched ${lockers.length} lockers from Firestore`);
+    return lockers;
+  } catch (error) {
+    console.error('[locker-service.web] Error fetching lockers:', error);
+    throw new Error('Failed to fetch lockers');
   }
 }
 
-export async function fetchKricLockersForStations(stationIds: string[]): Promise<Locker[]> {
-  const MAX_STATIONS = 15;
-  const limitedIds = stationIds.slice(0, MAX_STATIONS);
+/**
+ * Fetches locker information from KRIC API for multiple stations.
+ * @param stationIds - Array of station IDs to fetch lockers for
+ * @returns Promise<Record<string, any>> - Object mapping station IDs to their locker data
+ */
+export async function fetchKricLockersForStations(stationIds: string[]): Promise<Record<string, any>> {
+  if (!Array.isArray(stationIds)) {
+    console.error('[locker-service.web] stationIds must be an array');
+    throw new Error('stationIds must be an array');
+  }
 
-  const results = await Promise.all(
-    limitedIds.map(async (stationId) => {
+  if (stationIds.length === 0) {
+    console.log('[locker-service.web] No station IDs provided');
+    return {};
+  }
+
+  console.log(`[locker-service.web] Fetching KRIC lockers for ${stationIds.length} stations`);
+
+  const results: Record<string, any> = {};
+  const errors: Record<string, string> = {};
+
+  // Fetch data for each station
+  await Promise.all(
+    stationIds.map(async (stationId) => {
       try {
-        return await fetchKricLockers(stationId);
-      } catch {
-        return [];
+        const url = `${KRIC_API_BASE_URL}/station/${stationId}/lockers`;
+        console.log(`[locker-service.web] Fetching from KRIC: ${url}`);
+
+        const response = await fetch(url, {
+          method: 'GET',
+          headers: {
+            'Accept': 'application/json',
+            'Content-Type': 'application/json',
+          },
+        });
+
+        if (!response.ok) {
+          throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+        }
+
+        const data = await response.json();
+
+        // Validate response structure
+        if (data && typeof data === 'object') {
+          results[stationId] = data;
+          console.log(`[locker-service.web] Successfully fetched lockers for station ${stationId}`);
+        } else {
+          throw new Error('Invalid response structure from KRIC API');
+        }
+      } catch (error) {
+        const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+        console.error(`[locker-service.web] Error fetching lockers for station ${stationId}:`, errorMessage);
+        errors[stationId] = errorMessage;
       }
     })
   );
 
-  return results.flat();
+  // Log summary
+  const successCount = Object.keys(results).length;
+  const errorCount = Object.keys(errors).length;
+  console.log(`[locker-service.web] KRIC fetch complete: ${successCount} successful, ${errorCount} failed`);
+
+  if (errorCount > 0) {
+    console.warn('[locker-service.web] Stations with errors:', errors);
+  }
+
+  return results;
 }
 
-async function fetchExternalLockers(stationId?: string): Promise<Locker[]> {
-  const kricLockers = await fetchKricLockers(stationId);
-  if (kricLockers.length > 0) {
-    return kricLockers;
+export async function getLockerById(lockerId: string): Promise<Locker | null> {
+  try {
+    const lockerRef = doc(db, 'lockers', lockerId);
+    const snapshot = await getDoc(lockerRef);
+
+    if (!snapshot.exists()) {
+      return null;
+    }
+
+    return mapFirestoreLocker(snapshot.id, snapshot.data() as LockerDoc);
+  } catch (error) {
+    console.error('[locker-service.web] Error fetching locker:', error);
+    throw new Error('Failed to fetch locker');
   }
-  return [];
+}
+
+export async function getLockersByStation(stationId: string): Promise<Locker[]> {
+  try {
+    const lockersRef = collection(db, 'lockers');
+    const q = query(lockersRef, where('stationId', '==', stationId));
+    const snapshot = await getDocs(q);
+
+    return snapshot.docs.map((docSnap) =>
+      mapFirestoreLocker(docSnap.id, docSnap.data() as LockerDoc)
+    );
+  } catch (error) {
+    console.error('[locker-service.web] Error fetching station lockers:', error);
+    throw new Error('Failed to fetch station lockers');
+  }
+}
+
+/**
+ * Updates a locker's status.
+ * @param lockerId - The locker ID
+ * @param status - The new status
+ * @returns Promise<void>
+ */
+export async function updateLockerStatus(lockerId: string, status: LockerStatus): Promise<void> {
+  try {
+    const lockerRef = doc(db, 'lockers', lockerId);
+    await updateDoc(lockerRef, {
+      status,
+      updatedAt: serverTimestamp(),
+    });
+    console.log(`[locker-service.web] Updated locker ${lockerId} status to ${status}`);
+  } catch (error) {
+    console.error('[locker-service.web] Error updating locker status:', error);
+    throw new Error('Failed to update locker status');
+  }
+}
+
+/**
+ * Creates a new reservation for a locker.
+ * @param lockerId - The locker ID
+ * @param reservationData - The reservation data
+ * @returns Promise<string> - The reservation ID
+ */
+export async function createLockerReservation(
+  lockerId: string,
+  reservationData: {
+    userId: string;
+    startTime: Date;
+    endTime: Date;
+  }
+): Promise<string> {
+  try {
+    // Create reservation
+    const reservationRef = await addDoc(collection(db, 'reservations'), {
+      lockerId,
+      userId: reservationData.userId,
+      startTime: Timestamp.fromDate(reservationData.startTime),
+      endTime: Timestamp.fromDate(reservationData.endTime),
+      status: 'active',
+      createdAt: serverTimestamp(),
+      updatedAt: serverTimestamp(),
+    });
+
+    // Update locker with current reservation
+    const lockerRef = doc(db, 'lockers', lockerId);
+    await updateDoc(lockerRef, {
+      status: 'reserved',
+      currentReservationId: reservationRef.id,
+      updatedAt: serverTimestamp(),
+    });
+
+    console.log(`[locker-service.web] Created reservation ${reservationRef.id} for locker ${lockerId}`);
+    return reservationRef.id;
+  } catch (error) {
+    console.error('[locker-service.web] Error creating reservation:', error);
+    throw new Error('Failed to create reservation');
+  }
 }
