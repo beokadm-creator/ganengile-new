@@ -871,7 +871,7 @@ export default function CreateRequestScreen({ navigation, route }: Props) {
         isPhoneVerified={isPhoneVerified}
         otpSending={false}
         otpVerifying={false}
-        setLockerLocatorTarget={() => {}}
+        setLockerLocatorTarget={setLockerLocatorTarget}
       />
 
       <OptimizedStationSelectModal
@@ -956,6 +956,30 @@ export default function CreateRequestScreen({ navigation, route }: Props) {
               안전한 배송을 위해 정보를 저장하고 있습니다. 완료 후 배송 현황 화면으로 이동합니다.
             </Text>
           </View>
+        </View>
+      </Modal>
+
+      <Modal visible={lockerLocatorTarget !== null} animationType="slide">
+        <View style={{ flex: 1 }}>
+          <LockerLocator
+            selectedStationId={lockerLocatorTarget === 'pickup' ? pickupStation?.stationId : deliveryStation?.stationId}
+            mode="specific"
+            initialTargetStationType={lockerLocatorTarget === 'dropoff' ? 'delivery' : lockerLocatorTarget ?? 'pickup'}
+            onLockerSelect={(locker) => {
+              const s = useCreateRequestStore.getState();
+              if (lockerLocatorTarget === 'pickup') {
+                s.setPickupLockerId(locker.lockerId);
+                s.setPickupStorageLocation(locker.stationName);
+                s.setPickupLockerFee(locker.pricePerHour ?? 0);
+              } else {
+                s.setDropoffLockerId(locker.lockerId);
+                s.setDropoffStorageLocation(locker.stationName);
+                s.setDropoffLockerFee(locker.pricePerHour ?? 0);
+              }
+              setLockerLocatorTarget(null);
+            }}
+            onClose={() => setLockerLocatorTarget(null)}
+          />
         </View>
       </Modal>
 

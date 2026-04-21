@@ -280,7 +280,43 @@ export default function CreateRequestFunnel(props: Props) {
     );
   };
 
-  const renderPickupLocker = () => null; // Removed
+  const renderPickupLocker = () => {
+    if (!store.usePickupLocker || !store.pickupStation || currentStep < 2) return null;
+
+    const hasSelected = !!store.pickupLockerId;
+
+    return (
+      <Animated.View
+        entering={FadeInDown.duration(300)}
+        layout={Layout.springify()}
+        style={styles.lockerCard}
+      >
+        <View style={styles.questionHeader}>
+          <Text style={styles.questionText}>출발역 사물함을 선택하세요</Text>
+        </View>
+
+        {hasSelected && (
+          <View style={styles.selectedBox}>
+            <Text style={styles.selectedBoxText}>
+              {store.pickupStation.stationName} · {store.pickupLockerId}
+              {store.pickupLockerFee != null && store.pickupLockerFee > 0
+                ? ` · ${store.pickupLockerFee.toLocaleString()}원`
+                : ''}
+            </Text>
+          </View>
+        )}
+
+        <TouchableOpacity
+          style={styles.nextButton}
+          onPress={() => props.setLockerLocatorTarget('pickup')}
+        >
+          <Text style={styles.nextButtonText}>
+            {hasSelected ? '다른 사물함 선택하기' : '사물함 선택하기'}
+          </Text>
+        </TouchableOpacity>
+      </Animated.View>
+    );
+  };
 
   const renderDeliveryMode = () => {
     return renderQuestionBox(
@@ -393,7 +429,43 @@ export default function CreateRequestFunnel(props: Props) {
     );
   };
 
-  const renderDeliveryLocker = () => null; // Removed
+  const renderDeliveryLocker = () => {
+    if (!store.useDropoffLocker || !store.deliveryStation || currentStep < 4) return null;
+
+    const hasSelected = !!store.dropoffLockerId;
+
+    return (
+      <Animated.View
+        entering={FadeInDown.duration(300)}
+        layout={Layout.springify()}
+        style={styles.lockerCard}
+      >
+        <View style={styles.questionHeader}>
+          <Text style={styles.questionText}>도착역 사물함을 선택하세요</Text>
+        </View>
+
+        {hasSelected && (
+          <View style={styles.selectedBox}>
+            <Text style={styles.selectedBoxText}>
+              {store.deliveryStation.stationName} · {store.dropoffLockerId}
+              {store.dropoffLockerFee != null && store.dropoffLockerFee > 0
+                ? ` · ${store.dropoffLockerFee.toLocaleString()}원`
+                : ''}
+            </Text>
+          </View>
+        )}
+
+        <TouchableOpacity
+          style={styles.nextButton}
+          onPress={() => props.setLockerLocatorTarget('dropoff')}
+        >
+          <Text style={styles.nextButtonText}>
+            {hasSelected ? '다른 사물함 선택하기' : '사물함 선택하기'}
+          </Text>
+        </TouchableOpacity>
+      </Animated.View>
+    );
+  };
 
   const renderItemInfo = () => {
     const hasValue = !!store.packageItemName && !!store.packageDescription && !!store.packageSize && !!store.weightKg;
@@ -651,7 +723,13 @@ export default function CreateRequestFunnel(props: Props) {
         <View style={styles.quoteBreakdown}>
           <QuoteBreakdownRow label="기본요금" value={card.pricing.baseFee} />
           <QuoteBreakdownRow label="거리요금" value={card.pricing.distanceFee} />
-          {card.pricing.lockerFee > 0 && <QuoteBreakdownRow label="사물함" value={card.pricing.lockerFee} />}
+          <QuoteBreakdownRow label="무게 추가요금" value={card.pricing.weightFee} />
+          <QuoteBreakdownRow label="크기 추가요금" value={card.pricing.sizeFee} />
+          <QuoteBreakdownRow label="사물함 이용료" value={card.pricing.lockerFee} />
+          <QuoteBreakdownRow label="출발지 방문 요금" value={card.pricing.addressPickupFee} />
+          <QuoteBreakdownRow label="도착지 방문 요금" value={card.pricing.addressDropoffFee} />
+          <QuoteBreakdownRow label="플랫폼 이용료" value={card.pricing.serviceFee} />
+          <QuoteBreakdownRow label="부가세(VAT)" value={card.pricing.vat} />
           <View style={styles.quoteDivider} />
           <QuoteBreakdownRow label="최종 결제 금액" value={finalPrice} strong />
         </View>
@@ -726,4 +804,5 @@ const styles = StyleSheet.create({
   errorText: { color: Colors.error, fontSize: Typography.fontSize.sm, fontWeight: Typography.fontWeight.bold, marginTop: Spacing.xs },
   currentLocationButton: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', padding: Spacing.md, backgroundColor: Colors.surface, borderRadius: BorderRadius.md, borderWidth: 1, borderColor: Colors.primary, borderStyle: 'dashed', gap: Spacing.xs, marginTop: Spacing.xs },
   currentLocationText: { color: Colors.primary, fontSize: Typography.fontSize.sm, fontWeight: Typography.fontWeight.bold },
+  lockerCard: { backgroundColor: Colors.surface, borderRadius: BorderRadius.lg, padding: Spacing.xl, borderWidth: 1, borderColor: Colors.border, marginTop: Spacing.md },
 });

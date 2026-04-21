@@ -1,3 +1,4 @@
+import { Platform } from 'react-native';
 import * as Location from 'expo-location';
 
 export interface LocationData {
@@ -38,6 +39,28 @@ export class LocationService {
 
   async getCurrentLocation(): Promise<LocationData | null> {
     try {
+      if (Platform.OS === 'web' && typeof navigator !== 'undefined' && navigator.geolocation) {
+        return new Promise<LocationData | null>((resolve) => {
+          navigator.geolocation.getCurrentPosition(
+            (position) => {
+              resolve({
+                latitude: position.coords.latitude,
+                longitude: position.coords.longitude,
+                accuracy: position.coords.accuracy ?? 0,
+                altitude: position.coords.altitude ?? null,
+                speed: position.coords.speed ?? null,
+                heading: position.coords.heading ?? null,
+              });
+            },
+            (error) => {
+              console.warn('[location-service.web] geolocation failed:', error.message);
+              resolve(null);
+            },
+            { enableHighAccuracy: false, timeout: 10000, maximumAge: 60000 }
+          );
+        });
+      }
+
       const hasPermission = await this.requestLocationPermission();
       if (!hasPermission) {
         return null;

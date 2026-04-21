@@ -50,7 +50,7 @@ export function InteractiveNaverMap({
           border: 2px solid white;
         }
       </style>
-      <script type="text/javascript" src="https://oapi.map.naver.com/openapi/v3/maps.js?ncpClientId=${clientId}"></script>
+      <script type="text/javascript" src="https://oapi.map.naver.com/openapi/v3/maps.js?ncpKeyId=${clientId}"></script>
     </head>
     <body>
       <div id="map"></div>

@@ -97,7 +97,7 @@ export function getNaverWebSdkUrl(): string {
     return '';
   }
 
-  return `https://oapi.map.naver.com/openapi/v3/maps.js?ncpClientId=${encodeURIComponent(
+  return `https://oapi.map.naver.com/openapi/v3/maps.js?ncpKeyId=${encodeURIComponent(
     clientId
   )}`;
 }
