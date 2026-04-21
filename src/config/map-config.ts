@@ -24,11 +24,7 @@ export function isMapEnabled(): boolean {
 }
 
 export function canUseDynamicWebMap(): boolean {
-  const isForcedStaticHost =
-    typeof window !== 'undefined' && window.location.hostname === 'ganengile.web.app';
-
   return (
-    !isForcedStaticHost &&
     mapConfig.enabled &&
     mapConfig.dynamicWebEnabled &&
     mapConfig.provider !== 'none' &&

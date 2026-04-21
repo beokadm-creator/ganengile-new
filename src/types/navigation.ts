@@ -136,6 +136,8 @@ export type MainStackParamList = {
     stationId?: string;
     stationName?: string;
     lockerId?: string;
+    currentLatitude?: number;
+    currentLongitude?: number;
   };
 
   DisputeResolution: {

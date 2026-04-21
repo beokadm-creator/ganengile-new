@@ -158,11 +158,18 @@ export default function LockerMapScreen(): JSX.Element {
     longitude: 126.978,
   };
 
+  const nearbyItems = currentLocation
+    ? mapItems.filter((item) => item.distanceMeters != null && item.distanceMeters <= 2000)
+    : [];
+
   const handleSelect = (item: LockerMapItem): void => {
     navigation.navigate('LockerSelection', {
       stationId: item.locker.location.stationId,
       stationName: item.locker.location.stationName,
       lockerId: item.locker.lockerId,
+      ...(currentLocation
+        ? { currentLatitude: currentLocation.latitude, currentLongitude: currentLocation.longitude }
+        : {}),
     });
   };
 
@@ -184,9 +191,13 @@ export default function LockerMapScreen(): JSX.Element {
       ListHeaderComponent={
         <>
           <View style={styles.hero}>
-            <Text style={styles.title}>주변 사물함 보기</Text>
+            <Text style={styles.title}>
+              {currentLocation ? '내 주변 사물함' : '사물함 목록'}
+            </Text>
             <Text style={styles.subtitle}>
-              내 주변이나 지하철역 근처에 있는 사용 가능한 사물함을 확인할 수 있습니다.
+              {currentLocation
+                ? '현재 위치에서 가까운 사물함을 보여드려요.'
+                : '위치 권한을 허용하면 내 주변 사물함을 볼 수 있어요.'}
             </Text>
           </View>
 
@@ -214,18 +225,37 @@ export default function LockerMapScreen(): JSX.Element {
           <Text style={styles.emptyBody}>다른 시간대에 다시 확인하거나 일반 배송 흐름으로 진행해 주세요.</Text>
         </View>
       }
-      renderItem={({ item }) => (
-        <TouchableOpacity style={styles.card} onPress={() => handleSelect(item)}>
-          <View style={styles.cardHeader}>
-            <Text style={styles.cardTitle}>{item.locker.location.stationName}</Text>
-            <Text style={styles.badge}>{formatDistance(item.distanceMeters)}</Text>
-          </View>
-          <Text style={styles.cardBody}>
-            {item.locker.location.line ?? '노선 정보 없음'} · {item.locker.location.floor}층 · {item.locker.location.section}
-          </Text>
-          <Text style={styles.cardMeta}>{formatLockerPricing(item.locker)}</Text>
-        </TouchableOpacity>
-      )}
+      renderItem={({ item, index }) => {
+        const isNearby = item.distanceMeters != null && item.distanceMeters <= 2000;
+        const showNearbyHeader =
+          currentLocation &&
+          nearbyItems.length > 0 &&
+          index === nearbyItems.length &&
+          !isNearby;
+
+        return (
+          <>
+            {showNearbyHeader && (
+              <View style={styles.sectionDivider}>
+                <Text style={styles.sectionLabel}>다른 역 사물함</Text>
+              </View>
+            )}
+            <TouchableOpacity
+              style={[styles.card, isNearby ? styles.cardNearby : undefined]}
+              onPress={() => handleSelect(item)}
+            >
+              <View style={styles.cardHeader}>
+                <Text style={styles.cardTitle}>{item.locker.location.stationName}</Text>
+                <Text style={styles.badge}>{formatDistance(item.distanceMeters)}</Text>
+              </View>
+              <Text style={styles.cardBody}>
+                {item.locker.location.line ?? '노선 정보 없음'} · {item.locker.location.floor}층 · {item.locker.location.section}
+              </Text>
+              <Text style={styles.cardMeta}>{formatLockerPricing(item.locker)}</Text>
+            </TouchableOpacity>
+          </>
+        );
+      }}
     />
   );
 }
@@ -313,5 +343,18 @@ const styles = StyleSheet.create({
   cardMeta: {
     color: Colors.textSecondary,
     fontSize: Typography.fontSize.sm,
+  },
+  cardNearby: {
+    borderWidth: 1,
+    borderColor: Colors.primary,
+  },
+  sectionDivider: {
+    paddingTop: Spacing.sm,
+  },
+  sectionLabel: {
+    fontSize: Typography.fontSize.sm,
+    fontWeight: Typography.fontWeight.bold,
+    color: Colors.textSecondary,
+    textTransform: 'uppercase' as const,
   },
 });

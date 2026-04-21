@@ -13,6 +13,7 @@ import { RouteProp, useNavigation, useRoute } from '@react-navigation/native';
 import { createLockerReservation, getLockersByStation } from '../../services/locker-service';
 import { requireUserId } from '../../services/firebase';
 import { QRCodeService } from '../../services/qrcode-service';
+import { locationService } from '../../services/location-service';
 import type { Locker } from '../../types/locker';
 import type { MainStackNavigationProp, MainStackParamList } from '../../types/navigation';
 import { Colors, Spacing, BorderRadius } from '../../theme';
@@ -20,15 +21,35 @@ import { Typography } from '../../theme/typography';
 
 type LockerSelectionRoute = RouteProp<MainStackParamList, 'LockerSelection'>;
 
+function formatDistance(meters: number | null): string {
+  if (meters == null) return '';
+  if (meters < 1000) return `${Math.round(meters)}m`;
+  return `${(meters / 1000).toFixed(1)}km`;
+}
+
+function computeLockerDistance(
+  locker: Locker,
+  lat: number | undefined,
+  lng: number | undefined,
+): number | null {
+  if (lat == null || lng == null) return null;
+  const lockerLat = locker.location.latitude;
+  const lockerLng = locker.location.longitude;
+  if (lockerLat == null || lockerLng == null) return null;
+  return locationService.calculateDistance(lat, lng, lockerLat, lockerLng);
+}
+
 export default function LockerSelectionScreen() {
   const navigation = useNavigation<MainStackNavigationProp>();
   const route = useRoute<LockerSelectionRoute>();
-  const { stationId, stationName, lockerId } = route.params ?? {};
+  const { stationId, stationName, lockerId, currentLatitude, currentLongitude } = route.params ?? {};
 
   const [lockers, setLockers] = useState<Locker[]>([]);
   const [loading, setLoading] = useState(true);
   const [reserving, setReserving] = useState(false);
   const [selectedLockerId, setSelectedLockerId] = useState<string | null>(lockerId ?? null);
+
+  const hasLocation = currentLatitude != null && currentLongitude != null;
 
   const loadLockers = useCallback(async (targetStationId: string): Promise<void> => {
     try {
@@ -53,6 +74,15 @@ export default function LockerSelectionScreen() {
     }
     void loadLockers(stationId);
   }, [loadLockers, stationId]);
+
+  const sortedLockers = useMemo(() => {
+    if (!hasLocation) return lockers;
+    return [...lockers].sort((a, b) => {
+      const distA = computeLockerDistance(a, currentLatitude, currentLongitude);
+      const distB = computeLockerDistance(b, currentLatitude, currentLongitude);
+      return (distA ?? Number.MAX_SAFE_INTEGER) - (distB ?? Number.MAX_SAFE_INTEGER);
+    });
+  }, [lockers, hasLocation, currentLatitude, currentLongitude]);
 
   const selectedLocker = useMemo(
     () => lockers.find((locker) => locker.lockerId === selectedLockerId) ?? null,
@@ -121,18 +151,22 @@ export default function LockerSelectionScreen() {
       <View style={styles.header}>
         <Text style={styles.title}>{stationName ?? '사물함 선택'}</Text>
         <Text style={styles.subtitle}>
-          사물함 정보를 확인하거나 예약을 진행해 보세요.
+          {hasLocation
+            ? '현재 위치에서 가까운 사물함 순으로 정렬되어 있어요.'
+            : '사물함 정보를 확인하거나 예약을 진행해 보세요.'}
         </Text>
       </View>
 
-      {lockers.length === 0 ? (
+      {sortedLockers.length === 0 ? (
         <View style={styles.emptyCard}>
           <Text style={styles.emptyTitle}>이 역에는 선택 가능한 사물함이 없어요</Text>
           <Text style={styles.emptyBody}>다른 역을 선택하거나 일반 배송 흐름으로 진행해 주세요.</Text>
         </View>
       ) : (
-        lockers.map((locker) => {
+        sortedLockers.map((locker) => {
           const active = locker.lockerId === selectedLockerId;
+          const distance = computeLockerDistance(locker, currentLatitude, currentLongitude);
+          const distanceLabel = formatDistance(distance);
           return (
             <TouchableOpacity
               key={locker.lockerId}
@@ -141,7 +175,12 @@ export default function LockerSelectionScreen() {
             >
               <View style={styles.cardHeader}>
                 <Text style={styles.cardTitle}>{locker.location.section || locker.lockerId}</Text>
-                <Text style={styles.badge}>{locker.status}</Text>
+                <View style={styles.badgeRow}>
+                  {distanceLabel ? (
+                    <Text style={styles.distanceBadge}>{distanceLabel}</Text>
+                  ) : null}
+                  <Text style={styles.badge}>{locker.status}</Text>
+                </View>
               </View>
               <Text style={styles.cardBody}>
                 {locker.location.floor}층 · {locker.location.line || '노선 정보 없음'}
@@ -231,6 +270,21 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
     gap: Spacing.md,
+  },
+  badgeRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.xs,
+  },
+  distanceBadge: {
+    fontSize: Typography.fontSize.xs,
+    fontWeight: Typography.fontWeight.bold,
+    color: Colors.primary,
+    backgroundColor: Colors.primaryMint,
+    borderRadius: BorderRadius.full,
+    paddingHorizontal: Spacing.sm,
+    paddingVertical: Spacing.xs,
+    overflow: 'hidden',
   },
   cardTitle: {
     flex: 1,
