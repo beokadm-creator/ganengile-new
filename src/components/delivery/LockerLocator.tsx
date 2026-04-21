@@ -111,6 +111,7 @@ export default function LockerLocator({
   const [viewMode, setViewMode] = useState<'list' | 'map'>('list');
   const [includeNonSubway, setIncludeNonSubway] = useState(false);
   const [userLocation, setUserLocation] = useState<LocationData | null>(null);
+  const [isNearbyFallback, setIsNearbyFallback] = useState(false);
 
   const loadLockers = useCallback(
     async (abortSignal?: AbortSignal): Promise<void> => {
@@ -139,14 +140,62 @@ export default function LockerLocator({
         }
 
         let lockerList: Locker[] = [];
+        let nearbyFallback = false;
+
         if (includeNonSubway) {
           lockerList = await getNonSubwayLockers();
         } else if (activeStationId) {
           lockerList = await getLockersByStation(activeStationId);
+
+          if (lockerList.length === 0 && targetStation) {
+            const stationLat = getStationLat(targetStation);
+            const stationLng = getStationLng(targetStation);
+
+            if (stationLat != null && stationLng != null) {
+              const stationLocation: LocationData = {
+                latitude: stationLat,
+                longitude: stationLng,
+                accuracy: 0,
+                altitude: null,
+                speed: null,
+                heading: null,
+              };
+
+              const nearbyStations = locationService.findNearestStations(
+                stationLocation,
+                stations.map(s => ({
+                  name: s.stationName,
+                  line: s.lines?.[0]?.lineName ?? '',
+                  latitude: s.location?.latitude ?? 0,
+                  longitude: s.location?.longitude ?? 0,
+                  stationId: s.stationId,
+                })),
+                5
+              );
+
+              // 자기 자신(선택한 역)은 제외
+              const otherStations = nearbyStations.filter(
+                ns => ns.station.stationId !== activeStationId && ns.station.latitude !== 0
+              );
+
+              // 주변 역들의 사물함 조회 (병렬)
+              const nearbyLockerLists = await Promise.all(
+                otherStations.slice(0, 5).map(ns => getLockersByStation(ns.station.stationId))
+              );
+
+              lockerList = nearbyLockerLists.flat();
+
+              if (lockerList.length > 0) {
+                nearbyFallback = true;
+              }
+            }
+          }
         } else {
           // If no station is selected, don't fetch all lockers to avoid massive data load
           lockerList = [];
         }
+
+        setIsNearbyFallback(nearbyFallback);
 
         if (abortSignal?.aborted) return;
 
@@ -330,6 +379,15 @@ export default function LockerLocator({
         </TouchableOpacity>
       </View>
 
+      {isNearbyFallback && (
+        <View style={styles.nearbyBanner}>
+          <Ionicons name="information-circle" size={18} color={Colors.warning} />
+          <Text style={styles.nearbyBannerText}>
+            선택한 역에 사용 가능한 사물함이 없습니다. 주변 역 사물함을 보여드립니다.
+          </Text>
+        </View>
+      )}
+
       {!hideHeader && (
         <View style={styles.header}>
           <View style={styles.headerTop}>
@@ -493,5 +551,23 @@ const styles = StyleSheet.create({
   mapRowBody: { flex: 1, gap: 2 },
   mapRowTitle: { fontSize: FONT_SM, fontWeight: Typography.fontWeight.bold, color: Colors.gray900 },
   mapRowMeta: { fontSize: FONT_XS, color: Colors.gray600 },
+  nearbyBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.xs,
+    marginHorizontal: Spacing.lg,
+    marginBottom: Spacing.sm,
+    padding: Spacing.md,
+    backgroundColor: '#FFF8E1',
+    borderRadius: BorderRadius.md,
+    borderWidth: 1,
+    borderColor: '#FFE082',
+  },
+  nearbyBannerText: {
+    flex: 1,
+    fontSize: FONT_XS,
+    lineHeight: 16,
+    color: '#F57F17',
+  },
 });
 
