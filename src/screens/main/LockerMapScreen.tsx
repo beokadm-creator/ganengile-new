@@ -13,7 +13,7 @@ import { useNavigation } from '@react-navigation/native';
 import { NaverMapCard } from '../../components/maps/NaverMapCard';
 import { getAllStations } from '../../services/config-service';
 import { locationService, type LocationData } from '../../services/location-service';
-import { getAvailableLockers } from '../../services/locker-service';
+import { getAllLockers, fetchKricLockersForStations } from '../../services/locker-service';
 import type { Station } from '../../types/config';
 import type { Locker } from '../../types/locker';
 import type { MainStackNavigationProp } from '../../types/navigation';
@@ -66,13 +66,33 @@ export default function LockerMapScreen(): JSX.Element {
       try {
         setLoading(true);
         const [nextLockers, nextStations, nextLocation] = await Promise.all([
-          getAvailableLockers(),
+          getAllLockers(),
           getAllStations(),
           locationService.getCurrentLocation(),
         ]);
 
         if (!isMounted.current) return;
-        setLockers(nextLockers);
+
+        let enrichedLockers = nextLockers;
+        if (nextLockers.length < 5 && nextStations.length > 0) {
+          const kricStationIds = nextStations
+            .filter((s) => s.kric?.stationCode && s.kric?.lineCode)
+            .map((s) => s.stationId)
+            .slice(0, 15);
+
+          if (kricStationIds.length > 0) {
+            const kricLockers = await fetchKricLockersForStations(kricStationIds);
+            if (kricLockers.length > 0) {
+              const merged = new Map<string, Locker>();
+              nextLockers.forEach((l) => merged.set(l.lockerId, l));
+              kricLockers.forEach((l) => merged.set(l.lockerId, l));
+              enrichedLockers = Array.from(merged.values());
+            }
+          }
+        }
+
+        if (!isMounted.current) return;
+        setLockers(enrichedLockers);
         setStations(nextStations);
         setCurrentLocation(nextLocation);
       } catch (error) {

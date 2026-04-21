@@ -376,6 +376,27 @@ async function fetchKricLockers(stationId?: string): Promise<Locker[]> {
   }
 }
 
+export async function fetchKricLockersForStations(stationIds: string[]): Promise<Locker[]> {
+  if (!KRIC_SERVICE_KEY || stationIds.length === 0) {
+    return [];
+  }
+
+  const MAX_STATIONS = 15;
+  const limitedIds = stationIds.slice(0, MAX_STATIONS);
+
+  const results = await Promise.all(
+    limitedIds.map(async (stationId) => {
+      try {
+        return await fetchKricLockers(stationId);
+      } catch {
+        return [];
+      }
+    })
+  );
+
+  return results.flat();
+}
+
 async function fetchExternalLockers(stationId?: string): Promise<Locker[]> {
   if (KRIC_SERVICE_KEY) {
     const kricLockers = await fetchKricLockers(stationId);
@@ -809,6 +830,10 @@ export async function unlockLocker(
     const message = error instanceof Error ? error.message : '사물함을 열 수 없습니다.';
     return { success: false, message };
   }
+}
+
+export async function getAllLockers(): Promise<Locker[]> {
+  return lockerService.getAllLockers();
 }
 
 export async function getAvailableLockers(): Promise<Locker[]> {

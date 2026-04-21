@@ -83,8 +83,41 @@ export function NaverMapCard({
 }: NaverMapCardProps): ReactElement {
   const mapId = useId().replace(/:/g, '_');
   const [dynamicReady, setDynamicReady] = useState(false);
+  const [authFailed, setAuthFailed] = useState(false);
   const mapInstanceRef = useRef<any>(null);
   const overlaysRef = useRef<any[]>([]);
+
+  // Intercept console.error to detect Naver Maps SDK auth failure
+  useEffect(() => {
+    if (!canUseDynamicWebMap()) return;
+
+    const originalError = console.error;
+    console.error = (...args: unknown[]) => {
+      const message = args
+        .map((a) => (typeof a === 'string' ? a : String(a)))
+        .join(' ');
+      if (message.includes('인증이 실패') || message.includes('Authentication Failed')) {
+        setAuthFailed(true);
+      }
+      originalError.apply(console, args);
+    };
+
+    return () => {
+      console.error = originalError;
+    };
+  }, []);
+
+  // Cleanup map instance when auth fails
+  useEffect(() => {
+    if (authFailed && mapInstanceRef.current) {
+      try {
+        mapInstanceRef.current.destroy();
+      } catch {
+        // ignore cleanup errors
+      }
+      mapInstanceRef.current = null;
+    }
+  }, [authFailed]);
 
   useEffect(() => {
     if (!canUseDynamicWebMap()) {
@@ -97,6 +130,15 @@ export function NaverMapCard({
     }
 
     let cancelled = false;
+
+    const timeoutId = setTimeout(() => {
+      if (!cancelled && mapInstanceRef.current) {
+        const target = document.getElementById(mapId);
+        if (target && target.children.length === 0) {
+          setAuthFailed(true);
+        }
+      }
+    }, 8000);
 
     void ensureNaverMapScript(sdkUrl)
       .then(() => {
@@ -120,6 +162,7 @@ export function NaverMapCard({
 
     return () => {
       cancelled = true;
+      clearTimeout(timeoutId);
       try {
         if (mapInstanceRef.current && typeof mapInstanceRef.current.destroy === 'function') {
           mapInstanceRef.current.destroy();
@@ -190,6 +233,19 @@ export function NaverMapCard({
       })),
     [markers],
   );
+
+  if (authFailed) {
+    return (
+      <StaticMapPreview
+        title={title}
+        subtitle={subtitle}
+        center={center}
+        markers={markerSummary}
+        path={path}
+        height={height}
+      />
+    );
+  }
 
   if (canUseDynamicWebMap()) {
     return (
