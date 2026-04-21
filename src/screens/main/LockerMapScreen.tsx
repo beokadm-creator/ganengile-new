@@ -64,7 +64,7 @@ function formatLockerPricing(locker: Locker): string {
     return `기본 ${basePrice.toLocaleString()}원`;
   }
 
-  return '요금 정보 확인 중';
+  return '운영 요금 미등록';
 }
 
 export default function LockerMapScreen(): JSX.Element {

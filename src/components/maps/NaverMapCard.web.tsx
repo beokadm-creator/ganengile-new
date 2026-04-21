@@ -116,10 +116,6 @@ export function NaverMapCard({
 
   useEffect(() => {
     if (fallbackToStatic && mapInstanceRef.current) {
-      try {
-        mapInstanceRef.current.destroy();
-      } catch {
-      }
       mapInstanceRef.current = null;
     }
   }, [fallbackToStatic]);
@@ -175,8 +171,7 @@ export function NaverMapCard({
           mapInstanceRef.current.destroy();
           mapInstanceRef.current = null;
         }
-      } catch (e) {
-        console.warn('Error during Naver Map cleanup:', e);
+      } catch {
       }
     };
   }, [fallbackToStatic, mapId]);

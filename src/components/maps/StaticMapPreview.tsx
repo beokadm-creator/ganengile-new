@@ -133,7 +133,7 @@ export default function StaticMapPreview({
         key={uri}
         source={{ uri }}
         style={[styles.image, height ? { height } : undefined]}
-        resizeMode="cover"
+        contentFit="cover"
         accessibilityLabel={title}
         onLoadStart={() => {
           setLoading(true);
