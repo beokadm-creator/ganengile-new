@@ -54,12 +54,8 @@ export async function middleware(request: NextRequest) {
 
 /**
  * Matcher configuration to exclude static assets and optimize middleware execution.
- * Runs on all routes except:
- * - _next/static (static files)
- * - _next/image (image optimization files)
- * - favicon.ico
- * - Static assets with extensions: .png, .jpg, .jpeg, .svg, .gif, .ico, .webp
+ * Runs on all routes except public paths.
  */
 export const config = {
-  matcher: ['/((?!_next/static|_next/image|favicon.ico.*\\.(png|jpg|jpeg|svg|gif|ico|webp)$).*)'],
+  matcher: ['/((?!_next/|favicon.ico).*)'],
 };

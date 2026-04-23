@@ -65,15 +65,6 @@ const sizeLabel: Record<string, string> = {
   large: '대형',
 };
 
-const operatorLabel: Record<string, string> = {
-  seoul_metro: '서울메트로',
-  korail: '코레일',
-  local_gov: '지자체',
-  cu: 'CU',
-  gs25: 'GS25',
-  locker_box: 'Locker Box',
-};
-
 function formatFloor(floor: number | undefined): string {
   if (floor === undefined) return '-';
   if (floor < 0) return `B${Math.abs(floor)}`;
@@ -136,11 +127,7 @@ export default function LockersPage() {
         }
       );
       if (res.ok) {
-        setItems((prev) =>
-          prev.map((item) =>
-            item.id === editingLocker.id ? { ...item, status: newStatus as LockerItem['status'] } : item
-          )
-        );
+        await loadData();
         setEditingLocker(null);
       }
     } catch (_error) {
@@ -158,7 +145,7 @@ export default function LockersPage() {
         method: 'DELETE',
       });
       if (res.ok) {
-        setItems((prev) => prev.filter((i) => i.id !== item.id));
+        await loadData();
       }
     } catch (_error) {
       void _error;
