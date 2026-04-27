@@ -254,7 +254,7 @@ export default function ProfileScreen({ navigation }: { navigation: MainStackNav
   }
 
   function handleLogout() {
-    if (typeof window !== 'undefined') {
+    if (Platform.OS === 'web') {
       const confirmed = window.confirm('로그아웃하시겠습니까?');
       if (!confirmed) {
         return;

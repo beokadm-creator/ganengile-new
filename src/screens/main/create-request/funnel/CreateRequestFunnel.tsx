@@ -57,6 +57,7 @@ type Props = {
   isPhoneVerified: boolean;
   otpSending: boolean;
   otpVerifying: boolean;
+  otpHintCode: string | null;
 };
 
 export default function CreateRequestFunnel(props: Props) {
@@ -643,7 +644,6 @@ export default function CreateRequestFunnel(props: Props) {
             keyboardType="phone-pad"
             value={props.contactPhoneNumber}
             onChangeText={props.handleContactPhoneChange}
-            editable={!props.isPhoneVerified}
           />
           <TouchableOpacity 
             style={[styles.nextButton, { marginTop: 0, justifyContent: 'center' }]} 
@@ -675,6 +675,12 @@ export default function CreateRequestFunnel(props: Props) {
               </Text>
             </TouchableOpacity>
           </View>
+        ) : null}
+
+        {props.otpHintCode ? (
+          <Text style={{ color: Colors.gray500, fontSize: 12, marginTop: 4 }}>
+            [개발] 인증번호: {props.otpHintCode}
+          </Text>
         ) : null}
 
         {props.recipientPrivacyConfig?.thirdPartyConsentRequired && (

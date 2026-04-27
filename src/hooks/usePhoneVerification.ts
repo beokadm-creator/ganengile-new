@@ -48,7 +48,6 @@ export function usePhoneVerification({
     normalizedVerifiedPhone === normalizedContactPhone;
 
   function handleContactPhoneChange(value: string) {
-    if (hasLockedVerifiedPhone) return;
     const formatted = formatPhoneDigits(value);
     setContactPhoneNumber(formatted);
     if (normalizePhoneNumber(formatted) !== normalizedVerifiedPhone) {

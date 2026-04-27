@@ -4,6 +4,7 @@ import { signOut } from 'firebase/auth';
 import { doc, serverTimestamp, updateDoc } from 'firebase/firestore';
 
 import { useAuth } from './AuthContext';
+import { Platform } from 'react-native';
 import { auth, db } from '../services/firebase';
 import { createUser, getUserById } from '../services/user-service';
 import { AuthProviderType, UserRole, type User } from '../types/user';
@@ -319,7 +320,7 @@ export function UserProvider({ children }: UserProviderProps) {
       setCurrentRole(null);
       setLoading(false);
 
-      if (typeof window !== 'undefined') {
+      if (Platform.OS === 'web' && typeof window !== 'undefined') {
         window.location.replace('/');
       }
     } catch (error) {

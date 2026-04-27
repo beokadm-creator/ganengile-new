@@ -870,8 +870,9 @@ export default function CreateRequestScreen({ navigation, route }: Props) {
         contactOtpCode={contactOtpCode}
         setContactOtpCode={setContactOtpCode}
         isPhoneVerified={isPhoneVerified}
-        otpSending={false}
-        otpVerifying={false}
+        otpSending={contactOtpSending}
+        otpVerifying={contactOtpVerifying}
+        otpHintCode={contactOtpHintCode}
         setLockerLocatorTarget={setLockerLocatorTarget}
       />
 
