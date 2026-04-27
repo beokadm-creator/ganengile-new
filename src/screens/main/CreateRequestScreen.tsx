@@ -425,9 +425,22 @@ export default function CreateRequestScreen({ navigation, route }: Props) {
     void run();
   }, [user?.uid]);
 
+  const contactPhoneInitializedRef = useRef(false);
   useEffect(() => {
-    setContactPhoneNumber(formatPhoneDigits(user?.phoneVerification?.phoneNumber ?? user?.phoneNumber ?? ''));
-  }, [user?.phoneNumber, user?.phoneVerification?.phoneNumber]);
+    // Initialize once with the user's stored number. After that, never overwrite
+    // the user's typed input (e.g., refreshUser() after OTP verification could
+    // otherwise reset what the user just typed).
+    if (contactPhoneInitializedRef.current) return;
+    if (contactPhoneNumber) {
+      // User already has a value (typed or restored from draft) — don't overwrite.
+      contactPhoneInitializedRef.current = true;
+      return;
+    }
+    const initial = user?.phoneVerification?.phoneNumber ?? user?.phoneNumber ?? '';
+    if (!initial) return; // wait until user data is loaded
+    setContactPhoneNumber(formatPhoneDigits(initial));
+    contactPhoneInitializedRef.current = true;
+  }, [user?.phoneNumber, user?.phoneVerification?.phoneNumber, contactPhoneNumber]);
 
   useEffect(() => {
     let mounted = true;

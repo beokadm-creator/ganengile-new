@@ -136,7 +136,7 @@ export default function CreateRequestFunnel(props: Props) {
             </TouchableOpacity>
           )}
         </View>
-        <View pointerEvents={isActive ? 'auto' : 'none'}>{content}</View>
+        <View style={{ pointerEvents: isActive ? 'auto' : 'none' }}>{content}</View>
       </Animated.View>
     );
   };

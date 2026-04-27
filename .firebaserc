@@ -1,5 +1,17 @@
 {
   "projects": {
     "default": "ganengile"
+  },
+  "targets": {
+    "ganengile": {
+      "hosting": {
+        "web": [
+          "ganengile"
+        ],
+        "admin": [
+          "ganengile-admin"
+        ]
+      }
+    }
   }
 }
