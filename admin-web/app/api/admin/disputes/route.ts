@@ -1,8 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import type { Firestore } from 'firebase-admin/firestore';
-import { getAdminDb } from '@/lib/firebase-admin';
+import { db } from '@/lib/firebase-admin';
 import { isAdmin } from '@/lib/auth';
 import { getWalletSummary } from '../../../../../src/utils/wallet-balance';
+import type { WalletBalances } from '../../../../../src/types/beta1-wallet';
 
 type Responsibility = 'giller' | 'requester' | 'system';
 
@@ -35,7 +36,7 @@ interface ResolvePayload {
 }
 
 function getDb(): Firestore {
-  return getAdminDb() as unknown as Firestore;
+  return db as unknown as Firestore;
 }
 
 function normalizeDisputeItem(id: string, data: DisputeDoc, requestData?: any) {
@@ -194,12 +195,12 @@ export async function PATCH(req: NextRequest) {
             pendingWithdrawalBalance: Number(rawBalances.pendingWithdrawalBalance ?? 0),
           };
 
-          const oldSummary = getWalletSummary(currentBalances as Record<string, unknown>);
+          const oldSummary = getWalletSummary(currentBalances as unknown as WalletBalances);
           const newBalances = {
             ...currentBalances,
             promoBalance: currentBalances.promoBalance + compensationAmount, // 보상금은 프로모션 포인트로 지급
           };
-          const newSummary = getWalletSummary(newBalances as Record<string, unknown>);
+          const newSummary = getWalletSummary(newBalances as unknown as WalletBalances);
           const now = new Date();
           
           transaction.update(userRef, {

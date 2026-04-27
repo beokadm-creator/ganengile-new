@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import type { Firestore } from 'firebase-admin/firestore';
-import { getAdminDb } from '@/lib/firebase-admin';
+import { db } from '@/lib/firebase-admin';
 import { isAdmin } from '@/lib/auth';
 import {
   DEFAULT_SHARED_PRICING_POLICY,
@@ -10,7 +10,7 @@ import {
 type UnknownRecord = Record<string, unknown>;
 
 function getDb(): Firestore {
-  return getAdminDb() as unknown as Firestore;
+  return db as unknown as Firestore;
 }
 
 function asNumber(value: unknown): number | null {

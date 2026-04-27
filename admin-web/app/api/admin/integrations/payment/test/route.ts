@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getAdminDb } from '@/lib/firebase-admin';
+import { db } from '@/lib/firebase-admin';
 import { isAdmin } from '@/lib/auth';
 
 export async function POST(req: NextRequest) {
@@ -13,7 +13,7 @@ export async function POST(req: NextRequest) {
     orderName?: string;
   };
 
-  const db = getAdminDb();
+   
   const privateSnap = await db.collection('admin_settings').doc('payment').get();
   const publicSnap = await db.collection('config_integrations').doc('payment').get();
   const privateConfig = privateSnap.exists ? privateSnap.data() : {};

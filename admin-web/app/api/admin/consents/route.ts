@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import type { Firestore, Timestamp } from 'firebase-admin/firestore';
-import { getAdminDb } from '@/lib/firebase-admin';
+import { db } from '@/lib/firebase-admin';
 import { isAdmin } from '@/lib/auth';
 
 function tsToISO(value: unknown): string | null {
@@ -17,10 +17,10 @@ export async function GET() {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
-  const db: Firestore = getAdminDb();
+   
   const snap = await db.collection('consentTemplates').orderBy('sortOrder', 'asc').get();
 
-  const items = snap.docs.map((doc) => {
+  const items = snap.docs.map((doc: any) => {
     const data = doc.data() ?? {};
     return {
       id: doc.id,
@@ -65,7 +65,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'key, title, content are required' }, { status: 400 });
   }
 
-  const db: Firestore = getAdminDb();
+   
   const docRef = db.collection('consentTemplates').doc(key);
   const now = new Date();
 

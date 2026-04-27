@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { getAdminDb } from '@/lib/firebase-admin';
+import { db } from '@/lib/firebase-admin';
 import { isAdmin } from '@/lib/auth';
 
 export async function GET(request: Request) {
@@ -8,7 +8,7 @@ export async function GET(request: Request) {
   }
 
   try {
-    const adminDb = getAdminDb();
+     
 
     const { searchParams } = new URL(request.url);
     const status = searchParams.get('status') || 'pending';
@@ -17,13 +17,13 @@ export async function GET(request: Request) {
 
     try {
       // Fetch from partner_settlements with order
-      const settlementsRef = adminDb.collection('partner_settlements')
+      const settlementsRef = db.collection('partner_settlements')
         .where('status', '==', status)
         .orderBy('createdAt', 'desc')
         .limit(100);
 
       const snapshot = await settlementsRef.get();
-      items = snapshot.docs.map(doc => {
+      items = snapshot.docs.map((doc: any) => {
         const data = doc.data() as Record<string, any>;
         return {
           id: doc.id,
@@ -41,12 +41,12 @@ export async function GET(request: Request) {
       if (isIndexError) {
         console.warn('B2B Settlements: Missing index for status + createdAt, falling back to client-side sort');
         
-        const fallbackRef = adminDb.collection('partner_settlements')
+        const fallbackRef = db.collection('partner_settlements')
           .where('status', '==', status)
           .limit(100);
           
         const snapshot = await fallbackRef.get();
-        items = snapshot.docs.map(doc => {
+        items = snapshot.docs.map((doc: any) => {
           const data = doc.data() as Record<string, any>;
           return {
             id: doc.id,
@@ -54,7 +54,7 @@ export async function GET(request: Request) {
             createdAt: data.createdAt?.toDate?.()?.toISOString() || null,
             settledAt: data.settledAt?.toDate?.()?.toISOString() || null,
           };
-        }).sort((a, b) => {
+        }).sort((a: any, b: any) => {
           const timeA = a.createdAt ? new Date(a.createdAt).getTime() : 0;
           const timeB = b.createdAt ? new Date(b.createdAt).getTime() : 0;
           return timeB - timeA;

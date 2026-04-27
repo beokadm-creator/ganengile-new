@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getAdminDb } from '@/lib/firebase-admin';
+import { db } from '@/lib/firebase-admin';
 import { isAdmin } from '@/lib/auth';
 import { FieldValue } from 'firebase-admin/firestore';
 
@@ -26,7 +26,7 @@ export async function GET(
   const collection = validateCollection(searchParams.get('collection'));
 
   try {
-    const db = getAdminDb();
+     
     const doc = await db.collection(collection).doc(lockerId).get();
 
     if (!doc.exists) {
@@ -92,7 +92,7 @@ export async function PUT(
       updates.location = locationUpdate;
     }
 
-    const db = getAdminDb();
+     
     await db.collection(collection).doc(lockerId).update(updates);
 
     return NextResponse.json({ success: true });
@@ -115,7 +115,7 @@ export async function DELETE(
   const collection = validateCollection(searchParams.get('collection'));
 
   try {
-    const db = getAdminDb();
+     
     await db.collection(collection).doc(lockerId).delete();
 
     return NextResponse.json({ success: true });

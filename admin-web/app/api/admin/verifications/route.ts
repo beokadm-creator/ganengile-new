@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getAdminDb } from '@/lib/firebase-admin';
+import { db } from '@/lib/firebase-admin';
 import { isAdmin } from '@/lib/auth';
 
 function toMillis(value: unknown): number {
@@ -24,7 +24,7 @@ function toMillis(value: unknown): number {
 export async function GET(req: NextRequest) {
   if (!(await isAdmin())) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
-  const db = getAdminDb();
+   
   const { searchParams } = new URL(req.url);
   const status = searchParams.get('status') ?? 'pending';
 
@@ -78,7 +78,7 @@ export async function PATCH(req: NextRequest) {
   const status =
     action === 'approve' ? 'approved' : action === 'reject' ? 'rejected' : 'under_review';
 
-  const db = getAdminDb();
+   
   const ref = db.collection('users').doc(userId).collection('verification').doc(userId);
   const snap = await ref.get();
   if (!snap.exists) return NextResponse.json({ error: 'Not found' }, { status: 404 });

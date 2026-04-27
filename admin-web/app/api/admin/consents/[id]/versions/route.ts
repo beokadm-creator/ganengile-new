@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import type { Firestore, Timestamp } from 'firebase-admin/firestore';
-import { getAdminDb } from '@/lib/firebase-admin';
+import { db } from '@/lib/firebase-admin';
 import { isAdmin } from '@/lib/auth';
 
 function tsToISO(value: unknown): string | null {
@@ -21,7 +21,7 @@ export async function GET(
   }
 
   const { id } = await params;
-  const db: Firestore = getAdminDb();
+   
   const versionsSnap = await db
     .collection('consentTemplates')
     .doc(id)
@@ -30,7 +30,7 @@ export async function GET(
     .limit(50)
     .get();
 
-  const items = versionsSnap.docs.map((doc) => {
+  const items = versionsSnap.docs.map((doc: any) => {
     const data = doc.data() ?? {};
     return {
       id: doc.id,

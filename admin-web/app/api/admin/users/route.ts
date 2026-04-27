@@ -5,7 +5,7 @@ import type {
   Query,
   QueryDocumentSnapshot,
 } from 'firebase-admin/firestore';
-import { getAdminDb, getAdminApp } from '@/lib/firebase-admin';
+import { db, app } from '@/lib/firebase-admin';
 import { getAuth } from 'firebase-admin/auth';
 import { isAdmin } from '@/lib/auth';
 
@@ -103,12 +103,12 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
-  const db: Firestore = getAdminDb();
+   
   const { searchParams } = new URL(req.url);
   const search = searchParams.get('search') ?? '';
   const role = searchParams.get('role') ?? '';
 
-  let query: Query<UserDoc> = db
+  let query: any = db
     .collection('users')
     .withConverter<UserDoc>({
       toFirestore: (data) => data,
@@ -163,7 +163,7 @@ export async function PATCH(req: NextRequest) {
     return NextResponse.json({ error: 'Missing fields' }, { status: 400 });
   }
 
-  const db: Firestore = getAdminDb();
+   
   await db.collection('users').doc(userId).update({
     isActive,
     updatedAt: new Date(),
@@ -187,13 +187,13 @@ export async function DELETE(req: NextRequest) {
     return NextResponse.json({ error: 'Missing userId' }, { status: 400 });
   }
 
-  const db: Firestore = getAdminDb();
+   
   const userRef = db.collection('users').doc(userId);
   const userSnap = await userRef.get();
 
   if (!userSnap.exists) {
     try {
-      await getAuth(getAdminApp()).deleteUser(userId);
+      await getAuth(app).deleteUser(userId);
     } catch (e) {
       // Ignore if user not found in Auth
     }
@@ -224,9 +224,9 @@ export async function DELETE(req: NextRequest) {
   await Promise.all(deletions);
 
   // 2. Delete Firebase Auth user last to prevent orphaned data
-  try {
-    await getAuth(getAdminApp()).deleteUser(userId);
-  } catch (error) {
+    try {
+      await getAuth(app).deleteUser(userId);
+    } catch (error) {
     console.error(`Failed to delete Auth user ${userId}:`, error);
     // Even if Auth deletion fails, the DB is clean. 
     // It's better than DB being orphaned.

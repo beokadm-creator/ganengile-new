@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getAdminDb } from '@/lib/firebase-admin';
+import { db } from '@/lib/firebase-admin';
 import { isAdmin } from '@/lib/auth';
 import type { Query } from 'firebase-admin/firestore';
 
@@ -27,7 +27,7 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
-  const db = getAdminDb();
+   
   const { searchParams } = new URL(req.url);
   const collection = validateCollection(searchParams.get('collection'));
   const search = (searchParams.get('search') ?? '').toLowerCase();

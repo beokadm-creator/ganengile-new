@@ -1,5 +1,5 @@
 import { NextResponse, type NextRequest } from 'next/server';
-import { getAdminDb } from '@/lib/firebase-admin';
+import { db } from '@/lib/firebase-admin';
 import { isAdmin } from '@/lib/auth';
 
 const ACTIVE_STATUSES = ['pending', 'matched', 'accepted', 'picked_up', 'in_transit', 'arrived', 'at_locker', 'delivered', 'handover_pending', 'last_mile_in_progress'];
@@ -9,7 +9,7 @@ export async function GET(req: NextRequest) {
   if (!(await isAdmin())) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
   try {
-    const db = getAdminDb();
+     
     const { searchParams } = new URL(req.url);
     const tab = searchParams.get('tab') ?? 'active';
 
@@ -22,7 +22,7 @@ export async function GET(req: NextRequest) {
       .limit(100)
       .get();
 
-    const items = snap.docs.map((doc) => {
+    const items = snap.docs.map((doc: any) => {
       const d = doc.data();
       return {
         id: doc.id,

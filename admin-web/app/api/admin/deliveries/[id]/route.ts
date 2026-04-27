@@ -1,5 +1,5 @@
 import { NextResponse, type NextRequest } from 'next/server';
-import { getAdminDb } from '@/lib/firebase-admin';
+import { db } from '@/lib/firebase-admin';
 import { isAdmin } from '@/lib/auth';
 
 export async function PATCH(
@@ -18,7 +18,7 @@ export async function PATCH(
       return NextResponse.json({ error: 'Status is required' }, { status: 400 });
     }
 
-    const db = getAdminDb();
+     
     const deliveryRef = db.collection('deliveries').doc(id);
     const snap = await deliveryRef.get();
 

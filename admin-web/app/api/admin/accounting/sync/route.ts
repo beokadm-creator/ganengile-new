@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getAdminDb } from '@/lib/firebase-admin';
+import { db } from '@/lib/firebase-admin';
 import { isAdmin } from '@/lib/auth';
 
 export async function POST(req: NextRequest) {
@@ -16,7 +16,7 @@ export async function POST(req: NextRequest) {
     const endOfMonth = new Date(year, month, 0, 23, 59, 59, 999);
     const docId = `${year}-${String(month).padStart(2, '0')}`;
 
-    const db = getAdminDb();
+     
 
     let totalGrossRevenue = 0;
     let totalRevenueDiscount = 0;

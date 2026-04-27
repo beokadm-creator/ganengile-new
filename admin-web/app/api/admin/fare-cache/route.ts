@@ -1,12 +1,12 @@
 import { NextResponse } from 'next/server';
-import { getAdminDb } from '@/lib/firebase-admin';
+import { db } from '@/lib/firebase-admin';
 import { isAdmin } from '@/lib/auth';
 import { runFareCacheSync } from '@/lib/fare-cache-sync';
 
 export async function GET() {
   if (!(await isAdmin())) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
-  const db = getAdminDb();
+   
 
   const [totalCount, latestSnap, missingCodeCount] = await Promise.all([
     db.collection('config_fares').count().get(),
@@ -28,7 +28,7 @@ export async function POST() {
   if (!(await isAdmin())) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
   try {
-    const db = getAdminDb();
+     
     const result = await runFareCacheSync(db);
     return NextResponse.json({ ok: true, result });
   } catch (error) {

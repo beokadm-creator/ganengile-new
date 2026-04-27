@@ -1,9 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getAdminDb } from '@/lib/firebase-admin';
+import { db } from '@/lib/firebase-admin';
 import { isAdmin } from '@/lib/auth';
 import { readAccountLast4, readMaskedAccountNumber } from '../../../../../shared/bank-account';
 
 import { getWalletSummary } from '../../../../../src/utils/wallet-balance';
+import type { WalletBalances } from '../../../../../src/types/beta1-wallet';
 
 type UnknownRecord = Record<string, unknown>;
 
@@ -64,7 +65,7 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
-  const db = getAdminDb();
+   
   const { searchParams } = new URL(req.url);
   const status = searchParams.get('status') ?? 'pending';
 
@@ -197,7 +198,7 @@ export async function PATCH(req: NextRequest) {
     return NextResponse.json({ error: 'Missing fields' }, { status: 400 });
   }
 
-  const db = getAdminDb();
+   
   const ref = db.collection('withdraw_requests').doc(requestId);
   
   try {
@@ -241,7 +242,7 @@ export async function PATCH(req: NextRequest) {
             pendingWithdrawalBalance: Number(rawBalances.pendingWithdrawalBalance ?? 0),
           };
 
-          const oldSummary = getWalletSummary(currentBalances as Record<string, unknown>);
+          const oldSummary = getWalletSummary(currentBalances as unknown as WalletBalances);
           const newBalances = { ...currentBalances };
 
           if (action === 'approve') {
@@ -253,7 +254,7 @@ export async function PATCH(req: NextRequest) {
             newBalances.earnedBalance += amount;
           }
 
-          const newSummary = getWalletSummary(newBalances as Record<string, unknown>);
+          const newSummary = getWalletSummary(newBalances as unknown as WalletBalances);
           const now = new Date();
 
           // 1. 유저 업데이트 (Legacy fallback)

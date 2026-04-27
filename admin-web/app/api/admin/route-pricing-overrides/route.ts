@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getAdminDb } from '@/lib/firebase-admin';
+import { db } from '@/lib/firebase-admin';
 import { isAdmin } from '@/lib/auth';
 import {
   normalizeRoutePricingOverride,
@@ -13,9 +13,9 @@ export async function GET() {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
-  const db = getAdminDb();
+   
   const snap = await db.collection(COLLECTION).orderBy('updatedAt', 'desc').limit(100).get();
-  const items = snap.docs.map((doc) => ({
+  const items = snap.docs.map((doc: any) => ({
     id: doc.id,
     ...normalizeRoutePricingOverride(doc.data() as Partial<RoutePricingOverrideConfig>),
     updatedAt: doc.data().updatedAt ?? null,
@@ -34,7 +34,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'routeKey is required' }, { status: 400 });
   }
 
-  const db = getAdminDb();
+   
   await db.collection(COLLECTION).doc(body.routeKey).set({
     ...body,
     updatedAt: new Date(),
@@ -54,7 +54,7 @@ export async function PATCH(req: NextRequest) {
     return NextResponse.json({ error: 'routeKey is required' }, { status: 400 });
   }
 
-  const db = getAdminDb();
+   
   await db.collection(COLLECTION).doc(body.routeKey).set({
     ...body,
     updatedAt: new Date(),

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getAdminDb } from '@/lib/firebase-admin';
+import { db } from '@/lib/firebase-admin';
 import { isAdmin } from '@/lib/auth';
 import { readAccountLast4, readMaskedAccountNumber } from '../../../../../shared/bank-account';
 
@@ -100,14 +100,14 @@ export async function GET(req: NextRequest) {
   }
 
   try {
-    const db = getAdminDb();
+     
     const { searchParams } = new URL(req.url);
     const status = searchParams.get('status') ?? 'pending';
     const aliases = STATUS_ALIAS[status] ?? [status];
 
     const snap = await db.collection('giller_applications').limit(500).get();
 
-    const appItems: GillerApplicationItem[] = snap.docs.map((doc) => {
+    const appItems: GillerApplicationItem[] = snap.docs.map((doc: any) => {
       const data = doc.data() as Record<string, unknown>;
       return {
         id: doc.id,
@@ -128,7 +128,7 @@ export async function GET(req: NextRequest) {
     );
 
     const fallbackItems = pendingUsersSnap.docs
-      .map((doc) => {
+      .map((doc: any) => {
         const user = doc.data() as Record<string, unknown>;
         return {
           id: `user-${doc.id}`,
@@ -148,7 +148,7 @@ export async function GET(req: NextRequest) {
           isSynthetic: true,
         };
       })
-      .filter((user) => !existingUserIds.has(String(user.userId)));
+      .filter((user: any) => !existingUserIds.has(String(user.userId)));
 
     const items = [...appItems, ...fallbackItems]
       .filter((item) => aliases.includes(String(item.status ?? 'pending')))
@@ -164,13 +164,13 @@ export async function GET(req: NextRequest) {
       const chunk = userIdsToFetch.slice(i, i + chunkSize);
       if (chunk.length > 0) {
         const usersSnap = await db.collection('users').where('__name__', 'in', chunk).get();
-        usersSnap.docs.forEach((doc) => {
+        usersSnap.docs.forEach((doc: any) => {
           usersDataMap.set(doc.id, doc.data());
         });
 
         const verificationRefs = chunk.map((id) => db.collection('users').doc(id).collection('verification').doc(id));
         const verificationSnaps = await db.getAll(...verificationRefs);
-        verificationSnaps.forEach((snap) => {
+        verificationSnaps.forEach((snap: any) => {
           if (snap.exists) {
             verificationDataMap.set(snap.id, snap.data());
           }
@@ -227,7 +227,7 @@ export async function PATCH(req: NextRequest) {
     return NextResponse.json({ error: 'Missing fields' }, { status: 400 });
   }
 
-  const db = getAdminDb();
+   
   const ref = db.collection('giller_applications').doc(body.applicationId);
   const snap = await ref.get();
   if (!snap.exists) {

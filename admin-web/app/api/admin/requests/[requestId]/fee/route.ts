@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getAdminDb } from '@/lib/firebase-admin';
+import { db } from '@/lib/firebase-admin';
 import { isAdmin } from '@/lib/auth';
 
 export async function GET(
@@ -13,7 +13,7 @@ export async function GET(
     return NextResponse.json({ error: 'Missing requestId' }, { status: 400 });
   }
 
-  const db = getAdminDb();
+   
   const snap = await db.collection('requests').doc(requestId).get();
   if (!snap.exists) {
     return NextResponse.json({ error: 'Not found' }, { status: 404 });

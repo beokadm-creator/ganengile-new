@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import type { Firestore } from 'firebase-admin/firestore';
-import { getAdminDb } from '@/lib/firebase-admin';
+import { db } from '@/lib/firebase-admin';
 import { isAdmin } from '@/lib/auth';
 
 type UnknownRecord = Record<string, unknown>;
@@ -9,7 +9,7 @@ const PARTNERS_COLLECTION = 'delivery_partners';
 const PRIVATE_COLLECTION = 'admin_delivery_partner_integrations';
 
 function getDb(): Firestore {
-  return getAdminDb() as unknown as Firestore;
+  return db as unknown as Firestore;
 }
 
 function asString(value: unknown, fallback = ''): string {

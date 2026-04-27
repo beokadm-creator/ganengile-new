@@ -1,55 +1,29 @@
-import { NextRequest, NextResponse } from 'next/server';
-import { getAdminApp } from '@/lib/firebase-admin';
-import { getAuth } from 'firebase-admin/auth';
-
-/**
- * Admin authentication middleware for Next.js.
- * 
- * Protects all admin routes and API routes by verifying the admin_session cookie.
- * - Admin routes (/(admin)/*): redirect to /login if not authenticated
- * - API routes (/api/*): return 401 JSON if not authenticated
- * - Public routes (/login, /_next/*, /favicon.ico): skip auth check
- */
-const PUBLIC_PATHS = ['/login', '/api/login'];
+import { NextResponse } from 'next/server';
+import type { NextRequest } from 'next/server';
 
 export async function middleware(request: NextRequest) {
-  const { pathname } = request.nextUrl;
+  // 인증이 필요 없는 공개 경로 설정
+  const publicPaths = ['/login', '/_next/', '/favicon.ico', '/api/'];
 
-  if (
-    PUBLIC_PATHS.some(path => pathname.startsWith(path)) ||
-    pathname.startsWith('/_next') ||
-    pathname === '/favicon.ico'
-  ) {
+  // 현재 요청 경로가 공개 경로에 포함되는지 확인
+  const isPublicPath = publicPaths.some((path) => request.nextUrl.pathname.startsWith(path));
+
+  // 공개 경로는 바로 통과
+  if (isPublicPath) {
     return NextResponse.next();
   }
 
-  const sessionCookie = request.cookies.get('admin_session')?.value;
+  const sessionCookie = request.cookies.get('session');
 
-  if (!sessionCookie) {
-    if (pathname.startsWith('/api/')) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
-    return NextResponse.redirect(new URL('/login', request.url));
+  // 세션 쿠키가 없으면 로그인 페이지로 리다이렉트
+  if (!sessionCookie?.value) {
+    const loginUrl = new URL('/login', request.url);
+    loginUrl.searchParams.set('redirect', request.nextUrl.pathname);
+    return NextResponse.redirect(loginUrl);
   }
 
-  try {
-    getAdminApp();
-    const decodedClaims = await getAuth().verifySessionCookie(sessionCookie, true);
-
-    const allowedUids = process.env.ADMIN_UID?.split(',').map(uid => uid.trim()) || [];
-    const isAdmin = decodedClaims.admin === true || allowedUids.includes(decodedClaims.uid);
-
-    if (!isAdmin) {
-      throw new Error('Not admin');
-    }
-
-    return NextResponse.next();
-  } catch (error) {
-    if (pathname.startsWith('/api/')) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
-    return NextResponse.redirect(new URL('/login', request.url));
-  }
+  // 간단한 존재 여부만 체크 (실제 검증은 API 라우트나 서버 컴포넌트에서 수행)
+  return NextResponse.next();
 }
 
 /**
@@ -57,5 +31,5 @@ export async function middleware(request: NextRequest) {
  * Runs on all routes except public paths.
  */
 export const config = {
-  matcher: ['/((?!_next/|favicon.ico).*)'],
+  matcher: ['/((?!_next/|favicon.ico|api/|.*\\.(?:png|jpg|jpeg|svg|gif|ico|webp)$).*)'],
 };

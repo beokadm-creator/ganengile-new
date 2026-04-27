@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getAdminDb } from '@/lib/firebase-admin';
+import { db } from '@/lib/firebase-admin';
 import { isAdmin } from '@/lib/auth';
 
 export async function POST(req: NextRequest) {
@@ -12,7 +12,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Missing couponId or userId' }, { status: 400 });
     }
 
-    const db = getAdminDb();
+     
     
     // 1. Verify coupon exists and is active
     const couponSnap = await db.collection('coupons').doc(couponId).get();

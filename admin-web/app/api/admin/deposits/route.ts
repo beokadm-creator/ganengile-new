@@ -1,8 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import type { Firestore } from 'firebase-admin/firestore';
-import { getAdminDb } from '@/lib/firebase-admin';
+import { db } from '@/lib/firebase-admin';
 import { isAdmin } from '@/lib/auth';
 import { getWalletSummary } from '../../../../../src/utils/wallet-balance';
+import type { WalletBalances } from '../../../../../src/types/beta1-wallet';
 
 interface DepositDoc {
   userId?: string;
@@ -35,7 +36,7 @@ interface DepositActionPayload {
 }
 
 function getDb(): Firestore {
-  return getAdminDb() as unknown as Firestore;
+  return db as unknown as Firestore;
 }
 
 export async function GET(req: NextRequest) {
@@ -220,7 +221,7 @@ export async function PATCH(req: NextRequest) {
               pendingWithdrawalBalance: Number(rawBalances.pendingWithdrawalBalance ?? 0),
             };
 
-            const oldSummary = getWalletSummary(currentBalances as Record<string, unknown>);
+            const oldSummary = getWalletSummary(currentBalances as unknown as WalletBalances);
             const pointAmount = data.pointAmount ?? 0;
             
             // Refund goes back to earnedBalance by default for deposits
@@ -228,7 +229,7 @@ export async function PATCH(req: NextRequest) {
               ...currentBalances,
               earnedBalance: currentBalances.earnedBalance + pointAmount,
             };
-            const newSummary = getWalletSummary(newBalances as Record<string, unknown>);
+            const newSummary = getWalletSummary(newBalances as unknown as WalletBalances);
             const now = new Date();
 
             transaction.update(userRef, {

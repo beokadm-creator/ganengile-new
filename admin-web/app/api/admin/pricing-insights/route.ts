@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { getAdminDb } from '@/lib/firebase-admin';
+import { db } from '@/lib/firebase-admin';
 import { isAdmin } from '@/lib/auth';
 import {
   DEFAULT_SHARED_PRICING_POLICY,
@@ -44,7 +44,7 @@ export async function GET() {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
-  const db = getAdminDb();
+   
   const [historySnap, policySnap] = await Promise.all([
     db.collection('request_pricing_history').orderBy('completedAt', 'desc').limit(200).get(),
     db.collection('config_pricing').doc('default').get(),
@@ -56,29 +56,29 @@ export async function GET() {
       : DEFAULT_SHARED_PRICING_POLICY
   );
 
-  const rows = historySnap.docs.map((doc) => doc.data() as HistoryRow);
+  const rows = historySnap.docs.map((doc: any) => doc.data() as HistoryRow);
   const completedCount = rows.length;
   const feeValues = rows
-    .map((row) => toNumber(row.totalFee))
-    .filter((value): value is number => value !== null && value > 0);
+    .map((row: any) => toNumber(row.totalFee))
+    .filter((value: any): value is number => value !== null && value > 0);
   const averageFee =
     feeValues.length > 0
-      ? Math.round(feeValues.reduce((sum, value) => sum + value, 0) / feeValues.length)
+      ? Math.round(feeValues.reduce((sum: any, value: any) => sum + value, 0) / feeValues.length)
       : 0;
   const averageDynamicAdjustment =
     completedCount > 0
       ? Math.round(
-          rows.reduce((sum, row) => sum + (toNumber(row.dynamicAdjustment) ?? 0), 0) / completedCount
+          rows.reduce((sum: any, row: any) => sum + (toNumber(row.dynamicAdjustment) ?? 0), 0) / completedCount
         )
       : 0;
 
-  const peakCount = rows.filter((row) => row.pricingContext?.isPeakTime === true).length;
-  const lowSupplyCount = rows.filter((row) => {
+  const peakCount = rows.filter((row: any) => row.pricingContext?.isPeakTime === true).length;
+  const lowSupplyCount = rows.filter((row: any) => {
     const nearby = row.pricingContext?.nearbyGillerCount;
     return typeof nearby === 'number' && nearby <= pricingPolicy.dynamicRules.lowSupplyThreshold;
   }).length;
-  const rainSnowCount = rows.filter((row) => row.pricingContext?.weather === 'rain' || row.pricingContext?.weather === 'snow').length;
-  const immediateCount = rows.filter((row) => row.requestMode !== 'reservation').length;
+  const rainSnowCount = rows.filter((row: any) => row.pricingContext?.weather === 'rain' || row.pricingContext?.weather === 'snow').length;
+  const immediateCount = rows.filter((row: any) => row.requestMode !== 'reservation').length;
 
   const routeMap = new Map<string, RouteAggregate & { totalFeeSum: number; dynamicSum: number; peakCount: number; lowSupplyCount: number; immediateCount: number }>();
 

@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { getAdminDb } from '@/lib/firebase-admin';
+import { db } from '@/lib/firebase-admin';
 import { isAdmin } from '@/lib/auth';
 
 function toIso(value: unknown): string | null {
@@ -54,10 +54,10 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
     }
 
-    const db = getAdminDb();
+     
     const decisionRef = db.collection('actor_selection_decisions').doc(decisionId);
 
-    await db.runTransaction(async (transaction) => {
+    await db.runTransaction(async (transaction: any) => {
       const decisionDoc = await transaction.get(decisionRef);
       if (!decisionDoc.exists) {
         throw new Error('Decision not found');
@@ -111,7 +111,7 @@ export async function GET(req: Request) {
     const { searchParams } = new URL(req.url);
   const limitCount = Number(searchParams.get('limit')) || 50;
 
-  const db = getAdminDb();
+   
   const [
     analysesSnap,
     draftsSnap,
@@ -138,7 +138,7 @@ export async function GET(req: Request) {
     db.collection('request_drafts').where('requestMode', '==', 'immediate').count().get(),
   ]);
 
-  const analyses = analysesSnap.docs.map((snap) => {
+  const analyses = analysesSnap.docs.map((snap: any) => {
     const data = snap.data() as Record<string, unknown>;
     const result = (data.result ?? {}) as Record<string, unknown>;
 
@@ -155,7 +155,7 @@ export async function GET(req: Request) {
     };
   });
 
-  const drafts = draftsSnap.docs.map((snap) => {
+  const drafts = draftsSnap.docs.map((snap: any) => {
     const data = snap.data() as Record<string, unknown>;
     const packageDraft = (data.packageDraft ?? {}) as Record<string, unknown>;
     const preferredSchedule = (data.preferredSchedule ?? {}) as Record<string, unknown>;
@@ -179,7 +179,7 @@ export async function GET(req: Request) {
     };
   });
 
-  const quotes = quotesSnap.docs.map((snap) => {
+  const quotes = quotesSnap.docs.map((snap: any) => {
     const data = snap.data() as Record<string, unknown>;
     const finalPricing = (data.finalPricing ?? {}) as Record<string, unknown>;
     const deliveryOption = (data.selectedDeliveryOption ?? {}) as Record<string, unknown>;
@@ -200,7 +200,7 @@ export async function GET(req: Request) {
     };
   });
 
-  const decisions = decisionsSnap.docs.map((snap) => {
+  const decisions = decisionsSnap.docs.map((snap: any) => {
     const data = snap.data() as Record<string, unknown>;
 
     return {
@@ -216,7 +216,7 @@ export async function GET(req: Request) {
     };
   });
 
-  const missions = missionsSnap.docs.map((snap) => {
+  const missions = missionsSnap.docs.map((snap: any) => {
     const data = snap.data() as Record<string, unknown>;
 
     return {

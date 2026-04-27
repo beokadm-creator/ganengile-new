@@ -1,31 +1,32 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getAdminDb } from '@/lib/firebase-admin';
+import { db } from '@/lib/firebase-admin';
 import { isAdmin } from '@/lib/auth';
 import { getWalletSummary } from '../../../../../src/utils/wallet-balance';
+import type { WalletBalances } from '../../../../../src/types/beta1-wallet';
 
 export async function GET(req: NextRequest) {
   try {
     if (!(await isAdmin())) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
-    const db = getAdminDb();
+     
     const { searchParams } = new URL(req.url);
     const search = searchParams.get('search') ?? '';
 
     let query = db.collection('users').orderBy('pointBalance', 'desc').limit(50);
     const snap = await query.get();
 
-    const userIds = snap.docs.map((doc) => doc.id);
+    const userIds = snap.docs.map((doc: any) => doc.id);
     
     // Fetch wallet ledgers for these users
     const ledgersSnap = userIds.length > 0 
       ? await db.collection('wallet_ledgers').where('userId', 'in', userIds).get()
       : { docs: [] };
       
-    const ledgersMap = new Map(ledgersSnap.docs.map((d) => [d.data().userId, d.data()]));
+    const ledgersMap = new Map(ledgersSnap.docs.map((d: any) => [d.data().userId, d.data()]));
 
-    let items = snap.docs.map((doc) => {
+    let items = snap.docs.map((doc: any) => {
       const userData = doc.data();
-      const ledger = ledgersMap.get(doc.id);
+      const ledger: any = ledgersMap.get(doc.id);
       
       // Fallback logic similar to normalizeWalletBalances
       const rawBalances = ledger?.balances ?? userData.walletBalances ?? {};
@@ -39,7 +40,7 @@ export async function GET(req: NextRequest) {
         pendingWithdrawalBalance: Number(rawBalances.pendingWithdrawalBalance ?? 0),
       };
       
-      const summary = getWalletSummary(balances as Record<string, unknown>);
+      const summary = getWalletSummary(balances as unknown as WalletBalances);
 
       return {
         id: doc.id,
@@ -60,7 +61,7 @@ export async function GET(req: NextRequest) {
 
     if (search) {
       items = items.filter(
-        (u) => u.displayName.includes(search) || u.email.includes(search) || u.id.includes(search)
+        (u: any) => u.displayName.includes(search) || u.email.includes(search) || u.id.includes(search)
       );
     }
 
@@ -81,7 +82,7 @@ export async function PATCH(req: NextRequest) {
   const { userId, type, amount, reason, fundingSource = 'promo' } = await req.json();
   if (!userId || !type || !amount || !reason) return NextResponse.json({ error: 'Missing fields' }, { status: 400 });
 
-  const db = getAdminDb();
+   
   
   // 1. User & Ledger Reference
   const userRef = db.collection('users').doc(userId);
@@ -105,7 +106,7 @@ export async function PATCH(req: NextRequest) {
     pendingWithdrawalBalance: Number(rawBalances.pendingWithdrawalBalance ?? 0),
   };
 
-  const oldSummary = getWalletSummary(currentBalances as Record<string, unknown>);
+  const oldSummary = getWalletSummary(currentBalances as unknown as WalletBalances);
   const requestedDelta = type === 'earn' ? Number(amount) : -Number(amount);
 
   // 3. Apply changes to the specific funding source
@@ -123,7 +124,7 @@ export async function PATCH(req: NextRequest) {
     actualDelta = newBalances.promoBalance - currentBalances.promoBalance;
   }
 
-  const newSummary = getWalletSummary(newBalances as Record<string, unknown>);
+  const newSummary = getWalletSummary(newBalances as unknown as WalletBalances);
   const now = new Date();
 
   // 4. Batch write to both users and wallet_ledgers to maintain backward compatibility

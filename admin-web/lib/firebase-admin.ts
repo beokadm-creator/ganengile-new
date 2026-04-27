@@ -1,38 +1,26 @@
-import { initializeApp, getApps, cert, App } from 'firebase-admin/app';
-import { getFirestore, Firestore } from 'firebase-admin/firestore';
+import { initializeApp, getApps, cert } from 'firebase-admin/app';
+import { getFirestore } from 'firebase-admin/firestore';
+import { getAuth } from 'firebase-admin/auth';
 
-let adminApp: App;
-let adminDb: Firestore;
+const apps = getApps();
 
-export function getAdminApp(): App {
-  if (adminApp) return adminApp;
+// 로컬 빌드 환경(Vercel 빌드 타임 등)에서 에러가 발생하지 않도록 더미 데이터를 사용하거나 초기화를 지연합니다.
+const projectId = process.env.FIREBASE_PROJECT_ID || process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID || 'ganengile-dummy';
+const clientEmail = process.env.FIREBASE_CLIENT_EMAIL || 'dummy@ganengile.iam.gserviceaccount.com';
 
-  if (getApps().length > 0) {
-    adminApp = getApps()[0];
-    return adminApp;
-  }
+// 빌드 시점에 firebase-admin 초기화를 방지합니다. (앱 호스팅/로컬 환경에서는 정상 작동)
+const isBuild = process.env.npm_lifecycle_event === 'build';
 
-  const serviceAccountKey = process.env.FIREBASE_SERVICE_ACCOUNT_KEY;
-  if (serviceAccountKey) {
-    // 로컬 개발: .env.local에 서비스 계정 키 JSON 문자열
-    adminApp = initializeApp({
-      credential: cert(JSON.parse(serviceAccountKey)),
-      projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID,
-    });
-  } else {
-    // Firebase App Hosting / Cloud Run: Application Default Credentials 자동 사용
-    adminApp = initializeApp({
-      projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID ?? 'ganengile',
-    });
-  }
+export const app = !apps.length && !isBuild
+  ? initializeApp({
+      credential: cert({
+        projectId: process.env.FIREBASE_PROJECT_ID,
+        clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
+        privateKey: process.env.FIREBASE_PRIVATE_KEY?.replace(/\\n/g, '\n'),
+      }),
+    })
+  : apps[0];
 
-  return adminApp;
-}
-
-export function getAdminDb(): Firestore {
-  if (!adminDb) {
-    getAdminApp();
-    adminDb = getFirestore();
-  }
-  return adminDb;
-}
+export const getAdminApp = () => app;
+export const db = isBuild ? ({} as any) : getFirestore(app);
+export const auth = isBuild ? ({} as any) : getAuth(app);

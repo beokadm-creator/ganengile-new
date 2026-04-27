@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { getAdminDb } from '@/lib/firebase-admin';
+import { db } from '@/lib/firebase-admin';
 import { isAdmin } from '@/lib/auth';
 
 export async function GET() {
@@ -8,7 +8,7 @@ export async function GET() {
   }
 
   try {
-    const db = getAdminDb();
+     
     const doc = await db.collection('system_settings').doc('nhn_alimtalk').get();
 
     if (!doc.exists) {
@@ -39,7 +39,7 @@ export async function POST(req: Request) {
     const body = await req.json();
     const { appKey, secretKey, senderKey, templates } = body;
 
-    const db = getAdminDb();
+     
     await db.collection('system_settings').doc('nhn_alimtalk').set({
       appKey: appKey || '',
       secretKey: secretKey || '',

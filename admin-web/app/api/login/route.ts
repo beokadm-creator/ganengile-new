@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getAdminApp } from '@/lib/firebase-admin';
+import { app } from '@/lib/firebase-admin';
 import { getAuth } from 'firebase-admin/auth';
 
 export async function POST(req: NextRequest) {
@@ -9,8 +9,7 @@ export async function POST(req: NextRequest) {
 
   try {
     // Firebase Admin으로 ID 토큰 검증
-    getAdminApp();
-    const auth = getAuth();
+    const auth = getAuth(app);
     const decoded = await auth.verifyIdToken(idToken);
 
     // 허용된 관리자 UID 확인 (콤마로 구분된 여러 관리자 지원)

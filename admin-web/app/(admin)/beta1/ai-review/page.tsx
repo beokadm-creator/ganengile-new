@@ -359,7 +359,7 @@ export default function AIReviewPage() {
                           <div className="flex gap-2">
                             <button
                               onClick={async () => {
-                                if (confirm('이 AI 결정을 승인하고 실행하시겠습니까?')) {
+                                if (window.confirm('이 AI 결정을 승인하고 실행하시겠습니까?')) {
                                   try {
                                     const res = await fetch('/api/admin/beta1-ai-review', {
                                       method: 'POST',
@@ -380,7 +380,7 @@ export default function AIReviewPage() {
                             </button>
                             <button
                               onClick={async () => {
-                                if (confirm('이 AI 결정을 반려하시겠습니까?')) {
+                                if (window.confirm('이 AI 결정을 반려하시겠습니까?')) {
                                   try {
                                     const res = await fetch('/api/admin/beta1-ai-review', {
                                       method: 'POST',
@@ -388,7 +388,7 @@ export default function AIReviewPage() {
                                       body: JSON.stringify({ decisionId: item.id, action: 'reject' }),
                                     });
                                     if (!res.ok) throw new Error('반려 실패');
-                                    alert('반려되었습니다.');
+                                    alert('반려되었습니다. 새로고침을 권장합니다.');
                                     window.location.reload();
                                   } catch (e) {
                                     alert(e instanceof Error ? e.message : '오류 발생');

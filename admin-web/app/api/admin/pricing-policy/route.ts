@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getAdminDb } from '@/lib/firebase-admin';
+import { db } from '@/lib/firebase-admin';
 import { isAdmin } from '@/lib/auth';
 import {
   DEFAULT_SHARED_PRICING_POLICY,
@@ -15,7 +15,7 @@ export async function GET() {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
-  const db = getAdminDb();
+   
   const snap = await db.collection(PRIVATE_DOC_PATH[0]).doc(PRIVATE_DOC_PATH[1]).get();
   const item = normalizeSharedPricingPolicy(
     snap.exists ? (snap.data() as Partial<SharedPricingPolicyConfig>) : DEFAULT_SHARED_PRICING_POLICY
@@ -36,7 +36,7 @@ export async function PATCH(req: NextRequest) {
     updatedAt: new Date(),
   };
 
-  const db = getAdminDb();
+   
   await db.collection(PRIVATE_DOC_PATH[0]).doc(PRIVATE_DOC_PATH[1]).set(payload, { merge: true });
   await db.collection(PUBLIC_DOC_PATH[0]).doc(PUBLIC_DOC_PATH[1]).set(payload, { merge: true });
 

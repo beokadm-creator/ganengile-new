@@ -1,54 +1,65 @@
 import { NextResponse } from 'next/server';
-import { getAdminDb } from '@/lib/firebase-admin';
+import { db } from '@/lib/firebase-admin';
 import { requireAdmin } from '@/lib/auth';
 
 export async function GET() {
   try {
     await requireAdmin();
-    const adminDb = getAdminDb();
+     
 
     // Fetch summaries from partner_dispatches and partner_settlements
     
-    // 1. Total Partner Dispatches this month
+    // 1. 이번 달 배송 통계
     const now = new Date();
     const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
     
-    const deliveriesQuery = await adminDb.collection('partner_dispatches')
+    const deliveriesQuery = await db.collection('partner_dispatches')
       .where('createdAt', '>=', startOfMonth)
       .get();
       
-    const totalDeliveriesThisMonth = deliveriesQuery.size;
     let completedDeliveriesThisMonth = 0;
     
-    deliveriesQuery.forEach(doc => {
+    deliveriesQuery.forEach((doc: any) => {
       const data = doc.data();
       if (data.status === 'completed' || data.status === 'delivered') {
         completedDeliveriesThisMonth++;
       }
     });
 
-    // 2. Active Partners Count
-    const partnersQuery = await adminDb.collection('delivery_partners').where('status', '==', 'active').get();
-    const activePartnersCount = partnersQuery.size;
+    // 2. 파트너 통계
+    const partnersQuery = await db.collection('delivery_partners').where('status', '==', 'active').get();
+    const activePartners = partnersQuery.size;
 
-    // 3. Current Pending Settlements
-    const settlementsQuery = await adminDb.collection('partner_settlements')
-      .where('status', 'in', ['pending', 'processing'])
+    // 3. 최근 정산금
+    const settlementsQuery = await db.collection('partner_settlements')
+      .orderBy('periodEnd', 'desc')
+      .limit(1)
       .get();
       
-    let pendingSettlementAmount = 0;
-    settlementsQuery.forEach(doc => {
-      const data = doc.data();
-      pendingSettlementAmount += (data.netAmount || 0);
+    let thisMonthSettlement = 0;
+    if (!settlementsQuery.empty) {
+      const latestSettlement = settlementsQuery.docs[0].data();
+      thisMonthSettlement = latestSettlement.totalAmount || 0;
+    }
+
+    // 4. 최근 디스패치 목록 (최대 10개)
+    const recentDispatches: any[] = [];
+    deliveriesQuery.docs.slice(0, 10).forEach((doc: any) => {
+      recentDispatches.push({
+        id: doc.id,
+        ...doc.data(),
+        createdAt: doc.data().createdAt?.toDate?.()?.toISOString() || null,
+      });
     });
 
     return NextResponse.json({
       success: true,
-      stats: {
-        totalDeliveriesThisMonth,
+      data: {
+        activePartners,
+        totalDeliveriesThisMonth: deliveriesQuery.size,
         completedDeliveriesThisMonth,
-        activePartnersCount,
-        pendingSettlementAmount
+        thisMonthSettlement,
+        recentDispatches,
       }
     });
   } catch (error: unknown) {

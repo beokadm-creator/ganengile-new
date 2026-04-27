@@ -1,9 +1,9 @@
 import { NextResponse } from 'next/server';
-import { getAdminDb } from '@/lib/firebase-admin';
+import { db } from '@/lib/firebase-admin';
 import { isAdmin } from '@/lib/auth';
 
 async function getCount(collectionPath: string, field: string, value: unknown) {
-  const db = getAdminDb();
+   
   return db.collection(collectionPath).where(field, '==', value).count().get();
 }
 
@@ -17,7 +17,7 @@ async function getCombinedCount(
 }
 
 async function getDelayedRequestCount(requestDelayThreshold: Date) {
-  const db = getAdminDb();
+   
   const [pendingSnap, matchedSnap] = await Promise.all([
     db.collection('requests').where('status', '==', 'pending').get(),
     db.collection('requests').where('status', '==', 'matched').get(),
@@ -33,12 +33,12 @@ async function getDelayedRequestCount(requestDelayThreshold: Date) {
 }
 
 async function getDelayedDeliveryCount(deliveryDelayThreshold: Date) {
-  const db = getAdminDb();
+   
   const snap = await db.collection('deliveries')
     .where('status', 'in', ['picked_up', 'in_transit', 'arrived', 'at_locker', 'handover_pending', 'last_mile_in_progress'])
     .get();
 
-  return snap.docs.filter((doc) => {
+  return snap.docs.filter((doc: any) => {
     const createdAt = doc.data().createdAt;
     if (createdAt && typeof createdAt.toDate === 'function') {
       return createdAt.toDate() <= deliveryDelayThreshold;
@@ -125,7 +125,7 @@ export async function GET() {
   }
 
   try {
-    const db = getAdminDb();
+     
     const now = new Date();
     const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
     const requestDelayThreshold = new Date(now.getTime() - 15 * 60 * 1000);
@@ -192,7 +192,7 @@ export async function GET() {
       : null;
 
     const onboarding = usersSnap.docs.reduce(
-      (acc, doc) => {
+      (acc: any, doc: any) => {
         const data = doc.data();
         const state = readUserUpgradeState(data);
         const readiness = readRequesterReadiness(data);
@@ -234,7 +234,7 @@ export async function GET() {
       longitude: number;
     }> = [];
 
-    recentRequestsSnap.docs.forEach((doc) => {
+    recentRequestsSnap.docs.forEach((doc: any) => {
       if (geoMarkers.length >= 8) {
         return;
       }

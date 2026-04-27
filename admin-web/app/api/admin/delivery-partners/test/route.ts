@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getAdminDb } from '@/lib/firebase-admin';
+import { db } from '@/lib/firebase-admin';
 import { isAdmin } from '@/lib/auth';
 
 type UnknownRecord = Record<string, unknown>;
@@ -19,7 +19,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ ok: false, error: 'partnerId is required' }, { status: 400 });
   }
 
-  const db = getAdminDb();
+   
   const [publicSnap, privateSnap] = await Promise.all([
     db.collection('delivery_partners').doc(partnerId).get(),
     db.collection('admin_delivery_partner_integrations').doc(partnerId).get(),

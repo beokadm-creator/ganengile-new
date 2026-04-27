@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import type { Firestore, Timestamp } from 'firebase-admin/firestore';
-import { getAdminDb } from '@/lib/firebase-admin';
+import { db } from '@/lib/firebase-admin';
 import { isAdmin } from '@/lib/auth';
 
 function tsToISO(value: unknown): string | null {
@@ -21,7 +21,7 @@ export async function GET(
   }
 
   const { id } = await params;
-  const db: Firestore = getAdminDb();
+   
   const doc = await db.collection('consentTemplates').doc(id).get();
 
   if (!doc.exists) {
@@ -61,7 +61,7 @@ export async function PATCH(
   }
 
   const record = body as Record<string, unknown>;
-  const db: Firestore = getAdminDb();
+   
   const docRef = db.collection('consentTemplates').doc(id);
   const existing = await docRef.get();
 
@@ -111,7 +111,7 @@ export async function DELETE(
   }
 
   const { id } = await params;
-  const db: Firestore = getAdminDb();
+   
   await db.collection('consentTemplates').doc(id).delete();
 
   return NextResponse.json({ ok: true });
