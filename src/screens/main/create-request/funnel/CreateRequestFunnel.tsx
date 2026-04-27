@@ -55,6 +55,7 @@ type Props = {
   contactOtpCode: string;
   setContactOtpCode: (code: string) => void;
   isPhoneVerified: boolean;
+  phoneVerificationBypassEnabled: boolean;
   otpSending: boolean;
   otpVerifying: boolean;
   otpHintCode: string | null;
@@ -636,51 +637,68 @@ export default function CreateRequestFunnel(props: Props) {
         />
 
         {/* 본인 인증 (Phone Verification) */}
-        <Text style={styles.label}>보내는 분(본인) 연락처 인증</Text>
+        <Text style={styles.label}>보내는 분(본인) 연락처</Text>
         <View style={styles.row}>
           <TextInput
             style={[styles.inputBox, { flex: 1 }]}
             placeholder="본인 연락처 (010-0000-0000)"
             keyboardType="phone-pad"
+            inputMode="tel"
+            textContentType="telephoneNumber"
+            autoComplete="tel"
             value={props.contactPhoneNumber}
             onChangeText={props.handleContactPhoneChange}
           />
-          <TouchableOpacity 
-            style={[styles.nextButton, { marginTop: 0, justifyContent: 'center' }]} 
-            onPress={props.handleRequestContactOtp}
-            disabled={props.isPhoneVerified || props.otpSending || !props.contactPhoneNumber}
-          >
-            <Text style={styles.nextButtonText}>
-              {props.isPhoneVerified ? '인증완료' : (props.otpSending ? '전송중...' : '인증요청')}
-            </Text>
-          </TouchableOpacity>
-        </View>
-
-        {!props.isPhoneVerified && props.contactPhoneNumber ? (
-          <View style={styles.row}>
-            <TextInput
-              style={[styles.inputBox, { flex: 1 }]}
-              placeholder="인증번호 6자리"
-              keyboardType="number-pad"
-              value={props.contactOtpCode}
-              onChangeText={props.setContactOtpCode}
-            />
-            <TouchableOpacity 
-              style={[styles.nextButton, { marginTop: 0, justifyContent: 'center' }]} 
-              onPress={props.handleVerifyContactOtp}
-              disabled={props.otpVerifying || !props.contactOtpCode}
+          {!props.phoneVerificationBypassEnabled ? (
+            <TouchableOpacity
+              style={[styles.nextButton, { marginTop: 0, justifyContent: 'center' }]}
+              onPress={props.handleRequestContactOtp}
+              disabled={props.isPhoneVerified || props.otpSending || !props.contactPhoneNumber}
             >
               <Text style={styles.nextButtonText}>
-                {props.otpVerifying ? '확인중...' : '확인'}
+                {props.isPhoneVerified ? '인증완료' : (props.otpSending ? '전송중...' : '인증요청')}
               </Text>
             </TouchableOpacity>
-          </View>
+          ) : null}
+        </View>
+
+        {props.phoneVerificationBypassEnabled ? (
+          <Text style={styles.verificationBypassText}>
+            테스트 모드에서는 휴대폰 인증 없이 계속 진행할 수 있습니다.
+          </Text>
         ) : null}
 
-        {props.otpHintCode ? (
-          <Text style={{ color: Colors.gray500, fontSize: 12, marginTop: 4 }}>
-            [개발] 인증번호: {props.otpHintCode}
-          </Text>
+        {!props.phoneVerificationBypassEnabled && !props.isPhoneVerified && props.contactPhoneNumber ? (
+          <>
+            <View style={styles.row}>
+              <TextInput
+                style={[styles.inputBox, { flex: 1 }]}
+                placeholder="인증번호 6자리"
+                keyboardType="numeric"
+                inputMode="numeric"
+                textContentType="oneTimeCode"
+                autoComplete="one-time-code"
+                maxLength={6}
+                value={props.contactOtpCode}
+                onChangeText={(value) => props.setContactOtpCode(value.replace(/\D/g, '').slice(0, 6))}
+              />
+              <TouchableOpacity
+                style={[styles.nextButton, { marginTop: 0, justifyContent: 'center' }]}
+                onPress={props.handleVerifyContactOtp}
+                disabled={props.otpVerifying || props.contactOtpCode.length !== 6}
+              >
+                <Text style={styles.nextButtonText}>
+                  {props.otpVerifying ? '확인중...' : '확인'}
+                </Text>
+              </TouchableOpacity>
+            </View>
+
+            {props.otpHintCode ? (
+              <Text style={styles.otpHintText}>
+                [개발] 인증번호: {props.otpHintCode}
+              </Text>
+            ) : null}
+          </>
         ) : null}
 
         {props.recipientPrivacyConfig?.thirdPartyConsentRequired && (
@@ -802,6 +820,8 @@ const styles = StyleSheet.create({
   disabledButton: { opacity: 0.5 },
   consentBox: { flexDirection: 'row', alignItems: 'center', gap: Spacing.xs, marginTop: Spacing.sm },
   consentText: { fontSize: Typography.fontSize.sm, color: Colors.textSecondary },
+  verificationBypassText: { color: Colors.gray500, fontSize: Typography.fontSize.sm, marginTop: Spacing.xs },
+  otpHintText: { color: Colors.gray500, fontSize: Typography.fontSize.xs, marginTop: Spacing.xs },
   privacyNoticeBox: { backgroundColor: Colors.gray100, borderRadius: BorderRadius.md, padding: Spacing.md },
   privacyNoticeText: { color: Colors.textSecondary, fontSize: Typography.fontSize.sm, lineHeight: 18 },
   privacyNoticeMeta: { color: Colors.gray500, fontSize: Typography.fontSize.xs, marginTop: Spacing.xs, lineHeight: 16 },

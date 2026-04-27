@@ -44,7 +44,7 @@ import {
 } from '../../services/config-service';
 import { requireUserId } from '../../services/firebase';
 import { locationService } from '../../services/location-service';
-import { confirmPhoneOtp, requestPhoneOtp } from '../../services/otp-service';
+import { getIdentityIntegrationConfig } from '../../services/integration-config-service';
 import { pickPhotoFromLibrary, takePhoto, uploadPhotoWithThumbnail } from '../../services/photo-service';
 import { getPricingPolicyConfig } from '../../services/pricing-policy-config-service';
 import { resolvePricingContextForRequest } from '../../services/pricing-context-service';
@@ -333,20 +333,15 @@ export default function CreateRequestScreen({ navigation, route }: Props) {
   } = useLocationResolution(stations);
   
   const {
-    otpSessionId: contactOtpSessionId,
     otpCode: contactOtpCode,
     setOtpCode: setContactOtpCode,
     otpHintCode: contactOtpHintCode,
-    otpDestination: contactOtpDestination,
-    otpExpiresAt: contactOtpExpiresAt,
     otpSending: contactOtpSending,
     otpVerifying: contactOtpVerifying,
-    hasLockedVerifiedPhone,
     isPhoneVerified,
     handlePhoneChange: handleContactPhoneChange,
     handleRequestOtp: handleRequestContactOtp,
     handleVerifyOtp: handleVerifyContactOtp,
-    resetOtpState,
   } = usePhoneVerification({
     contactPhoneNumber,
     setContactPhoneNumber,
@@ -357,6 +352,7 @@ export default function CreateRequestScreen({ navigation, route }: Props) {
   const [recipientPrivacyConfig, setRecipientPrivacyConfig] = useState<RecipientContactPrivacyConfig>(
     FALLBACK_RECIPIENT_PRIVACY_CONFIG
   );
+  const [phoneVerificationBypassEnabled, setPhoneVerificationBypassEnabled] = useState(false);
 
   useEffect(() => {
     if (prefill || params?.mode === 'reservation') {
@@ -406,6 +402,32 @@ export default function CreateRequestScreen({ navigation, route }: Props) {
     };
 
     void run();
+  }, []);
+
+  useEffect(() => {
+    let mounted = true;
+
+    const run = async () => {
+      try {
+        const config = await getIdentityIntegrationConfig();
+        const shouldBypass =
+          (config.testMode || !config.liveReady) && config.allowTestBypass !== false;
+        if (mounted) {
+          setPhoneVerificationBypassEnabled(shouldBypass);
+        }
+      } catch (error) {
+        console.error('Failed to load identity integration config', error);
+        if (mounted) {
+          setPhoneVerificationBypassEnabled(true);
+        }
+      }
+    };
+
+    void run();
+
+    return () => {
+      mounted = false;
+    };
   }, []);
 
   useEffect(() => {
@@ -518,7 +540,7 @@ export default function CreateRequestScreen({ navigation, route }: Props) {
     !recipientPhone.trim() ||
     (pickupMode === 'address' && (!pickupRoadAddress.trim() || !pickupDetailAddress.trim())) ||
     (deliveryMode === 'address' && (!deliveryRoadAddress.trim() || !deliveryDetailAddress.trim())) ||
-    !isPhoneVerified ||
+    (!phoneVerificationBypassEnabled && !isPhoneVerified) ||
     (recipientPrivacyConfig.thirdPartyConsentRequired && !recipientConsentChecked) ||
     (requestMode === 'reservation' && (!preferredPickupDate.trim() || !preferredPickupTime.trim()));
 
@@ -536,7 +558,7 @@ export default function CreateRequestScreen({ navigation, route }: Props) {
       items.push('출발지 주소를 완성해 주세요');
     if (deliveryMode === 'address' && (!deliveryRoadAddress.trim() || !deliveryDetailAddress.trim()))
       items.push('도착지 주소를 완성해 주세요');
-    if (!isPhoneVerified) items.push('휴대폰 번호 인증을 완료해 주세요');
+    if (!phoneVerificationBypassEnabled && !isPhoneVerified) items.push('휴대폰 번호 인증을 완료해 주세요');
     if (recipientPrivacyConfig.thirdPartyConsentRequired && !recipientConsentChecked)
       items.push('수령인 정보 제공 동의에 체크해 주세요');
     if (requestMode === 'reservation' && (!preferredPickupDate.trim() || !preferredPickupTime.trim()))
@@ -548,7 +570,7 @@ export default function CreateRequestScreen({ navigation, route }: Props) {
     pickupLocationDetail, storageLocation, specialInstructions,
     pickupMode, pickupRoadAddress, pickupDetailAddress,
     deliveryMode, deliveryRoadAddress, deliveryDetailAddress,
-    isPhoneVerified, recipientPrivacyConfig.thirdPartyConsentRequired, recipientConsentChecked,
+    phoneVerificationBypassEnabled, isPhoneVerified, recipientPrivacyConfig.thirdPartyConsentRequired, recipientConsentChecked,
     requestMode, preferredPickupDate, preferredPickupTime,
   ]);
 
@@ -883,6 +905,7 @@ export default function CreateRequestScreen({ navigation, route }: Props) {
         contactOtpCode={contactOtpCode}
         setContactOtpCode={setContactOtpCode}
         isPhoneVerified={isPhoneVerified}
+        phoneVerificationBypassEnabled={phoneVerificationBypassEnabled}
         otpSending={contactOtpSending}
         otpVerifying={contactOtpVerifying}
         otpHintCode={contactOtpHintCode}
