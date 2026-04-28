@@ -221,6 +221,7 @@ service cloud.firestore {
 
       // 본인 신청만 생성 허용
       allow create: if isAuthenticated() &&
+                    applicationId == request.auth.uid &&
                     request.resource.data.userId == request.auth.uid &&
                     request.resource.data.status == 'pending';
 
@@ -228,6 +229,7 @@ service cloud.firestore {
       allow update: if isAdmin() ||
                     (
                       isAuthenticated() &&
+                      applicationId == request.auth.uid &&
                       resource.data.userId == request.auth.uid &&
                       request.resource.data.userId == resource.data.userId &&
                       resource.data.status in ['pending', 'rejected'] &&

@@ -13,7 +13,7 @@ import {
   View,
   BackHandler,
 } from 'react-native';
-import { doc, serverTimestamp, setDoc } from 'firebase/firestore';
+import { collection, doc, getDocs, limit, query, serverTimestamp, setDoc, where } from 'firebase/firestore';
 import { useFocusEffect } from '@react-navigation/native';
 import { FirebaseError } from 'firebase/app';
 import { useUser } from '../../contexts/UserContext';
@@ -138,6 +138,8 @@ export default function GillerApplyScreen({ navigation }: { navigation: MainStac
   }, [step, user?.gillerApplicationStatus, navigation]);
 
   const handleSubmit = async () => {
+    if (loading) return;
+
     setSubmitHint('');
     if (!user?.uid) {
       Alert.alert('로그인 필요', '사용자 정보를 찾을 수 없습니다.');
@@ -149,27 +151,37 @@ export default function GillerApplyScreen({ navigation }: { navigation: MainStac
 
     try {
       const applicationRef = doc(db, 'giller_applications', user.uid);
+      const existingReviewSnap = await getDocs(
+        query(
+          collection(db, 'giller_applications'),
+          where('userId', '==', user.uid),
+          where('status', 'in', ['pending', 'in_review']),
+          limit(1)
+        )
+      );
 
-      await setDoc(applicationRef, {
-        userId: user.uid,
-        userName: user.name,
-        phone: user.phoneNumber ?? '',
-        verificationStatus:
-          identityTestMode && identityConfig?.allowTestBypass
-            ? 'approved_test_bypass'
-            : verification?.status ?? 'not_submitted',
-        verificationProvider: verification?.externalAuth?.provider ?? null,
-        integrationSnapshot: {
-          identity: {
-            testMode: identityTestMode,
-            liveReady: identityConfig?.liveReady ?? false,
-            allowTestBypass: identityConfig?.allowTestBypass ?? true,
+      if (existingReviewSnap.empty) {
+        await setDoc(applicationRef, {
+          userId: user.uid,
+          userName: user.name,
+          phone: user.phoneNumber ?? '',
+          verificationStatus:
+            identityTestMode && identityConfig?.allowTestBypass
+              ? 'approved_test_bypass'
+              : verification?.status ?? 'not_submitted',
+          verificationProvider: verification?.externalAuth?.provider ?? null,
+          integrationSnapshot: {
+            identity: {
+              testMode: identityTestMode,
+              liveReady: identityConfig?.liveReady ?? false,
+              allowTestBypass: identityConfig?.allowTestBypass ?? true,
+            },
           },
-        },
-        status: 'pending',
-        createdAt: serverTimestamp(),
-        updatedAt: serverTimestamp(),
-      });
+          status: 'pending',
+          createdAt: serverTimestamp(),
+          updatedAt: serverTimestamp(),
+        });
+      }
 
       await setDoc(
         doc(db, 'users', user.uid),

@@ -94,6 +94,33 @@ interface GillerApplicationItem {
   [key: string]: unknown;
 }
 
+function getUserKey(item: GillerApplicationItem): string {
+  return String(item.userId || item.id);
+}
+
+function pickLatestApplication(items: GillerApplicationItem[]): GillerApplicationItem[] {
+  const byUser = new Map<string, GillerApplicationItem>();
+
+  for (const item of items) {
+    const key = getUserKey(item);
+    const current = byUser.get(key);
+    if (!current || toMillis(item.createdAt) > toMillis(current.createdAt)) {
+      byUser.set(key, item);
+    }
+  }
+
+  return Array.from(byUser.values());
+}
+
+function readString(record: Record<string, any> | null | undefined, ...keys: string[]): string {
+  if (!record) return '';
+  for (const key of keys) {
+    const value = record[key];
+    if (typeof value === 'string' && value.trim()) return value.trim();
+  }
+  return '';
+}
+
 export async function GET(req: NextRequest) {
   if (!(await isAdmin())) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
@@ -117,17 +144,21 @@ export async function GET(req: NextRequest) {
       };
     });
 
-    const pendingUsersSnap = await db
-      .collection('users')
-      .where('gillerApplicationStatus', '==', 'pending')
-      .limit(200)
-      .get();
-
-    const existingUserIds = new Set(
-      appItems.map((item) => String(item.userId ?? item.id ?? ''))
+    const filteredAppItems = pickLatestApplication(
+      appItems.filter((item) => aliases.includes(String(item.status ?? 'pending')))
     );
 
-    const fallbackItems = pendingUsersSnap.docs
+    const pendingUsersSnap = status === 'pending'
+      ? await db
+          .collection('users')
+          .where('gillerApplicationStatus', '==', 'pending')
+          .limit(200)
+          .get()
+      : null;
+
+    const existingUserIds = new Set(filteredAppItems.map(getUserKey));
+
+    const fallbackItems = (pendingUsersSnap?.docs ?? [])
       .map((doc: any) => {
         const user = doc.data() as Record<string, unknown>;
         return {
@@ -150,8 +181,7 @@ export async function GET(req: NextRequest) {
       })
       .filter((user: any) => !existingUserIds.has(String(user.userId)));
 
-    const items = [...appItems, ...fallbackItems]
-      .filter((item) => aliases.includes(String(item.status ?? 'pending')))
+    const items = [...filteredAppItems, ...fallbackItems]
       .sort((a, b) => toMillis(b.createdAt) - toMillis(a.createdAt));
 
     // Enrich with user profile and activity stats
@@ -184,6 +214,7 @@ export async function GET(req: NextRequest) {
       const gllerInfo = (userData?.gllerInfo as Record<string, any>) || {};
       const gillerInfo = (userData?.gillerInfo as Record<string, any>) || {};
       const stats = (userData?.stats as Record<string, any>) || {};
+      const phoneVerification = (userData?.phoneVerification as Record<string, any>) || {};
       
       const bankAccounts = userData?.bankAccounts as any[] | undefined;
       const defaultBankAccount = bankAccounts?.find((b: any) => b.isDefault) || bankAccounts?.[0] || null;
@@ -194,6 +225,22 @@ export async function GET(req: NextRequest) {
 
       return {
         ...item,
+        userName:
+          item.userName ||
+          readString(userData, 'name', 'displayName') ||
+          readString(verificationData, 'name', 'realName') ||
+          '(이름 없음)',
+        phone:
+          item.phone ||
+          readString(userData, 'phoneNumber', 'phone') ||
+          readString(phoneVerification, 'phoneNumber') ||
+          '',
+        verificationStatus:
+          item.verificationStatus ||
+          readString(verificationData, 'status') ||
+          readString(gillerInfo, 'identityVerificationStatus') ||
+          (userData?.isVerified ? 'approved' : 'not_submitted'),
+        createdAt: item.createdAt ?? userData?.updatedAt ?? userData?.createdAt ?? null,
         userCreatedAt: userData?.createdAt ?? null,
         profilePhoto: userData?.profilePhoto ?? null,
         totalRequests: gllerInfo.totalRequests ?? stats.totalRequests ?? 0,
@@ -202,7 +249,11 @@ export async function GET(req: NextRequest) {
         idCardBackUrl: verificationData?.idCard?.backImageUrl ?? null,
         realName: verificationData?.name ?? null,
         birthDate: verificationData?.birthDate ?? null,
-        actualVerificationStatus: verificationData?.status ?? item.verificationStatus,
+        actualVerificationStatus:
+          verificationData?.status ??
+          item.verificationStatus ??
+          gillerInfo.identityVerificationStatus ??
+          (userData?.isVerified ? 'approved' : 'not_submitted'),
         bankAccount: defaultBankAccount || item.bankAccount,
         bankAccountMasked,
         bankAccountLast4,
