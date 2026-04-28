@@ -184,6 +184,13 @@ export async function GET(req: NextRequest) {
       const gllerInfo = (userData?.gllerInfo as Record<string, any>) || {};
       const gillerInfo = (userData?.gillerInfo as Record<string, any>) || {};
       const stats = (userData?.stats as Record<string, any>) || {};
+      
+      const bankAccounts = userData?.bankAccounts as any[] | undefined;
+      const defaultBankAccount = bankAccounts?.find((b: any) => b.isDefault) || bankAccounts?.[0] || null;
+      
+      const bankAccountMasked = defaultBankAccount ? readMaskedAccountNumber(defaultBankAccount) : item.bankAccountMasked;
+      const bankAccountLast4 = defaultBankAccount ? readAccountLast4(defaultBankAccount) : item.bankAccountLast4;
+      const bankVerificationStatus = defaultBankAccount?.status ?? item.bankVerificationStatus;
 
       return {
         ...item,
@@ -196,6 +203,10 @@ export async function GET(req: NextRequest) {
         realName: verificationData?.name ?? null,
         birthDate: verificationData?.birthDate ?? null,
         actualVerificationStatus: verificationData?.status ?? item.verificationStatus,
+        bankAccount: defaultBankAccount || item.bankAccount,
+        bankAccountMasked,
+        bankAccountLast4,
+        bankVerificationStatus,
       };
     });
 

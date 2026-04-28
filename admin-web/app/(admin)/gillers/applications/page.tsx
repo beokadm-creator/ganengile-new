@@ -67,7 +67,7 @@ function asBankAccount(value: unknown): GillerApplication['bankAccount'] {
     accountLast4: typeof record.accountLast4 === 'string' ? record.accountLast4 : undefined,
     accountHolder: typeof record.accountHolder === 'string' ? record.accountHolder : undefined,
     verificationStatus:
-      typeof record.verificationStatus === 'string' ? record.verificationStatus : undefined,
+      typeof record.verificationStatus === 'string' ? record.verificationStatus : (typeof record.status === 'string' ? record.status : undefined),
   };
 }
 
