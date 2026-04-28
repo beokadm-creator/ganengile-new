@@ -9,28 +9,23 @@ import {
   ScrollView,
   StyleSheet,
   Text,
-  TextInput,
   TouchableOpacity,
   View,
   BackHandler,
 } from 'react-native';
-import { addDoc, collection, doc, serverTimestamp, setDoc } from 'firebase/firestore';
+import { doc, serverTimestamp, setDoc } from 'firebase/firestore';
 import { useFocusEffect } from '@react-navigation/native';
 import { FirebaseError } from 'firebase/app';
 import { useUser } from '../../contexts/UserContext';
 import { db } from '../../services/firebase';
 import { getUserVerification, getVerificationStatusDisplay } from '../../services/verification-service';
 import {
-  getBankIntegrationConfig,
   getIdentityIntegrationConfig,
-  type BankIntegrationConfig,
   type IdentityIntegrationConfig,
 } from '../../services/integration-config-service';
 import type { MainStackNavigationProp } from '../../types/navigation';
 import type { UserVerification } from '../../types/profile';
 import AppTopBar from '../../components/common/AppTopBar';
-import BankSelectModal from '../../components/common/BankSelectModal';
-import { createProtectedBankAccount } from '../../../shared/bank-account';
 
 const TOTAL_STEPS = 2;
 const ACCENT = Colors.primary;
@@ -153,7 +148,9 @@ export default function GillerApplyScreen({ navigation }: { navigation: MainStac
     setSubmitHint('신청을 접수하고 있습니다.');
 
     try {
-      await addDoc(collection(db, 'giller_applications'), {
+      const applicationRef = doc(db, 'giller_applications', user.uid);
+
+      await setDoc(applicationRef, {
         userId: user.uid,
         userName: user.name,
         phone: user.phoneNumber ?? '',
@@ -171,6 +168,7 @@ export default function GillerApplyScreen({ navigation }: { navigation: MainStac
         },
         status: 'pending',
         createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp(),
       });
 
       await setDoc(
@@ -344,41 +342,6 @@ export default function GillerApplyScreen({ navigation }: { navigation: MainStac
   );
 }
 
-function InputField({
-  label,
-  value,
-  onChangeText,
-  placeholder,
-  helper,
-  multiline,
-  keyboardType,
-}: {
-  label: string;
-  value: string;
-  onChangeText: (value: string) => void;
-  placeholder: string;
-  helper?: string;
-  multiline?: boolean;
-  keyboardType?: 'default' | 'phone-pad' | 'number-pad';
-}) {
-  return (
-    <View style={styles.field}>
-      <Text style={styles.label}>{label}</Text>
-      <TextInput
-        style={[styles.input, multiline ? styles.textArea : undefined]}
-        value={value}
-        onChangeText={onChangeText}
-        placeholder={placeholder}
-        placeholderTextColor={Colors.textTertiary}
-        multiline={multiline}
-        keyboardType={keyboardType ?? 'default'}
-        textAlignVertical={multiline ? 'top' : 'center'}
-      />
-      {helper ? <Text style={styles.helperText}>{helper}</Text> : null}
-    </View>
-  );
-}
-
 const styles = StyleSheet.create({
   container: {
     flex: 1,
@@ -443,28 +406,6 @@ const styles = StyleSheet.create({
     fontSize: Typography.fontSize.xl,
     fontWeight: Typography.fontWeight.extrabold,
     color: Colors.textPrimary,
-  },
-  field: {
-    marginBottom: 16,
-    gap: 8,
-  },
-  label: {
-    fontSize: Typography.fontSize.base,
-    fontWeight: Typography.fontWeight.bold,
-    color: Colors.textPrimary,
-  },
-  input: {
-    borderWidth: 1,
-    borderColor: Colors.border,
-    borderRadius: 16,
-    paddingHorizontal: 16,
-    paddingVertical: 14,
-    backgroundColor: Colors.surface,
-    color: Colors.textPrimary,
-    fontSize: Typography.fontSize.base,
-  },
-  textArea: {
-    minHeight: 120,
   },
   helperText: {
     fontSize: Typography.fontSize.sm,
