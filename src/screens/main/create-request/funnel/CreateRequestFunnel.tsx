@@ -9,7 +9,6 @@ import { Chip } from '../components/Chip';
 import type { SavedAddress } from '../../../../types/profile';
 import type { Beta1AIAnalysisResponse } from '../../../../services/beta1-ai-service';
 import type { Beta1QuoteCard } from '../../../../services/beta1-orchestration-service';
-import { formatDetailedAddress } from '../../../../services/beta1-orchestration-leg-service';
 import { QuoteBreakdownRow } from '../components/QuoteBreakdownRow';
 import TimePicker from '../../../../components/common/TimePicker';
 import type { PackageSize } from '../types';
@@ -110,6 +109,22 @@ export default function CreateRequestFunnel(props: Props) {
 
   const goToStep = (step: number) => {
     setCurrentStep(step);
+  };
+
+  const renderMissingRequirements = (items: string[]) => {
+    if (items.length === 0) return null;
+
+    return (
+      <View style={styles.missingBox}>
+        <Text style={styles.missingTitle}>다음으로 진행하려면 아래 항목을 입력해 주세요.</Text>
+        {items.map((item) => (
+          <View key={item} style={styles.missingRow}>
+            <MaterialIcons name="error-outline" size={16} color={Colors.error} />
+            <Text style={styles.missingText}>{item}</Text>
+          </View>
+        ))}
+      </View>
+    );
   };
 
   // Render Helpers
@@ -217,10 +232,10 @@ export default function CreateRequestFunnel(props: Props) {
     const hasRoadAddress = !!store.pickupRoadAddress;
     const hasStation = !!store.pickupStation;
     const hasValue = isAddress ? (hasRoadAddress && hasStation) : hasStation;
-    const valueText = isAddress
-      ? store.pickupRoadAddress ? formatDetailedAddress(store.pickupRoadAddress, store.pickupDetailAddress) : ''
-      : store.pickupStation?.stationName || '';
-
+    const missingRequirements = [
+      ...(isAddress && !hasRoadAddress ? ['출발지 주소'] : []),
+      ...(!hasStation ? [isAddress ? '서비스 가능한 출발지 주변 지하철역' : '출발역'] : []),
+    ];
     return renderQuestionBox(
       2,
       isAddress ? '출발지 주소를 알려주세요.' : '어느 역에서 출발하나요?',
@@ -277,6 +292,7 @@ export default function CreateRequestFunnel(props: Props) {
             <Text style={styles.nextButtonText}>다음</Text>
           </TouchableOpacity>
         )}
+        {!hasValue && currentStep === 2 ? renderMissingRequirements(missingRequirements) : null}
       </View>,
       currentStep === 2
     );
@@ -366,10 +382,10 @@ export default function CreateRequestFunnel(props: Props) {
     const hasRoadAddress = !!store.deliveryRoadAddress;
     const hasStation = !!store.deliveryStation;
     const hasValue = isAddress ? (hasRoadAddress && hasStation) : hasStation;
-    const valueText = isAddress
-      ? store.deliveryRoadAddress ? formatDetailedAddress(store.deliveryRoadAddress, store.deliveryDetailAddress) : ''
-      : store.deliveryStation?.stationName || '';
-
+    const missingRequirements = [
+      ...(isAddress && !hasRoadAddress ? ['도착지 주소'] : []),
+      ...(!hasStation ? [isAddress ? '서비스 가능한 도착지 주변 지하철역' : '도착역'] : []),
+    ];
     return renderQuestionBox(
       4,
       isAddress ? '도착지 주소를 알려주세요.' : '어느 역으로 도착하나요?',
@@ -426,6 +442,7 @@ export default function CreateRequestFunnel(props: Props) {
             <Text style={styles.nextButtonText}>다음</Text>
           </TouchableOpacity>
         )}
+        {!hasValue && currentStep === 4 ? renderMissingRequirements(missingRequirements) : null}
       </View>,
       currentStep === 4
     );
@@ -471,6 +488,12 @@ export default function CreateRequestFunnel(props: Props) {
 
   const renderItemInfo = () => {
     const hasValue = !!store.packageItemName && !!store.packageDescription && !!store.packageSize && !!store.weightKg;
+    const missingRequirements = [
+      ...(!store.packageItemName.trim() ? ['물품명'] : []),
+      ...(!store.packageDescription.trim() ? ['상세 설명'] : []),
+      ...(!store.packageSize ? ['물품 크기'] : []),
+      ...(!store.weightKg.trim() ? ['무게'] : []),
+    ];
 
     return renderQuestionBox(
       5,
@@ -570,13 +593,23 @@ export default function CreateRequestFunnel(props: Props) {
             <Text style={styles.nextButtonText}>다음</Text>
           </TouchableOpacity>
         )}
+        {!hasValue && currentStep === 5 ? renderMissingRequirements(missingRequirements) : null}
       </View>,
       currentStep === 5
     );
   };
 
   const renderRecipientInfo = () => {
-    const hasValue = !!store.recipientName && !!store.recipientPhone && store.recipientConsentChecked && props.isPhoneVerified;
+    const isContactPhoneReady = props.phoneVerificationBypassEnabled || props.isPhoneVerified;
+    const hasValue = !!store.recipientName && !!store.recipientPhone && store.recipientConsentChecked && isContactPhoneReady;
+    const missingRequirements = [
+      ...(!store.recipientName.trim() ? ['수령인 이름'] : []),
+      ...(!store.recipientPhone.trim() ? ['수령인 연락처'] : []),
+      ...(props.recipientPrivacyConfig?.thirdPartyConsentRequired && !store.recipientConsentChecked
+        ? ['개인정보 제3자 제공 동의']
+        : []),
+      ...(!isContactPhoneReady ? ['보내는 분 휴대폰 인증'] : []),
+    ];
 
     return renderQuestionBox(
       6,
@@ -720,6 +753,7 @@ export default function CreateRequestFunnel(props: Props) {
             <Text style={styles.nextButtonText}>다음</Text>
           </TouchableOpacity>
         )}
+        {!hasValue && currentStep === 6 ? renderMissingRequirements(missingRequirements) : null}
       </View>,
       currentStep === 6
     );
@@ -767,6 +801,7 @@ export default function CreateRequestFunnel(props: Props) {
             {props.saving ? '접수 중...' : `${finalPrice.toLocaleString()}원 결제하고 배송 요청`}
           </Text>
         </TouchableOpacity>
+        {props.submitDisabled ? renderMissingRequirements(props.missingItems) : null}
       </Animated.View>
     );
   };
@@ -822,6 +857,10 @@ const styles = StyleSheet.create({
   consentText: { fontSize: Typography.fontSize.sm, color: Colors.textSecondary },
   verificationBypassText: { color: Colors.gray500, fontSize: Typography.fontSize.sm, marginTop: Spacing.xs },
   otpHintText: { color: Colors.gray500, fontSize: Typography.fontSize.xs, marginTop: Spacing.xs },
+  missingBox: { backgroundColor: Colors.gray100, borderRadius: BorderRadius.md, padding: Spacing.md, gap: Spacing.xs },
+  missingTitle: { color: Colors.textSecondary, fontSize: Typography.fontSize.sm, fontWeight: Typography.fontWeight.bold },
+  missingRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing.xs },
+  missingText: { color: Colors.error, fontSize: Typography.fontSize.sm, flex: 1 },
   privacyNoticeBox: { backgroundColor: Colors.gray100, borderRadius: BorderRadius.md, padding: Spacing.md },
   privacyNoticeText: { color: Colors.textSecondary, fontSize: Typography.fontSize.sm, lineHeight: 18 },
   privacyNoticeMeta: { color: Colors.gray500, fontSize: Typography.fontSize.xs, marginTop: Spacing.xs, lineHeight: 16 },
