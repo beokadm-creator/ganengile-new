@@ -20,8 +20,8 @@ export async function isAdmin(): Promise<boolean> {
   if (!sessionCookie) return false;
 
   try {
-    getAdminApp();
-    const decodedClaims = await getAuth().verifySessionCookie(sessionCookie, true);
+    const app = getAdminApp();
+    const decodedClaims = await getAuth(app).verifySessionCookie(sessionCookie, true);
     
     // Check if the custom claim is true or if UID matches any in the allowed list
     const allowedUids = process.env.ADMIN_UID?.split(',').map(uid => uid.trim()) || [];
@@ -29,7 +29,7 @@ export async function isAdmin(): Promise<boolean> {
       return true;
     }
     return false;
-  } catch (error) {
+  } catch {
     return false;
   }
 }

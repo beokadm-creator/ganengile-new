@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { app } from '@/lib/firebase-admin';
+import { getAdminApp } from '@/lib/firebase-admin';
 import { getAuth } from 'firebase-admin/auth';
 
 export async function POST(req: NextRequest) {
@@ -9,6 +9,7 @@ export async function POST(req: NextRequest) {
 
   try {
     // Firebase Admin으로 ID 토큰 검증
+    const app = getAdminApp();
     const auth = getAuth(app);
     const decoded = await auth.verifyIdToken(idToken);
 

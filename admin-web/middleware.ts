@@ -13,7 +13,7 @@ export async function middleware(request: NextRequest) {
     return NextResponse.next();
   }
 
-  const sessionCookie = request.cookies.get('session');
+  const sessionCookie = request.cookies.get('admin_session');
 
   // 세션 쿠키가 없으면 로그인 페이지로 리다이렉트
   if (!sessionCookie?.value) {
