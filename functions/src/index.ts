@@ -92,7 +92,13 @@ export const triggerMatching = functions.https.onCall((data: TriggerMatchingData
 
 export { saveFCMToken } from './callables/fcm';
 
-export { beta1AnalyzeRequestDraft, beta1GeneratePricingQuotes, beta1PlanMissionExecution } from './callables/beta1';
+export {
+  beta1AcceptMissionBundleForGiller,
+  beta1AnalyzeRequestDraft,
+  beta1GeneratePricingQuotes,
+  beta1PlanMissionExecution,
+  beta1ReleaseMissionBundleForGiller,
+} from './callables/beta1';
 
 export { sendPushNotification } from './callables/fcm';
 
